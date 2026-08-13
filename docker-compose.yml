@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: inbus
+      POSTGRES_PASSWORD: inbus
+      POSTGRES_DB: inbus
+    ports:
+      - "5432:5432"
+    volumes:
+      - inbus_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inbus"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  inbus_postgres_data:
