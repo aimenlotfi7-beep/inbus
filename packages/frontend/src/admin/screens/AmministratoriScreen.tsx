@@ -115,10 +115,13 @@ export function AmministratoriScreen() {
   const moduli = Array.from(new Set(permessiAssegnabili.map((p) => p.modulo)));
 
   const ETICHETTA_STATO: Record<StatoPermesso, string> = {
-    ruolo: '✓ dal ruolo',
-    extra: '+ concesso in più',
-    negato: '✕ tolto',
-    nessuno: '— non attivo',
+    ruolo: '✓ Dal ruolo',
+    extra: '+ Concesso in più',
+    negato: '✕ Tolto',
+    nessuno: '— Non attivo',
+  };
+  const CLASSE_STATO: Record<StatoPermesso, string> = {
+    ruolo: 'dal-ruolo', extra: 'concesso-extra', negato: 'negato', nessuno: 'non-attivo',
   };
 
   return (
@@ -131,13 +134,13 @@ export function AmministratoriScreen() {
           { etichetta: 'Email', render: (a) => a.email },
           { etichetta: 'Ruolo', render: (a) => nomeRuolo(a.ruoloId) },
           { etichetta: 'Stato', render: (a) => a.attivo ? 'Attivo' : 'Disattivo' },
-          { etichetta: 'Permessi extra', render: (a) => <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11.5 }} onClick={() => apriPermessi(a)}>Personalizza</button> },
+          { etichetta: 'Permessi extra', render: (a) => <button className="btn btn-ghost" style={{ padding: '5px 12px', fontSize: 12.5 }} onClick={() => apriPermessi(a)}>Personalizza</button> },
         ]}
         onModifica={apriModifica}
         onElimina={elimina}
       />
 
-      <h3 style={{ fontSize: 15, margin: '28px 0 14px' }}>Log attività recenti</h3>
+      <h3 style={{ fontSize: 16, margin: '30px 0 14px' }}>Log attività recenti</h3>
       <TabellaGenerica
         righe={log.map((l) => ({ ...l, id: l.id }))}
         colonne={[
@@ -160,7 +163,7 @@ export function AmministratoriScreen() {
               ))}
             </select>
             {ruoliAssegnabili.length === 0 && (
-              <p style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+              <p className="testo-intro" style={{ fontSize: 13, marginTop: 6, marginBottom: 0 }}>
                 Nessun ruolo assegnabile trovato: vai in "Ruoli" e crea prima un ruolo con permessi tuoi o inferiori.
               </p>
             )}
@@ -170,37 +173,27 @@ export function AmministratoriScreen() {
       )}
 
       {permessiUtenza && !ruoloOwnerTarget && (
-        <Modale titolo={`Permessi personali di ${permessiUtenza.nome}`} onClose={() => setPermessiUtenza(null)}>
-          <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 12 }}>
+        <Modale titolo={`Permessi personali di ${permessiUtenza.nome}`} onClose={() => setPermessiUtenza(null)} larga>
+          <p className="testo-intro">
             Di base questa utenza ha i permessi del ruolo "{nomeRuolo(permessiUtenza.ruoloId)}". Clicca un permesso per
             aggiungerlo o toglierlo solo per questa persona, indipendentemente dal ruolo. Puoi togliere qualsiasi
             permesso, ma puoi concederne in più solo tra quelli che possiedi tu stesso.
           </p>
           {moduli.map((modulo) => (
-            <div key={modulo} style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.4, opacity: 0.6, marginBottom: 6 }}>{modulo}</div>
+            <div key={modulo} className="gruppo-modulo">
+              <p className="section-label">{modulo}</p>
               {permessiAssegnabili.filter((p) => p.modulo === modulo).map((p) => {
                 const stato = statoPermessi[p.chiave] ?? 'nessuno';
                 return (
-                  <button
-                    key={p.chiave}
-                    type="button"
-                    onClick={() => ciclaStato(p.chiave)}
-                    style={{
-                      display: 'flex', justifyContent: 'space-between', width: '100%',
-                      padding: '6px 8px', fontSize: 13.5, background: 'transparent',
-                      border: 'none', borderBottom: '1px solid var(--line)', cursor: 'pointer',
-                      color: stato === 'negato' ? 'var(--pink)' : stato === 'extra' ? '#6fd6a0' : 'inherit',
-                    }}
-                  >
-                    <span>{p.etichetta}</span>
-                    <span style={{ opacity: 0.8, fontSize: 12 }}>{ETICHETTA_STATO[stato]}</span>
+                  <button key={p.chiave} type="button" onClick={() => ciclaStato(p.chiave)} className="riga-cliccabile">
+                    <span className="riga-titolo">{p.etichetta}</span>
+                    <span className={`badge ${CLASSE_STATO[stato]}`}>{ETICHETTA_STATO[stato]}</span>
                   </button>
                 );
               })}
             </div>
           ))}
-          <button className="btn btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={salvaPermessi}>Salva permessi personali</button>
+          <button className="btn btn-primary" style={{ width: '100%', marginTop: 14 }} onClick={salvaPermessi}>Salva permessi personali</button>
         </Modale>
       )}
     </div>

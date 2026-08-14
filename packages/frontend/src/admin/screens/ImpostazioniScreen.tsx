@@ -44,7 +44,7 @@ export function ImpostazioniScreen() {
       ) : (
         <div style={{ maxWidth: 420 }}>
           <div className="campo">
-            <label>Posti per bus (usato per "Calcola bus necessari" nella sezione Partenze)</label>
+            <label>Posti per bus (usato per "Calcola bus necessari" nella tab Partenze di ogni evento)</label>
             <input type="number" min={1} value={postiPerBus} onChange={(e) => setPostiPerBus(e.target.value)} />
           </div>
           <button className="btn btn-primary" onClick={salva} disabled={salvataggio}>

@@ -593,3 +593,59 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
   background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
 }
 .campo textarea{min-height:70px; resize:vertical;}
+
+/* ---------- TAB INTERNE (es. Dettagli/Partenze dentro la modale evento) ---------- */
+.mini-tabs{display:flex; gap:4px; border-bottom:1px solid var(--line); margin:4px 0 20px; padding-bottom:0;}
+.mini-tab{
+  font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600; color:var(--mist);
+  background:transparent; border:none; border-bottom:2px solid transparent; cursor:pointer;
+  padding:10px 4px; margin-right:20px;
+}
+.mini-tab:hover{color:var(--paper);}
+.mini-tab.active{color:var(--pink); border-bottom-color:var(--pink);}
+
+/* ---------- CARD SEZIONE (contenitori tipo "Tratta X", "Bus Y") ---------- */
+.section-card{
+  background:var(--dusk); border:1px solid var(--line); border-radius:12px;
+  padding:16px 18px; margin-bottom:14px;
+}
+.section-card + .section-card{margin-top:0;}
+.section-card h3{font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:700; margin:0;}
+.section-card .section-sub{color:var(--mist); font-size:13px; margin:4px 0 0; line-height:1.5;}
+.section-card .section-divider{border-top:1px solid var(--line); padding-top:12px; margin-top:12px;}
+.section-label{
+  font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:1px;
+  color:var(--mist); margin:0 0 8px;
+}
+
+/* ---------- CHIP (es. passeggeri per fermata) ---------- */
+.chip{
+  display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600;
+  background:var(--night); border:1px solid var(--line); border-radius:999px; padding:5px 11px;
+}
+.chip-num{color:var(--pink); font-family:'Space Mono',monospace;}
+
+/* ---------- BADGE: stati aggiuntivi (copertura tratte, permessi) ---------- */
+.badge.coperta{background:rgba(72,214,140,.15); color:#5be0a0;}
+.badge.non-coperta{background:rgba(255,61,122,.15); color:var(--pink);}
+.badge.dal-ruolo{background:rgba(169,159,194,.15); color:var(--mist);}
+.badge.concesso-extra{background:rgba(72,214,140,.15); color:#5be0a0;}
+.badge.negato{background:rgba(255,61,122,.15); color:var(--pink);}
+.badge.non-attivo{background:rgba(169,159,194,.08); color:var(--mist);}
+.badge-btn{border:none; cursor:pointer; font-family:inherit;}
+
+/* ---------- RIGA CLICCABILE (es. permesso in editor eccezioni, bus in Partenze) ---------- */
+.riga-cliccabile{
+  display:flex; justify-content:space-between; align-items:center; width:100%;
+  padding:9px 4px; font-size:14px; background:transparent; border:none; cursor:pointer;
+  border-bottom:1px solid var(--line); text-align:left; color:var(--paper);
+}
+.riga-cliccabile:last-child{border-bottom:none;}
+.riga-cliccabile:hover{background:rgba(255,255,255,.03);}
+.riga-cliccabile .riga-titolo{font-size:14px;}
+.riga-cliccabile .riga-meta{font-size:12.5px; color:var(--mist); display:flex; align-items:center; gap:8px;}
+
+/* ---------- Leggibilità generale sezioni informative ---------- */
+.testo-intro{color:var(--mist); font-size:14px; line-height:1.6; margin-bottom:16px;}
+.gruppo-modulo{margin-bottom:20px;}
+.gruppo-modulo:last-child{margin-bottom:0;}

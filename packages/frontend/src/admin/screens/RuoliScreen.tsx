@@ -70,7 +70,7 @@ export function RuoliScreen() {
   return (
     <div>
       <PanelHead titolo="Ruoli" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo ruolo</button>} />
-      <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 16 }}>
+      <p className="testo-intro">
         Puoi creare ruoli con il nome che preferisci e scegliere esattamente cosa può fare chi lo ha.
         Puoi assegnare solo i permessi che possiedi tu stesso.
       </p>
@@ -86,19 +86,19 @@ export function RuoliScreen() {
       />
 
       {modaleAperta && (
-        <Modale titolo={inModifica ? 'Modifica ruolo' : 'Nuovo ruolo'} onClose={() => setModaleAperta(false)}>
+        <Modale titolo={inModifica ? 'Modifica ruolo' : 'Nuovo ruolo'} onClose={() => setModaleAperta(false)} larga>
           <div className="campo"><label>Nome del ruolo</label><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="es. Responsabile eventi" /></div>
           <div className="campo"><label>Descrizione (facoltativa)</label><input value={form.descrizione} onChange={(e) => setForm({ ...form, descrizione: e.target.value })} /></div>
 
-          <label style={{ display: 'block', margin: '16px 0 8px', fontWeight: 600 }}>Permessi</label>
+          <p className="section-label" style={{ marginTop: 16, fontSize: 13, textTransform: 'none', letterSpacing: 0, color: 'var(--paper)', fontWeight: 700 }}>Permessi</p>
           {permessiAssegnabili.length === 0 && (
-            <p style={{ fontSize: 12, opacity: 0.7 }}>Non hai permessi assegnabili ad altri: non puoi creare o modificare ruoli con funzioni.</p>
+            <p className="testo-intro" style={{ fontSize: 13 }}>Non hai permessi assegnabili ad altri: non puoi creare o modificare ruoli con funzioni.</p>
           )}
           {moduli.map((modulo) => (
-            <div key={modulo} style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.4, opacity: 0.6, marginBottom: 6 }}>{modulo}</div>
+            <div key={modulo} className="gruppo-modulo">
+              <p className="section-label">{modulo}</p>
               {permessiAssegnabili.filter((p) => p.modulo === modulo).map((p) => (
-                <label key={p.chiave} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13.5 }}>
+                <label key={p.chiave} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 2px', fontSize: 14 }}>
                   <input type="checkbox" checked={form.permessi.includes(p.chiave)} onChange={() => togglePermesso(p.chiave)} />
                   {p.etichetta}
                 </label>
