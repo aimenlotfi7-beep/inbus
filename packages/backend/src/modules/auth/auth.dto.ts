@@ -8,6 +8,8 @@ export type LoginAdminInput = z.infer<typeof loginAdminSchema>;
 
 export interface TokenPayload {
   sub: string; // id amministratore
-  ruolo: 'AMMINISTRATORE' | 'OPERATORE' | 'COLLABORATORE';
   nome: string;
+  // Nota: i permessi NON sono nel token (che dura 12h): vengono ricalcolati
+  // ad ogni richiesta protetta, così un cambio di permessi/ruolo ha effetto
+  // immediato senza dover aspettare che l'utente rifaccia il login.
 }

@@ -6,7 +6,7 @@ import { tragitti, fermateTragitto } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedeRuolo } from '../auth/auth.middleware.js';
+import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 
 const fermataTragittoSchema = z.object({
   citta: z.string().min(1),
@@ -76,16 +76,16 @@ export const tragittiService = {
 };
 
 export const tragittiRouter = Router();
-tragittiRouter.use(richiedeAuth, richiedeRuolo('AMMINISTRATORE', 'OPERATORE', 'COLLABORATORE'));
+tragittiRouter.use(richiedeAuth);
 
-tragittiRouter.get('/', asyncHandler(async (_req: Request, res: Response) => res.json(await tragittiService.list())));
-tragittiRouter.get('/:id', asyncHandler(async (req: Request, res: Response) => res.json(await tragittiService.getById(req.params.id))));
-tragittiRouter.post('/', richiedeRuolo('AMMINISTRATORE', 'OPERATORE'), valida(tragittoSchema), asyncHandler(async (req: Request, res: Response) => {
+tragittiRouter.get('/', richiedePermesso('tragitti.visualizza'), asyncHandler(async (_req: Request, res: Response) => res.json(await tragittiService.list())));
+tragittiRouter.get('/:id', richiedePermesso('tragitti.visualizza'), asyncHandler(async (req: Request, res: Response) => res.json(await tragittiService.getById(req.params.id))));
+tragittiRouter.post('/', richiedePermesso('tragitti.gestisci'), valida(tragittoSchema), asyncHandler(async (req: Request, res: Response) => {
   const id = await tragittiService.create(req.body);
   res.status(201).json(await tragittiService.getById(id));
 }));
-tragittiRouter.put('/:id', richiedeRuolo('AMMINISTRATORE', 'OPERATORE'), valida(aggiornaTragittoSchema), asyncHandler(async (req: Request, res: Response) => {
+tragittiRouter.put('/:id', richiedePermesso('tragitti.gestisci'), valida(aggiornaTragittoSchema), asyncHandler(async (req: Request, res: Response) => {
   const id = await tragittiService.update(req.params.id, req.body);
   res.json(await tragittiService.getById(id));
 }));
-tragittiRouter.delete('/:id', richiedeRuolo('AMMINISTRATORE', 'OPERATORE'), asyncHandler(async (req: Request, res: Response) => { await tragittiService.remove(req.params.id); res.status(204).send(); }));
+tragittiRouter.delete('/:id', richiedePermesso('tragitti.gestisci'), asyncHandler(async (req: Request, res: Response) => { await tragittiService.remove(req.params.id); res.status(204).send(); }));

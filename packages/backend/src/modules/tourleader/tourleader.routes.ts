@@ -6,7 +6,7 @@ import { tourLeader } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedeRuolo } from '../auth/auth.middleware.js';
+import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 
 const candidaturaSchema = z.object({
   nome: z.string().min(1),
@@ -57,8 +57,8 @@ tourLeaderRouter.post('/candidatura', valida(candidaturaSchema), asyncHandler(as
 }));
 
 // Amministrazione
-tourLeaderRouter.use(richiedeAuth, richiedeRuolo('AMMINISTRATORE', 'OPERATORE', 'COLLABORATORE'));
-tourLeaderRouter.get('/', asyncHandler(async (_req: Request, res: Response) => res.json(await tourLeaderService.list())));
-tourLeaderRouter.get('/:id', asyncHandler(async (req: Request, res: Response) => res.json(await tourLeaderService.getById(req.params.id))));
-tourLeaderRouter.put('/:id', richiedeRuolo('AMMINISTRATORE', 'OPERATORE'), valida(aggiornaSchema), asyncHandler(async (req: Request, res: Response) => res.json(await tourLeaderService.update(req.params.id, req.body))));
-tourLeaderRouter.delete('/:id', richiedeRuolo('AMMINISTRATORE', 'OPERATORE'), asyncHandler(async (req: Request, res: Response) => { await tourLeaderService.remove(req.params.id); res.status(204).send(); }));
+tourLeaderRouter.use(richiedeAuth);
+tourLeaderRouter.get('/', richiedePermesso('tourleader.visualizza'), asyncHandler(async (_req: Request, res: Response) => res.json(await tourLeaderService.list())));
+tourLeaderRouter.get('/:id', richiedePermesso('tourleader.visualizza'), asyncHandler(async (req: Request, res: Response) => res.json(await tourLeaderService.getById(req.params.id))));
+tourLeaderRouter.put('/:id', richiedePermesso('tourleader.gestisci'), valida(aggiornaSchema), asyncHandler(async (req: Request, res: Response) => res.json(await tourLeaderService.update(req.params.id, req.body))));
+tourLeaderRouter.delete('/:id', richiedePermesso('tourleader.gestisci'), asyncHandler(async (req: Request, res: Response) => { await tourLeaderService.remove(req.params.id); res.status(204).send(); }));

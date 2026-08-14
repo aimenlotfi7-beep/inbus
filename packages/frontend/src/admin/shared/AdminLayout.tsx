@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { haPermesso, type SessioneAdmin } from '../../api/auth';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino'
@@ -6,38 +7,46 @@ export type SezioneGestionale =
   | 'utenti' | 'promoter' | 'tourleader'
   | 'fornitori' | 'tragitti'
   | 'chat' | 'contenuti'
-  | 'amministratori';
+  | 'amministratori' | 'ruoli';
 
-const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string }[] }[] = [
+// Ogni voce dichiara il permesso che serve per vederla. Chi ha ruolo
+// "owner" vede sempre tutto (haPermesso lo gestisce automaticamente).
+const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; permesso: string }[] }[] = [
   { titolo: 'Eventi', voci: [
-    { id: 'eventi', label: 'Eventi' },
-    { id: 'vetrina', label: 'Vetrina' },
+    { id: 'eventi', label: 'Eventi', permesso: 'eventi.visualizza' },
+    { id: 'vetrina', label: 'Vetrina', permesso: 'eventi.vetrina' },
+    { id: 'calendario', label: 'Calendario', permesso: 'eventi.calendario' },
+    { id: 'cestino', label: 'Cestino', permesso: 'eventi.cestino' },
   ]},
   { titolo: 'Vendite', voci: [
-    { id: 'coupon', label: 'Coupon' },
+    { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
+    { id: 'transazioni', label: 'Transazioni', permesso: 'prenotazioni.transazioni' },
+    { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
   ]},
   { titolo: 'Persone', voci: [
-    { id: 'utenti', label: 'Utenti' },
-    { id: 'promoter', label: 'Promoter' },
-    { id: 'tourleader', label: 'Tour Leader' },
+    { id: 'utenti', label: 'Utenti', permesso: 'utenti.visualizza' },
+    { id: 'promoter', label: 'Promoter', permesso: 'promoter.visualizza' },
+    { id: 'tourleader', label: 'Tour Leader', permesso: 'tourleader.visualizza' },
   ]},
   { titolo: 'Logistica', voci: [
-    { id: 'fornitori', label: 'Fornitori' },
-    { id: 'tragitti', label: 'Tragitti' },
+    { id: 'fornitori', label: 'Fornitori', permesso: 'fornitori.visualizza' },
+    { id: 'tragitti', label: 'Tragitti', permesso: 'tragitti.visualizza' },
   ]},
   { titolo: 'Comunicazione', voci: [
-    { id: 'chat', label: 'Chat' },
-    { id: 'contenuti', label: 'Contenuti sito' },
+    { id: 'chat', label: 'Chat', permesso: 'chat.visualizza' },
+    { id: 'contenuti', label: 'Contenuti sito', permesso: 'pagine.gestisci' },
   ]},
   { titolo: 'Sistema', voci: [
-    { id: 'amministratori', label: 'Amministratori' },
-    { id: 'statistiche', label: 'Statistiche' },
+    { id: 'amministratori', label: 'Amministratori', permesso: 'utenze.gestisci' },
+    { id: 'ruoli', label: 'Ruoli', permesso: 'permessi.gestisci' },
+    { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
   ]},
 ];
 
 export function AdminLayout({
-  sezioneAttiva, onCambiaSezione, onVaiHome, onLogout, children,
+  sessione, sezioneAttiva, onCambiaSezione, onVaiHome, onLogout, children,
 }: {
+  sessione: SessioneAdmin;
   sezioneAttiva: SezioneGestionale | 'home';
   onCambiaSezione: (s: SezioneGestionale) => void;
   onVaiHome: () => void;
@@ -46,6 +55,12 @@ export function AdminLayout({
 }) {
   const [gruppiCollassati, setGruppiCollassati] = useState<Record<string, boolean>>({});
 
+  // Filtro sia i gruppi che le voci in base a ciò che l'utente loggato
+  // può vedere: un gruppo compare solo se ha almeno una voce visibile.
+  const gruppiVisibili = GRUPPI
+    .map((gruppo) => ({ ...gruppo, voci: gruppo.voci.filter((v) => haPermesso(sessione, v.permesso)) }))
+    .filter((gruppo) => gruppo.voci.length > 0);
+
   return (
     <div id="app" className="app-shell">
       <aside className="sidebar">
@@ -53,7 +68,7 @@ export function AdminLayout({
           IN<span>BUS</span> <small>gestionale</small>
         </div>
         <nav className="side-nav">
-          {GRUPPI.map((gruppo) => (
+          {gruppiVisibili.map((gruppo) => (
             <div className={`side-group${gruppiCollassati[gruppo.titolo] ? ' collassato' : ''}`} key={gruppo.titolo}>
               <button
                 className="side-group-header"

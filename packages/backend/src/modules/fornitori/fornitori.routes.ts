@@ -6,7 +6,7 @@ import { fornitori } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedeRuolo } from '../auth/auth.middleware.js';
+import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 
 const fornitoreSchema = z.object({
   nome: z.string().min(1),
@@ -46,10 +46,10 @@ export const fornitoriService = {
 };
 
 export const fornitoriRouter = Router();
-fornitoriRouter.use(richiedeAuth, richiedeRuolo('AMMINISTRATORE', 'OPERATORE', 'COLLABORATORE'));
+fornitoriRouter.use(richiedeAuth);
 
-fornitoriRouter.get('/', asyncHandler(async (_req: Request, res: Response) => res.json(await fornitoriService.list())));
-fornitoriRouter.get('/:id', asyncHandler(async (req: Request, res: Response) => res.json(await fornitoriService.getById(req.params.id))));
-fornitoriRouter.post('/', richiedeRuolo('AMMINISTRATORE', 'OPERATORE'), valida(fornitoreSchema), asyncHandler(async (req: Request, res: Response) => res.status(201).json(await fornitoriService.create(req.body))));
-fornitoriRouter.put('/:id', richiedeRuolo('AMMINISTRATORE', 'OPERATORE'), valida(aggiornaFornitoreSchema), asyncHandler(async (req: Request, res: Response) => res.json(await fornitoriService.update(req.params.id, req.body))));
-fornitoriRouter.delete('/:id', richiedeRuolo('AMMINISTRATORE'), asyncHandler(async (req: Request, res: Response) => { await fornitoriService.remove(req.params.id); res.status(204).send(); }));
+fornitoriRouter.get('/', richiedePermesso('fornitori.visualizza'), asyncHandler(async (_req: Request, res: Response) => res.json(await fornitoriService.list())));
+fornitoriRouter.get('/:id', richiedePermesso('fornitori.visualizza'), asyncHandler(async (req: Request, res: Response) => res.json(await fornitoriService.getById(req.params.id))));
+fornitoriRouter.post('/', richiedePermesso('fornitori.gestisci'), valida(fornitoreSchema), asyncHandler(async (req: Request, res: Response) => res.status(201).json(await fornitoriService.create(req.body))));
+fornitoriRouter.put('/:id', richiedePermesso('fornitori.gestisci'), valida(aggiornaFornitoreSchema), asyncHandler(async (req: Request, res: Response) => res.json(await fornitoriService.update(req.params.id, req.body))));
+fornitoriRouter.delete('/:id', richiedePermesso('fornitori.elimina'), asyncHandler(async (req: Request, res: Response) => { await fornitoriService.remove(req.params.id); res.status(204).send(); }));

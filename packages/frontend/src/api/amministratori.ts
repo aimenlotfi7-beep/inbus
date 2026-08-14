@@ -4,11 +4,11 @@ export interface Amministratore {
   id: string;
   nome: string;
   email: string;
-  ruolo: 'AMMINISTRATORE' | 'OPERATORE' | 'COLLABORATORE';
+  ruoloId: string;
   attivo: boolean;
 }
 export interface AmministratoreInput {
-  nome: string; email: string; password?: string; ruolo?: Amministratore['ruolo']; attivo?: boolean;
+  nome: string; email: string; password?: string; ruoloId?: string; attivo?: boolean;
 }
 export interface LogRiga {
   id: string;

@@ -1,19 +1,38 @@
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import bcrypt from 'bcryptjs';
+import { eq } from 'drizzle-orm';
 import * as schema from './schema.js';
 import { env } from '../config/env.js';
+import { REGISTRO_PERMESSI } from '../shared/permessi-registro.js';
 
 async function main() {
   const client = postgres(env.DATABASE_URL, { max: 1 });
   const db = drizzle(client, { schema });
 
-  console.log('Creo l\'amministratore di default...');
+  console.log('Sincronizzo i permessi dal registro...');
+  for (const def of REGISTRO_PERMESSI) {
+    await db.insert(schema.permessi).values({
+      chiave: def.chiave, etichetta: def.etichetta, modulo: def.modulo, attivo: true,
+    }).onConflictDoNothing();
+  }
+
+  console.log('Creo il ruolo Proprietario (owner)...');
+  let [ruoloOwner] = await db.select().from(schema.ruoli).where(eq(schema.ruoli.nome, 'Proprietario')).limit(1);
+  if (!ruoloOwner) {
+    [ruoloOwner] = await db.insert(schema.ruoli).values({
+      nome: 'Proprietario',
+      descrizione: 'Accesso completo, presente e futuro. Non modificabile né eliminabile.',
+      owner: true,
+    }).returning();
+  }
+
+  console.log('Creo l\'amministratore di default (proprietario)...');
   await db.insert(schema.amministratori).values({
     nome: 'Admin',
     email: 'admin@inbus.it',
     passwordHash: await bcrypt.hash('inbus2026', 10),
-    ruolo: 'AMMINISTRATORE',
+    ruoloId: ruoloOwner.id,
   }).onConflictDoNothing();
 
   console.log('Creo un evento di esempio con un bus e tre fermate...');

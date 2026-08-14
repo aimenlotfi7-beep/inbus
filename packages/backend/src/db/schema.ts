@@ -33,6 +33,9 @@ export const statoTourLeaderEnum = pgEnum('stato_tour_leader', ['CANDIDATO', 'AT
 export const tipoCouponEnum = pgEnum('tipo_coupon', ['PERCENTUALE', 'FISSO']);
 export const autoreMessaggioEnum = pgEnum('autore_messaggio', ['CLIENTE', 'ADMIN']);
 export const statoListaAttesaEnum = pgEnum('stato_lista_attesa', ['IN_ATTESA', 'PROMOSSA']);
+// Deprecato: sostituito dal sistema di ruoli dinamici (tabella `ruoli`).
+// Lasciato solo per leggere i valori esistenti durante la migrazione
+// (vedi src/db/migra-permessi.ts). Rimuovibile dopo la migrazione.
 export const ruoloAdminEnum = pgEnum('ruolo_admin', ['AMMINISTRATORE', 'OPERATORE', 'COLLABORATORE']);
 
 // ---------------------------------------------------------------------
@@ -267,14 +270,49 @@ export const listaAttesa = pgTable('lista_attesa', {
 });
 
 // ---------------------------------------------------------------------
-// AMMINISTRATORI (ruoli) + LOG
+// RUOLI E PERMESSI (dinamici, configurabili dal gestionale)
+// ---------------------------------------------------------------------
+
+// I ruoli non sono più fissi nel codice: sono righe create dagli utenti
+// autorizzati, con nome libero e permessi assegnabili a piacere.
+export const ruoli = pgTable('ruoli', {
+  id: id(),
+  nome: text('nome').notNull().unique(),
+  descrizione: text('descrizione'),
+  // Il ruolo "owner" ha SEMPRE tutti i permessi, presenti e futuri, a
+  // prescindere da cosa è assegnato in ruolo_permessi. Non è eliminabile
+  // e non è modificabile nei permessi (per non poter mai restare senza
+  // nessuno con accesso completo). Deve essercene sempre almeno uno.
+  owner: boolean('owner').notNull().default(false),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+});
+
+// Elenco di TUTTI i permessi esistenti nell'app, sincronizzato in automatico
+// dal registro nel codice (src/shared/permessi-registro.ts) ad ogni avvio.
+export const permessi = pgTable('permessi', {
+  chiave: text('chiave').primaryKey(), // es. 'eventi.crea'
+  etichetta: text('etichetta').notNull(),
+  modulo: text('modulo').notNull(),
+  attivo: boolean('attivo').notNull().default(true), // false se rimosso dal registro
+});
+
+// Quali permessi ha ogni ruolo (ignorato per i ruoli con owner = true).
+export const ruoloPermessi = pgTable('ruolo_permessi', {
+  ruoloId: text('ruolo_id').notNull().references(() => ruoli.id, { onDelete: 'cascade' }),
+  permessoChiave: text('permesso_chiave').notNull().references(() => permessi.chiave, { onDelete: 'cascade' }),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.ruoloId, t.permessoChiave] }),
+}));
+
+// ---------------------------------------------------------------------
+// AMMINISTRATORI (utenze del gestionale) + LOG
 // ---------------------------------------------------------------------
 export const amministratori = pgTable('amministratori', {
   id: id(),
   nome: text('nome').notNull(),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  ruolo: ruoloAdminEnum('ruolo').notNull().default('OPERATORE'),
+  ruoloId: text('ruolo_id').notNull().references(() => ruoli.id),
   attivo: boolean('attivo').notNull().default(true),
 });
 
@@ -380,4 +418,18 @@ export const promoterRelations = relations(promoter, ({ many }) => ({
 export const promoterEventiRelations = relations(promoterEventi, ({ one }) => ({
   promoter: one(promoter, { fields: [promoterEventi.promoterId], references: [promoter.id] }),
   evento: one(eventi, { fields: [promoterEventi.eventoId], references: [eventi.id] }),
+}));
+
+export const ruoliRelations = relations(ruoli, ({ many }) => ({
+  permessi: many(ruoloPermessi),
+  amministratori: many(amministratori),
+}));
+
+export const ruoloPermessiRelations = relations(ruoloPermessi, ({ one }) => ({
+  ruolo: one(ruoli, { fields: [ruoloPermessi.ruoloId], references: [ruoli.id] }),
+  permesso: one(permessi, { fields: [ruoloPermessi.permessoChiave], references: [permessi.chiave] }),
+}));
+
+export const amministratoriRelations = relations(amministratori, ({ one }) => ({
+  ruolo: one(ruoli, { fields: [amministratori.ruoloId], references: [ruoli.id] }),
 }));

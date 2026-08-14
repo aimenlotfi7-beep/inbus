@@ -3,7 +3,7 @@ import { prenotazioniService } from './prenotazioni.service.js';
 import { creaPrenotazioneSchema } from './prenotazioni.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedeRuolo } from '../auth/auth.middleware.js';
+import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { z } from 'zod';
 
 export const prenotazioniController = {
@@ -31,7 +31,7 @@ export const prenotazioniController = {
 export const prenotazioniRouter = Router();
 
 // Amministrazione: elenco completo per Transazioni/Pagamenti nel gestionale
-prenotazioniRouter.get('/', richiedeAuth, richiedeRuolo('AMMINISTRATORE', 'OPERATORE', 'COLLABORATORE'), asyncHandler(prenotazioniController.listAll));
+prenotazioniRouter.get('/', richiedeAuth, richiedePermesso('prenotazioni.visualizza'), asyncHandler(prenotazioniController.listAll));
 
 // Pubbliche: il checkout del sito e l'area cliente non richiedono login admin
 prenotazioniRouter.post('/', valida(creaPrenotazioneSchema), asyncHandler(prenotazioniController.crea));

@@ -5,7 +5,7 @@ import { db } from '../../db/client.js';
 import { pagineCms, contenutiSito } from '../../db/schema.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedeRuolo } from '../auth/auth.middleware.js';
+import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { NonTrovato } from '../../shared/errors.js';
 
 const upsertPaginaSchema = z.object({ titolo: z.string().min(1), contenuto: z.string() });
@@ -48,7 +48,7 @@ pagineRouter.get('/:chiave', asyncHandler(async (req: Request, res: Response) =>
 pagineRouter.put(
   '/:chiave',
   richiedeAuth,
-  richiedeRuolo('AMMINISTRATORE', 'OPERATORE'),
+  richiedePermesso('pagine.gestisci'),
   valida(upsertPaginaSchema),
   asyncHandler(async (req: Request, res: Response) => res.json(await pagineService.upsert(req.params.chiave, req.body)))
 );
@@ -58,7 +58,7 @@ contenutiRouter.get('/', asyncHandler(async (_req: Request, res: Response) => re
 contenutiRouter.put(
   '/:chiave',
   richiedeAuth,
-  richiedeRuolo('AMMINISTRATORE', 'OPERATORE'),
+  richiedePermesso('pagine.gestisci'),
   valida(upsertContenutoSchema),
   asyncHandler(async (req: Request, res: Response) => {
     await pagineService.upsertContenuto(req.params.chiave, req.body.valore);

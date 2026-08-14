@@ -9,6 +9,7 @@ export const authController = {
   },
 
   async me(req: Request, res: Response) {
-    res.json({ admin: req.admin });
+    if (!req.admin) return res.status(401).json({ errore: 'Non autorizzato' });
+    res.json({ admin: await authService.datiSessione(req.admin.sub) });
   },
 };

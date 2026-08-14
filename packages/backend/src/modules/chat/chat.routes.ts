@@ -5,7 +5,7 @@ import { db } from '../../db/client.js';
 import { messaggiChat } from '../../db/schema.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedeRuolo } from '../auth/auth.middleware.js';
+import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 
 const inviaMessaggioSchema = z.object({
   eventoId: z.string().min(1),
@@ -48,5 +48,5 @@ chatRouter.post('/', valida(inviaMessaggioSchema), asyncHandler(async (req: Requ
 chatRouter.get('/by-email', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(async (req: Request, res: Response) => res.json(await chatService.storicoCliente(String(req.query.email)))));
 
 // Admin: vista per evento e segna-come-letto
-chatRouter.get('/by-evento/:eventoId', richiedeAuth, richiedeRuolo('AMMINISTRATORE', 'OPERATORE', 'COLLABORATORE'), asyncHandler(async (req: Request, res: Response) => res.json(await chatService.perEvento(req.params.eventoId))));
-chatRouter.post('/segna-letti', richiedeAuth, richiedeRuolo('AMMINISTRATORE', 'OPERATORE'), valida(z.object({ email: z.string().email() })), asyncHandler(async (req: Request, res: Response) => { await chatService.segnaLetti(req.body.email); res.status(204).send(); }));
+chatRouter.get('/by-evento/:eventoId', richiedeAuth, richiedePermesso('chat.visualizza'), asyncHandler(async (req: Request, res: Response) => res.json(await chatService.perEvento(req.params.eventoId))));
+chatRouter.post('/segna-letti', richiedeAuth, richiedePermesso('chat.rispondi'), valida(z.object({ email: z.string().email() })), asyncHandler(async (req: Request, res: Response) => { await chatService.segnaLetti(req.body.email); res.status(204).send(); }));

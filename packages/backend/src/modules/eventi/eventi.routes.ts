@@ -3,7 +3,7 @@ import { eventiController } from './eventi.controller.js';
 import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema } from './eventi.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedeRuolo } from '../auth/auth.middleware.js';
+import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 
 export const eventiRouter = Router();
 
@@ -16,20 +16,20 @@ eventiRouter.get('/:id/opzioni-partenza', asyncHandler(eventiController.opzioniP
 eventiRouter.post(
   '/',
   richiedeAuth,
-  richiedeRuolo('AMMINISTRATORE', 'OPERATORE'),
+  richiedePermesso('eventi.crea'),
   valida(creaEventoSchema),
   asyncHandler(eventiController.create)
 );
 eventiRouter.put(
   '/:id',
   richiedeAuth,
-  richiedeRuolo('AMMINISTRATORE', 'OPERATORE'),
+  richiedePermesso('eventi.crea'),
   valida(aggiornaEventoSchema),
   asyncHandler(eventiController.update)
 );
 eventiRouter.delete(
   '/:id',
   richiedeAuth,
-  richiedeRuolo('AMMINISTRATORE'),
+  richiedePermesso('eventi.elimina'),
   asyncHandler(eventiController.remove)
 );

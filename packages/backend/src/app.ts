@@ -15,6 +15,7 @@ import { tourLeaderRouter } from './modules/tourleader/tourleader.routes.js';
 import { chatRouter } from './modules/chat/chat.routes.js';
 import { amministratoriRouter } from './modules/amministratori/amministratori.routes.js';
 import { statisticheRouter } from './modules/statistiche/statistiche.routes.js';
+import { ruoliRouter } from './modules/ruoli/ruoli.routes.js';
 
 export function creaApp() {
   const app = express();
@@ -39,6 +40,7 @@ export function creaApp() {
   app.use('/api/chat', chatRouter);
   app.use('/api/amministratori', amministratoriRouter);
   app.use('/api/statistiche', statisticheRouter);
+  app.use('/api/ruoli', ruoliRouter);
 
   // Il gestore errori DEVE essere l'ultimo middleware registrato.
   app.use(gestoreErrori);

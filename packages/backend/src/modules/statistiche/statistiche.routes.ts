@@ -3,7 +3,7 @@ import { eq, gte, and, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { prenotazioni, eventi } from '../../db/schema.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedeRuolo } from '../auth/auth.middleware.js';
+import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 
 export const statisticheService = {
   async generali() {
@@ -65,7 +65,7 @@ export const statisticheService = {
 };
 
 export const statisticheRouter = Router();
-statisticheRouter.use(richiedeAuth, richiedeRuolo('AMMINISTRATORE', 'OPERATORE', 'COLLABORATORE'));
+statisticheRouter.use(richiedeAuth, richiedePermesso('statistiche.visualizza'));
 
 statisticheRouter.get('/generali', asyncHandler(async (_req: Request, res: Response) => res.json(await statisticheService.generali())));
 statisticheRouter.get('/per-evento', asyncHandler(async (_req: Request, res: Response) => res.json(await statisticheService.perEvento())));

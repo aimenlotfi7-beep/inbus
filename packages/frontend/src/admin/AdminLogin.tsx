@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { authApi } from '../api/auth';
+import { authApi, type SessioneAdmin } from '../api/auth';
 import { ErroreApi } from '../api/client';
 
-export function AdminLogin({ onLogin }: { onLogin: () => void }) {
+export function AdminLogin({ onLogin }: { onLogin: (sessione: SessioneAdmin) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errore, setErrore] = useState('');
@@ -13,9 +13,9 @@ export function AdminLogin({ onLogin }: { onLogin: () => void }) {
     setCaricamento(true);
     setErrore('');
     try {
-      const { token } = await authApi.loginAdmin(email, password);
+      const { token, admin } = await authApi.loginAdmin(email, password);
       localStorage.setItem('inbus_admin_token', token);
-      onLogin();
+      onLogin(admin);
     } catch (err) {
       setErrore(err instanceof ErroreApi ? err.message : 'Impossibile contattare il server');
     } finally {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AdminLogin } from './AdminLogin';
 import { AdminLayout, type SezioneGestionale } from './shared/AdminLayout';
 import { AdminHome } from './screens/AdminHome';
@@ -18,6 +18,8 @@ import { CouponScreen } from './screens/CouponScreen';
 import { ChatScreen } from './screens/ChatScreen';
 import { ContenutiScreen } from './screens/ContenutiScreen';
 import { AmministratoriScreen } from './screens/AmministratoriScreen';
+import { RuoliScreen } from './screens/RuoliScreen';
+import { authApi, haPermesso, type SessioneAdmin } from '../api/auth';
 
 function StatisticheSenzaHeader() {
   return <AdminDashboard onLogout={() => {}} soloContenuto />;
@@ -40,22 +42,67 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   chat: ChatScreen,
   contenuti: ContenutiScreen,
   amministratori: AmministratoriScreen,
+  ruoli: RuoliScreen,
+};
+
+// Permesso richiesto per ogni sezione, usato per bloccare l'accesso
+// diretto (non solo nascondere la voce di menu) se qualcuno perde un
+// permesso mentre è già loggato.
+const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
+  statistiche: 'statistiche.visualizza',
+  eventi: 'eventi.visualizza',
+  vetrina: 'eventi.vetrina',
+  calendario: 'eventi.calendario',
+  cestino: 'eventi.cestino',
+  transazioni: 'prenotazioni.transazioni',
+  pagamenti: 'prenotazioni.pagamenti',
+  utenti: 'utenti.visualizza',
+  fornitori: 'fornitori.visualizza',
+  tragitti: 'tragitti.visualizza',
+  promoter: 'promoter.visualizza',
+  tourleader: 'tourleader.visualizza',
+  coupon: 'coupon.visualizza',
+  chat: 'chat.visualizza',
+  contenuti: 'pagine.gestisci',
+  amministratori: 'utenze.gestisci',
+  ruoli: 'permessi.gestisci',
 };
 
 export function AdminApp() {
-  const [loggato, setLoggato] = useState(() => !!localStorage.getItem('inbus_admin_token'));
+  const [sessione, setSessione] = useState<SessioneAdmin | null>(null);
+  const [caricamentoIniziale, setCaricamentoIniziale] = useState(true);
   const [sezione, setSezione] = useState<SezioneGestionale | 'home'>('home');
+
+  // Al primo caricamento, se c'è un token salvato, ricalcola la sessione
+  // (permessi inclusi) dal server invece di fidarsi di dati vecchi in
+  // memoria — così un cambio di permessi si vede anche solo ricaricando
+  // la pagina, senza dover rifare login.
+  useEffect(() => {
+    const token = localStorage.getItem('inbus_admin_token');
+    if (!token) { setCaricamentoIniziale(false); return; }
+    authApi.me()
+      .then(({ admin }) => setSessione(admin))
+      .catch(() => localStorage.removeItem('inbus_admin_token'))
+      .finally(() => setCaricamentoIniziale(false));
+  }, []);
 
   function logout() {
     localStorage.removeItem('inbus_admin_token');
-    setLoggato(false);
+    setSessione(null);
+    setSezione('home');
   }
 
-  if (!loggato) return <AdminLogin onLogin={() => setLoggato(true)} />;
+  function cambiaSezione(s: SezioneGestionale) {
+    if (sessione && !haPermesso(sessione, PERMESSO_SEZIONE[s])) return; // difesa extra, oltre al menu già filtrato
+    setSezione(s);
+  }
+
+  if (caricamentoIniziale) return null; // evita un lampo di schermata di login mentre verifichiamo il token
+  if (!sessione) return <AdminLogin onLogin={setSessione} />;
 
   return (
-    <AdminLayout sezioneAttiva={sezione} onCambiaSezione={setSezione} onVaiHome={() => setSezione('home')} onLogout={logout}>
-      {sezione === 'home' ? <AdminHome onVaiA={setSezione} /> : (() => { const Schermata = SCHERMATE[sezione]; return <Schermata />; })()}
+    <AdminLayout sessione={sessione} sezioneAttiva={sezione} onCambiaSezione={cambiaSezione} onVaiHome={() => setSezione('home')} onLogout={logout}>
+      {sezione === 'home' ? <AdminHome onVaiA={cambiaSezione} /> : (() => { const Schermata = SCHERMATE[sezione]; return <Schermata />; })()}
     </AdminLayout>
   );
 }

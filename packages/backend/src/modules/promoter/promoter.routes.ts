@@ -8,7 +8,7 @@ import { promoter, promoterEventi, prenotazioni } from '../../db/schema.js';
 import { NonTrovato, NonAutorizzato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedeRuolo } from '../auth/auth.middleware.js';
+import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { env } from '../../config/env.js';
 
 function generaCodice(nome: string) {
@@ -125,19 +125,19 @@ promoterRouter.get('/me/statistiche', richiedeAuthPromoter, asyncHandler(async (
   res.json(await promoterService.statistiche(p.codice));
 }));
 
-promoterRouter.use(richiedeAuth, richiedeRuolo('AMMINISTRATORE', 'OPERATORE'));
-promoterRouter.get('/', asyncHandler(async (_req: Request, res: Response) => res.json(await promoterService.list())));
-promoterRouter.get('/:id', asyncHandler(async (req: Request, res: Response) => res.json(await promoterService.getById(req.params.id))));
-promoterRouter.get('/:id/statistiche', asyncHandler(async (req: Request, res: Response) => {
+promoterRouter.use(richiedeAuth);
+promoterRouter.get('/', richiedePermesso('promoter.visualizza'), asyncHandler(async (_req: Request, res: Response) => res.json(await promoterService.list())));
+promoterRouter.get('/:id', richiedePermesso('promoter.visualizza'), asyncHandler(async (req: Request, res: Response) => res.json(await promoterService.getById(req.params.id))));
+promoterRouter.get('/:id/statistiche', richiedePermesso('promoter.visualizza'), asyncHandler(async (req: Request, res: Response) => {
   const p = await promoterService.getById(req.params.id);
   res.json(await promoterService.statistiche(p.codice));
 }));
-promoterRouter.post('/', valida(creaPromoterSchema), asyncHandler(async (req: Request, res: Response) => {
+promoterRouter.post('/', richiedePermesso('promoter.gestisci'), valida(creaPromoterSchema), asyncHandler(async (req: Request, res: Response) => {
   const id = await promoterService.create(req.body);
   res.status(201).json(await promoterService.getById(id));
 }));
-promoterRouter.put('/:id', valida(aggiornaPromoterSchema), asyncHandler(async (req: Request, res: Response) => {
+promoterRouter.put('/:id', richiedePermesso('promoter.gestisci'), valida(aggiornaPromoterSchema), asyncHandler(async (req: Request, res: Response) => {
   const id = await promoterService.update(req.params.id, req.body);
   res.json(await promoterService.getById(id));
 }));
-promoterRouter.delete('/:id', asyncHandler(async (req: Request, res: Response) => { await promoterService.remove(req.params.id); res.status(204).send(); }));
+promoterRouter.delete('/:id', richiedePermesso('promoter.gestisci'), asyncHandler(async (req: Request, res: Response) => { await promoterService.remove(req.params.id); res.status(204).send(); }));
