@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { haPermesso, type SessioneAdmin } from '../../api/auth';
+import { eventiApi } from '../../api/eventi';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'partenze'
@@ -56,6 +57,15 @@ export function AdminLayout({
   children: ReactNode;
 }) {
   const [gruppiCollassati, setGruppiCollassati] = useState<Record<string, boolean>>({});
+  const [allertePartenze, setAllertePartenze] = useState(0);
+
+  // Notifica sulla voce "Partenze": quante tratte, in tutti gli eventi,
+  // hanno più passeggeri confermati dei posti previsti. Solo per chi ha
+  // il permesso di vedere quella sezione.
+  useEffect(() => {
+    if (!haPermesso(sessione, 'eventi.partenze')) return;
+    eventiApi.allertePartenze().then((r) => setAllertePartenze(r.conteggio)).catch(() => {});
+  }, [sessione]);
 
   // Filtro sia i gruppi che le voci in base a ciò che l'utente loggato
   // può vedere: un gruppo compare solo se ha almeno una voce visibile.
@@ -87,6 +97,9 @@ export function AdminLayout({
                     onClick={() => onCambiaSezione(voce.id)}
                   >
                     {voce.label}
+                    {voce.id === 'partenze' && allertePartenze > 0 && (
+                      <span className="side-badge" title={`${allertePartenze} tratta/e con posti superati`}>{allertePartenze}</span>
+                    )}
                   </button>
                 ))}
               </div>

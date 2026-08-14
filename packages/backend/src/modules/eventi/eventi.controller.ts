@@ -62,4 +62,8 @@ export const eventiController = {
     await eventiService.rimuoviBus(req.params.busId);
     res.status(204).send();
   },
+
+  async allertePartenze(_req: Request, res: Response) {
+    res.json({ conteggio: await eventiService.contaAllertePartenze() });
+  },
 };

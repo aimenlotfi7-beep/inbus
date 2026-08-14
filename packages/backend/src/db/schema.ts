@@ -53,6 +53,9 @@ export const eventi = pgTable('eventi', {
   ordineEvidenza: integer('ordine_evidenza').notNull().default(0),
   vetrinaDal: timestamp('vetrina_dal', { mode: 'date' }),
   vetrinaAl: timestamp('vetrina_al', { mode: 'date' }),
+  // Acconto specifico per questo evento (in euro). Se non impostato,
+  // si usa il default globale (variabile d'ambiente ACCONTO_FISSO_EUR).
+  accontoEur: numeric('acconto_eur', { precision: 10, scale: 2 }),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
   aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 });

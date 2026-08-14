@@ -30,6 +30,7 @@ export const creaEventoSchema = z.object({
   ordineEvidenza: z.number().int().default(0),
   vetrinaDal: z.coerce.date().optional(),
   vetrinaAl: z.coerce.date().optional(),
+  accontoEur: z.number().positive().optional(),
   immagini: z.array(z.string().url()).default([]),
   allegati: z.array(z.object({ nome: z.string(), url: z.string() })).default([]),
   linee: z.array(lineaSchema).default([]),

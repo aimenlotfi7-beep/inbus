@@ -53,9 +53,21 @@ export function ContenutiScreen() {
         <button className="btn btn-primary" onClick={salvaPagina}>Salva pagina</button>
       </div>
 
+      <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
+        <h3 style={{ fontSize: 15, marginBottom: 14 }}>Sfondo homepage</h3>
+        <div className="campo">
+          <label>URL immagine di sfondo</label>
+          <input
+            defaultValue={contenuti.find((c) => c.chiave === 'sfondoUrl')?.valore ?? ''}
+            placeholder="https://..."
+            onBlur={(e) => salvaContenuto('sfondoUrl', e.target.value)}
+          />
+        </div>
+      </div>
+
       <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
         <h3 style={{ fontSize: 15, marginBottom: 14 }}>Testi configurabili (hero, statistiche, ecc.)</h3>
-        {contenuti.map((c) => (
+        {contenuti.filter((c) => c.chiave !== 'sfondoUrl').map((c) => (
           <div className="campo" key={c.chiave}>
             <label>{c.chiave}</label>
             <input defaultValue={c.valore} onBlur={(e) => salvaContenuto(c.chiave, e.target.value)} />

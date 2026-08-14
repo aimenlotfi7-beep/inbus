@@ -60,7 +60,7 @@ export const prenotazioniService = {
       const importoBase = prezzoEffettivo * input.passeggeri;
       const { sconto, coupon: couponUsato } = await validaCoupon(input.couponCodice, importoBase);
 
-      const acconto = env.ACCONTO_FISSO_EUR;
+      const acconto = evento.accontoEur ? Number(evento.accontoEur) : env.ACCONTO_FISSO_EUR;
       const totale = importoBase - sconto;
       const saldoPagato = input.tipoPagamento === 'COMPLETO';
       const scadenzaSaldo = input.tipoPagamento === 'ACCONTO'

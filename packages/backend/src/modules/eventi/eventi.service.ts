@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray } from 'drizzle-orm';
+import { and, eq, ilike, inArray, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
   eventi,
@@ -63,6 +63,7 @@ export const eventiService = {
           ordineEvidenza: input.ordineEvidenza,
           vetrinaDal: input.vetrinaDal,
           vetrinaAl: input.vetrinaAl,
+          accontoEur: input.accontoEur?.toFixed(2),
         })
         .returning();
 
@@ -128,6 +129,7 @@ export const eventiService = {
           ...(input.ordineEvidenza !== undefined && { ordineEvidenza: input.ordineEvidenza }),
           ...(input.vetrinaDal !== undefined && { vetrinaDal: input.vetrinaDal }),
           ...(input.vetrinaAl !== undefined && { vetrinaAl: input.vetrinaAl }),
+          ...(input.accontoEur !== undefined && { accontoEur: input.accontoEur.toFixed(2) }),
           aggiornatoIl: new Date(),
         })
         .where(eq(eventi.id, id));
@@ -363,5 +365,28 @@ export const eventiService = {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
     await db.delete(busFisici).where(eq(busFisici.id, busId)); // cascade su bus_tratte
+  },
+
+  /** Conta quante tratte, in tutti gli eventi, hanno più passeggeri
+   *  confermati dei posti totali previsti — usato per il pallino di
+   *  notifica sulla voce "Partenze" nel menu del gestionale. */
+  async contaAllertePartenze() {
+    const righe = await db
+      .select({ lineaId: lineeBus.id, postiTotali: lineeBus.postiTotali })
+      .from(lineeBus);
+
+    const somme = await db
+      .select({ lineaId: prenotazioni.lineaId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
+      .from(prenotazioni)
+      .where(eq(prenotazioni.stato, 'CONFERMATA'))
+      .groupBy(prenotazioni.lineaId);
+
+    const mappaPasseggeri = new Map(somme.map((s) => [s.lineaId, Number(s.totale)]));
+    let conteggio = 0;
+    for (const r of righe) {
+      const passeggeri = mappaPasseggeri.get(r.lineaId) ?? 0;
+      if (passeggeri > r.postiTotali) conteggio++;
+    }
+    return conteggio;
   },
 };

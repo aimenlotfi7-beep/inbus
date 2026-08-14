@@ -9,7 +9,8 @@ export interface LineaInput {
 }
 export interface EventoInput {
   artista: string; genere: string; luogo: string; citta: string; data: string; prezzo: number;
-  inEvidenza?: boolean; ordineEvidenza?: number; immagini?: string[]; allegati?: { nome: string; url: string }[]; linee?: LineaInput[];
+  inEvidenza?: boolean; ordineEvidenza?: number; accontoEur?: number;
+  immagini?: string[]; allegati?: { nome: string; url: string }[]; linee?: LineaInput[];
 }
 
 export interface FermataConPasseggeri { fermataId: string; citta: string; passeggeri: number; }
@@ -54,4 +55,5 @@ export const eventiApi = {
   creaBus: (id: string, input: BusFisicoInput) => api.post<{ id: string }>(`/api/eventi/${id}/bus`, input),
   aggiornaBus: (id: string, busId: string, input: Partial<BusFisicoInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/bus/${busId}`, input),
   rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
+  allertePartenze: () => api.get<{ conteggio: number }>('/api/eventi/allerte-partenze'),
 };

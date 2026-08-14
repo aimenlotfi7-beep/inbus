@@ -89,12 +89,19 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
         <p className="testo-intro">Questa scheda non ha ancora nessuna tratta configurata — vai nella tab "Dettagli" per aggiungerne una.</p>
       )}
 
-      {calcolo.map((linea) => (
-        <div key={linea.lineaId} className="section-card">
+      {calcolo.map((linea) => {
+        const postiSuperati = linea.totalePasseggeri > linea.postiTotali;
+        return (
+        <div key={linea.lineaId} className="section-card" style={postiSuperati ? { borderColor: 'var(--pink)' } : undefined}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 12 }}>
             <div>
               <h3>{linea.nome}</h3>
-              <p className="section-sub">{linea.totalePasseggeri} passeggeri confermati · capienza {linea.capienzaPerBus} posti/bus</p>
+              <p className="section-sub">{linea.totalePasseggeri} passeggeri confermati su {linea.postiTotali} posti previsti · capienza {linea.capienzaPerBus} posti/bus</p>
+              {postiSuperati && (
+                <span className="badge non-coperta" style={{ marginTop: 6, display: 'inline-block' }}>
+                  ⚠ Posti superati di {linea.totalePasseggeri - linea.postiTotali}
+                </span>
+              )}
             </div>
             <button
               type="button"
@@ -133,7 +140,8 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {calcolo.length > 0 && (
         <button className="btn btn-primary" onClick={apriNuovoBus}>+ Censisci bus</button>

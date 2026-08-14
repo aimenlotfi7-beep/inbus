@@ -9,6 +9,9 @@ export const eventiRouter = Router();
 
 // Lettura: pubblica (il sito e l'app cliente le usano senza login)
 eventiRouter.get('/', valida(listaEventiQuerySchema, 'query'), asyncHandler(eventiController.list));
+// IMPORTANTE: va registrata PRIMA di GET '/:id', altrimenti Express la
+// interpreterebbe come una richiesta per un evento con id "allerte-partenze".
+eventiRouter.get('/allerte-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenze));
 eventiRouter.get('/:id', asyncHandler(eventiController.getById));
 eventiRouter.get('/:id/opzioni-partenza', asyncHandler(eventiController.opzioniPartenza));
 

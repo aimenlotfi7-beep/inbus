@@ -29,6 +29,13 @@
       "when": 1786724060906,
       "tag": "0003_aggiungi_partenze_bus_eccezioni_permessi",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786747537644,
+      "tag": "0004_aggiungi_acconto_evento",
+      "breakpoints": true
     }
   ]
 }

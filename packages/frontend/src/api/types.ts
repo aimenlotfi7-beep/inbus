@@ -29,6 +29,7 @@ export interface Evento {
   prezzo: string;
   inEvidenza: boolean;
   ordineEvidenza: number;
+  accontoEur: string | null;
   linee: LineaBus[];
   immagini: { id: string; url: string; ordine: number }[];
   allegati: { id: string; nome: string; url: string }[];
