@@ -1,4 +1,4 @@
-import { and, eq, ilike } from 'drizzle-orm';
+import { and, eq, ilike, inArray } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
   eventi,
@@ -6,8 +6,12 @@ import {
   fermate,
   immaginiEvento,
   allegatiEvento,
+  prenotazioni,
+  busFisici,
+  busTratte,
 } from '../../db/schema.js';
-import { NonTrovato } from '../../shared/errors.js';
+import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
+import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 
 // Include standard riusato da list/getById: evento con tutte le sue
@@ -217,5 +221,147 @@ export const eventiService = {
       }
     }
     return opzioni;
+  },
+
+  /**
+   * Suggerisce quanti bus servono per ogni linea dell'evento, in base ai
+   * passeggeri confermati per fermata. Logica (concordata con l'utente):
+   * si percorrono le fermate in ordine; se i passeggeri di UNA fermata da
+   * soli riempiono (o superano) un bus, quella fermata ottiene bus dedicati
+   * partendo direttamente da lì; altrimenti i passeggeri di fermate vicine
+   * si accumulano sullo stesso bus finché non si supera la capienza.
+   * È un suggerimento, non un instradamento reale: l'orario di partenza
+   * di ogni bus resta da compilare a mano (richiederebbe tempi di
+   * percorrenza reali tra le città, non disponibili nel gestionale).
+   */
+  async calcolaBusNecessari(eventoId: string) {
+    const evento = await getById(eventoId);
+    const capienza = await leggiPostiPerBus();
+
+    const prenotazioniConfermate = await db
+      .select({ lineaId: prenotazioni.lineaId, fermataCitta: prenotazioni.fermataCitta, passeggeri: prenotazioni.passeggeri })
+      .from(prenotazioni)
+      .where(and(eq(prenotazioni.eventoId, eventoId), eq(prenotazioni.stato, 'CONFERMATA')));
+
+    return evento.linee.map((linea) => {
+      const fermateOrdinate = [...linea.fermate].sort((a, b) => a.ordine - b.ordine);
+
+      const fermateConPasseggeri = fermateOrdinate.map((f) => {
+        const passeggeri = prenotazioniConfermate
+          .filter((p) => p.lineaId === linea.id && p.fermataCitta === f.citta)
+          .reduce((somma, p) => somma + p.passeggeri, 0);
+        return { fermataId: f.id, citta: f.citta, passeggeri };
+      });
+
+      let busSuggeriti = 0;
+      let caricoBusCorrente = 0;
+      for (const f of fermateConPasseggeri) {
+        if (f.passeggeri >= capienza) {
+          // Questa fermata da sola riempie almeno un bus: se c'era un bus
+          // "in accumulo" da fermate precedenti, lo chiudo prima.
+          if (caricoBusCorrente > 0) { busSuggeriti += 1; caricoBusCorrente = 0; }
+          busSuggeriti += Math.floor(f.passeggeri / capienza);
+          const resto = f.passeggeri % capienza;
+          caricoBusCorrente = resto; // il resto prova ad accumularsi con le prossime fermate
+        } else if (caricoBusCorrente + f.passeggeri <= capienza) {
+          caricoBusCorrente += f.passeggeri;
+        } else {
+          busSuggeriti += 1; // il bus in accumulo è pieno, ne apro uno nuovo
+          caricoBusCorrente = f.passeggeri;
+        }
+      }
+      if (caricoBusCorrente > 0) busSuggeriti += 1;
+
+      const totalePasseggeri = fermateConPasseggeri.reduce((s, f) => s + f.passeggeri, 0);
+
+      return {
+        lineaId: linea.id,
+        nome: linea.nome,
+        postiTotali: linea.postiTotali,
+        capienzaPerBus: capienza,
+        fermate: fermateConPasseggeri,
+        totalePasseggeri,
+        busSuggeriti,
+        coperta: linea.coperta,
+      };
+    });
+  },
+
+  /** Segna una linea/tratta come coperta (o no) — sezione Partenze. Non
+   *  tocca fermate né altro, per non rischiare di sovrascrivere dati con
+   *  l'update "wholesale" dell'evento. */
+  async impostaCopertura(eventoId: string, lineaId: string, coperta: boolean, noteCoperta?: string) {
+    const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, lineaId)).limit(1);
+    if (!linea || linea.eventoId !== eventoId) throw new NonTrovato('Linea');
+    await db.update(lineeBus).set({ coperta, ...(noteCoperta !== undefined && { noteCoperta }) }).where(eq(lineeBus.id, lineaId));
+  },
+
+  /** Bus fisici collegati a una qualunque linea dell'evento, con le tratte
+   *  (linee) che ciascuno copre. */
+  async listaBus(eventoId: string) {
+    const evento = await getById(eventoId);
+    const lineeIds = evento.linee.map((l) => l.id);
+    if (lineeIds.length === 0) return [];
+
+    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.lineaId, lineeIds));
+    const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
+    if (busIds.length === 0) return [];
+
+    const bus = await db.select().from(busFisici).where(inArray(busFisici.id, busIds));
+    return bus.map((b) => ({
+      ...b,
+      lineeIds: assegnazioni.filter((a) => a.busId === b.id).map((a) => a.lineaId),
+    }));
+  },
+
+  async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; note?: string; lineeIds: string[] }) {
+    const evento = await getById(eventoId);
+    const lineeValide = new Set(evento.linee.map((l) => l.id));
+    const lineeIdsFiltrate = input.lineeIds.filter((id) => lineeValide.has(id));
+    if (lineeIdsFiltrate.length === 0) throw new ConflittoDati('Seleziona almeno una tratta di questo evento per il bus.');
+
+    return db.transaction(async (tx) => {
+      const [nuovo] = await tx.insert(busFisici).values({
+        fornitoreId: input.fornitoreId,
+        riferimento: input.riferimento,
+        autistaNome: input.autistaNome,
+        autistaTelefono: input.autistaTelefono,
+        note: input.note,
+      }).returning();
+      await tx.insert(busTratte).values(lineeIdsFiltrate.map((lineaId) => ({ busId: nuovo.id, lineaId })));
+      return nuovo.id;
+    });
+  },
+
+  async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; note?: string; lineeIds?: string[] }) {
+    const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
+    if (!bus) throw new NonTrovato('Bus');
+
+    return db.transaction(async (tx) => {
+      if (input.riferimento !== undefined || input.fornitoreId !== undefined || input.autistaNome !== undefined || input.autistaTelefono !== undefined || input.note !== undefined) {
+        await tx.update(busFisici).set({
+          ...(input.riferimento !== undefined && { riferimento: input.riferimento }),
+          ...(input.fornitoreId !== undefined && { fornitoreId: input.fornitoreId }),
+          ...(input.autistaNome !== undefined && { autistaNome: input.autistaNome }),
+          ...(input.autistaTelefono !== undefined && { autistaTelefono: input.autistaTelefono }),
+          ...(input.note !== undefined && { note: input.note }),
+        }).where(eq(busFisici.id, busId));
+      }
+      if (input.lineeIds !== undefined) {
+        const evento = await getById(eventoId);
+        const lineeValide = new Set(evento.linee.map((l) => l.id));
+        const lineeIdsFiltrate = input.lineeIds.filter((id) => lineeValide.has(id));
+        await tx.delete(busTratte).where(eq(busTratte.busId, busId));
+        if (lineeIdsFiltrate.length > 0) {
+          await tx.insert(busTratte).values(lineeIdsFiltrate.map((lineaId) => ({ busId, lineaId })));
+        }
+      }
+    });
+  },
+
+  async rimuoviBus(busId: string) {
+    const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
+    if (!bus) throw new NonTrovato('Bus');
+    await db.delete(busFisici).where(eq(busFisici.id, busId)); // cascade su bus_tratte
   },
 };

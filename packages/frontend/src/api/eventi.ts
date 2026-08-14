@@ -12,6 +12,30 @@ export interface EventoInput {
   inEvidenza?: boolean; ordineEvidenza?: number; immagini?: string[]; allegati?: { nome: string; url: string }[]; linee?: LineaInput[];
 }
 
+export interface FermataConPasseggeri { fermataId: string; citta: string; passeggeri: number; }
+export interface CalcoloBusLinea {
+  lineaId: string;
+  nome: string;
+  postiTotali: number;
+  capienzaPerBus: number;
+  fermate: FermataConPasseggeri[];
+  totalePasseggeri: number;
+  busSuggeriti: number;
+  coperta: boolean;
+}
+export interface BusFisico {
+  id: string;
+  fornitoreId: string | null;
+  riferimento: string;
+  autistaNome: string | null;
+  autistaTelefono: string | null;
+  note: string | null;
+  lineeIds: string[];
+}
+export interface BusFisicoInput {
+  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; note?: string; lineeIds: string[];
+}
+
 export const eventiApi = {
   list: (filtri?: { citta?: string; genere?: string }) => {
     const query = new URLSearchParams(filtri as Record<string, string>).toString();
@@ -22,4 +46,12 @@ export const eventiApi = {
   create: (input: EventoInput) => api.post<Evento>('/api/eventi', input),
   update: (id: string, input: Partial<EventoInput>) => api.put<Evento>(`/api/eventi/${id}`, input),
   remove: (id: string) => api.delete<void>(`/api/eventi/${id}`),
+
+  calcolaBus: (id: string) => api.get<CalcoloBusLinea[]>(`/api/eventi/${id}/calcola-bus`),
+  impostaCopertura: (id: string, lineaId: string, coperta: boolean, noteCoperta?: string) =>
+    api.put<{ ok: true }>(`/api/eventi/${id}/linee/${lineaId}/copertura`, { coperta, noteCoperta }),
+  listaBus: (id: string) => api.get<BusFisico[]>(`/api/eventi/${id}/bus`),
+  creaBus: (id: string, input: BusFisicoInput) => api.post<{ id: string }>(`/api/eventi/${id}/bus`, input),
+  aggiornaBus: (id: string, busId: string, input: Partial<BusFisicoInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/bus/${busId}`, input),
+  rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
 };

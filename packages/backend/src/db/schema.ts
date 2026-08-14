@@ -100,6 +100,11 @@ export const lineeBus = pgTable('linee_bus', {
   referenteNome: text('referente_nome'),
   referenteTelefono: text('referente_telefono'),
   fornitoreId: text('fornitore_id').references(() => fornitori.id),
+  // Sezione "Partenze": indica se questa tratta è coperta (bus prenotato
+  // con l'agenzia/fornitore), a prescindere dal calcolo automatico dei
+  // bus necessari, che resta solo un suggerimento.
+  coperta: boolean('coperta').notNull().default(false),
+  noteCoperta: text('note_coperta'),
 });
 
 export const fermate = pgTable('fermate', {
@@ -115,6 +120,29 @@ export const fermate = pgTable('fermate', {
   lat: doublePrecision('lat'),
   lng: doublePrecision('lng'),
 });
+
+// ---------------------------------------------------------------------
+// BUS FISICI (Sezione Partenze: censimento dei mezzi reali e delle tratte
+// che coprono)
+// ---------------------------------------------------------------------
+export const busFisici = pgTable('bus_fisici', {
+  id: id(),
+  fornitoreId: text('fornitore_id').references(() => fornitori.id),
+  riferimento: text('riferimento').notNull(), // es. targa, o riferimento dato dall'agenzia
+  autistaNome: text('autista_nome'),
+  autistaTelefono: text('autista_telefono'),
+  note: text('note'),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+});
+
+// Un bus può coprire più tratte (linee) diverse; una tratta può essere
+// coperta da più bus se la capienza di uno solo non basta.
+export const busTratte = pgTable('bus_tratte', {
+  busId: text('bus_id').notNull().references(() => busFisici.id, { onDelete: 'cascade' }),
+  lineaId: text('linea_id').notNull().references(() => lineeBus.id, { onDelete: 'cascade' }),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.busId, t.lineaId] }),
+}));
 
 // ---------------------------------------------------------------------
 // TRAGITTI (template riutilizzabili di fermate)
@@ -316,6 +344,19 @@ export const amministratori = pgTable('amministratori', {
   attivo: boolean('attivo').notNull().default(true),
 });
 
+// Eccezioni per singolo amministratore: se presente una riga, sovrascrive
+// quello che darebbe il ruolo. `concesso = true` forza il permesso anche
+// se il ruolo non ce l'ha; `concesso = false` lo toglie anche se il ruolo
+// ce l'ha. Ignorato per gli amministratori con ruolo owner (hanno sempre
+// tutto, le eccezioni non hanno effetto).
+export const amministratorePermessi = pgTable('amministratore_permessi', {
+  amministratoreId: text('amministratore_id').notNull().references(() => amministratori.id, { onDelete: 'cascade' }),
+  permessoChiave: text('permesso_chiave').notNull().references(() => permessi.chiave, { onDelete: 'cascade' }),
+  concesso: boolean('concesso').notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.amministratoreId, t.permessoChiave] }),
+}));
+
 export const logAttivita = pgTable('log_attivita', {
   id: id(),
   amministratoreId: text('amministratore_id').references(() => amministratori.id),
@@ -387,10 +428,21 @@ export const lineeBusRelations = relations(lineeBus, ({ one, many }) => ({
   fornitore: one(fornitori, { fields: [lineeBus.fornitoreId], references: [fornitori.id] }),
   fermate: many(fermate),
   prenotazioni: many(prenotazioni),
+  busAssegnati: many(busTratte),
 }));
 
 export const fermateRelations = relations(fermate, ({ one }) => ({
   linea: one(lineeBus, { fields: [fermate.lineaId], references: [lineeBus.id] }),
+}));
+
+export const busFisiciRelations = relations(busFisici, ({ one, many }) => ({
+  fornitore: one(fornitori, { fields: [busFisici.fornitoreId], references: [fornitori.id] }),
+  tratte: many(busTratte),
+}));
+
+export const busTratteRelations = relations(busTratte, ({ one }) => ({
+  bus: one(busFisici, { fields: [busTratte.busId], references: [busFisici.id] }),
+  linea: one(lineeBus, { fields: [busTratte.lineaId], references: [lineeBus.id] }),
 }));
 
 export const tragittiRelations = relations(tragitti, ({ many }) => ({
@@ -430,6 +482,12 @@ export const ruoloPermessiRelations = relations(ruoloPermessi, ({ one }) => ({
   permesso: one(permessi, { fields: [ruoloPermessi.permessoChiave], references: [permessi.chiave] }),
 }));
 
-export const amministratoriRelations = relations(amministratori, ({ one }) => ({
+export const amministratoriRelations = relations(amministratori, ({ one, many }) => ({
   ruolo: one(ruoli, { fields: [amministratori.ruoloId], references: [ruoli.id] }),
+  permessiExtra: many(amministratorePermessi),
+}));
+
+export const amministratorePermessiRelations = relations(amministratorePermessi, ({ one }) => ({
+  amministratore: one(amministratori, { fields: [amministratorePermessi.amministratoreId], references: [amministratori.id] }),
+  permesso: one(permessi, { fields: [amministratorePermessi.permessoChiave], references: [permessi.chiave] }),
 }));

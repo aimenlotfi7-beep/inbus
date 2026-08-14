@@ -2,12 +2,12 @@ import { useState, type ReactNode } from 'react';
 import { haPermesso, type SessioneAdmin } from '../../api/auth';
 
 export type SezioneGestionale =
-  | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino'
+  | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'partenze'
   | 'transazioni' | 'pagamenti' | 'coupon'
   | 'utenti' | 'promoter' | 'tourleader'
   | 'fornitori' | 'tragitti'
   | 'chat' | 'contenuti'
-  | 'amministratori' | 'ruoli';
+  | 'amministratori' | 'ruoli' | 'impostazioni';
 
 // Ogni voce dichiara il permesso che serve per vederla. Chi ha ruolo
 // "owner" vede sempre tutto (haPermesso lo gestisce automaticamente).
@@ -16,6 +16,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'eventi', label: 'Eventi', permesso: 'eventi.visualizza' },
     { id: 'vetrina', label: 'Vetrina', permesso: 'eventi.vetrina' },
     { id: 'calendario', label: 'Calendario', permesso: 'eventi.calendario' },
+    { id: 'partenze', label: 'Partenze', permesso: 'eventi.partenze' },
     { id: 'cestino', label: 'Cestino', permesso: 'eventi.cestino' },
   ]},
   { titolo: 'Vendite', voci: [
@@ -39,6 +40,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   { titolo: 'Sistema', voci: [
     { id: 'amministratori', label: 'Amministratori', permesso: 'utenze.gestisci' },
     { id: 'ruoli', label: 'Ruoli', permesso: 'permessi.gestisci' },
+    { id: 'impostazioni', label: 'Impostazioni', permesso: 'impostazioni.gestisci' },
     { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
   ]},
 ];

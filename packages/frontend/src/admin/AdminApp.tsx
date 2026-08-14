@@ -19,6 +19,8 @@ import { ChatScreen } from './screens/ChatScreen';
 import { ContenutiScreen } from './screens/ContenutiScreen';
 import { AmministratoriScreen } from './screens/AmministratoriScreen';
 import { RuoliScreen } from './screens/RuoliScreen';
+import { PartenzeScreen } from './screens/PartenzeScreen';
+import { ImpostazioniScreen } from './screens/ImpostazioniScreen';
 import { authApi, haPermesso, type SessioneAdmin } from '../api/auth';
 
 function StatisticheSenzaHeader() {
@@ -43,6 +45,8 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   contenuti: ContenutiScreen,
   amministratori: AmministratoriScreen,
   ruoli: RuoliScreen,
+  partenze: PartenzeScreen,
+  impostazioni: ImpostazioniScreen,
 };
 
 // Permesso richiesto per ogni sezione, usato per bloccare l'accesso
@@ -66,6 +70,8 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   contenuti: 'pagine.gestisci',
   amministratori: 'utenze.gestisci',
   ruoli: 'permessi.gestisci',
+  partenze: 'eventi.partenze',
+  impostazioni: 'impostazioni.gestisci',
 };
 
 export function AdminApp() {

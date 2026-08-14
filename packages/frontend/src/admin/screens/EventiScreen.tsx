@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { eventiApi, type EventoInput, type LineaInput, type FermataInput } from '../../api/eventi';
+import { tragittiApi, type Tragitto } from '../../api/tragitti';
 import { ErroreApi } from '../../api/client';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
@@ -10,11 +11,15 @@ const VUOTO: EventoInput = { artista: '', genere: '', luogo: '', citta: '', data
 
 export function EventiScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
+  const [tragitti, setTragitti] = useState<Tragitto[]>([]);
   const [inModifica, setInModifica] = useState<Evento | null>(null);
   const [form, setForm] = useState<EventoInput>(VUOTO);
   const [modaleAperta, setModaleAperta] = useState(false);
 
-  function ricarica() { eventiApi.list().then(setEventi); }
+  function ricarica() {
+    eventiApi.list().then(setEventi);
+    tragittiApi.list().then(setTragitti);
+  }
   useEffect(ricarica, []);
 
   function apriNuovo() { setInModifica(null); setForm(VUOTO); setModaleAperta(true); }
@@ -46,6 +51,32 @@ export function EventiScreen() {
     const fermate = [...linee[idxLinea].fermate];
     fermate[idxFermata] = { ...fermate[idxFermata], [campo]: campo === 'prezzo' ? Number(valore) || undefined : valore };
     linee[idxLinea] = { ...linee[idxLinea], fermate };
+    setForm({ ...form, linee });
+  }
+  function rimuoviFermata(idxLinea: number, idxFermata: number) {
+    const linee = [...(form.linee ?? [])];
+    const fermate = linee[idxLinea].fermate.filter((_, i) => i !== idxFermata);
+    // Una linea deve avere sempre almeno una riga fermata nel form, anche
+    // vuota, altrimenti non c'è modo di aggiungerne una nuova da capo.
+    linee[idxLinea] = { ...linee[idxLinea], fermate: fermate.length ? fermate : [{ citta: '', indirizzo: '' }] };
+    setForm({ ...form, linee });
+  }
+  function rimuoviLinea(idxLinea: number) {
+    const linee = (form.linee ?? []).filter((_, i) => i !== idxLinea);
+    setForm({ ...form, linee });
+  }
+  function applicaTragitto(idxLinea: number, tragittoId: string) {
+    if (!tragittoId) return;
+    const tragitto = tragitti.find((t) => t.id === tragittoId);
+    if (!tragitto) return;
+    const linee = [...(form.linee ?? [])];
+    // Copio le fermate del tragitto in questa linea: da qui in poi sono
+    // fermate della linea, modificabili liberamente senza toccare il
+    // tragitto originale (che resta un modello riutilizzabile).
+    linee[idxLinea] = {
+      ...linee[idxLinea],
+      fermate: tragitto.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario, prezzo: f.prezzo })),
+    };
     setForm({ ...form, linee });
   }
 
@@ -114,15 +145,31 @@ export function EventiScreen() {
           <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, margin: '18px 0 10px' }}>Bus</p>
           {(form.linee ?? []).map((linea, idxLinea) => (
             <div key={idxLinea} style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 10, padding: 12, marginBottom: 10 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr .6fr', gap: 8, marginBottom: 8 }}>
-                <input placeholder="Nome bus" value={linea.nome} onChange={(e) => aggiornaLinea(idxLinea, 'nome', e.target.value)} />
-                <input placeholder="Posti totali" type="number" value={linea.postiTotali} onChange={(e) => aggiornaLinea(idxLinea, 'postiTotali', Number(e.target.value))} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr .6fr', gap: 8, flex: 1 }}>
+                  <input placeholder="Nome bus" value={linea.nome} onChange={(e) => aggiornaLinea(idxLinea, 'nome', e.target.value)} />
+                  <input placeholder="Posti totali" type="number" value={linea.postiTotali} onChange={(e) => aggiornaLinea(idxLinea, 'postiTotali', Number(e.target.value))} />
+                </div>
+                <button type="button" className="btn btn-ghost" style={{ marginLeft: 8, color: 'var(--pink)', fontSize: 11 }} onClick={() => rimuoviLinea(idxLinea)}>Rimuovi bus</button>
               </div>
+
+              {tragitti.length > 0 && (
+                <select
+                  defaultValue=""
+                  style={{ marginBottom: 8 }}
+                  onChange={(e) => { applicaTragitto(idxLinea, e.target.value); e.target.value = ''; }}
+                >
+                  <option value="" disabled>Applica un tragitto salvato...</option>
+                  {tragitti.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                </select>
+              )}
+
               {linea.fermate.map((f, idxFermata) => (
-                <div key={idxFermata} style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr .6fr', gap: 6, marginBottom: 6 }}>
+                <div key={idxFermata} style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr .6fr auto', gap: 6, marginBottom: 6, alignItems: 'center' }}>
                   <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'citta', e.target.value)} />
                   <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'indirizzo', e.target.value)} />
                   <input placeholder="Orario" type="time" value={f.orario ?? ''} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'orario', e.target.value)} />
+                  <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxLinea, idxFermata)} title="Rimuovi fermata">✕</button>
                 </div>
               ))}
               <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={() => aggiungiFermata(idxLinea)}>+ Aggiungi fermata</button>

@@ -45,3 +45,18 @@ export const listaEventiQuerySchema = z.object({
   soloInEvidenza: z.coerce.boolean().optional(),
 });
 export type ListaEventiQuery = z.infer<typeof listaEventiQuerySchema>;
+
+export const impostaCoperturaSchema = z.object({
+  coperta: z.boolean(),
+  noteCoperta: z.string().optional(),
+});
+
+export const creaBusSchema = z.object({
+  fornitoreId: z.string().optional(),
+  riferimento: z.string().min(1),
+  autistaNome: z.string().optional(),
+  autistaTelefono: z.string().optional(),
+  note: z.string().optional(),
+  lineeIds: z.array(z.string()).min(1),
+});
+export const aggiornaBusSchema = creaBusSchema.partial();

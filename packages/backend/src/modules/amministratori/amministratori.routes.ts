@@ -3,7 +3,7 @@ import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { db } from '../../db/client.js';
-import { amministratori, logAttivita, ruoli, ruoloPermessi } from '../../db/schema.js';
+import { amministratori, logAttivita, ruoli, ruoloPermessi, amministratorePermessi } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati, VietatoDaiPermessi } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
@@ -133,5 +133,66 @@ amministratoriRouter.delete(
     }
     await amministratoriService.remove(req.params.id);
     res.status(204).send();
+  })
+);
+
+// ---------------------------------------------------------------------
+// Eccezioni di permesso per singolo amministratore, oltre al suo ruolo.
+// ---------------------------------------------------------------------
+
+const eccezioniSchema = z.object({
+  eccezioni: z.array(z.object({ chiave: z.string(), concesso: z.boolean() })),
+});
+
+amministratoriRouter.get(
+  '/:id/permessi',
+  richiedePermesso('utenze.gestisci'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const target = await getById(req.params.id);
+    const [ruolo] = await db.select().from(ruoli).where(eq(ruoli.id, target.ruoloId)).limit(1);
+    const delRuolo = ruolo?.owner
+      ? ['*']
+      : (await db.select().from(ruoloPermessi).where(eq(ruoloPermessi.ruoloId, target.ruoloId))).map((r) => r.permessoChiave);
+    const eccezioni = await db.select().from(amministratorePermessi).where(eq(amministratorePermessi.amministratoreId, target.id));
+    const eff = await permessiEffettivi(target.id);
+
+    res.json({
+      ruoloOwner: ruolo?.owner ?? false,
+      permessiRuolo: delRuolo,
+      eccezioni: eccezioni.map((e) => ({ chiave: e.permessoChiave, concesso: e.concesso })),
+      effettivi: eff.owner ? ['*'] : Array.from(eff.permessi),
+    });
+  })
+);
+
+amministratoriRouter.put(
+  '/:id/permessi',
+  richiedePermesso('utenze.gestisci'),
+  valida(eccezioniSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const target = await getById(req.params.id);
+    const [ruoloTarget] = await db.select().from(ruoli).where(eq(ruoli.id, target.ruoloId)).limit(1);
+    if (ruoloTarget?.owner) {
+      throw new ConflittoDati('Il proprietario ha già tutti i permessi: non servono eccezioni personali.');
+    }
+
+    const eff = await permessiEffettivi(req.admin!.sub);
+    if (!eff.owner) {
+      const chiaviDaConcedere = req.body.eccezioni.filter((e: { chiave: string; concesso: boolean }) => e.concesso).map((e: { chiave: string }) => e.chiave);
+      const nonPossedute = chiaviDaConcedere.filter((c: string) => !eff.permessi.has(c));
+      if (nonPossedute.length > 0) {
+        throw new VietatoDaiPermessi(`Non puoi concedere permessi che non possiedi: ${nonPossedute.join(', ')}`);
+      }
+    }
+
+    await db.delete(amministratorePermessi).where(eq(amministratorePermessi.amministratoreId, target.id));
+    if (req.body.eccezioni.length > 0) {
+      await db.insert(amministratorePermessi).values(
+        req.body.eccezioni.map((e: { chiave: string; concesso: boolean }) => ({
+          amministratoreId: target.id, permessoChiave: e.chiave, concesso: e.concesso,
+        }))
+      );
+    }
+    res.json({ ok: true });
   })
 );

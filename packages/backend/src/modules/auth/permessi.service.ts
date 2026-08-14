@@ -1,14 +1,16 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { amministratori, ruoli, ruoloPermessi } from '../../db/schema.js';
+import { amministratori, ruoli, ruoloPermessi, amministratorePermessi } from '../../db/schema.js';
 
 export interface PermessiEffettivi {
   owner: boolean;
   permessi: Set<string>; // ignorato/irrilevante se owner === true
 }
 
-/** Calcola i permessi effettivi di un amministratore in base al suo ruolo.
- *  Un ruolo "owner" ha sempre tutti i permessi, presenti e futuri. */
+/** Calcola i permessi effettivi di un amministratore: permessi del suo
+ *  ruolo, con sopra applicate le eventuali eccezioni personali (concedi/
+ *  nega). Un ruolo "owner" ha sempre tutti i permessi, presenti e futuri,
+ *  a prescindere dalle eccezioni (che vengono ignorate in quel caso). */
 export async function permessiEffettivi(amministratoreId: string): Promise<PermessiEffettivi> {
   const [admin] = await db
     .select({ ruoloId: amministratori.ruoloId })
@@ -27,7 +29,19 @@ export async function permessiEffettivi(amministratoreId: string): Promise<Perme
     .from(ruoloPermessi)
     .where(eq(ruoloPermessi.ruoloId, ruolo.id));
 
-  return { owner: false, permessi: new Set(righe.map((r) => r.chiave)) };
+  const insieme = new Set(righe.map((r) => r.chiave));
+
+  const eccezioni = await db
+    .select()
+    .from(amministratorePermessi)
+    .where(eq(amministratorePermessi.amministratoreId, amministratoreId));
+
+  for (const e of eccezioni) {
+    if (e.concesso) insieme.add(e.permessoChiave);
+    else insieme.delete(e.permessoChiave);
+  }
+
+  return { owner: false, permessi: insieme };
 }
 
 export async function haPermesso(amministratoreId: string, chiave: string): Promise<boolean> {

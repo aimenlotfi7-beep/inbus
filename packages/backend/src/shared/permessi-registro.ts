@@ -25,6 +25,7 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   { chiave: 'eventi.vetrina', etichetta: 'Gestire la Vetrina (eventi in evidenza)', modulo: 'Eventi' }, // solo UI
   { chiave: 'eventi.calendario', etichetta: 'Visualizzare il Calendario eventi', modulo: 'Eventi' }, // solo UI
   { chiave: 'eventi.cestino', etichetta: 'Accedere al Cestino eventi eliminati', modulo: 'Eventi' }, // solo UI
+  { chiave: 'eventi.partenze', etichetta: 'Gestire la sezione Partenze (bus e copertura tratte)', modulo: 'Eventi' },
 
   // Prenotazioni
   { chiave: 'prenotazioni.visualizza', etichetta: 'Visualizzare prenotazioni', modulo: 'Prenotazioni' },
@@ -72,4 +73,5 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   { chiave: 'utenze.crea', etichetta: 'Creare nuove utenze del gestionale', modulo: 'Amministrazione' },
   { chiave: 'utenze.gestisci', etichetta: 'Modificare/disattivare/eliminare utenze esistenti', modulo: 'Amministrazione' },
   { chiave: 'permessi.gestisci', etichetta: 'Definire ruoli e le relative autorizzazioni', modulo: 'Amministrazione' },
+  { chiave: 'impostazioni.gestisci', etichetta: 'Modificare le impostazioni generali (es. posti per bus)', modulo: 'Amministrazione' },
 ];
