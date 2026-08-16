@@ -4,6 +4,7 @@ import { ErroreApi } from '../../api/client';
 import { geocodifica, durataViaggio, attesa } from '../shared/geo';
 import { OrarioInput } from '../shared/OrarioInput';
 import { PanelHead } from '../shared/PanelHead';
+import { RicercaSezione } from '../shared/RicercaSezione';
 import { Modale } from '../shared/Modale';
 import { useAvvisoModificheNonSalvate } from '../shared/useAvvisoModificheNonSalvate';
 
@@ -22,6 +23,7 @@ export function TragittiScreen() {
   const [statoCalcolo, setStatoCalcolo] = useState('');
   const [calcolando, setCalcolando] = useState(false);
   const [snapshotIniziale, setSnapshotIniziale] = useState('');
+  const [ricerca, setRicerca] = useState('');
 
   function ricarica() { tragittiApi.list().then(setTragitti); }
   useEffect(ricarica, []);
@@ -148,12 +150,17 @@ export function TragittiScreen() {
   const modificato = snapshotIniziale !== '' && JSON.stringify({ nome, fermate }) !== snapshotIniziale;
   const chiediConferma = useAvvisoModificheNonSalvate(modificato);
 
+  const tragittiFiltrati = ricerca.trim()
+    ? tragitti.filter((t) => `${t.nome} ${t.fermate.map((f) => f.citta).join(' ')}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
+    : tragitti;
+
   return (
     <div>
       <PanelHead titolo="Tragitti" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo tragitto</button>} />
-      {!tragitti.length && <p style={{ color: 'var(--mist)' }}>Nessun tragitto ancora.</p>}
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome tragitto o città..." />
+      {!tragittiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun tragitto trovato.' : 'Nessun tragitto ancora.'}</p>}
       <div className="cards-list">
-        {tragitti.map((t) => (
+        {tragittiFiltrati.map((t) => (
           <div key={t.id} className="evento-card" onClick={() => apriModifica(t)}>
             <h3>{t.nome}</h3>
             <p>{t.fermate.map((f) => f.citta).filter(Boolean).join(' → ') || 'Nessuna fermata'}</p>
@@ -182,7 +189,7 @@ export function TragittiScreen() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idx, 'orario', v)} placeholder="Orario" />
                   {idx === fermate.length - 1 ? (
-                    <span style={{ display: 'flex', alignItems: 'center', fontSize: 11.5, color: 'var(--mist)' }}>Nessun prezzo per l'arrivo</span>
+                    <span />
                   ) : (
                     <input placeholder="Prezzo €" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'prezzo', e.target.value)} />
                   )}

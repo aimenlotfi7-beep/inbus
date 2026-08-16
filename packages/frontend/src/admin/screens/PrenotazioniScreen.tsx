@@ -79,16 +79,17 @@ export function PrenotazioniScreen() {
             </div>
           )}
 
-          <div className="mini-tabs" style={{ flexWrap: 'wrap' }}>
+          <div className="cards-list" style={{ marginBottom: 24 }}>
             {tabFiltrate.map((ev) => (
-              <button
+              <div
                 key={ev.id}
-                type="button"
-                className={`mini-tab${eventoAttivoId === ev.id ? ' active' : ''}`}
+                className="evento-card"
+                style={eventoAttivoId === ev.id ? { borderColor: 'var(--pink)' } : undefined}
                 onClick={() => { setEventoAttivoId(ev.id); setSottoTab('CONFERMATA'); setRicercaPrenotazioni(''); }}
               >
-                {ev.artista}
-              </button>
+                <h3 style={{ fontSize: 16, margin: 0 }}>{ev.artista}</h3>
+                <p style={{ color: 'var(--mist)', fontSize: 12.5, marginTop: 6 }}>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
+              </div>
             ))}
           </div>
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { fornitoriApi, type Fornitore, type FornitoreInput } from '../../api/fornitori';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
+import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { Modale } from '../shared/Modale';
 
@@ -12,9 +13,14 @@ export function FornitoriScreen() {
   const [inModifica, setInModifica] = useState<Fornitore | null>(null);
   const [form, setForm] = useState<Partial<FornitoreInput>>(VUOTO);
   const [modaleAperta, setModaleAperta] = useState(false);
+  const [ricerca, setRicerca] = useState('');
 
   function ricarica() { fornitoriApi.list().then(setFornitori); }
   useEffect(ricarica, []);
+
+  const fornitoriFiltrati = ricerca.trim()
+    ? fornitori.filter((f) => `${f.nome} ${f.referente ?? ''} ${f.indirizzo ?? ''}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
+    : fornitori;
 
   function apriNuovo() { setInModifica(null); setForm(VUOTO); setModaleAperta(true); }
   function apriModifica(f: Fornitore) { setInModifica(f); setForm(f); setModaleAperta(true); }
@@ -39,8 +45,9 @@ export function FornitoriScreen() {
   return (
     <div>
       <PanelHead titolo="Fornitori" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo fornitore</button>} />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, referente o indirizzo..." />
       <TabellaGenerica
-        righe={fornitori}
+        righe={fornitoriFiltrati}
         colonne={[
           { etichetta: 'Nome', render: (f) => f.nome },
           { etichetta: 'Referente', render: (f) => f.referente ?? '—' },

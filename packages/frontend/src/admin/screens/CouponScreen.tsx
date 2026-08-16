@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { couponApi, type Coupon, type CouponInput } from '../../api/coupon';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
+import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { Modale } from '../shared/Modale';
 
@@ -12,9 +13,14 @@ export function CouponScreen() {
   const [inModifica, setInModifica] = useState<Coupon | null>(null);
   const [form, setForm] = useState<CouponInput>(VUOTO);
   const [modaleAperta, setModaleAperta] = useState(false);
+  const [ricerca, setRicerca] = useState('');
 
   function ricarica() { couponApi.list().then(setCoupon); }
   useEffect(ricarica, []);
+
+  const couponFiltrati = ricerca.trim()
+    ? coupon.filter((c) => c.codice.toLowerCase().includes(ricerca.trim().toLowerCase()))
+    : coupon;
 
   function apriNuovo() { setInModifica(null); setForm(VUOTO); setModaleAperta(true); }
   function apriModifica(c: Coupon) { setInModifica(c); setForm({ codice: c.codice, tipo: c.tipo, valore: Number(c.valore), usiMax: c.usiMax ?? undefined, attivo: c.attivo }); setModaleAperta(true); }
@@ -39,8 +45,9 @@ export function CouponScreen() {
   return (
     <div>
       <PanelHead titolo="Coupon" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo coupon</button>} />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per codice coupon..." />
       <TabellaGenerica
-        righe={coupon}
+        righe={couponFiltrati}
         colonne={[
           { etichetta: 'Codice', render: (c) => c.codice },
           { etichetta: 'Sconto', render: (c) => c.tipo === 'PERCENTUALE' ? `${c.valore}%` : `€${c.valore}` },

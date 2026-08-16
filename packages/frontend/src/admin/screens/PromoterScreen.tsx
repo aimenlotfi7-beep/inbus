@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { promoterApi, type Promoter, type PromoterInput } from '../../api/promoter';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
+import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { Modale } from '../shared/Modale';
 
@@ -13,9 +14,14 @@ export function PromoterScreen() {
   const [form, setForm] = useState<PromoterInput>(VUOTO);
   const [modaleAperta, setModaleAperta] = useState(false);
   const [statistiche, setStatistiche] = useState<{ numeroPrenotazioni: number; fatturato: number } | null>(null);
+  const [ricerca, setRicerca] = useState('');
 
   function ricarica() { promoterApi.list().then(setPromoter); }
   useEffect(ricarica, []);
+
+  const promoterFiltrati = ricerca.trim()
+    ? promoter.filter((p) => `${p.nome} ${p.email} ${p.codice}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
+    : promoter;
 
   function apriNuovo() { setInModifica(null); setForm(VUOTO); setStatistiche(null); setModaleAperta(true); }
   function apriModifica(p: Promoter) {
@@ -45,8 +51,9 @@ export function PromoterScreen() {
   return (
     <div>
       <PanelHead titolo="Promoter" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo promoter</button>} />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o codice..." />
       <TabellaGenerica
-        righe={promoter}
+        righe={promoterFiltrati}
         colonne={[
           { etichetta: 'Nome', render: (p) => p.nome },
           { etichetta: 'Email', render: (p) => p.email },

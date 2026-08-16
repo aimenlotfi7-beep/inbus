@@ -4,17 +4,23 @@ import { ErroreApi } from '../../api/client';
 import { prezzoMinimoEvento } from '../../api/prezzi';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
+import { RicercaSezione } from '../shared/RicercaSezione';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 
 export function EventiScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [inModifica, setInModifica] = useState<Evento | null>(null);
   const [modaleAperta, setModaleAperta] = useState(false);
+  const [ricerca, setRicerca] = useState('');
 
   function ricarica() {
     eventiApi.list().then(setEventi);
   }
   useEffect(ricarica, []);
+
+  const eventiFiltrati = ricerca.trim()
+    ? eventi.filter((ev) => `${ev.artista} ${ev.genere} ${ev.citta} ${ev.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
+    : eventi;
 
   function apriNuovo() { setInModifica(null); setModaleAperta(true); }
   function apriModifica(ev: Evento) { setInModifica(ev); setModaleAperta(true); }
@@ -32,9 +38,10 @@ export function EventiScreen() {
   return (
     <div>
       <PanelHead titolo="Eventi" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo evento</button>} />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, genere o città..." />
 
       <div className="cards-list">
-        {eventi.map((ev) => (
+        {eventiFiltrati.map((ev) => (
           <div key={ev.id} className="evento-card" onClick={() => apriModifica(ev)}>
             <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
             <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
@@ -46,7 +53,7 @@ export function EventiScreen() {
             <button className="btn btn-ghost" style={{ marginTop: 10, fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(ev); }}>Elimina</button>
           </div>
         ))}
-        {!eventi.length && <p style={{ color: 'var(--mist)' }}>Nessun evento ancora.</p>}
+        {!eventiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun evento trovato.' : 'Nessun evento ancora.'}</p>}
       </div>
 
       {modaleAperta && (

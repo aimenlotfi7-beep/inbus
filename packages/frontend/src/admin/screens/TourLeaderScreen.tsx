@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react';
 import { tourLeaderApi, type TourLeader } from '../../api/tourleader';
 import { PanelHead } from '../shared/PanelHead';
+import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 
 const ETICHETTE: Record<TourLeader['stato'], string> = { CANDIDATO: 'Candidato', ATTIVO: 'Attivo', ARCHIVIATO: 'Archiviato' };
 
 export function TourLeaderScreen() {
   const [lista, setLista] = useState<TourLeader[]>([]);
+  const [ricerca, setRicerca] = useState('');
   function ricarica() { tourLeaderApi.list().then(setLista); }
   useEffect(ricarica, []);
+
+  const listaFiltrata = ricerca.trim()
+    ? lista.filter((t) => `${t.nome} ${t.cognome} ${t.email} ${t.citta ?? ''}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
+    : lista;
 
   async function cambiaStato(t: TourLeader, stato: TourLeader['stato']) {
     await tourLeaderApi.update(t.id, { stato });
@@ -26,8 +32,9 @@ export function TourLeaderScreen() {
       <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 16 }}>
         Le candidature arrivano dal form pubblico di autocandidatura. Cambia lo stato per approvarle o archiviarle.
       </p>
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o città..." />
       <TabellaGenerica
-        righe={lista}
+        righe={listaFiltrata}
         colonne={[
           { etichetta: 'Nome', render: (t) => `${t.nome} ${t.cognome}` },
           { etichetta: 'Contatti', render: (t) => `${t.email}${t.telefono ? ' · ' + t.telefono : ''}` },

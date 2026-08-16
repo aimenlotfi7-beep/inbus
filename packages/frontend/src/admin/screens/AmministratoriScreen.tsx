@@ -3,6 +3,7 @@ import { amministratoriApi, type Amministratore, type AmministratoreInput, type 
 import { ruoliApi, type Ruolo, type Permesso } from '../../api/ruoli';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
+import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { Modale } from '../shared/Modale';
 
@@ -23,6 +24,7 @@ export function AmministratoriScreen() {
   const [permessiRuolo, setPermessiRuolo] = useState<string[]>([]);
   const [ruoloOwnerTarget, setRuoloOwnerTarget] = useState(false);
   const [statoPermessi, setStatoPermessi] = useState<Record<string, StatoPermesso>>({});
+  const [ricerca, setRicerca] = useState('');
 
   function ricarica() {
     amministratoriApi.list().then(setAdmin);
@@ -38,6 +40,10 @@ export function AmministratoriScreen() {
   function nomeRuolo(ruoloId: string) {
     return ruoliAssegnabili.find((r) => r.id === ruoloId)?.nome ?? '—';
   }
+
+  const adminFiltrati = ricerca.trim()
+    ? admin.filter((a) => `${a.nome} ${a.email} ${nomeRuolo(a.ruoloId)}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
+    : admin;
 
   function apriNuovo() { setInModifica(null); setForm({ ...VUOTO, ruoloId: ruoliAssegnabili[0]?.id ?? '' }); setModaleAperta(true); }
   function apriModifica(a: Amministratore) { setInModifica(a); setForm({ nome: a.nome, email: a.email, ruoloId: a.ruoloId, attivo: a.attivo }); setModaleAperta(true); }
@@ -127,8 +133,9 @@ export function AmministratoriScreen() {
   return (
     <div>
       <PanelHead titolo="Amministratori" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo amministratore</button>} />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o ruolo..." />
       <TabellaGenerica
-        righe={admin}
+        righe={adminFiltrati}
         colonne={[
           { etichetta: 'Nome', render: (a) => a.nome },
           { etichetta: 'Email', render: (a) => a.email },
