@@ -24,6 +24,10 @@ export function PartenzeScreen() {
     ? eventi.filter((ev) => `${ev.artista} ${ev.citta} ${ev.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : eventi;
 
+  if (selezionato) {
+    return <SchedaEventoModale evento={selezionato} tabIniziale="partenze" onClose={() => setSelezionato(null)} onSalvato={ricarica} />;
+  }
+
   return (
     <div>
       <PanelHead titolo="Partenze" />
@@ -41,10 +45,6 @@ export function PartenzeScreen() {
         ))}
         {!eventiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun evento trovato.' : 'Nessun evento ancora — creane uno dalla sezione Eventi.'}</p>}
       </div>
-
-      {selezionato && (
-        <SchedaEventoModale evento={selezionato} tabIniziale="partenze" onClose={() => setSelezionato(null)} onSalvato={ricarica} />
-      )}
     </div>
   );
 }

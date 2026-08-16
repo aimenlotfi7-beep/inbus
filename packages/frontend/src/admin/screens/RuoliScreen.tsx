@@ -4,7 +4,7 @@ import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
-import { Modale } from '../shared/Modale';
+import { PaginaSezione } from '../shared/PaginaSezione';
 
 interface FormRuolo {
   nome: string;
@@ -73,6 +73,33 @@ export function RuoliScreen() {
     }
   }
 
+  if (modaleAperta) {
+    return (
+      <PaginaSezione titolo={inModifica ? 'Modifica ruolo' : 'Nuovo ruolo'} onIndietro={() => setModaleAperta(false)}>
+        <div className="campo"><label>Nome del ruolo</label><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="es. Responsabile eventi" /></div>
+        <div className="campo"><label>Descrizione (facoltativa)</label><input value={form.descrizione} onChange={(e) => setForm({ ...form, descrizione: e.target.value })} /></div>
+
+        <p className="section-label" style={{ marginTop: 16, fontSize: 13, textTransform: 'none', letterSpacing: 0, color: 'var(--paper)', fontWeight: 700 }}>Permessi</p>
+        {permessiAssegnabili.length === 0 && (
+          <p className="testo-intro" style={{ fontSize: 13 }}>Non hai permessi assegnabili ad altri: non puoi creare o modificare ruoli con funzioni.</p>
+        )}
+        {moduli.map((modulo) => (
+          <div key={modulo} className="gruppo-modulo">
+            <p className="section-label">{modulo}</p>
+            {permessiAssegnabili.filter((p) => p.modulo === modulo).map((p) => (
+              <label key={p.chiave} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 2px', fontSize: 14 }}>
+                <input type="checkbox" checked={form.permessi.includes(p.chiave)} onChange={() => togglePermesso(p.chiave)} />
+                {p.etichetta}
+              </label>
+            ))}
+          </div>
+        ))}
+
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva ruolo</button>
+      </PaginaSezione>
+    );
+  }
+
   return (
     <div>
       <PanelHead titolo="Ruoli" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo ruolo</button>} />
@@ -91,31 +118,6 @@ export function RuoliScreen() {
         onModifica={apriModifica}
         onElimina={elimina}
       />
-
-      {modaleAperta && (
-        <Modale titolo={inModifica ? 'Modifica ruolo' : 'Nuovo ruolo'} onClose={() => setModaleAperta(false)} larga>
-          <div className="campo"><label>Nome del ruolo</label><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="es. Responsabile eventi" /></div>
-          <div className="campo"><label>Descrizione (facoltativa)</label><input value={form.descrizione} onChange={(e) => setForm({ ...form, descrizione: e.target.value })} /></div>
-
-          <p className="section-label" style={{ marginTop: 16, fontSize: 13, textTransform: 'none', letterSpacing: 0, color: 'var(--paper)', fontWeight: 700 }}>Permessi</p>
-          {permessiAssegnabili.length === 0 && (
-            <p className="testo-intro" style={{ fontSize: 13 }}>Non hai permessi assegnabili ad altri: non puoi creare o modificare ruoli con funzioni.</p>
-          )}
-          {moduli.map((modulo) => (
-            <div key={modulo} className="gruppo-modulo">
-              <p className="section-label">{modulo}</p>
-              {permessiAssegnabili.filter((p) => p.modulo === modulo).map((p) => (
-                <label key={p.chiave} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 2px', fontSize: 14 }}>
-                  <input type="checkbox" checked={form.permessi.includes(p.chiave)} onChange={() => togglePermesso(p.chiave)} />
-                  {p.etichetta}
-                </label>
-              ))}
-            </div>
-          ))}
-
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva ruolo</button>
-        </Modale>
-      )}
     </div>
   );
 }

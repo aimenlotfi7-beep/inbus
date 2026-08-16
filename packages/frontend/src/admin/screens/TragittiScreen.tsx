@@ -5,7 +5,7 @@ import { geocodifica, durataViaggio, attesa } from '../shared/geo';
 import { OrarioInput } from '../shared/OrarioInput';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
-import { Modale } from '../shared/Modale';
+import { PaginaSezione } from '../shared/PaginaSezione';
 import { useAvvisoModificheNonSalvate } from '../shared/useAvvisoModificheNonSalvate';
 
 function etichettaFermata(idx: number, totale: number) {
@@ -161,6 +161,52 @@ export function TragittiScreen() {
     ? tragitti.filter((t) => `${t.nome} ${t.fermate.map((f) => f.citta).join(' ')}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : tragitti;
 
+  if (modaleAperta) {
+    return (
+      <PaginaSezione titolo={inModifica ? 'Modifica tragitto' : 'Nuovo tragitto'} onIndietro={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
+        <div className="campo"><label>Nome tragitto</label><input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+
+        <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate</p>
+        {fermate.map((f, idx) => {
+          const etichetta = etichettaFermata(idx, fermate.length);
+          return (
+            <div key={idx} style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: etichetta.colore }}>{etichetta.testo}</span>
+                <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 11, color: 'var(--pink)' }} onClick={() => rimuoviFermata(idx)}>✕</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 8, marginBottom: 6 }}>
+                <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idx, 'citta', e.target.value)} />
+                <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idx, 'orario', v)} placeholder="Orario" />
+                {idx === fermate.length - 1 ? (
+                  <span />
+                ) : (
+                  <input placeholder="Prezzo €" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'prezzo', e.target.value)} />
+                )}
+              </div>
+            </div>
+          );
+        })}
+        <button className="btn btn-ghost" style={{ marginBottom: 18 }} onClick={aggiungiFermataIntermedia}>+ Aggiungi fermata intermedia</button>
+
+        <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, marginBottom: 18 }}>
+          <p style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 4 }}>Calcola orari di partenza dalle distanze</p>
+          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 10 }}>
+            Usa l'indirizzo e l'orario già inseriti nella fermata ARRIVO qui sopra come riferimento, e ricava a
+            ritroso l'orario di ogni fermata precedente in base ai tempi di viaggio reali.
+          </p>
+          <button className="btn btn-ghost" onClick={calcolaOrari} disabled={calcolando}>{calcolando ? 'Calcolo...' : 'Calcola orari'}</button>
+          {statoCalcolo && <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 8 }}>{statoCalcolo}</p>}
+        </div>
+
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva tragitto</button>
+      </PaginaSezione>
+    );
+  }
+
   return (
     <div>
       <PanelHead titolo="Tragitti" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo tragitto</button>} />
@@ -175,50 +221,6 @@ export function TragittiScreen() {
           </div>
         ))}
       </div>
-
-      {modaleAperta && (
-        <Modale titolo={inModifica ? 'Modifica tragitto' : 'Nuovo tragitto'} onClose={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
-          <div className="campo"><label>Nome tragitto</label><input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-
-          <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate</p>
-          {fermate.map((f, idx) => {
-            const etichetta = etichettaFermata(idx, fermate.length);
-            return (
-              <div key={idx} style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: etichetta.colore }}>{etichetta.testo}</span>
-                  <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 11, color: 'var(--pink)' }} onClick={() => rimuoviFermata(idx)}>✕</button>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 8, marginBottom: 6 }}>
-                  <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idx, 'citta', e.target.value)} />
-                  <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idx, 'orario', v)} placeholder="Orario" />
-                  {idx === fermate.length - 1 ? (
-                    <span />
-                  ) : (
-                    <input placeholder="Prezzo €" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'prezzo', e.target.value)} />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          <button className="btn btn-ghost" style={{ marginBottom: 18 }} onClick={aggiungiFermataIntermedia}>+ Aggiungi fermata intermedia</button>
-
-          <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, marginBottom: 18 }}>
-            <p style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 4 }}>Calcola orari di partenza dalle distanze</p>
-            <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 10 }}>
-              Usa l'indirizzo e l'orario già inseriti nella fermata ARRIVO qui sopra come riferimento, e ricava a
-              ritroso l'orario di ogni fermata precedente in base ai tempi di viaggio reali.
-            </p>
-            <button className="btn btn-ghost" onClick={calcolaOrari} disabled={calcolando}>{calcolando ? 'Calcolo...' : 'Calcola orari'}</button>
-            {statoCalcolo && <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 8 }}>{statoCalcolo}</p>}
-          </div>
-
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva tragitto</button>
-        </Modale>
-      )}
     </div>
   );
 }

@@ -15,6 +15,7 @@ const fermataSchema = z.object({
 });
 
 const lineaSchema = z.object({
+  id: z.string().optional(), // presente = tratta già esistente da aggiornare, assente = nuova
   nome: z.string().min(1),
   postiTotali: z.number().int().positive(),
   prezzoExtra: z.number().default(0),

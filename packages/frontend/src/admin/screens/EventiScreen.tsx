@@ -35,6 +35,10 @@ export function EventiScreen() {
     }
   }
 
+  if (modaleAperta) {
+    return <SchedaEventoModale evento={inModifica} tabIniziale="dettagli" onClose={() => setModaleAperta(false)} onSalvato={ricarica} />;
+  }
+
   return (
     <div>
       <PanelHead titolo="Eventi" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo evento</button>} />
@@ -55,10 +59,6 @@ export function EventiScreen() {
         ))}
         {!eventiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun evento trovato.' : 'Nessun evento ancora.'}</p>}
       </div>
-
-      {modaleAperta && (
-        <SchedaEventoModale evento={inModifica} tabIniziale="dettagli" onClose={() => setModaleAperta(false)} onSalvato={ricarica} />
-      )}
     </div>
   );
 }

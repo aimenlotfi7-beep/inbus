@@ -4,7 +4,7 @@ import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
-import { Modale } from '../shared/Modale';
+import { PaginaSezione } from '../shared/PaginaSezione';
 
 const VUOTO: Partial<FornitoreInput> = { nome: '', partitaIva: '', referente: '', telefono: '', email: '', indirizzo: '', note: '' };
 
@@ -42,6 +42,21 @@ export function FornitoriScreen() {
     ricarica();
   }
 
+  if (modaleAperta) {
+    return (
+      <PaginaSezione titolo={inModifica ? 'Modifica fornitore' : 'Nuovo fornitore'} onIndietro={() => setModaleAperta(false)}>
+        <div className="campo"><label>Nome</label><input value={form.nome ?? ''} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
+        <div className="campo"><label>Partita IVA</label><input value={form.partitaIva ?? ''} onChange={(e) => setForm({ ...form, partitaIva: e.target.value })} /></div>
+        <div className="campo"><label>Referente</label><input value={form.referente ?? ''} onChange={(e) => setForm({ ...form, referente: e.target.value })} /></div>
+        <div className="campo"><label>Telefono</label><input value={form.telefono ?? ''} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></div>
+        <div className="campo"><label>Email</label><input value={form.email ?? ''} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+        <div className="campo"><label>Indirizzo</label><input value={form.indirizzo ?? ''} onChange={(e) => setForm({ ...form, indirizzo: e.target.value })} /></div>
+        <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva fornitore</button>
+      </PaginaSezione>
+    );
+  }
+
   return (
     <div>
       <PanelHead titolo="Fornitori" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo fornitore</button>} />
@@ -57,18 +72,6 @@ export function FornitoriScreen() {
         onModifica={apriModifica}
         onElimina={elimina}
       />
-      {modaleAperta && (
-        <Modale titolo={inModifica ? 'Modifica fornitore' : 'Nuovo fornitore'} onClose={() => setModaleAperta(false)}>
-          <div className="campo"><label>Nome</label><input value={form.nome ?? ''} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
-          <div className="campo"><label>Partita IVA</label><input value={form.partitaIva ?? ''} onChange={(e) => setForm({ ...form, partitaIva: e.target.value })} /></div>
-          <div className="campo"><label>Referente</label><input value={form.referente ?? ''} onChange={(e) => setForm({ ...form, referente: e.target.value })} /></div>
-          <div className="campo"><label>Telefono</label><input value={form.telefono ?? ''} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></div>
-          <div className="campo"><label>Email</label><input value={form.email ?? ''} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          <div className="campo"><label>Indirizzo</label><input value={form.indirizzo ?? ''} onChange={(e) => setForm({ ...form, indirizzo: e.target.value })} /></div>
-          <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva fornitore</button>
-        </Modale>
-      )}
     </div>
   );
 }

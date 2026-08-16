@@ -5,7 +5,7 @@ import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
-import { Modale } from '../shared/Modale';
+import { PaginaSezione } from '../shared/PaginaSezione';
 
 const VUOTO: AmministratoreInput = { nome: '', email: '', password: '', ruoloId: '' };
 
@@ -130,6 +130,57 @@ export function AmministratoriScreen() {
     ruolo: 'dal-ruolo', extra: 'concesso-extra', negato: 'negato', nessuno: 'non-attivo',
   };
 
+  if (modaleAperta) {
+    return (
+      <PaginaSezione titolo={inModifica ? 'Modifica amministratore' : 'Nuovo amministratore'} onIndietro={() => setModaleAperta(false)}>
+        <div className="campo"><label>Nome</label><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
+        <div className="campo"><label>Email</label><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+        {!inModifica && <div className="campo"><label>Password</label><input type="password" value={form.password ?? ''} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>}
+        <div className="campo">
+          <label>Ruolo</label>
+          <select value={form.ruoloId} onChange={(e) => setForm({ ...form, ruoloId: e.target.value })}>
+            {ruoliAssegnabili.map((r) => (
+              <option key={r.id} value={r.id}>{r.nome}</option>
+            ))}
+          </select>
+          {ruoliAssegnabili.length === 0 && (
+            <p className="testo-intro" style={{ fontSize: 13, marginTop: 6, marginBottom: 0 }}>
+              Nessun ruolo assegnabile trovato: vai in "Ruoli" e crea prima un ruolo con permessi tuoi o inferiori.
+            </p>
+          )}
+        </div>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva amministratore</button>
+      </PaginaSezione>
+    );
+  }
+
+  if (permessiUtenza && !ruoloOwnerTarget) {
+    return (
+      <PaginaSezione titolo={`Permessi personali di ${permessiUtenza.nome}`} onIndietro={() => setPermessiUtenza(null)}>
+        <p className="testo-intro">
+          Di base questa utenza ha i permessi del ruolo "{nomeRuolo(permessiUtenza.ruoloId)}". Clicca un permesso per
+          aggiungerlo o toglierlo solo per questa persona, indipendentemente dal ruolo. Puoi togliere qualsiasi
+          permesso, ma puoi concederne in più solo tra quelli che possiedi tu stesso.
+        </p>
+        {moduli.map((modulo) => (
+          <div key={modulo} className="gruppo-modulo">
+            <p className="section-label">{modulo}</p>
+            {permessiAssegnabili.filter((p) => p.modulo === modulo).map((p) => {
+              const stato = statoPermessi[p.chiave] ?? 'nessuno';
+              return (
+                <button key={p.chiave} type="button" onClick={() => ciclaStato(p.chiave)} className="riga-cliccabile">
+                  <span className="riga-titolo">{p.etichetta}</span>
+                  <span className={`badge ${CLASSE_STATO[stato]}`}>{ETICHETTA_STATO[stato]}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+        <button className="btn btn-primary" style={{ width: '100%', marginTop: 14 }} onClick={salvaPermessi}>Salva permessi personali</button>
+      </PaginaSezione>
+    );
+  }
+
   return (
     <div>
       <PanelHead titolo="Amministratori" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo amministratore</button>} />
@@ -156,53 +207,6 @@ export function AmministratoriScreen() {
           { etichetta: 'Quando', render: (l) => new Date(l.data).toLocaleString('it-IT') },
         ]}
       />
-
-      {modaleAperta && (
-        <Modale titolo={inModifica ? 'Modifica amministratore' : 'Nuovo amministratore'} onClose={() => setModaleAperta(false)}>
-          <div className="campo"><label>Nome</label><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
-          <div className="campo"><label>Email</label><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          {!inModifica && <div className="campo"><label>Password</label><input type="password" value={form.password ?? ''} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>}
-          <div className="campo">
-            <label>Ruolo</label>
-            <select value={form.ruoloId} onChange={(e) => setForm({ ...form, ruoloId: e.target.value })}>
-              {ruoliAssegnabili.map((r) => (
-                <option key={r.id} value={r.id}>{r.nome}</option>
-              ))}
-            </select>
-            {ruoliAssegnabili.length === 0 && (
-              <p className="testo-intro" style={{ fontSize: 13, marginTop: 6, marginBottom: 0 }}>
-                Nessun ruolo assegnabile trovato: vai in "Ruoli" e crea prima un ruolo con permessi tuoi o inferiori.
-              </p>
-            )}
-          </div>
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva amministratore</button>
-        </Modale>
-      )}
-
-      {permessiUtenza && !ruoloOwnerTarget && (
-        <Modale titolo={`Permessi personali di ${permessiUtenza.nome}`} onClose={() => setPermessiUtenza(null)} larga>
-          <p className="testo-intro">
-            Di base questa utenza ha i permessi del ruolo "{nomeRuolo(permessiUtenza.ruoloId)}". Clicca un permesso per
-            aggiungerlo o toglierlo solo per questa persona, indipendentemente dal ruolo. Puoi togliere qualsiasi
-            permesso, ma puoi concederne in più solo tra quelli che possiedi tu stesso.
-          </p>
-          {moduli.map((modulo) => (
-            <div key={modulo} className="gruppo-modulo">
-              <p className="section-label">{modulo}</p>
-              {permessiAssegnabili.filter((p) => p.modulo === modulo).map((p) => {
-                const stato = statoPermessi[p.chiave] ?? 'nessuno';
-                return (
-                  <button key={p.chiave} type="button" onClick={() => ciclaStato(p.chiave)} className="riga-cliccabile">
-                    <span className="riga-titolo">{p.etichetta}</span>
-                    <span className={`badge ${CLASSE_STATO[stato]}`}>{ETICHETTA_STATO[stato]}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-          <button className="btn btn-primary" style={{ width: '100%', marginTop: 14 }} onClick={salvaPermessi}>Salva permessi personali</button>
-        </Modale>
-      )}
     </div>
   );
 }

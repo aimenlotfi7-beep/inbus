@@ -324,8 +324,8 @@ export const listaAttesa = pgTable('lista_attesa', {
   // Tratta/fermata preferita (facoltativa: potrebbe non essercene una
   // con posti quando si iscrive) — usata per precompilare il checkout
   // quando viene promossa.
-  lineaId: text('linea_id').references(() => lineeBus.id),
-  fermataId: text('fermata_id').references(() => fermate.id),
+  lineaId: text('linea_id').references(() => lineeBus.id, { onDelete: 'set null' }),
+  fermataId: text('fermata_id').references(() => fermate.id, { onDelete: 'set null' }),
   // Un passeggero per riga OLTRE al richiedente, come nel checkout
   // normale: [{nome,cognome}, ...]. Salvato come JSON per semplicità,
   // non serve interrogarlo separatamente.

@@ -4,7 +4,7 @@ import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
-import { Modale } from '../shared/Modale';
+import { PaginaSezione } from '../shared/PaginaSezione';
 
 const VUOTO: CouponInput = { codice: '', tipo: 'PERCENTUALE', valore: 10, attivo: true };
 
@@ -42,6 +42,27 @@ export function CouponScreen() {
     ricarica();
   }
 
+  if (modaleAperta) {
+    return (
+      <PaginaSezione titolo={inModifica ? 'Modifica coupon' : 'Nuovo coupon'} onIndietro={() => setModaleAperta(false)}>
+        <div className="campo"><label>Codice</label><input value={form.codice} onChange={(e) => setForm({ ...form, codice: e.target.value.toUpperCase() })} /></div>
+        <div className="campo">
+          <label>Tipo</label>
+          <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value as CouponInput['tipo'] })}>
+            <option value="PERCENTUALE">Percentuale</option>
+            <option value="FISSO">Importo fisso</option>
+          </select>
+        </div>
+        <div className="campo"><label>Valore</label><input type="number" value={form.valore} onChange={(e) => setForm({ ...form, valore: Number(e.target.value) })} /></div>
+        <div className="campo"><label>Usi massimi (vuoto = illimitati)</label><input type="number" value={form.usiMax ?? ''} onChange={(e) => setForm({ ...form, usiMax: e.target.value ? Number(e.target.value) : undefined })} /></div>
+        <div className="campo">
+          <label><input type="checkbox" checked={form.attivo ?? true} onChange={(e) => setForm({ ...form, attivo: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Attivo</label>
+        </div>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva coupon</button>
+      </PaginaSezione>
+    );
+  }
+
   return (
     <div>
       <PanelHead titolo="Coupon" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo coupon</button>} />
@@ -57,24 +78,6 @@ export function CouponScreen() {
         onModifica={apriModifica}
         onElimina={elimina}
       />
-      {modaleAperta && (
-        <Modale titolo={inModifica ? 'Modifica coupon' : 'Nuovo coupon'} onClose={() => setModaleAperta(false)}>
-          <div className="campo"><label>Codice</label><input value={form.codice} onChange={(e) => setForm({ ...form, codice: e.target.value.toUpperCase() })} /></div>
-          <div className="campo">
-            <label>Tipo</label>
-            <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value as CouponInput['tipo'] })}>
-              <option value="PERCENTUALE">Percentuale</option>
-              <option value="FISSO">Importo fisso</option>
-            </select>
-          </div>
-          <div className="campo"><label>Valore</label><input type="number" value={form.valore} onChange={(e) => setForm({ ...form, valore: Number(e.target.value) })} /></div>
-          <div className="campo"><label>Usi massimi (vuoto = illimitati)</label><input type="number" value={form.usiMax ?? ''} onChange={(e) => setForm({ ...form, usiMax: e.target.value ? Number(e.target.value) : undefined })} /></div>
-          <div className="campo">
-            <label><input type="checkbox" checked={form.attivo ?? true} onChange={(e) => setForm({ ...form, attivo: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Attivo</label>
-          </div>
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva coupon</button>
-        </Modale>
-      )}
     </div>
   );
 }

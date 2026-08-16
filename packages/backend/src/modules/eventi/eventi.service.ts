@@ -140,40 +140,96 @@ export const eventiService = {
         })
         .where(eq(eventi.id, id));
 
-      // Le linee/fermate, se inviate, sostituiscono interamente quelle
-      // esistenti (stesso comportamento del prototipo originale): è la
-      // via più semplice e prevedibile per un form che invia sempre
-      // l'elenco completo, invece di fare un diff granulare.
+      // Le linee/fermate, se inviate: quelle con un `id` (già esistenti)
+      // vengono AGGIORNATE sul posto, non cancellate e ricreate — se le
+      // cancellassimo e quella tratta avesse già prenotazioni vere
+      // collegate, il database rifiuterebbe la cancellazione (per non
+      // perdere quei dati) e l'intero salvataggio fallirebbe con un
+      // errore. Solo le linee rimosse dal form vengono davvero cancellate,
+      // e solo se non hanno prenotazioni collegate.
       if (input.linee) {
-        await tx.delete(lineeBus).where(eq(lineeBus.eventoId, id)); // cascade sulle fermate
+        const lineeEsistenti = await tx.select().from(lineeBus).where(eq(lineeBus.eventoId, id));
+        const idsInviati = new Set(input.linee.filter((l) => l.id).map((l) => l.id));
+
+        // Tratte tolte dal form: cancellale solo se libere da prenotazioni.
+        for (const esistente of lineeEsistenti) {
+          if (idsInviati.has(esistente.id)) continue;
+          const collegate = await tx.select({ id: prenotazioni.id }).from(prenotazioni).where(eq(prenotazioni.lineaId, esistente.id)).limit(1);
+          if (collegate.length > 0) {
+            throw new ConflittoDati(`Non puoi rimuovere la tratta "${esistente.nome}": ha prenotazioni collegate. Lasciala nell'evento, anche se non la usi più per le nuove vendite.`);
+          }
+          await tx.delete(lineeBus).where(eq(lineeBus.id, esistente.id)); // cascade su fermate/bus_tratte
+        }
+
         for (const linea of input.linee) {
-          const [nuovaLinea] = await tx
-            .insert(lineeBus)
-            .values({
-              eventoId: id,
+          const giaEsistente = linea.id ? lineeEsistenti.find((l) => l.id === linea.id) : undefined;
+
+          if (giaEsistente) {
+            // I posti occupati (venduti) restano tali: se cambi i posti
+            // totali, i disponibili si aggiustano della stessa quantità,
+            // invece di essere resettati (perderebbe traccia di chi ha
+            // già prenotato).
+            const postiOccupati = giaEsistente.postiTotali - giaEsistente.postiDisponibili;
+            const nuoviPostiDisponibili = Math.max(0, linea.postiTotali - postiOccupati);
+
+            await tx.update(lineeBus).set({
               nome: linea.nome,
               postiTotali: linea.postiTotali,
-              postiDisponibili: linea.postiTotali,
+              postiDisponibili: nuoviPostiDisponibili,
               prezzoExtra: linea.prezzoExtra.toFixed(2),
               referenteNome: linea.referenteNome,
               referenteTelefono: linea.referenteTelefono,
               fornitoreId: linea.fornitoreId,
-            })
-            .returning();
+            }).where(eq(lineeBus.id, giaEsistente.id));
 
-          if (linea.fermate.length) {
-            await tx.insert(fermate).values(
-              linea.fermate.map((f, ordine) => ({
-                lineaId: nuovaLinea.id,
-                ordine,
-                citta: f.citta,
-                indirizzo: f.indirizzo,
-                orario: f.orario,
-                orarioRitorno: f.orarioRitorno,
-                indirizzoRitorno: f.indirizzoRitorno,
-                prezzo: f.prezzo?.toFixed(2),
-              }))
-            );
+            // Le fermate non hanno prenotazioni collegate direttamente
+            // (le prenotazioni salvano città/indirizzo come testo, non un
+            // riferimento), quindi qui si possono sostituire liberamente.
+            await tx.delete(fermate).where(eq(fermate.lineaId, giaEsistente.id));
+            if (linea.fermate.length) {
+              await tx.insert(fermate).values(
+                linea.fermate.map((f, ordine) => ({
+                  lineaId: giaEsistente.id,
+                  ordine,
+                  citta: f.citta,
+                  indirizzo: f.indirizzo,
+                  orario: f.orario,
+                  orarioRitorno: f.orarioRitorno,
+                  indirizzoRitorno: f.indirizzoRitorno,
+                  prezzo: f.prezzo?.toFixed(2),
+                }))
+              );
+            }
+          } else {
+            // Tratta nuova.
+            const [nuovaLinea] = await tx
+              .insert(lineeBus)
+              .values({
+                eventoId: id,
+                nome: linea.nome,
+                postiTotali: linea.postiTotali,
+                postiDisponibili: linea.postiTotali,
+                prezzoExtra: linea.prezzoExtra.toFixed(2),
+                referenteNome: linea.referenteNome,
+                referenteTelefono: linea.referenteTelefono,
+                fornitoreId: linea.fornitoreId,
+              })
+              .returning();
+
+            if (linea.fermate.length) {
+              await tx.insert(fermate).values(
+                linea.fermate.map((f, ordine) => ({
+                  lineaId: nuovaLinea.id,
+                  ordine,
+                  citta: f.citta,
+                  indirizzo: f.indirizzo,
+                  orario: f.orario,
+                  orarioRitorno: f.orarioRitorno,
+                  indirizzoRitorno: f.indirizzoRitorno,
+                  prezzo: f.prezzo?.toFixed(2),
+                }))
+              );
+            }
           }
         }
       }

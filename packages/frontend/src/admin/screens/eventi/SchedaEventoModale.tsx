@@ -4,7 +4,7 @@ import { tragittiApi, type Tragitto } from '../../../api/tragitti';
 import { categorieApi, type Categoria } from '../../../api/categorie';
 import { ErroreApi } from '../../../api/client';
 import type { Evento } from '../../../api/types';
-import { Modale } from '../../shared/Modale';
+import { PaginaSezione } from '../../shared/PaginaSezione';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
 import { PartenzeTab } from '../partenze/PartenzeTab';
@@ -68,6 +68,7 @@ export function SchedaEventoModale({
         statoDisponibilita: evento.statoDisponibilita,
         immagini: [...evento.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
         linee: evento.linee.map((l) => ({
+          id: l.id,
           nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra),
           // Normalizzo qui il prezzo che arriva dal server: se una fermata
           // non ne aveva uno salvato, arriva `null`, non `undefined` — va
@@ -443,7 +444,7 @@ export function SchedaEventoModale({
 
   if (evento) {
     return (
-      <Modale titolo="Modifica evento" onClose={onClose} larga={tabAttiva !== 'dettagli'} richiediConferma={() => chiediConferma(onClose)}>
+      <PaginaSezione titolo="Modifica evento" onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)}>
         <div className="mini-tabs">
           <button type="button" className={`mini-tab${tabAttiva === 'dettagli' ? ' active' : ''}`} onClick={() => setTabAttiva('dettagli')}>Dettagli</button>
           <button type="button" className={`mini-tab${tabAttiva === 'partenze' ? ' active' : ''}`} onClick={() => setTabAttiva('partenze')}>Partenze</button>
@@ -462,7 +463,7 @@ export function SchedaEventoModale({
             <button className="btn btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={salva}>Salva evento</button>
           </>
         )}
-      </Modale>
+      </PaginaSezione>
     );
   }
 
@@ -471,7 +472,7 @@ export function SchedaEventoModale({
   const numeroTratte = (form.linee ?? []).filter((l) => l.nome.trim()).length;
 
   return (
-    <Modale titolo="Nuovo evento" onClose={onClose} richiediConferma={() => chiediConferma(onClose)} larga>
+    <PaginaSezione titolo="Nuovo evento" onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)}>
       <div className="wizard-stepper">
         {STEP_WIZARD.map((s) => (
           <div key={s.numero} className={`wizard-dot${step === s.numero ? ' active' : step > s.numero ? ' completato' : ''}`}>
@@ -505,7 +506,7 @@ export function SchedaEventoModale({
       )}
 
       <div className="wizard-nav">
-        <button className="btn btn-ghost" disabled={step === 1} onClick={() => setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s))}>← Indietro</button>
+        <button className="btn btn-ghost" disabled={step === 1} onClick={() => setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s))}>← Passo precedente</button>
         {step < 4 ? (
           <button
             className="btn btn-primary"
@@ -520,6 +521,6 @@ export function SchedaEventoModale({
           <button className="btn btn-primary" onClick={salva}>Crea evento</button>
         )}
       </div>
-    </Modale>
+    </PaginaSezione>
   );
 }

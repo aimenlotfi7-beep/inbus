@@ -607,6 +607,20 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 }
 .campo textarea{min-height:70px; resize:vertical;}
 
+/* ---------- PAGINA SEZIONE (sostituisce la modale per le schede di
+   modifica/dettaglio: occupa tutta l'area invece di comparire come popup) ---------- */
+.pagina-sezione-head{
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--line);
+}
+.pagina-sezione-indietro{flex-shrink:0;}
+.pagina-sezione-head h2{
+  font-family:'Anton',sans-serif; text-transform:uppercase; font-size:22px; margin:0; flex:1;
+}
+.pagina-sezione-azioni{display:flex; gap:8px; flex-shrink:0;}
+.pagina-sezione-corpo{max-width:760px;}
+.pagina-sezione-corpo.larga{max-width:1100px;}
+
 /* ---------- CARD SEZIONE (contenitori tipo "Tratta X", "Bus Y") ---------- */
 .section-card{
   background:var(--dusk); border:1px solid var(--line); border-radius:12px;

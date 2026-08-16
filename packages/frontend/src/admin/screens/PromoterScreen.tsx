@@ -4,7 +4,7 @@ import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
-import { Modale } from '../shared/Modale';
+import { PaginaSezione } from '../shared/PaginaSezione';
 
 const VUOTO: PromoterInput = { nome: '', email: '', password: '', commissionePercentuale: 10 };
 
@@ -48,6 +48,24 @@ export function PromoterScreen() {
     ricarica();
   }
 
+  if (modaleAperta) {
+    return (
+      <PaginaSezione titolo={inModifica ? 'Modifica promoter' : 'Nuovo promoter'} onIndietro={() => setModaleAperta(false)}>
+        <div className="campo"><label>Nome</label><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
+        <div className="campo"><label>Email</label><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+        <div className="campo"><label>Telefono</label><input value={form.telefono ?? ''} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></div>
+        {!inModifica && <div className="campo"><label>Password iniziale</label><input type="password" value={form.password ?? ''} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>}
+        <div className="campo"><label>Commissione %</label><input type="number" value={form.commissionePercentuale ?? 10} onChange={(e) => setForm({ ...form, commissionePercentuale: Number(e.target.value) })} /></div>
+        {statistiche && (
+          <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 14 }}>
+            {statistiche.numeroPrenotazioni} prenotazioni portate · €{statistiche.fatturato.toFixed(2)} di fatturato generato
+          </p>
+        )}
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva promoter</button>
+      </PaginaSezione>
+    );
+  }
+
   return (
     <div>
       <PanelHead titolo="Promoter" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo promoter</button>} />
@@ -63,21 +81,6 @@ export function PromoterScreen() {
         onModifica={apriModifica}
         onElimina={elimina}
       />
-      {modaleAperta && (
-        <Modale titolo={inModifica ? 'Modifica promoter' : 'Nuovo promoter'} onClose={() => setModaleAperta(false)}>
-          <div className="campo"><label>Nome</label><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
-          <div className="campo"><label>Email</label><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          <div className="campo"><label>Telefono</label><input value={form.telefono ?? ''} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></div>
-          {!inModifica && <div className="campo"><label>Password iniziale</label><input type="password" value={form.password ?? ''} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>}
-          <div className="campo"><label>Commissione %</label><input type="number" value={form.commissionePercentuale ?? 10} onChange={(e) => setForm({ ...form, commissionePercentuale: Number(e.target.value) })} /></div>
-          {statistiche && (
-            <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 14 }}>
-              {statistiche.numeroPrenotazioni} prenotazioni portate · €{statistiche.fatturato.toFixed(2)} di fatturato generato
-            </p>
-          )}
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva promoter</button>
-        </Modale>
-      )}
     </div>
   );
 }
