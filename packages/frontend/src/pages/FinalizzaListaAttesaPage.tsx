@@ -86,7 +86,7 @@ export function FinalizzaListaAttesaPage() {
               <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
                 {opzioni.filter((o) => o.postiDisponibili > 0).map((o) => (
                   <option key={o.fermataId} value={o.fermataId}>
-                    {o.fermataCitta} ({o.fermataOrario ?? 'orario da definire'}) — €{o.prezzoEffettivo.toFixed(2)}
+                    {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{o.prezzoEffettivo.toFixed(2)}
                   </option>
                 ))}
               </select>

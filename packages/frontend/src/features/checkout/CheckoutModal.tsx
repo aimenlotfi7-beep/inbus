@@ -171,7 +171,7 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
                 <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
                   {opzioni.map((o) => (
                     <option key={o.fermataId} value={o.fermataId}>
-                      {o.fermataCitta} ({o.fermataOrario ?? 'orario da definire'}) — €{o.prezzoEffettivo.toFixed(2)}
+                      {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{o.prezzoEffettivo.toFixed(2)}
                     </option>
                   ))}
                 </select>
