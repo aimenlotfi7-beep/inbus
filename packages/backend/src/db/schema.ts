@@ -113,6 +113,12 @@ export const lineeBus = pgTable('linee_bus', {
   referenteNome: text('referente_nome'),
   referenteTelefono: text('referente_telefono'),
   fornitoreId: text('fornitore_id').references(() => fornitori.id),
+  // L'arrivo (destinazione + orario) si decide qui, sulla tratta
+  // dell'evento — non nel tragitto, perché la destinazione cambia a ogni
+  // evento anche riusando lo stesso tragitto di fermate. È l'ancora da
+  // cui si calcolano a ritroso gli orari delle fermate.
+  arrivoIndirizzo: text('arrivo_indirizzo'),
+  arrivoOrario: text('arrivo_orario'),
   // Sezione "Partenze": indica se questa tratta è coperta (bus prenotato
   // con l'agenzia/fornitore), a prescindere dal calcolo automatico dei
   // bus necessari, che resta solo un suggerimento.

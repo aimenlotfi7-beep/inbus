@@ -4,7 +4,6 @@ export interface FermataTragitto {
   id?: string;
   citta: string;
   indirizzo: string;
-  orario?: string;
   prezzo?: number;
 }
 export interface Tragitto {

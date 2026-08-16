@@ -8,33 +8,29 @@ import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 
+// I tragitti sono ora solo template di fermate+prezzo, riutilizzabili su
+// qualunque evento — l'orario non c'è più qui: si calcola sulla singola
+// tratta dell'evento, dove si sa qual è la vera destinazione.
 const fermataTragittoSchema = z.object({
   citta: z.string().min(1),
   indirizzo: z.string().min(1),
-  orario: z.string().optional(),
-  // Tollerante a `null` (può arrivare così ricaricando una fermata senza
-  // prezzo salvato in precedenza, es. l'arrivo) — lo tratta come assente.
+  // Tollerante a `null` per compatibilità con vecchie fermate salvate
+  // prima di questo cambiamento — lo tratta come assente.
   prezzo: z.number().positive().nullable().optional().transform((v) => v ?? undefined),
 });
 const tragittoSchema = z.object({
   nome: z.string().min(1),
   fermate: z.array(fermataTragittoSchema).default([]),
 }).refine(
-  (t) => t.fermate.length === 0 || t.fermate.length >= 2,
-  { message: 'Un tragitto deve avere almeno una fermata di partenza e una di arrivo.', path: ['fermate'] }
-).refine(
-  (t) => t.fermate.length === 0 || t.fermate.slice(0, -1).every((f) => f.prezzo !== undefined),
-  { message: 'Ogni fermata di partenza/intermedia deve avere un prezzo (solo l\'ultima, l\'arrivo, può non averlo).', path: ['fermate'] }
+  (t) => t.fermate.every((f) => f.prezzo !== undefined),
+  { message: 'Ogni fermata deve avere un prezzo.', path: ['fermate'] }
 );
 const aggiornaTragittoSchema = z.object({
   nome: z.string().min(1).optional(),
   fermate: z.array(fermataTragittoSchema).optional(),
 }).refine(
-  (t) => !t.fermate || t.fermate.length === 0 || t.fermate.length >= 2,
-  { message: 'Un tragitto deve avere almeno una fermata di partenza e una di arrivo.', path: ['fermate'] }
-).refine(
-  (t) => !t.fermate || t.fermate.length === 0 || t.fermate.slice(0, -1).every((f) => f.prezzo !== undefined),
-  { message: 'Ogni fermata di partenza/intermedia deve avere un prezzo (solo l\'ultima, l\'arrivo, può non averlo).', path: ['fermate'] }
+  (t) => !t.fermate || t.fermate.every((f) => f.prezzo !== undefined),
+  { message: 'Ogni fermata deve avere un prezzo.', path: ['fermate'] }
 );
 
 async function getById(id: string) {
@@ -57,7 +53,7 @@ export const tragittiService = {
         await tx.insert(fermateTragitto).values(
           input.fermate.map((f, ordine) => ({
             tragittoId: nuovo.id, ordine, citta: f.citta, indirizzo: f.indirizzo,
-            orario: f.orario, prezzo: f.prezzo?.toFixed(2),
+            prezzo: f.prezzo?.toFixed(2),
           }))
         );
       }
@@ -77,7 +73,7 @@ export const tragittiService = {
           await tx.insert(fermateTragitto).values(
             input.fermate.map((f, ordine) => ({
               tragittoId: id, ordine, citta: f.citta, indirizzo: f.indirizzo,
-              orario: f.orario, prezzo: f.prezzo?.toFixed(2),
+              prezzo: f.prezzo?.toFixed(2),
             }))
           );
         }

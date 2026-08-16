@@ -70,6 +70,7 @@ export function SchedaEventoModale({
         linee: evento.linee.map((l) => ({
           id: l.id,
           nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra),
+          arrivoIndirizzo: l.arrivoIndirizzo ?? undefined, arrivoOrario: l.arrivoOrario ?? undefined,
           // Normalizzo qui il prezzo che arriva dal server: se una fermata
           // non ne aveva uno salvato, arriva `null`, non `undefined` — va
           // convertito subito, altrimenti finirebbe di nuovo a rimbalzare
@@ -96,11 +97,7 @@ export function SchedaEventoModale({
   }
   function aggiungiFermata(idxLinea: number) {
     const linee = [...(form.linee ?? [])];
-    // La nuova fermata va prima dell'ultima (l'arrivo resta sempre per ultimo).
-    const fermate = [...linee[idxLinea].fermate];
-    const nuova: FermataInput = { citta: '', indirizzo: '' };
-    if (fermate.length >= 1) fermate.splice(fermate.length - 1, 0, nuova);
-    else fermate.push(nuova);
+    const fermate = [...linee[idxLinea].fermate, { citta: '', indirizzo: '' } as FermataInput];
     linee[idxLinea] = { ...linee[idxLinea], fermate };
     setForm({ ...form, linee });
   }
@@ -138,26 +135,21 @@ export function SchedaEventoModale({
   }
 
   /** Aggiunge una tratta a partire da un tragitto salvato: nome e fermate
-   *  vengono copiati — da qui in poi sono indipendenti, modificabili
-   *  liberamente senza toccare il tragitto originale. Il prezzo, se
-   *  assente su una fermata del tragitto (arriva come `null`), viene
-   *  normalizzato subito a "non impostato" invece di propagare il null. */
+   *  (con prezzo) vengono copiati — da qui in poi sono indipendenti,
+   *  modificabili liberamente senza toccare il tragitto originale. I
+   *  tragitti non hanno orari: l'arrivo si precompila con il luogo
+   *  dell'evento (spesso è proprio la destinazione), ma resta modificabile,
+   *  e l'orario di arrivo va sempre inserito a mano prima di calcolare. */
   function aggiungiTrattaDaTragitto(tragitto: Tragitto) {
     const nuovaLinea: LineaInput = {
       nome: tragitto.nome,
       postiTotali: 50,
       prezzoExtra: 0,
-      fermate: tragitto.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ?? undefined })),
+      arrivoIndirizzo: form.luogo || '',
+      fermate: tragitto.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined })),
     };
     setForm({ ...form, linee: [...(form.linee ?? []), nuovaLinea] });
   }
-  function trattaGiaAggiunta(tragitto: Tragitto) {
-    return (form.linee ?? []).some((l) => l.nome === tragitto.nome);
-  }
-  function rimuoviTrattaPerNome(nome: string) {
-    setForm({ ...form, linee: (form.linee ?? []).filter((l) => l.nome !== nome) });
-  }
-
   function aggiungiTrattaManuale() {
     setForm({ ...form, linee: [...(form.linee ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, fermate: [{ citta: '', indirizzo: '' }] }] });
   }
@@ -182,22 +174,29 @@ export function SchedaEventoModale({
   /** Ricalcola gli orari di una tratta a ritroso dall'orario di arrivo
    *  (ultima fermata), usando le distanze reali tra gli indirizzi via
    *  Nominatim + OSRM (gratuiti) — stessa logica già usata per i tragitti. */
+  /** Ricalcola gli orari di una tratta a ritroso dall'ARRIVO (campo
+   *  separato della tratta, non più l'ultima fermata), usando le distanze
+   *  reali tra gli indirizzi via Nominatim + OSRM (gratuiti). Tutte le
+   *  fermate ricevono un orario calcolato — nessuna è "l'arrivo". */
   async function ricalcolaOrariTratta(idxLinea: number) {
     const linea = (form.linee ?? [])[idxLinea];
     if (!linea) return;
     const fermateValide = linea.fermate.filter((f) => f.indirizzo.trim());
-    if (fermateValide.length < 2) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: 'Servono almeno due fermate con indirizzo compilato.' })); return; }
-    const orarioArrivo = fermateValide[fermateValide.length - 1].orario;
-    if (!orarioArrivo) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: "Inserisci prima l'orario sull'ultima fermata (l'arrivo)." })); return; }
+    if (fermateValide.length === 0) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: 'Aggiungi almeno una fermata con indirizzo compilato.' })); return; }
+    if (!linea.arrivoIndirizzo?.trim()) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: "Inserisci prima l'indirizzo di arrivo qui sopra." })); return; }
+    if (!linea.arrivoOrario) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: "Inserisci prima l'orario di arrivo qui sopra." })); return; }
 
     setRicalcolando((s) => ({ ...s, [idxLinea]: true }));
     setStatoRicalcolo((s) => ({ ...s, [idxLinea]: 'Localizzo gli indirizzi...' }));
 
-    const coordFermate: (Awaited<ReturnType<typeof geocodifica>>['coordinate'])[] = [];
+    // La sequenza da geolocalizzare è: fermate in ordine, poi l'arrivo per
+    // ultimo — il viaggio finisce sempre lì.
+    const indirizziCompleti = [...fermateValide.map((f) => `${f.indirizzo}, ${f.citta}`), linea.arrivoIndirizzo];
+    const coordinate: (Awaited<ReturnType<typeof geocodifica>>['coordinate'])[] = [];
     let problemaRete = false;
-    for (const f of fermateValide) {
-      const r = await geocodifica(`${f.indirizzo}, ${f.citta}`);
-      coordFermate.push(r.coordinate);
+    for (const indirizzo of indirizziCompleti) {
+      const r = await geocodifica(indirizzo);
+      coordinate.push(r.coordinate);
       if (r.erroreRete) problemaRete = true;
       await attesa(1100);
     }
@@ -209,18 +208,19 @@ export function SchedaEventoModale({
     }
 
     const durate: (number | null)[] = [];
-    for (let i = 0; i < coordFermate.length - 1; i++) {
-      const a = coordFermate[i], b = coordFermate[i + 1];
+    for (let i = 0; i < coordinate.length - 1; i++) {
+      const a = coordinate[i], b = coordinate[i + 1];
       durate.push(a && b ? await durataViaggio(a, b) : null);
       await attesa(300);
     }
 
-    let cursore = Number(orarioArrivo.split(':')[0]) * 60 + Number(orarioArrivo.split(':')[1]);
+    // Parto dall'orario di arrivo e risalgo tappa per tappa, dall'ultima
+    // fermata (quella più vicina all'arrivo) fino alla prima.
+    let cursore = Number(linea.arrivoOrario.split(':')[0]) * 60 + Number(linea.arrivoOrario.split(':')[1]);
     const orariCalcolati = new Array<string>(fermateValide.length);
-    orariCalcolati[fermateValide.length - 1] = orarioArrivo;
     let errori = 0;
-    for (let i = fermateValide.length - 2; i >= 0; i--) {
-      const durata = durate[i];
+    for (let i = fermateValide.length - 1; i >= 0; i--) {
+      const durata = durate[i]; // durata[i] = tratta dalla fermata i al punto successivo (fermata i+1, o l'arrivo se i è l'ultima)
       if (durata === null) { errori++; orariCalcolati[i] = ''; continue; }
       cursore -= durata + 5;
       const h = Math.floor(((cursore % 1440) + 1440) % 1440 / 60);
@@ -342,22 +342,17 @@ export function SchedaEventoModale({
     <>
       {tragitti.length > 0 && (
         <div className="section-card" style={{ marginBottom: 16 }}>
-          <p className="section-label" style={{ marginBottom: 10 }}>Tragitti salvati — clicca per aggiungerli come tratta</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {tragitti.map((t) => {
-              const aggiunta = trattaGiaAggiunta(t);
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`badge badge-btn ${aggiunta ? 'coperta' : 'dal-ruolo'}`}
-                  onClick={() => (aggiunta ? rimuoviTrattaPerNome(t.nome) : aggiungiTrattaDaTragitto(t))}
-                >
-                  {aggiunta ? '✓ ' : '+ '}{t.nome}
-                </button>
-              );
-            })}
-          </div>
+          <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi una tratta da un tragitto salvato</p>
+          <select
+            value=""
+            onChange={(e) => {
+              const t = tragitti.find((x) => x.id === e.target.value);
+              if (t) aggiungiTrattaDaTragitto(t);
+            }}
+          >
+            <option value="">Scegli un tragitto...</option>
+            {tragitti.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+          </select>
         </div>
       )}
 
@@ -369,6 +364,14 @@ export function SchedaEventoModale({
               <input placeholder="Posti totali" type="number" value={linea.postiTotali} onChange={(e) => aggiornaLinea(idxLinea, 'postiTotali', Number(e.target.value))} />
             </div>
             <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12.5 }} onClick={() => rimuoviLinea(idxLinea)}>Rimuovi tratta</button>
+          </div>
+
+          <div style={{ background: 'var(--night)', border: '1px solid var(--pink-dim)', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>Arrivo (destinazione)</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr', gap: 8 }}>
+              <input placeholder="Indirizzo di arrivo" value={linea.arrivoIndirizzo ?? ''} onChange={(e) => aggiornaLinea(idxLinea, 'arrivoIndirizzo', e.target.value)} />
+              <OrarioInput value={linea.arrivoOrario ?? ''} onChange={(v) => aggiornaLinea(idxLinea, 'arrivoOrario', v)} placeholder="Orario" />
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
@@ -383,39 +386,32 @@ export function SchedaEventoModale({
               Applica € a tutte le fermate
             </button>
             <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => ricalcolaOrariTratta(idxLinea)} disabled={ricalcolando[idxLinea]}>
-              {ricalcolando[idxLinea] ? 'Calcolo orari...' : '↻ Ricalcola orari dall\'arrivo'}
+              {ricalcolando[idxLinea] ? 'Calcolo orari...' : '↻ Calcola orari dall\'arrivo'}
             </button>
           </div>
           {statoRicalcolo[idxLinea] && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoRicalcolo[idxLinea]}</p>}
 
-          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla. L'ultima è sempre l'arrivo (non ha prezzo).</p>
-          {linea.fermate.map((f, idxFermata) => {
-            const ultima = idxFermata === linea.fermate.length - 1;
-            return (
-              <div
-                key={idxFermata}
-                draggable
-                onDragStart={() => onDragStart(idxLinea, idxFermata)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => onDropSu(idxLinea, idxFermata)}
-                style={{
-                  display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr .55fr .55fr auto', gap: 6, marginBottom: 6, alignItems: 'center',
-                  opacity: trascinata?.linea === idxLinea && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
-                }}
-              >
-                <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
-                <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'citta', e.target.value)} />
-                <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'indirizzo', e.target.value)} />
-                <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxLinea, idxFermata, 'orario', v)} />
-                {ultima ? (
-                  <span style={{ fontSize: 11.5, color: 'var(--mist)', textAlign: 'center' }}>arrivo</span>
-                ) : (
-                  <input placeholder="Prezzo € *" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'prezzo', e.target.value)} />
-                )}
-                <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxLinea, idxFermata)} title="Rimuovi fermata">✕</button>
-              </div>
-            );
-          })}
+          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla. Ognuna ha un prezzo — l'arrivo si imposta qui sopra, separatamente.</p>
+          {linea.fermate.map((f, idxFermata) => (
+            <div
+              key={idxFermata}
+              draggable
+              onDragStart={() => onDragStart(idxLinea, idxFermata)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => onDropSu(idxLinea, idxFermata)}
+              style={{
+                display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr .55fr .55fr auto', gap: 6, marginBottom: 6, alignItems: 'center',
+                opacity: trascinata?.linea === idxLinea && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
+              }}
+            >
+              <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
+              <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'citta', e.target.value)} />
+              <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'indirizzo', e.target.value)} />
+              <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxLinea, idxFermata, 'orario', v)} />
+              <input placeholder="Prezzo € *" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'prezzo', e.target.value)} />
+              <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxLinea, idxFermata)} title="Rimuovi fermata">✕</button>
+            </div>
+          ))}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxLinea)}>+ Aggiungi fermata</button>
         </div>
       ))}

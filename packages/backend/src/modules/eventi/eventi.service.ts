@@ -97,6 +97,8 @@ export const eventiService = {
             referenteNome: linea.referenteNome,
             referenteTelefono: linea.referenteTelefono,
             fornitoreId: linea.fornitoreId,
+            arrivoIndirizzo: linea.arrivoIndirizzo,
+            arrivoOrario: linea.arrivoOrario,
           })
           .returning();
 
@@ -203,6 +205,8 @@ export const eventiService = {
               referenteNome: linea.referenteNome,
               referenteTelefono: linea.referenteTelefono,
               fornitoreId: linea.fornitoreId,
+              arrivoIndirizzo: linea.arrivoIndirizzo,
+              arrivoOrario: linea.arrivoOrario,
             }).where(eq(lineeBus.id, giaEsistente.id));
 
             // Le fermate non hanno prenotazioni collegate direttamente
@@ -236,6 +240,8 @@ export const eventiService = {
                 referenteNome: linea.referenteNome,
                 referenteTelefono: linea.referenteTelefono,
                 fornitoreId: linea.fornitoreId,
+                arrivoIndirizzo: linea.arrivoIndirizzo,
+                arrivoOrario: linea.arrivoOrario,
               })
               .returning();
 
@@ -299,12 +305,10 @@ export const eventiService = {
 
     for (const linea of evento.linee) {
       if (linea.postiDisponibili <= 0) continue;
-      // L'ultima fermata in ordine è sempre l'arrivo (stessa convenzione
-      // usata ovunque nel progetto): nessuno parte da lì, quindi non deve
-      // comparire come opzione di partenza selezionabile dal cliente.
-      const fermateOrdinate = [...linea.fermate].sort((a, b) => a.ordine - b.ordine);
-      const fermatePartenza = fermateOrdinate.length > 1 ? fermateOrdinate.slice(0, -1) : fermateOrdinate;
-      for (const f of fermatePartenza) {
+      // Con il nuovo modello, l'arrivo è un campo separato della tratta
+      // (non più l'ultima fermata): tutte le fermate qui sono partenze
+      // valide, nessuna esclusione.
+      for (const f of linea.fermate) {
         const prezzoEffettivo = f.prezzo
           ? Number(f.prezzo)
           : (evento.prezzo ? Number(evento.prezzo) : 0) + Number(linea.prezzoExtra);

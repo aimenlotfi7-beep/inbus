@@ -6,7 +6,9 @@ export interface FermataInput {
 }
 export interface LineaInput {
   id?: string; // presente = tratta già esistente, assente = nuova
-  nome: string; postiTotali: number; prezzoExtra?: number; referenteNome?: string; referenteTelefono?: string; fornitoreId?: string; fermate: FermataInput[];
+  nome: string; postiTotali: number; prezzoExtra?: number; referenteNome?: string; referenteTelefono?: string; fornitoreId?: string;
+  arrivoIndirizzo?: string; arrivoOrario?: string;
+  fermate: FermataInput[];
 }
 export interface EventoInput {
   artista: string; genere: string; luogo: string; citta: string; data: string; prezzo?: number;

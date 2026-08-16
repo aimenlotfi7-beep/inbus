@@ -16,6 +16,8 @@ export interface LineaBus {
   prezzoExtra: string;
   referenteNome: string | null;
   referenteTelefono: string | null;
+  arrivoIndirizzo: string | null;
+  arrivoOrario: string | null;
   fermate: Fermata[];
 }
 

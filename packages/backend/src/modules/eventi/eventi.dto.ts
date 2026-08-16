@@ -22,12 +22,13 @@ const lineaSchema = z.object({
   referenteNome: z.string().optional(),
   referenteTelefono: z.string().optional(),
   fornitoreId: z.string().optional(),
+  // L'arrivo (destinazione + orario) è specifico dell'evento, non del
+  // tragitto: è l'ancora da cui si calcolano a ritroso gli orari delle
+  // fermate. I tragitti restano solo fermate+prezzo, riutilizzabili.
+  arrivoIndirizzo: z.string().optional(),
+  arrivoOrario: z.string().optional(),
   fermate: z.array(fermataSchema).default([]),
 });
-// Nota: il prezzo obbligatorio per fermata (tranne l'arrivo) si applica
-// alla creazione/modifica dei TRAGITTI (la fonte), non più qui — così
-// modificare un evento esistente non si blocca per tratte create prima
-// che questa regola esistesse.
 
 export const creaEventoSchema = z.object({
   artista: z.string().min(1),
