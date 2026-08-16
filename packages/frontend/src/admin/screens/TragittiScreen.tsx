@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { tragittiApi, type Tragitto, type FermataTragitto } from '../../api/tragitti';
 import { ErroreApi } from '../../api/client';
 import { geocodifica, durataViaggio, attesa } from '../shared/geo';
+import { OrarioInput } from '../shared/OrarioInput';
 import { PanelHead } from '../shared/PanelHead';
 import { Modale } from '../shared/Modale';
 
@@ -31,7 +32,8 @@ export function TragittiScreen() {
   }
   function apriModifica(t: Tragitto) {
     setInModifica(t); setNome(t.nome);
-    setFermate(t.fermate.length ? t.fermate : [{ citta: '', indirizzo: '' }]);
+    const fermateNormalizzate = t.fermate.map((f) => ({ ...f, prezzo: f.prezzo ?? undefined }));
+    setFermate(fermateNormalizzate.length ? fermateNormalizzate : [{ citta: '', indirizzo: '' }]);
     setStatoCalcolo('');
     setModaleAperta(true);
   }
@@ -169,8 +171,12 @@ export function TragittiScreen() {
                   <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <input placeholder="Orario" type="time" value={f.orario ?? ''} onChange={(e) => aggiornaFermata(idx, 'orario', e.target.value)} />
-                  <input placeholder="Prezzo €" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'prezzo', e.target.value)} />
+                  <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idx, 'orario', v)} placeholder="Orario" />
+                  {idx === fermate.length - 1 ? (
+                    <span style={{ display: 'flex', alignItems: 'center', fontSize: 11.5, color: 'var(--mist)' }}>Nessun prezzo per l'arrivo</span>
+                  ) : (
+                    <input placeholder="Prezzo €" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'prezzo', e.target.value)} />
+                  )}
                 </div>
               </div>
             );

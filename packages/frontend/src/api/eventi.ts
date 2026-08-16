@@ -8,7 +8,7 @@ export interface LineaInput {
   nome: string; postiTotali: number; prezzoExtra?: number; referenteNome?: string; referenteTelefono?: string; fornitoreId?: string; fermate: FermataInput[];
 }
 export interface EventoInput {
-  artista: string; genere: string; luogo: string; citta: string; data: string; prezzo: number;
+  artista: string; genere: string; luogo: string; citta: string; data: string; prezzo?: number;
   inEvidenza?: boolean; ordineEvidenza?: number; accontoEur?: number;
   immagini?: string[]; allegati?: { nome: string; url: string }[]; linee?: LineaInput[];
 }
@@ -38,7 +38,7 @@ export interface BusFisicoInput {
 }
 
 export const eventiApi = {
-  list: (filtri?: { citta?: string; genere?: string }) => {
+  list: (filtri?: { citta?: string; genere?: string; ricerca?: string }) => {
     const query = new URLSearchParams(filtri as Record<string, string>).toString();
     return api.get<Evento[]>(`/api/eventi${query ? `?${query}` : ''}`);
   },

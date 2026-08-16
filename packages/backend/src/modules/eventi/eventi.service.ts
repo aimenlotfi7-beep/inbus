@@ -38,6 +38,10 @@ export const eventiService = {
     if (query.citta) condizioni.push(ilike(eventi.citta, `%${query.citta}%`));
     if (query.genere) condizioni.push(ilike(eventi.genere, `%${query.genere}%`));
     if (query.soloInEvidenza) condizioni.push(eq(eventi.inEvidenza, true));
+    if (query.ricerca?.trim()) {
+      const q = `%${query.ricerca.trim()}%`;
+      condizioni.push(sql`(${ilike(eventi.artista, q)} OR ${ilike(eventi.luogo, q)} OR ${ilike(eventi.citta, q)})`);
+    }
 
     return db.query.eventi.findMany({
       where: condizioni.length ? and(...condizioni) : undefined,
@@ -58,7 +62,7 @@ export const eventiService = {
           luogo: input.luogo,
           citta: input.citta,
           data: input.data,
-          prezzo: input.prezzo.toFixed(2),
+          prezzo: input.prezzo?.toFixed(2),
           inEvidenza: input.inEvidenza,
           ordineEvidenza: input.ordineEvidenza,
           vetrinaDal: input.vetrinaDal,
@@ -217,7 +221,7 @@ export const eventiService = {
       for (const f of linea.fermate) {
         const prezzoEffettivo = f.prezzo
           ? Number(f.prezzo)
-          : Number(evento.prezzo) + Number(linea.prezzoExtra);
+          : (evento.prezzo ? Number(evento.prezzo) : 0) + Number(linea.prezzoExtra);
         opzioni.push({
           lineaId: linea.id,
           postiDisponibili: linea.postiDisponibili,

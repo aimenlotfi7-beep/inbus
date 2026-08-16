@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { eventiApi } from '../../api/eventi';
 import { ErroreApi } from '../../api/client';
+import { prezzoMinimoEvento } from '../../api/prezzi';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
@@ -38,7 +39,10 @@ export function EventiScreen() {
             <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
             <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
             <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{ev.luogo}, {ev.citta}</p>
-            <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{new Date(ev.data).toLocaleDateString('it-IT')} · €{Number(ev.prezzo).toFixed(2)}</p>
+            <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>
+              {new Date(ev.data).toLocaleDateString('it-IT')}
+              {(() => { const p = prezzoMinimoEvento(ev); return p !== null ? ` · da €${p.toFixed(2)}` : ''; })()}
+            </p>
             <button className="btn btn-ghost" style={{ marginTop: 10, fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(ev); }}>Elimina</button>
           </div>
         ))}

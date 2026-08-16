@@ -1,6 +1,6 @@
-import { and, eq, sql, desc } from 'drizzle-orm';
+import { and, eq, sql, desc, inArray } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { prenotazioni, lineeBus, fermate, eventi, coupon, utenti } from '../../db/schema.js';
+import { prenotazioni, lineeBus, fermate, eventi, coupon, utenti, partecipantiPrenotazione } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo } from '../../shared/errors.js';
 import { utentiService } from '../utenti/utenti.service.js';
 import { env } from '../../config/env.js';
@@ -56,7 +56,7 @@ export const prenotazioniService = {
         throw new ConflittoDati('Posti non più disponibili su questo bus: qualcun altro li ha appena prenotati.');
       }
 
-      const prezzoEffettivo = fermata.prezzo ? Number(fermata.prezzo) : Number(evento.prezzo) + Number(linea.prezzoExtra);
+      const prezzoEffettivo = fermata.prezzo ? Number(fermata.prezzo) : (evento.prezzo ? Number(evento.prezzo) : 0) + Number(linea.prezzoExtra);
       const importoBase = prezzoEffettivo * input.passeggeri;
       const { sconto, coupon: couponUsato } = await validaCoupon(input.couponCodice, importoBase);
 
@@ -104,6 +104,13 @@ export const prenotazioniService = {
         })
         .returning();
 
+      // Il richiedente conta come primo partecipante (ordine 0), poi uno
+      // per ogni modulo passeggero aggiuntivo compilato al checkout.
+      await tx.insert(partecipantiPrenotazione).values([
+        { prenotazioneId: prenotazione.id, nome: input.cliente.nome, cognome: input.cliente.cognome, ordine: 0 },
+        ...input.partecipanti.map((p, i) => ({ prenotazioneId: prenotazione.id, nome: p.nome, cognome: p.cognome, ordine: i + 1 })),
+      ]);
+
       return { ...prenotazione, totaleComplessivo: totale };
     });
   },
@@ -120,10 +127,19 @@ export const prenotazioniService = {
     return db.select().from(prenotazioni).where(eq(prenotazioni.utenteId, utente.id));
   },
 
-  /** Elenco completo per il gestionale (Transazioni/Pagamenti), con dati
-   *  cliente/evento già uniti per evitare N query separate dal frontend. */
-  async listAll() {
-    return db
+  /** Elenco per il gestionale (sezione Prenotazioni), con dati
+   *  cliente/evento già uniti per evitare N query separate dal frontend.
+   *  Filtrabile per evento, stato e parola chiave (PNR, cliente,
+   *  partecipanti). I partecipanti di ogni prenotazione sono aggiunti con
+   *  una seconda query e uniti in JS, più semplice di un GROUP BY con
+   *  json_agg per questo volume di dati. */
+  async listAll(filtri: { eventoId?: string; stato?: 'CONFERMATA' | 'CANCELLATA'; ricerca?: string } = {}) {
+    const condizioni = [
+      filtri.eventoId ? eq(prenotazioni.eventoId, filtri.eventoId) : undefined,
+      filtri.stato ? eq(prenotazioni.stato, filtri.stato) : undefined,
+    ].filter((c): c is NonNullable<typeof c> => c !== undefined);
+
+    const righe = await db
       .select({
         id: prenotazioni.id,
         pnr: prenotazioni.pnr,
@@ -134,14 +150,46 @@ export const prenotazioniService = {
         saldoPagato: prenotazioni.saldoPagato,
         stato: prenotazioni.stato,
         creataIl: prenotazioni.creataIl,
+        eventoId: prenotazioni.eventoId,
         artista: eventi.artista,
         clienteEmail: utenti.email,
         clienteNome: utenti.nome,
+        clienteCognome: utenti.cognome,
+        clienteTelefono: utenti.telefono,
       })
       .from(prenotazioni)
       .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
       .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
+      .where(condizioni.length > 0 ? and(...condizioni) : undefined)
       .orderBy(desc(prenotazioni.creataIl));
+
+    if (righe.length === 0) return [];
+
+    const idPrenotazioni = righe.map((r) => r.id);
+    const partecipanti = await db
+      .select()
+      .from(partecipantiPrenotazione)
+      .where(inArray(partecipantiPrenotazione.prenotazioneId, idPrenotazioni))
+      .orderBy(partecipantiPrenotazione.ordine);
+
+    const risultato = righe.map((r) => ({
+      ...r,
+      partecipanti: partecipanti.filter((p) => p.prenotazioneId === r.id).map((p) => ({ nome: p.nome, cognome: p.cognome })),
+    }));
+
+    if (!filtri.ricerca?.trim()) return risultato;
+
+    // Ricerca testuale sui campi già caricati (volumi ridotti, non serve
+    // farla via SQL): PNR, nome/cognome/email cliente, nome/cognome di
+    // ogni partecipante.
+    const q = filtri.ricerca.trim().toLowerCase();
+    return risultato.filter((r) => (
+      r.pnr.toLowerCase().includes(q) ||
+      (r.clienteNome ?? '').toLowerCase().includes(q) ||
+      (r.clienteCognome ?? '').toLowerCase().includes(q) ||
+      r.clienteEmail.toLowerCase().includes(q) ||
+      r.partecipanti.some((p) => p.nome.toLowerCase().includes(q) || p.cognome.toLowerCase().includes(q))
+    ));
   },
 
   /** Cancella e restituisce i posti al bus, in un'unica transazione. */
@@ -174,5 +222,17 @@ export const prenotazioniService = {
       .returning();
     if (!aggiornata) throw new NonTrovato('Prenotazione');
     return aggiornata;
+  },
+
+  /** Elimina DEFINITIVAMENTE una prenotazione dal database — solo se già
+   *  cancellata (mai una attiva/confermata, per non perdere dati veri).
+   *  Usato dal gestionale per ripulire prenotazioni di test. */
+  async eliminaDefinitivamente(pnr: string) {
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
+    if (!p) throw new NonTrovato('Prenotazione');
+    if (p.stato !== 'CANCELLATA') {
+      throw new ConflittoDati('Puoi eliminare definitivamente solo prenotazioni già cancellate. Cancellala prima.');
+    }
+    await db.delete(prenotazioni).where(eq(prenotazioni.pnr, pnr));
   },
 };

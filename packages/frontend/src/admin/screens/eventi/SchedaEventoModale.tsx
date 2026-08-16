@@ -5,9 +5,11 @@ import { categorieApi, type Categoria } from '../../../api/categorie';
 import { ErroreApi } from '../../../api/client';
 import type { Evento } from '../../../api/types';
 import { Modale } from '../../shared/Modale';
+import { OrarioInput } from '../../shared/OrarioInput';
 import { PartenzeTab } from '../partenze/PartenzeTab';
+import { geocodifica, durataViaggio, attesa } from '../../shared/geo';
 
-const VUOTO: EventoInput = { artista: '', genere: '', luogo: '', citta: '', data: '', prezzo: 0, inEvidenza: false, accontoEur: 10, immagini: [], linee: [] };
+const VUOTO: EventoInput = { artista: '', genere: '', luogo: '', citta: '', data: '', inEvidenza: false, accontoEur: 10, immagini: [], linee: [] };
 
 const STEP_WIZARD = [
   { numero: 1, label: 'Info evento' },
@@ -22,6 +24,11 @@ const STEP_WIZARD = [
  *   Immagini → Riepilogo), come nel prototipo originale.
  * - Modifica (evento esistente): tab "Dettagli"/"Partenze", per poter
  *   saltare direttamente al campo che serve senza rifare tutti gli step.
+ *
+ * I prezzi arrivano sempre dalle fermate delle tratte (non c'è più un
+ * "prezzo base" evento): ogni fermata di partenza/intermedia richiede un
+ * prezzo prima di poter salvare — solo l'ultima (l'arrivo) può non
+ * averlo, perché nessuno parte da lì.
  */
 export function SchedaEventoModale({
   evento, tabIniziale = 'dettagli', onClose, onSalvato,
@@ -38,6 +45,9 @@ export function SchedaEventoModale({
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [aggiustiPerTratta, setAggiustiPerTratta] = useState<Record<number, string>>({});
   const [nuovaImmagine, setNuovaImmagine] = useState('');
+  const [trascinata, setTrascinata] = useState<{ linea: number; fermata: number } | null>(null);
+  const [statoRicalcolo, setStatoRicalcolo] = useState<Record<number, string>>({});
+  const [ricalcolando, setRicalcolando] = useState<Record<number, boolean>>({});
 
   function ricaricaCategorie() {
     categorieApi.list().then(setCategorie);
@@ -49,11 +59,15 @@ export function SchedaEventoModale({
     if (evento) {
       setForm({
         artista: evento.artista, genere: evento.genere, luogo: evento.luogo, citta: evento.citta,
-        data: evento.data.slice(0, 10), prezzo: Number(evento.prezzo), inEvidenza: evento.inEvidenza,
+        data: evento.data.slice(0, 10), inEvidenza: evento.inEvidenza,
         accontoEur: evento.accontoEur ? Number(evento.accontoEur) : 10,
         immagini: [...evento.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
         linee: evento.linee.map((l) => ({
           nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra),
+          // Normalizzo qui il prezzo che arriva dal server: se una fermata
+          // non ne aveva uno salvato, arriva `null`, non `undefined` — va
+          // convertito subito, altrimenti finirebbe di nuovo a rimbalzare
+          // in giro come null fino a far fallire la validazione al salvataggio.
           fermate: l.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ? Number(f.prezzo) : undefined })),
         })),
       });
@@ -62,6 +76,7 @@ export function SchedaEventoModale({
       setStep(1);
     }
     setAggiustiPerTratta({});
+    setStatoRicalcolo({});
     setTabAttiva(tabIniziale);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evento?.id]);
@@ -73,13 +88,18 @@ export function SchedaEventoModale({
   }
   function aggiungiFermata(idxLinea: number) {
     const linee = [...(form.linee ?? [])];
-    linee[idxLinea] = { ...linee[idxLinea], fermate: [...linee[idxLinea].fermate, { citta: '', indirizzo: '' }] };
+    // La nuova fermata va prima dell'ultima (l'arrivo resta sempre per ultimo).
+    const fermate = [...linee[idxLinea].fermate];
+    const nuova: FermataInput = { citta: '', indirizzo: '' };
+    if (fermate.length >= 1) fermate.splice(fermate.length - 1, 0, nuova);
+    else fermate.push(nuova);
+    linee[idxLinea] = { ...linee[idxLinea], fermate };
     setForm({ ...form, linee });
   }
   function aggiornaFermata(idxLinea: number, idxFermata: number, campo: keyof FermataInput, valore: string) {
     const linee = [...(form.linee ?? [])];
     const fermate = [...linee[idxLinea].fermate];
-    fermate[idxFermata] = { ...fermate[idxFermata], [campo]: campo === 'prezzo' ? Number(valore) || undefined : valore };
+    fermate[idxFermata] = { ...fermate[idxFermata], [campo]: campo === 'prezzo' ? (Number(valore) || undefined) : valore };
     linee[idxLinea] = { ...linee[idxLinea], fermate };
     setForm({ ...form, linee });
   }
@@ -94,16 +114,32 @@ export function SchedaEventoModale({
     setForm({ ...form, linee });
   }
 
+  // ---- Riordino fermate trascinandole (drag & drop nativo, senza librerie) ----
+  function onDragStart(idxLinea: number, idxFermata: number) {
+    setTrascinata({ linea: idxLinea, fermata: idxFermata });
+  }
+  function onDropSu(idxLinea: number, idxFermataDestinazione: number) {
+    if (!trascinata || trascinata.linea !== idxLinea) { setTrascinata(null); return; }
+    const linee = [...(form.linee ?? [])];
+    const fermate = [...linee[idxLinea].fermate];
+    const [spostata] = fermate.splice(trascinata.fermata, 1);
+    fermate.splice(idxFermataDestinazione, 0, spostata);
+    linee[idxLinea] = { ...linee[idxLinea], fermate };
+    setForm({ ...form, linee });
+    setTrascinata(null);
+  }
+
   /** Aggiunge una tratta a partire da un tragitto salvato: nome e fermate
-   *  (con il prezzo per fermata già impostato nel tragitto) vengono
-   *  copiati — da qui in poi sono indipendenti, modificabili liberamente
-   *  senza toccare il tragitto originale. */
+   *  vengono copiati — da qui in poi sono indipendenti, modificabili
+   *  liberamente senza toccare il tragitto originale. Il prezzo, se
+   *  assente su una fermata del tragitto (arriva come `null`), viene
+   *  normalizzato subito a "non impostato" invece di propagare il null. */
   function aggiungiTrattaDaTragitto(tragitto: Tragitto) {
     const nuovaLinea: LineaInput = {
       nome: tragitto.nome,
       postiTotali: 50,
       prezzoExtra: 0,
-      fermate: tragitto.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario, prezzo: f.prezzo })),
+      fermate: tragitto.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ?? undefined })),
     };
     setForm({ ...form, linee: [...(form.linee ?? []), nuovaLinea] });
   }
@@ -120,8 +156,7 @@ export function SchedaEventoModale({
 
   /** Applica +/- € a tutte le fermate con un prezzo già impostato di
    *  questa tratta (es. +10 aggiunge 10€ ovunque, -5 toglie 5€, mai sotto
-   *  zero). Le fermate senza prezzo proprio non vengono toccate: usano
-   *  comunque il prezzo base evento + eventuale prezzoExtra della tratta. */
+   *  zero). Le fermate senza prezzo proprio non vengono toccate. */
   function aggiustaPrezziTratta(idxLinea: number) {
     const delta = Number(aggiustiPerTratta[idxLinea]);
     if (!delta) return;
@@ -136,8 +171,90 @@ export function SchedaEventoModale({
     setAggiustiPerTratta((s) => ({ ...s, [idxLinea]: '' }));
   }
 
+  /** Ricalcola gli orari di una tratta a ritroso dall'orario di arrivo
+   *  (ultima fermata), usando le distanze reali tra gli indirizzi via
+   *  Nominatim + OSRM (gratuiti) — stessa logica già usata per i tragitti. */
+  async function ricalcolaOrariTratta(idxLinea: number) {
+    const linea = (form.linee ?? [])[idxLinea];
+    if (!linea) return;
+    const fermateValide = linea.fermate.filter((f) => f.indirizzo.trim());
+    if (fermateValide.length < 2) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: 'Servono almeno due fermate con indirizzo compilato.' })); return; }
+    const orarioArrivo = fermateValide[fermateValide.length - 1].orario;
+    if (!orarioArrivo) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: "Inserisci prima l'orario sull'ultima fermata (l'arrivo)." })); return; }
+
+    setRicalcolando((s) => ({ ...s, [idxLinea]: true }));
+    setStatoRicalcolo((s) => ({ ...s, [idxLinea]: 'Localizzo gli indirizzi...' }));
+
+    const coordFermate: (Awaited<ReturnType<typeof geocodifica>>['coordinate'])[] = [];
+    let problemaRete = false;
+    for (const f of fermateValide) {
+      const r = await geocodifica(`${f.indirizzo}, ${f.citta}`);
+      coordFermate.push(r.coordinate);
+      if (r.erroreRete) problemaRete = true;
+      await attesa(1100);
+    }
+
+    if (problemaRete) {
+      setStatoRicalcolo((s) => ({ ...s, [idxLinea]: 'Richiesta a OpenStreetMap non riuscita (rete/firewall). Apri la Console (F12) per il dettaglio.' }));
+      setRicalcolando((s) => ({ ...s, [idxLinea]: false }));
+      return;
+    }
+
+    const durate: (number | null)[] = [];
+    for (let i = 0; i < coordFermate.length - 1; i++) {
+      const a = coordFermate[i], b = coordFermate[i + 1];
+      durate.push(a && b ? await durataViaggio(a, b) : null);
+      await attesa(300);
+    }
+
+    let cursore = Number(orarioArrivo.split(':')[0]) * 60 + Number(orarioArrivo.split(':')[1]);
+    const orariCalcolati = new Array<string>(fermateValide.length);
+    orariCalcolati[fermateValide.length - 1] = orarioArrivo;
+    let errori = 0;
+    for (let i = fermateValide.length - 2; i >= 0; i--) {
+      const durata = durate[i];
+      if (durata === null) { errori++; orariCalcolati[i] = ''; continue; }
+      cursore -= durata + 5;
+      const h = Math.floor(((cursore % 1440) + 1440) % 1440 / 60);
+      const m = ((cursore % 1440) + 1440) % 1440 % 60;
+      orariCalcolati[i] = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    let idxValida = 0;
+    const linee = [...(form.linee ?? [])];
+    linee[idxLinea] = {
+      ...linee[idxLinea],
+      fermate: linee[idxLinea].fermate.map((f) => {
+        if (!f.indirizzo.trim()) return f;
+        const orario = orariCalcolati[idxValida]; idxValida++;
+        return orario ? { ...f, orario } : f;
+      }),
+    };
+    setForm({ ...form, linee });
+
+    setStatoRicalcolo((s) => ({ ...s, [idxLinea]: errori ? `Fatto, ma ${errori} indirizzo/i non localizzato/i: controlla a mano.` : 'Orari ricalcolati e applicati.' }));
+    setRicalcolando((s) => ({ ...s, [idxLinea]: false }));
+  }
+
   function infoCompleta() {
-    return Boolean(form.artista && form.genere && form.luogo && form.citta && form.data && form.prezzo);
+    return Boolean(form.artista && form.genere && form.luogo && form.citta && form.data);
+  }
+
+  /** Ogni fermata di partenza/intermedia deve avere un prezzo — solo
+   *  l'ultima (l'arrivo) può non averlo. Controllato anche lato server,
+   *  qui serve solo per dare un messaggio immediato senza fare la
+   *  chiamata di rete a vuoto. */
+  function prezziTratteCompleti(): string | null {
+    for (const linea of form.linee ?? []) {
+      if (!linea.nome.trim()) continue;
+      const fermateValide = linea.fermate.filter((f) => f.citta.trim());
+      for (let i = 0; i < fermateValide.length - 1; i++) {
+        if (fermateValide[i].prezzo === undefined) {
+          return `Manca il prezzo sulla fermata "${fermateValide[i].citta}" della tratta "${linea.nome}" (obbligatorio su tutte tranne l'arrivo).`;
+        }
+      }
+    }
+    return null;
   }
 
   async function nuovoGenere() {
@@ -163,7 +280,12 @@ export function SchedaEventoModale({
 
   async function salva() {
     if (!infoCompleta()) {
-      alert('Compila almeno artista, genere, luogo, città, data e prezzo.');
+      alert('Compila almeno artista, genere, luogo, città e data.');
+      return;
+    }
+    const erroreProzzi = prezziTratteCompleti();
+    if (erroreProzzi) {
+      alert(erroreProzzi);
       return;
     }
     const payload = {
@@ -201,13 +323,13 @@ export function SchedaEventoModale({
         <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
         <label>Città <input value={form.citta} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>
         <label>Data <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
-        <label>Prezzo base (€) <input type="number" value={form.prezzo} onChange={(e) => setForm({ ...form, prezzo: Number(e.target.value) })} /></label>
         <label>Acconto (€)
           <input type="number" min={1} value={form.accontoEur ?? 10} onChange={(e) => setForm({ ...form, accontoEur: Number(e.target.value) })} />
         </label>
       </div>
       <p className="testo-intro" style={{ marginTop: -8, fontSize: 12.5 }}>
-        Chi prenota con acconto salda il resto entro 15 giorni prima della partenza.
+        I prezzi si impostano per fermata nello step "Tratte" (arrivano dai tragitti che applichi). Chi prenota con
+        acconto salda il resto entro 15 giorni prima della partenza.
       </p>
       <div className="campo">
         <label><input type="checkbox" checked={form.inEvidenza ?? false} onChange={(e) => setForm({ ...form, inEvidenza: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> In evidenza in homepage</label>
@@ -248,7 +370,7 @@ export function SchedaEventoModale({
             <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12.5 }} onClick={() => rimuoviLinea(idxLinea)}>Rimuovi tratta</button>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
             <input
               placeholder="es. +10 o -5"
               type="number"
@@ -257,19 +379,42 @@ export function SchedaEventoModale({
               onChange={(e) => setAggiustiPerTratta((s) => ({ ...s, [idxLinea]: e.target.value }))}
             />
             <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiustaPrezziTratta(idxLinea)}>
-              Applica € a tutte le fermate di questa tratta
+              Applica € a tutte le fermate
+            </button>
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => ricalcolaOrariTratta(idxLinea)} disabled={ricalcolando[idxLinea]}>
+              {ricalcolando[idxLinea] ? 'Calcolo orari...' : '↻ Ricalcola orari dall\'arrivo'}
             </button>
           </div>
+          {statoRicalcolo[idxLinea] && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoRicalcolo[idxLinea]}</p>}
 
-          {linea.fermate.map((f, idxFermata) => (
-            <div key={idxFermata} style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr .55fr .55fr auto', gap: 6, marginBottom: 6, alignItems: 'center' }}>
-              <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'citta', e.target.value)} />
-              <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'indirizzo', e.target.value)} />
-              <input placeholder="Orario" type="time" value={f.orario ?? ''} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'orario', e.target.value)} />
-              <input placeholder="Prezzo €" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'prezzo', e.target.value)} />
-              <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxLinea, idxFermata)} title="Rimuovi fermata">✕</button>
-            </div>
-          ))}
+          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla. L'ultima è sempre l'arrivo (non ha prezzo).</p>
+          {linea.fermate.map((f, idxFermata) => {
+            const ultima = idxFermata === linea.fermate.length - 1;
+            return (
+              <div
+                key={idxFermata}
+                draggable
+                onDragStart={() => onDragStart(idxLinea, idxFermata)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => onDropSu(idxLinea, idxFermata)}
+                style={{
+                  display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr .55fr .55fr auto', gap: 6, marginBottom: 6, alignItems: 'center',
+                  opacity: trascinata?.linea === idxLinea && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
+                }}
+              >
+                <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
+                <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'citta', e.target.value)} />
+                <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'indirizzo', e.target.value)} />
+                <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxLinea, idxFermata, 'orario', v)} />
+                {ultima ? (
+                  <span style={{ fontSize: 11.5, color: 'var(--mist)', textAlign: 'center' }}>arrivo</span>
+                ) : (
+                  <input placeholder="Prezzo € *" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'prezzo', e.target.value)} />
+                )}
+                <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxLinea, idxFermata)} title="Rimuovi fermata">✕</button>
+              </div>
+            );
+          })}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxLinea)}>+ Aggiungi fermata</button>
         </div>
       ))}
@@ -351,7 +496,6 @@ export function SchedaEventoModale({
           <div className="riepilogo-riga-evento"><span>Genere</span><b>{form.genere || '—'}</b></div>
           <div className="riepilogo-riga-evento"><span>Luogo</span><b>{form.luogo ? `${form.luogo}, ${form.citta}` : '—'}</b></div>
           <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? new Date(form.data).toLocaleDateString('it-IT') : '—'}</b></div>
-          <div className="riepilogo-riga-evento"><span>Prezzo base</span><b>€{Number(form.prezzo || 0).toFixed(2)}</b></div>
           <div className="riepilogo-riga-evento"><span>Acconto</span><b>€{Number(form.accontoEur || 10).toFixed(2)}</b></div>
           <div className="riepilogo-riga-evento"><span>In evidenza</span><b>{form.inEvidenza ? 'Sì' : 'No'}</b></div>
           <div className="riepilogo-riga-evento"><span>Tratte</span><b>{numeroTratte > 0 ? `${numeroTratte} configurate` : 'Nessuna (aggiungibile dopo)'}</b></div>
@@ -365,7 +509,11 @@ export function SchedaEventoModale({
           <button
             className="btn btn-primary"
             onClick={() => {
-              if (step === 1 && !infoCompleta()) { alert('Compila almeno artista, genere, luogo, città, data e prezzo prima di proseguire.'); return; }
+              if (step === 1 && !infoCompleta()) { alert('Compila almeno artista, genere, luogo, città e data prima di proseguire.'); return; }
+              if (step === 2) {
+                const errore = prezziTratteCompleti();
+                if (errore) { alert(errore); return; }
+              }
               setStep((s) => (s + 1) as 2 | 3 | 4);
             }}
           >

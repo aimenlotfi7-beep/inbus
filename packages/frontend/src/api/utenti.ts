@@ -13,4 +13,5 @@ export interface Utente {
 export const utentiApi = {
   list: () => api.get<Utente[]>('/api/utenti'),
   getById: (id: string) => api.get<Utente>(`/api/utenti/${id}`),
+  datiPerCheckout: (email: string) => api.get<{ nome: string | null; cognome: string | null; telefono: string | null } | null>(`/api/utenti/dati-checkout?email=${encodeURIComponent(email)}`),
 };

@@ -7,7 +7,7 @@ import { EventiScreen } from './screens/EventiScreen';
 import { VetrinaScreen } from './screens/VetrinaScreen';
 import { CalendarioScreen } from './screens/CalendarioScreen';
 import { CestinoScreen } from './screens/CestinoScreen';
-import { TransazioniScreen } from './screens/TransazioniScreen';
+import { PrenotazioniScreen } from './screens/PrenotazioniScreen';
 import { PagamentiScreen } from './screens/PagamentiScreen';
 import { UtentiScreen } from './screens/UtentiScreen';
 import { FornitoriScreen } from './screens/FornitoriScreen';
@@ -33,7 +33,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   vetrina: VetrinaScreen,
   calendario: CalendarioScreen,
   cestino: CestinoScreen,
-  transazioni: TransazioniScreen,
+  transazioni: PrenotazioniScreen,
   pagamenti: PagamentiScreen,
   utenti: UtentiScreen,
   fornitori: FornitoriScreen,

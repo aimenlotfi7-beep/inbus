@@ -10,12 +10,26 @@ export interface PrenotazioneRiga {
   saldoPagato: boolean;
   stato: 'CONFERMATA' | 'CANCELLATA';
   creataIl: string;
+  eventoId: string;
   artista: string;
   clienteEmail: string;
-  clienteNome: string | null;
+  clienteNome: string;
+  clienteCognome: string | null;
+  clienteTelefono: string | null;
+  partecipanti: { nome: string; cognome: string }[];
+}
+
+export interface FiltriPrenotazioni {
+  eventoId?: string;
+  stato?: 'CONFERMATA' | 'CANCELLATA';
+  ricerca?: string;
 }
 
 export const prenotazioniAdminApi = {
-  listAll: () => api.get<PrenotazioneRiga[]>('/api/prenotazioni'),
+  listAll: (filtri: FiltriPrenotazioni = {}) => {
+    const query = new URLSearchParams(Object.entries(filtri).filter(([, v]) => v) as [string, string][]).toString();
+    return api.get<PrenotazioneRiga[]>(`/api/prenotazioni${query ? `?${query}` : ''}`);
+  },
   cancella: (pnr: string) => api.post<void>(`/api/prenotazioni/${pnr}/cancella`),
+  eliminaDefinitivamente: (pnr: string) => api.delete<void>(`/api/prenotazioni/${pnr}`),
 };

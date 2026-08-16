@@ -1,12 +1,17 @@
 import { z } from 'zod';
 
+// Il prezzo tollera anche `null` in ingresso (può arrivare così da un
+// tragitto applicato che non aveva prezzo su quella fermata, es. l'arrivo)
+// e lo tratta come "non impostato", invece di rifiutare la richiesta.
+const prezzoFermataSchema = z.number().positive().nullable().optional().transform((v) => v ?? undefined);
+
 const fermataSchema = z.object({
   citta: z.string().min(1),
   indirizzo: z.string().min(1),
   orario: z.string().optional(),
   orarioRitorno: z.string().optional(),
   indirizzoRitorno: z.string().optional(),
-  prezzo: z.number().positive().optional(),
+  prezzo: prezzoFermataSchema,
 });
 
 const lineaSchema = z.object({
@@ -17,7 +22,10 @@ const lineaSchema = z.object({
   referenteTelefono: z.string().optional(),
   fornitoreId: z.string().optional(),
   fermate: z.array(fermataSchema).default([]),
-});
+}).refine(
+  (l) => l.fermate.length === 0 || l.fermate.slice(0, -1).every((f) => f.prezzo !== undefined),
+  { message: 'Ogni fermata di partenza/intermedia deve avere un prezzo (solo l\'ultima, l\'arrivo, può non averlo).', path: ['fermate'] }
+);
 
 export const creaEventoSchema = z.object({
   artista: z.string().min(1),
@@ -25,7 +33,9 @@ export const creaEventoSchema = z.object({
   luogo: z.string().min(1),
   citta: z.string().min(1),
   data: z.coerce.date(),
-  prezzo: z.number().positive(),
+  // Non più obbligatorio: i prezzi arrivano dalle fermate delle tratte.
+  // Resta come riferimento/fallback interno per eventi senza tratte.
+  prezzo: z.number().positive().nullable().optional().transform((v) => v ?? undefined),
   inEvidenza: z.boolean().default(false),
   ordineEvidenza: z.number().int().default(0),
   vetrinaDal: z.coerce.date().optional(),
@@ -44,6 +54,9 @@ export const listaEventiQuerySchema = z.object({
   citta: z.string().optional(),
   genere: z.string().optional(),
   soloInEvidenza: z.coerce.boolean().optional(),
+  // Ricerca testuale libera (artista/luogo/città), usata dalla barra di
+  // ricerca eventi nel gestionale (sezione Prenotazioni) e sul sito.
+  ricerca: z.string().optional(),
 });
 export type ListaEventiQuery = z.infer<typeof listaEventiQuerySchema>;
 

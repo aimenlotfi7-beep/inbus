@@ -26,7 +26,7 @@ export interface Evento {
   luogo: string;
   citta: string;
   data: string;
-  prezzo: string;
+  prezzo: string | null;
   inEvidenza: boolean;
   ordineEvidenza: number;
   accontoEur: string | null;

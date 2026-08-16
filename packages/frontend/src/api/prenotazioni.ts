@@ -10,7 +10,10 @@ export interface CreaPrenotazionePayload {
   metodoPagamento: 'CARTA' | 'PAYPAL' | 'SATISPAY' | 'DA_CONCORDARE';
   couponCodice?: string;
   promoterCodice?: string;
-  cliente: { email: string; nome: string; cognome?: string; telefono?: string };
+  cliente: { email: string; nome: string; cognome: string; telefono: string };
+  // Un modulo nome+cognome per ogni passeggero OLTRE al richiedente
+  // (deve essere lungo esattamente passeggeri-1).
+  partecipanti: { nome: string; cognome: string }[];
 }
 
 export const prenotazioniApi = {

@@ -43,6 +43,13 @@
       "when": 1786870732911,
       "tag": "0005_correggi_eliminazione_evento",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786874339276,
+      "tag": "0006_aggiungi_partecipanti_e_prezzo_opzionale",
+      "breakpoints": true
     }
   ]
 }

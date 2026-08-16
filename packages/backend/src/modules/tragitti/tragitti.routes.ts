@@ -12,7 +12,9 @@ const fermataTragittoSchema = z.object({
   citta: z.string().min(1),
   indirizzo: z.string().min(1),
   orario: z.string().optional(),
-  prezzo: z.number().positive().optional(),
+  // Tollerante a `null` (può arrivare così ricaricando una fermata senza
+  // prezzo salvato in precedenza, es. l'arrivo) — lo tratta come assente.
+  prezzo: z.number().positive().nullable().optional().transform((v) => v ?? undefined),
 });
 const tragittoSchema = z.object({
   nome: z.string().min(1),

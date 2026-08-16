@@ -19,6 +19,15 @@ export const utentiService = {
     return db.select().from(prenotazioni).where(eq(prenotazioni.utenteId, utenteId));
   },
 
+  /** Solo nome/cognome/telefono per il preriempimento al checkout — non
+   *  l'oggetto utente completo, per non esporre più dati del necessario
+   *  da un endpoint pubblico. */
+  async datiPerCheckout(email: string) {
+    const [utente] = await db.select().from(utenti).where(eq(utenti.email, email.toLowerCase())).limit(1);
+    if (!utente) return null;
+    return { nome: utente.nome, cognome: utente.cognome, telefono: utente.telefono };
+  },
+
   /** Crea l'utente se l'email non esiste ancora, altrimenti aggiorna i
    *  campi inviati. Chiamato dal checkout, dove il cliente non fa un vero
    *  "signup" ma i suoi dati vengono comunque salvati per il futuro. */

@@ -1,4 +1,5 @@
 import type { Evento } from '../../api/types';
+import { prezzoMinimoEvento } from '../../api/prezzi';
 
 function postiTotaliDisponibili(evento: Evento) {
   return evento.linee.reduce((somma, l) => somma + l.postiDisponibili, 0);
@@ -12,6 +13,7 @@ function fmtData(iso: string) {
 export function EventoCard({ evento, onPrenota }: { evento: Evento; onPrenota: (evento: Evento) => void }) {
   const posti = postiTotaliDisponibili(evento);
   const copertina = evento.immagini[0]?.url;
+  const prezzoMinimo = prezzoMinimoEvento(evento);
 
   return (
     <div className="card reveal in">
@@ -28,7 +30,9 @@ export function EventoCard({ evento, onPrenota }: { evento: Evento; onPrenota: (
           </span>
         </div>
         <div className="card-foot">
-          <div className="price">€{Number(evento.prezzo).toFixed(0)}<span> /persona</span></div>
+          <div className="price">
+            {prezzoMinimo !== null ? <>da €{prezzoMinimo.toFixed(0)}<span> /persona</span></> : <span>Prezzo da definire</span>}
+          </div>
           <button className="card-cta" disabled={posti === 0} onClick={() => onPrenota(evento)}>
             {posti === 0 ? "Lista d'attesa" : 'Prenota'}
           </button>

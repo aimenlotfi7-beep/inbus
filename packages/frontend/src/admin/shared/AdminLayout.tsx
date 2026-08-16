@@ -22,7 +22,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   ]},
   { titolo: 'Vendite', voci: [
     { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
-    { id: 'transazioni', label: 'Transazioni', permesso: 'prenotazioni.transazioni' },
+    { id: 'transazioni', label: 'Prenotazioni', permesso: 'prenotazioni.transazioni' },
     { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
   ]},
   { titolo: 'Persone', voci: [

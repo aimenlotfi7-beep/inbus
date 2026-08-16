@@ -48,7 +48,10 @@ export const eventi = pgTable('eventi', {
   luogo: text('luogo').notNull(),
   citta: text('citta').notNull(),
   data: timestamp('data', { mode: 'date' }).notNull(),
-  prezzo: numeric('prezzo', { precision: 10, scale: 2 }).notNull(),
+  // Non più obbligatorio: i prezzi arrivano dalle fermate delle tratte.
+  // Resta solo come riferimento residuo per eventi creati prima di questa
+  // modifica, o per il caso limite di un evento senza nessuna tratta.
+  prezzo: numeric('prezzo', { precision: 10, scale: 2 }),
   inEvidenza: boolean('in_evidenza').notNull().default(false),
   ordineEvidenza: integer('ordine_evidenza').notNull().default(0),
   vetrinaDal: timestamp('vetrina_dal', { mode: 'date' }),
@@ -214,6 +217,18 @@ export const prenotazioni = pgTable('prenotazioni', {
   rimborsoImporto: numeric('rimborso_importo', { precision: 10, scale: 2 }),
   rimborsoData: timestamp('rimborso_data'),
   creataIl: timestamp('creata_il').notNull().defaultNow(),
+});
+
+// Un partecipante per passeggero della prenotazione (il richiedente è
+// sempre il primo, ordine 0 — i suoi contatti completi, email e telefono,
+// restano sulla tabella utenti/prenotazioni; qui serve solo nome+cognome
+// di ognuno per l'elenco passeggeri nel gestionale).
+export const partecipantiPrenotazione = pgTable('partecipanti_prenotazione', {
+  id: id(),
+  prenotazioneId: text('prenotazione_id').notNull().references(() => prenotazioni.id, { onDelete: 'cascade' }),
+  nome: text('nome').notNull(),
+  cognome: text('cognome').notNull(),
+  ordine: integer('ordine').notNull().default(0),
 });
 
 // ---------------------------------------------------------------------
@@ -456,10 +471,15 @@ export const fermateTragittoRelations = relations(fermateTragitto, ({ one }) => 
   tragitto: one(tragitti, { fields: [fermateTragitto.tragittoId], references: [tragitti.id] }),
 }));
 
-export const prenotazioniRelations = relations(prenotazioni, ({ one }) => ({
+export const prenotazioniRelations = relations(prenotazioni, ({ one, many }) => ({
   evento: one(eventi, { fields: [prenotazioni.eventoId], references: [eventi.id] }),
   linea: one(lineeBus, { fields: [prenotazioni.lineaId], references: [lineeBus.id] }),
   utente: one(utenti, { fields: [prenotazioni.utenteId], references: [utenti.id] }),
+  partecipanti: many(partecipantiPrenotazione),
+}));
+
+export const partecipantiPrenotazioneRelations = relations(partecipantiPrenotazione, ({ one }) => ({
+  prenotazione: one(prenotazioni, { fields: [partecipantiPrenotazione.prenotazioneId], references: [prenotazioni.id] }),
 }));
 
 export const utentiRelations = relations(utenti, ({ many }) => ({
