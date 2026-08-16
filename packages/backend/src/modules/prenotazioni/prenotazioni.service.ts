@@ -127,6 +127,24 @@ export const prenotazioniService = {
     return db.select().from(prenotazioni).where(eq(prenotazioni.utenteId, utente.id));
   },
 
+  /** Eventi che hanno almeno una prenotazione (di qualsiasi stato) —
+   *  per mostrare direttamente le tab in "Prenotazioni" senza dover
+   *  cercare, che serve solo se gli eventi con prenotazioni sono tanti. */
+  async eventiConPrenotazioni() {
+    return db
+      .selectDistinct({
+        id: eventi.id,
+        artista: eventi.artista,
+        genere: eventi.genere,
+        luogo: eventi.luogo,
+        citta: eventi.citta,
+        data: eventi.data,
+      })
+      .from(prenotazioni)
+      .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
+      .orderBy(desc(eventi.data));
+  },
+
   /** Elenco per il gestionale (sezione Prenotazioni), con dati
    *  cliente/evento già uniti per evitare N query separate dal frontend.
    *  Filtrabile per evento, stato e parola chiave (PNR, cliente,

@@ -25,11 +25,14 @@ export interface FiltriPrenotazioni {
   ricerca?: string;
 }
 
+export interface EventoConPrenotazioni { id: string; artista: string; genere: string; luogo: string; citta: string; data: string; }
+
 export const prenotazioniAdminApi = {
   listAll: (filtri: FiltriPrenotazioni = {}) => {
     const query = new URLSearchParams(Object.entries(filtri).filter(([, v]) => v) as [string, string][]).toString();
     return api.get<PrenotazioneRiga[]>(`/api/prenotazioni${query ? `?${query}` : ''}`);
   },
+  eventiConPrenotazioni: () => api.get<EventoConPrenotazioni[]>('/api/prenotazioni/eventi'),
   cancella: (pnr: string) => api.post<void>(`/api/prenotazioni/${pnr}/cancella`),
   eliminaDefinitivamente: (pnr: string) => api.delete<void>(`/api/prenotazioni/${pnr}`),
 };

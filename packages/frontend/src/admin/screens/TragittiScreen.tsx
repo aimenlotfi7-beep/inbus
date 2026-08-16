@@ -5,6 +5,7 @@ import { geocodifica, durataViaggio, attesa } from '../shared/geo';
 import { OrarioInput } from '../shared/OrarioInput';
 import { PanelHead } from '../shared/PanelHead';
 import { Modale } from '../shared/Modale';
+import { useAvvisoModificheNonSalvate } from '../shared/useAvvisoModificheNonSalvate';
 
 function etichettaFermata(idx: number, totale: number) {
   if (idx === 0) return { testo: 'PARTENZA', colore: '#5be0a0' };
@@ -20,20 +21,25 @@ export function TragittiScreen() {
   const [modaleAperta, setModaleAperta] = useState(false);
   const [statoCalcolo, setStatoCalcolo] = useState('');
   const [calcolando, setCalcolando] = useState(false);
+  const [snapshotIniziale, setSnapshotIniziale] = useState('');
 
   function ricarica() { tragittiApi.list().then(setTragitti); }
   useEffect(ricarica, []);
 
   function apriNuovo() {
     setInModifica(null); setNome('');
-    setFermate([{ citta: '', indirizzo: '' }, { citta: '', indirizzo: '' }]);
+    const fermateVuote = [{ citta: '', indirizzo: '' }, { citta: '', indirizzo: '' }];
+    setFermate(fermateVuote);
+    setSnapshotIniziale(JSON.stringify({ nome: '', fermate: fermateVuote }));
     setStatoCalcolo('');
     setModaleAperta(true);
   }
   function apriModifica(t: Tragitto) {
     setInModifica(t); setNome(t.nome);
     const fermateNormalizzate = t.fermate.map((f) => ({ ...f, prezzo: f.prezzo ?? undefined }));
-    setFermate(fermateNormalizzate.length ? fermateNormalizzate : [{ citta: '', indirizzo: '' }]);
+    const fermateIniziali = fermateNormalizzate.length ? fermateNormalizzate : [{ citta: '', indirizzo: '' }];
+    setFermate(fermateIniziali);
+    setSnapshotIniziale(JSON.stringify({ nome: t.nome, fermate: fermateIniziali }));
     setStatoCalcolo('');
     setModaleAperta(true);
   }
@@ -139,6 +145,9 @@ export function TragittiScreen() {
     ricarica();
   }
 
+  const modificato = snapshotIniziale !== '' && JSON.stringify({ nome, fermate }) !== snapshotIniziale;
+  const chiediConferma = useAvvisoModificheNonSalvate(modificato);
+
   return (
     <div>
       <PanelHead titolo="Tragitti" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo tragitto</button>} />
@@ -154,7 +163,7 @@ export function TragittiScreen() {
       </div>
 
       {modaleAperta && (
-        <Modale titolo={inModifica ? 'Modifica tragitto' : 'Nuovo tragitto'} onClose={() => setModaleAperta(false)}>
+        <Modale titolo={inModifica ? 'Modifica tragitto' : 'Nuovo tragitto'} onClose={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
           <div className="campo"><label>Nome tragitto</label><input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
 
           <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate</p>

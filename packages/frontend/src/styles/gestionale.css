@@ -205,13 +205,15 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 }
 .pagina-tab.active{border-color:var(--pink); color:var(--paper); background:rgba(255,61,122,.08);}
 
-/* ---------- MINI-TAB (sotto-sezioni: Eventi/Categorie, Fornitori/Mappa) ---------- */
-.mini-tabs{display:flex; gap:8px; margin-bottom:18px; border-bottom:1px solid var(--line); padding-bottom:14px;}
+/* ---------- MINI-TAB (sotto-sezioni: Eventi/Categorie, Dettagli/Partenze, Confermate/Cancellate) ---------- */
+.mini-tabs{display:flex; gap:8px; margin-bottom:18px; border-bottom:none; padding-bottom:0;}
 .mini-tab{
-  font-family:'Space Mono',monospace; font-size:12px; padding:8px 16px; border-radius:999px;
-  border:1px solid var(--line); color:var(--mist); background:transparent; cursor:pointer;
+  font-family:'Space Grotesk',sans-serif; font-size:13.5px; font-weight:600; padding:9px 16px; border-radius:8px;
+  border:1px solid var(--line); color:var(--mist); background:var(--dusk); cursor:pointer;
 }
-.mini-tab.active{border-color:var(--pink); color:var(--paper); background:rgba(255,61,122,.08);}
+.mini-tab:hover{color:var(--paper); border-color:var(--pink-dim);}
+.mini-tab:focus, .mini-tab:focus-visible{outline:none; box-shadow:none;}
+.mini-tab.active{border-color:var(--pink); color:var(--paper); background:rgba(255,61,122,.1);}
 
 /* ---------- CATEGORIE EVENTI ---------- */
 .categorie-list{display:flex; flex-wrap:wrap; gap:10px;}
@@ -598,16 +600,6 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
   background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
 }
 .campo textarea{min-height:70px; resize:vertical;}
-
-/* ---------- TAB INTERNE (es. Dettagli/Partenze dentro la modale evento) ---------- */
-.mini-tabs{display:flex; gap:4px; border-bottom:1px solid var(--line); margin:4px 0 20px; padding-bottom:0;}
-.mini-tab{
-  font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600; color:var(--mist);
-  background:transparent; border:none; border-bottom:2px solid transparent; cursor:pointer;
-  padding:10px 4px; margin-right:20px;
-}
-.mini-tab:hover{color:var(--paper);}
-.mini-tab.active{color:var(--pink); border-bottom-color:var(--pink);}
 
 /* ---------- CARD SEZIONE (contenitori tipo "Tratta X", "Bus Y") ---------- */
 .section-card{

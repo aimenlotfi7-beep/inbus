@@ -129,8 +129,22 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
                 </select>
 
                 <label className="field-label">Passeggeri</label>
-                <input type="text" inputMode="numeric" value={passeggeri}
-                  onChange={(e) => setPasseggeri(Math.max(1, Number(e.target.value) || 1))} />
+                <div className="qty-control">
+                  <button type="button" onClick={() => setPasseggeri((p) => Math.max(1, p - 1))} aria-label="Togli passeggero">−</button>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    style={{ width: 40, textAlign: 'center' }}
+                    value={passeggeri}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, '');
+                      if (v === '') { setPasseggeri(1); return; }
+                      setPasseggeri(Math.min(20, Math.max(1, Number(v))));
+                    }}
+                    onFocus={(e) => e.target.select()}
+                  />
+                  <button type="button" onClick={() => setPasseggeri((p) => Math.min(20, p + 1))} aria-label="Aggiungi passeggero">+</button>
+                </div>
 
                 <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>I tuoi dati (richiedente)</p>
                 {autocompilato && <p style={{ fontSize: 12, opacity: .7, marginTop: -4, marginBottom: 8 }}>Precompilato dai tuoi dati — puoi modificarlo.</p>}

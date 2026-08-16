@@ -6,6 +6,7 @@ import { ErroreApi } from '../../../api/client';
 import type { Evento } from '../../../api/types';
 import { Modale } from '../../shared/Modale';
 import { OrarioInput } from '../../shared/OrarioInput';
+import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
 import { PartenzeTab } from '../partenze/PartenzeTab';
 import { geocodifica, durataViaggio, attesa } from '../../shared/geo';
 
@@ -48,6 +49,7 @@ export function SchedaEventoModale({
   const [trascinata, setTrascinata] = useState<{ linea: number; fermata: number } | null>(null);
   const [statoRicalcolo, setStatoRicalcolo] = useState<Record<number, string>>({});
   const [ricalcolando, setRicalcolando] = useState<Record<number, boolean>>({});
+  const [formIniziale, setFormIniziale] = useState('');
 
   function ricaricaCategorie() {
     categorieApi.list().then(setCategorie);
@@ -56,8 +58,9 @@ export function SchedaEventoModale({
   useEffect(() => {
     tragittiApi.list().then(setTragitti);
     ricaricaCategorie();
+    let nuovoForm: EventoInput;
     if (evento) {
-      setForm({
+      nuovoForm = {
         artista: evento.artista, genere: evento.genere, luogo: evento.luogo, citta: evento.citta,
         data: evento.data.slice(0, 10), inEvidenza: evento.inEvidenza,
         accontoEur: evento.accontoEur ? Number(evento.accontoEur) : 10,
@@ -70,11 +73,13 @@ export function SchedaEventoModale({
           // in giro come null fino a far fallire la validazione al salvataggio.
           fermate: l.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ? Number(f.prezzo) : undefined })),
         })),
-      });
+      };
     } else {
-      setForm(VUOTO);
+      nuovoForm = VUOTO;
       setStep(1);
     }
+    setForm(nuovoForm);
+    setFormIniziale(JSON.stringify(nuovoForm));
     setAggiustiPerTratta({});
     setStatoRicalcolo({});
     setTabAttiva(tabIniziale);
@@ -304,6 +309,9 @@ export function SchedaEventoModale({
     }
   }
 
+  const modificato = formIniziale !== '' && JSON.stringify(form) !== formIniziale;
+  const chiediConferma = useAvvisoModificheNonSalvate(modificato);
+
   // ---- Blocchi di campi condivisi tra wizard (creazione) e vista Dettagli (modifica) ----
 
   const campiInfoEvento: ReactNode = (
@@ -443,7 +451,7 @@ export function SchedaEventoModale({
 
   if (evento) {
     return (
-      <Modale titolo="Modifica evento" onClose={onClose} larga={tabAttiva === 'partenze'}>
+      <Modale titolo="Modifica evento" onClose={onClose} larga={tabAttiva === 'partenze'} richiediConferma={() => chiediConferma(onClose)}>
         <div className="mini-tabs">
           <button type="button" className={`mini-tab${tabAttiva === 'dettagli' ? ' active' : ''}`} onClick={() => setTabAttiva('dettagli')}>Dettagli</button>
           <button type="button" className={`mini-tab${tabAttiva === 'partenze' ? ' active' : ''}`} onClick={() => setTabAttiva('partenze')}>Partenze</button>
@@ -470,7 +478,7 @@ export function SchedaEventoModale({
   const numeroTratte = (form.linee ?? []).filter((l) => l.nome.trim()).length;
 
   return (
-    <Modale titolo="Nuovo evento" onClose={onClose}>
+    <Modale titolo="Nuovo evento" onClose={onClose} richiediConferma={() => chiediConferma(onClose)}>
       <div className="wizard-stepper">
         {STEP_WIZARD.map((s) => (
           <div key={s.numero} className={`wizard-dot${step === s.numero ? ' active' : step > s.numero ? ' completato' : ''}`}>

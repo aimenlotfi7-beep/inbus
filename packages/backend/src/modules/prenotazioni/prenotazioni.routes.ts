@@ -25,6 +25,9 @@ export const prenotazioniController = {
   async listByEmail(req: Request, res: Response) {
     res.json(await prenotazioniService.listByEmail(String(req.query.email)));
   },
+  async eventiConPrenotazioni(_req: Request, res: Response) {
+    res.json(await prenotazioniService.eventiConPrenotazioni());
+  },
   async cancella(req: Request, res: Response) {
     res.json(await prenotazioniService.cancella(req.params.pnr));
   },
@@ -41,6 +44,9 @@ export const prenotazioniRouter = Router();
 
 // Amministrazione: elenco completo per Transazioni/Pagamenti nel gestionale
 prenotazioniRouter.get('/', richiedeAuth, richiedePermesso('prenotazioni.visualizza'), asyncHandler(prenotazioniController.listAll));
+// IMPORTANTE: va registrata PRIMA di GET '/:pnr', altrimenti Express la
+// interpreterebbe come una richiesta per una prenotazione con pnr "eventi".
+prenotazioniRouter.get('/eventi', richiedeAuth, richiedePermesso('prenotazioni.visualizza'), asyncHandler(prenotazioniController.eventiConPrenotazioni));
 
 // Pubbliche: il checkout del sito e l'area cliente non richiedono login admin
 prenotazioniRouter.post('/', valida(creaPrenotazioneSchema), asyncHandler(prenotazioniController.crea));
