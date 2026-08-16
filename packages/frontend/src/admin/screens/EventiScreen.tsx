@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { eventiApi } from '../../api/eventi';
+import { ErroreApi } from '../../api/client';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
@@ -19,8 +20,12 @@ export function EventiScreen() {
 
   async function elimina(ev: Evento) {
     if (!confirm(`Eliminare l'evento "${ev.artista}"?`)) return;
-    await eventiApi.remove(ev.id);
-    ricarica();
+    try {
+      await eventiApi.remove(ev.id);
+      ricarica();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? e.message : "Eliminazione non riuscita: impossibile contattare il server.");
+    }
   }
 
   return (

@@ -252,7 +252,7 @@ export const tourLeader = pgTable('tour_leader', {
   disponibilita: text('disponibilita'),
   esperienza: text('esperienza'),
   stato: statoTourLeaderEnum('stato').notNull().default('CANDIDATO'),
-  eventoRiferimento: text('evento_riferimento').references(() => eventi.id),
+  eventoRiferimento: text('evento_riferimento').references(() => eventi.id, { onDelete: 'set null' }),
   note: text('note'),
   dataCandidatura: timestamp('data_candidatura').notNull().defaultNow(),
 });

@@ -178,7 +178,16 @@ export const eventiService = {
 
   async remove(id: string) {
     await getById(id);
-    await db.delete(eventi).where(eq(eventi.id, id)); // cascade su tutto il resto
+    const prenotazioniCollegate = await db
+      .select({ id: prenotazioni.id })
+      .from(prenotazioni)
+      .where(eq(prenotazioni.eventoId, id));
+    if (prenotazioniCollegate.length > 0) {
+      throw new ConflittoDati(
+        `Non puoi eliminare questo evento: ci sono ${prenotazioniCollegate.length} prenotazioni collegate (anche cancellate restano nello storico). Cancella prima quelle prenotazioni, se proprio necessario, oppure lascia l'evento così com'è: non comparirà più nelle nuove vendite se ne rimuovi la vetrina/evidenza.`
+      );
+    }
+    await db.delete(eventi).where(eq(eventi.id, id)); // cascade su linee/fermate/immagini/chat/lista attesa/promoter
   },
 
   /** Somma i posti disponibili su tutte le linee di un evento. */
