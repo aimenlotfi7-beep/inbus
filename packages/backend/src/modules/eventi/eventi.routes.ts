@@ -50,3 +50,4 @@ eventiRouter.get('/:id/bus', richiedeAuth, richiedePermesso('eventi.partenze'), 
 eventiRouter.post('/:id/bus', richiedeAuth, richiedePermesso('eventi.crea'), valida(creaBusSchema), asyncHandler(eventiController.creaBus));
 eventiRouter.put('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaBusSchema), asyncHandler(eventiController.aggiornaBus));
 eventiRouter.delete('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.rimuoviBus));
+eventiRouter.get('/:id/bus/:busId/passeggeri', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaPasseggeriBus));

@@ -9,6 +9,9 @@ import {
   prenotazioni,
   busFisici,
   busTratte,
+  tourLeader,
+  utenti,
+  partecipantiPrenotazione,
 } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
@@ -139,6 +142,26 @@ export const eventiService = {
           aggiornatoIl: new Date(),
         })
         .where(eq(eventi.id, id));
+
+      // Le immagini/allegati, se inviati, sostituiscono interamente quelli
+      // esistenti — nessun problema di vincoli qui (a differenza delle
+      // tratte), non ci sono altre tabelle che li referenziano.
+      if (input.immagini !== undefined) {
+        await tx.delete(immaginiEvento).where(eq(immaginiEvento.eventoId, id));
+        if (input.immagini.length) {
+          await tx.insert(immaginiEvento).values(
+            input.immagini.map((url, ordine) => ({ eventoId: id, url, ordine }))
+          );
+        }
+      }
+      if (input.allegati !== undefined) {
+        await tx.delete(allegatiEvento).where(eq(allegatiEvento.eventoId, id));
+        if (input.allegati.length) {
+          await tx.insert(allegatiEvento).values(
+            input.allegati.map((a) => ({ eventoId: id, nome: a.nome, url: a.url }))
+          );
+        }
+      }
 
       // Le linee/fermate, se inviate: quelle con un `id` (già esistenti)
       // vengono AGGIORNATE sul posto, non cancellate e ricreate — se le
@@ -276,7 +299,12 @@ export const eventiService = {
 
     for (const linea of evento.linee) {
       if (linea.postiDisponibili <= 0) continue;
-      for (const f of linea.fermate) {
+      // L'ultima fermata in ordine è sempre l'arrivo (stessa convenzione
+      // usata ovunque nel progetto): nessuno parte da lì, quindi non deve
+      // comparire come opzione di partenza selezionabile dal cliente.
+      const fermateOrdinate = [...linea.fermate].sort((a, b) => a.ordine - b.ordine);
+      const fermatePartenza = fermateOrdinate.length > 1 ? fermateOrdinate.slice(0, -1) : fermateOrdinate;
+      for (const f of fermatePartenza) {
         const prezzoEffettivo = f.prezzo
           ? Number(f.prezzo)
           : (evento.prezzo ? Number(evento.prezzo) : 0) + Number(linea.prezzoExtra);
@@ -381,13 +409,20 @@ export const eventiService = {
     if (busIds.length === 0) return [];
 
     const bus = await db.select().from(busFisici).where(inArray(busFisici.id, busIds));
-    return bus.map((b) => ({
-      ...b,
-      lineeIds: assegnazioni.filter((a) => a.busId === b.id).map((a) => a.lineaId),
-    }));
+    const tourLeaderIds = bus.map((b) => b.tourLeaderId).filter((id): id is string => id !== null);
+    const tourLeaders = tourLeaderIds.length ? await db.select().from(tourLeader).where(inArray(tourLeader.id, tourLeaderIds)) : [];
+
+    return bus.map((b) => {
+      const tl = tourLeaders.find((t) => t.id === b.tourLeaderId);
+      return {
+        ...b,
+        lineeIds: assegnazioni.filter((a) => a.busId === b.id).map((a) => a.lineaId),
+        tourLeaderNome: tl ? `${tl.nome} ${tl.cognome}` : null,
+      };
+    });
   },
 
-  async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; note?: string; lineeIds: string[] }) {
+  async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; note?: string; lineeIds: string[] }) {
     const evento = await getById(eventoId);
     const lineeValide = new Set(evento.linee.map((l) => l.id));
     const lineeIdsFiltrate = input.lineeIds.filter((id) => lineeValide.has(id));
@@ -399,6 +434,7 @@ export const eventiService = {
         riferimento: input.riferimento,
         autistaNome: input.autistaNome,
         autistaTelefono: input.autistaTelefono,
+        tourLeaderId: input.tourLeaderId,
         note: input.note,
       }).returning();
       await tx.insert(busTratte).values(lineeIdsFiltrate.map((lineaId) => ({ busId: nuovo.id, lineaId })));
@@ -406,17 +442,18 @@ export const eventiService = {
     });
   },
 
-  async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; note?: string; lineeIds?: string[] }) {
+  async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; note?: string; lineeIds?: string[] }) {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
 
     return db.transaction(async (tx) => {
-      if (input.riferimento !== undefined || input.fornitoreId !== undefined || input.autistaNome !== undefined || input.autistaTelefono !== undefined || input.note !== undefined) {
+      if (input.riferimento !== undefined || input.fornitoreId !== undefined || input.autistaNome !== undefined || input.autistaTelefono !== undefined || input.tourLeaderId !== undefined || input.note !== undefined) {
         await tx.update(busFisici).set({
           ...(input.riferimento !== undefined && { riferimento: input.riferimento }),
           ...(input.fornitoreId !== undefined && { fornitoreId: input.fornitoreId }),
           ...(input.autistaNome !== undefined && { autistaNome: input.autistaNome }),
           ...(input.autistaTelefono !== undefined && { autistaTelefono: input.autistaTelefono }),
+          ...(input.tourLeaderId !== undefined && { tourLeaderId: input.tourLeaderId }),
           ...(input.note !== undefined && { note: input.note }),
         }).where(eq(busFisici.id, busId));
       }
@@ -436,6 +473,60 @@ export const eventiService = {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
     await db.delete(busFisici).where(eq(busFisici.id, busId)); // cascade su bus_tratte
+  },
+
+  /** Elenco passeggeri (per la "lista tipo Excel" da dare al tour leader)
+   *  per un bus specifico: tutti i partecipanti delle prenotazioni
+   *  CONFERMATA sulle tratte coperte da quel bus. */
+  async listaPasseggeriBus(busId: string) {
+    const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
+    if (!bus) throw new NonTrovato('Bus');
+
+    const assegnazioni = await db.select().from(busTratte).where(eq(busTratte.busId, busId));
+    const lineeIds = assegnazioni.map((a) => a.lineaId);
+    if (lineeIds.length === 0) return [];
+
+    const righe = await db
+      .select({
+        prenotazioneId: prenotazioni.id,
+        pnr: prenotazioni.pnr,
+        fermataCitta: prenotazioni.fermataCitta,
+        telefonoReferente: prenotazioni.referenteTelefono,
+      })
+      .from(prenotazioni)
+      .where(and(inArray(prenotazioni.lineaId, lineeIds), eq(prenotazioni.stato, 'CONFERMATA')));
+
+    if (righe.length === 0) return [];
+
+    const prenotazioneIds = righe.map((r) => r.prenotazioneId);
+    const partecipantiRighe = await db
+      .select()
+      .from(partecipantiPrenotazione)
+      .where(inArray(partecipantiPrenotazione.prenotazioneId, prenotazioneIds))
+      .orderBy(partecipantiPrenotazione.ordine);
+
+    const utentiPerPrenotazione = await db
+      .select({ prenotazioneId: prenotazioni.id, telefono: utenti.telefono, email: utenti.email })
+      .from(prenotazioni)
+      .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
+      .where(inArray(prenotazioni.id, prenotazioneIds));
+
+    const elenco: { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string }[] = [];
+    for (const r of righe) {
+      const contatto = utentiPerPrenotazione.find((u) => u.prenotazioneId === r.prenotazioneId);
+      const partecipanti = partecipantiRighe.filter((p) => p.prenotazioneId === r.prenotazioneId);
+      for (const p of partecipanti) {
+        elenco.push({
+          pnr: r.pnr,
+          nome: p.nome,
+          cognome: p.cognome,
+          fermata: r.fermataCitta,
+          telefono: contatto?.telefono ?? '',
+          email: contatto?.email ?? '',
+        });
+      }
+    }
+    return elenco;
   },
 
   /** Conta quante tratte, in tutti gli eventi, hanno più passeggeri

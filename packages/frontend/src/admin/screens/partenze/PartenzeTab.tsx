@@ -1,10 +1,27 @@
 import { useEffect, useState } from 'react';
 import { eventiApi, type CalcoloBusLinea, type BusFisico, type BusFisicoInput } from '../../../api/eventi';
 import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
+import { tourLeaderApi, type TourLeader } from '../../../api/tourleader';
 import { ErroreApi } from '../../../api/client';
 import { Modale } from '../../shared/Modale';
 
 const BUS_VUOTO: BusFisicoInput = { riferimento: '', lineeIds: [] };
+
+/** Genera e scarica un file CSV (si apre in Excel) con l'elenco
+ *  passeggeri di un bus — la "lista tipo Excel" da dare al tour leader. */
+function scaricaListaCsv(riferimentoBus: string, righe: { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string }[]) {
+  const intestazione = ['PNR', 'Nome', 'Cognome', 'Fermata', 'Telefono', 'Email'];
+  const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const righeCsv = righe.map((r) => [r.pnr, r.nome, r.cognome, r.fermata, r.telefono, r.email].map(escapeCsv).join(';'));
+  const csv = '\uFEFF' + [intestazione.join(';'), ...righeCsv].join('\n'); // BOM per accenti corretti in Excel
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `passeggeri-${riferimentoBus.replace(/[^a-z0-9]+/gi, '-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 /** Sezione "Partenze" di un singolo evento: calcolo bus necessari,
  *  copertura tratte, censimento bus fisici. Va dentro la scheda
@@ -13,8 +30,10 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
   const [calcolo, setCalcolo] = useState<CalcoloBusLinea[]>([]);
   const [busLista, setBusLista] = useState<BusFisico[]>([]);
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
+  const [tourLeaders, setTourLeaders] = useState<TourLeader[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState('');
+  const [generandoLista, setGenerandoLista] = useState<string | null>(null);
 
   const [inModifica, setInModifica] = useState<BusFisico | null>(null);
   const [form, setForm] = useState<BusFisicoInput>(BUS_VUOTO);
@@ -31,6 +50,7 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
   useEffect(() => {
     ricarica();
     fornitoriApi.list().then(setFornitori).catch(() => setFornitori([]));
+    tourLeaderApi.list().then(setTourLeaders).catch(() => setTourLeaders([]));
   }, [eventoId]);
 
   async function toggleCopertura(linea: CalcoloBusLinea) {
@@ -45,7 +65,7 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
   function apriNuovoBus() { setInModifica(null); setForm(BUS_VUOTO); setModaleAperta(true); }
   function apriModificaBus(b: BusFisico) {
     setInModifica(b);
-    setForm({ fornitoreId: b.fornitoreId ?? undefined, riferimento: b.riferimento, autistaNome: b.autistaNome ?? undefined, autistaTelefono: b.autistaTelefono ?? undefined, note: b.note ?? undefined, lineeIds: b.lineeIds });
+    setForm({ fornitoreId: b.fornitoreId ?? undefined, riferimento: b.riferimento, autistaNome: b.autistaNome ?? undefined, autistaTelefono: b.autistaTelefono ?? undefined, tourLeaderId: b.tourLeaderId, note: b.note ?? undefined, lineeIds: b.lineeIds });
     setModaleAperta(true);
   }
 
@@ -77,6 +97,25 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+    }
+  }
+
+  async function generaLista(b: BusFisico) {
+    setGenerandoLista(b.id);
+    try {
+      const righe = await eventiApi.listaPasseggeriBus(eventoId, b.id);
+      if (righe.length === 0) {
+        alert('Nessun passeggero confermato ancora su questo bus.');
+        return;
+      }
+      scaricaListaCsv(b.riferimento, righe);
+      // L'invio diretto all'account del tour leader arriverà appena
+      // definiamo insieme come funzionerà l'account — per ora la lista
+      // si scarica qui e la giri tu.
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+    } finally {
+      setGenerandoLista(null);
     }
   }
 
@@ -127,9 +166,15 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
           <div className="section-divider">
             <p className="section-label">Bus registrati su questa tratta</p>
             {busLista.filter((b) => b.lineeIds.includes(linea.lineaId)).map((b) => (
-              <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default' }}>
-                <span className="riga-titolo">{b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}</span>
+              <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
+                <span className="riga-titolo">
+                  {b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}
+                  {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>Tour leader: {b.tourLeaderNome}</span></>}
+                </span>
                 <span className="riga-meta">
+                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => generaLista(b)} disabled={generandoLista === b.id}>
+                    {generandoLista === b.id ? 'Genero...' : '⤓ Genera lista'}
+                  </button>
                   <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => apriModificaBus(b)}>Modifica</button>
                   <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px', color: 'var(--pink)' }} onClick={() => rimuoviBus(b)}>Rimuovi</button>
                 </span>
@@ -159,6 +204,16 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
           </div>
           <div className="campo"><label>Autista (facoltativo)</label><input value={form.autistaNome ?? ''} onChange={(e) => setForm({ ...form, autistaNome: e.target.value })} /></div>
           <div className="campo"><label>Telefono autista (facoltativo)</label><input value={form.autistaTelefono ?? ''} onChange={(e) => setForm({ ...form, autistaTelefono: e.target.value })} /></div>
+          <div className="campo">
+            <label>Tour leader assegnato</label>
+            <select value={form.tourLeaderId ?? ''} onChange={(e) => setForm({ ...form, tourLeaderId: e.target.value || null })}>
+              <option value="">— Nessuno —</option>
+              {tourLeaders.map((t) => <option key={t.id} value={t.id}>{t.nome} {t.cognome} ({t.stato === 'ATTIVO' ? 'attivo' : t.stato === 'CANDIDATO' ? 'candidato' : 'archiviato'})</option>)}
+            </select>
+            {tourLeaders.length === 0 && (
+              <p className="testo-intro" style={{ fontSize: 12, marginTop: 4 }}>Nessun tour leader censito — vai nella sezione "Tour Leader" per aggiungerne uno.</p>
+            )}
+          </div>
           <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
 
           <p className="section-label" style={{ marginTop: 16 }}>Tratte coperte da questo bus</p>

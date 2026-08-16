@@ -32,12 +32,15 @@ export interface BusFisico {
   riferimento: string;
   autistaNome: string | null;
   autistaTelefono: string | null;
+  tourLeaderId: string | null;
+  tourLeaderNome: string | null;
   note: string | null;
   lineeIds: string[];
 }
 export interface BusFisicoInput {
-  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; note?: string; lineeIds: string[];
+  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; note?: string; lineeIds: string[];
 }
+export interface PasseggeroBus { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string; }
 
 export const eventiApi = {
   list: (filtri?: { citta?: string; genere?: string; ricerca?: string }) => {
@@ -57,5 +60,6 @@ export const eventiApi = {
   creaBus: (id: string, input: BusFisicoInput) => api.post<{ id: string }>(`/api/eventi/${id}/bus`, input),
   aggiornaBus: (id: string, busId: string, input: Partial<BusFisicoInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/bus/${busId}`, input),
   rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
+  listaPasseggeriBus: (id: string, busId: string) => api.get<PasseggeroBus[]>(`/api/eventi/${id}/bus/${busId}/passeggeri`),
   allertePartenze: () => api.get<{ conteggio: number }>('/api/eventi/allerte-partenze'),
 };

@@ -63,6 +63,10 @@ export const eventiController = {
     res.status(204).send();
   },
 
+  async listaPasseggeriBus(req: Request, res: Response) {
+    res.json(await eventiService.listaPasseggeriBus(req.params.busId));
+  },
+
   async allertePartenze(_req: Request, res: Response) {
     res.json({ conteggio: await eventiService.contaAllertePartenze() });
   },

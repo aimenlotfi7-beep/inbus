@@ -22,6 +22,10 @@ export function TragittiScreen() {
   const [modaleAperta, setModaleAperta] = useState(false);
   const [statoCalcolo, setStatoCalcolo] = useState('');
   const [calcolando, setCalcolando] = useState(false);
+  // Diventa vero solo dopo un "Calcola orari" riuscito, e torna falso ogni
+  // volta che tocchi una fermata (città/indirizzo) — obbliga a ricalcolare
+  // se cambi qualcosa, invece di lasciare orari ormai non più corretti.
+  const [orariCalcolati, setOrariCalcolati] = useState(false);
   const [snapshotIniziale, setSnapshotIniziale] = useState('');
   const [ricerca, setRicerca] = useState('');
 
@@ -34,27 +38,37 @@ export function TragittiScreen() {
     setFermate(fermateVuote);
     setSnapshotIniziale(JSON.stringify({ nome: '', fermate: fermateVuote }));
     setStatoCalcolo('');
+    setOrariCalcolati(false);
     setModaleAperta(true);
   }
   function apriModifica(t: Tragitto) {
     setInModifica(t); setNome(t.nome);
     const fermateNormalizzate = t.fermate.map((f) => ({ ...f, prezzo: f.prezzo ?? undefined }));
-    const fermateIniziali = fermateNormalizzate.length ? fermateNormalizzate : [{ citta: '', indirizzo: '' }];
+    const fermateIniziali: FermataTragitto[] = fermateNormalizzate.length ? fermateNormalizzate : [{ citta: '', indirizzo: '' }];
     setFermate(fermateIniziali);
     setSnapshotIniziale(JSON.stringify({ nome: t.nome, fermate: fermateIniziali }));
     setStatoCalcolo('');
+    // Se il tragitto esiste già ed ha già un orario su ogni fermata,
+    // consideriamo gli orari "calcolati" (non obbligare a ricalcolare
+    // solo per aver riaperto un tragitto invariato).
+    setOrariCalcolati(fermateIniziali.every((f) => !f.indirizzo.trim() || f.orario));
     setModaleAperta(true);
   }
 
   function aggiornaFermata(idx: number, campo: keyof FermataTragitto, valore: string) {
     setFermate(fermate.map((f, i) => i === idx ? { ...f, [campo]: campo === 'prezzo' ? Number(valore) || undefined : valore } : f));
+    // Toccare città/indirizzo invalida il calcolo già fatto (le distanze
+    // cambierebbero); modificare solo il prezzo no.
+    if (campo === 'citta' || campo === 'indirizzo') setOrariCalcolati(false);
   }
   function aggiungiFermataIntermedia() {
     const nuova: FermataTragitto = { citta: '', indirizzo: '' };
     setFermate(fermate.length >= 2 ? [...fermate.slice(0, -1), nuova, fermate[fermate.length - 1]] : [...fermate, nuova]);
+    setOrariCalcolati(false);
   }
   function rimuoviFermata(idx: number) {
     setFermate(fermate.filter((_, i) => i !== idx));
+    setOrariCalcolati(false);
   }
 
   // ---- Calcolo orari dalle distanze reali (Nominatim + OSRM, come in V18) ----
@@ -123,8 +137,9 @@ export function TragittiScreen() {
       return orario ? { ...f, orario } : f;
     }));
 
+    setOrariCalcolati(errori === 0);
     setStatoCalcolo(errori
-      ? `Fatto, ma ${errori} indirizzo/i non è stato localizzato: controllali manualmente.`
+      ? `Fatto, ma ${errori} indirizzo/i non è stato localizzato: controllali manualmente, poi ricalcola.`
       : 'Orari calcolati e applicati alle fermate qui sopra.');
     setCalcolando(false);
   }
@@ -137,6 +152,10 @@ export function TragittiScreen() {
         alert(`Manca il prezzo sulla fermata "${fermateValide[i].citta}" — è obbligatorio su tutte tranne l'ultima (l'arrivo).`);
         return;
       }
+    }
+    if (fermateValide.length >= 2 && !orariCalcolati) {
+      alert('Calcola prima gli orari (pulsante "Calcola orari" qui sotto) — obbligatorio prima di salvare, e di nuovo ogni volta che cambi una città o un indirizzo.');
+      return;
     }
     const payload = { nome, fermate: fermateValide };
     try {
@@ -192,11 +211,15 @@ export function TragittiScreen() {
         })}
         <button className="btn btn-ghost" style={{ marginBottom: 18 }} onClick={aggiungiFermataIntermedia}>+ Aggiungi fermata intermedia</button>
 
-        <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, marginBottom: 18 }}>
-          <p style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 4 }}>Calcola orari di partenza dalle distanze</p>
+        <div style={{ background: 'var(--dusk)', border: `1px solid ${orariCalcolati ? 'var(--line)' : 'var(--pink)'}`, borderRadius: 10, padding: 14, marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <p style={{ fontSize: 12.5, fontWeight: 700, margin: 0 }}>Calcola orari di partenza dalle distanze</p>
+            <span className={`badge ${orariCalcolati ? 'coperta' : 'non-coperta'}`}>{orariCalcolati ? '✓ Calcolati' : 'Obbligatorio'}</span>
+          </div>
           <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 10 }}>
             Usa l'indirizzo e l'orario già inseriti nella fermata ARRIVO qui sopra come riferimento, e ricava a
-            ritroso l'orario di ogni fermata precedente in base ai tempi di viaggio reali.
+            ritroso l'orario di ogni fermata precedente in base ai tempi di viaggio reali. Va rifatto ogni volta che
+            cambi una città o un indirizzo — è obbligatorio prima di poter salvare.
           </p>
           <button className="btn btn-ghost" onClick={calcolaOrari} disabled={calcolando}>{calcolando ? 'Calcolo...' : 'Calcola orari'}</button>
           {statoCalcolo && <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 8 }}>{statoCalcolo}</p>}

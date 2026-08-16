@@ -144,6 +144,11 @@ export const busFisici = pgTable('bus_fisici', {
   riferimento: text('riferimento').notNull(), // es. targa, o riferimento dato dall'agenzia
   autistaNome: text('autista_nome'),
   autistaTelefono: text('autista_telefono'),
+  // Il tour leader assegnato a questo bus (censito nell'apposita sezione).
+  // Nullo se il bus non ha ancora un tour leader assegnato; se il tour
+  // leader viene eliminato, l'assegnazione si scollega da sola invece di
+  // bloccare l'eliminazione.
+  tourLeaderId: text('tour_leader_id').references(() => tourLeader.id, { onDelete: 'set null' }),
   note: text('note'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
 });

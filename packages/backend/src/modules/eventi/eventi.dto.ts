@@ -73,7 +73,10 @@ export const creaBusSchema = z.object({
   riferimento: z.string().min(1),
   autistaNome: z.string().optional(),
   autistaTelefono: z.string().optional(),
+  tourLeaderId: z.string().optional(),
   note: z.string().optional(),
   lineeIds: z.array(z.string()).min(1),
 });
-export const aggiornaBusSchema = creaBusSchema.partial();
+export const aggiornaBusSchema = creaBusSchema.partial().extend({
+  tourLeaderId: z.string().nullable().optional(),
+});

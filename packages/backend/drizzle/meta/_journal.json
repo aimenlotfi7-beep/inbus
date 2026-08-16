@@ -64,6 +64,13 @@
       "when": 1786891687966,
       "tag": "0008_fix_cancellazione_tratte_con_prenotazioni",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786893529290,
+      "tag": "0009_assegna_tour_leader_a_bus",
+      "breakpoints": true
     }
   ]
 }
