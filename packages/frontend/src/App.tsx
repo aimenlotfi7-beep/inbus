@@ -5,6 +5,8 @@ import { AccountPage } from './pages/AccountPage';
 import { PaginaPage } from './pages/PaginaPage';
 import { PromoterPage } from './pages/PromoterPage';
 import { TourLeaderPage } from './pages/TourLeaderPage';
+import { FinalizzaListaAttesaPage } from './pages/FinalizzaListaAttesaPage';
+import { CompletaSaldoPage } from './pages/CompletaSaldoPage';
 
 export function App() {
   return (
@@ -15,6 +17,8 @@ export function App() {
       <Route path="/pagina/:chiave" element={<PaginaPage />} />
       <Route path="/promoter" element={<PromoterPage />} />
       <Route path="/tour-leader" element={<TourLeaderPage />} />
+      <Route path="/finalizza/:token" element={<FinalizzaListaAttesaPage />} />
+      <Route path="/completa-saldo/:pnr" element={<CompletaSaldoPage />} />
     </Routes>
   );
 }

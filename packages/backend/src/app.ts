@@ -18,6 +18,7 @@ import { statisticheRouter } from './modules/statistiche/statistiche.routes.js';
 import { ruoliRouter } from './modules/ruoli/ruoli.routes.js';
 import { impostazioniRouter } from './modules/impostazioni/impostazioni.routes.js';
 import { categorieRouter } from './modules/categorie/categorie.routes.js';
+import { listaAttesaRouter } from './modules/lista-attesa/lista-attesa.routes.js';
 
 export function creaApp() {
   const app = express();
@@ -45,6 +46,7 @@ export function creaApp() {
   app.use('/api/ruoli', ruoliRouter);
   app.use('/api/impostazioni', impostazioniRouter);
   app.use('/api/categorie', categorieRouter);
+  app.use('/api/lista-attesa', listaAttesaRouter);
 
   // Il gestore errori DEVE essere l'ultimo middleware registrato.
   app.use(gestoreErrori);

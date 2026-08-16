@@ -19,8 +19,17 @@ const fermataTragittoSchema = z.object({
 const tragittoSchema = z.object({
   nome: z.string().min(1),
   fermate: z.array(fermataTragittoSchema).default([]),
-});
-const aggiornaTragittoSchema = tragittoSchema.partial();
+}).refine(
+  (t) => t.fermate.length === 0 || t.fermate.slice(0, -1).every((f) => f.prezzo !== undefined),
+  { message: 'Ogni fermata di partenza/intermedia deve avere un prezzo (solo l\'ultima, l\'arrivo, può non averlo).', path: ['fermate'] }
+);
+const aggiornaTragittoSchema = z.object({
+  nome: z.string().min(1).optional(),
+  fermate: z.array(fermataTragittoSchema).optional(),
+}).refine(
+  (t) => !t.fermate || t.fermate.length === 0 || t.fermate.slice(0, -1).every((f) => f.prezzo !== undefined),
+  { message: 'Ogni fermata di partenza/intermedia deve avere un prezzo (solo l\'ultima, l\'arrivo, può non averlo).', path: ['fermate'] }
+);
 
 async function getById(id: string) {
   const tragitto = await db.query.tragitti.findFirst({

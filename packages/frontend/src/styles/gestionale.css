@@ -20,6 +20,11 @@ body{
 .hidden{display:none !important;}
 a{color:inherit;}
 
+/* Base minima per ogni input/select del gestionale: senza questa, gli
+   input in una griglia stretta (es. riga fermata) possono imporre una
+   larghezza minima maggiore delle colonne e far sbordare il contenitore. */
+input, select, textarea{ min-width:0; box-sizing:border-box; }
+
 .logo{font-family:'Anton',sans-serif; font-size:22px; display:flex; align-items:baseline; gap:6px;}
 .logo span{color:var(--pink);}
 .logo small{font-family:'Space Mono',monospace; font-size:11px; color:var(--mist); letter-spacing:1px; text-transform:uppercase;}
@@ -598,6 +603,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .campo input, .campo select, .campo textarea{
   font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--paper);
   background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+  min-width:0; box-sizing:border-box; width:100%;
 }
 .campo textarea{min-height:70px; resize:vertical;}
 

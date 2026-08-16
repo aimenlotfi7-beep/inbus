@@ -87,8 +87,11 @@ export function PrenotazioniScreen() {
                 style={eventoAttivoId === ev.id ? { borderColor: 'var(--pink)' } : undefined}
                 onClick={() => { setEventoAttivoId(ev.id); setSottoTab('CONFERMATA'); setRicercaPrenotazioni(''); }}
               >
-                <h3 style={{ fontSize: 16, margin: 0 }}>{ev.artista}</h3>
-                <p style={{ color: 'var(--mist)', fontSize: 12.5, marginTop: 6 }}>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
+                {ev.immagine && <div className="evento-card-thumb" style={{ backgroundImage: `url(${ev.immagine})` }} />}
+                <span className="tag">{ev.genere}</span>
+                <h3>{ev.artista}</h3>
+                <p>{ev.luogo}, {ev.citta}</p>
+                <p>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
               </div>
             ))}
           </div>
@@ -117,37 +120,50 @@ export function PrenotazioniScreen() {
                 <p className="testo-intro">Nessuna prenotazione {sottoTab === 'CONFERMATA' ? 'confermata' : 'cancellata'} {ricercaPrenotazioni ? 'per questa ricerca' : 'per questo evento'}.</p>
               )}
 
-              {righe.map((r) => (
-                <div key={r.id} className="section-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
-                    <div>
-                      <h3 style={{ fontSize: 15 }}>{r.pnr}</h3>
-                      <p className="section-sub">{r.clienteNome} {r.clienteCognome ?? ''} · {r.clienteEmail}{r.clienteTelefono ? ` · ${r.clienteTelefono}` : ''}</p>
-                    </div>
-                    <span className={`badge ${r.stato === 'CONFERMATA' ? 'coperta' : 'non-coperta'}`}>
-                      {r.stato === 'CONFERMATA' ? 'Confermata' : 'Cancellata'}
-                    </span>
-                  </div>
-
-                  <p style={{ fontSize: 13.5, marginBottom: 8 }}>
-                    {r.passeggeri} passeggero/i · €{Number(r.totale).toFixed(2)} · {new Date(r.creataIl).toLocaleDateString('it-IT')}
-                  </p>
-
-                  {r.partecipanti.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                      {r.partecipanti.map((p, i) => (
-                        <span key={i} className="chip">{p.nome} {p.cognome}</span>
+              {righe.length > 0 && (
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>PNR</th>
+                        <th>Cliente</th>
+                        <th>Partecipanti</th>
+                        <th>Passeggeri</th>
+                        <th>Totale</th>
+                        <th>Data</th>
+                        <th>Stato</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {righe.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.pnr}</td>
+                          <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{r.clienteEmail}{r.clienteTelefono ? ` · ${r.clienteTelefono}` : ''}</span></td>
+                          <td>
+                            {r.partecipanti.length > 0 ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                {r.partecipanti.map((p, i) => <span key={i} className="chip" style={{ fontSize: 11 }}>{p.nome} {p.cognome}</span>)}
+                              </div>
+                            ) : '—'}
+                          </td>
+                          <td>{r.passeggeri}</td>
+                          <td>€{Number(r.totale).toFixed(2)}</td>
+                          <td>{new Date(r.creataIl).toLocaleDateString('it-IT')}</td>
+                          <td><span className={`badge ${r.stato === 'CONFERMATA' ? 'coperta' : 'non-coperta'}`}>{r.stato === 'CONFERMATA' ? 'Confermata' : 'Cancellata'}</span></td>
+                          <td>
+                            {r.stato === 'CONFERMATA' ? (
+                              <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => cancella(r)}>Cancella</button>
+                            ) : (
+                              <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => eliminaDefinitivamente(r)}>Elimina def.</button>
+                            )}
+                          </td>
+                        </tr>
                       ))}
-                    </div>
-                  )}
-
-                  {r.stato === 'CONFERMATA' ? (
-                    <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)' }} onClick={() => cancella(r)}>Cancella</button>
-                  ) : (
-                    <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)' }} onClick={() => eliminaDefinitivamente(r)}>Elimina definitivamente</button>
-                  )}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              )}
             </>
           )}
         </>

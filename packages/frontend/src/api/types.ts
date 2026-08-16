@@ -30,6 +30,7 @@ export interface Evento {
   inEvidenza: boolean;
   ordineEvidenza: number;
   accontoEur: string | null;
+  statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
   linee: LineaBus[];
   immagini: { id: string; url: string; ordine: number }[];
   allegati: { id: string; nome: string; url: string }[];

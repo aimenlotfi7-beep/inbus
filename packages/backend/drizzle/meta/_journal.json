@@ -50,6 +50,13 @@
       "when": 1786874339276,
       "tag": "0006_aggiungi_partecipanti_e_prezzo_opzionale",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786889501971,
+      "tag": "0007_lista_attesa_completa_stato_disponibilita_promemoria",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import { Modale } from '../../shared/Modale';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
 import { PartenzeTab } from '../partenze/PartenzeTab';
+import { ListaAttesaTab } from './ListaAttesaTab';
 import { geocodifica, durataViaggio, attesa } from '../../shared/geo';
 
 const VUOTO: EventoInput = { artista: '', genere: '', luogo: '', citta: '', data: '', inEvidenza: false, accontoEur: 10, immagini: [], linee: [] };
@@ -35,14 +36,14 @@ export function SchedaEventoModale({
   evento, tabIniziale = 'dettagli', onClose, onSalvato,
 }: {
   evento: Evento | null; // null = nuovo evento
-  tabIniziale?: 'dettagli' | 'partenze';
+  tabIniziale?: 'dettagli' | 'partenze' | 'lista-attesa';
   onClose: () => void;
   onSalvato: () => void;
 }) {
   const [tragitti, setTragitti] = useState<Tragitto[]>([]);
   const [categorie, setCategorie] = useState<Categoria[]>([]);
   const [form, setForm] = useState<EventoInput>(VUOTO);
-  const [tabAttiva, setTabAttiva] = useState<'dettagli' | 'partenze'>(tabIniziale);
+  const [tabAttiva, setTabAttiva] = useState<'dettagli' | 'partenze' | 'lista-attesa'>(tabIniziale);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [aggiustiPerTratta, setAggiustiPerTratta] = useState<Record<number, string>>({});
   const [nuovaImmagine, setNuovaImmagine] = useState('');
@@ -64,6 +65,7 @@ export function SchedaEventoModale({
         artista: evento.artista, genere: evento.genere, luogo: evento.luogo, citta: evento.citta,
         data: evento.data.slice(0, 10), inEvidenza: evento.inEvidenza,
         accontoEur: evento.accontoEur ? Number(evento.accontoEur) : 10,
+        statoDisponibilita: evento.statoDisponibilita,
         immagini: [...evento.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
         linee: evento.linee.map((l) => ({
           nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra),
@@ -245,23 +247,6 @@ export function SchedaEventoModale({
     return Boolean(form.artista && form.genere && form.luogo && form.citta && form.data);
   }
 
-  /** Ogni fermata di partenza/intermedia deve avere un prezzo — solo
-   *  l'ultima (l'arrivo) può non averlo. Controllato anche lato server,
-   *  qui serve solo per dare un messaggio immediato senza fare la
-   *  chiamata di rete a vuoto. */
-  function prezziTratteCompleti(): string | null {
-    for (const linea of form.linee ?? []) {
-      if (!linea.nome.trim()) continue;
-      const fermateValide = linea.fermate.filter((f) => f.citta.trim());
-      for (let i = 0; i < fermateValide.length - 1; i++) {
-        if (fermateValide[i].prezzo === undefined) {
-          return `Manca il prezzo sulla fermata "${fermateValide[i].citta}" della tratta "${linea.nome}" (obbligatorio su tutte tranne l'arrivo).`;
-        }
-      }
-    }
-    return null;
-  }
-
   async function nuovoGenere() {
     const nome = window.prompt('Nome del nuovo genere:');
     if (!nome || !nome.trim()) return;
@@ -286,11 +271,6 @@ export function SchedaEventoModale({
   async function salva() {
     if (!infoCompleta()) {
       alert('Compila almeno artista, genere, luogo, città e data.');
-      return;
-    }
-    const erroreProzzi = prezziTratteCompleti();
-    if (erroreProzzi) {
-      alert(erroreProzzi);
       return;
     }
     const payload = {
@@ -334,10 +314,22 @@ export function SchedaEventoModale({
         <label>Acconto (€)
           <input type="number" min={1} value={form.accontoEur ?? 10} onChange={(e) => setForm({ ...form, accontoEur: Number(e.target.value) })} />
         </label>
+        <label>Avviso disponibilità (mostrato ai clienti al posto dei posti reali)
+          <select
+            value={form.statoDisponibilita ?? ''}
+            onChange={(e) => setForm({ ...form, statoDisponibilita: (e.target.value || null) as typeof form.statoDisponibilita })}
+          >
+            <option value="">Nessuno (normale)</option>
+            <option value="POCHI_POSTI">Pochi posti disponibili</option>
+            <option value="NUOVI_POSTI">Nuovi posti disponibili</option>
+            <option value="ESAURITO">Posti terminati</option>
+          </select>
+        </label>
       </div>
       <p className="testo-intro" style={{ marginTop: -8, fontSize: 12.5 }}>
         I prezzi si impostano per fermata nello step "Tratte" (arrivano dai tragitti che applichi). Chi prenota con
-        acconto salda il resto entro 15 giorni prima della partenza.
+        acconto salda il resto entro 15 giorni prima della partenza. L'avviso disponibilità è solo un'etichetta
+        (per creare urgenza o scarsità): non blocca davvero le prenotazioni, quello dipende dai posti reali.
       </p>
       <div className="campo">
         <label><input type="checkbox" checked={form.inEvidenza ?? false} onChange={(e) => setForm({ ...form, inEvidenza: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> In evidenza in homepage</label>
@@ -451,15 +443,16 @@ export function SchedaEventoModale({
 
   if (evento) {
     return (
-      <Modale titolo="Modifica evento" onClose={onClose} larga={tabAttiva === 'partenze'} richiediConferma={() => chiediConferma(onClose)}>
+      <Modale titolo="Modifica evento" onClose={onClose} larga={tabAttiva !== 'dettagli'} richiediConferma={() => chiediConferma(onClose)}>
         <div className="mini-tabs">
           <button type="button" className={`mini-tab${tabAttiva === 'dettagli' ? ' active' : ''}`} onClick={() => setTabAttiva('dettagli')}>Dettagli</button>
           <button type="button" className={`mini-tab${tabAttiva === 'partenze' ? ' active' : ''}`} onClick={() => setTabAttiva('partenze')}>Partenze</button>
+          <button type="button" className={`mini-tab${tabAttiva === 'lista-attesa' ? ' active' : ''}`} onClick={() => setTabAttiva('lista-attesa')}>Lista d'attesa</button>
         </div>
 
-        {tabAttiva === 'partenze' ? (
-          <PartenzeTab eventoId={evento.id} />
-        ) : (
+        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} />}
+        {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} />}
+        {tabAttiva === 'dettagli' && (
           <>
             {campiInfoEvento}
             <p className="section-label" style={{ marginTop: 18 }}>Tratte</p>
@@ -478,7 +471,7 @@ export function SchedaEventoModale({
   const numeroTratte = (form.linee ?? []).filter((l) => l.nome.trim()).length;
 
   return (
-    <Modale titolo="Nuovo evento" onClose={onClose} richiediConferma={() => chiediConferma(onClose)}>
+    <Modale titolo="Nuovo evento" onClose={onClose} richiediConferma={() => chiediConferma(onClose)} larga>
       <div className="wizard-stepper">
         {STEP_WIZARD.map((s) => (
           <div key={s.numero} className={`wizard-dot${step === s.numero ? ' active' : step > s.numero ? ' completato' : ''}`}>
@@ -518,10 +511,6 @@ export function SchedaEventoModale({
             className="btn btn-primary"
             onClick={() => {
               if (step === 1 && !infoCompleta()) { alert('Compila almeno artista, genere, luogo, città e data prima di proseguire.'); return; }
-              if (step === 2) {
-                const errore = prezziTratteCompleti();
-                if (errore) { alert(errore); return; }
-              }
               setStep((s) => (s + 1) as 2 | 3 | 4);
             }}
           >

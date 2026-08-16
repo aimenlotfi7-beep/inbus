@@ -167,6 +167,12 @@
   }
   .search-cta:hover{background:#000;}
   .search-cta svg{width:16px; height:16px; fill:var(--pink);}
+  .search-cta-secondaria{
+    width:100%; margin-top:8px; background:#fff; color:var(--ink); border:1px solid #e5ded0;
+    font-family:'Anton',sans-serif; letter-spacing:1px; font-size:15px; text-transform:uppercase;
+    padding:14px; border-radius:10px; cursor:pointer; transition:border-color .15s ease;
+  }
+  .search-cta-secondaria:hover{border-color:var(--mist);}
 
   /* ---------- SECTION HEADERS (comuni a più sezioni) ---------- */
   .section-head{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:26px; flex-wrap:wrap;}

@@ -38,6 +38,12 @@ export const prenotazioniController = {
   async richiediRimborso(req: Request, res: Response) {
     res.json(await prenotazioniService.richiediRimborso(req.params.pnr));
   },
+  async differenzaSaldo(req: Request, res: Response) {
+    res.json(await prenotazioniService.differenzaSaldo(req.params.pnr));
+  },
+  async saldaResto(req: Request, res: Response) {
+    res.json(await prenotazioniService.saldaResto(req.params.pnr));
+  },
 };
 
 export const prenotazioniRouter = Router();
@@ -54,6 +60,8 @@ prenotazioniRouter.get('/by-email', valida(z.object({ email: z.string().email() 
 prenotazioniRouter.get('/:pnr', asyncHandler(prenotazioniController.getByPnr));
 prenotazioniRouter.post('/:pnr/cancella', asyncHandler(prenotazioniController.cancella));
 prenotazioniRouter.post('/:pnr/richiedi-rimborso', asyncHandler(prenotazioniController.richiediRimborso));
+prenotazioniRouter.get('/:pnr/saldo', asyncHandler(prenotazioniController.differenzaSaldo));
+prenotazioniRouter.post('/:pnr/salda', asyncHandler(prenotazioniController.saldaResto));
 
 // Amministrazione: elimina DEFINITIVAMENTE una prenotazione già cancellata
 // (per ripulire dati di test o duplicati) — non tocca quelle confermate.

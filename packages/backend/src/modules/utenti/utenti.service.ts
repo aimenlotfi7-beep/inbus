@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { utenti, prenotazioni } from '../../db/schema.js';
+import { utenti, prenotazioni, eventi } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
 import type { UpsertUtenteInput } from './utenti.dto.js';
 
@@ -16,7 +16,23 @@ export const utentiService = {
   },
 
   async storicoPrenotazioni(utenteId: string) {
-    return db.select().from(prenotazioni).where(eq(prenotazioni.utenteId, utenteId));
+    return db
+      .select({
+        id: prenotazioni.id,
+        pnr: prenotazioni.pnr,
+        passeggeri: prenotazioni.passeggeri,
+        totale: prenotazioni.totale,
+        stato: prenotazioni.stato,
+        tipoPagamento: prenotazioni.tipoPagamento,
+        saldoPagato: prenotazioni.saldoPagato,
+        creataIl: prenotazioni.creataIl,
+        artista: eventi.artista,
+        dataEvento: eventi.data,
+      })
+      .from(prenotazioni)
+      .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
+      .where(eq(prenotazioni.utenteId, utenteId))
+      .orderBy(desc(prenotazioni.creataIl));
   },
 
   /** Solo nome/cognome/telefono per il preriempimento al checkout — non

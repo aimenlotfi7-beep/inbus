@@ -131,7 +131,14 @@ export function TragittiScreen() {
 
   async function salva() {
     if (!nome.trim()) { alert('Dai un nome al tragitto prima di salvarlo.'); return; }
-    const payload = { nome, fermate: fermate.filter((f) => f.citta.trim() && f.indirizzo.trim()) };
+    const fermateValide = fermate.filter((f) => f.citta.trim() && f.indirizzo.trim());
+    for (let i = 0; i < fermateValide.length - 1; i++) {
+      if (fermateValide[i].prezzo === undefined) {
+        alert(`Manca il prezzo sulla fermata "${fermateValide[i].citta}" — è obbligatorio su tutte tranne l'ultima (l'arrivo).`);
+        return;
+      }
+    }
+    const payload = { nome, fermate: fermateValide };
     try {
       if (inModifica) await tragittiApi.update(inModifica.id, payload);
       else await tragittiApi.create(payload);

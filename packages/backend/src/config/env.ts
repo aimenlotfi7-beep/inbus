@@ -12,6 +12,17 @@ const schemaEnv = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   ACCONTO_FISSO_EUR: z.coerce.number().default(10),
   GIORNI_SCADENZA_SALDO: z.coerce.number().default(15),
+  // Tutte facoltative: se SMTP_HOST manca, le email non partono davvero
+  // (il link viene solo stampato nei log del server), il resto continua
+  // a funzionare normalmente.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  // Base per costruire i link cliccabili nelle email (es. completamento
+  // lista d'attesa, saldo). Se non impostata, usa CORS_ORIGIN.
+  FRONTEND_URL: z.string().optional(),
 });
 
 const parsed = schemaEnv.safeParse(process.env);

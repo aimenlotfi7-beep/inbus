@@ -10,6 +10,7 @@ export interface LineaInput {
 export interface EventoInput {
   artista: string; genere: string; luogo: string; citta: string; data: string; prezzo?: number;
   inEvidenza?: boolean; ordineEvidenza?: number; accontoEur?: number;
+  statoDisponibilita?: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
   immagini?: string[]; allegati?: { nome: string; url: string }[]; linee?: LineaInput[];
 }
 

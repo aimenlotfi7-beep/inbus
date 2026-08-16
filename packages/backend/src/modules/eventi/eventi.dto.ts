@@ -22,10 +22,11 @@ const lineaSchema = z.object({
   referenteTelefono: z.string().optional(),
   fornitoreId: z.string().optional(),
   fermate: z.array(fermataSchema).default([]),
-}).refine(
-  (l) => l.fermate.length === 0 || l.fermate.slice(0, -1).every((f) => f.prezzo !== undefined),
-  { message: 'Ogni fermata di partenza/intermedia deve avere un prezzo (solo l\'ultima, l\'arrivo, può non averlo).', path: ['fermate'] }
-);
+});
+// Nota: il prezzo obbligatorio per fermata (tranne l'arrivo) si applica
+// alla creazione/modifica dei TRAGITTI (la fonte), non più qui — così
+// modificare un evento esistente non si blocca per tratte create prima
+// che questa regola esistesse.
 
 export const creaEventoSchema = z.object({
   artista: z.string().min(1),
@@ -41,6 +42,7 @@ export const creaEventoSchema = z.object({
   vetrinaDal: z.coerce.date().optional(),
   vetrinaAl: z.coerce.date().optional(),
   accontoEur: z.number().positive().optional(),
+  statoDisponibilita: z.enum(['POCHI_POSTI', 'NUOVI_POSTI', 'ESAURITO']).nullable().optional(),
   immagini: z.array(z.string().url()).default([]),
   allegati: z.array(z.object({ nome: z.string(), url: z.string() })).default([]),
   linee: z.array(lineaSchema).default([]),

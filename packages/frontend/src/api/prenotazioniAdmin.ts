@@ -25,7 +25,7 @@ export interface FiltriPrenotazioni {
   ricerca?: string;
 }
 
-export interface EventoConPrenotazioni { id: string; artista: string; genere: string; luogo: string; citta: string; data: string; }
+export interface EventoConPrenotazioni { id: string; artista: string; genere: string; luogo: string; citta: string; data: string; immagine: string | null; }
 
 export const prenotazioniAdminApi = {
   listAll: (filtri: FiltriPrenotazioni = {}) => {

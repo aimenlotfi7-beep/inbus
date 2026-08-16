@@ -1,6 +1,6 @@
 import { and, eq, sql, desc, inArray } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { prenotazioni, lineeBus, fermate, eventi, coupon, utenti, partecipantiPrenotazione } from '../../db/schema.js';
+import { prenotazioni, lineeBus, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo } from '../../shared/errors.js';
 import { utentiService } from '../utenti/utenti.service.js';
 import { env } from '../../config/env.js';
@@ -129,9 +129,10 @@ export const prenotazioniService = {
 
   /** Eventi che hanno almeno una prenotazione (di qualsiasi stato) —
    *  per mostrare direttamente le tab in "Prenotazioni" senza dover
-   *  cercare, che serve solo se gli eventi con prenotazioni sono tanti. */
+   *  cercare, che serve solo se gli eventi con prenotazioni sono tanti.
+   *  Include la prima immagine, per mostrarle come le card del sito. */
   async eventiConPrenotazioni() {
-    return db
+    const base = await db
       .selectDistinct({
         id: eventi.id,
         artista: eventi.artista,
@@ -143,6 +144,18 @@ export const prenotazioniService = {
       .from(prenotazioni)
       .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
       .orderBy(desc(eventi.data));
+
+    if (base.length === 0) return [];
+    const immagini = await db
+      .select({ eventoId: immaginiEvento.eventoId, url: immaginiEvento.url, ordine: immaginiEvento.ordine })
+      .from(immaginiEvento)
+      .where(inArray(immaginiEvento.eventoId, base.map((e) => e.id)))
+      .orderBy(immaginiEvento.ordine);
+
+    return base.map((e) => ({
+      ...e,
+      immagine: immagini.find((i) => i.eventoId === e.id)?.url ?? null,
+    }));
   },
 
   /** Elenco per il gestionale (sezione Prenotazioni), con dati
@@ -252,5 +265,88 @@ export const prenotazioniService = {
       throw new ConflittoDati('Puoi eliminare definitivamente solo prenotazioni già cancellate. Cancellala prima.');
     }
     await db.delete(prenotazioni).where(eq(prenotazioni.pnr, pnr));
+  },
+
+  /** Segna il saldo come pagato (simulato: non c'è un vero gateway di
+   *  pagamento collegato, coerente col resto del checkout). Usato dalla
+   *  pagina pubblica raggiunta tramite il link del promemoria saldo. */
+  async saldaResto(pnr: string) {
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
+    if (!p) throw new NonTrovato('Prenotazione');
+    if (p.stato !== 'CONFERMATA') throw new ConflittoDati('Questa prenotazione non è più valida.');
+    if (p.saldoPagato) return p;
+
+    const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
+    const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, p.lineaId)).limit(1);
+    const [fermata] = await db.select().from(fermate).where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.lineaId, p.lineaId))).limit(1);
+    const prezzoEffettivo = fermata?.prezzo ? Number(fermata.prezzo) : (evento?.prezzo ? Number(evento.prezzo) : 0) + Number(linea?.prezzoExtra ?? 0);
+    const totaleReale = prezzoEffettivo * p.passeggeri - Number(p.sconto);
+
+    const [aggiornata] = await db
+      .update(prenotazioni)
+      .set({ saldoPagato: true, totale: totaleReale.toFixed(2) })
+      .where(eq(prenotazioni.pnr, pnr))
+      .returning();
+    return aggiornata;
+  },
+
+  /** Quanto manca da pagare su una prenotazione ad acconto (per mostrarlo
+   *  nella pagina pubblica di completamento saldo, senza doverlo
+   *  ricalcolare lato frontend). */
+  async differenzaSaldo(pnr: string) {
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
+    if (!p) throw new NonTrovato('Prenotazione');
+    const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
+    const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, p.lineaId)).limit(1);
+    const [fermata] = await db.select().from(fermate).where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.lineaId, p.lineaId))).limit(1);
+    const prezzoEffettivo = fermata?.prezzo ? Number(fermata.prezzo) : (evento?.prezzo ? Number(evento.prezzo) : 0) + Number(linea?.prezzoExtra ?? 0);
+    const totaleReale = prezzoEffettivo * p.passeggeri - Number(p.sconto);
+    return {
+      pnr: p.pnr,
+      artista: evento?.artista ?? '',
+      dataEvento: evento?.data ?? null,
+      saldoPagato: p.saldoPagato,
+      accontoVersato: Number(p.totale),
+      totaleReale,
+      differenza: Math.max(0, totaleReale - Number(p.totale)),
+    };
+  },
+
+  /** Cerca le prenotazioni ad acconto il cui saldo scade tra oggi e
+   *  domani (finestra di un giorno, per non perdere invii se lo scheduler
+   *  gira una volta al giorno) e non hanno ancora ricevuto il promemoria,
+   *  e manda l'email con il link per completare il pagamento. Va
+   *  richiamata periodicamente (vedi src/shared/scheduler.ts). */
+  async inviaPromemoriaSaldo() {
+    const oraAdesso = new Date();
+    const domani = new Date(oraAdesso.getTime() + 24 * 3600 * 1000);
+
+    const daAvvisare = await db
+      .select()
+      .from(prenotazioni)
+      .where(and(
+        eq(prenotazioni.stato, 'CONFERMATA'),
+        eq(prenotazioni.tipoPagamento, 'ACCONTO'),
+        eq(prenotazioni.saldoPagato, false),
+        eq(prenotazioni.promemoriaSaldoInviato, false),
+      ));
+
+    const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
+    let inviate = 0;
+    for (const p of daAvvisare) {
+      if (!p.scadenzaSaldo || p.scadenzaSaldo > domani || p.scadenzaSaldo < oraAdesso) continue;
+      const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+      if (!utente) continue;
+      const dati = await this.differenzaSaldo(p.pnr);
+      const link = urlSito(`/completa-saldo/${p.pnr}`);
+      await inviaEmail({
+        a: utente.email,
+        oggetto: `Completa il saldo per ${dati.artista}`,
+        html: `<p>Ciao ${utente.nome ?? ''},</p><p>La partenza per <b>${dati.artista}</b> si avvicina: manca il saldo di <b>€${dati.differenza.toFixed(2)}</b> sulla tua prenotazione <b>${p.pnr}</b>.</p><p><a href="${link}">Completa il pagamento</a></p>`,
+      });
+      await db.update(prenotazioni).set({ promemoriaSaldoInviato: true }).where(eq(prenotazioni.id, p.id));
+      inviate++;
+    }
+    return { inviate };
   },
 };

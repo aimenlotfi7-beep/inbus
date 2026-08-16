@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { eventiApi } from '../../api/eventi';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
+import { RicercaSezione } from '../shared/RicercaSezione';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 
 /**
@@ -12,19 +13,25 @@ import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 export function PartenzeScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [selezionato, setSelezionato] = useState<Evento | null>(null);
+  const [ricerca, setRicerca] = useState('');
 
   function ricarica() {
     eventiApi.list().then(setEventi);
   }
   useEffect(ricarica, []);
 
+  const eventiFiltrati = ricerca.trim()
+    ? eventi.filter((ev) => `${ev.artista} ${ev.citta} ${ev.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
+    : eventi;
+
   return (
     <div>
       <PanelHead titolo="Partenze" />
       <p className="testo-intro">Scegli un evento per vedere il calcolo bus, la copertura delle tratte e i bus censiti.</p>
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
 
       <div className="cards-list">
-        {eventi.map((ev) => (
+        {eventiFiltrati.map((ev) => (
           <div key={ev.id} className="evento-card" onClick={() => setSelezionato(ev)}>
             <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
             <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
@@ -32,7 +39,7 @@ export function PartenzeScreen() {
             <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
           </div>
         ))}
-        {!eventi.length && <p style={{ color: 'var(--mist)' }}>Nessun evento ancora — creane uno dalla sezione Eventi.</p>}
+        {!eventiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun evento trovato.' : 'Nessun evento ancora — creane uno dalla sezione Eventi.'}</p>}
       </div>
 
       {selezionato && (

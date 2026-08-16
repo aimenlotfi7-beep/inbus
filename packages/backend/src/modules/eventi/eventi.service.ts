@@ -68,6 +68,7 @@ export const eventiService = {
           vetrinaDal: input.vetrinaDal,
           vetrinaAl: input.vetrinaAl,
           accontoEur: input.accontoEur?.toFixed(2),
+          statoDisponibilita: input.statoDisponibilita,
         })
         .returning();
 
@@ -134,6 +135,7 @@ export const eventiService = {
           ...(input.vetrinaDal !== undefined && { vetrinaDal: input.vetrinaDal }),
           ...(input.vetrinaAl !== undefined && { vetrinaAl: input.vetrinaAl }),
           ...(input.accontoEur !== undefined && { accontoEur: input.accontoEur.toFixed(2) }),
+          ...(input.statoDisponibilita !== undefined && { statoDisponibilita: input.statoDisponibilita }),
           aggiornatoIl: new Date(),
         })
         .where(eq(eventi.id, id));

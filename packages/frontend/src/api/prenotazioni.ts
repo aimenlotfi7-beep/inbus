@@ -16,8 +16,20 @@ export interface CreaPrenotazionePayload {
   partecipanti: { nome: string; cognome: string }[];
 }
 
+export interface DifferenzaSaldo {
+  pnr: string;
+  artista: string;
+  dataEvento: string | null;
+  saldoPagato: boolean;
+  accontoVersato: number;
+  totaleReale: number;
+  differenza: number;
+}
+
 export const prenotazioniApi = {
   crea: (payload: CreaPrenotazionePayload) => api.post<Prenotazione>('/api/prenotazioni', payload),
+  getSaldo: (pnr: string) => api.get<DifferenzaSaldo>(`/api/prenotazioni/${pnr}/saldo`),
+  saldaResto: (pnr: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`),
   getByPnr: (pnr: string) => api.get<Prenotazione>(`/api/prenotazioni/${pnr}`),
   listByEmail: (email: string) => api.get<Prenotazione[]>(`/api/prenotazioni/by-email?email=${encodeURIComponent(email)}`),
   cancella: (pnr: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/cancella`),

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import type { Evento, OpzionePartenza } from '../../api/types';
 import { eventiApi } from '../../api/eventi';
 import { prenotazioniApi } from '../../api/prenotazioni';
+import { listaAttesaApi } from '../../api/listaAttesa';
 import { utentiApi } from '../../api/utenti';
 import { ErroreApi } from '../../api/client';
 
-type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'errore';
+type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'confermato-attesa' | 'errore';
 interface Partecipante { nome: string; cognome: string; }
 
 export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: () => void }) {
@@ -31,7 +32,11 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
   useEffect(() => {
     eventiApi.opzioniPartenza(evento.id).then((o) => {
       setOpzioni(o);
-      if (o[0]) setFermataId(o[0].fermataId);
+      // Preseleziona la prima fermata con posti, se ce n'è una — altrimenti
+      // la prima in assoluto (serve comunque per la lista d'attesa, come
+      // preferenza).
+      const primaConPosti = o.find((x) => x.postiDisponibili > 0);
+      setFermataId((primaConPosti ?? o[0])?.fermataId ?? '');
       setStato('pronto');
     });
   }, [evento.id]);
@@ -69,12 +74,16 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
   }
 
   const opzioneScelta = opzioni.find((o) => o.fermataId === fermataId);
+  // Il cliente non vede mai il numero esatto di posti: qui serve solo
+  // internamente per decidere se mostrare il checkout normale o la
+  // lista d'attesa.
+  const nessunPostoDisponibile = opzioni.length === 0 || opzioni.every((o) => o.postiDisponibili === 0);
   const totale = opzioneScelta ? opzioneScelta.prezzoEffettivo * passeggeri : 0;
   const moduloRichiedenteCompleto = Boolean(email && nome && cognome && telefono);
   const partecipantiCompleti = partecipanti.every((p) => p.nome.trim() && p.cognome.trim());
   const puoConfermare = moduloRichiedenteCompleto && partecipantiCompleti && !!opzioneScelta;
 
-  async function confermaPrenotazione() {
+  async function confermaPrenotazione(tipoPagamento: 'COMPLETO' | 'ACCONTO') {
     if (!opzioneScelta) return;
     setStato('invio');
     setMessaggioErrore('');
@@ -85,7 +94,7 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
         lineaId: opzioneScelta.lineaId,
         fermataId: opzioneScelta.fermataId,
         passeggeri,
-        tipoPagamento: 'COMPLETO',
+        tipoPagamento,
         metodoPagamento: 'CARTA',
         cliente: { email, nome, cognome, telefono },
         partecipanti,
@@ -99,18 +108,50 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
     }
   }
 
+  async function iscrivitiListaAttesa() {
+    setStato('invio');
+    setMessaggioErrore('');
+    try {
+      await listaAttesaApi.iscriviti({
+        eventoId: evento.id,
+        lineaId: opzioneScelta?.lineaId,
+        fermataId: opzioneScelta?.fermataId,
+        passeggeri,
+        cliente: { email, nome, cognome, telefono },
+        partecipanti,
+      });
+      setStato('confermato-attesa');
+    } catch (e) {
+      setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
+      setStato('errore');
+    }
+  }
+
   return (
     <div className="modal-overlay show" onClick={onClose}>
       <div className="checkout-modal" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose}>✕</button>
 
-        {stato === 'confermato' ? (
+        {stato === 'confermato' && (
           <>
             <h3>Prenotazione confermata 🎉</h3>
             <div className="checkout-summary">Il tuo PNR è <b>{pnrConfermato}</b>. I biglietti arriveranno all'email <b>{email}</b>.</div>
             <button className="search-cta" onClick={onClose}>Chiudi</button>
           </>
-        ) : (
+        )}
+
+        {stato === 'confermato-attesa' && (
+          <>
+            <h3>Sei in lista d'attesa 📩</h3>
+            <div className="checkout-summary">
+              Ti scriveremo a <b>{email}</b> appena si libera un posto per <b>{evento.artista}</b>, con un link per
+              completare subito la prenotazione.
+            </div>
+            <button className="search-cta" onClick={onClose}>Chiudi</button>
+          </>
+        )}
+
+        {stato !== 'confermato' && stato !== 'confermato-attesa' && (
           <>
             <h3>{evento.artista}</h3>
             <div className="checkout-summary">{evento.luogo}, {evento.citta} · {new Date(evento.data).toLocaleDateString('it-IT')}</div>
@@ -119,11 +160,18 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
 
             {stato !== 'caricamento' && (
               <>
+                {nessunPostoDisponibile && (
+                  <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
+                    Al momento non ci sono posti disponibili. Iscriviti alla lista d'attesa: ti avviseremo via email
+                    non appena si libera un posto, con un link per completare subito la prenotazione compilata ora.
+                  </p>
+                )}
+
                 <label className="field-label">Fermata di partenza</label>
                 <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
                   {opzioni.map((o) => (
                     <option key={o.fermataId} value={o.fermataId}>
-                      {o.fermataCitta} ({o.fermataOrario ?? 'orario da definire'}) — €{o.prezzoEffettivo.toFixed(2)} · {o.postiDisponibili} posti liberi
+                      {o.fermataCitta} ({o.fermataOrario ?? 'orario da definire'}) — €{o.prezzoEffettivo.toFixed(2)}
                     </option>
                   ))}
                 </select>
@@ -175,19 +223,46 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
                   </>
                 )}
 
-                <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, margin: '18px 0 6px' }}>€{totale.toFixed(2)}</p>
-                <p style={{ fontSize: 12, opacity: .7, marginTop: -4 }}>I biglietti arriveranno via email al richiedente.</p>
-
                 {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
 
-                <button
-                  className="search-cta"
-                  style={{ marginTop: 10, opacity: (stato === 'invio' || !puoConfermare) ? .5 : 1 }}
-                  disabled={stato === 'invio' || !puoConfermare}
-                  onClick={confermaPrenotazione}
-                >
-                  {stato === 'invio' ? 'Invio...' : 'Conferma e paga'}
-                </button>
+                {nessunPostoDisponibile ? (
+                  <button
+                    className="search-cta"
+                    style={{ marginTop: 14, opacity: (stato === 'invio' || !moduloRichiedenteCompleto || !partecipantiCompleti) ? .5 : 1 }}
+                    disabled={stato === 'invio' || !moduloRichiedenteCompleto || !partecipantiCompleti}
+                    onClick={iscrivitiListaAttesa}
+                  >
+                    {stato === 'invio' ? 'Invio...' : "Iscriviti alla lista d'attesa"}
+                  </button>
+                ) : (
+                  <>
+                    <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, margin: '18px 0 6px' }}>€{totale.toFixed(2)}</p>
+                    <p style={{ fontSize: 12, opacity: .7, marginTop: -4 }}>I biglietti arriveranno via email al richiedente.</p>
+
+                    <button
+                      className="search-cta"
+                      style={{ marginTop: 10, opacity: (stato === 'invio' || !puoConfermare) ? .5 : 1 }}
+                      disabled={stato === 'invio' || !puoConfermare}
+                      onClick={() => confermaPrenotazione('COMPLETO')}
+                    >
+                      {stato === 'invio' ? 'Invio...' : 'Acquista'}
+                    </button>
+
+                    <button
+                      className="search-cta-secondaria"
+                      style={{ opacity: (stato === 'invio' || !puoConfermare) ? .5 : 1 }}
+                      disabled={stato === 'invio' || !puoConfermare}
+                      onClick={() => confermaPrenotazione('ACCONTO')}
+                    >
+                      {stato === 'invio' ? 'Invio...' : 'Prenota'}
+                    </button>
+                    <p style={{ fontSize: 11, opacity: .65, marginTop: 6, textAlign: 'center' }}>
+                      Con "Prenota" versi un acconto di €{Number(evento.accontoEur ?? 10).toFixed(2)} a passeggero
+                      ({(Number(evento.accontoEur ?? 10) * passeggeri).toFixed(2)}€ totali ora) e salderai il resto entro
+                      15 giorni prima della partenza.
+                    </p>
+                  </>
+                )}
               </>
             )}
           </>

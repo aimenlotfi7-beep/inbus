@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ruoliApi, type Ruolo, type Permesso } from '../../api/ruoli';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
+import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { Modale } from '../shared/Modale';
 
@@ -20,12 +21,17 @@ export function RuoliScreen() {
   const [inModifica, setInModifica] = useState<Ruolo | null>(null);
   const [form, setForm] = useState<FormRuolo>(VUOTO);
   const [modaleAperta, setModaleAperta] = useState(false);
+  const [ricerca, setRicerca] = useState('');
 
   function ricarica() {
     ruoliApi.list().then(setRuoli);
     ruoliApi.permessiAssegnabili().then(setPermessiAssegnabili);
   }
   useEffect(ricarica, []);
+
+  const ruoliFiltrati = ricerca.trim()
+    ? ruoli.filter((r) => r.nome.toLowerCase().includes(ricerca.trim().toLowerCase()))
+    : ruoli;
 
   const moduli = Array.from(new Set(permessiAssegnabili.map((p) => p.modulo)));
 
@@ -74,8 +80,9 @@ export function RuoliScreen() {
         Puoi creare ruoli con il nome che preferisci e scegliere esattamente cosa può fare chi lo ha.
         Puoi assegnare solo i permessi che possiedi tu stesso.
       </p>
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome ruolo..." />
       <TabellaGenerica
-        righe={ruoli}
+        righe={ruoliFiltrati}
         colonne={[
           { etichetta: 'Nome', render: (r) => r.owner ? `${r.nome} (proprietario)` : r.nome },
           { etichetta: 'Descrizione', render: (r) => r.descrizione ?? '—' },

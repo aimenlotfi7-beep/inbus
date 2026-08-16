@@ -33,6 +33,10 @@ export const statoTourLeaderEnum = pgEnum('stato_tour_leader', ['CANDIDATO', 'AT
 export const tipoCouponEnum = pgEnum('tipo_coupon', ['PERCENTUALE', 'FISSO']);
 export const autoreMessaggioEnum = pgEnum('autore_messaggio', ['CLIENTE', 'ADMIN']);
 export const statoListaAttesaEnum = pgEnum('stato_lista_attesa', ['IN_ATTESA', 'PROMOSSA']);
+// Etichetta di scarsità/abbondanza mostrata ai clienti al posto del
+// numero esatto di posti — impostata a mano dal gestionale, indipendente
+// dai posti reali (serve per creare percezione di scarsità o urgenza).
+export const statoDisponibilitaEnum = pgEnum('stato_disponibilita', ['POCHI_POSTI', 'NUOVI_POSTI', 'ESAURITO']);
 // Deprecato: sostituito dal sistema di ruoli dinamici (tabella `ruoli`).
 // Lasciato solo per leggere i valori esistenti durante la migrazione
 // (vedi src/db/migra-permessi.ts). Rimuovibile dopo la migrazione.
@@ -59,6 +63,9 @@ export const eventi = pgTable('eventi', {
   // Acconto specifico per questo evento (in euro). Se non impostato,
   // si usa il default globale (variabile d'ambiente ACCONTO_FISSO_EUR).
   accontoEur: numeric('acconto_eur', { precision: 10, scale: 2 }),
+  // Null = nessun avviso (comportamento normale). Impostato a mano
+  // dal gestionale, si applica a tutte le tratte/fermate dell'evento.
+  statoDisponibilita: statoDisponibilitaEnum('stato_disponibilita'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
   aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 });
@@ -216,6 +223,8 @@ export const prenotazioni = pgTable('prenotazioni', {
   rimborsoStato: text('rimborso_stato'), // 'richiesto' | 'approvato'
   rimborsoImporto: numeric('rimborso_importo', { precision: 10, scale: 2 }),
   rimborsoData: timestamp('rimborso_data'),
+  // Evita di rimandare più volte lo stesso promemoria "salda il resto".
+  promemoriaSaldoInviato: boolean('promemoria_saldo_inviato').notNull().default(false),
   creataIl: timestamp('creata_il').notNull().defaultNow(),
 });
 
@@ -308,10 +317,27 @@ export const listaAttesa = pgTable('lista_attesa', {
   id: id(),
   eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
   nome: text('nome').notNull(),
+  cognome: text('cognome'),
   email: text('email').notNull(),
   telefono: text('telefono'),
   passeggeri: integer('passeggeri').notNull(),
+  // Tratta/fermata preferita (facoltativa: potrebbe non essercene una
+  // con posti quando si iscrive) — usata per precompilare il checkout
+  // quando viene promossa.
+  lineaId: text('linea_id').references(() => lineeBus.id),
+  fermataId: text('fermata_id').references(() => fermate.id),
+  // Un passeggero per riga OLTRE al richiedente, come nel checkout
+  // normale: [{nome,cognome}, ...]. Salvato come JSON per semplicità,
+  // non serve interrogarlo separatamente.
+  partecipantiJson: text('partecipanti_json'),
   stato: statoListaAttesaEnum('stato').notNull().default('IN_ATTESA'),
+  // Token univoco per il link "completa la tua prenotazione" nell'email
+  // di promozione — generato quando l'iscrizione viene promossa.
+  token: text('token').unique(),
+  emailInviata: boolean('email_inviata').notNull().default(false),
+  // Vero quando il cliente ha davvero completato la prenotazione dal
+  // link ricevuto (per non permettere di riusarlo due volte).
+  completata: boolean('completata').notNull().default(false),
   dataCreazione: timestamp('data_creazione').notNull().defaultNow(),
 });
 
