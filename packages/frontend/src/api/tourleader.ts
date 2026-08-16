@@ -23,6 +23,7 @@ export interface CandidaturaInput {
 
 export const tourLeaderApi = {
   list: () => api.get<TourLeader[]>('/api/tour-leader'),
+  create: (input: CandidaturaInput & { stato?: TourLeader['stato'] }) => api.post<TourLeader>('/api/tour-leader', input),
   update: (id: string, input: Partial<Pick<TourLeader, 'stato' | 'note'>>) =>
     api.put<TourLeader>(`/api/tour-leader/${id}`, input),
   remove: (id: string) => api.delete<void>(`/api/tour-leader/${id}`),

@@ -24,6 +24,9 @@ const candidaturaSchema = z.object({
 const aggiornaSchema = candidaturaSchema.partial().extend({
   stato: z.enum(['CANDIDATO', 'ATTIVO', 'ARCHIVIATO']).optional(),
 });
+const creaAmministrativoSchema = candidaturaSchema.extend({
+  stato: z.enum(['CANDIDATO', 'ATTIVO', 'ARCHIVIATO']).optional(),
+});
 
 async function getById(id: string) {
   const [t] = await db.select().from(tourLeader).where(eq(tourLeader.id, id)).limit(1);
@@ -36,6 +39,13 @@ export const tourLeaderService = {
   getById,
   candidati: async (input: z.infer<typeof candidaturaSchema>) => {
     const [nuovo] = await db.insert(tourLeader).values({ ...input, stato: 'CANDIDATO' }).returning();
+    return nuovo;
+  },
+  // Censimento diretto dal gestionale (non passa dal form pubblico): chi
+  // lo crea decide subito lo stato, di default ATTIVO dato che è già
+  // stato valutato per essere censito qui.
+  creaAmministrativo: async (input: z.infer<typeof candidaturaSchema> & { stato?: 'CANDIDATO' | 'ATTIVO' | 'ARCHIVIATO' }) => {
+    const [nuovo] = await db.insert(tourLeader).values({ ...input, stato: input.stato ?? 'ATTIVO' }).returning();
     return nuovo;
   },
   update: async (id: string, input: z.infer<typeof aggiornaSchema>) => {
@@ -59,6 +69,7 @@ tourLeaderRouter.post('/candidatura', valida(candidaturaSchema), asyncHandler(as
 // Amministrazione
 tourLeaderRouter.use(richiedeAuth);
 tourLeaderRouter.get('/', richiedePermesso('tourleader.visualizza'), asyncHandler(async (_req: Request, res: Response) => res.json(await tourLeaderService.list())));
+tourLeaderRouter.post('/', richiedePermesso('tourleader.gestisci'), valida(creaAmministrativoSchema), asyncHandler(async (req: Request, res: Response) => res.status(201).json(await tourLeaderService.creaAmministrativo(req.body))));
 tourLeaderRouter.get('/:id', richiedePermesso('tourleader.visualizza'), asyncHandler(async (req: Request, res: Response) => res.json(await tourLeaderService.getById(req.params.id))));
 tourLeaderRouter.put('/:id', richiedePermesso('tourleader.gestisci'), valida(aggiornaSchema), asyncHandler(async (req: Request, res: Response) => res.json(await tourLeaderService.update(req.params.id, req.body))));
 tourLeaderRouter.delete('/:id', richiedePermesso('tourleader.gestisci'), asyncHandler(async (req: Request, res: Response) => { await tourLeaderService.remove(req.params.id); res.status(204).send(); }));

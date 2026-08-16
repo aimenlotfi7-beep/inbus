@@ -147,13 +147,17 @@ export function TragittiScreen() {
   async function salva() {
     if (!nome.trim()) { alert('Dai un nome al tragitto prima di salvarlo.'); return; }
     const fermateValide = fermate.filter((f) => f.citta.trim() && f.indirizzo.trim());
+    if (fermateValide.length < 2) {
+      alert('Un tragitto deve avere almeno una fermata di partenza e una di arrivo, entrambe con città e indirizzo compilati.');
+      return;
+    }
     for (let i = 0; i < fermateValide.length - 1; i++) {
       if (fermateValide[i].prezzo === undefined) {
         alert(`Manca il prezzo sulla fermata "${fermateValide[i].citta}" — è obbligatorio su tutte tranne l'ultima (l'arrivo).`);
         return;
       }
     }
-    if (fermateValide.length >= 2 && !orariCalcolati) {
+    if (!orariCalcolati) {
       alert('Calcola prima gli orari (pulsante "Calcola orari" qui sotto) — obbligatorio prima di salvare, e di nuovo ogni volta che cambi una città o un indirizzo.');
       return;
     }
