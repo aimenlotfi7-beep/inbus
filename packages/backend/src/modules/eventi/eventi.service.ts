@@ -45,6 +45,8 @@ export const eventiService = {
       const q = `%${query.ricerca.trim()}%`;
       condizioni.push(sql`(${ilike(eventi.artista, q)} OR ${ilike(eventi.luogo, q)} OR ${ilike(eventi.citta, q)})`);
     }
+    if (query.soloFuturi) condizioni.push(sql`${eventi.data} >= now()`);
+    if (query.soloVisibili) condizioni.push(eq(eventi.visibileSito, true));
 
     return db.query.eventi.findMany({
       where: condizioni.length ? and(...condizioni) : undefined,
@@ -72,6 +74,9 @@ export const eventiService = {
           vetrinaAl: input.vetrinaAl,
           accontoEur: input.accontoEur?.toFixed(2),
           statoDisponibilita: input.statoDisponibilita,
+          arrivoIndirizzo: input.arrivoIndirizzo,
+          arrivoOrario: input.arrivoOrario,
+          visibileSito: input.visibileSito,
         })
         .returning();
 
@@ -97,8 +102,6 @@ export const eventiService = {
             referenteNome: linea.referenteNome,
             referenteTelefono: linea.referenteTelefono,
             fornitoreId: linea.fornitoreId,
-            arrivoIndirizzo: linea.arrivoIndirizzo,
-            arrivoOrario: linea.arrivoOrario,
           })
           .returning();
 
@@ -141,6 +144,9 @@ export const eventiService = {
           ...(input.vetrinaAl !== undefined && { vetrinaAl: input.vetrinaAl }),
           ...(input.accontoEur !== undefined && { accontoEur: input.accontoEur.toFixed(2) }),
           ...(input.statoDisponibilita !== undefined && { statoDisponibilita: input.statoDisponibilita }),
+          ...(input.arrivoIndirizzo !== undefined && { arrivoIndirizzo: input.arrivoIndirizzo }),
+          ...(input.arrivoOrario !== undefined && { arrivoOrario: input.arrivoOrario }),
+          ...(input.visibileSito !== undefined && { visibileSito: input.visibileSito }),
           aggiornatoIl: new Date(),
         })
         .where(eq(eventi.id, id));
@@ -205,8 +211,6 @@ export const eventiService = {
               referenteNome: linea.referenteNome,
               referenteTelefono: linea.referenteTelefono,
               fornitoreId: linea.fornitoreId,
-              arrivoIndirizzo: linea.arrivoIndirizzo,
-              arrivoOrario: linea.arrivoOrario,
             }).where(eq(lineeBus.id, giaEsistente.id));
 
             // Le fermate non hanno prenotazioni collegate direttamente
@@ -240,8 +244,6 @@ export const eventiService = {
                 referenteNome: linea.referenteNome,
                 referenteTelefono: linea.referenteTelefono,
                 fornitoreId: linea.fornitoreId,
-                arrivoIndirizzo: linea.arrivoIndirizzo,
-                arrivoOrario: linea.arrivoOrario,
               })
               .returning();
 

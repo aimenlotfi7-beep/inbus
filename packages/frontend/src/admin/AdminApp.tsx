@@ -15,6 +15,7 @@ import { TragittiScreen } from './screens/TragittiScreen';
 import { PromoterScreen } from './screens/PromoterScreen';
 import { TourLeaderScreen } from './screens/TourLeaderScreen';
 import { CouponScreen } from './screens/CouponScreen';
+import { CampagneScreen } from './screens/CampagneScreen';
 import { ChatScreen } from './screens/ChatScreen';
 import { ContenutiScreen } from './screens/ContenutiScreen';
 import { AmministratoriScreen } from './screens/AmministratoriScreen';
@@ -41,6 +42,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   promoter: PromoterScreen,
   tourleader: TourLeaderScreen,
   coupon: CouponScreen,
+  campagne: CampagneScreen,
   chat: ChatScreen,
   contenuti: ContenutiScreen,
   amministratori: AmministratoriScreen,
@@ -66,6 +68,7 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   promoter: 'promoter.visualizza',
   tourleader: 'tourleader.visualizza',
   coupon: 'coupon.visualizza',
+  campagne: 'campagne.gestisci',
   chat: 'chat.visualizza',
   contenuti: 'pagine.gestisci',
   amministratori: 'utenze.gestisci',

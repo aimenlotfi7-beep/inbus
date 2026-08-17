@@ -21,6 +21,14 @@ export const creaPrenotazioneSchema = z.object({
   metodoPagamento: z.enum(['CARTA', 'PAYPAL', 'SATISPAY', 'DA_CONCORDARE']).default('CARTA'),
   couponCodice: z.string().optional(),
   promoterCodice: z.string().optional(),
+  // Marketing: se la prenotazione arriva da un link con offerta dedicata
+  // e/o da una campagna tracciata (facoltativi, indipendenti tra loro).
+  offertaId: z.string().optional(),
+  campagnaId: z.string().optional(),
+  utmSource: z.string().optional(),
+  utmMedium: z.string().optional(),
+  utmCampaign: z.string().optional(),
+  utmContent: z.string().optional(),
   cliente: clienteCheckoutSchema,
   // Un modulo nome+cognome per ogni passeggero OLTRE al richiedente
   // (che è già coperto da "cliente" qui sopra) — quindi deve essere

@@ -16,8 +16,6 @@ export interface LineaBus {
   prezzoExtra: string;
   referenteNome: string | null;
   referenteTelefono: string | null;
-  arrivoIndirizzo: string | null;
-  arrivoOrario: string | null;
   fermate: Fermata[];
 }
 
@@ -33,6 +31,9 @@ export interface Evento {
   ordineEvidenza: number;
   accontoEur: string | null;
   statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
+  arrivoIndirizzo: string | null;
+  arrivoOrario: string | null;
+  visibileSito: boolean;
   linee: LineaBus[];
   immagini: { id: string; url: string; ordine: number }[];
   allegati: { id: string; nome: string; url: string }[];

@@ -66,6 +66,17 @@ export const eventi = pgTable('eventi', {
   // Null = nessun avviso (comportamento normale). Impostato a mano
   // dal gestionale, si applica a tutte le tratte/fermate dell'evento.
   statoDisponibilita: statoDisponibilitaEnum('stato_disponibilita'),
+  // L'arrivo (destinazione + orario) è unico per l'evento e si applica a
+  // tutte le sue tratte — è l'ancora da cui si calcolano a ritroso gli
+  // orari delle fermate. Non è nel tragitto perché la destinazione
+  // cambia a ogni evento anche riusando lo stesso tragitto di fermate.
+  arrivoIndirizzo: text('arrivo_indirizzo'),
+  arrivoOrario: text('arrivo_orario'),
+  // Controllo manuale indipendente dalla data: se falso, l'evento non
+  // compare mai sul sito pubblico, nemmeno se è nel futuro. Se vero
+  // (default), vale comunque la regola "non visibile dopo la data
+  // dell'evento" applicata separatamente.
+  visibileSito: boolean('visibile_sito').notNull().default(true),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
   aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 });
@@ -75,6 +86,50 @@ export const immaginiEvento = pgTable('immagini_evento', {
   eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
   url: text('url').notNull(), // in produzione: URL su storage tipo S3/Cloudinary
   ordine: integer('ordine').notNull().default(0),
+});
+
+// ---------------------------------------------------------------------
+// MARKETING: campagne pubblicitarie e offerte con prezzo dedicato
+// ---------------------------------------------------------------------
+
+// Una campagna pubblicitaria (Meta, Google, newsletter, ecc.) — serve a
+// sapere da dove arriva un cliente, indipendentemente dal fatto che usi
+// o meno un'offerta con prezzo scontato.
+export const campagne = pgTable('campagne', {
+  id: id(),
+  nome: text('nome').notNull(),
+  piattaforma: text('piattaforma'), // testo libero: es. "Meta", "Google", "Instagram", "Newsletter"
+  tipo: text('tipo'), // testo libero: es. "Retargeting", "Acquisizione"
+  utmSource: text('utm_source'),
+  utmMedium: text('utm_medium'),
+  utmCampaign: text('utm_campaign'),
+  utmContent: text('utm_content'),
+  attiva: boolean('attiva').notNull().default(true),
+  creataIl: timestamp('creata_il').notNull().defaultNow(),
+});
+
+// Un link con un prezzo dedicato per un evento specifico (es. "40€
+// invece di 50€" per chi arriva da una campagna Meta). Il prezzo vive
+// solo qui: il link pubblico porta solo lo slug, mai il prezzo, così
+// non è modificabile dal browser.
+export const offerteEvento = pgTable('offerte_evento', {
+  id: id(),
+  eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  campagnaId: text('campagna_id').references(() => campagne.id, { onDelete: 'set null' }),
+  nome: text('nome').notNull(),
+  slug: text('slug').notNull().unique(),
+  // Prezzo fisso per passeggero: sostituisce il prezzo normale (quello
+  // calcolato per fermata) quando si prenota tramite questo link,
+  // indipendentemente dalla fermata scelta.
+  prezzo: numeric('prezzo', { precision: 10, scale: 2 }).notNull(),
+  // Solo per mostrare "invece di X€" nella pagina pubblica — facoltativo.
+  prezzoOriginale: numeric('prezzo_originale', { precision: 10, scale: 2 }),
+  attiva: boolean('attiva').notNull().default(true),
+  validoDal: timestamp('valido_dal'),
+  validoAl: timestamp('valido_al'),
+  limiteUtilizzi: integer('limite_utilizzi'),
+  utilizzi: integer('utilizzi').notNull().default(0),
+  creataIl: timestamp('creata_il').notNull().defaultNow(),
 });
 
 export const allegatiEvento = pgTable('allegati_evento', {
@@ -113,12 +168,6 @@ export const lineeBus = pgTable('linee_bus', {
   referenteNome: text('referente_nome'),
   referenteTelefono: text('referente_telefono'),
   fornitoreId: text('fornitore_id').references(() => fornitori.id),
-  // L'arrivo (destinazione + orario) si decide qui, sulla tratta
-  // dell'evento — non nel tragitto, perché la destinazione cambia a ogni
-  // evento anche riusando lo stesso tragitto di fermate. È l'ancora da
-  // cui si calcolano a ritroso gli orari delle fermate.
-  arrivoIndirizzo: text('arrivo_indirizzo'),
-  arrivoOrario: text('arrivo_orario'),
   // Sezione "Partenze": indica se questa tratta è coperta (bus prenotato
   // con l'agenzia/fornitore), a prescindere dal calcolo automatico dei
   // bus necessari, che resta solo un suggerimento.
@@ -236,6 +285,14 @@ export const prenotazioni = pgTable('prenotazioni', {
   rimborsoData: timestamp('rimborso_data'),
   // Evita di rimandare più volte lo stesso promemoria "salda il resto".
   promemoriaSaldoInviato: boolean('promemoria_saldo_inviato').notNull().default(false),
+  // Marketing: se la prenotazione arriva da un link con offerta dedicata
+  // e/o da una campagna tracciata (anche senza offerta, solo UTM).
+  offertaId: text('offerta_id').references(() => offerteEvento.id, { onDelete: 'set null' }),
+  campagnaId: text('campagna_id').references(() => campagne.id, { onDelete: 'set null' }),
+  utmSource: text('utm_source'),
+  utmMedium: text('utm_medium'),
+  utmCampaign: text('utm_campaign'),
+  utmContent: text('utm_content'),
   creataIl: timestamp('creata_il').notNull().defaultNow(),
 });
 

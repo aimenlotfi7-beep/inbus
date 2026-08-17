@@ -13,7 +13,7 @@ export function HomePage() {
   const [genereAttivo, setGenereAttivo] = useState('Tutti');
 
   useEffect(() => {
-    eventiApi.list()
+    eventiApi.list({ soloFuturi: true, soloVisibili: true })
       .then((lista) => {
         setEventi(lista);
         // Se arrivo da un link con ?evento=ID (es. condiviso da un promoter

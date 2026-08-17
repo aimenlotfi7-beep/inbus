@@ -4,7 +4,7 @@ import { eventiApi } from '../../api/eventi';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'partenze'
-  | 'transazioni' | 'pagamenti' | 'coupon'
+  | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne'
   | 'utenti' | 'promoter' | 'tourleader'
   | 'fornitori' | 'tragitti'
   | 'chat' | 'contenuti'
@@ -24,6 +24,9 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
     { id: 'transazioni', label: 'Prenotazioni', permesso: 'prenotazioni.transazioni' },
     { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
+  ]},
+  { titolo: 'Marketing', voci: [
+    { id: 'campagne', label: 'Campagne', permesso: 'campagne.gestisci' },
   ]},
   { titolo: 'Persone', voci: [
     { id: 'utenti', label: 'Utenti', permesso: 'utenti.visualizza' },

@@ -38,6 +38,10 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   // Utenti (clienti)
   { chiave: 'utenti.visualizza', etichetta: 'Visualizzare utenti', modulo: 'Utenti' },
 
+  // Marketing (offerte con prezzo dedicato per campagna, e campagne stesse)
+  { chiave: 'offerte.gestisci', etichetta: 'Creare/gestire offerte con link dedicato', modulo: 'Marketing' },
+  { chiave: 'campagne.gestisci', etichetta: 'Gestire le campagne pubblicitarie', modulo: 'Marketing' },
+
   // Coupon
   { chiave: 'coupon.visualizza', etichetta: 'Visualizzare coupon', modulo: 'Coupon' },
   { chiave: 'coupon.gestisci', etichetta: 'Creare/modificare/eliminare coupon', modulo: 'Coupon' },

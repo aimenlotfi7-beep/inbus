@@ -7,13 +7,16 @@ export interface FermataInput {
 export interface LineaInput {
   id?: string; // presente = tratta già esistente, assente = nuova
   nome: string; postiTotali: number; prezzoExtra?: number; referenteNome?: string; referenteTelefono?: string; fornitoreId?: string;
-  arrivoIndirizzo?: string; arrivoOrario?: string;
   fermate: FermataInput[];
 }
 export interface EventoInput {
   artista: string; genere: string; luogo: string; citta: string; data: string; prezzo?: number;
   inEvidenza?: boolean; ordineEvidenza?: number; accontoEur?: number;
   statoDisponibilita?: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
+  // L'arrivo (destinazione + orario) è unico per l'evento e si applica a
+  // tutte le sue tratte come ancora per il calcolo orari.
+  arrivoIndirizzo?: string; arrivoOrario?: string;
+  visibileSito?: boolean;
   immagini?: string[]; allegati?: { nome: string; url: string }[]; linee?: LineaInput[];
 }
 
@@ -45,7 +48,7 @@ export interface BusFisicoInput {
 export interface PasseggeroBus { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string; }
 
 export const eventiApi = {
-  list: (filtri?: { citta?: string; genere?: string; ricerca?: string }) => {
+  list: (filtri?: { citta?: string; genere?: string; ricerca?: string; soloFuturi?: boolean; soloVisibili?: boolean }) => {
     const query = new URLSearchParams(filtri as Record<string, string>).toString();
     return api.get<Evento[]>(`/api/eventi${query ? `?${query}` : ''}`);
   },

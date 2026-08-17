@@ -9,6 +9,7 @@ import { OrarioInput } from '../../shared/OrarioInput';
 import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
 import { PartenzeTab } from '../partenze/PartenzeTab';
 import { ListaAttesaTab } from './ListaAttesaTab';
+import { OfferteTab } from './OfferteTab';
 import { geocodifica, durataViaggio, attesa } from '../../shared/geo';
 
 const VUOTO: EventoInput = { artista: '', genere: '', luogo: '', citta: '', data: '', inEvidenza: false, accontoEur: 10, immagini: [], linee: [] };
@@ -36,14 +37,14 @@ export function SchedaEventoModale({
   evento, tabIniziale = 'dettagli', onClose, onSalvato,
 }: {
   evento: Evento | null; // null = nuovo evento
-  tabIniziale?: 'dettagli' | 'partenze' | 'lista-attesa';
+  tabIniziale?: 'dettagli' | 'partenze' | 'lista-attesa' | 'offerte';
   onClose: () => void;
   onSalvato: () => void;
 }) {
   const [tragitti, setTragitti] = useState<Tragitto[]>([]);
   const [categorie, setCategorie] = useState<Categoria[]>([]);
   const [form, setForm] = useState<EventoInput>(VUOTO);
-  const [tabAttiva, setTabAttiva] = useState<'dettagli' | 'partenze' | 'lista-attesa'>(tabIniziale);
+  const [tabAttiva, setTabAttiva] = useState<'dettagli' | 'partenze' | 'lista-attesa' | 'offerte'>(tabIniziale);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [aggiustiPerTratta, setAggiustiPerTratta] = useState<Record<number, string>>({});
   const [nuovaImmagine, setNuovaImmagine] = useState('');
@@ -66,11 +67,13 @@ export function SchedaEventoModale({
         data: evento.data.slice(0, 10), inEvidenza: evento.inEvidenza,
         accontoEur: evento.accontoEur ? Number(evento.accontoEur) : 10,
         statoDisponibilita: evento.statoDisponibilita,
+        arrivoIndirizzo: evento.arrivoIndirizzo ?? undefined,
+        arrivoOrario: evento.arrivoOrario ?? undefined,
+        visibileSito: evento.visibileSito,
         immagini: [...evento.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
         linee: evento.linee.map((l) => ({
           id: l.id,
           nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra),
-          arrivoIndirizzo: l.arrivoIndirizzo ?? undefined, arrivoOrario: l.arrivoOrario ?? undefined,
           // Normalizzo qui il prezzo che arriva dal server: se una fermata
           // non ne aveva uno salvato, arriva `null`, non `undefined` — va
           // convertito subito, altrimenti finirebbe di nuovo a rimbalzare
@@ -137,15 +140,13 @@ export function SchedaEventoModale({
   /** Aggiunge una tratta a partire da un tragitto salvato: nome e fermate
    *  (con prezzo) vengono copiati — da qui in poi sono indipendenti,
    *  modificabili liberamente senza toccare il tragitto originale. I
-   *  tragitti non hanno orari: l'arrivo si precompila con il luogo
-   *  dell'evento (spesso è proprio la destinazione), ma resta modificabile,
-   *  e l'orario di arrivo va sempre inserito a mano prima di calcolare. */
+   *  tragitti non hanno orari: l'arrivo (unico per tutto l'evento) va
+   *  compilato una volta sola nel box qui sopra. */
   function aggiungiTrattaDaTragitto(tragitto: Tragitto) {
     const nuovaLinea: LineaInput = {
       nome: tragitto.nome,
       postiTotali: 50,
       prezzoExtra: 0,
-      arrivoIndirizzo: form.luogo || '',
       fermate: tragitto.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined })),
     };
     setForm({ ...form, linee: [...(form.linee ?? []), nuovaLinea] });
@@ -183,15 +184,15 @@ export function SchedaEventoModale({
     if (!linea) return;
     const fermateValide = linea.fermate.filter((f) => f.indirizzo.trim());
     if (fermateValide.length === 0) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: 'Aggiungi almeno una fermata con indirizzo compilato.' })); return; }
-    if (!linea.arrivoIndirizzo?.trim()) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: "Inserisci prima l'indirizzo di arrivo qui sopra." })); return; }
-    if (!linea.arrivoOrario) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: "Inserisci prima l'orario di arrivo qui sopra." })); return; }
+    if (!form.arrivoIndirizzo?.trim()) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: "Inserisci prima l'indirizzo di arrivo qui sopra (vale per tutte le tratte)." })); return; }
+    if (!form.arrivoOrario) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: "Inserisci prima l'orario di arrivo qui sopra." })); return; }
 
     setRicalcolando((s) => ({ ...s, [idxLinea]: true }));
     setStatoRicalcolo((s) => ({ ...s, [idxLinea]: 'Localizzo gli indirizzi...' }));
 
     // La sequenza da geolocalizzare è: fermate in ordine, poi l'arrivo per
     // ultimo — il viaggio finisce sempre lì.
-    const indirizziCompleti = [...fermateValide.map((f) => `${f.indirizzo}, ${f.citta}`), linea.arrivoIndirizzo];
+    const indirizziCompleti = [...fermateValide.map((f) => `${f.indirizzo}, ${f.citta}`), form.arrivoIndirizzo];
     const coordinate: (Awaited<ReturnType<typeof geocodifica>>['coordinate'])[] = [];
     let problemaRete = false;
     for (const indirizzo of indirizziCompleti) {
@@ -216,7 +217,7 @@ export function SchedaEventoModale({
 
     // Parto dall'orario di arrivo e risalgo tappa per tappa, dall'ultima
     // fermata (quella più vicina all'arrivo) fino alla prima.
-    let cursore = Number(linea.arrivoOrario.split(':')[0]) * 60 + Number(linea.arrivoOrario.split(':')[1]);
+    let cursore = Number(form.arrivoOrario.split(':')[0]) * 60 + Number(form.arrivoOrario.split(':')[1]);
     const orariCalcolati = new Array<string>(fermateValide.length);
     let errori = 0;
     for (let i = fermateValide.length - 1; i >= 0; i--) {
@@ -335,11 +336,26 @@ export function SchedaEventoModale({
       <div className="campo">
         <label><input type="checkbox" checked={form.inEvidenza ?? false} onChange={(e) => setForm({ ...form, inEvidenza: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> In evidenza in homepage</label>
       </div>
+      <div className="campo">
+        <label><input type="checkbox" checked={form.visibileSito ?? true} onChange={(e) => setForm({ ...form, visibileSito: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Visibile sul sito</label>
+        <p className="testo-intro" style={{ fontSize: 12, marginTop: 4, marginBottom: 0 }}>
+          Se lo disattivi, l'evento non compare mai sul sito (anche se è nel futuro). Gli eventi con data già
+          passata comunque non compaiono più sul sito, a prescindere da questo interruttore.
+        </p>
+      </div>
     </>
   );
 
   const campiTratte: ReactNode = (
     <>
+      <div className="section-card" style={{ marginBottom: 16, border: '1px solid var(--pink-dim)' }}>
+        <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>Arrivo (destinazione) — vale per tutte le tratte di questo evento</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr', gap: 8 }}>
+          <input placeholder="Indirizzo di arrivo" value={form.arrivoIndirizzo ?? ''} onChange={(e) => setForm({ ...form, arrivoIndirizzo: e.target.value })} />
+          <OrarioInput value={form.arrivoOrario ?? ''} onChange={(v) => setForm({ ...form, arrivoOrario: v })} placeholder="Orario" />
+        </div>
+      </div>
+
       {tragitti.length > 0 && (
         <div className="section-card" style={{ marginBottom: 16 }}>
           <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi una tratta da un tragitto salvato</p>
@@ -364,14 +380,6 @@ export function SchedaEventoModale({
               <input placeholder="Posti totali" type="number" value={linea.postiTotali} onChange={(e) => aggiornaLinea(idxLinea, 'postiTotali', Number(e.target.value))} />
             </div>
             <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12.5 }} onClick={() => rimuoviLinea(idxLinea)}>Rimuovi tratta</button>
-          </div>
-
-          <div style={{ background: 'var(--night)', border: '1px solid var(--pink-dim)', borderRadius: 8, padding: 10, marginBottom: 12 }}>
-            <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>Arrivo (destinazione)</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr', gap: 8 }}>
-              <input placeholder="Indirizzo di arrivo" value={linea.arrivoIndirizzo ?? ''} onChange={(e) => aggiornaLinea(idxLinea, 'arrivoIndirizzo', e.target.value)} />
-              <OrarioInput value={linea.arrivoOrario ?? ''} onChange={(v) => aggiornaLinea(idxLinea, 'arrivoOrario', v)} placeholder="Orario" />
-            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
@@ -445,10 +453,12 @@ export function SchedaEventoModale({
           <button type="button" className={`mini-tab${tabAttiva === 'dettagli' ? ' active' : ''}`} onClick={() => setTabAttiva('dettagli')}>Dettagli</button>
           <button type="button" className={`mini-tab${tabAttiva === 'partenze' ? ' active' : ''}`} onClick={() => setTabAttiva('partenze')}>Partenze</button>
           <button type="button" className={`mini-tab${tabAttiva === 'lista-attesa' ? ' active' : ''}`} onClick={() => setTabAttiva('lista-attesa')}>Lista d'attesa</button>
+          <button type="button" className={`mini-tab${tabAttiva === 'offerte' ? ' active' : ''}`} onClick={() => setTabAttiva('offerte')}>Offerte</button>
         </div>
 
         {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} />}
         {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} />}
+        {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}
         {tabAttiva === 'dettagli' && (
           <>
             {campiInfoEvento}

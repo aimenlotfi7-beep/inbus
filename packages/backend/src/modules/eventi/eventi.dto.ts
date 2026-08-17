@@ -22,11 +22,6 @@ const lineaSchema = z.object({
   referenteNome: z.string().optional(),
   referenteTelefono: z.string().optional(),
   fornitoreId: z.string().optional(),
-  // L'arrivo (destinazione + orario) è specifico dell'evento, non del
-  // tragitto: è l'ancora da cui si calcolano a ritroso gli orari delle
-  // fermate. I tragitti restano solo fermate+prezzo, riutilizzabili.
-  arrivoIndirizzo: z.string().optional(),
-  arrivoOrario: z.string().optional(),
   fermate: z.array(fermataSchema).default([]),
 });
 
@@ -45,6 +40,12 @@ export const creaEventoSchema = z.object({
   vetrinaAl: z.coerce.date().optional(),
   accontoEur: z.number().positive().optional(),
   statoDisponibilita: z.enum(['POCHI_POSTI', 'NUOVI_POSTI', 'ESAURITO']).nullable().optional(),
+  // L'arrivo (destinazione + orario) è unico per l'evento e si applica a
+  // tutte le sue tratte: è l'ancora da cui si calcolano a ritroso gli
+  // orari delle fermate. I tragitti restano solo fermate+prezzo, riusabili.
+  arrivoIndirizzo: z.string().optional(),
+  arrivoOrario: z.string().optional(),
+  visibileSito: z.boolean().default(true),
   immagini: z.array(z.string().url()).default([]),
   allegati: z.array(z.object({ nome: z.string(), url: z.string() })).default([]),
   linee: z.array(lineaSchema).default([]),
@@ -61,6 +62,11 @@ export const listaEventiQuerySchema = z.object({
   // Ricerca testuale libera (artista/luogo/città), usata dalla barra di
   // ricerca eventi nel gestionale (sezione Prenotazioni) e sul sito.
   ricerca: z.string().optional(),
+  // Usati dal sito pubblico: nasconde eventi già passati e/o con
+  // visibileSito=false. Il gestionale non li passa mai, per vedere
+  // sempre tutto (comprese le tab "Eventi passati").
+  soloFuturi: z.coerce.boolean().optional(),
+  soloVisibili: z.coerce.boolean().optional(),
 });
 export type ListaEventiQuery = z.infer<typeof listaEventiQuerySchema>;
 

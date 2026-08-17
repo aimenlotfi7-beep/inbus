@@ -78,6 +78,27 @@
       "when": 1786914021307,
       "tag": "0010_arrivo_su_tratta_evento_tragitti_solo_fermate",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786915044492,
+      "tag": "0011_arrivo_su_evento_non_tratta",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786915489932,
+      "tag": "0012_aggiungi_visibile_sito_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786916121488,
+      "tag": "0013_campagne_e_offerte_evento",
+      "breakpoints": true
     }
   ]
 }

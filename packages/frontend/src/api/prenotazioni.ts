@@ -10,6 +10,7 @@ export interface CreaPrenotazionePayload {
   metodoPagamento: 'CARTA' | 'PAYPAL' | 'SATISPAY' | 'DA_CONCORDARE';
   couponCodice?: string;
   promoterCodice?: string;
+  offertaId?: string;
   cliente: { email: string; nome: string; cognome: string; telefono: string };
   // Un modulo nome+cognome per ogni passeggero OLTRE al richiedente
   // (deve essere lungo esattamente passeggeri-1).

@@ -56,7 +56,19 @@ export const prenotazioniService = {
         throw new ConflittoDati('Posti non più disponibili su questo bus: qualcun altro li ha appena prenotati.');
       }
 
-      const prezzoEffettivo = fermata.prezzo ? Number(fermata.prezzo) : (evento.prezzo ? Number(evento.prezzo) : 0) + Number(linea.prezzoExtra);
+      const prezzoNormale = fermata.prezzo ? Number(fermata.prezzo) : (evento.prezzo ? Number(evento.prezzo) : 0) + Number(linea.prezzoExtra);
+      // Se la prenotazione arriva da un link con offerta dedicata, il
+      // prezzo dell'offerta sostituisce quello normale per fermata — è
+      // fisso indipendentemente da quale fermata scelga il cliente.
+      // Verificata qui (dentro la transazione, subito prima di
+      // confermare) per essere sicuri che sia ancora valida in questo
+      // preciso istante, non solo quando l'ha vista sulla pagina.
+      let prezzoEffettivo = prezzoNormale;
+      if (input.offertaId) {
+        const { offerteService } = await import('../offerte/offerte.service.js');
+        const offerta = await offerteService.verificaEIncrementaUtilizzo(input.offertaId, input.eventoId);
+        prezzoEffettivo = Number(offerta.prezzo);
+      }
       const importoBase = prezzoEffettivo * input.passeggeri;
       const { sconto, coupon: couponUsato } = await validaCoupon(input.couponCodice, importoBase);
 
@@ -95,6 +107,12 @@ export const prenotazioniService = {
           totale: (input.tipoPagamento === 'ACCONTO' ? acconto : totale).toFixed(2),
           sconto: sconto.toFixed(2),
           couponCodice: couponUsato?.codice,
+          offertaId: input.offertaId,
+          campagnaId: input.campagnaId,
+          utmSource: input.utmSource,
+          utmMedium: input.utmMedium,
+          utmCampaign: input.utmCampaign,
+          utmContent: input.utmContent,
           tipoPagamento: input.tipoPagamento,
           saldoPagato,
           scadenzaSaldo,

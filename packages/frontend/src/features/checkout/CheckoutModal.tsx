@@ -9,7 +9,12 @@ import { ErroreApi } from '../../api/client';
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'confermato-attesa' | 'errore';
 interface Partecipante { nome: string; cognome: string; }
 
-export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: () => void }) {
+/** Se il cliente arriva da un link con offerta dedicata (/offerta/:slug),
+ *  il prezzo dell'offerta sostituisce quello normale per fermata,
+ *  qualunque fermata scelga. */
+export interface OffertaCheckout { id: string; nome: string; prezzo: number; prezzoOriginale?: number; }
+
+export function CheckoutModal({ evento, offerta, onClose }: { evento: Evento; offerta?: OffertaCheckout; onClose: () => void }) {
   const [stato, setStato] = useState<Stato>('caricamento');
   const [opzioni, setOpzioni] = useState<OpzionePartenza[]>([]);
   const [fermataId, setFermataId] = useState('');
@@ -78,7 +83,8 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
   // internamente per decidere se mostrare il checkout normale o la
   // lista d'attesa.
   const nessunPostoDisponibile = opzioni.length === 0 || opzioni.every((o) => o.postiDisponibili === 0);
-  const totale = opzioneScelta ? opzioneScelta.prezzoEffettivo * passeggeri : 0;
+  const prezzoUnitario = offerta ? offerta.prezzo : (opzioneScelta?.prezzoEffettivo ?? 0);
+  const totale = opzioneScelta ? prezzoUnitario * passeggeri : 0;
   const moduloRichiedenteCompleto = Boolean(email && nome && cognome && telefono);
   const partecipantiCompleti = partecipanti.every((p) => p.nome.trim() && p.cognome.trim());
   const puoConfermare = moduloRichiedenteCompleto && partecipantiCompleti && !!opzioneScelta;
@@ -99,6 +105,7 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
         cliente: { email, nome, cognome, telefono },
         partecipanti,
         ...(promoterCodice && { promoterCodice }),
+        ...(offerta && { offertaId: offerta.id }),
       });
       setPnrConfermato(prenotazione.pnr);
       setStato('confermato');
@@ -156,6 +163,13 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
             <h3>{evento.artista}</h3>
             <div className="checkout-summary">{evento.luogo}, {evento.citta} · {new Date(evento.data).toLocaleDateString('it-IT')}</div>
 
+            {offerta && (
+              <p style={{ background: '#e8f7ea', border: '1px solid #b6e3bb', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
+                🎉 Offerta "{offerta.nome}": €{offerta.prezzo.toFixed(2)} a persona
+                {offerta.prezzoOriginale ? <> invece di €{offerta.prezzoOriginale.toFixed(2)}</> : null}.
+              </p>
+            )}
+
             {stato === 'caricamento' && <p>Carico le fermate disponibili...</p>}
 
             {stato !== 'caricamento' && (
@@ -171,7 +185,7 @@ export function CheckoutModal({ evento, onClose }: { evento: Evento; onClose: ()
                 <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
                   {opzioni.map((o) => (
                     <option key={o.fermataId} value={o.fermataId}>
-                      {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{o.prezzoEffettivo.toFixed(2)}
+                      {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{(offerta ? offerta.prezzo : o.prezzoEffettivo).toFixed(2)}
                     </option>
                   ))}
                 </select>
