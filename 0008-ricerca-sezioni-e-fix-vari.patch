@@ -1,0 +1,376 @@
+﻿diff --git a/packages/frontend/src/admin/screens/AmministratoriScreen.tsx b/packages/frontend/src/admin/screens/AmministratoriScreen.tsx
+index 866929c..4c70d08 100644
+--- a/packages/frontend/src/admin/screens/AmministratoriScreen.tsx
++++ b/packages/frontend/src/admin/screens/AmministratoriScreen.tsx
+@@ -3,6 +3,7 @@ import { amministratoriApi, type Amministratore, type AmministratoreInput, type
+ import { ruoliApi, type Ruolo, type Permesso } from '../../api/ruoli';
+ import { ErroreApi } from '../../api/client';
+ import { PanelHead } from '../shared/PanelHead';
++import { RicercaSezione } from '../shared/RicercaSezione';
+ import { TabellaGenerica } from '../shared/TabellaGenerica';
+ import { Modale } from '../shared/Modale';
+ 
+@@ -23,6 +24,7 @@ export function AmministratoriScreen() {
+   const [permessiRuolo, setPermessiRuolo] = useState<string[]>([]);
+   const [ruoloOwnerTarget, setRuoloOwnerTarget] = useState(false);
+   const [statoPermessi, setStatoPermessi] = useState<Record<string, StatoPermesso>>({});
++  const [ricerca, setRicerca] = useState('');
+ 
+   function ricarica() {
+     amministratoriApi.list().then(setAdmin);
+@@ -39,6 +41,10 @@ export function AmministratoriScreen() {
+     return ruoliAssegnabili.find((r) => r.id === ruoloId)?.nome ?? 'â€”';
+   }
+ 
++  const adminFiltrati = ricerca.trim()
++    ? admin.filter((a) => `${a.nome} ${a.email} ${nomeRuolo(a.ruoloId)}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
++    : admin;
++
+   function apriNuovo() { setInModifica(null); setForm({ ...VUOTO, ruoloId: ruoliAssegnabili[0]?.id ?? '' }); setModaleAperta(true); }
+   function apriModifica(a: Amministratore) { setInModifica(a); setForm({ nome: a.nome, email: a.email, ruoloId: a.ruoloId, attivo: a.attivo }); setModaleAperta(true); }
+ 
+@@ -127,8 +133,9 @@ export function AmministratoriScreen() {
+   return (
+     <div>
+       <PanelHead titolo="Amministratori" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo amministratore</button>} />
++      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o ruolo..." />
+       <TabellaGenerica
+-        righe={admin}
++        righe={adminFiltrati}
+         colonne={[
+           { etichetta: 'Nome', render: (a) => a.nome },
+           { etichetta: 'Email', render: (a) => a.email },
+diff --git a/packages/frontend/src/admin/screens/CouponScreen.tsx b/packages/frontend/src/admin/screens/CouponScreen.tsx
+index 1e983ae..6e3911e 100644
+--- a/packages/frontend/src/admin/screens/CouponScreen.tsx
++++ b/packages/frontend/src/admin/screens/CouponScreen.tsx
+@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
+ import { couponApi, type Coupon, type CouponInput } from '../../api/coupon';
+ import { ErroreApi } from '../../api/client';
+ import { PanelHead } from '../shared/PanelHead';
++import { RicercaSezione } from '../shared/RicercaSezione';
+ import { TabellaGenerica } from '../shared/TabellaGenerica';
+ import { Modale } from '../shared/Modale';
+ 
+@@ -12,10 +13,15 @@ export function CouponScreen() {
+   const [inModifica, setInModifica] = useState<Coupon | null>(null);
+   const [form, setForm] = useState<CouponInput>(VUOTO);
+   const [modaleAperta, setModaleAperta] = useState(false);
++  const [ricerca, setRicerca] = useState('');
+ 
+   function ricarica() { couponApi.list().then(setCoupon); }
+   useEffect(ricarica, []);
+ 
++  const couponFiltrati = ricerca.trim()
++    ? coupon.filter((c) => c.codice.toLowerCase().includes(ricerca.trim().toLowerCase()))
++    : coupon;
++
+   function apriNuovo() { setInModifica(null); setForm(VUOTO); setModaleAperta(true); }
+   function apriModifica(c: Coupon) { setInModifica(c); setForm({ codice: c.codice, tipo: c.tipo, valore: Number(c.valore), usiMax: c.usiMax ?? undefined, attivo: c.attivo }); setModaleAperta(true); }
+ 
+@@ -39,8 +45,9 @@ export function CouponScreen() {
+   return (
+     <div>
+       <PanelHead titolo="Coupon" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo coupon</button>} />
++      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per codice coupon..." />
+       <TabellaGenerica
+-        righe={coupon}
++        righe={couponFiltrati}
+         colonne={[
+           { etichetta: 'Codice', render: (c) => c.codice },
+           { etichetta: 'Sconto', render: (c) => c.tipo === 'PERCENTUALE' ? `${c.valore}%` : `â‚¬${c.valore}` },
+diff --git a/packages/frontend/src/admin/screens/EventiScreen.tsx b/packages/frontend/src/admin/screens/EventiScreen.tsx
+index 2ff70e1..0199d21 100644
+--- a/packages/frontend/src/admin/screens/EventiScreen.tsx
++++ b/packages/frontend/src/admin/screens/EventiScreen.tsx
+@@ -4,18 +4,24 @@ import { ErroreApi } from '../../api/client';
+ import { prezzoMinimoEvento } from '../../api/prezzi';
+ import type { Evento } from '../../api/types';
+ import { PanelHead } from '../shared/PanelHead';
++import { RicercaSezione } from '../shared/RicercaSezione';
+ import { SchedaEventoModale } from './eventi/SchedaEventoModale';
+ 
+ export function EventiScreen() {
+   const [eventi, setEventi] = useState<Evento[]>([]);
+   const [inModifica, setInModifica] = useState<Evento | null>(null);
+   const [modaleAperta, setModaleAperta] = useState(false);
++  const [ricerca, setRicerca] = useState('');
+ 
+   function ricarica() {
+     eventiApi.list().then(setEventi);
+   }
+   useEffect(ricarica, []);
+ 
++  const eventiFiltrati = ricerca.trim()
++    ? eventi.filter((ev) => `${ev.artista} ${ev.genere} ${ev.citta} ${ev.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
++    : eventi;
++
+   function apriNuovo() { setInModifica(null); setModaleAperta(true); }
+   function apriModifica(ev: Evento) { setInModifica(ev); setModaleAperta(true); }
+ 
+@@ -32,9 +38,10 @@ export function EventiScreen() {
+   return (
+     <div>
+       <PanelHead titolo="Eventi" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo evento</button>} />
++      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, genere o cittÃ ..." />
+ 
+       <div className="cards-list">
+-        {eventi.map((ev) => (
++        {eventiFiltrati.map((ev) => (
+           <div key={ev.id} className="evento-card" onClick={() => apriModifica(ev)}>
+             <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
+             <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
+@@ -46,7 +53,7 @@ export function EventiScreen() {
+             <button className="btn btn-ghost" style={{ marginTop: 10, fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(ev); }}>Elimina</button>
+           </div>
+         ))}
+-        {!eventi.length && <p style={{ color: 'var(--mist)' }}>Nessun evento ancora.</p>}
++        {!eventiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun evento trovato.' : 'Nessun evento ancora.'}</p>}
+       </div>
+ 
+       {modaleAperta && (
+diff --git a/packages/frontend/src/admin/screens/FornitoriScreen.tsx b/packages/frontend/src/admin/screens/FornitoriScreen.tsx
+index 792d203..a4e5cac 100644
+--- a/packages/frontend/src/admin/screens/FornitoriScreen.tsx
++++ b/packages/frontend/src/admin/screens/FornitoriScreen.tsx
+@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
+ import { fornitoriApi, type Fornitore, type FornitoreInput } from '../../api/fornitori';
+ import { ErroreApi } from '../../api/client';
+ import { PanelHead } from '../shared/PanelHead';
++import { RicercaSezione } from '../shared/RicercaSezione';
+ import { TabellaGenerica } from '../shared/TabellaGenerica';
+ import { Modale } from '../shared/Modale';
+ 
+@@ -12,10 +13,15 @@ export function FornitoriScreen() {
+   const [inModifica, setInModifica] = useState<Fornitore | null>(null);
+   const [form, setForm] = useState<Partial<FornitoreInput>>(VUOTO);
+   const [modaleAperta, setModaleAperta] = useState(false);
++  const [ricerca, setRicerca] = useState('');
+ 
+   function ricarica() { fornitoriApi.list().then(setFornitori); }
+   useEffect(ricarica, []);
+ 
++  const fornitoriFiltrati = ricerca.trim()
++    ? fornitori.filter((f) => `${f.nome} ${f.referente ?? ''} ${f.indirizzo ?? ''}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
++    : fornitori;
++
+   function apriNuovo() { setInModifica(null); setForm(VUOTO); setModaleAperta(true); }
+   function apriModifica(f: Fornitore) { setInModifica(f); setForm(f); setModaleAperta(true); }
+ 
+@@ -39,8 +45,9 @@ export function FornitoriScreen() {
+   return (
+     <div>
+       <PanelHead titolo="Fornitori" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo fornitore</button>} />
++      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, referente o indirizzo..." />
+       <TabellaGenerica
+-        righe={fornitori}
++        righe={fornitoriFiltrati}
+         colonne={[
+           { etichetta: 'Nome', render: (f) => f.nome },
+           { etichetta: 'Referente', render: (f) => f.referente ?? 'â€”' },
+diff --git a/packages/frontend/src/admin/screens/PrenotazioniScreen.tsx b/packages/frontend/src/admin/screens/PrenotazioniScreen.tsx
+index 9d19072..92585b9 100644
+--- a/packages/frontend/src/admin/screens/PrenotazioniScreen.tsx
++++ b/packages/frontend/src/admin/screens/PrenotazioniScreen.tsx
+@@ -79,16 +79,17 @@ export function PrenotazioniScreen() {
+             </div>
+           )}
+ 
+-          <div className="mini-tabs" style={{ flexWrap: 'wrap' }}>
++          <div className="cards-list" style={{ marginBottom: 24 }}>
+             {tabFiltrate.map((ev) => (
+-              <button
++              <div
+                 key={ev.id}
+-                type="button"
+-                className={`mini-tab${eventoAttivoId === ev.id ? ' active' : ''}`}
++                className="evento-card"
++                style={eventoAttivoId === ev.id ? { borderColor: 'var(--pink)' } : undefined}
+                 onClick={() => { setEventoAttivoId(ev.id); setSottoTab('CONFERMATA'); setRicercaPrenotazioni(''); }}
+               >
+-                {ev.artista}
+-              </button>
++                <h3 style={{ fontSize: 16, margin: 0 }}>{ev.artista}</h3>
++                <p style={{ color: 'var(--mist)', fontSize: 12.5, marginTop: 6 }}>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
++              </div>
+             ))}
+           </div>
+ 
+diff --git a/packages/frontend/src/admin/screens/PromoterScreen.tsx b/packages/frontend/src/admin/screens/PromoterScreen.tsx
+index f0ca448..91fee16 100644
+--- a/packages/frontend/src/admin/screens/PromoterScreen.tsx
++++ b/packages/frontend/src/admin/screens/PromoterScreen.tsx
+@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
+ import { promoterApi, type Promoter, type PromoterInput } from '../../api/promoter';
+ import { ErroreApi } from '../../api/client';
+ import { PanelHead } from '../shared/PanelHead';
++import { RicercaSezione } from '../shared/RicercaSezione';
+ import { TabellaGenerica } from '../shared/TabellaGenerica';
+ import { Modale } from '../shared/Modale';
+ 
+@@ -13,10 +14,15 @@ export function PromoterScreen() {
+   const [form, setForm] = useState<PromoterInput>(VUOTO);
+   const [modaleAperta, setModaleAperta] = useState(false);
+   const [statistiche, setStatistiche] = useState<{ numeroPrenotazioni: number; fatturato: number } | null>(null);
++  const [ricerca, setRicerca] = useState('');
+ 
+   function ricarica() { promoterApi.list().then(setPromoter); }
+   useEffect(ricarica, []);
+ 
++  const promoterFiltrati = ricerca.trim()
++    ? promoter.filter((p) => `${p.nome} ${p.email} ${p.codice}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
++    : promoter;
++
+   function apriNuovo() { setInModifica(null); setForm(VUOTO); setStatistiche(null); setModaleAperta(true); }
+   function apriModifica(p: Promoter) {
+     setInModifica(p);
+@@ -45,8 +51,9 @@ export function PromoterScreen() {
+   return (
+     <div>
+       <PanelHead titolo="Promoter" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo promoter</button>} />
++      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o codice..." />
+       <TabellaGenerica
+-        righe={promoter}
++        righe={promoterFiltrati}
+         colonne={[
+           { etichetta: 'Nome', render: (p) => p.nome },
+           { etichetta: 'Email', render: (p) => p.email },
+diff --git a/packages/frontend/src/admin/screens/TourLeaderScreen.tsx b/packages/frontend/src/admin/screens/TourLeaderScreen.tsx
+index 690e874..1f643f7 100644
+--- a/packages/frontend/src/admin/screens/TourLeaderScreen.tsx
++++ b/packages/frontend/src/admin/screens/TourLeaderScreen.tsx
+@@ -1,15 +1,21 @@
+ import { useEffect, useState } from 'react';
+ import { tourLeaderApi, type TourLeader } from '../../api/tourleader';
+ import { PanelHead } from '../shared/PanelHead';
++import { RicercaSezione } from '../shared/RicercaSezione';
+ import { TabellaGenerica } from '../shared/TabellaGenerica';
+ 
+ const ETICHETTE: Record<TourLeader['stato'], string> = { CANDIDATO: 'Candidato', ATTIVO: 'Attivo', ARCHIVIATO: 'Archiviato' };
+ 
+ export function TourLeaderScreen() {
+   const [lista, setLista] = useState<TourLeader[]>([]);
++  const [ricerca, setRicerca] = useState('');
+   function ricarica() { tourLeaderApi.list().then(setLista); }
+   useEffect(ricarica, []);
+ 
++  const listaFiltrata = ricerca.trim()
++    ? lista.filter((t) => `${t.nome} ${t.cognome} ${t.email} ${t.citta ?? ''}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
++    : lista;
++
+   async function cambiaStato(t: TourLeader, stato: TourLeader['stato']) {
+     await tourLeaderApi.update(t.id, { stato });
+     ricarica();
+@@ -26,8 +32,9 @@ export function TourLeaderScreen() {
+       <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 16 }}>
+         Le candidature arrivano dal form pubblico di autocandidatura. Cambia lo stato per approvarle o archiviarle.
+       </p>
++      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o cittÃ ..." />
+       <TabellaGenerica
+-        righe={lista}
++        righe={listaFiltrata}
+         colonne={[
+           { etichetta: 'Nome', render: (t) => `${t.nome} ${t.cognome}` },
+           { etichetta: 'Contatti', render: (t) => `${t.email}${t.telefono ? ' Â· ' + t.telefono : ''}` },
+diff --git a/packages/frontend/src/admin/screens/TragittiScreen.tsx b/packages/frontend/src/admin/screens/TragittiScreen.tsx
+index 0dea2fd..4195673 100644
+--- a/packages/frontend/src/admin/screens/TragittiScreen.tsx
++++ b/packages/frontend/src/admin/screens/TragittiScreen.tsx
+@@ -4,6 +4,7 @@ import { ErroreApi } from '../../api/client';
+ import { geocodifica, durataViaggio, attesa } from '../shared/geo';
+ import { OrarioInput } from '../shared/OrarioInput';
+ import { PanelHead } from '../shared/PanelHead';
++import { RicercaSezione } from '../shared/RicercaSezione';
+ import { Modale } from '../shared/Modale';
+ import { useAvvisoModificheNonSalvate } from '../shared/useAvvisoModificheNonSalvate';
+ 
+@@ -22,6 +23,7 @@ export function TragittiScreen() {
+   const [statoCalcolo, setStatoCalcolo] = useState('');
+   const [calcolando, setCalcolando] = useState(false);
+   const [snapshotIniziale, setSnapshotIniziale] = useState('');
++  const [ricerca, setRicerca] = useState('');
+ 
+   function ricarica() { tragittiApi.list().then(setTragitti); }
+   useEffect(ricarica, []);
+@@ -148,12 +150,17 @@ export function TragittiScreen() {
+   const modificato = snapshotIniziale !== '' && JSON.stringify({ nome, fermate }) !== snapshotIniziale;
+   const chiediConferma = useAvvisoModificheNonSalvate(modificato);
+ 
++  const tragittiFiltrati = ricerca.trim()
++    ? tragitti.filter((t) => `${t.nome} ${t.fermate.map((f) => f.citta).join(' ')}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
++    : tragitti;
++
+   return (
+     <div>
+       <PanelHead titolo="Tragitti" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo tragitto</button>} />
+-      {!tragitti.length && <p style={{ color: 'var(--mist)' }}>Nessun tragitto ancora.</p>}
++      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome tragitto o cittÃ ..." />
++      {!tragittiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun tragitto trovato.' : 'Nessun tragitto ancora.'}</p>}
+       <div className="cards-list">
+-        {tragitti.map((t) => (
++        {tragittiFiltrati.map((t) => (
+           <div key={t.id} className="evento-card" onClick={() => apriModifica(t)}>
+             <h3>{t.nome}</h3>
+             <p>{t.fermate.map((f) => f.citta).filter(Boolean).join(' â†’ ') || 'Nessuna fermata'}</p>
+@@ -182,7 +189,7 @@ export function TragittiScreen() {
+                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                   <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idx, 'orario', v)} placeholder="Orario" />
+                   {idx === fermate.length - 1 ? (
+-                    <span style={{ display: 'flex', alignItems: 'center', fontSize: 11.5, color: 'var(--mist)' }}>Nessun prezzo per l'arrivo</span>
++                    <span />
+                   ) : (
+                     <input placeholder="Prezzo â‚¬" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'prezzo', e.target.value)} />
+                   )}
+diff --git a/packages/frontend/src/admin/screens/UtentiScreen.tsx b/packages/frontend/src/admin/screens/UtentiScreen.tsx
+index f39ac93..8c4aa26 100644
+--- a/packages/frontend/src/admin/screens/UtentiScreen.tsx
++++ b/packages/frontend/src/admin/screens/UtentiScreen.tsx
+@@ -1,17 +1,24 @@
+ import { useEffect, useState } from 'react';
+ import { utentiApi, type Utente } from '../../api/utenti';
+ import { PanelHead } from '../shared/PanelHead';
++import { RicercaSezione } from '../shared/RicercaSezione';
+ import { TabellaGenerica } from '../shared/TabellaGenerica';
+ 
+ export function UtentiScreen() {
+   const [utenti, setUtenti] = useState<Utente[]>([]);
++  const [ricerca, setRicerca] = useState('');
+   useEffect(() => { utentiApi.list().then(setUtenti); }, []);
+ 
++  const utentiFiltrati = ricerca.trim()
++    ? utenti.filter((u) => `${u.nome ?? ''} ${u.cognome ?? ''} ${u.email} ${u.citta ?? ''}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
++    : utenti;
++
+   return (
+     <div>
+       <PanelHead titolo="Utenti" />
++      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o cittÃ ..." />
+       <TabellaGenerica
+-        righe={utenti}
++        righe={utentiFiltrati}
+         colonne={[
+           { etichetta: 'Nome', render: (u) => `${u.nome ?? ''} ${u.cognome ?? ''}`.trim() || 'â€”' },
+           { etichetta: 'Email', render: (u) => u.email },
+diff --git a/packages/frontend/src/admin/shared/RicercaSezione.tsx b/packages/frontend/src/admin/shared/RicercaSezione.tsx
+new file mode 100644
+index 0000000..95e478d
+--- /dev/null
++++ b/packages/frontend/src/admin/shared/RicercaSezione.tsx
+@@ -0,0 +1,17 @@
++/** Campo di ricerca grande e centrato, stesso stile della ricerca nella
++ *  Home del gestionale â€” da mettere in cima alle sezioni con un elenco,
++ *  per filtrare i dati di quella sezione (non Ã¨ la ricerca globale). */
++export function RicercaSezione({ valore, onChange, placeholder }: { valore: string; onChange: (v: string) => void; placeholder?: string }) {
++  return (
++    <div className="home-search-center" style={{ maxWidth: 560, margin: '0 auto 28px' }}>
++      <div className="home-search-box">
++        <input
++          type="text"
++          placeholder={placeholder ?? 'Inizia a digitare per cercare...'}
++          value={valore}
++          onChange={(e) => onChange(e.target.value)}
++        />
++      </div>
++    </div>
++  );
++}

@@ -1,0 +1,3330 @@
+From 2c5c0ca69b513dc8ca4e651e1456670493a10b9f Mon Sep 17 00:00:00 2001
+From: Claude <assistant@example.com>
+Date: Fri, 14 Aug 2026 16:18:21 +0000
+Subject: [PATCH] Eccezioni permessi personali + Sezione Partenze (calcolo bus,
+ copertura tratte, censimento bus fisici)
+
+---
+ ...giungi_partenze_bus_eccezioni_permessi.sql |   54 +
+ .../backend/drizzle/meta/0003_snapshot.json   | 1971 +++++++++++++++++
+ packages/backend/drizzle/meta/_journal.json   |    7 +
+ packages/backend/src/app.ts                   |    2 +
+ packages/backend/src/db/schema.ts             |   60 +-
+ .../amministratori/amministratori.routes.ts   |   63 +-
+ .../src/modules/auth/permessi.service.ts      |   22 +-
+ .../src/modules/eventi/eventi.controller.ts   |   28 +
+ .../backend/src/modules/eventi/eventi.dto.ts  |   15 +
+ .../src/modules/eventi/eventi.routes.ts       |   16 +-
+ .../src/modules/eventi/eventi.service.ts      |  150 +-
+ .../impostazioni/impostazioni.routes.ts       |   38 +
+ .../backend/src/shared/permessi-registro.ts   |    2 +
+ packages/frontend/src/admin/AdminApp.tsx      |    6 +
+ .../admin/screens/AmministratoriScreen.tsx    |  109 +-
+ .../src/admin/screens/EventiScreen.tsx        |   57 +-
+ .../src/admin/screens/ImpostazioniScreen.tsx  |   57 +
+ .../src/admin/screens/PartenzeScreen.tsx      |  183 ++
+ .../frontend/src/admin/shared/AdminLayout.tsx |    6 +-
+ packages/frontend/src/api/amministratori.ts   |   10 +
+ packages/frontend/src/api/eventi.ts           |   32 +
+ packages/frontend/src/api/impostazioni.ts     |    8 +
+ 22 files changed, 2876 insertions(+), 20 deletions(-)
+ create mode 100644 packages/backend/drizzle/0003_aggiungi_partenze_bus_eccezioni_permessi.sql
+ create mode 100644 packages/backend/drizzle/meta/0003_snapshot.json
+ create mode 100644 packages/backend/src/modules/impostazioni/impostazioni.routes.ts
+ create mode 100644 packages/frontend/src/admin/screens/ImpostazioniScreen.tsx
+ create mode 100644 packages/frontend/src/admin/screens/PartenzeScreen.tsx
+ create mode 100644 packages/frontend/src/api/impostazioni.ts
+
+diff --git a/packages/backend/drizzle/0003_aggiungi_partenze_bus_eccezioni_permessi.sql b/packages/backend/drizzle/0003_aggiungi_partenze_bus_eccezioni_permessi.sql
+new file mode 100644
+index 0000000..d6549a4
+--- /dev/null
++++ b/packages/backend/drizzle/0003_aggiungi_partenze_bus_eccezioni_permessi.sql
+@@ -0,0 +1,54 @@
++CREATE TABLE IF NOT EXISTS "amministratore_permessi" (
++	"amministratore_id" text NOT NULL,
++	"permesso_chiave" text NOT NULL,
++	"concesso" boolean NOT NULL,
++	CONSTRAINT "amministratore_permessi_amministratore_id_permesso_chiave_pk" PRIMARY KEY("amministratore_id","permesso_chiave")
++);
++--> statement-breakpoint
++CREATE TABLE IF NOT EXISTS "bus_fisici" (
++	"id" text PRIMARY KEY NOT NULL,
++	"fornitore_id" text,
++	"riferimento" text NOT NULL,
++	"autista_nome" text,
++	"autista_telefono" text,
++	"note" text,
++	"creato_il" timestamp DEFAULT now() NOT NULL
++);
++--> statement-breakpoint
++CREATE TABLE IF NOT EXISTS "bus_tratte" (
++	"bus_id" text NOT NULL,
++	"linea_id" text NOT NULL,
++	CONSTRAINT "bus_tratte_bus_id_linea_id_pk" PRIMARY KEY("bus_id","linea_id")
++);
++--> statement-breakpoint
++ALTER TABLE "linee_bus" ADD COLUMN "coperta" boolean DEFAULT false NOT NULL;--> statement-breakpoint
++ALTER TABLE "linee_bus" ADD COLUMN "note_coperta" text;--> statement-breakpoint
++DO $$ BEGIN
++ ALTER TABLE "amministratore_permessi" ADD CONSTRAINT "amministratore_permessi_amministratore_id_amministratori_id_fk" FOREIGN KEY ("amministratore_id") REFERENCES "public"."amministratori"("id") ON DELETE cascade ON UPDATE no action;
++EXCEPTION
++ WHEN duplicate_object THEN null;
++END $$;
++--> statement-breakpoint
++DO $$ BEGIN
++ ALTER TABLE "amministratore_permessi" ADD CONSTRAINT "amministratore_permessi_permesso_chiave_permessi_chiave_fk" FOREIGN KEY ("permesso_chiave") REFERENCES "public"."permessi"("chiave") ON DELETE cascade ON UPDATE no action;
++EXCEPTION
++ WHEN duplicate_object THEN null;
++END $$;
++--> statement-breakpoint
++DO $$ BEGIN
++ ALTER TABLE "bus_fisici" ADD CONSTRAINT "bus_fisici_fornitore_id_fornitori_id_fk" FOREIGN KEY ("fornitore_id") REFERENCES "public"."fornitori"("id") ON DELETE no action ON UPDATE no action;
++EXCEPTION
++ WHEN duplicate_object THEN null;
++END $$;
++--> statement-breakpoint
++DO $$ BEGIN
++ ALTER TABLE "bus_tratte" ADD CONSTRAINT "bus_tratte_bus_id_bus_fisici_id_fk" FOREIGN KEY ("bus_id") REFERENCES "public"."bus_fisici"("id") ON DELETE cascade ON UPDATE no action;
++EXCEPTION
++ WHEN duplicate_object THEN null;
++END $$;
++--> statement-breakpoint
++DO $$ BEGIN
++ ALTER TABLE "bus_tratte" ADD CONSTRAINT "bus_tratte_linea_id_linee_bus_id_fk" FOREIGN KEY ("linea_id") REFERENCES "public"."linee_bus"("id") ON DELETE cascade ON UPDATE no action;
++EXCEPTION
++ WHEN duplicate_object THEN null;
++END $$;
+diff --git a/packages/backend/drizzle/meta/0003_snapshot.json b/packages/backend/drizzle/meta/0003_snapshot.json
+new file mode 100644
+index 0000000..4f723fd
+--- /dev/null
++++ b/packages/backend/drizzle/meta/0003_snapshot.json
+@@ -0,0 +1,1971 @@
++{
++  "id": "ea311128-b4a3-423a-b6a3-0c66d82d1768",
++  "prevId": "8d2b1f7c-ca69-4237-b5e7-371c1d477702",
++  "version": "7",
++  "dialect": "postgresql",
++  "tables": {
++    "public.allegati_evento": {
++      "name": "allegati_evento",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "evento_id": {
++          "name": "evento_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "url": {
++          "name": "url",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "allegati_evento_evento_id_eventi_id_fk": {
++          "name": "allegati_evento_evento_id_eventi_id_fk",
++          "tableFrom": "allegati_evento",
++          "tableTo": "eventi",
++          "columnsFrom": [
++            "evento_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.amministratore_permessi": {
++      "name": "amministratore_permessi",
++      "schema": "",
++      "columns": {
++        "amministratore_id": {
++          "name": "amministratore_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "permesso_chiave": {
++          "name": "permesso_chiave",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "concesso": {
++          "name": "concesso",
++          "type": "boolean",
++          "primaryKey": false,
++          "notNull": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "amministratore_permessi_amministratore_id_amministratori_id_fk": {
++          "name": "amministratore_permessi_amministratore_id_amministratori_id_fk",
++          "tableFrom": "amministratore_permessi",
++          "tableTo": "amministratori",
++          "columnsFrom": [
++            "amministratore_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        },
++        "amministratore_permessi_permesso_chiave_permessi_chiave_fk": {
++          "name": "amministratore_permessi_permesso_chiave_permessi_chiave_fk",
++          "tableFrom": "amministratore_permessi",
++          "tableTo": "permessi",
++          "columnsFrom": [
++            "permesso_chiave"
++          ],
++          "columnsTo": [
++            "chiave"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {
++        "amministratore_permessi_amministratore_id_permesso_chiave_pk": {
++          "name": "amministratore_permessi_amministratore_id_permesso_chiave_pk",
++          "columns": [
++            "amministratore_id",
++            "permesso_chiave"
++          ]
++        }
++      },
++      "uniqueConstraints": {}
++    },
++    "public.amministratori": {
++      "name": "amministratori",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "email": {
++          "name": "email",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "password_hash": {
++          "name": "password_hash",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "ruolo_id": {
++          "name": "ruolo_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "attivo": {
++          "name": "attivo",
++          "type": "boolean",
++          "primaryKey": false,
++          "notNull": true,
++          "default": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "amministratori_ruolo_id_ruoli_id_fk": {
++          "name": "amministratori_ruolo_id_ruoli_id_fk",
++          "tableFrom": "amministratori",
++          "tableTo": "ruoli",
++          "columnsFrom": [
++            "ruolo_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "no action",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {
++        "amministratori_email_unique": {
++          "name": "amministratori_email_unique",
++          "nullsNotDistinct": false,
++          "columns": [
++            "email"
++          ]
++        }
++      }
++    },
++    "public.bus_fisici": {
++      "name": "bus_fisici",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "fornitore_id": {
++          "name": "fornitore_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "riferimento": {
++          "name": "riferimento",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "autista_nome": {
++          "name": "autista_nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "autista_telefono": {
++          "name": "autista_telefono",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "note": {
++          "name": "note",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "creato_il": {
++          "name": "creato_il",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "now()"
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "bus_fisici_fornitore_id_fornitori_id_fk": {
++          "name": "bus_fisici_fornitore_id_fornitori_id_fk",
++          "tableFrom": "bus_fisici",
++          "tableTo": "fornitori",
++          "columnsFrom": [
++            "fornitore_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "no action",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.bus_tratte": {
++      "name": "bus_tratte",
++      "schema": "",
++      "columns": {
++        "bus_id": {
++          "name": "bus_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "linea_id": {
++          "name": "linea_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "bus_tratte_bus_id_bus_fisici_id_fk": {
++          "name": "bus_tratte_bus_id_bus_fisici_id_fk",
++          "tableFrom": "bus_tratte",
++          "tableTo": "bus_fisici",
++          "columnsFrom": [
++            "bus_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        },
++        "bus_tratte_linea_id_linee_bus_id_fk": {
++          "name": "bus_tratte_linea_id_linee_bus_id_fk",
++          "tableFrom": "bus_tratte",
++          "tableTo": "linee_bus",
++          "columnsFrom": [
++            "linea_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {
++        "bus_tratte_bus_id_linea_id_pk": {
++          "name": "bus_tratte_bus_id_linea_id_pk",
++          "columns": [
++            "bus_id",
++            "linea_id"
++          ]
++        }
++      },
++      "uniqueConstraints": {}
++    },
++    "public.categorie": {
++      "name": "categorie",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {
++        "categorie_nome_unique": {
++          "name": "categorie_nome_unique",
++          "nullsNotDistinct": false,
++          "columns": [
++            "nome"
++          ]
++        }
++      }
++    },
++    "public.contenuti_sito": {
++      "name": "contenuti_sito",
++      "schema": "",
++      "columns": {
++        "chiave": {
++          "name": "chiave",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "valore": {
++          "name": "valore",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.coupon": {
++      "name": "coupon",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "codice": {
++          "name": "codice",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "tipo": {
++          "name": "tipo",
++          "type": "tipo_coupon",
++          "typeSchema": "public",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "valore": {
++          "name": "valore",
++          "type": "numeric(10, 2)",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "usi_max": {
++          "name": "usi_max",
++          "type": "integer",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "usi_attuali": {
++          "name": "usi_attuali",
++          "type": "integer",
++          "primaryKey": false,
++          "notNull": true,
++          "default": 0
++        },
++        "valido_dal": {
++          "name": "valido_dal",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "valido_al": {
++          "name": "valido_al",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "attivo": {
++          "name": "attivo",
++          "type": "boolean",
++          "primaryKey": false,
++          "notNull": true,
++          "default": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {
++        "coupon_codice_unique": {
++          "name": "coupon_codice_unique",
++          "nullsNotDistinct": false,
++          "columns": [
++            "codice"
++          ]
++        }
++      }
++    },
++    "public.eventi": {
++      "name": "eventi",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "artista": {
++          "name": "artista",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "genere": {
++          "name": "genere",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "luogo": {
++          "name": "luogo",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "citta": {
++          "name": "citta",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "data": {
++          "name": "data",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "prezzo": {
++          "name": "prezzo",
++          "type": "numeric(10, 2)",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "in_evidenza": {
++          "name": "in_evidenza",
++          "type": "boolean",
++          "primaryKey": false,
++          "notNull": true,
++          "default": false
++        },
++        "ordine_evidenza": {
++          "name": "ordine_evidenza",
++          "type": "integer",
++          "primaryKey": false,
++          "notNull": true,
++          "default": 0
++        },
++        "vetrina_dal": {
++          "name": "vetrina_dal",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "vetrina_al": {
++          "name": "vetrina_al",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "creato_il": {
++          "name": "creato_il",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "now()"
++        },
++        "aggiornato_il": {
++          "name": "aggiornato_il",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "now()"
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.fermate": {
++      "name": "fermate",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "linea_id": {
++          "name": "linea_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "ordine": {
++          "name": "ordine",
++          "type": "integer",
++          "primaryKey": false,
++          "notNull": true,
++          "default": 0
++        },
++        "citta": {
++          "name": "citta",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "indirizzo": {
++          "name": "indirizzo",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "orario": {
++          "name": "orario",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "orario_ritorno": {
++          "name": "orario_ritorno",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "indirizzo_ritorno": {
++          "name": "indirizzo_ritorno",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "prezzo": {
++          "name": "prezzo",
++          "type": "numeric(10, 2)",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "lat": {
++          "name": "lat",
++          "type": "double precision",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "lng": {
++          "name": "lng",
++          "type": "double precision",
++          "primaryKey": false,
++          "notNull": false
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "fermate_linea_id_linee_bus_id_fk": {
++          "name": "fermate_linea_id_linee_bus_id_fk",
++          "tableFrom": "fermate",
++          "tableTo": "linee_bus",
++          "columnsFrom": [
++            "linea_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.fermate_tragitto": {
++      "name": "fermate_tragitto",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "tragitto_id": {
++          "name": "tragitto_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "ordine": {
++          "name": "ordine",
++          "type": "integer",
++          "primaryKey": false,
++          "notNull": true,
++          "default": 0
++        },
++        "citta": {
++          "name": "citta",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "indirizzo": {
++          "name": "indirizzo",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "orario": {
++          "name": "orario",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "prezzo": {
++          "name": "prezzo",
++          "type": "numeric(10, 2)",
++          "primaryKey": false,
++          "notNull": false
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "fermate_tragitto_tragitto_id_tragitti_id_fk": {
++          "name": "fermate_tragitto_tragitto_id_tragitti_id_fk",
++          "tableFrom": "fermate_tragitto",
++          "tableTo": "tragitti",
++          "columnsFrom": [
++            "tragitto_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.fornitori": {
++      "name": "fornitori",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "partita_iva": {
++          "name": "partita_iva",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "referente": {
++          "name": "referente",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "telefono": {
++          "name": "telefono",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "email": {
++          "name": "email",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "indirizzo": {
++          "name": "indirizzo",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "note": {
++          "name": "note",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "lat": {
++          "name": "lat",
++          "type": "double precision",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "lng": {
++          "name": "lng",
++          "type": "double precision",
++          "primaryKey": false,
++          "notNull": false
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.immagini_evento": {
++      "name": "immagini_evento",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "evento_id": {
++          "name": "evento_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "url": {
++          "name": "url",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "ordine": {
++          "name": "ordine",
++          "type": "integer",
++          "primaryKey": false,
++          "notNull": true,
++          "default": 0
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "immagini_evento_evento_id_eventi_id_fk": {
++          "name": "immagini_evento_evento_id_eventi_id_fk",
++          "tableFrom": "immagini_evento",
++          "tableTo": "eventi",
++          "columnsFrom": [
++            "evento_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.impostazioni": {
++      "name": "impostazioni",
++      "schema": "",
++      "columns": {
++        "chiave": {
++          "name": "chiave",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "valore": {
++          "name": "valore",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.linee_bus": {
++      "name": "linee_bus",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "evento_id": {
++          "name": "evento_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "posti_totali": {
++          "name": "posti_totali",
++          "type": "integer",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "posti_disponibili": {
++          "name": "posti_disponibili",
++          "type": "integer",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "prezzo_extra": {
++          "name": "prezzo_extra",
++          "type": "numeric(10, 2)",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "'0'"
++        },
++        "referente_nome": {
++          "name": "referente_nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "referente_telefono": {
++          "name": "referente_telefono",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "fornitore_id": {
++          "name": "fornitore_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "coperta": {
++          "name": "coperta",
++          "type": "boolean",
++          "primaryKey": false,
++          "notNull": true,
++          "default": false
++        },
++        "note_coperta": {
++          "name": "note_coperta",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "linee_bus_evento_id_eventi_id_fk": {
++          "name": "linee_bus_evento_id_eventi_id_fk",
++          "tableFrom": "linee_bus",
++          "tableTo": "eventi",
++          "columnsFrom": [
++            "evento_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        },
++        "linee_bus_fornitore_id_fornitori_id_fk": {
++          "name": "linee_bus_fornitore_id_fornitori_id_fk",
++          "tableFrom": "linee_bus",
++          "tableTo": "fornitori",
++          "columnsFrom": [
++            "fornitore_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "no action",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.lista_attesa": {
++      "name": "lista_attesa",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "evento_id": {
++          "name": "evento_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "email": {
++          "name": "email",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "telefono": {
++          "name": "telefono",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "passeggeri": {
++          "name": "passeggeri",
++          "type": "integer",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "stato": {
++          "name": "stato",
++          "type": "stato_lista_attesa",
++          "typeSchema": "public",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "'IN_ATTESA'"
++        },
++        "data_creazione": {
++          "name": "data_creazione",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "now()"
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "lista_attesa_evento_id_eventi_id_fk": {
++          "name": "lista_attesa_evento_id_eventi_id_fk",
++          "tableFrom": "lista_attesa",
++          "tableTo": "eventi",
++          "columnsFrom": [
++            "evento_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.log_attivita": {
++      "name": "log_attivita",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "amministratore_id": {
++          "name": "amministratore_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "azione": {
++          "name": "azione",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "dettaglio": {
++          "name": "dettaglio",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "data": {
++          "name": "data",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "now()"
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "log_attivita_amministratore_id_amministratori_id_fk": {
++          "name": "log_attivita_amministratore_id_amministratori_id_fk",
++          "tableFrom": "log_attivita",
++          "tableTo": "amministratori",
++          "columnsFrom": [
++            "amministratore_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "no action",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.messaggi_chat": {
++      "name": "messaggi_chat",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "evento_id": {
++          "name": "evento_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "autore": {
++          "name": "autore",
++          "type": "autore_messaggio",
++          "typeSchema": "public",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "email": {
++          "name": "email",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "testo": {
++          "name": "testo",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "letto": {
++          "name": "letto",
++          "type": "boolean",
++          "primaryKey": false,
++          "notNull": true,
++          "default": false
++        },
++        "creato_il": {
++          "name": "creato_il",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "now()"
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "messaggi_chat_evento_id_eventi_id_fk": {
++          "name": "messaggi_chat_evento_id_eventi_id_fk",
++          "tableFrom": "messaggi_chat",
++          "tableTo": "eventi",
++          "columnsFrom": [
++            "evento_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.pagine_cms": {
++      "name": "pagine_cms",
++      "schema": "",
++      "columns": {
++        "chiave": {
++          "name": "chiave",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "titolo": {
++          "name": "titolo",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "contenuto": {
++          "name": "contenuto",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.permessi": {
++      "name": "permessi",
++      "schema": "",
++      "columns": {
++        "chiave": {
++          "name": "chiave",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "etichetta": {
++          "name": "etichetta",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "modulo": {
++          "name": "modulo",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "attivo": {
++          "name": "attivo",
++          "type": "boolean",
++          "primaryKey": false,
++          "notNull": true,
++          "default": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.prenotazioni": {
++      "name": "prenotazioni",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "pnr": {
++          "name": "pnr",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "evento_id": {
++          "name": "evento_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "linea_id": {
++          "name": "linea_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "fermata_citta": {
++          "name": "fermata_citta",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "fermata_indirizzo": {
++          "name": "fermata_indirizzo",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "fermata_orario": {
++          "name": "fermata_orario",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "orario_ritorno": {
++          "name": "orario_ritorno",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "indirizzo_ritorno": {
++          "name": "indirizzo_ritorno",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "referente_nome": {
++          "name": "referente_nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "referente_telefono": {
++          "name": "referente_telefono",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "passeggeri": {
++          "name": "passeggeri",
++          "type": "integer",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "totale": {
++          "name": "totale",
++          "type": "numeric(10, 2)",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "sconto": {
++          "name": "sconto",
++          "type": "numeric(10, 2)",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "'0'"
++        },
++        "coupon_codice": {
++          "name": "coupon_codice",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "tipo_pagamento": {
++          "name": "tipo_pagamento",
++          "type": "tipo_pagamento",
++          "typeSchema": "public",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "'COMPLETO'"
++        },
++        "saldo_pagato": {
++          "name": "saldo_pagato",
++          "type": "boolean",
++          "primaryKey": false,
++          "notNull": true,
++          "default": true
++        },
++        "scadenza_saldo": {
++          "name": "scadenza_saldo",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "metodo_pagamento": {
++          "name": "metodo_pagamento",
++          "type": "metodo_pagamento",
++          "typeSchema": "public",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "'CARTA'"
++        },
++        "utente_id": {
++          "name": "utente_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "promoter_codice": {
++          "name": "promoter_codice",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "stato": {
++          "name": "stato",
++          "type": "stato_prenotazione",
++          "typeSchema": "public",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "'CONFERMATA'"
++        },
++        "motivo_cancellazione": {
++          "name": "motivo_cancellazione",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "rimborso_stato": {
++          "name": "rimborso_stato",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "rimborso_importo": {
++          "name": "rimborso_importo",
++          "type": "numeric(10, 2)",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "rimborso_data": {
++          "name": "rimborso_data",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "creata_il": {
++          "name": "creata_il",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "now()"
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "prenotazioni_evento_id_eventi_id_fk": {
++          "name": "prenotazioni_evento_id_eventi_id_fk",
++          "tableFrom": "prenotazioni",
++          "tableTo": "eventi",
++          "columnsFrom": [
++            "evento_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "no action",
++          "onUpdate": "no action"
++        },
++        "prenotazioni_linea_id_linee_bus_id_fk": {
++          "name": "prenotazioni_linea_id_linee_bus_id_fk",
++          "tableFrom": "prenotazioni",
++          "tableTo": "linee_bus",
++          "columnsFrom": [
++            "linea_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "no action",
++          "onUpdate": "no action"
++        },
++        "prenotazioni_utente_id_utenti_id_fk": {
++          "name": "prenotazioni_utente_id_utenti_id_fk",
++          "tableFrom": "prenotazioni",
++          "tableTo": "utenti",
++          "columnsFrom": [
++            "utente_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "no action",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {
++        "prenotazioni_pnr_unique": {
++          "name": "prenotazioni_pnr_unique",
++          "nullsNotDistinct": false,
++          "columns": [
++            "pnr"
++          ]
++        }
++      }
++    },
++    "public.promoter": {
++      "name": "promoter",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "email": {
++          "name": "email",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "telefono": {
++          "name": "telefono",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "password_hash": {
++          "name": "password_hash",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "codice": {
++          "name": "codice",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "commissione_percentuale": {
++          "name": "commissione_percentuale",
++          "type": "numeric(5, 2)",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "'10'"
++        },
++        "note": {
++          "name": "note",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {
++        "promoter_email_unique": {
++          "name": "promoter_email_unique",
++          "nullsNotDistinct": false,
++          "columns": [
++            "email"
++          ]
++        },
++        "promoter_codice_unique": {
++          "name": "promoter_codice_unique",
++          "nullsNotDistinct": false,
++          "columns": [
++            "codice"
++          ]
++        }
++      }
++    },
++    "public.promoter_eventi": {
++      "name": "promoter_eventi",
++      "schema": "",
++      "columns": {
++        "promoter_id": {
++          "name": "promoter_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "evento_id": {
++          "name": "evento_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "promoter_eventi_promoter_id_promoter_id_fk": {
++          "name": "promoter_eventi_promoter_id_promoter_id_fk",
++          "tableFrom": "promoter_eventi",
++          "tableTo": "promoter",
++          "columnsFrom": [
++            "promoter_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        },
++        "promoter_eventi_evento_id_eventi_id_fk": {
++          "name": "promoter_eventi_evento_id_eventi_id_fk",
++          "tableFrom": "promoter_eventi",
++          "tableTo": "eventi",
++          "columnsFrom": [
++            "evento_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {
++        "promoter_eventi_promoter_id_evento_id_pk": {
++          "name": "promoter_eventi_promoter_id_evento_id_pk",
++          "columns": [
++            "promoter_id",
++            "evento_id"
++          ]
++        }
++      },
++      "uniqueConstraints": {}
++    },
++    "public.ruoli": {
++      "name": "ruoli",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "descrizione": {
++          "name": "descrizione",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "owner": {
++          "name": "owner",
++          "type": "boolean",
++          "primaryKey": false,
++          "notNull": true,
++          "default": false
++        },
++        "creato_il": {
++          "name": "creato_il",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "now()"
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {
++        "ruoli_nome_unique": {
++          "name": "ruoli_nome_unique",
++          "nullsNotDistinct": false,
++          "columns": [
++            "nome"
++          ]
++        }
++      }
++    },
++    "public.ruolo_permessi": {
++      "name": "ruolo_permessi",
++      "schema": "",
++      "columns": {
++        "ruolo_id": {
++          "name": "ruolo_id",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "permesso_chiave": {
++          "name": "permesso_chiave",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "ruolo_permessi_ruolo_id_ruoli_id_fk": {
++          "name": "ruolo_permessi_ruolo_id_ruoli_id_fk",
++          "tableFrom": "ruolo_permessi",
++          "tableTo": "ruoli",
++          "columnsFrom": [
++            "ruolo_id"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        },
++        "ruolo_permessi_permesso_chiave_permessi_chiave_fk": {
++          "name": "ruolo_permessi_permesso_chiave_permessi_chiave_fk",
++          "tableFrom": "ruolo_permessi",
++          "tableTo": "permessi",
++          "columnsFrom": [
++            "permesso_chiave"
++          ],
++          "columnsTo": [
++            "chiave"
++          ],
++          "onDelete": "cascade",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {
++        "ruolo_permessi_ruolo_id_permesso_chiave_pk": {
++          "name": "ruolo_permessi_ruolo_id_permesso_chiave_pk",
++          "columns": [
++            "ruolo_id",
++            "permesso_chiave"
++          ]
++        }
++      },
++      "uniqueConstraints": {}
++    },
++    "public.tour_leader": {
++      "name": "tour_leader",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "cognome": {
++          "name": "cognome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "email": {
++          "name": "email",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "telefono": {
++          "name": "telefono",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "data_nascita": {
++          "name": "data_nascita",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "citta": {
++          "name": "citta",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "lingue": {
++          "name": "lingue",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "disponibilita": {
++          "name": "disponibilita",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "esperienza": {
++          "name": "esperienza",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "stato": {
++          "name": "stato",
++          "type": "stato_tour_leader",
++          "typeSchema": "public",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "'CANDIDATO'"
++        },
++        "evento_riferimento": {
++          "name": "evento_riferimento",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "note": {
++          "name": "note",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "data_candidatura": {
++          "name": "data_candidatura",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "now()"
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {
++        "tour_leader_evento_riferimento_eventi_id_fk": {
++          "name": "tour_leader_evento_riferimento_eventi_id_fk",
++          "tableFrom": "tour_leader",
++          "tableTo": "eventi",
++          "columnsFrom": [
++            "evento_riferimento"
++          ],
++          "columnsTo": [
++            "id"
++          ],
++          "onDelete": "no action",
++          "onUpdate": "no action"
++        }
++      },
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.tragitti": {
++      "name": "tragitti",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {}
++    },
++    "public.utenti": {
++      "name": "utenti",
++      "schema": "",
++      "columns": {
++        "id": {
++          "name": "id",
++          "type": "text",
++          "primaryKey": true,
++          "notNull": true
++        },
++        "nome": {
++          "name": "nome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "cognome": {
++          "name": "cognome",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "email": {
++          "name": "email",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": true
++        },
++        "telefono": {
++          "name": "telefono",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "codice_fiscale": {
++          "name": "codice_fiscale",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "data_nascita": {
++          "name": "data_nascita",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "indirizzo": {
++          "name": "indirizzo",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "citta": {
++          "name": "citta",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "cap": {
++          "name": "cap",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "note": {
++          "name": "note",
++          "type": "text",
++          "primaryKey": false,
++          "notNull": false
++        },
++        "creato_il": {
++          "name": "creato_il",
++          "type": "timestamp",
++          "primaryKey": false,
++          "notNull": true,
++          "default": "now()"
++        }
++      },
++      "indexes": {},
++      "foreignKeys": {},
++      "compositePrimaryKeys": {},
++      "uniqueConstraints": {
++        "utenti_email_unique": {
++          "name": "utenti_email_unique",
++          "nullsNotDistinct": false,
++          "columns": [
++            "email"
++          ]
++        }
++      }
++    }
++  },
++  "enums": {
++    "public.autore_messaggio": {
++      "name": "autore_messaggio",
++      "schema": "public",
++      "values": [
++        "CLIENTE",
++        "ADMIN"
++      ]
++    },
++    "public.metodo_pagamento": {
++      "name": "metodo_pagamento",
++      "schema": "public",
++      "values": [
++        "CARTA",
++        "PAYPAL",
++        "SATISPAY",
++        "DA_CONCORDARE"
++      ]
++    },
++    "public.ruolo_admin": {
++      "name": "ruolo_admin",
++      "schema": "public",
++      "values": [
++        "AMMINISTRATORE",
++        "OPERATORE",
++        "COLLABORATORE"
++      ]
++    },
++    "public.stato_lista_attesa": {
++      "name": "stato_lista_attesa",
++      "schema": "public",
++      "values": [
++        "IN_ATTESA",
++        "PROMOSSA"
++      ]
++    },
++    "public.stato_prenotazione": {
++      "name": "stato_prenotazione",
++      "schema": "public",
++      "values": [
++        "CONFERMATA",
++        "CANCELLATA"
++      ]
++    },
++    "public.stato_tour_leader": {
++      "name": "stato_tour_leader",
++      "schema": "public",
++      "values": [
++        "CANDIDATO",
++        "ATTIVO",
++        "ARCHIVIATO"
++      ]
++    },
++    "public.tipo_coupon": {
++      "name": "tipo_coupon",
++      "schema": "public",
++      "values": [
++        "PERCENTUALE",
++        "FISSO"
++      ]
++    },
++    "public.tipo_pagamento": {
++      "name": "tipo_pagamento",
++      "schema": "public",
++      "values": [
++        "COMPLETO",
++        "ACCONTO"
++      ]
++    }
++  },
++  "schemas": {},
++  "sequences": {},
++  "_meta": {
++    "columns": {},
++    "schemas": {},
++    "tables": {}
++  }
++}
+\ No newline at end of file
+diff --git a/packages/backend/drizzle/meta/_journal.json b/packages/backend/drizzle/meta/_journal.json
+index edaf8d7..11f28a3 100644
+--- a/packages/backend/drizzle/meta/_journal.json
++++ b/packages/backend/drizzle/meta/_journal.json
+@@ -22,6 +22,13 @@
+       "when": 1786716341723,
+       "tag": "0002_completa_migrazione_ruoli",
+       "breakpoints": true
++    },
++    {
++      "idx": 3,
++      "version": "7",
++      "when": 1786724060906,
++      "tag": "0003_aggiungi_partenze_bus_eccezioni_permessi",
++      "breakpoints": true
+     }
+   ]
+ }
+\ No newline at end of file
+diff --git a/packages/backend/src/app.ts b/packages/backend/src/app.ts
+index 5bda76d..d1321fe 100644
+--- a/packages/backend/src/app.ts
++++ b/packages/backend/src/app.ts
+@@ -16,6 +16,7 @@ import { chatRouter } from './modules/chat/chat.routes.js';
+ import { amministratoriRouter } from './modules/amministratori/amministratori.routes.js';
+ import { statisticheRouter } from './modules/statistiche/statistiche.routes.js';
+ import { ruoliRouter } from './modules/ruoli/ruoli.routes.js';
++import { impostazioniRouter } from './modules/impostazioni/impostazioni.routes.js';
+ 
+ export function creaApp() {
+   const app = express();
+@@ -41,6 +42,7 @@ export function creaApp() {
+   app.use('/api/amministratori', amministratoriRouter);
+   app.use('/api/statistiche', statisticheRouter);
+   app.use('/api/ruoli', ruoliRouter);
++  app.use('/api/impostazioni', impostazioniRouter);
+ 
+   // Il gestore errori DEVE essere l'ultimo middleware registrato.
+   app.use(gestoreErrori);
+diff --git a/packages/backend/src/db/schema.ts b/packages/backend/src/db/schema.ts
+index 0560535..274422a 100644
+--- a/packages/backend/src/db/schema.ts
++++ b/packages/backend/src/db/schema.ts
+@@ -100,6 +100,11 @@ export const lineeBus = pgTable('linee_bus', {
+   referenteNome: text('referente_nome'),
+   referenteTelefono: text('referente_telefono'),
+   fornitoreId: text('fornitore_id').references(() => fornitori.id),
++  // Sezione "Partenze": indica se questa tratta è coperta (bus prenotato
++  // con l'agenzia/fornitore), a prescindere dal calcolo automatico dei
++  // bus necessari, che resta solo un suggerimento.
++  coperta: boolean('coperta').notNull().default(false),
++  noteCoperta: text('note_coperta'),
+ });
+ 
+ export const fermate = pgTable('fermate', {
+@@ -116,6 +121,29 @@ export const fermate = pgTable('fermate', {
+   lng: doublePrecision('lng'),
+ });
+ 
++// ---------------------------------------------------------------------
++// BUS FISICI (Sezione Partenze: censimento dei mezzi reali e delle tratte
++// che coprono)
++// ---------------------------------------------------------------------
++export const busFisici = pgTable('bus_fisici', {
++  id: id(),
++  fornitoreId: text('fornitore_id').references(() => fornitori.id),
++  riferimento: text('riferimento').notNull(), // es. targa, o riferimento dato dall'agenzia
++  autistaNome: text('autista_nome'),
++  autistaTelefono: text('autista_telefono'),
++  note: text('note'),
++  creatoIl: timestamp('creato_il').notNull().defaultNow(),
++});
++
++// Un bus può coprire più tratte (linee) diverse; una tratta può essere
++// coperta da più bus se la capienza di uno solo non basta.
++export const busTratte = pgTable('bus_tratte', {
++  busId: text('bus_id').notNull().references(() => busFisici.id, { onDelete: 'cascade' }),
++  lineaId: text('linea_id').notNull().references(() => lineeBus.id, { onDelete: 'cascade' }),
++}, (t) => ({
++  pk: primaryKey({ columns: [t.busId, t.lineaId] }),
++}));
++
+ // ---------------------------------------------------------------------
+ // TRAGITTI (template riutilizzabili di fermate)
+ // ---------------------------------------------------------------------
+@@ -316,6 +344,19 @@ export const amministratori = pgTable('amministratori', {
+   attivo: boolean('attivo').notNull().default(true),
+ });
+ 
++// Eccezioni per singolo amministratore: se presente una riga, sovrascrive
++// quello che darebbe il ruolo. `concesso = true` forza il permesso anche
++// se il ruolo non ce l'ha; `concesso = false` lo toglie anche se il ruolo
++// ce l'ha. Ignorato per gli amministratori con ruolo owner (hanno sempre
++// tutto, le eccezioni non hanno effetto).
++export const amministratorePermessi = pgTable('amministratore_permessi', {
++  amministratoreId: text('amministratore_id').notNull().references(() => amministratori.id, { onDelete: 'cascade' }),
++  permessoChiave: text('permesso_chiave').notNull().references(() => permessi.chiave, { onDelete: 'cascade' }),
++  concesso: boolean('concesso').notNull(),
++}, (t) => ({
++  pk: primaryKey({ columns: [t.amministratoreId, t.permessoChiave] }),
++}));
++
+ export const logAttivita = pgTable('log_attivita', {
+   id: id(),
+   amministratoreId: text('amministratore_id').references(() => amministratori.id),
+@@ -387,12 +428,23 @@ export const lineeBusRelations = relations(lineeBus, ({ one, many }) => ({
+   fornitore: one(fornitori, { fields: [lineeBus.fornitoreId], references: [fornitori.id] }),
+   fermate: many(fermate),
+   prenotazioni: many(prenotazioni),
++  busAssegnati: many(busTratte),
+ }));
+ 
+ export const fermateRelations = relations(fermate, ({ one }) => ({
+   linea: one(lineeBus, { fields: [fermate.lineaId], references: [lineeBus.id] }),
+ }));
+ 
++export const busFisiciRelations = relations(busFisici, ({ one, many }) => ({
++  fornitore: one(fornitori, { fields: [busFisici.fornitoreId], references: [fornitori.id] }),
++  tratte: many(busTratte),
++}));
++
++export const busTratteRelations = relations(busTratte, ({ one }) => ({
++  bus: one(busFisici, { fields: [busTratte.busId], references: [busFisici.id] }),
++  linea: one(lineeBus, { fields: [busTratte.lineaId], references: [lineeBus.id] }),
++}));
++
+ export const tragittiRelations = relations(tragitti, ({ many }) => ({
+   fermate: many(fermateTragitto),
+ }));
+@@ -430,6 +482,12 @@ export const ruoloPermessiRelations = relations(ruoloPermessi, ({ one }) => ({
+   permesso: one(permessi, { fields: [ruoloPermessi.permessoChiave], references: [permessi.chiave] }),
+ }));
+ 
+-export const amministratoriRelations = relations(amministratori, ({ one }) => ({
++export const amministratoriRelations = relations(amministratori, ({ one, many }) => ({
+   ruolo: one(ruoli, { fields: [amministratori.ruoloId], references: [ruoli.id] }),
++  permessiExtra: many(amministratorePermessi),
++}));
++
++export const amministratorePermessiRelations = relations(amministratorePermessi, ({ one }) => ({
++  amministratore: one(amministratori, { fields: [amministratorePermessi.amministratoreId], references: [amministratori.id] }),
++  permesso: one(permessi, { fields: [amministratorePermessi.permessoChiave], references: [permessi.chiave] }),
+ }));
+diff --git a/packages/backend/src/modules/amministratori/amministratori.routes.ts b/packages/backend/src/modules/amministratori/amministratori.routes.ts
+index cae8315..16d0906 100644
+--- a/packages/backend/src/modules/amministratori/amministratori.routes.ts
++++ b/packages/backend/src/modules/amministratori/amministratori.routes.ts
+@@ -3,7 +3,7 @@ import { desc, eq } from 'drizzle-orm';
+ import { z } from 'zod';
+ import bcrypt from 'bcryptjs';
+ import { db } from '../../db/client.js';
+-import { amministratori, logAttivita, ruoli, ruoloPermessi } from '../../db/schema.js';
++import { amministratori, logAttivita, ruoli, ruoloPermessi, amministratorePermessi } from '../../db/schema.js';
+ import { NonTrovato, ConflittoDati, VietatoDaiPermessi } from '../../shared/errors.js';
+ import { valida } from '../../shared/validate.js';
+ import { asyncHandler } from '../../shared/http.js';
+@@ -135,3 +135,64 @@ amministratoriRouter.delete(
+     res.status(204).send();
+   })
+ );
++
++// ---------------------------------------------------------------------
++// Eccezioni di permesso per singolo amministratore, oltre al suo ruolo.
++// ---------------------------------------------------------------------
++
++const eccezioniSchema = z.object({
++  eccezioni: z.array(z.object({ chiave: z.string(), concesso: z.boolean() })),
++});
++
++amministratoriRouter.get(
++  '/:id/permessi',
++  richiedePermesso('utenze.gestisci'),
++  asyncHandler(async (req: Request, res: Response) => {
++    const target = await getById(req.params.id);
++    const [ruolo] = await db.select().from(ruoli).where(eq(ruoli.id, target.ruoloId)).limit(1);
++    const delRuolo = ruolo?.owner
++      ? ['*']
++      : (await db.select().from(ruoloPermessi).where(eq(ruoloPermessi.ruoloId, target.ruoloId))).map((r) => r.permessoChiave);
++    const eccezioni = await db.select().from(amministratorePermessi).where(eq(amministratorePermessi.amministratoreId, target.id));
++    const eff = await permessiEffettivi(target.id);
++
++    res.json({
++      ruoloOwner: ruolo?.owner ?? false,
++      permessiRuolo: delRuolo,
++      eccezioni: eccezioni.map((e) => ({ chiave: e.permessoChiave, concesso: e.concesso })),
++      effettivi: eff.owner ? ['*'] : Array.from(eff.permessi),
++    });
++  })
++);
++
++amministratoriRouter.put(
++  '/:id/permessi',
++  richiedePermesso('utenze.gestisci'),
++  valida(eccezioniSchema),
++  asyncHandler(async (req: Request, res: Response) => {
++    const target = await getById(req.params.id);
++    const [ruoloTarget] = await db.select().from(ruoli).where(eq(ruoli.id, target.ruoloId)).limit(1);
++    if (ruoloTarget?.owner) {
++      throw new ConflittoDati('Il proprietario ha già tutti i permessi: non servono eccezioni personali.');
++    }
++
++    const eff = await permessiEffettivi(req.admin!.sub);
++    if (!eff.owner) {
++      const chiaviDaConcedere = req.body.eccezioni.filter((e: { chiave: string; concesso: boolean }) => e.concesso).map((e: { chiave: string }) => e.chiave);
++      const nonPossedute = chiaviDaConcedere.filter((c: string) => !eff.permessi.has(c));
++      if (nonPossedute.length > 0) {
++        throw new VietatoDaiPermessi(`Non puoi concedere permessi che non possiedi: ${nonPossedute.join(', ')}`);
++      }
++    }
++
++    await db.delete(amministratorePermessi).where(eq(amministratorePermessi.amministratoreId, target.id));
++    if (req.body.eccezioni.length > 0) {
++      await db.insert(amministratorePermessi).values(
++        req.body.eccezioni.map((e: { chiave: string; concesso: boolean }) => ({
++          amministratoreId: target.id, permessoChiave: e.chiave, concesso: e.concesso,
++        }))
++      );
++    }
++    res.json({ ok: true });
++  })
++);
+diff --git a/packages/backend/src/modules/auth/permessi.service.ts b/packages/backend/src/modules/auth/permessi.service.ts
+index 93cdbdc..84a10e2 100644
+--- a/packages/backend/src/modules/auth/permessi.service.ts
++++ b/packages/backend/src/modules/auth/permessi.service.ts
+@@ -1,14 +1,16 @@
+ import { eq } from 'drizzle-orm';
+ import { db } from '../../db/client.js';
+-import { amministratori, ruoli, ruoloPermessi } from '../../db/schema.js';
++import { amministratori, ruoli, ruoloPermessi, amministratorePermessi } from '../../db/schema.js';
+ 
+ export interface PermessiEffettivi {
+   owner: boolean;
+   permessi: Set<string>; // ignorato/irrilevante se owner === true
+ }
+ 
+-/** Calcola i permessi effettivi di un amministratore in base al suo ruolo.
+- *  Un ruolo "owner" ha sempre tutti i permessi, presenti e futuri. */
++/** Calcola i permessi effettivi di un amministratore: permessi del suo
++ *  ruolo, con sopra applicate le eventuali eccezioni personali (concedi/
++ *  nega). Un ruolo "owner" ha sempre tutti i permessi, presenti e futuri,
++ *  a prescindere dalle eccezioni (che vengono ignorate in quel caso). */
+ export async function permessiEffettivi(amministratoreId: string): Promise<PermessiEffettivi> {
+   const [admin] = await db
+     .select({ ruoloId: amministratori.ruoloId })
+@@ -27,7 +29,19 @@ export async function permessiEffettivi(amministratoreId: string): Promise<Perme
+     .from(ruoloPermessi)
+     .where(eq(ruoloPermessi.ruoloId, ruolo.id));
+ 
+-  return { owner: false, permessi: new Set(righe.map((r) => r.chiave)) };
++  const insieme = new Set(righe.map((r) => r.chiave));
++
++  const eccezioni = await db
++    .select()
++    .from(amministratorePermessi)
++    .where(eq(amministratorePermessi.amministratoreId, amministratoreId));
++
++  for (const e of eccezioni) {
++    if (e.concesso) insieme.add(e.permessoChiave);
++    else insieme.delete(e.permessoChiave);
++  }
++
++  return { owner: false, permessi: insieme };
+ }
+ 
+ export async function haPermesso(amministratoreId: string, chiave: string): Promise<boolean> {
+diff --git a/packages/backend/src/modules/eventi/eventi.controller.ts b/packages/backend/src/modules/eventi/eventi.controller.ts
+index aea1ccc..47ece61 100644
+--- a/packages/backend/src/modules/eventi/eventi.controller.ts
++++ b/packages/backend/src/modules/eventi/eventi.controller.ts
+@@ -34,4 +34,32 @@ export const eventiController = {
+     const opzioni = await eventiService.opzioniPartenza(req.params.id);
+     res.json(opzioni);
+   },
++
++  async calcolaBus(req: Request, res: Response) {
++    res.json(await eventiService.calcolaBusNecessari(req.params.id));
++  },
++
++  async impostaCopertura(req: Request, res: Response) {
++    await eventiService.impostaCopertura(req.params.id, req.params.lineaId, req.body.coperta, req.body.noteCoperta);
++    res.json({ ok: true });
++  },
++
++  async listaBus(req: Request, res: Response) {
++    res.json(await eventiService.listaBus(req.params.id));
++  },
++
++  async creaBus(req: Request, res: Response) {
++    const busId = await eventiService.creaBus(req.params.id, req.body);
++    res.status(201).json({ id: busId });
++  },
++
++  async aggiornaBus(req: Request, res: Response) {
++    await eventiService.aggiornaBus(req.params.id, req.params.busId, req.body);
++    res.json({ ok: true });
++  },
++
++  async rimuoviBus(req: Request, res: Response) {
++    await eventiService.rimuoviBus(req.params.busId);
++    res.status(204).send();
++  },
+ };
+diff --git a/packages/backend/src/modules/eventi/eventi.dto.ts b/packages/backend/src/modules/eventi/eventi.dto.ts
+index e8fdf85..fca7491 100644
+--- a/packages/backend/src/modules/eventi/eventi.dto.ts
++++ b/packages/backend/src/modules/eventi/eventi.dto.ts
+@@ -45,3 +45,18 @@ export const listaEventiQuerySchema = z.object({
+   soloInEvidenza: z.coerce.boolean().optional(),
+ });
+ export type ListaEventiQuery = z.infer<typeof listaEventiQuerySchema>;
++
++export const impostaCoperturaSchema = z.object({
++  coperta: z.boolean(),
++  noteCoperta: z.string().optional(),
++});
++
++export const creaBusSchema = z.object({
++  fornitoreId: z.string().optional(),
++  riferimento: z.string().min(1),
++  autistaNome: z.string().optional(),
++  autistaTelefono: z.string().optional(),
++  note: z.string().optional(),
++  lineeIds: z.array(z.string()).min(1),
++});
++export const aggiornaBusSchema = creaBusSchema.partial();
+diff --git a/packages/backend/src/modules/eventi/eventi.routes.ts b/packages/backend/src/modules/eventi/eventi.routes.ts
+index b3c3517..1731374 100644
+--- a/packages/backend/src/modules/eventi/eventi.routes.ts
++++ b/packages/backend/src/modules/eventi/eventi.routes.ts
+@@ -1,6 +1,6 @@
+ import { Router } from 'express';
+ import { eventiController } from './eventi.controller.js';
+-import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema } from './eventi.dto.js';
++import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, impostaCoperturaSchema, creaBusSchema, aggiornaBusSchema } from './eventi.dto.js';
+ import { valida } from '../../shared/validate.js';
+ import { asyncHandler } from '../../shared/http.js';
+ import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
+@@ -33,3 +33,17 @@ eventiRouter.delete(
+   richiedePermesso('eventi.elimina'),
+   asyncHandler(eventiController.remove)
+ );
++
++// Sezione Partenze: calcolo bus necessari, copertura tratte, bus fisici.
++eventiRouter.get('/:id/calcola-bus', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.calcolaBus));
++eventiRouter.put(
++  '/:id/linee/:lineaId/copertura',
++  richiedeAuth,
++  richiedePermesso('eventi.crea'),
++  valida(impostaCoperturaSchema),
++  asyncHandler(eventiController.impostaCopertura)
++);
++eventiRouter.get('/:id/bus', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaBus));
++eventiRouter.post('/:id/bus', richiedeAuth, richiedePermesso('eventi.crea'), valida(creaBusSchema), asyncHandler(eventiController.creaBus));
++eventiRouter.put('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaBusSchema), asyncHandler(eventiController.aggiornaBus));
++eventiRouter.delete('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.rimuoviBus));
+diff --git a/packages/backend/src/modules/eventi/eventi.service.ts b/packages/backend/src/modules/eventi/eventi.service.ts
+index 9529a0b..49bab20 100644
+--- a/packages/backend/src/modules/eventi/eventi.service.ts
++++ b/packages/backend/src/modules/eventi/eventi.service.ts
+@@ -1,4 +1,4 @@
+-import { and, eq, ilike } from 'drizzle-orm';
++import { and, eq, ilike, inArray } from 'drizzle-orm';
+ import { db } from '../../db/client.js';
+ import {
+   eventi,
+@@ -6,8 +6,12 @@ import {
+   fermate,
+   immaginiEvento,
+   allegatiEvento,
++  prenotazioni,
++  busFisici,
++  busTratte,
+ } from '../../db/schema.js';
+-import { NonTrovato } from '../../shared/errors.js';
++import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
++import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
+ import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
+ 
+ // Include standard riusato da list/getById: evento con tutte le sue
+@@ -218,4 +222,146 @@ export const eventiService = {
+     }
+     return opzioni;
+   },
++
++  /**
++   * Suggerisce quanti bus servono per ogni linea dell'evento, in base ai
++   * passeggeri confermati per fermata. Logica (concordata con l'utente):
++   * si percorrono le fermate in ordine; se i passeggeri di UNA fermata da
++   * soli riempiono (o superano) un bus, quella fermata ottiene bus dedicati
++   * partendo direttamente da lì; altrimenti i passeggeri di fermate vicine
++   * si accumulano sullo stesso bus finché non si supera la capienza.
++   * È un suggerimento, non un instradamento reale: l'orario di partenza
++   * di ogni bus resta da compilare a mano (richiederebbe tempi di
++   * percorrenza reali tra le città, non disponibili nel gestionale).
++   */
++  async calcolaBusNecessari(eventoId: string) {
++    const evento = await getById(eventoId);
++    const capienza = await leggiPostiPerBus();
++
++    const prenotazioniConfermate = await db
++      .select({ lineaId: prenotazioni.lineaId, fermataCitta: prenotazioni.fermataCitta, passeggeri: prenotazioni.passeggeri })
++      .from(prenotazioni)
++      .where(and(eq(prenotazioni.eventoId, eventoId), eq(prenotazioni.stato, 'CONFERMATA')));
++
++    return evento.linee.map((linea) => {
++      const fermateOrdinate = [...linea.fermate].sort((a, b) => a.ordine - b.ordine);
++
++      const fermateConPasseggeri = fermateOrdinate.map((f) => {
++        const passeggeri = prenotazioniConfermate
++          .filter((p) => p.lineaId === linea.id && p.fermataCitta === f.citta)
++          .reduce((somma, p) => somma + p.passeggeri, 0);
++        return { fermataId: f.id, citta: f.citta, passeggeri };
++      });
++
++      let busSuggeriti = 0;
++      let caricoBusCorrente = 0;
++      for (const f of fermateConPasseggeri) {
++        if (f.passeggeri >= capienza) {
++          // Questa fermata da sola riempie almeno un bus: se c'era un bus
++          // "in accumulo" da fermate precedenti, lo chiudo prima.
++          if (caricoBusCorrente > 0) { busSuggeriti += 1; caricoBusCorrente = 0; }
++          busSuggeriti += Math.floor(f.passeggeri / capienza);
++          const resto = f.passeggeri % capienza;
++          caricoBusCorrente = resto; // il resto prova ad accumularsi con le prossime fermate
++        } else if (caricoBusCorrente + f.passeggeri <= capienza) {
++          caricoBusCorrente += f.passeggeri;
++        } else {
++          busSuggeriti += 1; // il bus in accumulo è pieno, ne apro uno nuovo
++          caricoBusCorrente = f.passeggeri;
++        }
++      }
++      if (caricoBusCorrente > 0) busSuggeriti += 1;
++
++      const totalePasseggeri = fermateConPasseggeri.reduce((s, f) => s + f.passeggeri, 0);
++
++      return {
++        lineaId: linea.id,
++        nome: linea.nome,
++        postiTotali: linea.postiTotali,
++        capienzaPerBus: capienza,
++        fermate: fermateConPasseggeri,
++        totalePasseggeri,
++        busSuggeriti,
++        coperta: linea.coperta,
++      };
++    });
++  },
++
++  /** Segna una linea/tratta come coperta (o no) — sezione Partenze. Non
++   *  tocca fermate né altro, per non rischiare di sovrascrivere dati con
++   *  l'update "wholesale" dell'evento. */
++  async impostaCopertura(eventoId: string, lineaId: string, coperta: boolean, noteCoperta?: string) {
++    const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, lineaId)).limit(1);
++    if (!linea || linea.eventoId !== eventoId) throw new NonTrovato('Linea');
++    await db.update(lineeBus).set({ coperta, ...(noteCoperta !== undefined && { noteCoperta }) }).where(eq(lineeBus.id, lineaId));
++  },
++
++  /** Bus fisici collegati a una qualunque linea dell'evento, con le tratte
++   *  (linee) che ciascuno copre. */
++  async listaBus(eventoId: string) {
++    const evento = await getById(eventoId);
++    const lineeIds = evento.linee.map((l) => l.id);
++    if (lineeIds.length === 0) return [];
++
++    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.lineaId, lineeIds));
++    const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
++    if (busIds.length === 0) return [];
++
++    const bus = await db.select().from(busFisici).where(inArray(busFisici.id, busIds));
++    return bus.map((b) => ({
++      ...b,
++      lineeIds: assegnazioni.filter((a) => a.busId === b.id).map((a) => a.lineaId),
++    }));
++  },
++
++  async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; note?: string; lineeIds: string[] }) {
++    const evento = await getById(eventoId);
++    const lineeValide = new Set(evento.linee.map((l) => l.id));
++    const lineeIdsFiltrate = input.lineeIds.filter((id) => lineeValide.has(id));
++    if (lineeIdsFiltrate.length === 0) throw new ConflittoDati('Seleziona almeno una tratta di questo evento per il bus.');
++
++    return db.transaction(async (tx) => {
++      const [nuovo] = await tx.insert(busFisici).values({
++        fornitoreId: input.fornitoreId,
++        riferimento: input.riferimento,
++        autistaNome: input.autistaNome,
++        autistaTelefono: input.autistaTelefono,
++        note: input.note,
++      }).returning();
++      await tx.insert(busTratte).values(lineeIdsFiltrate.map((lineaId) => ({ busId: nuovo.id, lineaId })));
++      return nuovo.id;
++    });
++  },
++
++  async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; note?: string; lineeIds?: string[] }) {
++    const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
++    if (!bus) throw new NonTrovato('Bus');
++
++    return db.transaction(async (tx) => {
++      if (input.riferimento !== undefined || input.fornitoreId !== undefined || input.autistaNome !== undefined || input.autistaTelefono !== undefined || input.note !== undefined) {
++        await tx.update(busFisici).set({
++          ...(input.riferimento !== undefined && { riferimento: input.riferimento }),
++          ...(input.fornitoreId !== undefined && { fornitoreId: input.fornitoreId }),
++          ...(input.autistaNome !== undefined && { autistaNome: input.autistaNome }),
++          ...(input.autistaTelefono !== undefined && { autistaTelefono: input.autistaTelefono }),
++          ...(input.note !== undefined && { note: input.note }),
++        }).where(eq(busFisici.id, busId));
++      }
++      if (input.lineeIds !== undefined) {
++        const evento = await getById(eventoId);
++        const lineeValide = new Set(evento.linee.map((l) => l.id));
++        const lineeIdsFiltrate = input.lineeIds.filter((id) => lineeValide.has(id));
++        await tx.delete(busTratte).where(eq(busTratte.busId, busId));
++        if (lineeIdsFiltrate.length > 0) {
++          await tx.insert(busTratte).values(lineeIdsFiltrate.map((lineaId) => ({ busId, lineaId })));
++        }
++      }
++    });
++  },
++
++  async rimuoviBus(busId: string) {
++    const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
++    if (!bus) throw new NonTrovato('Bus');
++    await db.delete(busFisici).where(eq(busFisici.id, busId)); // cascade su bus_tratte
++  },
+ };
+diff --git a/packages/backend/src/modules/impostazioni/impostazioni.routes.ts b/packages/backend/src/modules/impostazioni/impostazioni.routes.ts
+new file mode 100644
+index 0000000..c081163
+--- /dev/null
++++ b/packages/backend/src/modules/impostazioni/impostazioni.routes.ts
+@@ -0,0 +1,38 @@
++import { Router, type Request, type Response } from 'express';
++import { eq } from 'drizzle-orm';
++import { z } from 'zod';
++import { db } from '../../db/client.js';
++import { impostazioni } from '../../db/schema.js';
++import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
++import { valida } from '../../shared/validate.js';
++import { asyncHandler } from '../../shared/http.js';
++
++/** Chiave usata per la capienza di default di un bus, in "Calcola bus
++ *  necessari" nella sezione Partenze. Modificabile dal gestionale. */
++export const CHIAVE_POSTI_PER_BUS = 'posti_per_bus';
++const DEFAULT_POSTI_PER_BUS = 50;
++
++export async function leggiPostiPerBus(): Promise<number> {
++  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_POSTI_PER_BUS)).limit(1);
++  const valore = riga ? Number(riga.valore) : NaN;
++  return Number.isFinite(valore) && valore > 0 ? valore : DEFAULT_POSTI_PER_BUS;
++}
++
++export const impostazioniRouter = Router();
++impostazioniRouter.use(richiedeAuth);
++
++impostazioniRouter.get('/', richiedePermesso('impostazioni.gestisci'), asyncHandler(async (_req: Request, res: Response) => {
++  const tutte = await db.select().from(impostazioni);
++  res.json(tutte);
++}));
++
++impostazioniRouter.put(
++  '/:chiave',
++  richiedePermesso('impostazioni.gestisci'),
++  valida(z.object({ valore: z.string().min(1) })),
++  asyncHandler(async (req: Request, res: Response) => {
++    await db.insert(impostazioni).values({ chiave: req.params.chiave, valore: req.body.valore })
++      .onConflictDoUpdate({ target: impostazioni.chiave, set: { valore: req.body.valore } });
++    res.json({ ok: true });
++  })
++);
+diff --git a/packages/backend/src/shared/permessi-registro.ts b/packages/backend/src/shared/permessi-registro.ts
+index 7dbf865..b4aff5f 100644
+--- a/packages/backend/src/shared/permessi-registro.ts
++++ b/packages/backend/src/shared/permessi-registro.ts
+@@ -25,6 +25,7 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
+   { chiave: 'eventi.vetrina', etichetta: 'Gestire la Vetrina (eventi in evidenza)', modulo: 'Eventi' }, // solo UI
+   { chiave: 'eventi.calendario', etichetta: 'Visualizzare il Calendario eventi', modulo: 'Eventi' }, // solo UI
+   { chiave: 'eventi.cestino', etichetta: 'Accedere al Cestino eventi eliminati', modulo: 'Eventi' }, // solo UI
++  { chiave: 'eventi.partenze', etichetta: 'Gestire la sezione Partenze (bus e copertura tratte)', modulo: 'Eventi' },
+ 
+   // Prenotazioni
+   { chiave: 'prenotazioni.visualizza', etichetta: 'Visualizzare prenotazioni', modulo: 'Prenotazioni' },
+@@ -72,4 +73,5 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
+   { chiave: 'utenze.crea', etichetta: 'Creare nuove utenze del gestionale', modulo: 'Amministrazione' },
+   { chiave: 'utenze.gestisci', etichetta: 'Modificare/disattivare/eliminare utenze esistenti', modulo: 'Amministrazione' },
+   { chiave: 'permessi.gestisci', etichetta: 'Definire ruoli e le relative autorizzazioni', modulo: 'Amministrazione' },
++  { chiave: 'impostazioni.gestisci', etichetta: 'Modificare le impostazioni generali (es. posti per bus)', modulo: 'Amministrazione' },
+ ];
+diff --git a/packages/frontend/src/admin/AdminApp.tsx b/packages/frontend/src/admin/AdminApp.tsx
+index 26c98ec..772d45f 100644
+--- a/packages/frontend/src/admin/AdminApp.tsx
++++ b/packages/frontend/src/admin/AdminApp.tsx
+@@ -19,6 +19,8 @@ import { ChatScreen } from './screens/ChatScreen';
+ import { ContenutiScreen } from './screens/ContenutiScreen';
+ import { AmministratoriScreen } from './screens/AmministratoriScreen';
+ import { RuoliScreen } from './screens/RuoliScreen';
++import { PartenzeScreen } from './screens/PartenzeScreen';
++import { ImpostazioniScreen } from './screens/ImpostazioniScreen';
+ import { authApi, haPermesso, type SessioneAdmin } from '../api/auth';
+ 
+ function StatisticheSenzaHeader() {
+@@ -43,6 +45,8 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
+   contenuti: ContenutiScreen,
+   amministratori: AmministratoriScreen,
+   ruoli: RuoliScreen,
++  partenze: PartenzeScreen,
++  impostazioni: ImpostazioniScreen,
+ };
+ 
+ // Permesso richiesto per ogni sezione, usato per bloccare l'accesso
+@@ -66,6 +70,8 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
+   contenuti: 'pagine.gestisci',
+   amministratori: 'utenze.gestisci',
+   ruoli: 'permessi.gestisci',
++  partenze: 'eventi.partenze',
++  impostazioni: 'impostazioni.gestisci',
+ };
+ 
+ export function AdminApp() {
+diff --git a/packages/frontend/src/admin/screens/AmministratoriScreen.tsx b/packages/frontend/src/admin/screens/AmministratoriScreen.tsx
+index e423e4d..abd6149 100644
+--- a/packages/frontend/src/admin/screens/AmministratoriScreen.tsx
++++ b/packages/frontend/src/admin/screens/AmministratoriScreen.tsx
+@@ -1,6 +1,6 @@
+ import { useEffect, useState } from 'react';
+-import { amministratoriApi, type Amministratore, type AmministratoreInput, type LogRiga } from '../../api/amministratori';
+-import { ruoliApi, type Ruolo } from '../../api/ruoli';
++import { amministratoriApi, type Amministratore, type AmministratoreInput, type LogRiga, type EccezionePermesso } from '../../api/amministratori';
++import { ruoliApi, type Ruolo, type Permesso } from '../../api/ruoli';
+ import { ErroreApi } from '../../api/client';
+ import { PanelHead } from '../shared/PanelHead';
+ import { TabellaGenerica } from '../shared/TabellaGenerica';
+@@ -8,16 +8,22 @@ import { Modale } from '../shared/Modale';
+ 
+ const VUOTO: AmministratoreInput = { nome: '', email: '', password: '', ruoloId: '' };
+ 
++type StatoPermesso = 'ruolo' | 'extra' | 'negato' | 'nessuno';
++
+ export function AmministratoriScreen() {
+   const [admin, setAdmin] = useState<Amministratore[]>([]);
+   const [log, setLog] = useState<LogRiga[]>([]);
+-  // Ruoli assegnabili: già filtrati dal server in base a ciò che l'utente
+-  // loggato possiede lui stesso ("puoi dare solo ciò che hai").
+   const [ruoliAssegnabili, setRuoliAssegnabili] = useState<Ruolo[]>([]);
++  const [permessiAssegnabili, setPermessiAssegnabili] = useState<Permesso[]>([]);
+   const [inModifica, setInModifica] = useState<Amministratore | null>(null);
+   const [form, setForm] = useState<AmministratoreInput>(VUOTO);
+   const [modaleAperta, setModaleAperta] = useState(false);
+ 
++  const [permessiUtenza, setPermessiUtenza] = useState<Amministratore | null>(null);
++  const [permessiRuolo, setPermessiRuolo] = useState<string[]>([]);
++  const [ruoloOwnerTarget, setRuoloOwnerTarget] = useState(false);
++  const [statoPermessi, setStatoPermessi] = useState<Record<string, StatoPermesso>>({});
++
+   function ricarica() {
+     amministratoriApi.list().then(setAdmin);
+     amministratoriApi.log().then(setLog);
+@@ -25,6 +31,7 @@ export function AmministratoriScreen() {
+       setRuoliAssegnabili(lista);
+       setForm((f) => (f.ruoloId ? f : { ...f, ruoloId: lista[0]?.id ?? '' }));
+     });
++    ruoliApi.permessiAssegnabili().then(setPermessiAssegnabili);
+   }
+   useEffect(ricarica, []);
+ 
+@@ -56,6 +63,64 @@ export function AmministratoriScreen() {
+     }
+   }
+ 
++  async function apriPermessi(a: Amministratore) {
++    try {
++      const dati = await amministratoriApi.permessi(a.id);
++      if (dati.ruoloOwner) {
++        alert('Questa utenza ha il ruolo proprietario: ha già tutti i permessi, non servono eccezioni personali.');
++        return;
++      }
++      setPermessiUtenza(a);
++      setRuoloOwnerTarget(dati.ruoloOwner);
++      setPermessiRuolo(dati.permessiRuolo);
++      const stato: Record<string, StatoPermesso> = {};
++      for (const p of permessiAssegnabili) {
++        const daRuolo = dati.permessiRuolo.includes(p.chiave);
++        const eccezione = dati.eccezioni.find((e) => e.chiave === p.chiave);
++        if (eccezione) stato[p.chiave] = eccezione.concesso ? 'extra' : 'negato';
++        else stato[p.chiave] = daRuolo ? 'ruolo' : 'nessuno';
++      }
++      setStatoPermessi(stato);
++    } catch (e) {
++      alert(e instanceof ErroreApi ? `Impossibile aprire i permessi: ${e.message}` : 'Impossibile aprire i permessi: errore di rete.');
++    }
++  }
++
++  function ciclaStato(chiave: string) {
++    const daRuolo = permessiRuolo.includes(chiave);
++    setStatoPermessi((s) => {
++      const attuale = s[chiave];
++      let prossimo: StatoPermesso;
++      if (daRuolo) prossimo = attuale === 'ruolo' ? 'negato' : 'ruolo';
++      else prossimo = attuale === 'nessuno' ? 'extra' : 'nessuno';
++      return { ...s, [chiave]: prossimo };
++    });
++  }
++
++  async function salvaPermessi() {
++    if (!permessiUtenza) return;
++    const eccezioni: EccezionePermesso[] = [];
++    for (const [chiave, stato] of Object.entries(statoPermessi)) {
++      if (stato === 'extra') eccezioni.push({ chiave, concesso: true });
++      if (stato === 'negato') eccezioni.push({ chiave, concesso: false });
++    }
++    try {
++      await amministratoriApi.salvaPermessi(permessiUtenza.id, eccezioni);
++      setPermessiUtenza(null);
++    } catch (e) {
++      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
++    }
++  }
++
++  const moduli = Array.from(new Set(permessiAssegnabili.map((p) => p.modulo)));
++
++  const ETICHETTA_STATO: Record<StatoPermesso, string> = {
++    ruolo: '✓ dal ruolo',
++    extra: '+ concesso in più',
++    negato: '✕ tolto',
++    nessuno: '— non attivo',
++  };
++
+   return (
+     <div>
+       <PanelHead titolo="Amministratori" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo amministratore</button>} />
+@@ -66,6 +131,7 @@ export function AmministratoriScreen() {
+           { etichetta: 'Email', render: (a) => a.email },
+           { etichetta: 'Ruolo', render: (a) => nomeRuolo(a.ruoloId) },
+           { etichetta: 'Stato', render: (a) => a.attivo ? 'Attivo' : 'Disattivo' },
++          { etichetta: 'Permessi extra', render: (a) => <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11.5 }} onClick={() => apriPermessi(a)}>Personalizza</button> },
+         ]}
+         onModifica={apriModifica}
+         onElimina={elimina}
+@@ -102,6 +168,41 @@ export function AmministratoriScreen() {
+           <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva amministratore</button>
+         </Modale>
+       )}
++
++      {permessiUtenza && !ruoloOwnerTarget && (
++        <Modale titolo={`Permessi personali di ${permessiUtenza.nome}`} onClose={() => setPermessiUtenza(null)}>
++          <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 12 }}>
++            Di base questa utenza ha i permessi del ruolo "{nomeRuolo(permessiUtenza.ruoloId)}". Clicca un permesso per
++            aggiungerlo o toglierlo solo per questa persona, indipendentemente dal ruolo. Puoi togliere qualsiasi
++            permesso, ma puoi concederne in più solo tra quelli che possiedi tu stesso.
++          </p>
++          {moduli.map((modulo) => (
++            <div key={modulo} style={{ marginBottom: 14 }}>
++              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.4, opacity: 0.6, marginBottom: 6 }}>{modulo}</div>
++              {permessiAssegnabili.filter((p) => p.modulo === modulo).map((p) => {
++                const stato = statoPermessi[p.chiave] ?? 'nessuno';
++                return (
++                  <button
++                    key={p.chiave}
++                    type="button"
++                    onClick={() => ciclaStato(p.chiave)}
++                    style={{
++                      display: 'flex', justifyContent: 'space-between', width: '100%',
++                      padding: '6px 8px', fontSize: 13.5, background: 'transparent',
++                      border: 'none', borderBottom: '1px solid var(--line)', cursor: 'pointer',
++                      color: stato === 'negato' ? 'var(--pink)' : stato === 'extra' ? '#6fd6a0' : 'inherit',
++                    }}
++                  >
++                    <span>{p.etichetta}</span>
++                    <span style={{ opacity: 0.8, fontSize: 12 }}>{ETICHETTA_STATO[stato]}</span>
++                  </button>
++                );
++              })}
++            </div>
++          ))}
++          <button className="btn btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={salvaPermessi}>Salva permessi personali</button>
++        </Modale>
++      )}
+     </div>
+   );
+ }
+diff --git a/packages/frontend/src/admin/screens/EventiScreen.tsx b/packages/frontend/src/admin/screens/EventiScreen.tsx
+index 4fb7430..f0a8a17 100644
+--- a/packages/frontend/src/admin/screens/EventiScreen.tsx
++++ b/packages/frontend/src/admin/screens/EventiScreen.tsx
+@@ -1,5 +1,6 @@
+ import { useEffect, useState } from 'react';
+ import { eventiApi, type EventoInput, type LineaInput, type FermataInput } from '../../api/eventi';
++import { tragittiApi, type Tragitto } from '../../api/tragitti';
+ import { ErroreApi } from '../../api/client';
+ import type { Evento } from '../../api/types';
+ import { PanelHead } from '../shared/PanelHead';
+@@ -10,11 +11,15 @@ const VUOTO: EventoInput = { artista: '', genere: '', luogo: '', citta: '', data
+ 
+ export function EventiScreen() {
+   const [eventi, setEventi] = useState<Evento[]>([]);
++  const [tragitti, setTragitti] = useState<Tragitto[]>([]);
+   const [inModifica, setInModifica] = useState<Evento | null>(null);
+   const [form, setForm] = useState<EventoInput>(VUOTO);
+   const [modaleAperta, setModaleAperta] = useState(false);
+ 
+-  function ricarica() { eventiApi.list().then(setEventi); }
++  function ricarica() {
++    eventiApi.list().then(setEventi);
++    tragittiApi.list().then(setTragitti);
++  }
+   useEffect(ricarica, []);
+ 
+   function apriNuovo() { setInModifica(null); setForm(VUOTO); setModaleAperta(true); }
+@@ -48,6 +53,32 @@ export function EventiScreen() {
+     linee[idxLinea] = { ...linee[idxLinea], fermate };
+     setForm({ ...form, linee });
+   }
++  function rimuoviFermata(idxLinea: number, idxFermata: number) {
++    const linee = [...(form.linee ?? [])];
++    const fermate = linee[idxLinea].fermate.filter((_, i) => i !== idxFermata);
++    // Una linea deve avere sempre almeno una riga fermata nel form, anche
++    // vuota, altrimenti non c'è modo di aggiungerne una nuova da capo.
++    linee[idxLinea] = { ...linee[idxLinea], fermate: fermate.length ? fermate : [{ citta: '', indirizzo: '' }] };
++    setForm({ ...form, linee });
++  }
++  function rimuoviLinea(idxLinea: number) {
++    const linee = (form.linee ?? []).filter((_, i) => i !== idxLinea);
++    setForm({ ...form, linee });
++  }
++  function applicaTragitto(idxLinea: number, tragittoId: string) {
++    if (!tragittoId) return;
++    const tragitto = tragitti.find((t) => t.id === tragittoId);
++    if (!tragitto) return;
++    const linee = [...(form.linee ?? [])];
++    // Copio le fermate del tragitto in questa linea: da qui in poi sono
++    // fermate della linea, modificabili liberamente senza toccare il
++    // tragitto originale (che resta un modello riutilizzabile).
++    linee[idxLinea] = {
++      ...linee[idxLinea],
++      fermate: tragitto.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario, prezzo: f.prezzo })),
++    };
++    setForm({ ...form, linee });
++  }
+ 
+   async function salva() {
+     if (!form.artista || !form.genere || !form.luogo || !form.citta || !form.data || !form.prezzo) {
+@@ -114,15 +145,31 @@ export function EventiScreen() {
+           <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, margin: '18px 0 10px' }}>Bus</p>
+           {(form.linee ?? []).map((linea, idxLinea) => (
+             <div key={idxLinea} style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 10, padding: 12, marginBottom: 10 }}>
+-              <div style={{ display: 'grid', gridTemplateColumns: '1fr .6fr', gap: 8, marginBottom: 8 }}>
+-                <input placeholder="Nome bus" value={linea.nome} onChange={(e) => aggiornaLinea(idxLinea, 'nome', e.target.value)} />
+-                <input placeholder="Posti totali" type="number" value={linea.postiTotali} onChange={(e) => aggiornaLinea(idxLinea, 'postiTotali', Number(e.target.value))} />
++              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
++                <div style={{ display: 'grid', gridTemplateColumns: '1fr .6fr', gap: 8, flex: 1 }}>
++                  <input placeholder="Nome bus" value={linea.nome} onChange={(e) => aggiornaLinea(idxLinea, 'nome', e.target.value)} />
++                  <input placeholder="Posti totali" type="number" value={linea.postiTotali} onChange={(e) => aggiornaLinea(idxLinea, 'postiTotali', Number(e.target.value))} />
++                </div>
++                <button type="button" className="btn btn-ghost" style={{ marginLeft: 8, color: 'var(--pink)', fontSize: 11 }} onClick={() => rimuoviLinea(idxLinea)}>Rimuovi bus</button>
+               </div>
++
++              {tragitti.length > 0 && (
++                <select
++                  defaultValue=""
++                  style={{ marginBottom: 8 }}
++                  onChange={(e) => { applicaTragitto(idxLinea, e.target.value); e.target.value = ''; }}
++                >
++                  <option value="" disabled>Applica un tragitto salvato...</option>
++                  {tragitti.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
++                </select>
++              )}
++
+               {linea.fermate.map((f, idxFermata) => (
+-                <div key={idxFermata} style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr .6fr', gap: 6, marginBottom: 6 }}>
++                <div key={idxFermata} style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr .6fr auto', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                   <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'citta', e.target.value)} />
+                   <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'indirizzo', e.target.value)} />
+                   <input placeholder="Orario" type="time" value={f.orario ?? ''} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'orario', e.target.value)} />
++                  <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxLinea, idxFermata)} title="Rimuovi fermata">✕</button>
+                 </div>
+               ))}
+               <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={() => aggiungiFermata(idxLinea)}>+ Aggiungi fermata</button>
+diff --git a/packages/frontend/src/admin/screens/ImpostazioniScreen.tsx b/packages/frontend/src/admin/screens/ImpostazioniScreen.tsx
+new file mode 100644
+index 0000000..8f2b74d
+--- /dev/null
++++ b/packages/frontend/src/admin/screens/ImpostazioniScreen.tsx
+@@ -0,0 +1,57 @@
++import { useEffect, useState } from 'react';
++import { impostazioniApi } from '../../api/impostazioni';
++import { ErroreApi } from '../../api/client';
++import { PanelHead } from '../shared/PanelHead';
++
++const CHIAVE_POSTI_PER_BUS = 'posti_per_bus';
++
++export function ImpostazioniScreen() {
++  const [postiPerBus, setPostiPerBus] = useState('50');
++  const [caricamento, setCaricamento] = useState(true);
++  const [salvataggio, setSalvataggio] = useState(false);
++
++  useEffect(() => {
++    impostazioniApi.list()
++      .then((lista) => {
++        const riga = lista.find((i) => i.chiave === CHIAVE_POSTI_PER_BUS);
++        if (riga) setPostiPerBus(riga.valore);
++      })
++      .finally(() => setCaricamento(false));
++  }, []);
++
++  async function salva() {
++    const numero = Number(postiPerBus);
++    if (!Number.isFinite(numero) || numero <= 0) {
++      alert('Inserisci un numero di posti valido.');
++      return;
++    }
++    setSalvataggio(true);
++    try {
++      await impostazioniApi.set(CHIAVE_POSTI_PER_BUS, String(numero));
++      alert('Impostazione salvata.');
++    } catch (e) {
++      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
++    } finally {
++      setSalvataggio(false);
++    }
++  }
++
++  return (
++    <div>
++      <PanelHead titolo="Impostazioni" />
++      {caricamento ? (
++        <p style={{ color: 'var(--mist)' }}>Caricamento...</p>
++      ) : (
++        <div style={{ maxWidth: 420 }}>
++          <div className="campo">
++            <label>Posti per bus (usato per "Calcola bus necessari" nella sezione Partenze)</label>
++            <input type="number" min={1} value={postiPerBus} onChange={(e) => setPostiPerBus(e.target.value)} />
++          </div>
++          <button className="btn btn-primary" onClick={salva} disabled={salvataggio}>
++            {salvataggio ? 'Salvataggio...' : 'Salva'}
++          </button>
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/packages/frontend/src/admin/screens/PartenzeScreen.tsx b/packages/frontend/src/admin/screens/PartenzeScreen.tsx
+new file mode 100644
+index 0000000..22de834
+--- /dev/null
++++ b/packages/frontend/src/admin/screens/PartenzeScreen.tsx
+@@ -0,0 +1,183 @@
++import { useEffect, useState } from 'react';
++import { eventiApi, type CalcoloBusLinea, type BusFisico, type BusFisicoInput } from '../../api/eventi';
++import { fornitoriApi, type Fornitore } from '../../api/fornitori';
++import { ErroreApi } from '../../api/client';
++import type { Evento } from '../../api/types';
++import { PanelHead } from '../shared/PanelHead';
++import { Modale } from '../shared/Modale';
++
++const BUS_VUOTO: BusFisicoInput = { riferimento: '', lineeIds: [] };
++
++export function PartenzeScreen() {
++  const [eventi, setEventi] = useState<Evento[]>([]);
++  const [eventoId, setEventoId] = useState('');
++  const [calcolo, setCalcolo] = useState<CalcoloBusLinea[]>([]);
++  const [busLista, setBusLista] = useState<BusFisico[]>([]);
++  const [fornitori, setFornitori] = useState<Fornitore[]>([]);
++  const [caricamento, setCaricamento] = useState(false);
++
++  const [inModifica, setInModifica] = useState<BusFisico | null>(null);
++  const [form, setForm] = useState<BusFisicoInput>(BUS_VUOTO);
++  const [modaleAperta, setModaleAperta] = useState(false);
++
++  useEffect(() => {
++    eventiApi.list().then((lista) => {
++      setEventi(lista);
++      if (lista.length && !eventoId) setEventoId(lista[0].id);
++    });
++    fornitoriApi.list().then(setFornitori).catch(() => setFornitori([]));
++  }, []);
++
++  function ricaricaEvento(id: string) {
++    if (!id) return;
++    setCaricamento(true);
++    Promise.all([eventiApi.calcolaBus(id), eventiApi.listaBus(id)])
++      .then(([c, b]) => { setCalcolo(c); setBusLista(b); })
++      .catch((e) => alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete nel caricare la sezione Partenze.'))
++      .finally(() => setCaricamento(false));
++  }
++  useEffect(() => { ricaricaEvento(eventoId); }, [eventoId]);
++
++  async function toggleCopertura(linea: CalcoloBusLinea) {
++    try {
++      await eventiApi.impostaCopertura(eventoId, linea.lineaId, !linea.coperta);
++      ricaricaEvento(eventoId);
++    } catch (e) {
++      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
++    }
++  }
++
++  function apriNuovoBus() { setInModifica(null); setForm(BUS_VUOTO); setModaleAperta(true); }
++  function apriModificaBus(b: BusFisico) { setInModifica(b); setForm({ fornitoreId: b.fornitoreId ?? undefined, riferimento: b.riferimento, autistaNome: b.autistaNome ?? undefined, autistaTelefono: b.autistaTelefono ?? undefined, note: b.note ?? undefined, lineeIds: b.lineeIds }); setModaleAperta(true); }
++
++  function toggleLineaForm(lineaId: string) {
++    setForm((f) => ({
++      ...f,
++      lineeIds: f.lineeIds.includes(lineaId) ? f.lineeIds.filter((id) => id !== lineaId) : [...f.lineeIds, lineaId],
++    }));
++  }
++
++  async function salvaBus() {
++    if (!form.riferimento || form.lineeIds.length === 0) {
++      alert('Indica un riferimento per il bus e seleziona almeno una tratta che copre.');
++      return;
++    }
++    try {
++      if (inModifica) await eventiApi.aggiornaBus(eventoId, inModifica.id, form);
++      else await eventiApi.creaBus(eventoId, form);
++      setModaleAperta(false);
++      ricaricaEvento(eventoId);
++    } catch (e) {
++      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
++    }
++  }
++  async function rimuoviBus(b: BusFisico) {
++    if (!confirm(`Rimuovere il bus "${b.riferimento}" dal censimento?`)) return;
++    try {
++      await eventiApi.rimuoviBus(eventoId, b.id);
++      ricaricaEvento(eventoId);
++    } catch (e) {
++      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
++    }
++  }
++
++  return (
++    <div>
++      <PanelHead titolo="Partenze" />
++
++      <div className="campo" style={{ maxWidth: 420, marginBottom: 20 }}>
++        <label>Evento</label>
++        <select value={eventoId} onChange={(e) => setEventoId(e.target.value)}>
++          {eventi.map((ev) => (
++            <option key={ev.id} value={ev.id}>{ev.artista} — {new Date(ev.data).toLocaleDateString('it-IT')}</option>
++          ))}
++        </select>
++      </div>
++
++      {caricamento && <p style={{ color: 'var(--mist)' }}>Caricamento...</p>}
++
++      {!caricamento && calcolo.length === 0 && (
++        <p style={{ color: 'var(--mist)' }}>Questo evento non ha ancora nessuna tratta/bus configurato (vai in Eventi per aggiungerne uno).</p>
++      )}
++
++      {!caricamento && calcolo.map((linea) => (
++        <div key={linea.lineaId} style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
++          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
++            <div>
++              <h3 style={{ fontSize: 15, margin: 0 }}>{linea.nome}</h3>
++              <p style={{ color: 'var(--mist)', fontSize: 12.5, margin: '4px 0 0' }}>
++                {linea.totalePasseggeri} passeggeri confermati · capienza {linea.capienzaPerBus}/bus
++              </p>
++            </div>
++            <button
++              className="btn"
++              style={{ fontSize: 12, padding: '6px 12px', background: linea.coperta ? '#6fd6a0' : 'transparent', color: linea.coperta ? '#0a0a0a' : 'var(--pink)', border: linea.coperta ? 'none' : '1px solid var(--pink)' }}
++              onClick={() => toggleCopertura(linea)}
++            >
++              {linea.coperta ? '✓ Tratta coperta' : 'Segna come coperta'}
++            </button>
++          </div>
++
++          <div style={{ fontSize: 13, marginBottom: 8 }}>
++            <strong>Bus suggeriti: {linea.busSuggeriti}</strong>
++            <span style={{ color: 'var(--mist)' }}> (stima in base ai passeggeri per fermata — l'orario di ogni bus va comunque compilato a mano)</span>
++          </div>
++
++          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
++            {linea.fermate.map((f) => (
++              <span key={f.fermataId} style={{ fontSize: 12, background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 8px' }}>
++                {f.citta}: {f.passeggeri}
++              </span>
++            ))}
++          </div>
++
++          <div style={{ borderTop: '1px solid var(--line)', paddingTop: 10 }}>
++            <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 6 }}>Bus registrati su questa tratta</p>
++            {busLista.filter((b) => b.lineeIds.includes(linea.lineaId)).map((b) => (
++              <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
++                <span>{b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}</span>
++                <span>
++                  <button className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => apriModificaBus(b)}>Modifica</button>
++                  <button className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px', color: 'var(--pink)' }} onClick={() => rimuoviBus(b)}>Rimuovi</button>
++                </span>
++              </div>
++            ))}
++            {busLista.filter((b) => b.lineeIds.includes(linea.lineaId)).length === 0 && (
++              <p style={{ fontSize: 12.5, color: 'var(--mist)' }}>Nessun bus ancora censito per questa tratta.</p>
++            )}
++          </div>
++        </div>
++      ))}
++
++      {calcolo.length > 0 && (
++        <button className="btn btn-primary" onClick={apriNuovoBus} style={{ marginTop: 4 }}>+ Censisci bus</button>
++      )}
++
++      {modaleAperta && (
++        <Modale titolo={inModifica ? 'Modifica bus' : 'Censisci nuovo bus'} onClose={() => setModaleAperta(false)}>
++          <div className="campo"><label>Riferimento (es. targa, o codice dell'agenzia)</label><input value={form.riferimento} onChange={(e) => setForm({ ...form, riferimento: e.target.value })} /></div>
++          <div className="campo">
++            <label>Fornitore</label>
++            <select value={form.fornitoreId ?? ''} onChange={(e) => setForm({ ...form, fornitoreId: e.target.value || undefined })}>
++              <option value="">— Nessuno —</option>
++              {fornitori.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
++            </select>
++          </div>
++          <div className="campo"><label>Autista (facoltativo)</label><input value={form.autistaNome ?? ''} onChange={(e) => setForm({ ...form, autistaNome: e.target.value })} /></div>
++          <div className="campo"><label>Telefono autista (facoltativo)</label><input value={form.autistaTelefono ?? ''} onChange={(e) => setForm({ ...form, autistaTelefono: e.target.value })} /></div>
++          <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
++
++          <label style={{ display: 'block', margin: '14px 0 8px', fontWeight: 600 }}>Tratte coperte da questo bus</label>
++          {calcolo.map((linea) => (
++            <label key={linea.lineaId} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13.5 }}>
++              <input type="checkbox" checked={form.lineeIds.includes(linea.lineaId)} onChange={() => toggleLineaForm(linea.lineaId)} />
++              {linea.nome}
++            </label>
++          ))}
++
++          <button className="btn btn-primary" style={{ width: '100%', marginTop: 14 }} onClick={salvaBus}>Salva bus</button>
++        </Modale>
++      )}
++    </div>
++  );
++}
+diff --git a/packages/frontend/src/admin/shared/AdminLayout.tsx b/packages/frontend/src/admin/shared/AdminLayout.tsx
+index 58c08e2..6c37ef2 100644
+--- a/packages/frontend/src/admin/shared/AdminLayout.tsx
++++ b/packages/frontend/src/admin/shared/AdminLayout.tsx
+@@ -2,12 +2,12 @@ import { useState, type ReactNode } from 'react';
+ import { haPermesso, type SessioneAdmin } from '../../api/auth';
+ 
+ export type SezioneGestionale =
+-  | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino'
++  | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'partenze'
+   | 'transazioni' | 'pagamenti' | 'coupon'
+   | 'utenti' | 'promoter' | 'tourleader'
+   | 'fornitori' | 'tragitti'
+   | 'chat' | 'contenuti'
+-  | 'amministratori' | 'ruoli';
++  | 'amministratori' | 'ruoli' | 'impostazioni';
+ 
+ // Ogni voce dichiara il permesso che serve per vederla. Chi ha ruolo
+ // "owner" vede sempre tutto (haPermesso lo gestisce automaticamente).
+@@ -16,6 +16,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
+     { id: 'eventi', label: 'Eventi', permesso: 'eventi.visualizza' },
+     { id: 'vetrina', label: 'Vetrina', permesso: 'eventi.vetrina' },
+     { id: 'calendario', label: 'Calendario', permesso: 'eventi.calendario' },
++    { id: 'partenze', label: 'Partenze', permesso: 'eventi.partenze' },
+     { id: 'cestino', label: 'Cestino', permesso: 'eventi.cestino' },
+   ]},
+   { titolo: 'Vendite', voci: [
+@@ -39,6 +40,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
+   { titolo: 'Sistema', voci: [
+     { id: 'amministratori', label: 'Amministratori', permesso: 'utenze.gestisci' },
+     { id: 'ruoli', label: 'Ruoli', permesso: 'permessi.gestisci' },
++    { id: 'impostazioni', label: 'Impostazioni', permesso: 'impostazioni.gestisci' },
+     { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
+   ]},
+ ];
+diff --git a/packages/frontend/src/api/amministratori.ts b/packages/frontend/src/api/amministratori.ts
+index d690ff4..8b0ca0f 100644
+--- a/packages/frontend/src/api/amministratori.ts
++++ b/packages/frontend/src/api/amministratori.ts
+@@ -17,10 +17,20 @@ export interface LogRiga {
+   data: string;
+ }
+ 
++export interface EccezionePermesso { chiave: string; concesso: boolean; }
++export interface PermessiUtenza {
++  ruoloOwner: boolean;
++  permessiRuolo: string[]; // ['*'] se il ruolo è owner
++  eccezioni: EccezionePermesso[];
++  effettivi: string[]; // ['*'] se owner
++}
++
+ export const amministratoriApi = {
+   list: () => api.get<Amministratore[]>('/api/amministratori'),
+   create: (input: AmministratoreInput) => api.post<Amministratore>('/api/amministratori', input),
+   update: (id: string, input: Partial<AmministratoreInput>) => api.put<Amministratore>(`/api/amministratori/${id}`, input),
+   remove: (id: string) => api.delete<void>(`/api/amministratori/${id}`),
+   log: () => api.get<LogRiga[]>('/api/amministratori/log'),
++  permessi: (id: string) => api.get<PermessiUtenza>(`/api/amministratori/${id}/permessi`),
++  salvaPermessi: (id: string, eccezioni: EccezionePermesso[]) => api.put<{ ok: true }>(`/api/amministratori/${id}/permessi`, { eccezioni }),
+ };
+diff --git a/packages/frontend/src/api/eventi.ts b/packages/frontend/src/api/eventi.ts
+index e758b90..755fbc3 100644
+--- a/packages/frontend/src/api/eventi.ts
++++ b/packages/frontend/src/api/eventi.ts
+@@ -12,6 +12,30 @@ export interface EventoInput {
+   inEvidenza?: boolean; ordineEvidenza?: number; immagini?: string[]; allegati?: { nome: string; url: string }[]; linee?: LineaInput[];
+ }
+ 
++export interface FermataConPasseggeri { fermataId: string; citta: string; passeggeri: number; }
++export interface CalcoloBusLinea {
++  lineaId: string;
++  nome: string;
++  postiTotali: number;
++  capienzaPerBus: number;
++  fermate: FermataConPasseggeri[];
++  totalePasseggeri: number;
++  busSuggeriti: number;
++  coperta: boolean;
++}
++export interface BusFisico {
++  id: string;
++  fornitoreId: string | null;
++  riferimento: string;
++  autistaNome: string | null;
++  autistaTelefono: string | null;
++  note: string | null;
++  lineeIds: string[];
++}
++export interface BusFisicoInput {
++  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; note?: string; lineeIds: string[];
++}
++
+ export const eventiApi = {
+   list: (filtri?: { citta?: string; genere?: string }) => {
+     const query = new URLSearchParams(filtri as Record<string, string>).toString();
+@@ -22,4 +46,12 @@ export const eventiApi = {
+   create: (input: EventoInput) => api.post<Evento>('/api/eventi', input),
+   update: (id: string, input: Partial<EventoInput>) => api.put<Evento>(`/api/eventi/${id}`, input),
+   remove: (id: string) => api.delete<void>(`/api/eventi/${id}`),
++
++  calcolaBus: (id: string) => api.get<CalcoloBusLinea[]>(`/api/eventi/${id}/calcola-bus`),
++  impostaCopertura: (id: string, lineaId: string, coperta: boolean, noteCoperta?: string) =>
++    api.put<{ ok: true }>(`/api/eventi/${id}/linee/${lineaId}/copertura`, { coperta, noteCoperta }),
++  listaBus: (id: string) => api.get<BusFisico[]>(`/api/eventi/${id}/bus`),
++  creaBus: (id: string, input: BusFisicoInput) => api.post<{ id: string }>(`/api/eventi/${id}/bus`, input),
++  aggiornaBus: (id: string, busId: string, input: Partial<BusFisicoInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/bus/${busId}`, input),
++  rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
+ };
+diff --git a/packages/frontend/src/api/impostazioni.ts b/packages/frontend/src/api/impostazioni.ts
+new file mode 100644
+index 0000000..1ec4bc0
+--- /dev/null
++++ b/packages/frontend/src/api/impostazioni.ts
+@@ -0,0 +1,8 @@
++import { api } from './client';
++
++export interface Impostazione { chiave: string; valore: string; }
++
++export const impostazioniApi = {
++  list: () => api.get<Impostazione[]>('/api/impostazioni'),
++  set: (chiave: string, valore: string) => api.put<{ ok: true }>(`/api/impostazioni/${chiave}`, { valore }),
++};
+-- 
+2.43.0
+

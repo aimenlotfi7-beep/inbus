@@ -448,7 +448,7 @@ export function SchedaEventoModale({
 
   if (evento) {
     return (
-      <PaginaSezione titolo="Modifica evento" onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)}>
+      <PaginaSezione titolo={`Modifica evento — ${evento.artista}`} onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)}>
         <div className="mini-tabs">
           <button type="button" className={`mini-tab${tabAttiva === 'dettagli' ? ' active' : ''}`} onClick={() => setTabAttiva('dettagli')}>Dettagli</button>
           <button type="button" className={`mini-tab${tabAttiva === 'partenze' ? ' active' : ''}`} onClick={() => setTabAttiva('partenze')}>Partenze</button>
