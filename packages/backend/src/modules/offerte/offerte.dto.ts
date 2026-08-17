@@ -7,8 +7,9 @@ export const creaOffertaSchema = z.object({
   // Solo lettere minuscole, numeri e trattini — diventa parte dell'URL
   // pubblico (es. /offerta/salmo-meta-retarget).
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/, 'Solo lettere minuscole, numeri e trattini, senza spazi.'),
-  prezzo: z.number().positive(),
-  prezzoOriginale: z.number().positive().optional(),
+  // Percentuale di sconto (es. 20 = -20%), applicata al prezzo normale
+  // di qualunque fermata scelga il cliente — non un prezzo fisso.
+  scontoPercentuale: z.number().positive().max(100),
   attiva: z.boolean().default(true),
   validoDal: z.coerce.date().optional(),
   validoAl: z.coerce.date().optional(),

@@ -11,6 +11,10 @@ export interface CreaPrenotazionePayload {
   couponCodice?: string;
   promoterCodice?: string;
   offertaId?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
   cliente: { email: string; nome: string; cognome: string; telefono: string };
   // Un modulo nome+cognome per ogni passeggero OLTRE al richiedente
   // (deve essere lungo esattamente passeggeri-1).

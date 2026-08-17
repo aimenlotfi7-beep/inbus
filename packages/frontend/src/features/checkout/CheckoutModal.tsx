@@ -10,9 +10,10 @@ type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'confermato-att
 interface Partecipante { nome: string; cognome: string; }
 
 /** Se il cliente arriva da un link con offerta dedicata (/offerta/:slug),
- *  il prezzo dell'offerta sostituisce quello normale per fermata,
- *  qualunque fermata scelga. */
-export interface OffertaCheckout { id: string; nome: string; prezzo: number; prezzoOriginale?: number; }
+ *  lo sconto percentuale si applica al prezzo normale di qualunque
+ *  fermata scelga — non è un prezzo fisso, dato che il prezzo varia già
+ *  per fermata. */
+export interface OffertaCheckout { id: string; nome: string; scontoPercentuale: number; }
 
 export function CheckoutModal({ evento, offerta, onClose }: { evento: Evento; offerta?: OffertaCheckout; onClose: () => void }) {
   const [stato, setStato] = useState<Stato>('caricamento');
@@ -83,7 +84,9 @@ export function CheckoutModal({ evento, offerta, onClose }: { evento: Evento; of
   // internamente per decidere se mostrare il checkout normale o la
   // lista d'attesa.
   const nessunPostoDisponibile = opzioni.length === 0 || opzioni.every((o) => o.postiDisponibili === 0);
-  const prezzoUnitario = offerta ? offerta.prezzo : (opzioneScelta?.prezzoEffettivo ?? 0);
+  const prezzoUnitario = opzioneScelta
+    ? (offerta ? opzioneScelta.prezzoEffettivo * (1 - offerta.scontoPercentuale / 100) : opzioneScelta.prezzoEffettivo)
+    : 0;
   const totale = opzioneScelta ? prezzoUnitario * passeggeri : 0;
   const moduloRichiedenteCompleto = Boolean(email && nome && cognome && telefono);
   const partecipantiCompleti = partecipanti.every((p) => p.nome.trim() && p.cognome.trim());
@@ -95,6 +98,15 @@ export function CheckoutModal({ evento, offerta, onClose }: { evento: Evento; of
     setMessaggioErrore('');
     try {
       const promoterCodice = new URLSearchParams(window.location.search).get('promo') || undefined;
+      // Catturati automaticamente dall'indirizzo se il cliente arriva da
+      // un link pubblicitario (es. ...?utm_source=meta&utm_medium=paid_social)
+      // — così sai sempre da dove arriva ogni prenotazione, senza dover
+      // fare nulla in più.
+      const parametriUrl = new URLSearchParams(window.location.search);
+      const utmSource = parametriUrl.get('utm_source') || undefined;
+      const utmMedium = parametriUrl.get('utm_medium') || undefined;
+      const utmCampaign = parametriUrl.get('utm_campaign') || undefined;
+      const utmContent = parametriUrl.get('utm_content') || undefined;
       const prenotazione = await prenotazioniApi.crea({
         eventoId: evento.id,
         lineaId: opzioneScelta.lineaId,
@@ -106,6 +118,10 @@ export function CheckoutModal({ evento, offerta, onClose }: { evento: Evento; of
         partecipanti,
         ...(promoterCodice && { promoterCodice }),
         ...(offerta && { offertaId: offerta.id }),
+        ...(utmSource && { utmSource }),
+        ...(utmMedium && { utmMedium }),
+        ...(utmCampaign && { utmCampaign }),
+        ...(utmContent && { utmContent }),
       });
       setPnrConfermato(prenotazione.pnr);
       setStato('confermato');
@@ -165,8 +181,7 @@ export function CheckoutModal({ evento, offerta, onClose }: { evento: Evento; of
 
             {offerta && (
               <p style={{ background: '#e8f7ea', border: '1px solid #b6e3bb', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
-                🎉 Offerta "{offerta.nome}": €{offerta.prezzo.toFixed(2)} a persona
-                {offerta.prezzoOriginale ? <> invece di €{offerta.prezzoOriginale.toFixed(2)}</> : null}.
+                🎉 Offerta "{offerta.nome}": -{offerta.scontoPercentuale.toFixed(0)}% su tutte le fermate.
               </p>
             )}
 
@@ -183,11 +198,15 @@ export function CheckoutModal({ evento, offerta, onClose }: { evento: Evento; of
 
                 <label className="field-label">Fermata di partenza</label>
                 <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
-                  {opzioni.map((o) => (
-                    <option key={o.fermataId} value={o.fermataId}>
-                      {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{(offerta ? offerta.prezzo : o.prezzoEffettivo).toFixed(2)}
-                    </option>
-                  ))}
+                  {opzioni.map((o) => {
+                    const prezzoMostrato = offerta ? o.prezzoEffettivo * (1 - offerta.scontoPercentuale / 100) : o.prezzoEffettivo;
+                    return (
+                      <option key={o.fermataId} value={o.fermataId}>
+                        {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{prezzoMostrato.toFixed(2)}
+                        {offerta ? ` (invece di €${o.prezzoEffettivo.toFixed(2)})` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
 
                 <label className="field-label">Passeggeri</label>

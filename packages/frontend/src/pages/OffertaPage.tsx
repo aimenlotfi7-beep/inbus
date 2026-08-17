@@ -20,7 +20,7 @@ export function OffertaPage() {
     offerteApi.getBySlug(slug)
       .then((r) => {
         setEvento(r.evento);
-        setOfferta({ id: r.offerta.id, nome: r.offerta.nome, prezzo: Number(r.offerta.prezzo), prezzoOriginale: r.offerta.prezzoOriginale ? Number(r.offerta.prezzoOriginale) : undefined });
+        setOfferta({ id: r.offerta.id, nome: r.offerta.nome, scontoPercentuale: Number(r.offerta.scontoPercentuale) });
         setStato('pronto');
       })
       .catch((e) => {

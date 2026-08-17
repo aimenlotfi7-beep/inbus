@@ -67,7 +67,7 @@ export const prenotazioniService = {
       if (input.offertaId) {
         const { offerteService } = await import('../offerte/offerte.service.js');
         const offerta = await offerteService.verificaEIncrementaUtilizzo(input.offertaId, input.eventoId);
-        prezzoEffettivo = Number(offerta.prezzo);
+        prezzoEffettivo = prezzoNormale * (1 - Number(offerta.scontoPercentuale) / 100);
       }
       const importoBase = prezzoEffettivo * input.passeggeri;
       const { sconto, coupon: couponUsato } = await validaCoupon(input.couponCodice, importoBase);

@@ -7,8 +7,7 @@ export interface Offerta {
   campagnaId: string | null;
   nome: string;
   slug: string;
-  prezzo: string;
-  prezzoOriginale: string | null;
+  scontoPercentuale: string;
   attiva: boolean;
   validoDal: string | null;
   validoAl: string | null;
@@ -22,8 +21,7 @@ export interface OffertaInput {
   campagnaId?: string;
   nome: string;
   slug: string;
-  prezzo: number;
-  prezzoOriginale?: number;
+  scontoPercentuale: number;
   attiva?: boolean;
   validoDal?: string;
   validoAl?: string;

@@ -108,22 +108,20 @@ export const campagne = pgTable('campagne', {
   creataIl: timestamp('creata_il').notNull().defaultNow(),
 });
 
-// Un link con un prezzo dedicato per un evento specifico (es. "40€
-// invece di 50€" per chi arriva da una campagna Meta). Il prezzo vive
-// solo qui: il link pubblico porta solo lo slug, mai il prezzo, così
-// non è modificabile dal browser.
+// Un link con uno SCONTO PERCENTUALE dedicato per un evento specifico
+// (es. "-20% su tutte le tratte" per chi arriva da una campagna Meta),
+// applicato al prezzo normale di qualunque fermata scelga il cliente —
+// non un prezzo fisso, perché il prezzo varia già per fermata. Il link
+// pubblico porta solo lo slug, mai lo sconto, così non è modificabile
+// dal browser.
 export const offerteEvento = pgTable('offerte_evento', {
   id: id(),
   eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
   campagnaId: text('campagna_id').references(() => campagne.id, { onDelete: 'set null' }),
   nome: text('nome').notNull(),
   slug: text('slug').notNull().unique(),
-  // Prezzo fisso per passeggero: sostituisce il prezzo normale (quello
-  // calcolato per fermata) quando si prenota tramite questo link,
-  // indipendentemente dalla fermata scelta.
-  prezzo: numeric('prezzo', { precision: 10, scale: 2 }).notNull(),
-  // Solo per mostrare "invece di X€" nella pagina pubblica — facoltativo.
-  prezzoOriginale: numeric('prezzo_originale', { precision: 10, scale: 2 }),
+  // Es. 20.00 = -20% sul prezzo normale di ogni fermata.
+  scontoPercentuale: numeric('sconto_percentuale', { precision: 5, scale: 2 }).notNull(),
   attiva: boolean('attiva').notNull().default(true),
   validoDal: timestamp('valido_dal'),
   validoAl: timestamp('valido_al'),
