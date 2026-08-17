@@ -7,7 +7,7 @@
 -- lo slug generato qui le mantiene — cosmetico, non bloccante. I nuovi
 -- eventi creati da qui in poi avranno comunque lo slug ripulito bene
 -- dal codice dell'applicazione.
-ALTER TABLE "eventi" ADD COLUMN "slug" text;
+ALTER TABLE "eventi" ADD COLUMN IF NOT EXISTS "slug" text;
 --> statement-breakpoint
 UPDATE "eventi" SET "slug" =
   trim(both '-' from regexp_replace(lower(artista || '-' || citta), '[^a-z0-9]+', '-', 'g'))
@@ -16,4 +16,7 @@ WHERE "slug" IS NULL;
 --> statement-breakpoint
 ALTER TABLE "eventi" ALTER COLUMN "slug" SET NOT NULL;
 --> statement-breakpoint
-ALTER TABLE "eventi" ADD CONSTRAINT "eventi_slug_unique" UNIQUE("slug");
+DO $$ BEGIN
+  ALTER TABLE "eventi" ADD CONSTRAINT "eventi_slug_unique" UNIQUE("slug");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
