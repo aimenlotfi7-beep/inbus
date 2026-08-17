@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { Evento } from '../../api/types';
 import { prezzoMinimoEvento } from '../../api/prezzi';
 
@@ -16,7 +17,11 @@ const ETICHETTA_STATO: Record<NonNullable<Evento['statoDisponibilita']>, string>
   ESAURITO: 'Posti terminati',
 };
 
-export function EventoCard({ evento, onPrenota }: { evento: Evento; onPrenota: (evento: Evento) => void }) {
+// La card porta sempre alla pagina dedicata dell'evento (/eventi/:slug):
+// così ogni evento ha un suo indirizzo indicizzabile da Google e
+// condivisibile con un'anteprima propria, invece di vivere solo dentro
+// un popup nella home.
+export function EventoCard({ evento }: { evento: Evento }) {
   // Il numero esatto di posti non si mostra mai al cliente: solo
   // un'etichetta impostata a mano dal gestionale (o nessuna). La
   // possibilità di prenotare/andare in lista d'attesa dipende invece dai
@@ -26,7 +31,7 @@ export function EventoCard({ evento, onPrenota }: { evento: Evento; onPrenota: (
   const prezzoMinimo = prezzoMinimoEvento(evento);
 
   return (
-    <div className="card reveal in">
+    <Link to={`/eventi/${evento.slug}`} className="card reveal in" style={{ display: 'block', color: 'inherit' }}>
       <div className="card-visual" style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
         {!copertina && <div className="beam" />}
         <span className="tag">{evento.genere}</span>
@@ -45,11 +50,11 @@ export function EventoCard({ evento, onPrenota }: { evento: Evento; onPrenota: (
           <div className="price">
             {prezzoMinimo !== null ? <>da €{prezzoMinimo.toFixed(0)}<span> /persona</span></> : <span>Prezzo da definire</span>}
           </div>
-          <button className="card-cta" onClick={() => onPrenota(evento)}>
+          <span className="card-cta">
             {posti === 0 ? "Lista d'attesa" : 'Prenota'}
-          </button>
+          </span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

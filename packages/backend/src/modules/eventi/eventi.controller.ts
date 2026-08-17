@@ -12,6 +12,10 @@ export const eventiController = {
     const evento = await eventiService.getById(req.params.id);
     res.json(evento);
   },
+  async getBySlug(req: Request, res: Response) {
+    const evento = await eventiService.getBySlug(req.params.slug);
+    res.json(evento);
+  },
 
   async create(req: Request, res: Response) {
     const id = await eventiService.create(req.body as CreaEventoInput);

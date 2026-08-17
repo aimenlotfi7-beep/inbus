@@ -27,6 +27,9 @@ const lineaSchema = z.object({
 
 export const creaEventoSchema = z.object({
   artista: z.string().min(1),
+  // Indirizzo pubblico (es. "salmo-roma") — facoltativo: se non lo
+  // scrivi, viene generato da solo dal nome dell'artista e dalla città.
+  slug: z.string().regex(/^[a-z0-9-]*$/, 'Solo lettere minuscole, numeri e trattini, senza spazi.').optional(),
   genere: z.string().min(1),
   luogo: z.string().min(1),
   citta: z.string().min(1),

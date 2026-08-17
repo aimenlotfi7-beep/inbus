@@ -47,6 +47,11 @@ export const ruoloAdminEnum = pgEnum('ruolo_admin', ['AMMINISTRATORE', 'OPERATOR
 // ---------------------------------------------------------------------
 export const eventi = pgTable('eventi', {
   id: id(),
+  // Indirizzo pubblico leggibile (es. "salmo-roma") — ogni evento ha una
+  // sua pagina vera a /eventi/:slug, indicizzabile da Google e
+  // condivisibile con un'anteprima propria (a differenza di prima, dove
+  // tutto viveva solo dentro la home come popup).
+  slug: text('slug').notNull().unique(),
   artista: text('artista').notNull(),
   genere: text('genere').notNull(),
   luogo: text('luogo').notNull(),

@@ -11,6 +11,7 @@ export interface LineaInput {
 }
 export interface EventoInput {
   artista: string; genere: string; luogo: string; citta: string; data: string; prezzo?: number;
+  slug?: string;
   inEvidenza?: boolean; ordineEvidenza?: number; accontoEur?: number;
   statoDisponibilita?: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
   // L'arrivo (destinazione + orario) è unico per l'evento e si applica a
@@ -53,6 +54,7 @@ export const eventiApi = {
     return api.get<Evento[]>(`/api/eventi${query ? `?${query}` : ''}`);
   },
   getById: (id: string) => api.get<Evento>(`/api/eventi/${id}`),
+  getBySlug: (slug: string) => api.get<Evento>(`/api/eventi/slug/${slug}`),
   opzioniPartenza: (id: string) => api.get<OpzionePartenza[]>(`/api/eventi/${id}/opzioni-partenza`),
   create: (input: EventoInput) => api.post<Evento>('/api/eventi', input),
   update: (id: string, input: Partial<EventoInput>) => api.put<Evento>(`/api/eventi/${id}`, input),

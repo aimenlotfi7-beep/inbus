@@ -82,7 +82,7 @@ export function HomePage() {
           </div>
           <div className="carosello-wrap">
             <div className="carosello">
-              {consigliati.map((ev) => <EventoCard key={ev.id} evento={ev} onPrenota={setEventoInCheckout} />)}
+              {consigliati.map((ev) => <EventoCard key={ev.id} evento={ev} />)}
             </div>
           </div>
         </section>
@@ -107,7 +107,7 @@ export function HomePage() {
           <p style={{ color: 'var(--mist)', padding: 40, textAlign: 'center' }}>Nessun evento per questo filtro.</p>
         )}
         <div className="grid">
-          {eventiFiltrati.map((ev) => <EventoCard key={ev.id} evento={ev} onPrenota={setEventoInCheckout} />)}
+          {eventiFiltrati.map((ev) => <EventoCard key={ev.id} evento={ev} />)}
         </div>
       </section>
 

@@ -99,6 +99,13 @@
       "when": 1786954758644,
       "tag": "0014_sconto_percentuale_offerte",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1786977786657,
+      "tag": "0015_aggiungi_slug_evento",
+      "breakpoints": true
     }
   ]
 }

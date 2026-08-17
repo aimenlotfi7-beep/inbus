@@ -12,6 +12,9 @@ eventiRouter.get('/', valida(listaEventiQuerySchema, 'query'), asyncHandler(even
 // IMPORTANTE: va registrata PRIMA di GET '/:id', altrimenti Express la
 // interpreterebbe come una richiesta per un evento con id "allerte-partenze".
 eventiRouter.get('/allerte-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenze));
+// Stesso motivo: va prima di GET '/:id' per non essere interpretata come
+// una richiesta per un evento con id "slug".
+eventiRouter.get('/slug/:slug', asyncHandler(eventiController.getBySlug));
 eventiRouter.get('/:id', asyncHandler(eventiController.getById));
 eventiRouter.get('/:id/opzioni-partenza', asyncHandler(eventiController.opzioniPartenza));
 

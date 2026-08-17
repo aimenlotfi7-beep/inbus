@@ -35,6 +35,29 @@ async function getById(id: string) {
   return evento;
 }
 
+/** Genera uno slug leggibile e univoco (es. "salmo-roma", o
+ *  "salmo-roma-2" se già in uso) — usato quando non ne arriva uno
+ *  esplicito dal gestionale, o come base se quello scelto è già preso. */
+async function generaSlugUnivoco(base: string, idDaEscludere?: string) {
+  const pulito = base
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // toglie accenti
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '') || 'evento';
+
+  let candidato = pulito;
+  let tentativo = 1;
+  while (true) {
+    const condizione = idDaEscludere
+      ? and(eq(eventi.slug, candidato), sql`${eventi.id} != ${idDaEscludere}`)
+      : eq(eventi.slug, candidato);
+    const [esistente] = await db.select({ id: eventi.id }).from(eventi).where(condizione).limit(1);
+    if (!esistente) return candidato;
+    tentativo++;
+    candidato = `${pulito}-${tentativo}`;
+  }
+}
+
 export const eventiService = {
   async list(query: ListaEventiQuery) {
     const condizioni = [];
@@ -57,11 +80,26 @@ export const eventiService = {
 
   getById,
 
+  /** Recupera un evento dal suo slug pubblico (per la pagina dedicata
+   *  /eventi/:slug) — visibile solo se non è già passato e non è stato
+   *  nascosto manualmente, stessa regola della home. */
+  async getBySlug(slug: string) {
+    const evento = await db.query.eventi.findFirst({
+      where: eq(eventi.slug, slug),
+      with: includeCompleto,
+    });
+    if (!evento) throw new NonTrovato('Evento');
+    if (!evento.visibileSito || new Date(evento.data) < new Date()) throw new NonTrovato('Evento');
+    return evento;
+  },
+
   async create(input: CreaEventoInput) {
+    const slug = await generaSlugUnivoco(input.slug?.trim() || `${input.artista}-${input.citta}`);
     return db.transaction(async (tx) => {
       const [nuovoEvento] = await tx
         .insert(eventi)
         .values({
+          slug,
           artista: input.artista,
           genere: input.genere,
           luogo: input.luogo,
@@ -127,6 +165,7 @@ export const eventiService = {
 
   async update(id: string, input: AggiornaEventoInput) {
     await getById(id); // lancia NonTrovato se non esiste
+    const nuovoSlug = input.slug?.trim() ? await generaSlugUnivoco(input.slug.trim(), id) : undefined;
 
     return db.transaction(async (tx) => {
       await tx
@@ -144,6 +183,7 @@ export const eventiService = {
           ...(input.vetrinaAl !== undefined && { vetrinaAl: input.vetrinaAl }),
           ...(input.accontoEur !== undefined && { accontoEur: input.accontoEur.toFixed(2) }),
           ...(input.statoDisponibilita !== undefined && { statoDisponibilita: input.statoDisponibilita }),
+          ...(nuovoSlug !== undefined && { slug: nuovoSlug }),
           ...(input.arrivoIndirizzo !== undefined && { arrivoIndirizzo: input.arrivoIndirizzo }),
           ...(input.arrivoOrario !== undefined && { arrivoOrario: input.arrivoOrario }),
           ...(input.visibileSito !== undefined && { visibileSito: input.visibileSito }),

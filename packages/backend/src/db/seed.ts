@@ -37,6 +37,7 @@ async function main() {
 
   console.log('Creo un evento di esempio con un bus e tre fermate...');
   const [evento] = await db.insert(schema.eventi).values({
+    slug: 'ultimo-roma',
     artista: 'Ultimo',
     genere: 'Pop',
     luogo: 'Stadio Olimpico',

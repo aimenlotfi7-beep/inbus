@@ -65,6 +65,7 @@ export function SchedaEventoModale({
       nuovoForm = {
         artista: evento.artista, genere: evento.genere, luogo: evento.luogo, citta: evento.citta,
         data: evento.data.slice(0, 10), inEvidenza: evento.inEvidenza,
+        slug: evento.slug,
         accontoEur: evento.accontoEur ? Number(evento.accontoEur) : 10,
         statoDisponibilita: evento.statoDisponibilita,
         arrivoIndirizzo: evento.arrivoIndirizzo ?? undefined,
@@ -313,6 +314,13 @@ export function SchedaEventoModale({
         <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
         <label>Città <input value={form.citta} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>
         <label>Data <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
+        <label>Indirizzo pubblico (facoltativo — se lo lasci vuoto, si genera da solo)
+          <input
+            value={form.slug ?? ''}
+            onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
+            placeholder={`es. ${(form.artista || 'nome-evento').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${(form.citta || 'citta').toLowerCase()}`}
+          />
+        </label>
         <label>Acconto (€)
           <input type="number" min={1} value={form.accontoEur ?? 10} onChange={(e) => setForm({ ...form, accontoEur: Number(e.target.value) })} />
         </label>
@@ -328,6 +336,11 @@ export function SchedaEventoModale({
           </select>
         </label>
       </div>
+      {evento && (
+        <p className="testo-intro" style={{ marginTop: -8, fontSize: 12.5 }}>
+          Pagina pubblica: <code style={{ color: 'var(--paper)' }}>{window.location.origin}/eventi/{evento.slug}</code>
+        </p>
+      )}
       <p className="testo-intro" style={{ marginTop: -8, fontSize: 12.5 }}>
         I prezzi si impostano per fermata nello step "Tratte" (arrivano dai tragitti che applichi). Chi prenota con
         acconto salda il resto entro 15 giorni prima della partenza. L'avviso disponibilità è solo un'etichetta

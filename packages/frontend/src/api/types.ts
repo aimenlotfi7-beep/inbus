@@ -34,6 +34,7 @@ export interface Evento {
   arrivoIndirizzo: string | null;
   arrivoOrario: string | null;
   visibileSito: boolean;
+  slug: string;
   linee: LineaBus[];
   immagini: { id: string; url: string; ordine: number }[];
   allegati: { id: string; nome: string; url: string }[];

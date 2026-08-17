@@ -8,6 +8,7 @@ import { TourLeaderPage } from './pages/TourLeaderPage';
 import { FinalizzaListaAttesaPage } from './pages/FinalizzaListaAttesaPage';
 import { CompletaSaldoPage } from './pages/CompletaSaldoPage';
 import { OffertaPage } from './pages/OffertaPage';
+import { EventoPage } from './pages/EventoPage';
 
 export function App() {
   return (
@@ -21,6 +22,7 @@ export function App() {
       <Route path="/finalizza/:token" element={<FinalizzaListaAttesaPage />} />
       <Route path="/completa-saldo/:pnr" element={<CompletaSaldoPage />} />
       <Route path="/offerta/:slug" element={<OffertaPage />} />
+      <Route path="/eventi/:slug" element={<EventoPage />} />
     </Routes>
   );
 }
