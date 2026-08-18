@@ -5,6 +5,10 @@ interface SeoTags {
   description: string;
   image?: string;
   url: string;
+  // Dati strutturati schema.org (es. tipo "Event") — aiutano Google a
+  // mostrare data/prezzo/luogo direttamente nei risultati di ricerca,
+  // senza che l'utente debba nemmeno aprire la pagina.
+  jsonLd?: Record<string, unknown>;
 }
 
 function impostaMeta(nome: string, contenuto: string, attributo: 'name' | 'property' = 'name') {
@@ -28,7 +32,7 @@ function impostaMeta(nome: string, contenuto: string, attributo: 'name' | 'prope
  * un'anteprima con titolo/immagine giusti serve generare l'HTML in
  * anticipo (pre-rendering), un passo successivo a parte.
  */
-export function useSeoTags({ title, description, image, url }: SeoTags) {
+export function useSeoTags({ title, description, image, url, jsonLd }: SeoTags) {
   useEffect(() => {
     const titoloPrecedente = document.title;
     document.title = title;
@@ -52,6 +56,17 @@ export function useSeoTags({ title, description, image, url }: SeoTags) {
     }
     canonical.setAttribute('href', url);
 
-    return () => { document.title = titoloPrecedente; };
-  }, [title, description, image, url]);
+    let scriptJsonLd: HTMLScriptElement | null = null;
+    if (jsonLd) {
+      scriptJsonLd = document.createElement('script');
+      scriptJsonLd.type = 'application/ld+json';
+      scriptJsonLd.textContent = JSON.stringify(jsonLd);
+      document.head.appendChild(scriptJsonLd);
+    }
+
+    return () => {
+      document.title = titoloPrecedente;
+      if (scriptJsonLd) document.head.removeChild(scriptJsonLd);
+    };
+  }, [title, description, image, url, jsonLd]);
 }

@@ -4,7 +4,7 @@ import { eventiApi } from '../api/eventi';
 import type { Evento } from '../api/types';
 import { prezzoMinimoEvento } from '../api/prezzi';
 import { useSeoTags } from '../features/useSeoTags';
-import { CheckoutModal } from '../features/checkout/CheckoutModal';
+import { CheckoutForm } from '../features/checkout/CheckoutForm';
 import { Layout } from '../Layout';
 
 const ETICHETTA_STATO: Record<NonNullable<Evento['statoDisponibilita']>, string> = {
@@ -16,13 +16,13 @@ const ETICHETTA_STATO: Record<NonNullable<Evento['statoDisponibilita']>, string>
 type Stato = 'caricamento' | 'pronto' | 'non-trovato';
 
 /** Pagina propria per ogni evento — indicizzabile da Google e
- *  condivisibile con un'anteprima specifica (titolo, immagine, prezzo),
- *  invece di vivere solo dentro un popup nella home. */
+ *  condivisibile con un'anteprima specifica (titolo, immagine, prezzo).
+ *  Foto e info a sinistra, modulo di prenotazione a destra, sempre
+ *  visibile: niente popup da aprire. */
 export function EventoPage() {
   const { slug } = useParams<{ slug: string }>();
   const [stato, setStato] = useState<Stato>('caricamento');
   const [evento, setEvento] = useState<Evento | null>(null);
-  const [checkoutAperto, setCheckoutAperto] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -33,7 +33,6 @@ export function EventoPage() {
   }, [slug]);
 
   const prezzoMinimo = evento ? prezzoMinimoEvento(evento) : null;
-  const posti = evento ? evento.linee.reduce((s, l) => s + l.postiDisponibili, 0) : 0;
   const copertina = evento?.immagini[0]?.url;
 
   useSeoTags({
@@ -43,11 +42,24 @@ export function EventoPage() {
       : 'Prenota il tuo bus per l\'evento con INBUS.',
     image: copertina,
     url: window.location.href,
+    jsonLd: evento ? {
+      '@context': 'https://schema.org',
+      '@type': 'Event',
+      name: evento.artista,
+      startDate: evento.data,
+      eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+      eventStatus: 'https://schema.org/EventScheduled',
+      location: { '@type': 'Place', name: evento.luogo, address: { '@type': 'PostalAddress', addressLocality: evento.citta, addressCountry: 'IT' } },
+      ...(copertina && { image: [copertina] }),
+      ...(prezzoMinimo !== null && {
+        offers: { '@type': 'Offer', price: prezzoMinimo.toFixed(2), priceCurrency: 'EUR', availability: 'https://schema.org/InStock', url: window.location.href },
+      }),
+    } : undefined,
   });
 
   return (
     <Layout>
-      <div style={{ maxWidth: 720, margin: '40px auto 80px', padding: '0 20px' }}>
+      <div style={{ maxWidth: 960, margin: '40px auto 80px', padding: '0 20px' }}>
         {stato === 'caricamento' && <p>Carico...</p>}
 
         {stato === 'non-trovato' && (
@@ -57,44 +69,41 @@ export function EventoPage() {
         )}
 
         {stato === 'pronto' && evento && (
-          <>
-            {copertina && (
-              <img src={copertina} alt={`${evento.artista} — ${evento.luogo}, ${evento.citta}`} style={{ width: '100%', borderRadius: 18, marginBottom: 24, maxHeight: 420, objectFit: 'cover' }} />
-            )}
-            <span className="tag" style={{ position: 'static', display: 'inline-block', marginBottom: 10 }}>{evento.genere}</span>
-            <h1 style={{ fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: 36, margin: '0 0 10px' }}>{evento.artista}</h1>
-            <p style={{ fontSize: 16, opacity: .85, marginBottom: 4 }}>{evento.luogo}, {evento.citta}</p>
-            <p style={{ fontSize: 16, opacity: .85, marginBottom: 18 }}>{new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <div className="checkout-modal-wide" style={{ background: 'transparent', maxWidth: 'none' }}>
+            <div className="checkout-columns" style={{ maxHeight: 'none', borderRadius: 18, overflow: 'hidden' }}>
+              <div className="checkout-col-info" style={{ maxHeight: 'none' }}>
+                <div className="checkout-cover" style={copertina ? { backgroundImage: `url(${copertina})` } : undefined} />
+                <span className="tag">{evento.genere}</span>
+                <h2>{evento.artista}</h2>
+                <p className="meta-info">{evento.luogo}, {evento.citta}</p>
+                <p className="meta-info">{new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
 
-            {evento.statoDisponibilita && (
-              <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '8px 12px', fontSize: 13, display: 'inline-block', marginBottom: 18 }}>
-                {ETICHETTA_STATO[evento.statoDisponibilita]}
-              </p>
-            )}
+                {evento.statoDisponibilita && (
+                  <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, display: 'inline-block', marginTop: 12 }}>
+                    {ETICHETTA_STATO[evento.statoDisponibilita]}
+                  </p>
+                )}
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginTop: 20 }}>
-              <div className="price" style={{ fontSize: 20 }}>
-                {prezzoMinimo !== null ? <>da €{prezzoMinimo.toFixed(2)}<span> /persona</span></> : <span>Prezzo da definire</span>}
+                {prezzoMinimo !== null && (
+                  <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, marginTop: 18 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 12, opacity: .7 }}>/persona</span></p>
+                )}
+
+                {evento.immagini.length > 1 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 8, marginTop: 20 }}>
+                    {evento.immagini.slice(1).map((img) => (
+                      <img key={img.id} src={img.url} alt={`${evento.artista} — foto`} style={{ width: '100%', height: 70, objectFit: 'cover', borderRadius: 8 }} />
+                    ))}
+                  </div>
+                )}
               </div>
-              <button className="search-cta" style={{ width: 'auto', margin: 0, padding: '14px 28px' }} onClick={() => setCheckoutAperto(true)}>
-                {posti === 0 ? "Iscriviti alla lista d'attesa" : 'Prenota ora'}
-              </button>
+
+              <div className="checkout-col-form" style={{ maxHeight: 'none' }}>
+                <CheckoutForm evento={evento} />
+              </div>
             </div>
-
-            {evento.immagini.length > 1 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginTop: 32 }}>
-                {evento.immagini.slice(1).map((img) => (
-                  <img key={img.id} src={img.url} alt={`${evento.artista} — foto`} style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 10 }} />
-                ))}
-              </div>
-            )}
-          </>
+          </div>
         )}
       </div>
-
-      {evento && checkoutAperto && (
-        <CheckoutModal evento={evento} onClose={() => setCheckoutAperto(false)} />
-      )}
     </Layout>
   );
 }
