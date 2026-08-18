@@ -23,9 +23,20 @@ function scaricaListaCsv(riferimentoBus: string, righe: { pnr: string; nome: str
   URL.revokeObjectURL(url);
 }
 
-/** Sezione "Partenze" di un singolo evento: calcolo bus necessari,
- *  copertura tratte, censimento bus fisici. Va dentro la scheda
- *  dell'evento (tab), non è più una pagina a sé con selettore evento. */
+/** Un solo indicatore di stato per tratta (invece di due badge separati
+ *  che si accavallavano): rosso se ha posti superati (il problema più
+ *  urgente, ha sempre la precedenza), giallo se manca ancora la
+ *  copertura, verde se tutto ok. */
+function statoTratta(linea: CalcoloBusLinea) {
+  const postiSuperati = linea.totalePasseggeri > linea.postiTotali;
+  if (postiSuperati) return { classe: 'non-coperta', etichetta: `⚠ Posti superati di ${linea.totalePasseggeri - linea.postiTotali}` };
+  if (!linea.coperta) return { classe: 'attenzione', etichetta: 'Non ancora coperta' };
+  return { classe: 'coperta', etichetta: '✓ Coperta' };
+}
+
+/** Sezione "Partenze" di un singolo evento: riepilogo generale, calcolo
+ *  bus necessari, copertura tratte, censimento bus fisici. Va dentro la
+ *  scheda dell'evento (tab). */
 export function PartenzeTab({ eventoId }: { eventoId: string }) {
   const [calcolo, setCalcolo] = useState<CalcoloBusLinea[]>([]);
   const [busLista, setBusLista] = useState<BusFisico[]>([]);
@@ -34,6 +45,7 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState('');
   const [generandoLista, setGenerandoLista] = useState<string | null>(null);
+  const [aperte, setAperte] = useState<Set<string>>(new Set());
 
   const [inModifica, setInModifica] = useState<BusFisico | null>(null);
   const [form, setForm] = useState<BusFisicoInput>(BUS_VUOTO);
@@ -43,7 +55,13 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
     setCaricamento(true);
     setErrore('');
     Promise.all([eventiApi.calcolaBus(eventoId), eventiApi.listaBus(eventoId)])
-      .then(([c, b]) => { setCalcolo(c); setBusLista(b); })
+      .then(([c, b]) => {
+        setCalcolo(c);
+        setBusLista(b);
+        // Se c'è una sola tratta, tanto vale aprirla subito — altrimenti
+        // partono tutte chiuse, per non dover scorrere un elenco lungo.
+        setAperte((prev) => prev.size === 0 && c.length === 1 ? new Set([c[0].lineaId]) : prev);
+      })
       .catch((e) => setErrore(e instanceof ErroreApi ? e.message : 'Impossibile caricare la sezione Partenze. Controlla i tuoi permessi o riprova.'))
       .finally(() => setCaricamento(false));
   }
@@ -52,6 +70,14 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
     fornitoriApi.list().then(setFornitori).catch(() => setFornitori([]));
     tourLeaderApi.list().then(setTourLeaders).catch(() => setTourLeaders([]));
   }, [eventoId]);
+
+  function toggleApertura(lineaId: string) {
+    setAperte((prev) => {
+      const nuovo = new Set(prev);
+      if (nuovo.has(lineaId)) nuovo.delete(lineaId); else nuovo.add(lineaId);
+      return nuovo;
+    });
+  }
 
   async function toggleCopertura(linea: CalcoloBusLinea) {
     try {
@@ -62,7 +88,11 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
     }
   }
 
-  function apriNuovoBus() { setInModifica(null); setForm(BUS_VUOTO); setModaleAperta(true); }
+  function apriNuovoBus(lineaIdPreselezionata?: string) {
+    setInModifica(null);
+    setForm(lineaIdPreselezionata ? { ...BUS_VUOTO, lineeIds: [lineaIdPreselezionata] } : BUS_VUOTO);
+    setModaleAperta(true);
+  }
   function apriModificaBus(b: BusFisico) {
     setInModifica(b);
     setForm({ fornitoreId: b.fornitoreId ?? undefined, riferimento: b.riferimento, autistaNome: b.autistaNome ?? undefined, autistaTelefono: b.autistaTelefono ?? undefined, tourLeaderId: b.tourLeaderId, note: b.note ?? undefined, lineeIds: b.lineeIds });
@@ -122,74 +152,99 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
   if (caricamento) return <p className="testo-intro">Caricamento...</p>;
   if (errore) return <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>;
 
+  const trattoCoperte = calcolo.filter((l) => l.coperta).length;
+  const trattoConProblemi = calcolo.filter((l) => l.totalePasseggeri > l.postiTotali).length;
+
   return (
     <div>
       {calcolo.length === 0 && (
         <p className="testo-intro">Questa scheda non ha ancora nessuna tratta configurata — vai nella tab "Dettagli" per aggiungerne una.</p>
       )}
 
+      {calcolo.length > 0 && (
+        <div className="section-card" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 16 }}>
+          <span className="chip">{calcolo.length} tratt{calcolo.length === 1 ? 'a' : 'e'}</span>
+          <span className="chip">{trattoCoperte}/{calcolo.length} coperte</span>
+          <span className="chip">{busLista.length} bus censit{busLista.length === 1 ? 'o' : 'i'}</span>
+          {trattoConProblemi > 0 && (
+            <span className="badge non-coperta">⚠ {trattoConProblemi} tratt{trattoConProblemi === 1 ? 'a' : 'e'} con posti superati</span>
+          )}
+        </div>
+      )}
+
       {calcolo.map((linea) => {
-        const postiSuperati = linea.totalePasseggeri > linea.postiTotali;
+        const stato = statoTratta(linea);
+        const busTratta = busLista.filter((b) => b.lineeIds.includes(linea.lineaId));
+        const espansa = aperte.has(linea.lineaId);
         return (
-        <div key={linea.lineaId} className="section-card" style={postiSuperati ? { borderColor: 'var(--pink)' } : undefined}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 12 }}>
+        <div key={linea.lineaId} className="section-card" style={stato.classe === 'non-coperta' ? { borderColor: 'var(--pink)' } : undefined}>
+          <div
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}
+            onClick={() => toggleApertura(linea.lineaId)}
+          >
             <div>
-              <h3>{linea.nome}</h3>
-              <p className="section-sub">{linea.totalePasseggeri} passeggeri confermati su {linea.postiTotali} posti previsti · capienza {linea.capienzaPerBus} posti/bus</p>
-              {postiSuperati && (
-                <span className="badge non-coperta" style={{ marginTop: 6, display: 'inline-block' }}>
-                  ⚠ Posti superati di {linea.totalePasseggeri - linea.postiTotali}
-                </span>
-              )}
+              <h3>{espansa ? '▾' : '▸'} {linea.nome}</h3>
+              <p className="section-sub">{linea.totalePasseggeri} passeggeri confermati su {linea.postiTotali} posti previsti · {busTratta.length} bus censit{busTratta.length === 1 ? 'o' : 'i'}</p>
             </div>
-            <button
-              type="button"
-              className={`badge badge-btn ${linea.coperta ? 'coperta' : 'non-coperta'}`}
-              style={{ flexShrink: 0 }}
-              onClick={() => toggleCopertura(linea)}
-            >
-              {linea.coperta ? '✓ Tratta coperta' : 'Non coperta — segna come coperta'}
-            </button>
+            <span className={`badge ${stato.classe}`} style={{ flexShrink: 0 }}>{stato.etichetta}</span>
           </div>
 
-          <p style={{ fontSize: 14, marginBottom: 10 }}>
-            <strong>Bus suggeriti: {linea.busSuggeriti}</strong>
-            <span style={{ color: 'var(--mist)' }}> — stima in base ai passeggeri per fermata; l'orario di ogni bus resta da compilare a mano.</span>
-          </p>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
-            {linea.fermate.map((f) => (
-              <span key={f.fermataId} className="chip">{f.citta} <span className="chip-num">{f.passeggeri}</span></span>
-            ))}
-          </div>
-
-          <div className="section-divider">
-            <p className="section-label">Bus registrati su questa tratta</p>
-            {busLista.filter((b) => b.lineeIds.includes(linea.lineaId)).map((b) => (
-              <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
-                <span className="riga-titolo">
-                  {b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}
-                  {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>Tour leader: {b.tourLeaderNome}</span></>}
+          {espansa && (
+            <div style={{ marginTop: 14 }}>
+              <p style={{ fontSize: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span>
+                  <strong>Bus suggeriti: {linea.busSuggeriti}</strong>
+                  <span style={{ color: 'var(--mist)' }}> — stima in base ai passeggeri per fermata; l'orario di ogni bus resta da compilare a mano.</span>
                 </span>
-                <span className="riga-meta">
-                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => generaLista(b)} disabled={generandoLista === b.id}>
-                    {generandoLista === b.id ? 'Genero...' : '⤓ Genera lista'}
-                  </button>
-                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => apriModificaBus(b)}>Modifica</button>
-                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px', color: 'var(--pink)' }} onClick={() => rimuoviBus(b)}>Rimuovi</button>
-                </span>
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={(e) => { e.stopPropagation(); apriNuovoBus(linea.lineaId); }}>
+                  + Censisci bus per questa tratta
+                </button>
+              </p>
+
+              <button
+                type="button"
+                className={`badge badge-btn ${linea.coperta ? 'coperta' : 'non-coperta'}`}
+                style={{ marginBottom: 12 }}
+                onClick={(e) => { e.stopPropagation(); toggleCopertura(linea); }}
+              >
+                {linea.coperta ? '✓ Segnata come coperta — clicca per togliere' : 'Segna come coperta'}
+              </button>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+                {linea.fermate.map((f) => (
+                  <span key={f.fermataId} className="chip">{f.citta} <span className="chip-num">{f.passeggeri}</span></span>
+                ))}
               </div>
-            ))}
-            {busLista.filter((b) => b.lineeIds.includes(linea.lineaId)).length === 0 && (
-              <p className="testo-intro" style={{ marginBottom: 0, fontSize: 13 }}>Nessun bus ancora censito per questa tratta.</p>
-            )}
-          </div>
+
+              <div className="section-divider">
+                <p className="section-label">Bus registrati su questa tratta</p>
+                {busTratta.map((b) => (
+                  <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
+                    <span className="riga-titolo">
+                      {b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}
+                      {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>Tour leader: {b.tourLeaderNome}</span></>}
+                    </span>
+                    <span className="riga-meta">
+                      <button className="btn btn-primary" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => generaLista(b)} disabled={generandoLista === b.id}>
+                        {generandoLista === b.id ? 'Genero...' : '⤓ Genera lista'}
+                      </button>
+                      <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => apriModificaBus(b)}>Modifica</button>
+                      <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px', color: 'var(--pink)' }} onClick={() => rimuoviBus(b)}>Rimuovi</button>
+                    </span>
+                  </div>
+                ))}
+                {busTratta.length === 0 && (
+                  <p className="testo-intro" style={{ marginBottom: 0, fontSize: 13 }}>Nessun bus ancora censito per questa tratta.</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         );
       })}
 
       {calcolo.length > 0 && (
-        <button className="btn btn-primary" onClick={apriNuovoBus}>+ Censisci bus</button>
+        <button className="btn btn-primary" onClick={() => apriNuovoBus()}>+ Censisci bus</button>
       )}
 
       {modaleAperta && (
