@@ -191,14 +191,9 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
 
           {espansa && (
             <div style={{ marginTop: 14 }}>
-              <p style={{ fontSize: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <span>
-                  <strong>Bus suggeriti: {linea.busSuggeriti}</strong>
-                  <span style={{ color: 'var(--mist)' }}> — stima in base ai passeggeri per fermata; l'orario di ogni bus resta da compilare a mano.</span>
-                </span>
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={(e) => { e.stopPropagation(); apriNuovoBus(linea.lineaId); }}>
-                  + Censisci bus per questa tratta
-                </button>
+              <p style={{ fontSize: 14, marginBottom: 10 }}>
+                <strong>Bus suggeriti: {linea.busSuggeriti}</strong>
+                <span style={{ color: 'var(--mist)' }}> — stima in base ai passeggeri per fermata; l'orario di ogni bus resta da compilare a mano.</span>
               </p>
 
               <button
@@ -217,7 +212,12 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
               </div>
 
               <div className="section-divider">
-                <p className="section-label">Bus registrati su questa tratta</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                  <p className="section-label" style={{ marginBottom: 0 }}>Bus registrati su questa tratta</p>
+                  <button type="button" className="btn btn-primary" style={{ fontSize: 12.5, padding: '6px 14px' }} onClick={(e) => { e.stopPropagation(); apriNuovoBus(linea.lineaId); }}>
+                    + Censisci bus per questa tratta
+                  </button>
+                </div>
                 {busTratta.map((b) => (
                   <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
                     <span className="riga-titolo">
@@ -242,10 +242,6 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
         </div>
         );
       })}
-
-      {calcolo.length > 0 && (
-        <button className="btn btn-primary" onClick={() => apriNuovoBus()}>+ Censisci bus</button>
-      )}
 
       {modaleAperta && (
         <Modale titolo={inModifica ? 'Modifica bus' : 'Censisci nuovo bus'} onClose={() => setModaleAperta(false)}>

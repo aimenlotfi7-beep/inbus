@@ -19,16 +19,31 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
   }
   useEffect(ricarica, [eventoId]);
 
+  const [linkDaCopiare, setLinkDaCopiare] = useState<{ nome: string; link: string } | null>(null);
+  const [linkCopiato, setLinkCopiato] = useState(false);
+
   async function promuovi(riga: IscrizioneListaAttesa) {
     if (!confirm(`Promuovere ${riga.nome} ${riga.cognome ?? ''}? Le manderemo un'email con il link per completare la prenotazione.`)) return;
     try {
       const r = await listaAttesaApi.promuovi(riga.id);
       if (!r.emailInviata) {
-        alert(`Email non configurata: copia questo link e mandalo a mano al cliente:\n\n${r.link}`);
+        setLinkDaCopiare({ nome: `${riga.nome} ${riga.cognome ?? ''}`, link: r.link });
       }
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+    }
+  }
+
+  async function copiaLink() {
+    if (!linkDaCopiare) return;
+    try {
+      await navigator.clipboard.writeText(linkDaCopiare.link);
+      setLinkCopiato(true);
+      setTimeout(() => setLinkCopiato(false), 2500);
+    } catch {
+      // Se il browser blocca la copia automatica (raro), il link resta
+      // comunque visibile e selezionabile a mano nel riquadro qui sotto.
     }
   }
 
@@ -47,6 +62,28 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
 
   return (
     <div>
+      {linkDaCopiare && (
+        <div className="section-card" style={{ marginBottom: 16, borderColor: 'var(--pink)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+            <p className="section-label" style={{ marginBottom: 8 }}>
+              Email non configurata — invia questo link a {linkDaCopiare.nome} a mano
+            </p>
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 16, padding: '0 6px' }} onClick={() => setLinkDaCopiare(null)} title="Chiudi">✕</button>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              readOnly
+              value={linkDaCopiare.link}
+              onFocus={(e) => e.target.select()}
+              style={{ flex: 1, background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 6, padding: '8px 10px', color: 'var(--paper)', fontSize: 13 }}
+            />
+            <button type="button" className="btn btn-primary" style={{ fontSize: 13, padding: '8px 14px', flexShrink: 0 }} onClick={copiaLink}>
+              {linkCopiato ? '✓ Copiato' : 'Copia link'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
         <div className="section-card" style={{ flex: 1, minWidth: 160 }}>
           <p className="section-label" style={{ marginBottom: 4 }}>Partecipanti confermati</p>
