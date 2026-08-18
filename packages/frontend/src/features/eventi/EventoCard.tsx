@@ -32,9 +32,18 @@ export function EventoCard({ evento }: { evento: Evento }) {
 
   return (
     <Link to={`/eventi/${evento.slug}`} className="card reveal in" style={{ display: 'block', color: 'inherit' }}>
-      <div className="card-visual" style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
-        {!copertina && <div className="beam" />}
-        <span className="tag">{evento.genere}</span>
+      <div className="card-visual">
+        {copertina ? (
+          <img
+            src={copertina}
+            alt={`${evento.artista} — ${evento.luogo}, ${evento.citta}`}
+            loading="lazy"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <div className="beam" />
+        )}
+        <span className="tag" style={{ position: 'relative', zIndex: 1 }}>{evento.genere}</span>
       </div>
       <div className="card-body">
         <h3>{evento.artista}</h3>

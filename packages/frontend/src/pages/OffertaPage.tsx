@@ -41,11 +41,24 @@ export function OffertaPage() {
       : 'Offerta speciale INBUS.',
     image: copertina,
     url: window.location.href,
+    jsonLd: evento && offerta ? {
+      '@context': 'https://schema.org',
+      '@type': 'Event',
+      name: evento.artista,
+      startDate: evento.data,
+      eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+      eventStatus: 'https://schema.org/EventScheduled',
+      location: { '@type': 'Place', name: evento.luogo, address: { '@type': 'PostalAddress', addressLocality: evento.citta, addressCountry: 'IT' } },
+      ...(copertina && { image: [copertina] }),
+      ...(prezzoMinimo !== null && {
+        offers: { '@type': 'Offer', price: (prezzoMinimo * (1 - offerta.scontoPercentuale / 100)).toFixed(2), priceCurrency: 'EUR', availability: 'https://schema.org/InStock', url: window.location.href },
+      }),
+    } : undefined,
   });
 
   return (
     <Layout>
-      <div style={{ maxWidth: 960, margin: '40px auto 80px', padding: '0 20px' }}>
+      <div style={{ maxWidth: 1180, margin: '32px auto 80px', padding: '0 20px' }}>
         {stato === 'caricamento' && <p>Carico l'offerta...</p>}
 
         {stato === 'non-trovata' && (
@@ -55,29 +68,42 @@ export function OffertaPage() {
         )}
 
         {stato === 'pronto' && evento && offerta && (
-          <div className="checkout-modal-wide" style={{ background: 'transparent', maxWidth: 'none' }}>
-            <div className="checkout-columns" style={{ maxHeight: 'none', borderRadius: 18, overflow: 'hidden' }}>
-              <div className="checkout-col-info" style={{ maxHeight: 'none' }}>
-                <div className="checkout-cover" style={copertina ? { backgroundImage: `url(${copertina})` } : undefined} />
-                <span className="tag">🎉 {offerta.nome}</span>
-                <h2>{evento.artista}</h2>
-                <p className="meta-info">{evento.luogo}, {evento.citta}</p>
-                <p className="meta-info">{new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <>
+            <div className={`evento-pagina-hero${copertina ? '' : ' senza-foto'}`} style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
+              <span className="tag">🎉 {offerta.nome}</span>
+            </div>
+
+            <div className="evento-pagina-corpo">
+              <div className="evento-pagina-info">
+                <h1>{evento.artista}</h1>
+                <p className="meta-riga">📍 {evento.luogo}, {evento.citta}</p>
+                <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+
                 <p style={{ background: 'rgba(91,224,160,.15)', border: '1px solid rgba(91,224,160,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, display: 'inline-block', marginTop: 12 }}>
                   -{offerta.scontoPercentuale.toFixed(0)}% su tutte le fermate
                 </p>
+
                 {prezzoMinimo !== null && (
-                  <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, marginTop: 14 }}>
+                  <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 24, marginTop: 18 }}>
                     da €{(prezzoMinimo * (1 - offerta.scontoPercentuale / 100)).toFixed(2)}
-                    <span style={{ fontSize: 12, opacity: .7 }}> invece di €{prezzoMinimo.toFixed(2)}</span>
+                    <span style={{ fontSize: 13, opacity: .7 }}> invece di €{prezzoMinimo.toFixed(2)}</span>
                   </p>
                 )}
+
+                {evento.immagini.length > 1 && (
+                  <div className="galleria">
+                    {evento.immagini.slice(1).map((img) => (
+                      <img key={img.id} src={img.url} alt={`${evento.artista} — foto`} loading="lazy" />
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="checkout-col-form" style={{ maxHeight: 'none' }}>
+
+              <div className="evento-pagina-checkout">
                 <CheckoutForm evento={evento} offerta={offerta} />
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </Layout>

@@ -17,8 +17,8 @@ type Stato = 'caricamento' | 'pronto' | 'non-trovato';
 
 /** Pagina propria per ogni evento — indicizzabile da Google e
  *  condivisibile con un'anteprima specifica (titolo, immagine, prezzo).
- *  Foto e info a sinistra, modulo di prenotazione a destra, sempre
- *  visibile: niente popup da aprire. */
+ *  Foto grande in alto, informazioni sotto, modulo di prenotazione a
+ *  parte (a destra su schermi larghi) — niente popup da aprire. */
 export function EventoPage() {
   const { slug } = useParams<{ slug: string }>();
   const [stato, setStato] = useState<Stato>('caricamento');
@@ -59,7 +59,7 @@ export function EventoPage() {
 
   return (
     <Layout>
-      <div style={{ maxWidth: 960, margin: '40px auto 80px', padding: '0 20px' }}>
+      <div style={{ maxWidth: 1180, margin: '32px auto 80px', padding: '0 20px' }}>
         {stato === 'caricamento' && <p>Carico...</p>}
 
         {stato === 'non-trovato' && (
@@ -69,14 +69,16 @@ export function EventoPage() {
         )}
 
         {stato === 'pronto' && evento && (
-          <div className="checkout-modal-wide" style={{ background: 'transparent', maxWidth: 'none' }}>
-            <div className="checkout-columns" style={{ maxHeight: 'none', borderRadius: 18, overflow: 'hidden' }}>
-              <div className="checkout-col-info" style={{ maxHeight: 'none' }}>
-                <div className="checkout-cover" style={copertina ? { backgroundImage: `url(${copertina})` } : undefined} />
-                <span className="tag">{evento.genere}</span>
-                <h2>{evento.artista}</h2>
-                <p className="meta-info">{evento.luogo}, {evento.citta}</p>
-                <p className="meta-info">{new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <>
+            <div className={`evento-pagina-hero${copertina ? '' : ' senza-foto'}`} style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
+              <span className="tag">{evento.genere}</span>
+            </div>
+
+            <div className="evento-pagina-corpo">
+              <div className="evento-pagina-info">
+                <h1>{evento.artista}</h1>
+                <p className="meta-riga">📍 {evento.luogo}, {evento.citta}</p>
+                <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
 
                 {evento.statoDisponibilita && (
                   <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, display: 'inline-block', marginTop: 12 }}>
@@ -85,23 +87,23 @@ export function EventoPage() {
                 )}
 
                 {prezzoMinimo !== null && (
-                  <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, marginTop: 18 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 12, opacity: .7 }}>/persona</span></p>
+                  <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 24, marginTop: 18 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
                 )}
 
                 {evento.immagini.length > 1 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 8, marginTop: 20 }}>
+                  <div className="galleria">
                     {evento.immagini.slice(1).map((img) => (
-                      <img key={img.id} src={img.url} alt={`${evento.artista} — foto`} style={{ width: '100%', height: 70, objectFit: 'cover', borderRadius: 8 }} />
+                      <img key={img.id} src={img.url} alt={`${evento.artista} — foto`} loading="lazy" />
                     ))}
                   </div>
                 )}
               </div>
 
-              <div className="checkout-col-form" style={{ maxHeight: 'none' }}>
+              <div className="evento-pagina-checkout">
                 <CheckoutForm evento={evento} />
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </Layout>
