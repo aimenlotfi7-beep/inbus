@@ -351,10 +351,12 @@ export const eventiService = {
     }> = [];
 
     for (const linea of evento.linee) {
-      if (linea.postiDisponibili <= 0) continue;
-      // Con il nuovo modello, l'arrivo è un campo separato della tratta
-      // (non più l'ultima fermata): tutte le fermate qui sono partenze
-      // valide, nessuna esclusione.
+      // Nota: prima qui si saltava del tutto la tratta se il bus era
+      // esaurito — ma così il cliente non aveva modo di scegliere PER
+      // QUALE fermata mettersi in lista d'attesa (il menu restava vuoto).
+      // Ora le fermate compaiono sempre, con posti disponibili a 0
+      // quando è il caso: la scelta resta possibile, solo che porta
+      // alla lista d'attesa invece che al pagamento.
       for (const f of linea.fermate) {
         const prezzoEffettivo = f.prezzo
           ? Number(f.prezzo)

@@ -1,7 +1,7 @@
 import { eq, and, desc } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { listaAttesa, eventi, prenotazioni } from '../../db/schema.js';
+import { listaAttesa, eventi, prenotazioni, fermate } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
@@ -26,8 +26,30 @@ export const listaAttesaService = {
     return riga;
   },
 
+  /** Elenco iscrizioni alla lista d'attesa per un evento, con il nome
+   *  della fermata scelta (se c'era una disponibile al momento
+   *  dell'iscrizione) — così chi gestisce l'evento sa subito per quale
+   *  fermata c'è più richiesta. */
   async listByEvento(eventoId: string) {
-    return db.select().from(listaAttesa).where(eq(listaAttesa.eventoId, eventoId)).orderBy(desc(listaAttesa.dataCreazione));
+    const righe = await db
+      .select({
+        id: listaAttesa.id,
+        nome: listaAttesa.nome,
+        cognome: listaAttesa.cognome,
+        email: listaAttesa.email,
+        telefono: listaAttesa.telefono,
+        passeggeri: listaAttesa.passeggeri,
+        stato: listaAttesa.stato,
+        emailInviata: listaAttesa.emailInviata,
+        completata: listaAttesa.completata,
+        dataCreazione: listaAttesa.dataCreazione,
+        fermataCitta: fermate.citta,
+      })
+      .from(listaAttesa)
+      .leftJoin(fermate, eq(fermate.id, listaAttesa.fermataId))
+      .where(eq(listaAttesa.eventoId, eventoId))
+      .orderBy(desc(listaAttesa.dataCreazione));
+    return righe;
   },
 
   /** Conta i passeggeri totali confermati per un evento (somma su tutte

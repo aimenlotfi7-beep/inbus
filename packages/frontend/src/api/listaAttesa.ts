@@ -36,6 +36,7 @@ export interface IscrizioneListaAttesa {
   emailInviata: boolean;
   completata: boolean;
   dataCreazione: string;
+  fermataCitta: string | null;
 }
 
 export const listaAttesaApi = {

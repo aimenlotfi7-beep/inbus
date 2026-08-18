@@ -34,12 +34,41 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
 
   if (caricamento) return <p className="testo-intro">Carico...</p>;
 
+  // Raggruppo per fermata (in attesa, non ancora promosse) — così si
+  // vede subito quante persone aspettano e per quale città, senza
+  // doverle contare a mano scorrendo l'elenco.
+  const inAttesa = lista.filter((r) => r.stato === 'IN_ATTESA');
+  const perFermata = new Map<string, { passeggeri: number; iscritti: number }>();
+  for (const r of inAttesa) {
+    const chiave = r.fermataCitta ?? 'Nessuna fermata scelta';
+    const attuale = perFermata.get(chiave) ?? { passeggeri: 0, iscritti: 0 };
+    perFermata.set(chiave, { passeggeri: attuale.passeggeri + r.passeggeri, iscritti: attuale.iscritti + 1 });
+  }
+
   return (
     <div>
-      <div className="section-card" style={{ marginBottom: 16 }}>
-        <p className="section-label" style={{ marginBottom: 4 }}>Partecipanti confermati</p>
-        <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 26 }}>{partecipanti ?? 0}</p>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+        <div className="section-card" style={{ flex: 1, minWidth: 160 }}>
+          <p className="section-label" style={{ marginBottom: 4 }}>Partecipanti confermati</p>
+          <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 26 }}>{partecipanti ?? 0}</p>
+        </div>
+        <div className="section-card" style={{ flex: 1, minWidth: 160 }}>
+          <p className="section-label" style={{ marginBottom: 4 }}>In lista d'attesa</p>
+          <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 26 }}>{inAttesa.reduce((s, r) => s + r.passeggeri, 0)}</p>
+        </div>
       </div>
+
+      {perFermata.size > 0 && (
+        <div className="section-card" style={{ marginBottom: 16 }}>
+          <p className="section-label" style={{ marginBottom: 10 }}>Richieste per fermata</p>
+          {Array.from(perFermata.entries()).map(([citta, dati]) => (
+            <div key={citta} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 14 }}>
+              <span>{citta}</span>
+              <span style={{ color: 'var(--mist)' }}>{dati.passeggeri} passeggero/i · {dati.iscritti} iscrizione/i</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <p className="section-label" style={{ marginBottom: 10 }}>Lista d'attesa</p>
       {lista.length === 0 && <p className="testo-intro">Nessuna iscrizione alla lista d'attesa per questo evento.</p>}
@@ -48,6 +77,7 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
         <div key={riga.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
           <span className="riga-titolo">
             {riga.nome} {riga.cognome ?? ''} · {riga.passeggeri} passeggero/i
+            {riga.fermataCitta && <> · <span style={{ color: 'var(--amber)' }}>{riga.fermataCitta}</span></>}
             <br />
             <span style={{ color: 'var(--mist)', fontSize: 12 }}>{riga.email}{riga.telefono ? ` · ${riga.telefono}` : ''}</span>
           </span>
