@@ -115,6 +115,7 @@ export const eventiService = {
           arrivoIndirizzo: input.arrivoIndirizzo,
           arrivoOrario: input.arrivoOrario,
           visibileSito: input.visibileSito,
+          descrizione: input.descrizione,
         })
         .returning();
 
@@ -187,6 +188,7 @@ export const eventiService = {
           ...(input.arrivoIndirizzo !== undefined && { arrivoIndirizzo: input.arrivoIndirizzo }),
           ...(input.arrivoOrario !== undefined && { arrivoOrario: input.arrivoOrario }),
           ...(input.visibileSito !== undefined && { visibileSito: input.visibileSito }),
+          ...(input.descrizione !== undefined && { descrizione: input.descrizione }),
           aggiornatoIl: new Date(),
         })
         .where(eq(eventi.id, id));

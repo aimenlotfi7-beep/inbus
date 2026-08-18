@@ -7,7 +7,7 @@ import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { NonTrovato, ConflittoDati, VietatoDaiPermessi } from '../../shared/errors.js';
-import { permessiEffettivi, puoAssegnare, chiaviNonPossedute } from '../auth/permessi.service.js';
+import { permessiEffettivi, chiaviNonPossedute } from '../auth/permessi.service.js';
 
 const creaRuoloSchema = z.object({
   nome: z.string().min(1),

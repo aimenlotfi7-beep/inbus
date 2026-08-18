@@ -18,6 +18,7 @@ export interface EventoInput {
   // tutte le sue tratte come ancora per il calcolo orari.
   arrivoIndirizzo?: string; arrivoOrario?: string;
   visibileSito?: boolean;
+  descrizione?: string;
   immagini?: string[]; allegati?: { nome: string; url: string }[]; linee?: LineaInput[];
 }
 

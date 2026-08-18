@@ -17,8 +17,9 @@ type Stato = 'caricamento' | 'pronto' | 'non-trovato';
 
 /** Pagina propria per ogni evento — indicizzabile da Google e
  *  condivisibile con un'anteprima specifica (titolo, immagine, prezzo).
- *  Foto grande in alto, informazioni sotto, modulo di prenotazione a
- *  parte (a destra su schermi larghi) — niente popup da aprire. */
+ *  A sinistra: foto piccola + sezione informazioni (scritta dal
+ *  gestionale). A destra: prenotazione a step, sempre visibile, niente
+ *  popup da aprire. */
 export function EventoPage() {
   const { slug } = useParams<{ slug: string }>();
   const [stato, setStato] = useState<Stato>('caricamento');
@@ -59,7 +60,7 @@ export function EventoPage() {
 
   return (
     <Layout>
-      <div style={{ maxWidth: 1180, margin: '32px auto 80px', padding: '0 20px' }}>
+      <div style={{ maxWidth: 1100, margin: '32px auto 80px', padding: '0 20px' }}>
         {stato === 'caricamento' && <p>Carico...</p>}
 
         {stato === 'non-trovato' && (
@@ -69,41 +70,46 @@ export function EventoPage() {
         )}
 
         {stato === 'pronto' && evento && (
-          <>
-            <div className={`evento-pagina-hero${copertina ? '' : ' senza-foto'}`} style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
-              <span className="tag">{evento.genere}</span>
-            </div>
-
-            <div className="evento-pagina-corpo">
-              <div className="evento-pagina-info">
-                <h1>{evento.artista}</h1>
-                <p className="meta-riga">📍 {evento.luogo}, {evento.citta}</p>
-                <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-
-                {evento.statoDisponibilita && (
-                  <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, display: 'inline-block', marginTop: 12 }}>
-                    {ETICHETTA_STATO[evento.statoDisponibilita]}
-                  </p>
-                )}
-
-                {prezzoMinimo !== null && (
-                  <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 24, marginTop: 18 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
-                )}
-
-                {evento.immagini.length > 1 && (
-                  <div className="galleria">
-                    {evento.immagini.slice(1).map((img) => (
-                      <img key={img.id} src={img.url} alt={`${evento.artista} — foto`} loading="lazy" />
-                    ))}
-                  </div>
-                )}
+          <div className="evento-pagina-corpo">
+            <div className="evento-pagina-info">
+              <div className={`evento-pagina-hero${copertina ? '' : ' senza-foto'}`} style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
+                <span className="tag">{evento.genere}</span>
               </div>
 
-              <div className="evento-pagina-checkout">
-                <CheckoutForm evento={evento} />
-              </div>
+              <h1>{evento.artista}</h1>
+              <p className="meta-riga">📍 {evento.luogo}, {evento.citta}</p>
+              <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+
+              {evento.statoDisponibilita && (
+                <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, display: 'inline-block', marginTop: 10 }}>
+                  {ETICHETTA_STATO[evento.statoDisponibilita]}
+                </p>
+              )}
+
+              {prezzoMinimo !== null && (
+                <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, marginTop: 14 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
+              )}
+
+              {evento.descrizione && (
+                <div className="sezione-info">
+                  <h4>Informazioni</h4>
+                  {evento.descrizione}
+                </div>
+              )}
+
+              {evento.immagini.length > 1 && (
+                <div className="galleria">
+                  {evento.immagini.slice(1).map((img) => (
+                    <img key={img.id} src={img.url} alt={`${evento.artista} — foto`} loading="lazy" />
+                  ))}
+                </div>
+              )}
             </div>
-          </>
+
+            <div className="evento-pagina-checkout">
+              <CheckoutForm evento={evento} />
+            </div>
+          </div>
         )}
       </div>
     </Layout>

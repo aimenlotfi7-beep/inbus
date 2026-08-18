@@ -71,6 +71,7 @@ export function SchedaEventoModale({
         arrivoIndirizzo: evento.arrivoIndirizzo ?? undefined,
         arrivoOrario: evento.arrivoOrario ?? undefined,
         visibileSito: evento.visibileSito,
+        descrizione: evento.descrizione ?? undefined,
         immagini: [...evento.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
         linee: evento.linee.map((l) => ({
           id: l.id,
@@ -355,6 +356,15 @@ export function SchedaEventoModale({
           Se lo disattivi, l'evento non compare mai sul sito (anche se è nel futuro). Gli eventi con data già
           passata comunque non compaiono più sul sito, a prescindere da questo interruttore.
         </p>
+      </div>
+      <div className="campo">
+        <label>Informazioni per i clienti (mostrate sulla pagina dell'evento, sotto la foto)</label>
+        <textarea
+          value={form.descrizione ?? ''}
+          onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
+          rows={5}
+          placeholder="Es. orario e punto di ritrovo, cosa portare, regole del bus, contatti in caso di emergenza..."
+        />
       </div>
     </>
   );

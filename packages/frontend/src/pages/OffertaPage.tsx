@@ -58,7 +58,7 @@ export function OffertaPage() {
 
   return (
     <Layout>
-      <div style={{ maxWidth: 1180, margin: '32px auto 80px', padding: '0 20px' }}>
+      <div style={{ maxWidth: 1100, margin: '32px auto 80px', padding: '0 20px' }}>
         {stato === 'caricamento' && <p>Carico l'offerta...</p>}
 
         {stato === 'non-trovata' && (
@@ -68,42 +68,47 @@ export function OffertaPage() {
         )}
 
         {stato === 'pronto' && evento && offerta && (
-          <>
-            <div className={`evento-pagina-hero${copertina ? '' : ' senza-foto'}`} style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
-              <span className="tag">🎉 {offerta.nome}</span>
-            </div>
+          <div className="evento-pagina-corpo">
+            <div className="evento-pagina-info">
+              <div className={`evento-pagina-hero${copertina ? '' : ' senza-foto'}`} style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
+                <span className="tag">🎉 {offerta.nome}</span>
+              </div>
 
-            <div className="evento-pagina-corpo">
-              <div className="evento-pagina-info">
-                <h1>{evento.artista}</h1>
-                <p className="meta-riga">📍 {evento.luogo}, {evento.citta}</p>
-                <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <h1>{evento.artista}</h1>
+              <p className="meta-riga">📍 {evento.luogo}, {evento.citta}</p>
+              <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
 
-                <p style={{ background: 'rgba(91,224,160,.15)', border: '1px solid rgba(91,224,160,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, display: 'inline-block', marginTop: 12 }}>
-                  -{offerta.scontoPercentuale.toFixed(0)}% su tutte le fermate
+              <p style={{ background: 'rgba(91,224,160,.15)', border: '1px solid rgba(91,224,160,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, display: 'inline-block', marginTop: 10 }}>
+                -{offerta.scontoPercentuale.toFixed(0)}% su tutte le fermate
+              </p>
+
+              {prezzoMinimo !== null && (
+                <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, marginTop: 14 }}>
+                  da €{(prezzoMinimo * (1 - offerta.scontoPercentuale / 100)).toFixed(2)}
+                  <span style={{ fontSize: 13, opacity: .7 }}> invece di €{prezzoMinimo.toFixed(2)}</span>
                 </p>
+              )}
 
-                {prezzoMinimo !== null && (
-                  <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 24, marginTop: 18 }}>
-                    da €{(prezzoMinimo * (1 - offerta.scontoPercentuale / 100)).toFixed(2)}
-                    <span style={{ fontSize: 13, opacity: .7 }}> invece di €{prezzoMinimo.toFixed(2)}</span>
-                  </p>
-                )}
+              {evento.descrizione && (
+                <div className="sezione-info">
+                  <h4>Informazioni</h4>
+                  {evento.descrizione}
+                </div>
+              )}
 
-                {evento.immagini.length > 1 && (
-                  <div className="galleria">
-                    {evento.immagini.slice(1).map((img) => (
-                      <img key={img.id} src={img.url} alt={`${evento.artista} — foto`} loading="lazy" />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="evento-pagina-checkout">
-                <CheckoutForm evento={evento} offerta={offerta} />
-              </div>
+              {evento.immagini.length > 1 && (
+                <div className="galleria">
+                  {evento.immagini.slice(1).map((img) => (
+                    <img key={img.id} src={img.url} alt={`${evento.artista} — foto`} loading="lazy" />
+                  ))}
+                </div>
+              )}
             </div>
-          </>
+
+            <div className="evento-pagina-checkout">
+              <CheckoutForm evento={evento} offerta={offerta} />
+            </div>
+          </div>
         )}
       </div>
     </Layout>

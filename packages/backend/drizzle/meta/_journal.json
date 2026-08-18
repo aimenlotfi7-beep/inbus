@@ -106,6 +106,13 @@
       "when": 1786977786657,
       "tag": "0015_aggiungi_slug_evento",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1787046973650,
+      "tag": "0016_aggiungi_descrizione_evento",
+      "breakpoints": true
     }
   ]
 }

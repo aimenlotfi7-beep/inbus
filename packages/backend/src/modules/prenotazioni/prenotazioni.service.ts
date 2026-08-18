@@ -1,6 +1,6 @@
 import { and, eq, sql, desc, inArray } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { prenotazioni, lineeBus, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento } from '../../db/schema.js';
+import { prenotazioni, lineeBus, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo } from '../../shared/errors.js';
 import { utentiService } from '../utenti/utenti.service.js';
 import { env } from '../../config/env.js';
@@ -22,6 +22,26 @@ async function validaCoupon(codice: string | undefined, importo: number) {
 
   const sconto = c.tipo === 'PERCENTUALE' ? importo * (Number(c.valore) / 100) : Math.min(Number(c.valore), importo);
   return { sconto, coupon: c };
+}
+
+/** Ricalcola il totale "vero" di una prenotazione (prezzo pieno, non
+ *  l'acconto) — usato sia per completare il saldo sia per mostrare
+ *  quanto manca. Deve tenere conto dell'eventuale offerta con cui è
+ *  stata fatta la prenotazione, altrimenti a chi ha prenotato con uno
+ *  sconto verrebbe chiesto il saldo pieno, senza sconto, per errore. */
+async function calcolaTotaleReale(p: typeof prenotazioni.$inferSelect) {
+  const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
+  const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, p.lineaId)).limit(1);
+  const [fermata] = await db.select().from(fermate).where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.lineaId, p.lineaId))).limit(1);
+  const prezzoNormale = fermata?.prezzo ? Number(fermata.prezzo) : (evento?.prezzo ? Number(evento.prezzo) : 0) + Number(linea?.prezzoExtra ?? 0);
+
+  let prezzoEffettivo = prezzoNormale;
+  if (p.offertaId) {
+    const [offerta] = await db.select().from(offerteEvento).where(eq(offerteEvento.id, p.offertaId)).limit(1);
+    if (offerta) prezzoEffettivo = prezzoNormale * (1 - Number(offerta.scontoPercentuale) / 100);
+  }
+
+  return prezzoEffettivo * p.passeggeri - Number(p.sconto);
 }
 
 export const prenotazioniService = {
@@ -57,12 +77,12 @@ export const prenotazioniService = {
       }
 
       const prezzoNormale = fermata.prezzo ? Number(fermata.prezzo) : (evento.prezzo ? Number(evento.prezzo) : 0) + Number(linea.prezzoExtra);
-      // Se la prenotazione arriva da un link con offerta dedicata, il
-      // prezzo dell'offerta sostituisce quello normale per fermata — è
-      // fisso indipendentemente da quale fermata scelga il cliente.
-      // Verificata qui (dentro la transazione, subito prima di
-      // confermare) per essere sicuri che sia ancora valida in questo
-      // preciso istante, non solo quando l'ha vista sulla pagina.
+      // Se la prenotazione arriva da un link con offerta dedicata, lo
+      // sconto percentuale dell'offerta si applica al prezzo normale
+      // della fermata scelta (non è un prezzo fisso: il prezzo varia
+      // già per fermata). Verificata qui (dentro la transazione, subito
+      // prima di confermare) per essere sicuri che sia ancora valida in
+      // questo preciso istante, non solo quando l'ha vista sulla pagina.
       let prezzoEffettivo = prezzoNormale;
       if (input.offertaId) {
         const { offerteService } = await import('../offerte/offerte.service.js');
@@ -294,11 +314,7 @@ export const prenotazioniService = {
     if (p.stato !== 'CONFERMATA') throw new ConflittoDati('Questa prenotazione non è più valida.');
     if (p.saldoPagato) return p;
 
-    const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
-    const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, p.lineaId)).limit(1);
-    const [fermata] = await db.select().from(fermate).where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.lineaId, p.lineaId))).limit(1);
-    const prezzoEffettivo = fermata?.prezzo ? Number(fermata.prezzo) : (evento?.prezzo ? Number(evento.prezzo) : 0) + Number(linea?.prezzoExtra ?? 0);
-    const totaleReale = prezzoEffettivo * p.passeggeri - Number(p.sconto);
+    const totaleReale = await calcolaTotaleReale(p);
 
     const [aggiornata] = await db
       .update(prenotazioni)
@@ -315,10 +331,7 @@ export const prenotazioniService = {
     const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
     if (!p) throw new NonTrovato('Prenotazione');
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
-    const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, p.lineaId)).limit(1);
-    const [fermata] = await db.select().from(fermate).where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.lineaId, p.lineaId))).limit(1);
-    const prezzoEffettivo = fermata?.prezzo ? Number(fermata.prezzo) : (evento?.prezzo ? Number(evento.prezzo) : 0) + Number(linea?.prezzoExtra ?? 0);
-    const totaleReale = prezzoEffettivo * p.passeggeri - Number(p.sconto);
+    const totaleReale = await calcolaTotaleReale(p);
     return {
       pnr: p.pnr,
       artista: evento?.artista ?? '',

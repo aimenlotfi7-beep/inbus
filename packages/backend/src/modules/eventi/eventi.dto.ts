@@ -49,6 +49,7 @@ export const creaEventoSchema = z.object({
   arrivoIndirizzo: z.string().optional(),
   arrivoOrario: z.string().optional(),
   visibileSito: z.boolean().default(true),
+  descrizione: z.string().optional(),
   immagini: z.array(z.string().url()).default([]),
   allegati: z.array(z.object({ nome: z.string(), url: z.string() })).default([]),
   linee: z.array(lineaSchema).default([]),

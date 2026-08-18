@@ -15,14 +15,21 @@ interface Partecipante { nome: string; cognome: string; }
  *  per fermata. */
 export interface OffertaCheckout { id: string; nome: string; scontoPercentuale: number; }
 
+const STEP = [
+  { numero: 1, label: 'Fermata e passeggeri' },
+  { numero: 2, label: 'I tuoi dati' },
+  { numero: 3, label: 'Pagamento' },
+] as const;
+
 /**
- * Tutto il modulo di prenotazione (fermata, passeggeri, dati richiedente,
- * pulsanti Acquista/Prenota) — usato sia dentro il popup della home
- * (CheckoutModal) sia direttamente nella pagina dedicata dell'evento,
- * senza popup.
+ * Modulo di prenotazione a step (come la creazione evento nel
+ * gestionale): 1) fermata+passeggeri, 2) dati richiedente e
+ * partecipanti, 3) pagamento — usato sia dentro il popup della home
+ * (CheckoutModal) sia direttamente nella pagina dedicata dell'evento.
  */
 export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; offerta?: OffertaCheckout; onChiudi?: () => void }) {
   const [stato, setStato] = useState<Stato>('caricamento');
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [opzioni, setOpzioni] = useState<OpzionePartenza[]>([]);
   const [fermataId, setFermataId] = useState('');
   const [passeggeri, setPasseggeri] = useState(1);
@@ -44,18 +51,12 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   useEffect(() => {
     eventiApi.opzioniPartenza(evento.id).then((o) => {
       setOpzioni(o);
-      // Preseleziona la prima fermata con posti, se ce n'è una — altrimenti
-      // la prima in assoluto (serve comunque per la lista d'attesa, come
-      // preferenza).
       const primaConPosti = o.find((x) => x.postiDisponibili > 0);
       setFermataId((primaConPosti ?? o[0])?.fermataId ?? '');
       setStato('pronto');
     });
   }, [evento.id]);
 
-  // Tanti moduli partecipante quanti sono i passeggeri oltre al
-  // richiedente (se passeggeri=1, nessun modulo partecipante: c'è solo
-  // il richiedente, che vale come unico passeggero).
   useEffect(() => {
     setPartecipanti((prev) => {
       const necessari = Math.max(0, passeggeri - 1);
@@ -86,9 +87,6 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   }
 
   const opzioneScelta = opzioni.find((o) => o.fermataId === fermataId);
-  // Il cliente non vede mai il numero esatto di posti: qui serve solo
-  // internamente per decidere se mostrare il checkout normale o la
-  // lista d'attesa.
   const nessunPostoDisponibile = opzioni.length === 0 || opzioni.every((o) => o.postiDisponibili === 0);
   const prezzoUnitario = opzioneScelta
     ? (offerta ? opzioneScelta.prezzoEffettivo * (1 - offerta.scontoPercentuale / 100) : opzioneScelta.prezzoEffettivo)
@@ -96,7 +94,6 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   const totale = opzioneScelta ? prezzoUnitario * passeggeri : 0;
   const moduloRichiedenteCompleto = Boolean(email && nome && cognome && telefono);
   const partecipantiCompleti = partecipanti.every((p) => p.nome.trim() && p.cognome.trim());
-  const puoConfermare = moduloRichiedenteCompleto && partecipantiCompleti && !!opzioneScelta;
 
   async function confermaPrenotazione(tipoPagamento: 'COMPLETO' | 'ACCONTO') {
     if (!opzioneScelta) return;
@@ -104,10 +101,6 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
     setMessaggioErrore('');
     try {
       const promoterCodice = new URLSearchParams(window.location.search).get('promo') || undefined;
-      // Catturati automaticamente dall'indirizzo se il cliente arriva da
-      // un link pubblicitario (es. ...?utm_source=meta&utm_medium=paid_social)
-      // — così sai sempre da dove arriva ogni prenotazione, senza dover
-      // fare nulla in più.
       const parametriUrl = new URLSearchParams(window.location.search);
       const utmSource = parametriUrl.get('utm_source') || undefined;
       const utmMedium = parametriUrl.get('utm_medium') || undefined;
@@ -193,111 +186,160 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
 
       {stato !== 'caricamento' && (
         <>
-          {nessunPostoDisponibile && (
-            <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
-              Al momento non ci sono posti disponibili. Iscriviti alla lista d'attesa: ti avviseremo via email
-              non appena si libera un posto, con un link per completare subito la prenotazione compilata ora.
-            </p>
-          )}
-
-          <label className="field-label">Fermata di partenza</label>
-          <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
-            {opzioni.map((o) => {
-              const prezzoMostrato = offerta ? o.prezzoEffettivo * (1 - offerta.scontoPercentuale / 100) : o.prezzoEffettivo;
-              return (
-                <option key={o.fermataId} value={o.fermataId}>
-                  {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{prezzoMostrato.toFixed(2)}
-                  {offerta ? ` (invece di €${o.prezzoEffettivo.toFixed(2)})` : ''}
-                </option>
-              );
-            })}
-          </select>
-
-          <label className="field-label">Passeggeri</label>
-          <div className="qty-control">
-            <button type="button" onClick={() => setPasseggeri((p) => Math.max(1, p - 1))} aria-label="Togli passeggero">−</button>
-            <input
-              type="text"
-              inputMode="numeric"
-              style={{ width: 40, textAlign: 'center' }}
-              value={passeggeri}
-              onChange={(e) => {
-                const v = e.target.value.replace(/\D/g, '');
-                if (v === '') { setPasseggeri(1); return; }
-                setPasseggeri(Math.min(20, Math.max(1, Number(v))));
-              }}
-              onFocus={(e) => e.target.select()}
-            />
-            <button type="button" onClick={() => setPasseggeri((p) => Math.min(20, p + 1))} aria-label="Aggiungi passeggero">+</button>
+          <div className="checkout-stepper">
+            {STEP.map((s) => (
+              <div key={s.numero} className={`checkout-step-dot${step === s.numero ? ' active' : step > s.numero ? ' completato' : ''}`}>
+                <span>{step > s.numero ? '✓' : s.numero}</span> {s.label}
+              </div>
+            ))}
           </div>
 
-          <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>I tuoi dati (richiedente)</p>
-          {autocompilato && <p style={{ fontSize: 12, opacity: .7, marginTop: -4, marginBottom: 8 }}>Precompilato dai tuoi dati — puoi modificarlo.</p>}
-          <label className="field-label">Email</label>
-          <input type="email" value={email} onChange={(e) => emailCambiata(e.target.value)} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label className="field-label">Nome</label>
-              <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} />
-            </div>
-            <div>
-              <label className="field-label">Cognome</label>
-              <input type="text" value={cognome} onChange={(e) => setCognome(e.target.value)} />
-            </div>
-          </div>
-          <label className="field-label">Telefono</label>
-          <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-
-          {partecipanti.length > 0 && (
+          {step === 1 && (
             <>
-              <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>Altri passeggeri</p>
-              {partecipanti.map((p, idx) => (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-                  <input placeholder={`Nome passeggero ${idx + 2}`} value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} />
-                  <input placeholder="Cognome" value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} />
-                </div>
-              ))}
+              {nessunPostoDisponibile && (
+                <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
+                  Al momento non ci sono posti disponibili. Puoi comunque compilare i tuoi dati e iscriverti alla
+                  lista d'attesa: ti avviseremo via email non appena si libera un posto.
+                </p>
+              )}
+
+              <label className="field-label">Fermata di partenza</label>
+              <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
+                {opzioni.map((o) => {
+                  const prezzoMostrato = offerta ? o.prezzoEffettivo * (1 - offerta.scontoPercentuale / 100) : o.prezzoEffettivo;
+                  return (
+                    <option key={o.fermataId} value={o.fermataId}>
+                      {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{prezzoMostrato.toFixed(2)}
+                      {offerta ? ` (invece di €${o.prezzoEffettivo.toFixed(2)})` : ''}
+                    </option>
+                  );
+                })}
+              </select>
+
+              <label className="field-label">Passeggeri</label>
+              <div className="qty-control">
+                <button type="button" onClick={() => setPasseggeri((p) => Math.max(1, p - 1))} aria-label="Togli passeggero">−</button>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  style={{ width: 40, textAlign: 'center' }}
+                  value={passeggeri}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, '');
+                    if (v === '') { setPasseggeri(1); return; }
+                    setPasseggeri(Math.min(20, Math.max(1, Number(v))));
+                  }}
+                  onFocus={(e) => e.target.select()}
+                />
+                <button type="button" onClick={() => setPasseggeri((p) => Math.min(20, p + 1))} aria-label="Aggiungi passeggero">+</button>
+              </div>
+
+              <div className="checkout-step-nav">
+                <span />
+                <button className="search-cta" style={{ width: 'auto', margin: 0, padding: '12px 28px', opacity: opzioneScelta ? 1 : .5 }} disabled={!opzioneScelta} onClick={() => setStep(2)}>
+                  Avanti →
+                </button>
+              </div>
             </>
           )}
 
-          {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
-
-          {nessunPostoDisponibile ? (
-            <button
-              className="search-cta"
-              style={{ marginTop: 14, opacity: (stato === 'invio' || !moduloRichiedenteCompleto || !partecipantiCompleti) ? .5 : 1 }}
-              disabled={stato === 'invio' || !moduloRichiedenteCompleto || !partecipantiCompleti}
-              onClick={iscrivitiListaAttesa}
-            >
-              {stato === 'invio' ? 'Invio...' : "Iscriviti alla lista d'attesa"}
-            </button>
-          ) : (
+          {step === 2 && (
             <>
-              <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, margin: '18px 0 6px' }}>€{totale.toFixed(2)}</p>
-              <p style={{ fontSize: 12, opacity: .7, marginTop: -4 }}>I biglietti arriveranno via email al richiedente.</p>
+              <p className="field-label" style={{ marginBottom: 6 }}>I tuoi dati (richiedente)</p>
+              {autocompilato && <p style={{ fontSize: 12, opacity: .7, marginTop: -4, marginBottom: 8 }}>Precompilato dai tuoi dati — puoi modificarlo.</p>}
+              <label className="field-label">Email</label>
+              <input type="email" value={email} onChange={(e) => emailCambiata(e.target.value)} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className="field-label">Nome</label>
+                  <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} />
+                </div>
+                <div>
+                  <label className="field-label">Cognome</label>
+                  <input type="text" value={cognome} onChange={(e) => setCognome(e.target.value)} />
+                </div>
+              </div>
+              <label className="field-label">Telefono</label>
+              <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
 
-              <button
-                className="search-cta"
-                style={{ marginTop: 10, opacity: (stato === 'invio' || !puoConfermare) ? .5 : 1 }}
-                disabled={stato === 'invio' || !puoConfermare}
-                onClick={() => confermaPrenotazione('COMPLETO')}
-              >
-                {stato === 'invio' ? 'Invio...' : 'Acquista'}
-              </button>
+              {partecipanti.length > 0 && (
+                <>
+                  <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>Altri passeggeri</p>
+                  {partecipanti.map((p, idx) => (
+                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+                      <input placeholder={`Nome passeggero ${idx + 2}`} value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} />
+                      <input placeholder="Cognome" value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} />
+                    </div>
+                  ))}
+                </>
+              )}
 
-              <button
-                className="search-cta-secondaria"
-                style={{ opacity: (stato === 'invio' || !puoConfermare) ? .5 : 1 }}
-                disabled={stato === 'invio' || !puoConfermare}
-                onClick={() => confermaPrenotazione('ACCONTO')}
-              >
-                {stato === 'invio' ? 'Invio...' : 'Prenota'}
-              </button>
-              <p style={{ fontSize: 11, opacity: .65, marginTop: 6, textAlign: 'center' }}>
-                Con "Prenota" versi un acconto di €{Number(evento.accontoEur ?? 10).toFixed(2)} a passeggero
-                ({(Number(evento.accontoEur ?? 10) * passeggeri).toFixed(2)}€ totali ora) e salderai il resto entro
-                15 giorni prima della partenza.
-              </p>
+              <div className="checkout-step-nav">
+                <button className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '12px 24px' }} onClick={() => setStep(1)}>← Indietro</button>
+                <button
+                  className="search-cta"
+                  style={{ width: 'auto', margin: 0, padding: '12px 28px', opacity: (moduloRichiedenteCompleto && partecipantiCompleti) ? 1 : .5 }}
+                  disabled={!moduloRichiedenteCompleto || !partecipantiCompleti}
+                  onClick={() => setStep(3)}
+                >
+                  Avanti →
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
+
+              {nessunPostoDisponibile ? (
+                <>
+                  <p style={{ fontSize: 13.5, marginBottom: 14 }}>
+                    Confermi l'iscrizione alla lista d'attesa per <b>{passeggeri}</b> passeggero/i su "{evento.artista}"?
+                  </p>
+                  <button
+                    className="search-cta"
+                    style={{ opacity: stato === 'invio' ? .5 : 1 }}
+                    disabled={stato === 'invio'}
+                    onClick={iscrivitiListaAttesa}
+                  >
+                    {stato === 'invio' ? 'Invio...' : "Iscriviti alla lista d'attesa"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, margin: '0 0 6px' }}>€{totale.toFixed(2)}</p>
+                  <p style={{ fontSize: 12, opacity: .7, marginTop: -4 }}>I biglietti arriveranno via email al richiedente.</p>
+
+                  <button
+                    className="search-cta"
+                    style={{ marginTop: 10, opacity: stato === 'invio' ? .5 : 1 }}
+                    disabled={stato === 'invio'}
+                    onClick={() => confermaPrenotazione('COMPLETO')}
+                  >
+                    {stato === 'invio' ? 'Invio...' : 'Acquista'}
+                  </button>
+
+                  <button
+                    className="search-cta-secondaria"
+                    style={{ opacity: stato === 'invio' ? .5 : 1 }}
+                    disabled={stato === 'invio'}
+                    onClick={() => confermaPrenotazione('ACCONTO')}
+                  >
+                    {stato === 'invio' ? 'Invio...' : 'Prenota'}
+                  </button>
+                  <p style={{ fontSize: 11, opacity: .65, marginTop: 6, textAlign: 'center' }}>
+                    Con "Prenota" versi un acconto di €{Number(evento.accontoEur ?? 10).toFixed(2)} a passeggero
+                    ({(Number(evento.accontoEur ?? 10) * passeggeri).toFixed(2)}€ totali ora) e salderai il resto entro
+                    15 giorni prima della partenza.
+                  </p>
+                </>
+              )}
+
+              <div className="checkout-step-nav">
+                <button className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '12px 24px' }} onClick={() => setStep(2)}>← Indietro</button>
+                <span />
+              </div>
             </>
           )}
         </>

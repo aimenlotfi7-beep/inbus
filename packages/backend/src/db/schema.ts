@@ -82,6 +82,9 @@ export const eventi = pgTable('eventi', {
   // (default), vale comunque la regola "non visibile dopo la data
   // dell'evento" applicata separatamente.
   visibileSito: boolean('visibile_sito').notNull().default(true),
+  // Testo libero mostrato nella pagina pubblica dell'evento, sotto la
+  // foto — orari di ritrovo, cosa portare, regole del bus, ecc.
+  descrizione: text('descrizione'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
   aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 });
