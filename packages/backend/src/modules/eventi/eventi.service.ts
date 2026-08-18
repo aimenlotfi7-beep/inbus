@@ -483,7 +483,7 @@ export const eventiService = {
     });
   },
 
-  async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; note?: string; lineeIds: string[] }) {
+  async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; note?: string; lineeIds: string[] }) {
     const evento = await getById(eventoId);
     const lineeValide = new Set(evento.linee.map((l) => l.id));
     const lineeIdsFiltrate = input.lineeIds.filter((id) => lineeValide.has(id));
@@ -496,6 +496,7 @@ export const eventiService = {
         autistaNome: input.autistaNome,
         autistaTelefono: input.autistaTelefono,
         tourLeaderId: input.tourLeaderId,
+        costo: input.costo?.toFixed(2),
         note: input.note,
       }).returning();
       await tx.insert(busTratte).values(lineeIdsFiltrate.map((lineaId) => ({ busId: nuovo.id, lineaId })));
@@ -503,18 +504,19 @@ export const eventiService = {
     });
   },
 
-  async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; note?: string; lineeIds?: string[] }) {
+  async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; note?: string; lineeIds?: string[] }) {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
 
     return db.transaction(async (tx) => {
-      if (input.riferimento !== undefined || input.fornitoreId !== undefined || input.autistaNome !== undefined || input.autistaTelefono !== undefined || input.tourLeaderId !== undefined || input.note !== undefined) {
+      if (input.riferimento !== undefined || input.fornitoreId !== undefined || input.autistaNome !== undefined || input.autistaTelefono !== undefined || input.tourLeaderId !== undefined || input.costo !== undefined || input.note !== undefined) {
         await tx.update(busFisici).set({
           ...(input.riferimento !== undefined && { riferimento: input.riferimento }),
           ...(input.fornitoreId !== undefined && { fornitoreId: input.fornitoreId }),
           ...(input.autistaNome !== undefined && { autistaNome: input.autistaNome }),
           ...(input.autistaTelefono !== undefined && { autistaTelefono: input.autistaTelefono }),
           ...(input.tourLeaderId !== undefined && { tourLeaderId: input.tourLeaderId }),
+          ...(input.costo !== undefined && { costo: input.costo.toFixed(2) }),
           ...(input.note !== undefined && { note: input.note }),
         }).where(eq(busFisici.id, busId));
       }
@@ -588,6 +590,47 @@ export const eventiService = {
       }
     }
     return elenco;
+  },
+
+  /** Incassato, costo bus e guadagno per ogni tratta dell'evento —
+   *  l'incassato conta solo le prenotazioni CONFERMATA su quella tratta
+   *  (l'acconto versato per intero, non solo la parte già incassata: è
+   *  il "totale" della prenotazione, coerente con come viene mostrato
+   *  ovunque nel gestionale). Il costo è la somma dei bus registrati su
+   *  quella tratta (un bus copre sempre una tratta sola, come deciso). */
+  async riepilogoEconomico(eventoId: string) {
+    const evento = await getById(eventoId);
+    const lineeIds = evento.linee.map((l) => l.id);
+    if (lineeIds.length === 0) return [];
+
+    const prenotazioniConfermate = await db
+      .select({ lineaId: prenotazioni.lineaId, totale: prenotazioni.totale })
+      .from(prenotazioni)
+      .where(and(inArray(prenotazioni.lineaId, lineeIds), eq(prenotazioni.stato, 'CONFERMATA')));
+
+    const assegnazioni = lineeIds.length ? await db.select().from(busTratte).where(inArray(busTratte.lineaId, lineeIds)) : [];
+    const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
+    const bus = busIds.length ? await db.select().from(busFisici).where(inArray(busFisici.id, busIds)) : [];
+
+    return evento.linee.map((linea) => {
+      const incassato = prenotazioniConfermate
+        .filter((p) => p.lineaId === linea.id)
+        .reduce((s, p) => s + Number(p.totale), 0);
+
+      const busIdsTratta = assegnazioni.filter((a) => a.lineaId === linea.id).map((a) => a.busId);
+      const busTratta = bus.filter((b) => busIdsTratta.includes(b.id));
+      const costoCensito = busTratta.some((b) => b.costo !== null);
+      const costo = busTratta.reduce((s, b) => s + (b.costo ? Number(b.costo) : 0), 0);
+
+      return {
+        lineaId: linea.id,
+        nome: linea.nome,
+        incassato,
+        costo,
+        costoCensito, // false = nessun bus ha un costo compilato: il guadagno non è affidabile, va segnalato
+        guadagno: incassato - costo,
+      };
+    });
   },
 
   /** Conta quante tratte, in tutti gli eventi, hanno più passeggeri

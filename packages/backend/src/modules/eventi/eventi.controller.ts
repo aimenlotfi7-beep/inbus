@@ -71,6 +71,10 @@ export const eventiController = {
     res.json(await eventiService.listaPasseggeriBus(req.params.busId));
   },
 
+  async riepilogoEconomico(req: Request, res: Response) {
+    res.json(await eventiService.riepilogoEconomico(req.params.id));
+  },
+
   async allertePartenze(_req: Request, res: Response) {
     res.json({ conteggio: await eventiService.contaAllertePartenze() });
   },

@@ -88,6 +88,7 @@ export const creaBusSchema = z.object({
   autistaNome: z.string().optional(),
   autistaTelefono: z.string().optional(),
   tourLeaderId: z.string().optional(),
+  costo: z.number().nonnegative().optional(),
   note: z.string().optional(),
   lineeIds: z.array(z.string()).min(1),
 });

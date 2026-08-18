@@ -54,3 +54,4 @@ eventiRouter.post('/:id/bus', richiedeAuth, richiedePermesso('eventi.crea'), val
 eventiRouter.put('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaBusSchema), asyncHandler(eventiController.aggiornaBus));
 eventiRouter.delete('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.rimuoviBus));
 eventiRouter.get('/:id/bus/:busId/passeggeri', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaPasseggeriBus));
+eventiRouter.get('/:id/riepilogo-economico', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.riepilogoEconomico));

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { eventiApi, type CalcoloBusLinea, type BusFisico, type BusFisicoInput } from '../../../api/eventi';
+import { eventiApi, type CalcoloBusLinea, type BusFisico, type BusFisicoInput, type RiepilogoEconomicoTratta } from '../../../api/eventi';
 import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import { tourLeaderApi, type TourLeader } from '../../../api/tourleader';
 import { ErroreApi } from '../../../api/client';
@@ -40,6 +40,7 @@ function statoTratta(linea: CalcoloBusLinea) {
 export function PartenzeTab({ eventoId }: { eventoId: string }) {
   const [calcolo, setCalcolo] = useState<CalcoloBusLinea[]>([]);
   const [busLista, setBusLista] = useState<BusFisico[]>([]);
+  const [economia, setEconomia] = useState<RiepilogoEconomicoTratta[]>([]);
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
   const [tourLeaders, setTourLeaders] = useState<TourLeader[]>([]);
   const [caricamento, setCaricamento] = useState(true);
@@ -54,10 +55,11 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
   function ricarica() {
     setCaricamento(true);
     setErrore('');
-    Promise.all([eventiApi.calcolaBus(eventoId), eventiApi.listaBus(eventoId)])
-      .then(([c, b]) => {
+    Promise.all([eventiApi.calcolaBus(eventoId), eventiApi.listaBus(eventoId), eventiApi.riepilogoEconomico(eventoId)])
+      .then(([c, b, e]) => {
         setCalcolo(c);
         setBusLista(b);
+        setEconomia(e);
         // Se c'è una sola tratta, tanto vale aprirla subito — altrimenti
         // partono tutte chiuse, per non dover scorrere un elenco lungo.
         setAperte((prev) => prev.size === 0 && c.length === 1 ? new Set([c[0].lineaId]) : prev);
@@ -95,7 +97,7 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
   }
   function apriModificaBus(b: BusFisico) {
     setInModifica(b);
-    setForm({ fornitoreId: b.fornitoreId ?? undefined, riferimento: b.riferimento, autistaNome: b.autistaNome ?? undefined, autistaTelefono: b.autistaTelefono ?? undefined, tourLeaderId: b.tourLeaderId, note: b.note ?? undefined, lineeIds: b.lineeIds });
+    setForm({ fornitoreId: b.fornitoreId ?? undefined, riferimento: b.riferimento, autistaNome: b.autistaNome ?? undefined, autistaTelefono: b.autistaTelefono ?? undefined, tourLeaderId: b.tourLeaderId, costo: b.costo ? Number(b.costo) : undefined, note: b.note ?? undefined, lineeIds: b.lineeIds });
     setModaleAperta(true);
   }
 
@@ -211,6 +213,34 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
                 ))}
               </div>
 
+              {(() => {
+                const dati = economia.find((e) => e.lineaId === linea.lineaId);
+                if (!dati) return null;
+                return (
+                  <div className="section-divider" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                    <div>
+                      <p className="section-label" style={{ marginBottom: 4 }}>Incassato</p>
+                      <p style={{ fontFamily: "'Space Mono',monospace", fontSize: 16, color: '#5be0a0' }}>€{dati.incassato.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="section-label" style={{ marginBottom: 4 }}>Costo bus</p>
+                      <p style={{ fontFamily: "'Space Mono',monospace", fontSize: 16 }}>
+                        {dati.costoCensito ? `€${dati.costo.toFixed(2)}` : <span style={{ color: 'var(--mist)' }}>non censito</span>}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="section-label" style={{ marginBottom: 4 }}>Guadagno</p>
+                      <p style={{ fontFamily: "'Space Mono',monospace", fontSize: 16, color: dati.costoCensito ? (dati.guadagno >= 0 ? '#5be0a0' : 'var(--pink)') : 'var(--mist)' }}>
+                        {dati.costoCensito ? `€${dati.guadagno.toFixed(2)}` : '—'}
+                      </p>
+                      {!dati.costoCensito && (
+                        <p className="testo-intro" style={{ fontSize: 11, marginTop: 2 }}>Compila il costo su almeno un bus per calcolarlo</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="section-divider">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
                   <p className="section-label" style={{ marginBottom: 0 }}>Bus registrati su questa tratta</p>
@@ -265,6 +295,7 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
               <p className="testo-intro" style={{ fontSize: 12, marginTop: 4 }}>Nessun tour leader censito — vai nella sezione "Tour Leader" per aggiungerne uno.</p>
             )}
           </div>
+          <div className="campo"><label>Costo del bus (€, facoltativo — usato per calcolare il guadagno della tratta)</label><input type="number" min={0} value={form.costo ?? ''} onChange={(e) => setForm({ ...form, costo: e.target.value ? Number(e.target.value) : undefined })} /></div>
           <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
 
           <p className="section-label" style={{ marginTop: 16 }}>Tratte coperte da questo bus</p>

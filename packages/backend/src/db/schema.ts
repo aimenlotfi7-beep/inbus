@@ -217,6 +217,11 @@ export const busFisici = pgTable('bus_fisici', {
   // leader viene eliminato, l'assegnazione si scollega da sola invece di
   // bloccare l'eliminazione.
   tourLeaderId: text('tour_leader_id').references(() => tourLeader.id, { onDelete: 'set null' }),
+  // Quanto costa questo bus (noleggio/fornitore) per questo evento —
+  // usato per calcolare il guadagno reale di ogni tratta (incassato -
+  // costo). Facoltativo: se non lo compili, quella tratta risulta senza
+  // costo censito, non zero per errore.
+  costo: numeric('costo', { precision: 10, scale: 2 }),
   note: text('note'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
 });

@@ -41,13 +41,15 @@ export interface BusFisico {
   autistaTelefono: string | null;
   tourLeaderId: string | null;
   tourLeaderNome: string | null;
+  costo: string | null;
   note: string | null;
   lineeIds: string[];
 }
 export interface BusFisicoInput {
-  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; note?: string; lineeIds: string[];
+  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; note?: string; lineeIds: string[];
 }
 export interface PasseggeroBus { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string; }
+export interface RiepilogoEconomicoTratta { lineaId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; }
 
 export const eventiApi = {
   list: (filtri?: { citta?: string; genere?: string; ricerca?: string; soloFuturi?: boolean; soloVisibili?: boolean }) => {
@@ -69,5 +71,6 @@ export const eventiApi = {
   aggiornaBus: (id: string, busId: string, input: Partial<BusFisicoInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/bus/${busId}`, input),
   rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
   listaPasseggeriBus: (id: string, busId: string) => api.get<PasseggeroBus[]>(`/api/eventi/${id}/bus/${busId}/passeggeri`),
+  riepilogoEconomico: (id: string) => api.get<RiepilogoEconomicoTratta[]>(`/api/eventi/${id}/riepilogo-economico`),
   allertePartenze: () => api.get<{ conteggio: number }>('/api/eventi/allerte-partenze'),
 };

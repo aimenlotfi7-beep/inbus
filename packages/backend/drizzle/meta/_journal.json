@@ -120,6 +120,13 @@
       "when": 1787065283872,
       "tag": "0017_posti_max_per_fermata",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787069513419,
+      "tag": "0018_aggiungi_costo_bus",
+      "breakpoints": true
     }
   ]
 }
