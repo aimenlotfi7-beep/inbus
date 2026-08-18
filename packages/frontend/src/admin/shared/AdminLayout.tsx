@@ -15,36 +15,38 @@ export type SezioneGestionale =
 const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; permesso: string }[] }[] = [
   { titolo: 'Eventi', voci: [
     { id: 'eventi', label: 'Eventi', permesso: 'eventi.visualizza' },
-    { id: 'vetrina', label: 'Vetrina', permesso: 'eventi.vetrina' },
     { id: 'calendario', label: 'Calendario', permesso: 'eventi.calendario' },
-    { id: 'partenze', label: 'Partenze', permesso: 'eventi.partenze' },
     { id: 'cestino', label: 'Cestino', permesso: 'eventi.cestino' },
   ]},
+  { titolo: 'Partenze', voci: [
+    { id: 'partenze', label: 'Partenze', permesso: 'eventi.partenze' },
+  ]},
   { titolo: 'Vendite', voci: [
-    { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
     { id: 'transazioni', label: 'Prenotazioni', permesso: 'prenotazioni.transazioni' },
-    { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
   ]},
   { titolo: 'Marketing', voci: [
     { id: 'campagne', label: 'Campagne', permesso: 'campagne.gestisci' },
+    { id: 'vetrina', label: 'Vetrina', permesso: 'eventi.vetrina' },
+    { id: 'contenuti', label: 'Contenuti sito', permesso: 'pagine.gestisci' },
+  ]},
+  { titolo: 'Customer Care', voci: [
+    { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
+    { id: 'utenti', label: 'Utenti', permesso: 'utenti.visualizza' },
+    { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
+    { id: 'chat', label: 'Chat', permesso: 'chat.visualizza' },
   ]},
   { titolo: 'Persone', voci: [
-    { id: 'utenti', label: 'Utenti', permesso: 'utenti.visualizza' },
     { id: 'promoter', label: 'Promoter', permesso: 'promoter.visualizza' },
     { id: 'tourleader', label: 'Tour Leader', permesso: 'tourleader.visualizza' },
   ]},
   { titolo: 'Logistica', voci: [
     { id: 'fornitori', label: 'Fornitori', permesso: 'fornitori.visualizza' },
     { id: 'tragitti', label: 'Tragitti', permesso: 'tragitti.visualizza' },
-  ]},
-  { titolo: 'Comunicazione', voci: [
-    { id: 'chat', label: 'Chat', permesso: 'chat.visualizza' },
-    { id: 'contenuti', label: 'Contenuti sito', permesso: 'pagine.gestisci' },
+    { id: 'impostazioni', label: 'Impostazioni', permesso: 'impostazioni.gestisci' },
   ]},
   { titolo: 'Sistema', voci: [
     { id: 'amministratori', label: 'Amministratori', permesso: 'utenze.gestisci' },
     { id: 'ruoli', label: 'Ruoli', permesso: 'permessi.gestisci' },
-    { id: 'impostazioni', label: 'Impostazioni', permesso: 'impostazioni.gestisci' },
     { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
   ]},
 ];

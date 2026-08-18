@@ -2,7 +2,7 @@ import { api } from './client';
 import type { Evento, OpzionePartenza } from './types';
 
 export interface FermataInput {
-  citta: string; indirizzo: string; orario?: string; orarioRitorno?: string; indirizzoRitorno?: string; prezzo?: number;
+  citta: string; indirizzo: string; orario?: string; orarioRitorno?: string; indirizzoRitorno?: string; prezzo?: number; postiMax?: number;
 }
 export interface LineaInput {
   id?: string; // presente = tratta già esistente, assente = nuova

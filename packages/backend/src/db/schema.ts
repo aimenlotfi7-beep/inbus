@@ -191,6 +191,13 @@ export const fermate = pgTable('fermate', {
   orarioRitorno: text('orario_ritorno'),
   indirizzoRitorno: text('indirizzo_ritorno'),
   prezzo: numeric('prezzo', { precision: 10, scale: 2 }), // sovrascrive prezzo evento+extra se impostato
+  // Limite posti specifico di questa fermata (facoltativo). Se non
+  // impostato, questa fermata condivide semplicemente i posti di tutto
+  // il bus (comportamento di prima). Se impostato, quando si esaurisce
+  // SOLO questa fermata risulta piena — le altre fermate dello stesso
+  // bus restano prenotabili normalmente.
+  postiMax: integer('posti_max'),
+  postiPrenotati: integer('posti_prenotati').notNull().default(0),
   lat: doublePrecision('lat'),
   lng: doublePrecision('lng'),
 });

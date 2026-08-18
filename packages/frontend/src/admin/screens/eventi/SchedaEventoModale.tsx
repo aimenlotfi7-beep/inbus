@@ -80,7 +80,7 @@ export function SchedaEventoModale({
           // non ne aveva uno salvato, arriva `null`, non `undefined` — va
           // convertito subito, altrimenti finirebbe di nuovo a rimbalzare
           // in giro come null fino a far fallire la validazione al salvataggio.
-          fermate: l.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ? Number(f.prezzo) : undefined })),
+          fermate: l.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ? Number(f.prezzo) : undefined, postiMax: f.postiMax ?? undefined })),
         })),
       };
     } else {
@@ -109,7 +109,7 @@ export function SchedaEventoModale({
   function aggiornaFermata(idxLinea: number, idxFermata: number, campo: keyof FermataInput, valore: string) {
     const linee = [...(form.linee ?? [])];
     const fermate = [...linee[idxLinea].fermate];
-    fermate[idxFermata] = { ...fermate[idxFermata], [campo]: campo === 'prezzo' ? (Number(valore) || undefined) : valore };
+    fermate[idxFermata] = { ...fermate[idxFermata], [campo]: (campo === 'prezzo' || campo === 'postiMax') ? (Number(valore) || undefined) : valore };
     linee[idxLinea] = { ...linee[idxLinea], fermate };
     setForm({ ...form, linee });
   }
@@ -431,7 +431,7 @@ export function SchedaEventoModale({
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => onDropSu(idxLinea, idxFermata)}
               style={{
-                display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr .55fr .55fr auto', gap: 6, marginBottom: 6, alignItems: 'center',
+                display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr .55fr .55fr .55fr auto', gap: 6, marginBottom: 6, alignItems: 'center',
                 opacity: trascinata?.linea === idxLinea && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
               }}
             >
@@ -440,10 +440,15 @@ export function SchedaEventoModale({
               <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'indirizzo', e.target.value)} />
               <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxLinea, idxFermata, 'orario', v)} />
               <input placeholder="Prezzo € *" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'prezzo', e.target.value)} />
+              <input placeholder="Posti max" title="Facoltativo: limite posti solo per questa fermata. Se vuoto, condivide i posti di tutto il bus." type="number" value={f.postiMax ?? ''} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'postiMax', e.target.value)} />
               <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxLinea, idxFermata)} title="Rimuovi fermata">✕</button>
             </div>
           ))}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxLinea)}>+ Aggiungi fermata</button>
+          <p className="testo-intro" style={{ fontSize: 11.5, marginTop: 6 }}>
+            "Posti max" è facoltativo: mettilo solo se vuoi limitare quante persone possono salire da quella
+            città specifica, indipendentemente dai posti liberi sul resto del bus.
+          </p>
         </div>
       ))}
       <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTrattaManuale}>+ Aggiungi tratta manuale (senza tragitto salvato)</button>

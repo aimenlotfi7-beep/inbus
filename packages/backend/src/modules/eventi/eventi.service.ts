@@ -154,6 +154,7 @@ export const eventiService = {
               orario: f.orario,
               orarioRitorno: f.orarioRitorno,
               indirizzoRitorno: f.indirizzoRitorno,
+              postiMax: f.postiMax,
               prezzo: f.prezzo?.toFixed(2),
             }))
           );
@@ -269,6 +270,7 @@ export const eventiService = {
                   orario: f.orario,
                   orarioRitorno: f.orarioRitorno,
                   indirizzoRitorno: f.indirizzoRitorno,
+                  postiMax: f.postiMax,
                   prezzo: f.prezzo?.toFixed(2),
                 }))
               );
@@ -299,6 +301,7 @@ export const eventiService = {
                   orario: f.orario,
                   orarioRitorno: f.orarioRitorno,
                   indirizzoRitorno: f.indirizzoRitorno,
+                  postiMax: f.postiMax,
                   prezzo: f.prezzo?.toFixed(2),
                 }))
               );
@@ -356,9 +359,17 @@ export const eventiService = {
         const prezzoEffettivo = f.prezzo
           ? Number(f.prezzo)
           : (evento.prezzo ? Number(evento.prezzo) : 0) + Number(linea.prezzoExtra);
+        // Se questa fermata ha un limite posti suo (facoltativo), i suoi
+        // posti disponibili sono il minore tra quanto le resta e quanto
+        // resta sul bus in generale — così una fermata può esaurirsi da
+        // sola anche se il bus nel complesso ha ancora posti altrove, ma
+        // non può mai avere "più posti" di quelli davvero rimasti sul bus.
+        const postiDisponibiliFermata = f.postiMax != null
+          ? Math.min(linea.postiDisponibili, Math.max(0, f.postiMax - f.postiPrenotati))
+          : linea.postiDisponibili;
         opzioni.push({
           lineaId: linea.id,
-          postiDisponibili: linea.postiDisponibili,
+          postiDisponibili: postiDisponibiliFermata,
           fermataId: f.id,
           fermataCitta: f.citta,
           fermataIndirizzo: f.indirizzo,

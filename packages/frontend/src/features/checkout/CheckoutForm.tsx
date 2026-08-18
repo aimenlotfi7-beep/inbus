@@ -87,7 +87,12 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   }
 
   const opzioneScelta = opzioni.find((o) => o.fermataId === fermataId);
-  const nessunPostoDisponibile = opzioni.length === 0 || opzioni.every((o) => o.postiDisponibili === 0);
+  // Con i limiti per fermata, una singola fermata può esaurirsi da sola
+  // anche se il resto del bus ha ancora posti — vanno distinti i due casi
+  // per mostrare il messaggio giusto e proporre la lista d'attesa solo
+  // quando serve davvero.
+  const tutteEsaurite = opzioni.length === 0 || opzioni.every((o) => o.postiDisponibili === 0);
+  const fermataEsaurita = !opzioneScelta || opzioneScelta.postiDisponibili === 0;
   const prezzoUnitario = opzioneScelta
     ? (offerta ? opzioneScelta.prezzoEffettivo * (1 - offerta.scontoPercentuale / 100) : opzioneScelta.prezzoEffettivo)
     : 0;
@@ -151,29 +156,29 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
 
   if (stato === 'confermato') {
     return (
-      <>
+      <div className="checkout-form">
         <h3>Prenotazione confermata 🎉</h3>
         <div className="checkout-summary">Il tuo PNR è <b>{pnrConfermato}</b>. I biglietti arriveranno all'email <b>{email}</b>.</div>
         {onChiudi && <button className="search-cta" onClick={onChiudi}>Chiudi</button>}
-      </>
+      </div>
     );
   }
 
   if (stato === 'confermato-attesa') {
     return (
-      <>
+      <div className="checkout-form">
         <h3>Sei in lista d'attesa 📩</h3>
         <div className="checkout-summary">
           Ti scriveremo a <b>{email}</b> appena si libera un posto per <b>{evento.artista}</b>, con un link per
           completare subito la prenotazione.
         </div>
         {onChiudi && <button className="search-cta" onClick={onChiudi}>Chiudi</button>}
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="checkout-form">
       <h3>Prenota</h3>
 
       {offerta && (
@@ -196,10 +201,16 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
 
           {step === 1 && (
             <>
-              {nessunPostoDisponibile && (
+              {tutteEsaurite && (
                 <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
                   Al momento non ci sono posti disponibili. Puoi comunque compilare i tuoi dati e iscriverti alla
                   lista d'attesa: ti avviseremo via email non appena si libera un posto.
+                </p>
+              )}
+              {!tutteEsaurite && fermataEsaurita && (
+                <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
+                  I posti da questa fermata sono esauriti. Scegli un'altra fermata, oppure iscriviti alla lista
+                  d'attesa apposta per questa: ti avviseremo se si libera un posto qui.
                 </p>
               )}
 
@@ -211,6 +222,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
                     <option key={o.fermataId} value={o.fermataId}>
                       {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{prezzoMostrato.toFixed(2)}
                       {offerta ? ` (invece di €${o.prezzoEffettivo.toFixed(2)})` : ''}
+                      {o.postiDisponibili === 0 ? ' — ESAURITO, lista d\'attesa' : ''}
                     </option>
                   );
                 })}
@@ -292,10 +304,10 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
             <>
               {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
 
-              {nessunPostoDisponibile ? (
+              {fermataEsaurita ? (
                 <>
                   <p style={{ fontSize: 13.5, marginBottom: 14 }}>
-                    Confermi l'iscrizione alla lista d'attesa per <b>{passeggeri}</b> passeggero/i su "{evento.artista}"?
+                    Confermi l'iscrizione alla lista d'attesa per <b>{passeggeri}</b> passeggero/i su "{evento.artista}"{opzioneScelta ? ` da ${opzioneScelta.fermataCitta}` : ''}?
                   </p>
                   <button
                     className="search-cta"
@@ -344,6 +356,6 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
           )}
         </>
       )}
-    </>
+    </div>
   );
 }

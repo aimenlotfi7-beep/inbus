@@ -12,6 +12,9 @@ const fermataSchema = z.object({
   orarioRitorno: z.string().optional(),
   indirizzoRitorno: z.string().optional(),
   prezzo: prezzoFermataSchema,
+  // Limite posti facoltativo per questa singola fermata — se assente,
+  // la fermata condivide i posti di tutto il bus (come prima).
+  postiMax: z.number().int().positive().optional(),
 });
 
 const lineaSchema = z.object({

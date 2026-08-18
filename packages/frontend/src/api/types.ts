@@ -6,6 +6,8 @@ export interface Fermata {
   orarioRitorno: string | null;
   indirizzoRitorno: string | null;
   prezzo: string | null;
+  postiMax: number | null;
+  postiPrenotati: number;
 }
 
 export interface LineaBus {

@@ -65,7 +65,7 @@ export const prenotazioniService = {
       const [evento] = await tx.select().from(eventi).where(eq(eventi.id, input.eventoId)).limit(1);
       if (!evento) throw new NonTrovato('Evento');
 
-      // --- Blocco posti atomico ---
+      // --- Blocco posti atomico sul bus (come prima) ---
       const righeAggiornate = await tx
         .update(lineeBus)
         .set({ postiDisponibili: sql`${lineeBus.postiDisponibili} - ${input.passeggeri}` })
@@ -74,6 +74,32 @@ export const prenotazioniService = {
 
       if (righeAggiornate.length === 0) {
         throw new ConflittoDati('Posti non più disponibili su questo bus: qualcun altro li ha appena prenotati.');
+      }
+
+      // --- Blocco posti atomico sulla fermata, SOLO se questa fermata ha
+      // un limite specifico impostato (altrimenti condivide semplicemente
+      // i posti del bus, appena verificati sopra). Stesso principio del
+      // controllo sul bus: se la UPDATE non tocca righe, vuol dire che
+      // qualcun altro ha appena preso l'ultimo posto di questa fermata.
+      if (fermata.postiMax !== null) {
+        const fermataAggiornata = await tx
+          .update(fermate)
+          .set({ postiPrenotati: sql`${fermate.postiPrenotati} + ${input.passeggeri}` })
+          .where(and(
+            eq(fermate.id, input.fermataId),
+            sql`${fermate.postiPrenotati} + ${input.passeggeri} <= ${fermate.postiMax}`
+          ))
+          .returning();
+
+        if (fermataAggiornata.length === 0) {
+          // Il posto sul bus l'avevamo già preso: lo restituiamo, non ha
+          // senso tenerlo bloccato per una prenotazione che non va a buon fine.
+          await tx
+            .update(lineeBus)
+            .set({ postiDisponibili: sql`${lineeBus.postiDisponibili} + ${input.passeggeri}` })
+            .where(eq(lineeBus.id, input.lineaId));
+          throw new ConflittoDati('Posti non più disponibili su questa fermata: qualcun altro li ha appena prenotati.');
+        }
       }
 
       const prezzoNormale = fermata.prezzo ? Number(fermata.prezzo) : (evento.prezzo ? Number(evento.prezzo) : 0) + Number(linea.prezzoExtra);
@@ -272,6 +298,16 @@ export const prenotazioniService = {
         .update(lineeBus)
         .set({ postiDisponibili: sql`${lineeBus.postiDisponibili} + ${p.passeggeri}` })
         .where(eq(lineeBus.id, p.lineaId));
+
+      // Se la fermata aveva un suo limite specifico, restituisco il
+      // posto anche lì, altrimenti quella fermata resterebbe segnata
+      // come "esaurita" per sempre anche dopo la cancellazione. La
+      // prenotazione non salva l'id della fermata (solo città+bus, come
+      // altrove nel codice), quindi la ritrovo così.
+      await tx
+        .update(fermate)
+        .set({ postiPrenotati: sql`GREATEST(0, ${fermate.postiPrenotati} - ${p.passeggeri})` })
+        .where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.lineaId, p.lineaId), sql`${fermate.postiMax} IS NOT NULL`));
 
       const [aggiornata] = await tx
         .update(prenotazioni)
