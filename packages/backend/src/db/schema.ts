@@ -269,6 +269,16 @@ export const utenti = pgTable('utenti', {
   cap: text('cap'),
   note: text('note'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
+  // Consensi privacy — ognuno con la propria data: il GDPR richiede di
+  // poter DIMOSTRARE quando è stato dato un consenso, non solo che c'è.
+  // Nullo = non ancora scelto (mai mostrare come "acconsentito" di
+  // default: dev'essere sempre una scelta attiva del cliente).
+  presaVisioneInformativa: boolean('presa_visione_informativa'),
+  presaVisioneInformativaData: timestamp('presa_visione_informativa_data'),
+  consensoMarketing: boolean('consenso_marketing'),
+  consensoMarketingData: timestamp('consenso_marketing_data'),
+  consensoProfilazione: boolean('consenso_profilazione'),
+  consensoProfilazioneData: timestamp('consenso_profilazione_data'),
 });
 
 // ---------------------------------------------------------------------

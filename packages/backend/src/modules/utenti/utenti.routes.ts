@@ -18,6 +18,13 @@ export const utentiController = {
     const dati = await utentiService.datiPerCheckout(String(req.query.email));
     res.json(dati ?? null);
   },
+  async getPreferenzePrivacy(req: Request, res: Response) {
+    res.json(await utentiService.preferenzePrivacy(String(req.query.email)));
+  },
+  async setPreferenzePrivacy(req: Request, res: Response) {
+    const { email, ...resto } = req.body;
+    res.json(await utentiService.aggiornaPreferenzePrivacy(email, resto));
+  },
 };
 
 export const utentiRouter = Router();
@@ -28,5 +35,15 @@ utentiRouter.get('/', richiedeAuth, richiedePermesso('utenti.visualizza'), async
 // sta comunque per fornire lui stesso in quel momento, nessun dato
 // sensibile aggiuntivo (non l'id utente, non lo storico prenotazioni).
 utentiRouter.get('/dati-checkout', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(utentiController.datiPerCheckout));
+
+// Pubbliche, con lo stesso principio di accesso via email già usato nel
+// resto dell'area cliente (nessuna vera password oggi).
+utentiRouter.get('/preferenze-privacy', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(utentiController.getPreferenzePrivacy));
+utentiRouter.put('/preferenze-privacy', valida(z.object({
+  email: z.string().email(),
+  presaVisioneInformativa: z.boolean().optional(),
+  consensoMarketing: z.boolean().optional(),
+  consensoProfilazione: z.boolean().optional(),
+})), asyncHandler(utentiController.setPreferenzePrivacy));
 
 utentiRouter.get('/:id', richiedeAuth, richiedePermesso('utenti.visualizza'), asyncHandler(utentiController.getById));

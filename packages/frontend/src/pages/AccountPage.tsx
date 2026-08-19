@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import '../styles/account.css';
 import { prenotazioniApi } from '../api/prenotazioni';
+import { utentiApi, type PreferenzePrivacy } from '../api/utenti';
 import { eventiApi } from '../api/eventi';
 import { chatApi, type MessaggioChat } from '../api/chat';
 import type { Prenotazione, Evento } from '../api/types';
 import { HomePage } from './HomePage';
-import { LinkPreferenzeCookie } from '../features/CookieBanner';
+import { CookieBanner, LinkPreferenzeCookie } from '../features/CookieBanner';
 import { CHIAVE_EMAIL_CLIENTE } from '../features/clienteSessione';
 
-type Sezione = 'eventi' | 'profilo' | 'viaggi' | 'chat';
+type Sezione = 'eventi' | 'profilo' | 'viaggi' | 'privacy' | 'chat';
 
 export function AccountPage() {
   const [email, setEmail] = useState(() => sessionStorage.getItem(CHIAVE_EMAIL_CLIENTE) ?? '');
@@ -21,7 +22,7 @@ export function AccountPage() {
   // usa avanti/indietro del browser) resta dove si trovava, invece di
   // tornare sempre alla prima sezione.
   const [searchParams, setSearchParams] = useSearchParams();
-  const sezioniValide: Sezione[] = ['eventi', 'profilo', 'viaggi', 'chat'];
+  const sezioniValide: Sezione[] = ['eventi', 'profilo', 'viaggi', 'privacy', 'chat'];
   const sezioneUrl = searchParams.get('sezione') as Sezione | null;
   const sezione: Sezione = sezioneUrl && sezioniValide.includes(sezioneUrl) ? sezioneUrl : 'eventi';
   function setSezione(nuova: Sezione) {
@@ -45,6 +46,7 @@ export function AccountPage() {
     { id: 'eventi', label: 'Eventi' },
     { id: 'profilo', label: 'Il mio profilo' },
     { id: 'viaggi', label: 'I miei viaggi' },
+    { id: 'privacy', label: 'Preferenze Privacy' },
     { id: 'chat', label: 'Chat' },
   ];
 
@@ -85,6 +87,7 @@ export function AccountPage() {
             <div className="account-content">
               {sezione === 'profilo' && <SezioneProfilo email={email} />}
               {sezione === 'viaggi' && <SezioneViaggi email={email} />}
+              {sezione === 'privacy' && <SezionePrivacy email={email} />}
               {sezione === 'chat' && <SezioneChat email={email} />}
             </div>
           )}
@@ -95,6 +98,7 @@ export function AccountPage() {
           )}
         </div>
       )}
+      <CookieBanner />
     </>
   );
 }
@@ -110,8 +114,101 @@ function SezioneProfilo({ email }: { email: string }) {
           telefono, indirizzo...) vengono salvati automaticamente ogni volta che completi una prenotazione.
         </p>
       </div>
+    </section>
+  );
+}
+
+/** Un blocco di consenso in stile "ACCONSENTO / NON ACCONSENTO" — lo
+ *  stesso pattern usato da Vivaticket e altre piattaforme di
+ *  biglietteria: due pulsanti mutuamente esclusivi, nessuno dei due
+ *  preselezionato di default finché il cliente non ha scelto davvero
+ *  (mai dare per scontato un consenso). */
+function BloccoConsenso({ titolo, descrizione, valore, onScegli, salvando }: {
+  titolo: string; descrizione: string; valore: boolean | null; onScegli: (v: boolean) => void; salvando: boolean;
+}) {
+  return (
+    <div className="panel-box">
+      <h2>{titolo}</h2>
+      <p style={{ color: 'var(--mist)', fontSize: 13.5, marginBottom: 10 }}>{descrizione}</p>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button
+          type="button"
+          disabled={salvando}
+          onClick={() => onScegli(true)}
+          className={`btn ${valore === true ? 'btn-primary' : 'btn-ghost'}`}
+          style={{ fontSize: 13 }}
+        >
+          {valore === true ? '✓ ' : ''}Acconsento
+        </button>
+        <button
+          type="button"
+          disabled={salvando}
+          onClick={() => onScegli(false)}
+          className={`btn ${valore === false ? 'btn-primary' : 'btn-ghost'}`}
+          style={{ fontSize: 13 }}
+        >
+          {valore === false ? '✓ ' : ''}Non acconsento
+        </button>
+      </div>
+      {valore === null && <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 8 }}>Non hai ancora scelto.</p>}
+    </div>
+  );
+}
+
+function SezionePrivacy({ email }: { email: string }) {
+  const [preferenze, setPreferenze] = useState<PreferenzePrivacy | null>(null);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    utentiApi.preferenzePrivacy(email).then(setPreferenze);
+  }, [email]);
+
+  async function aggiorna(campo: keyof PreferenzePrivacy, valore: boolean) {
+    setSalvando(true);
+    try {
+      const nuove = await utentiApi.aggiornaPreferenzePrivacy(email, { [campo]: valore });
+      setPreferenze(nuove);
+    } catch {
+      alert('Salvataggio non riuscito, riprova.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  if (!preferenze) return <section className="acc-sezione"><h1>Preferenze Privacy</h1><p>Carico...</p></section>;
+
+  return (
+    <section className="acc-sezione">
+      <h1>Preferenze Privacy</h1>
+      <p style={{ color: 'var(--mist)', fontSize: 13.5, marginBottom: 18 }}>
+        Rivedi o cambia in qualsiasi momento come usiamo i tuoi dati. Leggi anche la nostra{' '}
+        <Link to="/pagina/privacy" style={{ color: 'var(--paper)', textDecoration: 'underline' }}>informativa completa sulla privacy</Link>.
+      </p>
+
+      <BloccoConsenso
+        titolo="Informativa sulla privacy"
+        descrizione="Confermo di aver letto l'informativa sul trattamento dei dati personali."
+        valore={preferenze.presaVisioneInformativa}
+        onScegli={(v) => aggiorna('presaVisioneInformativa', v)}
+        salvando={salvando}
+      />
+      <BloccoConsenso
+        titolo="Comunicazioni di marketing"
+        descrizione="Desidero ricevere email su novità, nuovi eventi e promozioni da INBUS."
+        valore={preferenze.consensoMarketing}
+        onScegli={(v) => aggiorna('consensoMarketing', v)}
+        salvando={salvando}
+      />
+      <BloccoConsenso
+        titolo="Profilazione"
+        descrizione="Acconsento all'uso dei miei dati (es. eventi visti o prenotati) per ricevere proposte più in linea con i miei gusti."
+        valore={preferenze.consensoProfilazione}
+        onScegli={(v) => aggiorna('consensoProfilazione', v)}
+        salvando={salvando}
+      />
+
       <div className="panel-box">
-        <h2>Privacy</h2>
+        <h2>Cookie</h2>
         <p style={{ color: 'var(--mist)', fontSize: 13.5, marginBottom: 10 }}>
           Puoi rivedere o cambiare in qualsiasi momento quali cookie hai accettato su questo dispositivo.
         </p>

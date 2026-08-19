@@ -5,6 +5,7 @@ import { tourLeaderApi } from '../api/tourleader';
 import { eventiApi } from '../api/eventi';
 import type { Evento } from '../api/types';
 import { ErroreApi } from '../api/client';
+import { CookieBanner } from '../features/CookieBanner';
 
 export function TourLeaderPage() {
   const [searchParams] = useSearchParams();
@@ -82,6 +83,7 @@ export function TourLeaderPage() {
           </div>
         )}
       </main>
+      <CookieBanner />
     </>
   );
 }

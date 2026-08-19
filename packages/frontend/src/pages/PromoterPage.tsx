@@ -5,6 +5,7 @@ import { promoterApi, type Promoter } from '../api/promoter';
 import { eventiApi } from '../api/eventi';
 import type { Evento } from '../api/types';
 import { ErroreApi } from '../api/client';
+import { CookieBanner } from '../features/CookieBanner';
 
 const CHIAVE_TOKEN = 'inbus_promoter_token';
 
@@ -123,6 +124,7 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
       <div className="toast" style={{ position: 'fixed', bottom: 26, left: '50%', transform: 'translateX(-50%)', background: 'var(--paper)', color: 'var(--ink)', padding: '12px 20px', borderRadius: 10, fontSize: 13.5, fontWeight: 600, opacity: toast ? 1 : 0, pointerEvents: 'none', transition: 'opacity .25s ease', zIndex: 999 }}>
         {toast}
       </div>
+      <CookieBanner />
     </>
   );
 }
