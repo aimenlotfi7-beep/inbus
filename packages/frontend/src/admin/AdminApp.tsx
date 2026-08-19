@@ -3,6 +3,7 @@ import { AdminLogin } from './AdminLogin';
 import { AdminLayout, type SezioneGestionale } from './shared/AdminLayout';
 import { AdminHome } from './screens/AdminHome';
 import { AdminDashboard } from './AdminDashboard';
+import { SessioneContext } from './shared/SessioneContext';
 import { EventiScreen } from './screens/EventiScreen';
 import { VetrinaScreen } from './screens/VetrinaScreen';
 import { CalendarioScreen } from './screens/CalendarioScreen';
@@ -110,8 +111,10 @@ export function AdminApp() {
   if (!sessione) return <AdminLogin onLogin={setSessione} />;
 
   return (
-    <AdminLayout sessione={sessione} sezioneAttiva={sezione} onCambiaSezione={cambiaSezione} onVaiHome={() => setSezione('home')} onLogout={logout}>
-      {sezione === 'home' ? <AdminHome onVaiA={cambiaSezione} /> : (() => { const Schermata = SCHERMATE[sezione]; return <Schermata />; })()}
-    </AdminLayout>
+    <SessioneContext.Provider value={sessione}>
+      <AdminLayout sessione={sessione} sezioneAttiva={sezione} onCambiaSezione={cambiaSezione} onVaiHome={() => setSezione('home')} onLogout={logout}>
+        {sezione === 'home' ? <AdminHome onVaiA={cambiaSezione} /> : (() => { const Schermata = SCHERMATE[sezione]; return <Schermata />; })()}
+      </AdminLayout>
+    </SessioneContext.Provider>
   );
 }

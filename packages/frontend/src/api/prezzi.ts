@@ -15,3 +15,13 @@ export function prezzoMinimoEvento(evento: Evento): number | null {
   if (prezzi.length > 0) return Math.min(...prezzi);
   return evento.prezzo ? Number(evento.prezzo) : null;
 }
+
+/** Applica lo sconto percentuale di un'offerta a un prezzo normale — solo
+ *  per MOSTRARLO al cliente: il calcolo che decide davvero quanto viene
+ *  addebitato resta sul server (mai fidarsi di un prezzo calcolato nel
+ *  browser). Scritta una sola volta qui invece che ripetuta in ogni
+ *  punto dove serve mostrare un prezzo scontato. */
+export function applicaScontoOfferta(prezzoNormale: number, scontoPercentuale: number | undefined): number {
+  if (!scontoPercentuale) return prezzoNormale;
+  return prezzoNormale * (1 - scontoPercentuale / 100);
+}

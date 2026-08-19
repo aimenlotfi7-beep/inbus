@@ -2,6 +2,7 @@ import { and, eq, sql, desc, inArray } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { prenotazioni, lineeBus, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo } from '../../shared/errors.js';
+import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { utentiService } from '../utenti/utenti.service.js';
 import { env } from '../../config/env.js';
 import type { CreaPrenotazioneInput } from './prenotazioni.dto.js';
@@ -33,12 +34,12 @@ async function calcolaTotaleReale(p: typeof prenotazioni.$inferSelect) {
   const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
   const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, p.lineaId)).limit(1);
   const [fermata] = await db.select().from(fermate).where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.lineaId, p.lineaId))).limit(1);
-  const prezzoNormale = fermata?.prezzo ? Number(fermata.prezzo) : (evento?.prezzo ? Number(evento.prezzo) : 0) + Number(linea?.prezzoExtra ?? 0);
+  const prezzoNormale = prezzoNormaleFermata(fermata, evento, linea);
 
   let prezzoEffettivo = prezzoNormale;
   if (p.offertaId) {
     const [offerta] = await db.select().from(offerteEvento).where(eq(offerteEvento.id, p.offertaId)).limit(1);
-    if (offerta) prezzoEffettivo = prezzoNormale * (1 - Number(offerta.scontoPercentuale) / 100);
+    prezzoEffettivo = applicaScontoOfferta(prezzoNormale, offerta);
   }
 
   return prezzoEffettivo * p.passeggeri - Number(p.sconto);
@@ -102,7 +103,7 @@ export const prenotazioniService = {
         }
       }
 
-      const prezzoNormale = fermata.prezzo ? Number(fermata.prezzo) : (evento.prezzo ? Number(evento.prezzo) : 0) + Number(linea.prezzoExtra);
+      const prezzoNormale = prezzoNormaleFermata(fermata, evento, linea);
       // Se la prenotazione arriva da un link con offerta dedicata, lo
       // sconto percentuale dell'offerta si applica al prezzo normale
       // della fermata scelta (non è un prezzo fisso: il prezzo varia
@@ -113,7 +114,7 @@ export const prenotazioniService = {
       if (input.offertaId) {
         const { offerteService } = await import('../offerte/offerte.service.js');
         const offerta = await offerteService.verificaEIncrementaUtilizzo(input.offertaId, input.eventoId);
-        prezzoEffettivo = prezzoNormale * (1 - Number(offerta.scontoPercentuale) / 100);
+        prezzoEffettivo = applicaScontoOfferta(prezzoNormale, offerta);
       }
       const importoBase = prezzoEffettivo * input.passeggeri;
       const { sconto, coupon: couponUsato } = await validaCoupon(input.couponCodice, importoBase);

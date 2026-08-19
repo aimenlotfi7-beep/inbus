@@ -3,6 +3,7 @@ import type { Evento, OpzionePartenza } from '../../api/types';
 import { eventiApi } from '../../api/eventi';
 import { prenotazioniApi } from '../../api/prenotazioni';
 import { listaAttesaApi } from '../../api/listaAttesa';
+import { applicaScontoOfferta } from '../../api/prezzi';
 import { utentiApi } from '../../api/utenti';
 import { ErroreApi } from '../../api/client';
 
@@ -94,7 +95,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   const tutteEsaurite = opzioni.length === 0 || opzioni.every((o) => o.postiDisponibili === 0);
   const fermataEsaurita = !opzioneScelta || opzioneScelta.postiDisponibili === 0;
   const prezzoUnitario = opzioneScelta
-    ? (offerta ? opzioneScelta.prezzoEffettivo * (1 - offerta.scontoPercentuale / 100) : opzioneScelta.prezzoEffettivo)
+    ? (offerta ? applicaScontoOfferta(opzioneScelta.prezzoEffettivo, offerta.scontoPercentuale) : opzioneScelta.prezzoEffettivo)
     : 0;
   const totale = opzioneScelta ? prezzoUnitario * passeggeri : 0;
   const moduloRichiedenteCompleto = Boolean(email && nome && cognome && telefono);
@@ -217,7 +218,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
               <label className="field-label">Fermata di partenza</label>
               <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
                 {opzioni.map((o) => {
-                  const prezzoMostrato = offerta ? o.prezzoEffettivo * (1 - offerta.scontoPercentuale / 100) : o.prezzoEffettivo;
+                  const prezzoMostrato = offerta ? applicaScontoOfferta(o.prezzoEffettivo, offerta.scontoPercentuale) : o.prezzoEffettivo;
                   return (
                     <option key={o.fermataId} value={o.fermataId}>
                       {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{prezzoMostrato.toFixed(2)}

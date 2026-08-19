@@ -4,6 +4,8 @@ import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import { tourLeaderApi, type TourLeader } from '../../../api/tourleader';
 import { ErroreApi } from '../../../api/client';
 import { Modale } from '../../shared/Modale';
+import { useSessione } from '../../shared/SessioneContext';
+import { haPermesso } from '../../../api/auth';
 
 const BUS_VUOTO: BusFisicoInput = { riferimento: '', lineeIds: [] };
 
@@ -38,6 +40,8 @@ function statoTratta(linea: CalcoloBusLinea) {
  *  bus necessari, copertura tratte, censimento bus fisici. Va dentro la
  *  scheda dell'evento (tab). */
 export function PartenzeTab({ eventoId }: { eventoId: string }) {
+  const sessione = useSessione();
+  const vedeEconomia = haPermesso(sessione, 'eventi.economia');
   const [calcolo, setCalcolo] = useState<CalcoloBusLinea[]>([]);
   const [busLista, setBusLista] = useState<BusFisico[]>([]);
   const [economia, setEconomia] = useState<RiepilogoEconomicoTratta[]>([]);
@@ -55,7 +59,11 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
   function ricarica() {
     setCaricamento(true);
     setErrore('');
-    Promise.all([eventiApi.calcolaBus(eventoId), eventiApi.listaBus(eventoId), eventiApi.riepilogoEconomico(eventoId)])
+    Promise.all([
+      eventiApi.calcolaBus(eventoId),
+      eventiApi.listaBus(eventoId),
+      vedeEconomia ? eventiApi.riepilogoEconomico(eventoId) : Promise.resolve([]),
+    ])
       .then(([c, b, e]) => {
         setCalcolo(c);
         setBusLista(b);
@@ -186,7 +194,22 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
           >
             <div>
               <h3>{espansa ? '▾' : '▸'} {linea.nome}</h3>
-              <p className="section-sub">{linea.totalePasseggeri} passeggeri confermati su {linea.postiTotali} posti previsti · {busTratta.length} bus censit{busTratta.length === 1 ? 'o' : 'i'}</p>
+              <p className="section-sub">
+                {linea.totalePasseggeri} passeggeri confermati su {linea.postiTotali} posti previsti · {busTratta.length} bus censit{busTratta.length === 1 ? 'o' : 'i'}
+                {vedeEconomia && (() => {
+                  const dati = economia.find((e) => e.lineaId === linea.lineaId);
+                  if (!dati) return null;
+                  return (
+                    <>
+                      {' · '}
+                      <span style={{ color: '#5be0a0' }}>Incassato €{dati.incassato.toFixed(2)}</span>
+                      {dati.costoCensito && (
+                        <> {' · '}<span style={{ color: dati.guadagno >= 0 ? '#5be0a0' : 'var(--pink)' }}>Guadagno €{dati.guadagno.toFixed(2)}</span></>
+                      )}
+                    </>
+                  );
+                })()}
+              </p>
             </div>
             <span className={`badge ${stato.classe}`} style={{ flexShrink: 0 }}>{stato.etichetta}</span>
           </div>

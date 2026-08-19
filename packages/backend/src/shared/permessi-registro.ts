@@ -26,6 +26,7 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   { chiave: 'eventi.calendario', etichetta: 'Visualizzare il Calendario eventi', modulo: 'Eventi' }, // solo UI
   { chiave: 'eventi.cestino', etichetta: 'Accedere al Cestino eventi eliminati', modulo: 'Eventi' }, // solo UI
   { chiave: 'eventi.partenze', etichetta: 'Gestire la sezione Partenze (bus e copertura tratte)', modulo: 'Eventi' },
+  { chiave: 'eventi.economia', etichetta: 'Vedere i dati economici delle tratte (incassato, costo bus, guadagno)', modulo: 'Eventi' },
 
   // Prenotazioni
   { chiave: 'prenotazioni.visualizza', etichetta: 'Visualizzare prenotazioni', modulo: 'Prenotazioni' },

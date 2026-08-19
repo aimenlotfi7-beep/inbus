@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { offerteApi } from '../api/offerte';
 import type { Evento } from '../api/types';
-import { prezzoMinimoEvento } from '../api/prezzi';
+import { prezzoMinimoEvento, applicaScontoOfferta } from '../api/prezzi';
 import type { OffertaCheckout } from '../features/checkout/CheckoutForm';
 import { CheckoutForm } from '../features/checkout/CheckoutForm';
 import { useSeoTags } from '../features/useSeoTags';
@@ -51,7 +51,7 @@ export function OffertaPage() {
       location: { '@type': 'Place', name: evento.luogo, address: { '@type': 'PostalAddress', addressLocality: evento.citta, addressCountry: 'IT' } },
       ...(copertina && { image: [copertina] }),
       ...(prezzoMinimo !== null && {
-        offers: { '@type': 'Offer', price: (prezzoMinimo * (1 - offerta.scontoPercentuale / 100)).toFixed(2), priceCurrency: 'EUR', availability: 'https://schema.org/InStock', url: window.location.href },
+        offers: { '@type': 'Offer', price: applicaScontoOfferta(prezzoMinimo, offerta.scontoPercentuale).toFixed(2), priceCurrency: 'EUR', availability: 'https://schema.org/InStock', url: window.location.href },
       }),
     } : undefined,
   });
@@ -84,7 +84,7 @@ export function OffertaPage() {
 
               {prezzoMinimo !== null && (
                 <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, marginTop: 14 }}>
-                  da €{(prezzoMinimo * (1 - offerta.scontoPercentuale / 100)).toFixed(2)}
+                  da €{applicaScontoOfferta(prezzoMinimo, offerta.scontoPercentuale).toFixed(2)}
                   <span style={{ fontSize: 13, opacity: .7 }}> invece di €{prezzoMinimo.toFixed(2)}</span>
                 </p>
               )}

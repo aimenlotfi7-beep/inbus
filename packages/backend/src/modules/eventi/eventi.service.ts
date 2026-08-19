@@ -14,6 +14,7 @@ import {
   partecipantiPrenotazione,
 } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
+import { prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 
@@ -358,9 +359,7 @@ export const eventiService = {
       // quando è il caso: la scelta resta possibile, solo che porta
       // alla lista d'attesa invece che al pagamento.
       for (const f of linea.fermate) {
-        const prezzoEffettivo = f.prezzo
-          ? Number(f.prezzo)
-          : (evento.prezzo ? Number(evento.prezzo) : 0) + Number(linea.prezzoExtra);
+        const prezzoEffettivo = prezzoNormaleFermata(f, evento, linea);
         // Se questa fermata ha un limite posti suo (facoltativo), i suoi
         // posti disponibili sono il minore tra quanto le resta e quanto
         // resta sul bus in generale — così una fermata può esaurirsi da
