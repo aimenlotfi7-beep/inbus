@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { CookieBanner, LinkPreferenzeCookie } from './features/CookieBanner';
 
 export function Layout({ children }: { children: ReactNode }) {
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
@@ -71,8 +72,11 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="footer-bottom">
           <span>© 2026 INBUS</span>
           <span>Progettato per viaggiare a ritmo di musica 🎸</span>
+          <LinkPreferenzeCookie />
         </div>
       </footer>
+
+      <CookieBanner />
     </>
   );
 }

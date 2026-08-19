@@ -500,3 +500,21 @@
   .checkout-step-dot:not(:last-child)::after{content:''; width:14px; height:1px; background:#d8d0bf; margin-left:2px;}
   .checkout-step-nav{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:auto; padding-top:18px;}
 
+  /* ---------- Banner consenso cookie ---------- */
+  .cookie-banner{
+    position:fixed; left:16px; right:16px; bottom:16px; z-index:2000; max-width:640px; margin:0 auto;
+    background:var(--dusk-2); border:1px solid var(--line); border-radius:14px; padding:18px 20px;
+    box-shadow:0 20px 50px -15px rgba(0,0,0,.6); display:flex; flex-direction:column; gap:14px;
+  }
+  .cookie-banner p{margin:0; font-size:13px; color:var(--mist); line-height:1.5;}
+  .cookie-banner p a{color:var(--paper); text-decoration:underline;}
+  .cookie-banner-azioni{display:flex; gap:10px; justify-content:flex-end;}
+  .cookie-banner-azioni .btn{padding:9px 18px; font-size:13px;}
+  @media (max-width:480px){
+    .cookie-banner{left:10px; right:10px; bottom:10px; padding:16px;}
+    .cookie-banner-azioni{flex-direction:column-reverse;}
+    .cookie-banner-azioni .btn{width:100%; text-align:center;}
+  }
+  .link-preferenze-cookie{
+    background:none; border:none; color:var(--mist); font-size:12.5px; text-decoration:underline; cursor:pointer; padding:0;
+  }
