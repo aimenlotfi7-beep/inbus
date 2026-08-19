@@ -6,6 +6,7 @@ import { eventiApi } from '../api/eventi';
 import { chatApi, type MessaggioChat } from '../api/chat';
 import type { Prenotazione, Evento } from '../api/types';
 import { HomePage } from './HomePage';
+import { LinkPreferenzeCookie } from '../features/CookieBanner';
 
 const CHIAVE_EMAIL = 'inbus_cliente_email';
 type Sezione = 'eventi' | 'profilo' | 'viaggi' | 'chat';
@@ -98,6 +99,13 @@ function SezioneProfilo({ email }: { email: string }) {
           Sei collegato con l'indirizzo <b style={{ color: 'var(--paper)' }}>{email}</b>. I tuoi dati (nome,
           telefono, indirizzo...) vengono salvati automaticamente ogni volta che completi una prenotazione.
         </p>
+      </div>
+      <div className="panel-box">
+        <h2>Privacy</h2>
+        <p style={{ color: 'var(--mist)', fontSize: 13.5, marginBottom: 10 }}>
+          Puoi rivedere o cambiare in qualsiasi momento quali cookie hai accettato su questo dispositivo.
+        </p>
+        <LinkPreferenzeCookie />
       </div>
     </section>
   );
