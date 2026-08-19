@@ -202,9 +202,9 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
                   return (
                     <>
                       {' · '}
-                      <span style={{ color: '#5be0a0' }}>Incassato €{dati.incassato.toFixed(2)}</span>
+                      <span style={{ color: '#5be0a0' }}>€{dati.incassato.toFixed(2)}</span>
                       {dati.costoCensito && (
-                        <> {' · '}<span style={{ color: dati.guadagno >= 0 ? '#5be0a0' : 'var(--pink)' }}>Guadagno €{dati.guadagno.toFixed(2)}</span></>
+                        <> {' · '}<span style={{ color: dati.guadagno >= 0 ? '#5be0a0' : 'var(--pink)' }}>€{dati.guadagno.toFixed(2)}</span></>
                       )}
                     </>
                   );
