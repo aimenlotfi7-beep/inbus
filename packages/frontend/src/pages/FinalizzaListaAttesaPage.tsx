@@ -4,6 +4,7 @@ import { listaAttesaApi, type DatiFinalizzazione } from '../api/listaAttesa';
 import { eventiApi } from '../api/eventi';
 import { ErroreApi } from '../api/client';
 import type { OpzionePartenza } from '../api/types';
+import { Layout } from '../Layout';
 
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'errore' | 'non-trovato';
 
@@ -54,57 +55,63 @@ export function FinalizzaListaAttesaPage() {
   }
 
   return (
-    <div style={{ maxWidth: 480, margin: '60px auto', padding: '0 20px' }}>
-      {stato === 'caricamento' && <p>Carico...</p>}
+    <Layout>
+      <div style={{ maxWidth: 480, margin: '60px auto 100px', padding: '0 20px' }}>
+        {stato === 'caricamento' && <p>Carico...</p>}
 
-      {stato === 'non-trovato' && (
-        <div className="checkout-summary">
-          Questo link non è valido, è scaduto, oppure la prenotazione è già stata completata in precedenza.
-        </div>
-      )}
+        {stato === 'non-trovato' && (
+          <div className="checkout-summary">
+            Questo link non è valido, è scaduto, oppure la prenotazione è già stata completata in precedenza.
+          </div>
+        )}
 
-      {stato === 'confermato' && dati && (
-        <>
-          <h1 style={{ fontFamily: "'Anton',sans-serif", textTransform: 'uppercase' }}>Prenotazione confermata 🎉</h1>
-          <div className="checkout-summary">Il tuo PNR è <b>{pnr}</b>. I biglietti arriveranno all'email <b>{dati.email}</b>.</div>
-        </>
-      )}
+        {(dati && stato !== 'non-trovato') && (
+          <div className="evento-pagina-checkout" style={{ position: 'static' }}>
+            {stato === 'confermato' ? (
+              <>
+                <h3>Prenotazione confermata 🎉</h3>
+                <div className="checkout-summary">Il tuo PNR è <b>{pnr}</b>. I biglietti arriveranno all'email <b>{dati.email}</b>.</div>
+              </>
+            ) : (
+              <>
+                <h3>Completa la tua prenotazione</h3>
+                <p style={{ fontSize: 13.5, color: 'var(--mist)', margin: '0 0 4px' }}>
+                  {dati.artista} — {dati.luogo}, {dati.citta}{dati.data ? ` · ${new Date(dati.data).toLocaleDateString('it-IT')}` : ''}
+                </p>
+                <p style={{ fontSize: 13, color: 'var(--mist)' }}>
+                  {dati.nome} {dati.cognome} · {dati.email} · {dati.passeggeri} passeggero/i
+                </p>
 
-      {dati && stato !== 'confermato' && stato !== 'non-trovato' && (
-        <>
-          <h1 style={{ fontFamily: "'Anton',sans-serif", textTransform: 'uppercase' }}>Completa la tua prenotazione</h1>
-          <div className="checkout-summary">{dati.artista} — {dati.luogo}, {dati.citta}{dati.data ? ` · ${new Date(dati.data).toLocaleDateString('it-IT')}` : ''}</div>
-          <p style={{ fontSize: 13, opacity: .8 }}>
-            {dati.nome} {dati.cognome} · {dati.email} · {dati.passeggeri} passeggero/i
-          </p>
+                {opzioni.filter((o) => o.postiDisponibili > 0).length === 0 ? (
+                  <p className="errore">Purtroppo i posti si sono di nuovo esauriti nel frattempo. Ci scusiamo per il disagio.</p>
+                ) : (
+                  <>
+                    <label className="field-label">Fermata di partenza</label>
+                    <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
+                      {opzioni.filter((o) => o.postiDisponibili > 0).map((o) => (
+                        <option key={o.fermataId} value={o.fermataId}>
+                          {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{o.prezzoEffettivo.toFixed(2)}
+                        </option>
+                      ))}
+                    </select>
 
-          {opzioni.filter((o) => o.postiDisponibili > 0).length === 0 ? (
-            <p className="errore">Purtroppo i posti si sono di nuovo esauriti nel frattempo. Ci scusiamo per il disagio.</p>
-          ) : (
-            <>
-              <label className="field-label">Fermata di partenza</label>
-              <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
-                {opzioni.filter((o) => o.postiDisponibili > 0).map((o) => (
-                  <option key={o.fermataId} value={o.fermataId}>
-                    {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{o.prezzoEffettivo.toFixed(2)}
-                  </option>
-                ))}
-              </select>
+                    <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 24, margin: '18px 0 6px' }}>€{totale.toFixed(2)}</p>
 
-              <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, margin: '18px 0 6px' }}>€{totale.toFixed(2)}</p>
+                    {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
 
-              {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
-
-              <button className="search-cta" style={{ opacity: stato === 'invio' ? .5 : 1 }} disabled={stato === 'invio'} onClick={() => conferma('COMPLETO')}>
-                {stato === 'invio' ? 'Invio...' : 'Acquista'}
-              </button>
-              <button className="search-cta-secondaria" style={{ opacity: stato === 'invio' ? .5 : 1 }} disabled={stato === 'invio'} onClick={() => conferma('ACCONTO')}>
-                {stato === 'invio' ? 'Invio...' : 'Prenota con acconto'}
-              </button>
-            </>
-          )}
-        </>
-      )}
-    </div>
+                    <button className="search-cta" style={{ opacity: stato === 'invio' ? .5 : 1 }} disabled={stato === 'invio'} onClick={() => conferma('COMPLETO')}>
+                      {stato === 'invio' ? 'Invio...' : 'Acquista'}
+                    </button>
+                    <button className="search-cta-secondaria" style={{ opacity: stato === 'invio' ? .5 : 1 }} disabled={stato === 'invio'} onClick={() => conferma('ACCONTO')}>
+                      {stato === 'invio' ? 'Invio...' : 'Prenota con acconto'}
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </Layout>
   );
 }

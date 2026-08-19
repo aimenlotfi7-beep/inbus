@@ -78,10 +78,29 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   impostazioni: 'impostazioni.gestisci',
 };
 
+/** Legge la sezione attiva dall'indirizzo (?sezione=...) — così se
+ *  l'amministratore ricarica la pagina (o usa avanti/indietro del
+ *  browser) resta dove si trovava, invece di tornare sempre alla home
+ *  del gestionale. Il gestionale è un'app separata dal sito (niente
+ *  react-router qui dentro), quindi uso direttamente le API del browser. */
+function leggiSezioneDaUrl(): SezioneGestionale | 'home' {
+  const valore = new URLSearchParams(window.location.search).get('sezione');
+  if (valore && valore in SCHERMATE) return valore as SezioneGestionale;
+  return 'home';
+}
+
 export function AdminApp() {
   const [sessione, setSessione] = useState<SessioneAdmin | null>(null);
   const [caricamentoIniziale, setCaricamentoIniziale] = useState(true);
-  const [sezione, setSezione] = useState<SezioneGestionale | 'home'>('home');
+  const [sezione, setSezioneState] = useState<SezioneGestionale | 'home'>(leggiSezioneDaUrl);
+
+  function setSezione(s: SezioneGestionale | 'home') {
+    setSezioneState(s);
+    const url = new URL(window.location.href);
+    if (s === 'home') url.searchParams.delete('sezione');
+    else url.searchParams.set('sezione', s);
+    window.history.replaceState(null, '', url);
+  }
 
   // Al primo caricamento, se c'è un token salvato, ricalcola la sessione
   // (permessi inclusi) dal server invece di fidarsi di dati vecchi in

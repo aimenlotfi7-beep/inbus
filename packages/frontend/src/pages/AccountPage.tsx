@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import '../styles/account.css';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { eventiApi } from '../api/eventi';
@@ -7,26 +7,36 @@ import { chatApi, type MessaggioChat } from '../api/chat';
 import type { Prenotazione, Evento } from '../api/types';
 import { HomePage } from './HomePage';
 import { LinkPreferenzeCookie } from '../features/CookieBanner';
+import { CHIAVE_EMAIL_CLIENTE } from '../features/clienteSessione';
 
-const CHIAVE_EMAIL = 'inbus_cliente_email';
 type Sezione = 'eventi' | 'profilo' | 'viaggi' | 'chat';
 
 export function AccountPage() {
-  const [email, setEmail] = useState(() => sessionStorage.getItem(CHIAVE_EMAIL) ?? '');
-  const [loggato, setLoggato] = useState(() => !!sessionStorage.getItem(CHIAVE_EMAIL));
+  const [email, setEmail] = useState(() => sessionStorage.getItem(CHIAVE_EMAIL_CLIENTE) ?? '');
+  const [loggato, setLoggato] = useState(() => !!sessionStorage.getItem(CHIAVE_EMAIL_CLIENTE));
   const [emailInput, setEmailInput] = useState('');
   const [erroreLogin, setErroreLogin] = useState('');
-  const [sezione, setSezione] = useState<Sezione>('eventi');
+  // La sezione attiva vive nell'indirizzo (?sezione=profilo), non solo
+  // nello stato del componente: così se l'utente ricarica la pagina (o
+  // usa avanti/indietro del browser) resta dove si trovava, invece di
+  // tornare sempre alla prima sezione.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sezioniValide: Sezione[] = ['eventi', 'profilo', 'viaggi', 'chat'];
+  const sezioneUrl = searchParams.get('sezione') as Sezione | null;
+  const sezione: Sezione = sezioneUrl && sezioniValide.includes(sezioneUrl) ? sezioneUrl : 'eventi';
+  function setSezione(nuova: Sezione) {
+    setSearchParams(nuova === 'eventi' ? {} : { sezione: nuova });
+  }
   const [menuAperto, setMenuAperto] = useState(false);
 
   function accedi() {
     if (!emailInput.includes('@')) { setErroreLogin('Inserisci un indirizzo email valido.'); return; }
-    sessionStorage.setItem(CHIAVE_EMAIL, emailInput.toLowerCase());
+    sessionStorage.setItem(CHIAVE_EMAIL_CLIENTE, emailInput.toLowerCase());
     setEmail(emailInput.toLowerCase());
     setLoggato(true);
   }
   function esci() {
-    sessionStorage.removeItem(CHIAVE_EMAIL);
+    sessionStorage.removeItem(CHIAVE_EMAIL_CLIENTE);
     setLoggato(false);
     setEmailInput('');
   }

@@ -56,7 +56,7 @@ export const prenotazioniService = {
    * (il rischio concreto che c'era nel prototipo basato su localStorage).
    */
   async crea(input: CreaPrenotazioneInput) {
-    return db.transaction(async (tx) => {
+    const risultato = await db.transaction(async (tx) => {
       const [fermata] = await tx.select().from(fermate).where(eq(fermate.id, input.fermataId)).limit(1);
       if (!fermata || fermata.lineaId !== input.lineaId) throw new NonTrovato('Fermata');
 
@@ -176,8 +176,41 @@ export const prenotazioniService = {
         ...input.partecipanti.map((p, i) => ({ prenotazioneId: prenotazione.id, nome: p.nome, cognome: p.cognome, ordine: i + 1 })),
       ]);
 
-      return { ...prenotazione, totaleComplessivo: totale };
+      return { ...prenotazione, totaleComplessivo: totale, eventoArtista: evento.artista };
     });
+
+    // Fuori dalla transazione apposta: se l'invio dell'email fallisce (o
+    // impiega tempo), la prenotazione resta comunque salvata — il
+    // cliente non deve mai perdere il posto per un problema di posta.
+    try {
+      const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
+      const linkTraccia = urlSito(`/account`);
+      await inviaEmail({
+        a: input.cliente.email,
+        oggetto: risultato.tipoPagamento === 'ACCONTO'
+          ? `Prenotazione confermata — ${risultato.eventoArtista}`
+          : `Il tuo biglietto — PNR ${risultato.pnr}`,
+        html: `
+          <p>Ciao ${input.cliente.nome},</p>
+          <p>La tua prenotazione è confermata! Ecco i dettagli:</p>
+          <ul>
+            <li><b>PNR:</b> ${risultato.pnr}</li>
+            <li><b>Partenza da:</b> ${risultato.fermataCitta}${risultato.fermataOrario ? ` alle ${risultato.fermataOrario}` : ''}</li>
+            <li><b>Passeggeri:</b> ${risultato.passeggeri}</li>
+            <li><b>Totale:</b> €${Number(risultato.totale).toFixed(2)}${risultato.tipoPagamento === 'ACCONTO' ? ' (acconto — il saldo va completato entro la scadenza indicata via email)' : ''}</li>
+          </ul>
+          <p>Puoi rivedere la tua prenotazione in qualsiasi momento nella tua <a href="${linkTraccia}">area personale</a>, accedendo con questa stessa email.</p>
+          <p>A presto!</p>
+        `,
+      });
+    } catch (err) {
+      // Non bastava che l'email fallisse in silenzio senza lasciare
+      // traccia: così almeno compare nei log di Railway, anche se al
+      // cliente non arriva nulla.
+      console.error('Invio email di conferma prenotazione non riuscito:', err);
+    }
+
+    return risultato;
   },
 
   async getByPnr(pnr: string) {

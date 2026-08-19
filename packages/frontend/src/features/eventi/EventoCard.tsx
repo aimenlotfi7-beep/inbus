@@ -19,8 +19,8 @@ const ETICHETTA_STATO: Record<NonNullable<Evento['statoDisponibilita']>, string>
 
 // La card porta sempre alla pagina dedicata dell'evento (/eventi/:slug):
 // così ogni evento ha un suo indirizzo indicizzabile da Google e
-// condivisibile con un'anteprima propria, invece di vivere solo dentro
-// un popup nella home.
+// condivisibile con un'anteprima propria — la stessa identica pagina sia
+// dentro l'area cliente sia fuori, coerente ovunque.
 export function EventoCard({ evento }: { evento: Evento }) {
   // Il numero esatto di posti non si mostra mai al cliente: solo
   // un'etichetta impostata a mano dal gestionale (o nessuna). La
