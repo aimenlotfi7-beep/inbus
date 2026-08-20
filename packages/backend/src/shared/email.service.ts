@@ -1,23 +1,44 @@
 import nodemailer from 'nodemailer';
+import dns from 'node:dns/promises';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 import { env } from '../config/env.js';
 
 let transporter: nodemailer.Transporter<SMTPTransport.SentMessageInfo> | null = null;
 
-function getTransporter() {
+/**
+ * Crea (una sola volta) il collegamento email. Railway non ha una rete
+ * IPv6 in uscita funzionante — e si è visto che dire a nodemailer
+ * "usa IPv4" (family:4) NON basta: quell'opzione non viene davvero
+ * applicata dal modulo che apre la connessione (verificato nel codice
+ * della libreria). L'unico modo affidabile è risolvere l'indirizzo
+ * IPv4 di Gmail NOI STESSI, e collegarci direttamente a quell'IP
+ * invece che al nome "smtp.gmail.com" (che il sistema potrebbe
+ * comunque risolvere in IPv6). Il nome host vero va comunque passato
+ * a parte (servername), altrimenti il certificato di sicurezza non
+ * risulterebbe valido per un IP nudo.
+ */
+async function getTransporter() {
   if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) return null;
   if (!transporter) {
+    let host = env.SMTP_HOST;
+    try {
+      const indirizzi = await dns.resolve4(env.SMTP_HOST);
+      if (indirizzi[0]) host = indirizzi[0];
+    } catch {
+      // Se la risoluzione IPv4 fallisce per qualche motivo, ripiega sul
+      // nome host normale — meglio provare (e magari fallire più avanti
+      // con lo stesso vecchio errore) che bloccare tutto qui.
+    }
     const opzioni: SMTPTransport.Options = {
-      host: env.SMTP_HOST,
+      host,
       port: env.SMTP_PORT,
       secure: env.SMTP_PORT === 465,
       auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
-      // Railway non ha una rete IPv6 in uscita funzionante: forziamo la
-      // connessione a usare solo IPv4, direttamente qui (non basta
-      // un'impostazione generale di Node, va detto anche al modulo che
-      // apre davvero la connessione). "family" esiste davvero in
-      // nodemailer anche se i tipi ufficiali non la elencano qui.
-      family: 4,
+      // Ci colleghiamo a un indirizzo IP nudo (risolto sopra), quindi
+      // nodemailer non saprebbe più a quale nome host verificare il
+      // certificato di sicurezza — va detto esplicitamente qui, non
+      // dentro "tls" (lì non viene letto per questo scopo).
+      servername: env.SMTP_HOST,
     } as SMTPTransport.Options;
     transporter = nodemailer.createTransport(opzioni);
   }
@@ -39,7 +60,7 @@ export function urlSito(percorso: string) {
  * per testare, o per chi preferisce mandare i link a mano per ora.
  */
 export async function inviaEmail({ a, oggetto, html }: { a: string; oggetto: string; html: string }): Promise<{ inviata: boolean }> {
-  const t = getTransporter();
+  const t = await getTransporter();
   if (!t) {
     console.log(`\n[EMAIL NON INVIATA — SMTP non configurato]\nA: ${a}\nOggetto: ${oggetto}\n${html.replace(/<[^>]+>/g, ' ').trim()}\n`);
     return { inviata: false };
