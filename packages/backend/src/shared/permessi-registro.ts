@@ -79,4 +79,5 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   { chiave: 'utenze.gestisci', etichetta: 'Modificare/disattivare/eliminare utenze esistenti', modulo: 'Amministrazione' },
   { chiave: 'permessi.gestisci', etichetta: 'Definire ruoli e le relative autorizzazioni', modulo: 'Amministrazione' },
   { chiave: 'impostazioni.gestisci', etichetta: 'Modificare le impostazioni generali (es. posti per bus)', modulo: 'Amministrazione' },
+  { chiave: 'template-email.gestisci', etichetta: 'Modificare il testo delle email automatiche', modulo: 'Amministrazione' },
 ];

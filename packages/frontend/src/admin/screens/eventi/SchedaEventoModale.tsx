@@ -77,6 +77,8 @@ export function SchedaEventoModale({
         arrivoOrario: evento.arrivoOrario ?? undefined,
         visibileSito: evento.visibileSito,
         descrizione: evento.descrizione ?? undefined,
+        ticketColoreAccento: evento.ticketColoreAccento ?? undefined,
+        ticketImmagineSfondoUrl: evento.ticketImmagineSfondoUrl ?? undefined,
         immagini: [...evento.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
         linee: evento.linee.map((l) => ({
           id: l.id,
@@ -370,6 +372,38 @@ export function SchedaEventoModale({
           rows={5}
           placeholder="Es. orario e punto di ritrovo, cosa portare, regole del bus, contatti in caso di emergenza..."
         />
+      </div>
+
+      <p className="section-label" style={{ marginTop: 18 }}>Grafica del biglietto digitale</p>
+      <p className="testo-intro" style={{ fontSize: 12, marginBottom: 10 }}>
+        Facoltativo — se non li imposti, il biglietto (PDF con QR) usa l'aspetto di base.
+      </p>
+      <div className="campo">
+        <label>Colore d'accento</label>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="color"
+            value={form.ticketColoreAccento || '#111111'}
+            onChange={(e) => setForm({ ...form, ticketColoreAccento: e.target.value })}
+            style={{ width: 44, height: 36, padding: 2, flexShrink: 0 }}
+          />
+          <input
+            placeholder="#dc2626"
+            value={form.ticketColoreAccento ?? ''}
+            onChange={(e) => setForm({ ...form, ticketColoreAccento: e.target.value || undefined })}
+          />
+        </div>
+      </div>
+      <div className="campo">
+        <label>Immagine di intestazione (link, facoltativo)</label>
+        <input
+          placeholder="https://..."
+          value={form.ticketImmagineSfondoUrl ?? ''}
+          onChange={(e) => setForm({ ...form, ticketImmagineSfondoUrl: e.target.value || undefined })}
+        />
+        <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
+          Compare come fascia in cima al biglietto (larga quanto la pagina, ritagliata automaticamente).
+        </p>
       </div>
     </>
   );

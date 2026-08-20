@@ -89,11 +89,13 @@ export const listaAttesaService = {
 
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, riga.eventoId)).limit(1);
     const link = urlSito(`/finalizza/${token}`);
-    const { inviata } = await inviaEmail({
-      a: riga.email,
-      oggetto: `Ci sono posti per ${evento?.artista ?? 'il tuo evento'}!`,
-      html: `<p>Ciao ${riga.nome},</p><p>Si sono liberati posti per <b>${evento?.artista ?? ''}</b>. Completa la tua prenotazione entro le prossime ore, prima che si esauriscano di nuovo:</p><p><a href="${link}">Completa la prenotazione</a></p>`,
+    const { templateEmailService } = await import('../template-email/template-email.service.js');
+    const { oggetto, html } = await templateEmailService.renderizza('lista_attesa_promossa', {
+      nome: riga.nome,
+      evento: evento?.artista ?? 'il tuo evento',
+      link,
     });
+    const { inviata } = await inviaEmail({ a: riga.email, oggetto, html });
     await db.update(listaAttesa).set({ emailInviata: inviata }).where(eq(listaAttesa.id, id));
     return { ok: true, emailInviata: inviata, link };
   },

@@ -148,6 +148,13 @@
       "when": 1787233571684,
       "tag": "0021_biglietto_digitale",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787237736276,
+      "tag": "0022_personalizzazione_biglietto_e_template_email",
+      "breakpoints": true
     }
   ]
 }

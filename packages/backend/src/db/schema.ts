@@ -86,6 +86,11 @@ export const eventi = pgTable('eventi', {
   // Testo libero mostrato nella pagina pubblica dell'evento, sotto la
   // foto — orari di ritrovo, cosa portare, regole del bus, ecc.
   descrizione: text('descrizione'),
+  // Personalizzazione del biglietto digitale (PDF) per questo evento
+  // specifico — entrambi facoltativi: se non impostati, il biglietto usa
+  // l'aspetto di base (nero su bianco).
+  ticketColoreAccento: text('ticket_colore_accento'), // es. "#dc2626"
+  ticketImmagineSfondoUrl: text('ticket_immagine_sfondo_url'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
   aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 });
@@ -549,6 +554,20 @@ export const contenutiSito = pgTable('contenuti_sito', {
 export const impostazioni = pgTable('impostazioni', {
   chiave: text('chiave').primaryKey(),
   valore: text('valore').notNull(),
+});
+
+// Modelli delle email automatiche (conferma, promemoria saldo, biglietto,
+// promozione lista d'attesa) — modificabili dal gestionale invece che
+// scritti fissi nel codice. "chiave" identifica quale email è (una per
+// ogni momento in cui il sistema scrive a un cliente), "oggetto"/"corpo"
+// possono contenere segnaposto tipo {{nome}} che vengono sostituiti al
+// momento dell'invio.
+export const templateEmail = pgTable('template_email', {
+  chiave: text('chiave').primaryKey(),
+  nome: text('nome').notNull(), // etichetta leggibile nel gestionale, es. "Conferma prenotazione (acconto)"
+  oggetto: text('oggetto').notNull(),
+  corpo: text('corpo').notNull(),
+  aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 });
 
 // ---------------------------------------------------------------------

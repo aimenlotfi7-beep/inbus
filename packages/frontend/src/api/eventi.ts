@@ -19,6 +19,8 @@ export interface EventoInput {
   arrivoIndirizzo?: string; arrivoOrario?: string;
   visibileSito?: boolean;
   descrizione?: string;
+  ticketColoreAccento?: string;
+  ticketImmagineSfondoUrl?: string;
   immagini?: string[]; allegati?: { nome: string; url: string }[]; linee?: LineaInput[];
 }
 

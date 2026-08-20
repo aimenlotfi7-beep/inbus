@@ -117,6 +117,8 @@ export const eventiService = {
           arrivoOrario: input.arrivoOrario,
           visibileSito: input.visibileSito,
           descrizione: input.descrizione,
+          ticketColoreAccento: input.ticketColoreAccento,
+          ticketImmagineSfondoUrl: input.ticketImmagineSfondoUrl,
         })
         .returning();
 
@@ -191,6 +193,8 @@ export const eventiService = {
           ...(input.arrivoOrario !== undefined && { arrivoOrario: input.arrivoOrario }),
           ...(input.visibileSito !== undefined && { visibileSito: input.visibileSito }),
           ...(input.descrizione !== undefined && { descrizione: input.descrizione }),
+          ...(input.ticketColoreAccento !== undefined && { ticketColoreAccento: input.ticketColoreAccento }),
+          ...(input.ticketImmagineSfondoUrl !== undefined && { ticketImmagineSfondoUrl: input.ticketImmagineSfondoUrl }),
           aggiornatoIl: new Date(),
         })
         .where(eq(eventi.id, id));

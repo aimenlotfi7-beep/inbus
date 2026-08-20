@@ -25,6 +25,7 @@ import { PartenzeScreen } from './screens/PartenzeScreen';
 import { ListaAttesaScreen } from './screens/ListaAttesaScreen';
 import { OfferteScreen } from './screens/OfferteScreen';
 import { ImpostazioniScreen } from './screens/ImpostazioniScreen';
+import { TemplateEmailScreen } from './screens/TemplateEmailScreen';
 import { authApi, haPermesso, type SessioneAdmin } from '../api/auth';
 
 function StatisticheSenzaHeader() {
@@ -54,6 +55,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   ruoli: RuoliScreen,
   partenze: PartenzeScreen,
   impostazioni: ImpostazioniScreen,
+  'template-email': TemplateEmailScreen,
 };
 
 // Permesso richiesto per ogni sezione, usato per bloccare l'accesso
@@ -82,6 +84,7 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   ruoli: 'permessi.gestisci',
   partenze: 'eventi.partenze',
   impostazioni: 'impostazioni.gestisci',
+  'template-email': 'template-email.gestisci',
 };
 
 /** Legge la sezione attiva dall'indirizzo (?sezione=...) — così se

@@ -192,23 +192,18 @@ export const prenotazioniService = {
         // Solo acconto: nessun biglietto ancora (si emette solo a saldo
         // completato) — mando la conferma "normale", senza allegato.
         const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
-        const linkTraccia = urlSito(`/account`);
-        await inviaEmail({
-          a: input.cliente.email,
-          oggetto: `Prenotazione confermata — ${risultato.eventoArtista}`,
-          html: `
-            <p>Ciao ${input.cliente.nome},</p>
-            <p>La tua prenotazione è confermata! Ecco i dettagli:</p>
-            <ul>
-              <li><b>PNR:</b> ${risultato.pnr}</li>
-              <li><b>Partenza da:</b> ${risultato.fermataCitta}${risultato.fermataOrario ? ` alle ${risultato.fermataOrario}` : ''}</li>
-              <li><b>Passeggeri:</b> ${risultato.passeggeri}</li>
-              <li><b>Totale:</b> €${Number(risultato.totale).toFixed(2)} (acconto — il saldo va completato entro la scadenza indicata via email; il biglietto vero arriverà via email a saldo completato)</li>
-            </ul>
-            <p>Puoi rivedere la tua prenotazione in qualsiasi momento nella tua <a href="${linkTraccia}">area personale</a>, accedendo con questa stessa email.</p>
-            <p>A presto!</p>
-          `,
+        const { templateEmailService } = await import('../template-email/template-email.service.js');
+        const { oggetto, html } = await templateEmailService.renderizza('conferma_acconto', {
+          nome: input.cliente.nome,
+          pnr: risultato.pnr,
+          fermata: risultato.fermataCitta,
+          orario: risultato.fermataOrario ?? 'da definire',
+          passeggeri: String(risultato.passeggeri),
+          totale: Number(risultato.totale).toFixed(2),
+          evento: risultato.eventoArtista,
+          link_account: urlSito('/account'),
         });
+        await inviaEmail({ a: input.cliente.email, oggetto, html });
       }
     } catch (err) {
       // Non bastava che l'email fallisse in silenzio senza lasciare
@@ -459,11 +454,15 @@ export const prenotazioniService = {
       if (!utente) continue;
       const dati = await this.differenzaSaldo(p.pnr);
       const link = urlSito(`/completa-saldo/${p.pnr}`);
-      await inviaEmail({
-        a: utente.email,
-        oggetto: `Completa il saldo per ${dati.artista}`,
-        html: `<p>Ciao ${utente.nome ?? ''},</p><p>La partenza per <b>${dati.artista}</b> si avvicina: manca il saldo di <b>€${dati.differenza.toFixed(2)}</b> sulla tua prenotazione <b>${p.pnr}</b>.</p><p><a href="${link}">Completa il pagamento</a></p>`,
+      const { templateEmailService } = await import('../template-email/template-email.service.js');
+      const { oggetto, html } = await templateEmailService.renderizza('promemoria_saldo', {
+        nome: utente.nome ?? '',
+        evento: dati.artista,
+        differenza: dati.differenza.toFixed(2),
+        pnr: p.pnr,
+        link,
       });
+      await inviaEmail({ a: utente.email, oggetto, html });
       await db.update(prenotazioni).set({ promemoriaSaldoInviato: true }).where(eq(prenotazioni.id, p.id));
       inviate++;
     }

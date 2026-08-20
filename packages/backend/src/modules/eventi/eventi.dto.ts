@@ -53,6 +53,8 @@ export const creaEventoSchema = z.object({
   arrivoOrario: z.string().optional(),
   visibileSito: z.boolean().default(true),
   descrizione: z.string().optional(),
+  ticketColoreAccento: z.string().optional(),
+  ticketImmagineSfondoUrl: z.string().optional(),
   immagini: z.array(z.string().url()).default([]),
   allegati: z.array(z.object({ nome: z.string(), url: z.string() })).default([]),
   linee: z.array(lineaSchema).default([]),

@@ -2,6 +2,7 @@ import dns from 'node:dns';
 import { creaApp } from './app.js';
 import { env } from './config/env.js';
 import { sincronizzaPermessi } from './shared/permessi-sync.js';
+import { sincronizzaTemplateEmail } from './modules/template-email/template-email.service.js';
 import { avviaSchedulerPromemoriaSaldo } from './shared/scheduler.js';
 
 // Railway (l'hosting del backend) non ha una rete IPv6 in uscita
@@ -16,6 +17,7 @@ dns.setDefaultResultOrder('ipv4first');
 const app = creaApp();
 
 sincronizzaPermessi()
+  .then(() => sincronizzaTemplateEmail())
   .then(() => {
     app.listen(env.PORT, () => {
       console.log(`INBUS API in ascolto su http://localhost:${env.PORT} (${env.NODE_ENV})`);
@@ -23,6 +25,6 @@ sincronizzaPermessi()
     });
   })
   .catch((err) => {
-    console.error('Errore nella sincronizzazione dei permessi:', err);
+    console.error('Errore nella sincronizzazione iniziale (permessi/template email):', err);
     process.exit(1);
   });
