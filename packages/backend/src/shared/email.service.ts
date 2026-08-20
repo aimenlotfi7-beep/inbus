@@ -59,14 +59,23 @@ export function urlSito(percorso: string) {
  * funzionare anche prima di aver collegato un vero account email — utile
  * per testare, o per chi preferisce mandare i link a mano per ora.
  */
-export async function inviaEmail({ a, oggetto, html }: { a: string; oggetto: string; html: string }): Promise<{ inviata: boolean }> {
+export async function inviaEmail({ a, oggetto, html, allegati }: {
+  a: string; oggetto: string; html: string;
+  allegati?: { nomeFile: string; contenuto: Buffer; tipo: string }[];
+}): Promise<{ inviata: boolean }> {
   const t = await getTransporter();
   if (!t) {
     console.log(`\n[EMAIL NON INVIATA — SMTP non configurato]\nA: ${a}\nOggetto: ${oggetto}\n${html.replace(/<[^>]+>/g, ' ').trim()}\n`);
     return { inviata: false };
   }
   try {
-    await t.sendMail({ from: env.SMTP_FROM || env.SMTP_USER, to: a, subject: oggetto, html });
+    await t.sendMail({
+      from: env.SMTP_FROM || env.SMTP_USER,
+      to: a,
+      subject: oggetto,
+      html,
+      attachments: allegati?.map((al) => ({ filename: al.nomeFile, content: al.contenuto, contentType: al.tipo })),
+    });
     return { inviata: true };
   } catch (err) {
     console.error(`Invio email a ${a} fallito:`, err);

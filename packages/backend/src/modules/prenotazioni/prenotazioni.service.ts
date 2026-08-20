@@ -183,26 +183,33 @@ export const prenotazioniService = {
     // impiega tempo), la prenotazione resta comunque salvata — il
     // cliente non deve mai perdere il posto per un problema di posta.
     try {
-      const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
-      const linkTraccia = urlSito(`/account`);
-      await inviaEmail({
-        a: input.cliente.email,
-        oggetto: risultato.tipoPagamento === 'ACCONTO'
-          ? `Prenotazione confermata — ${risultato.eventoArtista}`
-          : `Il tuo biglietto — PNR ${risultato.pnr}`,
-        html: `
-          <p>Ciao ${input.cliente.nome},</p>
-          <p>La tua prenotazione è confermata! Ecco i dettagli:</p>
-          <ul>
-            <li><b>PNR:</b> ${risultato.pnr}</li>
-            <li><b>Partenza da:</b> ${risultato.fermataCitta}${risultato.fermataOrario ? ` alle ${risultato.fermataOrario}` : ''}</li>
-            <li><b>Passeggeri:</b> ${risultato.passeggeri}</li>
-            <li><b>Totale:</b> €${Number(risultato.totale).toFixed(2)}${risultato.tipoPagamento === 'ACCONTO' ? ' (acconto — il saldo va completato entro la scadenza indicata via email)' : ''}</li>
-          </ul>
-          <p>Puoi rivedere la tua prenotazione in qualsiasi momento nella tua <a href="${linkTraccia}">area personale</a>, accedendo con questa stessa email.</p>
-          <p>A presto!</p>
-        `,
-      });
+      if (risultato.tipoPagamento === 'COMPLETO') {
+        // Pagamento pieno subito: il biglietto vero (PDF+QR) parte
+        // immediatamente, non serve una email di conferma separata.
+        const { ticketService } = await import('../ticket/ticket.service.js');
+        await ticketService.emetti(risultato.pnr);
+      } else {
+        // Solo acconto: nessun biglietto ancora (si emette solo a saldo
+        // completato) — mando la conferma "normale", senza allegato.
+        const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
+        const linkTraccia = urlSito(`/account`);
+        await inviaEmail({
+          a: input.cliente.email,
+          oggetto: `Prenotazione confermata — ${risultato.eventoArtista}`,
+          html: `
+            <p>Ciao ${input.cliente.nome},</p>
+            <p>La tua prenotazione è confermata! Ecco i dettagli:</p>
+            <ul>
+              <li><b>PNR:</b> ${risultato.pnr}</li>
+              <li><b>Partenza da:</b> ${risultato.fermataCitta}${risultato.fermataOrario ? ` alle ${risultato.fermataOrario}` : ''}</li>
+              <li><b>Passeggeri:</b> ${risultato.passeggeri}</li>
+              <li><b>Totale:</b> €${Number(risultato.totale).toFixed(2)} (acconto — il saldo va completato entro la scadenza indicata via email; il biglietto vero arriverà via email a saldo completato)</li>
+            </ul>
+            <p>Puoi rivedere la tua prenotazione in qualsiasi momento nella tua <a href="${linkTraccia}">area personale</a>, accedendo con questa stessa email.</p>
+            <p>A presto!</p>
+          `,
+        });
+      }
     } catch (err) {
       // Non bastava che l'email fallisse in silenzio senza lasciare
       // traccia: così almeno compare nei log di Railway, anche se al
@@ -391,6 +398,18 @@ export const prenotazioniService = {
       .set({ saldoPagato: true, totale: totaleReale.toFixed(2) })
       .where(eq(prenotazioni.pnr, pnr))
       .returning();
+
+    // Ora che ha saldato per intero, il biglietto vero (PDF+QR) può
+    // essere emesso — fuori dalla transazione: se l'email fallisce, il
+    // saldo resta comunque segnato come pagato, non blocchiamo per un
+    // problema di posta.
+    try {
+      const { ticketService } = await import('../ticket/ticket.service.js');
+      await ticketService.emetti(pnr);
+    } catch (err) {
+      console.error('Emissione biglietto dopo saldo non riuscita:', err);
+    }
+
     return aggiornata;
   },
 

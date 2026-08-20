@@ -27,6 +27,7 @@ const id = () => text('id').primaryKey().$defaultFn(() => createId());
 // ENUM
 // ---------------------------------------------------------------------
 export const statoPrenotazioneEnum = pgEnum('stato_prenotazione', ['CONFERMATA', 'CANCELLATA']);
+export const statoTicketEnum = pgEnum('stato_ticket', ['EMESSO', 'UTILIZZATO', 'ANNULLATO']);
 export const tipoPagamentoEnum = pgEnum('tipo_pagamento', ['COMPLETO', 'ACCONTO']);
 export const metodoPagamentoEnum = pgEnum('metodo_pagamento', ['CARTA', 'PAYPAL', 'SATISPAY', 'DA_CONCORDARE']);
 export const statoTourLeaderEnum = pgEnum('stato_tour_leader', ['CANDIDATO', 'ATTIVO', 'ARCHIVIATO']);
@@ -327,6 +328,18 @@ export const prenotazioni = pgTable('prenotazioni', {
   utmMedium: text('utm_medium'),
   utmCampaign: text('utm_campaign'),
   utmContent: text('utm_content'),
+  // Biglietto digitale (PDF + QR): emesso solo quando la prenotazione è
+  // pagata per intero (subito se paga tutto, oppure dopo aver saldato
+  // il resto se aveva pagato ad acconto). ticketToken è quello che finisce
+  // nel QR — non il PNR — così il codice a barre resta separato dal
+  // riferimento leggibile mostrato al cliente. "UTILIZZATO"/"ANNULLATO"
+  // non sono ancora usati da nessuna parte del codice: sono pronti per
+  // quando costruiremo l'app di controllo accessi sul bus, per non dover
+  // fare un'altra migrazione più avanti.
+  ticketToken: text('ticket_token').unique(),
+  ticketStato: statoTicketEnum('ticket_stato'),
+  ticketEmessoIl: timestamp('ticket_emesso_il'),
+  ticketUtilizzatoIl: timestamp('ticket_utilizzato_il'),
   creataIl: timestamp('creata_il').notNull().defaultNow(),
 });
 
