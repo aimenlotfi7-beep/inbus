@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { eq, gte, and, sql } from 'drizzle-orm';
+import { eq, gte, lt, and, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { prenotazioni, eventi } from '../../db/schema.js';
 import { asyncHandler } from '../../shared/http.js';
@@ -54,7 +54,7 @@ export const statisticheService = {
       const [{ totale }] = await db
         .select({ totale: sql<number>`coalesce(sum(${prenotazioni.totale}), 0)` })
         .from(prenotazioni)
-        .where(and(eq(prenotazioni.stato, 'CONFERMATA'), gte(prenotazioni.creataIl, dataInizio), sql`${prenotazioni.creataIl} < ${dataFine}`));
+        .where(and(eq(prenotazioni.stato, 'CONFERMATA'), gte(prenotazioni.creataIl, dataInizio), lt(prenotazioni.creataIl, dataFine)));
       return Number(totale);
     }
 

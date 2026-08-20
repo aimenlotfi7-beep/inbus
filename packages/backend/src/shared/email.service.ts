@@ -1,48 +1,46 @@
+import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import dns from 'node:dns/promises';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 import { env } from '../config/env.js';
 
-let transporter: nodemailer.Transporter<SMTPTransport.SentMessageInfo> | null = null;
+let resend: Resend | null = null;
+let transporterSmtp: nodemailer.Transporter<SMTPTransport.SentMessageInfo> | null = null;
+
+function getResend(): Resend | null {
+  if (!env.RESEND_API_KEY) return null;
+  if (!resend) resend = new Resend(env.RESEND_API_KEY);
+  return resend;
+}
 
 /**
- * Crea (una sola volta) il collegamento email. Railway non ha una rete
- * IPv6 in uscita funzionante — e si è visto che dire a nodemailer
- * "usa IPv4" (family:4) NON basta: quell'opzione non viene davvero
- * applicata dal modulo che apre la connessione (verificato nel codice
- * della libreria). L'unico modo affidabile è risolvere l'indirizzo
- * IPv4 di Gmail NOI STESSI, e collegarci direttamente a quell'IP
- * invece che al nome "smtp.gmail.com" (che il sistema potrebbe
- * comunque risolvere in IPv6). Il nome host vero va comunque passato
- * a parte (servername), altrimenti il certificato di sicurezza non
- * risulterebbe valido per un IP nudo.
+ * Riserva SMTP, usata solo se Resend non è configurato — utile per lo
+ * sviluppo in locale, dove SMTP normale funziona senza problemi. Su
+ * Railway, in produzione, la porta SMTP tradizionale risulta bloccata
+ * in uscita (verificato: gli stessi tentativi che funzionano in locale
+ * restano appesi fino al timeout lassù) — per questo Resend, che manda
+ * le email tramite una normale richiesta web, è il metodo preferito.
  */
-async function getTransporter() {
+async function getTransporterSmtp() {
   if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) return null;
-  if (!transporter) {
+  if (!transporterSmtp) {
     let host = env.SMTP_HOST;
     try {
       const indirizzi = await dns.resolve4(env.SMTP_HOST);
       if (indirizzi[0]) host = indirizzi[0];
     } catch {
-      // Se la risoluzione IPv4 fallisce per qualche motivo, ripiega sul
-      // nome host normale — meglio provare (e magari fallire più avanti
-      // con lo stesso vecchio errore) che bloccare tutto qui.
+      // Se la risoluzione IPv4 fallisce, ripiega sul nome host normale.
     }
     const opzioni: SMTPTransport.Options = {
       host,
       port: env.SMTP_PORT,
       secure: env.SMTP_PORT === 465,
       auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
-      // Ci colleghiamo a un indirizzo IP nudo (risolto sopra), quindi
-      // nodemailer non saprebbe più a quale nome host verificare il
-      // certificato di sicurezza — va detto esplicitamente qui, non
-      // dentro "tls" (lì non viene letto per questo scopo).
       servername: env.SMTP_HOST,
     } as SMTPTransport.Options;
-    transporter = nodemailer.createTransport(opzioni);
+    transporterSmtp = nodemailer.createTransport(opzioni);
   }
-  return transporter;
+  return transporterSmtp;
 }
 
 /** URL pubblico del sito, per costruire i link nelle email (es.
@@ -53,19 +51,37 @@ export function urlSito(percorso: string) {
 }
 
 /**
- * Invia un'email. Se SMTP non è configurato (SMTP_HOST/USER/PASS
- * mancanti), non fallisce: stampa il contenuto nei log del server, così
- * il resto del flusso (lista d'attesa, promemoria saldo) continua a
- * funzionare anche prima di aver collegato un vero account email — utile
- * per testare, o per chi preferisce mandare i link a mano per ora.
+ * Invia un'email. Prova prima Resend (se configurato — metodo
+ * preferito), poi SMTP come riserva. Se nessuno dei due è configurato,
+ * non fallisce: stampa il contenuto nei log del server, così il resto
+ * del flusso (lista d'attesa, promemoria saldo) continua a funzionare
+ * anche prima di aver collegato un vero account email.
  */
 export async function inviaEmail({ a, oggetto, html, allegati }: {
   a: string; oggetto: string; html: string;
   allegati?: { nomeFile: string; contenuto: Buffer; tipo: string }[];
 }): Promise<{ inviata: boolean }> {
-  const t = await getTransporter();
+  const r = getResend();
+  if (r) {
+    try {
+      const { error } = await r.emails.send({
+        from: env.RESEND_FROM || 'INBUS <onboarding@resend.dev>',
+        to: a,
+        subject: oggetto,
+        html,
+        attachments: allegati?.map((al) => ({ filename: al.nomeFile, content: al.contenuto, content_type: al.tipo })),
+      });
+      if (error) throw error;
+      return { inviata: true };
+    } catch (err) {
+      console.error(`Invio email (Resend) a ${a} fallito:`, err);
+      return { inviata: false };
+    }
+  }
+
+  const t = await getTransporterSmtp();
   if (!t) {
-    console.log(`\n[EMAIL NON INVIATA — SMTP non configurato]\nA: ${a}\nOggetto: ${oggetto}\n${html.replace(/<[^>]+>/g, ' ').trim()}\n`);
+    console.log(`\n[EMAIL NON INVIATA — né Resend né SMTP configurati]\nA: ${a}\nOggetto: ${oggetto}\n${html.replace(/<[^>]+>/g, ' ').trim()}\n`);
     return { inviata: false };
   }
   try {
@@ -78,7 +94,7 @@ export async function inviaEmail({ a, oggetto, html, allegati }: {
     });
     return { inviata: true };
   } catch (err) {
-    console.error(`Invio email a ${a} fallito:`, err);
+    console.error(`Invio email (SMTP) a ${a} fallito:`, err);
     return { inviata: false };
   }
 }

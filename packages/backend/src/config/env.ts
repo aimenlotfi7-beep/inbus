@@ -20,6 +20,12 @@ const schemaEnv = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  // Resend: metodo preferito per mandare email, perché usa una normale
+  // richiesta web (porta 443) invece della porta SMTP tradizionale —
+  // che su Railway risulta bloccata in uscita. Se presente, viene usato
+  // al posto di SMTP.
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM: z.string().optional(),
   // Base per costruire i link cliccabili nelle email (es. completamento
   // lista d'attesa, saldo). Se non impostata, usa CORS_ORIGIN.
   FRONTEND_URL: z.string().optional(),
