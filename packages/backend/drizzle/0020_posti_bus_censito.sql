@@ -1,0 +1,1 @@
+ALTER TABLE "bus_fisici" ADD COLUMN IF NOT EXISTS "posti_bus" integer;

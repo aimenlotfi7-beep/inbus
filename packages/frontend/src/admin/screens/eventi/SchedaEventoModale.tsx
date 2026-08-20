@@ -34,10 +34,15 @@ const STEP_WIZARD = [
  * averlo, perché nessuno parte da lì.
  */
 export function SchedaEventoModale({
-  evento, tabIniziale = 'dettagli', onClose, onSalvato,
+  evento, tabIniziale = 'dettagli', soloQuestaTab = false, onClose, onSalvato,
 }: {
   evento: Evento | null; // null = nuovo evento
   tabIniziale?: 'dettagli' | 'partenze' | 'lista-attesa' | 'offerte';
+  // Se vero, nasconde del tutto le altre tab — usato dalle sezioni
+  // principali del menu (Partenze, Lista d'attesa, Offerte), che devono
+  // occuparsi solo della propria competenza, senza poter navigare per
+  // sbaglio nelle altre.
+  soloQuestaTab?: boolean;
   onClose: () => void;
   onSalvato: () => void;
 }) {
@@ -475,20 +480,26 @@ export function SchedaEventoModale({
   // ---- Vista MODIFICA (evento esistente): tab Dettagli/Partenze ----
 
   if (evento) {
+    const titoloTab = soloQuestaTab
+      ? { dettagli: 'Modifica evento', partenze: 'Partenze', 'lista-attesa': "Lista d'attesa", offerte: 'Offerte' }[tabIniziale]
+      : 'Modifica evento';
     return (
-      <PaginaSezione titolo={`Modifica evento — ${evento.artista}`} onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)}>
-        <div className="mini-tabs">
-          <button type="button" className={`mini-tab${tabAttiva === 'dettagli' ? ' active' : ''}`} onClick={() => setTabAttiva('dettagli')}>Dettagli</button>
-          <button type="button" className={`mini-tab${tabAttiva === 'partenze' ? ' active' : ''}`} onClick={() => setTabAttiva('partenze')}>Partenze</button>
-          <button type="button" className={`mini-tab${tabAttiva === 'lista-attesa' ? ' active' : ''}`} onClick={() => setTabAttiva('lista-attesa')}>Lista d'attesa</button>
-          <button type="button" className={`mini-tab${tabAttiva === 'offerte' ? ' active' : ''}`} onClick={() => setTabAttiva('offerte')}>Offerte</button>
-        </div>
+      <PaginaSezione titolo={`${titoloTab} — ${evento.artista}`} onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)} larga={tabAttiva === 'partenze'}>
+        {!soloQuestaTab && (
+          <div className="mini-tabs">
+            <button type="button" className={`mini-tab${tabAttiva === 'dettagli' ? ' active' : ''}`} onClick={() => setTabAttiva('dettagli')}>Dettagli</button>
+            <button type="button" className={`mini-tab${tabAttiva === 'partenze' ? ' active' : ''}`} onClick={() => setTabAttiva('partenze')}>Partenze</button>
+            <button type="button" className={`mini-tab${tabAttiva === 'lista-attesa' ? ' active' : ''}`} onClick={() => setTabAttiva('lista-attesa')}>Lista d'attesa</button>
+            <button type="button" className={`mini-tab${tabAttiva === 'offerte' ? ' active' : ''}`} onClick={() => setTabAttiva('offerte')}>Offerte</button>
+          </div>
+        )}
 
         {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} />}
         {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} />}
         {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}
         {tabAttiva === 'dettagli' && (
           <>
+            {/* eslint-disable-next-line */}
             {campiInfoEvento}
             <p className="section-label" style={{ marginTop: 18 }}>Tratte</p>
             {campiTratte}

@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
  * URL — lo schermo intero è solo una questione di layout).
  */
 export function PaginaSezione({
-  titolo, onIndietro, azioni, children, richiediConferma,
+  titolo, onIndietro, azioni, children, richiediConferma, larga,
 }: {
   titolo: string;
   onIndietro: () => void;
@@ -18,6 +18,10 @@ export function PaginaSezione({
   // tornare indietro davvero (es. chiede conferma se ci sono modifiche
   // non salvate).
   richiediConferma?: () => void;
+  // Contenuti con tabelle/riepiloghi affiancati (es. Partenze) stanno
+  // più larghi di un modulo normale — di default resta stretto (760px,
+  // più leggibile per moduli/testo), qui si allarga a 1100px.
+  larga?: boolean;
 }) {
   const indietro = richiediConferma ?? onIndietro;
   return (
@@ -27,7 +31,7 @@ export function PaginaSezione({
         <h2>{titolo}</h2>
         {azioni && <div className="pagina-sezione-azioni">{azioni}</div>}
       </div>
-      <div className="pagina-sezione-corpo">{children}</div>
+      <div className={`pagina-sezione-corpo${larga ? ' larga' : ''}`}>{children}</div>
     </div>
   );
 }

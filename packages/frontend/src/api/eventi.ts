@@ -32,6 +32,7 @@ export interface CalcoloBusLinea {
   totalePasseggeri: number;
   busSuggeriti: number;
   coperta: boolean;
+  postiBusCensiti: number;
 }
 export interface BusFisico {
   id: string;
@@ -42,11 +43,12 @@ export interface BusFisico {
   tourLeaderId: string | null;
   tourLeaderNome: string | null;
   costo: string | null;
+  postiBus: number | null;
   note: string | null;
   lineeIds: string[];
 }
 export interface BusFisicoInput {
-  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; note?: string; lineeIds: string[];
+  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; lineeIds: string[];
 }
 export interface PasseggeroBus { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string; }
 export interface RiepilogoEconomicoTratta { lineaId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; }
@@ -64,8 +66,6 @@ export const eventiApi = {
   remove: (id: string) => api.delete<void>(`/api/eventi/${id}`),
 
   calcolaBus: (id: string) => api.get<CalcoloBusLinea[]>(`/api/eventi/${id}/calcola-bus`),
-  impostaCopertura: (id: string, lineaId: string, coperta: boolean, noteCoperta?: string) =>
-    api.put<{ ok: true }>(`/api/eventi/${id}/linee/${lineaId}/copertura`, { coperta, noteCoperta }),
   listaBus: (id: string) => api.get<BusFisico[]>(`/api/eventi/${id}/bus`),
   creaBus: (id: string, input: BusFisicoInput) => api.post<{ id: string }>(`/api/eventi/${id}/bus`, input),
   aggiornaBus: (id: string, busId: string, input: Partial<BusFisicoInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/bus/${busId}`, input),

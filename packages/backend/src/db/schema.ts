@@ -222,6 +222,12 @@ export const busFisici = pgTable('bus_fisici', {
   // costo). Facoltativo: se non lo compili, quella tratta risulta senza
   // costo censito, non zero per errore.
   costo: numeric('costo', { precision: 10, scale: 2 }),
+  // Quanti posti ha davvero questo bus specifico — usato per calcolare
+  // in automatico se la tratta è "coperta" (somma dei posti dei bus
+  // censiti su quella tratta >= passeggeri confermati). Facoltativo: se
+  // non lo compili, questo bus non contribuisce al calcolo automatico
+  // (meglio "non contribuisce" che assumere un numero a caso).
+  postiBus: integer('posti_bus'),
   note: text('note'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
 });

@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { haPermesso, type SessioneAdmin } from '../../api/auth';
 import { eventiApi } from '../../api/eventi';
+import { listaAttesaApi } from '../../api/listaAttesa';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'partenze'
-  | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne'
+  | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte'
   | 'utenti' | 'promoter' | 'tourleader'
   | 'fornitori' | 'tragitti'
   | 'chat' | 'contenuti'
@@ -23,9 +24,11 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   ]},
   { titolo: 'Vendite', voci: [
     { id: 'transazioni', label: 'Prenotazioni', permesso: 'prenotazioni.transazioni' },
+    { id: 'lista-attesa', label: "Lista d'attesa", permesso: 'eventi.partenze' },
   ]},
   { titolo: 'Marketing', voci: [
     { id: 'campagne', label: 'Campagne', permesso: 'campagne.gestisci' },
+    { id: 'offerte', label: 'Offerte', permesso: 'offerte.gestisci' },
     { id: 'vetrina', label: 'Vetrina', permesso: 'eventi.vetrina' },
     { id: 'contenuti', label: 'Contenuti sito', permesso: 'pagine.gestisci' },
   ]},
@@ -63,6 +66,7 @@ export function AdminLayout({
 }) {
   const [gruppiCollassati, setGruppiCollassati] = useState<Record<string, boolean>>({});
   const [allertePartenze, setAllertePartenze] = useState(0);
+  const [inAttesa, setInAttesa] = useState(0);
 
   // Notifica sulla voce "Partenze": quante tratte, in tutti gli eventi,
   // hanno più passeggeri confermati dei posti previsti. Solo per chi ha
@@ -70,6 +74,7 @@ export function AdminLayout({
   useEffect(() => {
     if (!haPermesso(sessione, 'eventi.partenze')) return;
     eventiApi.allertePartenze().then((r) => setAllertePartenze(r.conteggio)).catch(() => {});
+    listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
   }, [sessione]);
 
   // Filtro sia i gruppi che le voci in base a ciò che l'utente loggato
@@ -104,6 +109,9 @@ export function AdminLayout({
                     {voce.label}
                     {voce.id === 'partenze' && allertePartenze > 0 && (
                       <span className="side-badge" title={`${allertePartenze} tratta/e con posti superati`}>{allertePartenze}</span>
+                    )}
+                    {voce.id === 'lista-attesa' && inAttesa > 0 && (
+                      <span className="side-badge" title={`${inAttesa} iscrizione/i in attesa di promozione`}>{inAttesa}</span>
                     )}
                   </button>
                 ))}

@@ -398,11 +398,20 @@ export const eventiService = {
   async calcolaBusNecessari(eventoId: string) {
     const evento = await getById(eventoId);
     const capienza = await leggiPostiPerBus();
+    const lineeIds = evento.linee.map((l) => l.id);
 
     const prenotazioniConfermate = await db
       .select({ lineaId: prenotazioni.lineaId, fermataCitta: prenotazioni.fermataCitta, passeggeri: prenotazioni.passeggeri })
       .from(prenotazioni)
       .where(and(eq(prenotazioni.eventoId, eventoId), eq(prenotazioni.stato, 'CONFERMATA')));
+
+    // Per calcolare la copertura reale servono i bus davvero censiti su
+    // ogni tratta, con i loro posti (facoltativi: un bus senza posti
+    // indicati non contribuisce alla somma, invece di essere ignorato
+    // del tutto o contare come 0 posti per errore).
+    const assegnazioni = lineeIds.length ? await db.select().from(busTratte).where(inArray(busTratte.lineaId, lineeIds)) : [];
+    const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
+    const busCensiti = busIds.length ? await db.select().from(busFisici).where(inArray(busFisici.id, busIds)) : [];
 
     return evento.linee.map((linea) => {
       const fermateOrdinate = [...linea.fermate].sort((a, b) => a.ordine - b.ordine);
@@ -435,6 +444,16 @@ export const eventiService = {
 
       const totalePasseggeri = fermateConPasseggeri.reduce((s, f) => s + f.passeggeri, 0);
 
+      // Coperta = automatico, non più un interruttore da cliccare: somma
+      // i posti dei bus censiti su questa tratta e la confronta con i
+      // passeggeri REALMENTE confermati (non con i posti pianificati —
+      // quella è un'altra domanda, "sto vendendo più di quanto
+      // previsto?", già visibile separatamente come "posti superati").
+      const postiBusCensiti = busCensiti
+        .filter((b) => assegnazioni.some((a) => a.busId === b.id && a.lineaId === linea.id))
+        .reduce((s, b) => s + (b.postiBus ?? 0), 0);
+      const coperta = totalePasseggeri > 0 && postiBusCensiti >= totalePasseggeri;
+
       return {
         lineaId: linea.id,
         nome: linea.nome,
@@ -443,18 +462,10 @@ export const eventiService = {
         fermate: fermateConPasseggeri,
         totalePasseggeri,
         busSuggeriti,
-        coperta: linea.coperta,
+        coperta,
+        postiBusCensiti,
       };
     });
-  },
-
-  /** Segna una linea/tratta come coperta (o no) — sezione Partenze. Non
-   *  tocca fermate né altro, per non rischiare di sovrascrivere dati con
-   *  l'update "wholesale" dell'evento. */
-  async impostaCopertura(eventoId: string, lineaId: string, coperta: boolean, noteCoperta?: string) {
-    const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, lineaId)).limit(1);
-    if (!linea || linea.eventoId !== eventoId) throw new NonTrovato('Linea');
-    await db.update(lineeBus).set({ coperta, ...(noteCoperta !== undefined && { noteCoperta }) }).where(eq(lineeBus.id, lineaId));
   },
 
   /** Bus fisici collegati a una qualunque linea dell'evento, con le tratte
@@ -482,7 +493,7 @@ export const eventiService = {
     });
   },
 
-  async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; note?: string; lineeIds: string[] }) {
+  async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus?: number; note?: string; lineeIds: string[] }) {
     const evento = await getById(eventoId);
     const lineeValide = new Set(evento.linee.map((l) => l.id));
     const lineeIdsFiltrate = input.lineeIds.filter((id) => lineeValide.has(id));
@@ -496,6 +507,7 @@ export const eventiService = {
         autistaTelefono: input.autistaTelefono,
         tourLeaderId: input.tourLeaderId,
         costo: input.costo?.toFixed(2),
+        postiBus: input.postiBus,
         note: input.note,
       }).returning();
       await tx.insert(busTratte).values(lineeIdsFiltrate.map((lineaId) => ({ busId: nuovo.id, lineaId })));
@@ -503,12 +515,12 @@ export const eventiService = {
     });
   },
 
-  async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; note?: string; lineeIds?: string[] }) {
+  async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; lineeIds?: string[] }) {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
 
     return db.transaction(async (tx) => {
-      if (input.riferimento !== undefined || input.fornitoreId !== undefined || input.autistaNome !== undefined || input.autistaTelefono !== undefined || input.tourLeaderId !== undefined || input.costo !== undefined || input.note !== undefined) {
+      if (input.riferimento !== undefined || input.fornitoreId !== undefined || input.autistaNome !== undefined || input.autistaTelefono !== undefined || input.tourLeaderId !== undefined || input.costo !== undefined || input.postiBus !== undefined || input.note !== undefined) {
         await tx.update(busFisici).set({
           ...(input.riferimento !== undefined && { riferimento: input.riferimento }),
           ...(input.fornitoreId !== undefined && { fornitoreId: input.fornitoreId }),
@@ -516,6 +528,7 @@ export const eventiService = {
           ...(input.autistaTelefono !== undefined && { autistaTelefono: input.autistaTelefono }),
           ...(input.tourLeaderId !== undefined && { tourLeaderId: input.tourLeaderId }),
           ...(input.costo !== undefined && { costo: input.costo.toFixed(2) }),
+          ...(input.postiBus !== undefined && { postiBus: input.postiBus }),
           ...(input.note !== undefined && { note: input.note }),
         }).where(eq(busFisici.id, busId));
       }
@@ -632,25 +645,37 @@ export const eventiService = {
     });
   },
 
-  /** Conta quante tratte, in tutti gli eventi, hanno più passeggeri
-   *  confermati dei posti totali previsti — usato per il pallino di
-   *  notifica sulla voce "Partenze" nel menu del gestionale. */
+  /** Conta quante tratte, in tutti gli eventi, NON sono coperte — cioè
+   *  hanno passeggeri confermati ma i bus censiti su quella tratta non
+   *  bastano a contenerli tutti. Usato per il pallino di notifica sulla
+   *  voce "Partenze" nel menu del gestionale: prima segnalava "posti
+   *  superati" rispetto al pianificato, ora segnala il problema
+   *  operativo vero — non hai ancora censito bus a sufficienza. */
   async contaAllertePartenze() {
-    const righe = await db
-      .select({ lineaId: lineeBus.id, postiTotali: lineeBus.postiTotali })
-      .from(lineeBus);
+    const righeLinee = await db.select({ lineaId: lineeBus.id }).from(lineeBus);
+    if (righeLinee.length === 0) return 0;
+    const tutteLineeIds = righeLinee.map((r) => r.lineaId);
 
     const somme = await db
       .select({ lineaId: prenotazioni.lineaId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
       .from(prenotazioni)
       .where(eq(prenotazioni.stato, 'CONFERMATA'))
       .groupBy(prenotazioni.lineaId);
-
     const mappaPasseggeri = new Map(somme.map((s) => [s.lineaId, Number(s.totale)]));
+
+    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.lineaId, tutteLineeIds));
+    const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
+    const bus = busIds.length ? await db.select({ id: busFisici.id, postiBus: busFisici.postiBus }).from(busFisici).where(inArray(busFisici.id, busIds)) : [];
+    const mappaBus = new Map(bus.map((b) => [b.id, b.postiBus ?? 0]));
+
     let conteggio = 0;
-    for (const r of righe) {
-      const passeggeri = mappaPasseggeri.get(r.lineaId) ?? 0;
-      if (passeggeri > r.postiTotali) conteggio++;
+    for (const lineaId of tutteLineeIds) {
+      const passeggeri = mappaPasseggeri.get(lineaId) ?? 0;
+      if (passeggeri === 0) continue; // niente da coprire, non è un allarme
+      const postiBusCensiti = assegnazioni
+        .filter((a) => a.lineaId === lineaId)
+        .reduce((s, a) => s + (mappaBus.get(a.busId) ?? 0), 0);
+      if (postiBusCensiti < passeggeri) conteggio++;
     }
     return conteggio;
   },

@@ -134,6 +134,13 @@
       "when": 1787152576504,
       "tag": "0019_consensi_privacy_utenti",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1787214625043,
+      "tag": "0020_posti_bus_censito",
+      "breakpoints": true
     }
   ]
 }

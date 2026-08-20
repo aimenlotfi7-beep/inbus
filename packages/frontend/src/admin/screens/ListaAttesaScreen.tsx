@@ -6,11 +6,11 @@ import { RicercaSezione } from '../shared/RicercaSezione';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 
 /**
- * Elenco eventi pensato per arrivare rapidamente alla gestione delle
- * partenze: click su un evento → si apre la sua scheda già sulla tab
- * "Partenze" (niente selettore/tendina, solo la lista da cui scegliere).
+ * Elenco eventi pensato per arrivare rapidamente alla lista d'attesa:
+ * click su un evento → si apre isolata su questa sola sezione (niente
+ * Dettagli/Partenze/Offerte, solo la propria competenza).
  */
-export function PartenzeScreen() {
+export function ListaAttesaScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [selezionato, setSelezionato] = useState<Evento | null>(null);
   const [ricerca, setRicerca] = useState('');
@@ -25,13 +25,13 @@ export function PartenzeScreen() {
     : eventi;
 
   if (selezionato) {
-    return <SchedaEventoModale evento={selezionato} tabIniziale="partenze" soloQuestaTab onClose={() => setSelezionato(null)} onSalvato={ricarica} />;
+    return <SchedaEventoModale evento={selezionato} tabIniziale="lista-attesa" soloQuestaTab onClose={() => setSelezionato(null)} onSalvato={ricarica} />;
   }
 
   return (
     <div>
-      <PanelHead titolo="Partenze" />
-      <p className="testo-intro">Scegli un evento per vedere il calcolo bus, la copertura delle tratte e i bus censiti.</p>
+      <PanelHead titolo="Lista d'attesa" />
+      <p className="testo-intro">Scegli un evento per vedere chi è in lista d'attesa e promuovere le iscrizioni.</p>
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
 
       <div className="cards-list">

@@ -63,6 +63,15 @@ export const listaAttesaService = {
     return righe.reduce((somma, r) => somma + r.passeggeri, 0);
   },
 
+  /** Quante iscrizioni sono ancora "in attesa" (non promosse) su tutti
+   *  gli eventi — usato per il pallino di notifica sulla voce "Lista
+   *  d'attesa" nel menu del gestionale: se c'è qualcuno in attesa, va
+   *  segnalato subito, senza dover aprire ogni evento per scoprirlo. */
+  async contaInAttesa() {
+    const righe = await db.select({ id: listaAttesa.id }).from(listaAttesa).where(eq(listaAttesa.stato, 'IN_ATTESA'));
+    return righe.length;
+  },
+
   /** Genera un token univoco e manda l'email con il link "completa la tua
    *  prenotazione" — non crea ancora la prenotazione vera: quella viene
    *  creata solo quando il cliente clicca e finalizza davvero (così, se

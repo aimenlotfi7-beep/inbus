@@ -89,15 +89,6 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
     });
   }
 
-  async function toggleCopertura(linea: CalcoloBusLinea) {
-    try {
-      await eventiApi.impostaCopertura(eventoId, linea.lineaId, !linea.coperta);
-      ricarica();
-    } catch (e) {
-      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
-    }
-  }
-
   function apriNuovoBus(lineaIdPreselezionata?: string) {
     setInModifica(null);
     setForm(lineaIdPreselezionata ? { ...BUS_VUOTO, lineeIds: [lineaIdPreselezionata] } : BUS_VUOTO);
@@ -105,7 +96,7 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
   }
   function apriModificaBus(b: BusFisico) {
     setInModifica(b);
-    setForm({ fornitoreId: b.fornitoreId ?? undefined, riferimento: b.riferimento, autistaNome: b.autistaNome ?? undefined, autistaTelefono: b.autistaTelefono ?? undefined, tourLeaderId: b.tourLeaderId, costo: b.costo ? Number(b.costo) : undefined, note: b.note ?? undefined, lineeIds: b.lineeIds });
+    setForm({ fornitoreId: b.fornitoreId ?? undefined, riferimento: b.riferimento, autistaNome: b.autistaNome ?? undefined, autistaTelefono: b.autistaTelefono ?? undefined, tourLeaderId: b.tourLeaderId, costo: b.costo ? Number(b.costo) : undefined, postiBus: b.postiBus ?? undefined, note: b.note ?? undefined, lineeIds: b.lineeIds });
     setModaleAperta(true);
   }
 
@@ -221,14 +212,11 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
                 <span style={{ color: 'var(--mist)' }}> — stima in base ai passeggeri per fermata; l'orario di ogni bus resta da compilare a mano.</span>
               </p>
 
-              <button
-                type="button"
-                className={`badge badge-btn ${linea.coperta ? 'coperta' : 'non-coperta'}`}
-                style={{ marginBottom: 12 }}
-                onClick={(e) => { e.stopPropagation(); toggleCopertura(linea); }}
-              >
-                {linea.coperta ? '✓ Segnata come coperta — clicca per togliere' : 'Segna come coperta'}
-              </button>
+              <p style={{ fontSize: 13, marginBottom: 12, color: 'var(--mist)' }}>
+                {linea.postiBusCensiti > 0
+                  ? <>Bus censiti: <strong style={{ color: 'var(--paper)' }}>{linea.postiBusCensiti} posti</strong> per {linea.totalePasseggeri} passeggeri confermati — la copertura si aggiorna da sola in base a quanto censisci qui sotto.</>
+                  : 'Nessun bus con posti indicati ancora censito su questa tratta — la copertura si aggiornerà da sola appena ne censisci uno.'}
+              </p>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
                 {linea.fermate.map((f) => (
@@ -318,6 +306,7 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
               <p className="testo-intro" style={{ fontSize: 12, marginTop: 4 }}>Nessun tour leader censito — vai nella sezione "Tour Leader" per aggiungerne uno.</p>
             )}
           </div>
+          <div className="campo"><label>Posti del bus (usato per calcolare da solo se la tratta è coperta)</label><input type="number" min={0} value={form.postiBus ?? ''} onChange={(e) => setForm({ ...form, postiBus: e.target.value ? Number(e.target.value) : undefined })} /></div>
           <div className="campo"><label>Costo del bus (€, facoltativo — usato per calcolare il guadagno della tratta)</label><input type="number" min={0} value={form.costo ?? ''} onChange={(e) => setForm({ ...form, costo: e.target.value ? Number(e.target.value) : undefined })} /></div>
           <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
 

@@ -39,7 +39,7 @@ export function EventiScreen() {
   }
 
   if (modaleAperta) {
-    return <SchedaEventoModale evento={inModifica} tabIniziale="dettagli" onClose={() => setModaleAperta(false)} onSalvato={ricarica} />;
+    return <SchedaEventoModale evento={inModifica} tabIniziale="dettagli" soloQuestaTab onClose={() => setModaleAperta(false)} onSalvato={ricarica} />;
   }
 
   return (

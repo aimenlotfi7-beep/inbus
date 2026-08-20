@@ -3,19 +3,12 @@ import { listaAttesaApi, type IscrizioneListaAttesa } from '../../../api/listaAt
 import { ErroreApi } from '../../../api/client';
 
 export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
-  const [partecipanti, setPartecipanti] = useState<number | null>(null);
   const [lista, setLista] = useState<IscrizioneListaAttesa[]>([]);
   const [caricamento, setCaricamento] = useState(true);
 
   function ricarica() {
     setCaricamento(true);
-    Promise.all([
-      listaAttesaApi.contaPartecipanti(eventoId),
-      listaAttesaApi.listByEvento(eventoId),
-    ]).then(([c, l]) => {
-      setPartecipanti(c.partecipanti);
-      setLista(l);
-    }).finally(() => setCaricamento(false));
+    listaAttesaApi.listByEvento(eventoId).then(setLista).finally(() => setCaricamento(false));
   }
   useEffect(ricarica, [eventoId]);
 
@@ -53,6 +46,8 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
   // vede subito quante persone aspettano e per quale città, senza
   // doverle contare a mano scorrendo l'elenco.
   const inAttesa = lista.filter((r) => r.stato === 'IN_ATTESA');
+  const promosse = lista.filter((r) => r.stato === 'PROMOSSA').length;
+  const confermate = lista.filter((r) => r.completata).length;
   const perFermata = new Map<string, { passeggeri: number; iscritti: number }>();
   for (const r of inAttesa) {
     const chiave = r.fermataCitta ?? 'Nessuna fermata scelta';
@@ -85,13 +80,20 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
       )}
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-        <div className="section-card" style={{ flex: 1, minWidth: 160 }}>
-          <p className="section-label" style={{ marginBottom: 4 }}>Partecipanti confermati</p>
-          <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 26 }}>{partecipanti ?? 0}</p>
+        <div className="section-card" style={{ flex: 1, minWidth: 140 }}>
+          <p className="section-label" style={{ marginBottom: 4 }}>Lista d'attesa</p>
+          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 26 }}>{lista.length}</p>
+          <p className="testo-intro" style={{ fontSize: 11, marginTop: 2, marginBottom: 0 }}>iscrizioni totali</p>
         </div>
-        <div className="section-card" style={{ flex: 1, minWidth: 160 }}>
-          <p className="section-label" style={{ marginBottom: 4 }}>In lista d'attesa</p>
-          <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 26 }}>{inAttesa.reduce((s, r) => s + r.passeggeri, 0)}</p>
+        <div className="section-card" style={{ flex: 1, minWidth: 140 }}>
+          <p className="section-label" style={{ marginBottom: 4 }}>Promosse</p>
+          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 26, color: 'var(--amber)' }}>{promosse}</p>
+          <p className="testo-intro" style={{ fontSize: 11, marginTop: 2, marginBottom: 0 }}>link mandato in totale (comprese quelle già confermate)</p>
+        </div>
+        <div className="section-card" style={{ flex: 1, minWidth: 140 }}>
+          <p className="section-label" style={{ marginBottom: 4 }}>Confermate</p>
+          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 26, color: 'var(--green)' }}>{confermate}</p>
+          <p className="testo-intro" style={{ fontSize: 11, marginTop: 2, marginBottom: 0 }}>hanno completato davvero la prenotazione</p>
         </div>
       </div>
 

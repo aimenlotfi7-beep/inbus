@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { eventiController } from './eventi.controller.js';
-import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, impostaCoperturaSchema, creaBusSchema, aggiornaBusSchema } from './eventi.dto.js';
+import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, creaBusSchema, aggiornaBusSchema } from './eventi.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
@@ -42,13 +42,6 @@ eventiRouter.delete(
 
 // Sezione Partenze: calcolo bus necessari, copertura tratte, bus fisici.
 eventiRouter.get('/:id/calcola-bus', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.calcolaBus));
-eventiRouter.put(
-  '/:id/linee/:lineaId/copertura',
-  richiedeAuth,
-  richiedePermesso('eventi.crea'),
-  valida(impostaCoperturaSchema),
-  asyncHandler(eventiController.impostaCopertura)
-);
 eventiRouter.get('/:id/bus', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaBus));
 eventiRouter.post('/:id/bus', richiedeAuth, richiedePermesso('eventi.crea'), valida(creaBusSchema), asyncHandler(eventiController.creaBus));
 eventiRouter.put('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaBusSchema), asyncHandler(eventiController.aggiornaBus));

@@ -43,11 +43,6 @@ export const eventiController = {
     res.json(await eventiService.calcolaBusNecessari(req.params.id));
   },
 
-  async impostaCopertura(req: Request, res: Response) {
-    await eventiService.impostaCopertura(req.params.id, req.params.lineaId, req.body.coperta, req.body.noteCoperta);
-    res.json({ ok: true });
-  },
-
   async listaBus(req: Request, res: Response) {
     res.json(await eventiService.listaBus(req.params.id));
   },

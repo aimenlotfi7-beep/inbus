@@ -22,6 +22,8 @@ import { ContenutiScreen } from './screens/ContenutiScreen';
 import { AmministratoriScreen } from './screens/AmministratoriScreen';
 import { RuoliScreen } from './screens/RuoliScreen';
 import { PartenzeScreen } from './screens/PartenzeScreen';
+import { ListaAttesaScreen } from './screens/ListaAttesaScreen';
+import { OfferteScreen } from './screens/OfferteScreen';
 import { ImpostazioniScreen } from './screens/ImpostazioniScreen';
 import { authApi, haPermesso, type SessioneAdmin } from '../api/auth';
 
@@ -44,6 +46,8 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   tourleader: TourLeaderScreen,
   coupon: CouponScreen,
   campagne: CampagneScreen,
+  'lista-attesa': ListaAttesaScreen,
+  offerte: OfferteScreen,
   chat: ChatScreen,
   contenuti: ContenutiScreen,
   amministratori: AmministratoriScreen,
@@ -70,6 +74,8 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   tourleader: 'tourleader.visualizza',
   coupon: 'coupon.visualizza',
   campagne: 'campagne.gestisci',
+  'lista-attesa': 'eventi.partenze',
+  offerte: 'offerte.gestisci',
   chat: 'chat.visualizza',
   contenuti: 'pagine.gestisci',
   amministratori: 'utenze.gestisci',
