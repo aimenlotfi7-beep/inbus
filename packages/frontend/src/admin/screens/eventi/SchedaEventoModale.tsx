@@ -586,17 +586,21 @@ export function SchedaEventoModale({
         {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}
         {tabAttiva === 'dettagli' && (
           <>
-            <div className="wizard-stepper">
+            {/* In modifica sono vere e proprie tab, non un percorso da
+                completare in ordine: nessun segno di spunta sulle
+                precedenti, solo quella cliccata risulta evidenziata —
+                a differenza della creazione, qui i dati esistono già
+                tutti, si sta solo navigando tra le sezioni. */}
+            <div className="mini-tabs">
               {STEP_WIZARD.map((s) => (
-                <div
+                <button
                   key={s.numero}
-                  className={`wizard-dot${step === s.numero ? ' active' : step > s.numero ? ' completato' : ''}`}
+                  type="button"
+                  className={`mini-tab${step === s.numero ? ' active' : ''}`}
                   onClick={() => setStep(s.numero)}
-                  style={{ cursor: 'pointer' }}
-                  title="Vai direttamente a questo passo"
                 >
-                  <span>{step > s.numero ? '✓' : s.numero}</span> {s.label}
-                </div>
+                  {s.label}
+                </button>
               ))}
             </div>
 
@@ -624,22 +628,9 @@ export function SchedaEventoModale({
               </div>
             )}
 
-            <div className="wizard-nav">
-              <button className="btn btn-ghost" disabled={step === 1} onClick={() => setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s))}>← Passo precedente</button>
-              {step < 4 ? (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    if (step === 1 && !infoCompleta()) { alert('Compila almeno artista, genere, luogo, città e data prima di proseguire.'); return; }
-                    setStep((s) => (s + 1) as 2 | 3 | 4);
-                  }}
-                >
-                  Avanti →
-                </button>
-              ) : (
-                <button className="btn btn-primary" onClick={salva}>Salva evento</button>
-              )}
-            </div>
+            {/* Salva e esci subito, disponibile su qualunque sezione ci
+                si trovi — non serve passare dalle altre per salvare. */}
+            <button className="btn btn-primary" style={{ width: '100%', marginTop: 18 }} onClick={salva}>Salva modifica</button>
           </>
         )}
       </PaginaSezione>
