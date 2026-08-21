@@ -24,10 +24,10 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
         <li><b>Passeggeri:</b> {{passeggeri}}</li>
         <li><b>Totale:</b> €{{totale}} (acconto — il saldo va completato entro la scadenza indicata via email; il biglietto vero arriverà via email a saldo completato)</li>
       </ul>
-      <p>Puoi rivedere la tua prenotazione in qualsiasi momento nella tua <a href="{{link_account}}">area personale</a>, accedendo con questa stessa email.</p>
+      <p>Puoi completare il saldo in qualsiasi momento da <a href="{{link_saldo}}">questa pagina</a>, con già tutti i tuoi dati e la cifra da versare pronti.</p>
       <p>A presto!</p>
     `,
-    segnaposto: ['nome', 'pnr', 'fermata', 'orario', 'passeggeri', 'totale', 'evento', 'link_account'],
+    segnaposto: ['nome', 'pnr', 'fermata', 'orario', 'passeggeri', 'totale', 'evento', 'link_saldo'],
   },
   {
     chiave: 'ticket',
@@ -65,15 +65,37 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
   },
 ];
 
+/** Vecchio testo del modello "conferma_acconto" (prima del link corretto
+ *  a /completa-saldo) — usato solo per riconoscere se qualcuno l'ha già
+ *  modificato a mano o no, vedi sotto. */
+const VECCHIO_CORPO_CONFERMA_ACCONTO = `
+      <p>Ciao {{nome}},</p>
+      <p>La tua prenotazione è confermata! Ecco i dettagli:</p>
+      <ul>
+        <li><b>PNR:</b> {{pnr}}</li>
+        <li><b>Partenza da:</b> {{fermata}} alle {{orario}}</li>
+        <li><b>Passeggeri:</b> {{passeggeri}}</li>
+        <li><b>Totale:</b> €{{totale}} (acconto — il saldo va completato entro la scadenza indicata via email; il biglietto vero arriverà via email a saldo completato)</li>
+      </ul>
+      <p>Puoi rivedere la tua prenotazione in qualsiasi momento nella tua <a href="{{link_account}}">area personale</a>, accedendo con questa stessa email.</p>
+      <p>A presto!</p>
+    `;
+
 /** Da chiamare una volta all'avvio del server (come già si fa per i
  *  permessi): crea le righe mancanti con il testo di base, non tocca
  *  mai quelle già esistenti — così un riavvio non cancella mai le
- *  modifiche fatte dal gestionale. */
+ *  modifiche fatte dal gestionale. Un'eccezione, una tantum: se il
+ *  testo di "conferma_acconto" è ancora ESATTAMENTE quello vecchio (col
+ *  link sbagliato), lo aggiorna al testo nuovo — ma solo in quel caso
+ *  preciso, per non rischiare di cancellare per sbaglio una modifica
+ *  vera fatta dal gestionale nel frattempo. */
 export async function sincronizzaTemplateEmail() {
   for (const modello of MODELLI_BASE) {
-    const [esistente] = await db.select({ chiave: templateEmail.chiave }).from(templateEmail).where(eq(templateEmail.chiave, modello.chiave)).limit(1);
+    const [esistente] = await db.select().from(templateEmail).where(eq(templateEmail.chiave, modello.chiave)).limit(1);
     if (!esistente) {
       await db.insert(templateEmail).values({ chiave: modello.chiave, nome: modello.nome, oggetto: modello.oggetto, corpo: modello.corpo });
+    } else if (modello.chiave === 'conferma_acconto' && esistente.corpo === VECCHIO_CORPO_CONFERMA_ACCONTO) {
+      await db.update(templateEmail).set({ corpo: modello.corpo, aggiornatoIl: new Date() }).where(eq(templateEmail.chiave, modello.chiave));
     }
   }
 }

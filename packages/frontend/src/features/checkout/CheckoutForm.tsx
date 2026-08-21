@@ -30,6 +30,11 @@ const STEP = [
  */
 export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; offerta?: OffertaCheckout; onChiudi?: () => void }) {
   const [stato, setStato] = useState<Stato>('caricamento');
+  // Quale pulsante specifico è stato premuto — 'invio' da solo non basta,
+  // altrimenti "Acquista" e "Prenota" si accenderebbero insieme (era
+  // proprio questo il bug: entrambi mostravano "Invio..." a prescindere
+  // da quale avesse premuto davvero il cliente).
+  const [azioneInCorso, setAzioneInCorso] = useState<'acquista' | 'prenota' | 'lista-attesa' | null>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [opzioni, setOpzioni] = useState<OpzionePartenza[]>([]);
   const [fermataId, setFermataId] = useState('');
@@ -104,6 +109,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   async function confermaPrenotazione(tipoPagamento: 'COMPLETO' | 'ACCONTO') {
     if (!opzioneScelta) return;
     setStato('invio');
+    setAzioneInCorso(tipoPagamento === 'COMPLETO' ? 'acquista' : 'prenota');
     setMessaggioErrore('');
     try {
       const promoterCodice = new URLSearchParams(window.location.search).get('promo') || undefined;
@@ -133,11 +139,13 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
     } catch (e) {
       setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
       setStato('errore');
+      setAzioneInCorso(null);
     }
   }
 
   async function iscrivitiListaAttesa() {
     setStato('invio');
+    setAzioneInCorso('lista-attesa');
     setMessaggioErrore('');
     try {
       await listaAttesaApi.iscriviti({
@@ -152,6 +160,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
     } catch (e) {
       setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
       setStato('errore');
+      setAzioneInCorso(null);
     }
   }
 
@@ -316,7 +325,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
                     disabled={stato === 'invio'}
                     onClick={iscrivitiListaAttesa}
                   >
-                    {stato === 'invio' ? 'Invio...' : "Iscriviti alla lista d'attesa"}
+                    {azioneInCorso === 'lista-attesa' ? 'Invio...' : "Iscriviti alla lista d'attesa"}
                   </button>
                 </>
               ) : (
@@ -330,7 +339,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
                     disabled={stato === 'invio'}
                     onClick={() => confermaPrenotazione('COMPLETO')}
                   >
-                    {stato === 'invio' ? 'Invio...' : 'Acquista'}
+                    {azioneInCorso === 'acquista' ? 'Invio...' : 'Acquista'}
                   </button>
 
                   <button
@@ -339,7 +348,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
                     disabled={stato === 'invio'}
                     onClick={() => confermaPrenotazione('ACCONTO')}
                   >
-                    {stato === 'invio' ? 'Invio...' : 'Prenota'}
+                    {azioneInCorso === 'prenota' ? 'Invio...' : 'Prenota'}
                   </button>
                   <p style={{ fontSize: 11, opacity: .65, marginTop: 6, textAlign: 'center' }}>
                     Con "Prenota" versi un acconto di €{Number(evento.accontoEur ?? 10).toFixed(2)} a passeggero

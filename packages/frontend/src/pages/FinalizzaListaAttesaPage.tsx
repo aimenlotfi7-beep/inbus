@@ -16,6 +16,7 @@ export function FinalizzaListaAttesaPage() {
   const [fermataId, setFermataId] = useState('');
   const [messaggioErrore, setMessaggioErrore] = useState('');
   const [pnr, setPnr] = useState('');
+  const [azioneInCorso, setAzioneInCorso] = useState<'acquista' | 'acconto' | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -38,6 +39,7 @@ export function FinalizzaListaAttesaPage() {
   async function conferma(tipoPagamento: 'COMPLETO' | 'ACCONTO') {
     if (!token || !opzioneScelta) return;
     setStato('invio');
+    setAzioneInCorso(tipoPagamento === 'COMPLETO' ? 'acquista' : 'acconto');
     setMessaggioErrore('');
     try {
       const r = await listaAttesaApi.finalizza(token, {
@@ -51,6 +53,7 @@ export function FinalizzaListaAttesaPage() {
     } catch (e) {
       setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
       setStato('errore');
+      setAzioneInCorso(null);
     }
   }
 
@@ -100,10 +103,10 @@ export function FinalizzaListaAttesaPage() {
                     {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
 
                     <button className="search-cta" style={{ opacity: stato === 'invio' ? .5 : 1 }} disabled={stato === 'invio'} onClick={() => conferma('COMPLETO')}>
-                      {stato === 'invio' ? 'Invio...' : 'Acquista'}
+                      {azioneInCorso === 'acquista' ? 'Invio...' : 'Acquista'}
                     </button>
                     <button className="search-cta-secondaria" style={{ opacity: stato === 'invio' ? .5 : 1 }} disabled={stato === 'invio'} onClick={() => conferma('ACCONTO')}>
-                      {stato === 'invio' ? 'Invio...' : 'Prenota con acconto'}
+                      {azioneInCorso === 'acconto' ? 'Invio...' : 'Prenota con acconto'}
                     </button>
                   </>
                 )}

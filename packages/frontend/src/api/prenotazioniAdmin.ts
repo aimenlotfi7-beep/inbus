@@ -8,6 +8,7 @@ export interface PrenotazioneRiga {
   tipoPagamento: 'COMPLETO' | 'ACCONTO';
   metodoPagamento: string;
   saldoPagato: boolean;
+  saldoPagatoIl: string | null;
   stato: 'CONFERMATA' | 'CANCELLATA';
   creataIl: string;
   eventoId: string;

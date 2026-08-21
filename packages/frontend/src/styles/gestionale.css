@@ -669,6 +669,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .badge.concesso-extra{background:rgba(72,214,140,.15); color:var(--green);}
 .badge.negato{background:rgba(255,61,122,.15); color:var(--pink);}
 .badge.non-attivo{background:rgba(169,159,194,.08); color:var(--mist);}
+.badge.saldata{background:var(--blue-dim); color:var(--blue);}
 .badge-btn{border:none; cursor:pointer; font-family:inherit;}
 
 /* ---------- RIGA CLICCABILE (es. permesso in editor eccezioni, bus in Partenze) ---------- */

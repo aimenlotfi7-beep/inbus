@@ -2,29 +2,58 @@ import { useEffect, useState } from 'react';
 import { prenotazioniAdminApi, type PrenotazioneRiga, type EventoConPrenotazioni } from '../../api/prenotazioniAdmin';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
+import { Modale } from '../shared/Modale';
 
 type SottoTab = 'CONFERMATA' | 'CANCELLATA';
+
+const ETICHETTA_METODO: Record<string, string> = {
+  CARTA: 'Carta',
+  PAYPAL: 'PayPal',
+  SATISPAY: 'Satispay',
+  DA_CONCORDARE: 'Da concordare',
+};
+
+/** Quattro stati distinti, non tre: chi paga tutto subito è verde
+ *  ("Confermata"); chi ha versato solo l'acconto e non ha ancora
+ *  saldato è giallo ("Acconto"); chi aveva pagato ad acconto e HA GIÀ
+ *  saldato il resto è blu ("Saldata") — voluto diverso dal verde, per
+ *  distinguere a colpo d'occhio chi ha confermato subito da chi ci è
+ *  arrivato in due tempi; cancellata resta rossa. Lo stesso identico
+ *  record cambia colore da solo, appena il saldo viene completato. */
+function statoRiga(r: PrenotazioneRiga): { classe: string; etichetta: string } {
+  if (r.stato === 'CANCELLATA') return { classe: 'non-coperta', etichetta: 'Cancellata' };
+  if (r.tipoPagamento === 'ACCONTO' && !r.saldoPagato) return { classe: 'attenzione', etichetta: 'Acconto' };
+  if (r.tipoPagamento === 'ACCONTO' && r.saldoPagato) return { classe: 'saldata', etichetta: 'Saldata' };
+  return { classe: 'coperta', etichetta: 'Confermata' };
+}
 
 export function PrenotazioniScreen() {
   const [eventiConPren, setEventiConPren] = useState<EventoConPrenotazioni[]>([]);
   const [ricercaTab, setRicercaTab] = useState('');
+  const [mostraPassati, setMostraPassati] = useState(false);
   const [eventoAttivoId, setEventoAttivoId] = useState<string | null>(null);
   const [sottoTab, setSottoTab] = useState<SottoTab>('CONFERMATA');
   const [ricercaPrenotazioni, setRicercaPrenotazioni] = useState('');
   const [righe, setRighe] = useState<PrenotazioneRiga[]>([]);
   const [caricamento, setCaricamento] = useState(false);
+  const [passeggeriInModale, setPasseggeriInModale] = useState<PrenotazioneRiga | null>(null);
+  const [storicoInModale, setStoricoInModale] = useState<PrenotazioneRiga | null>(null);
 
   useEffect(() => {
     prenotazioniAdminApi.eventiConPrenotazioni().then((lista) => {
       setEventiConPren(lista);
-      if (lista[0]) setEventoAttivoId(lista[0].id);
+      const futuri = lista.filter((e) => new Date(e.data).getTime() >= Date.now());
+      const primaScelta = futuri[0] ?? lista[0];
+      if (primaScelta) setEventoAttivoId(primaScelta.id);
     });
   }, []);
 
   const eventoAttivo = eventiConPren.find((e) => e.id === eventoAttivoId) ?? null;
+  const adesso = Date.now();
+  const eventiPerData = eventiConPren.filter((e) => (mostraPassati ? new Date(e.data).getTime() < adesso : new Date(e.data).getTime() >= adesso));
   const tabFiltrate = ricercaTab.trim()
-    ? eventiConPren.filter((e) => e.artista.toLowerCase().includes(ricercaTab.toLowerCase()) || e.citta.toLowerCase().includes(ricercaTab.toLowerCase()))
-    : eventiConPren;
+    ? eventiPerData.filter((e) => e.artista.toLowerCase().includes(ricercaTab.toLowerCase()) || e.citta.toLowerCase().includes(ricercaTab.toLowerCase()))
+    : eventiPerData;
 
   function ricaricaPrenotazioni() {
     if (!eventoAttivoId) return;
@@ -62,39 +91,52 @@ export function PrenotazioniScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Prenotazioni" />
+      <PanelHead
+        titolo="Prenotazioni"
+        azione={
+          <button type="button" className="btn btn-ghost" onClick={() => { setMostraPassati((v) => !v); setEventoAttivoId(null); setRicercaTab(''); }}>
+            {mostraPassati ? '← Torna ai prossimi' : 'Viaggi passati'}
+          </button>
+        }
+      />
 
       {eventiConPren.length === 0 ? (
         <p className="testo-intro">Nessun evento ha ancora prenotazioni.</p>
       ) : (
         <>
-          {eventiConPren.length > 6 && (
-            <div className="home-search-box" style={{ maxWidth: 480, margin: '0 0 20px' }}>
-              <input
-                placeholder="Cerca tra gli eventi con prenotazioni..."
-                value={ricercaTab}
-                onChange={(e) => setRicercaTab(e.target.value)}
-                style={{ fontSize: 15, textAlign: 'left', padding: '10px 4px' }}
-              />
-            </div>
-          )}
+          {eventiPerData.length === 0 ? (
+            <p className="testo-intro">{mostraPassati ? 'Nessun evento passato con prenotazioni.' : 'Nessun evento futuro con prenotazioni.'}</p>
+          ) : (
+            <>
+              {eventiPerData.length > 6 && (
+                <div className="home-search-box" style={{ maxWidth: 480, margin: '0 0 20px' }}>
+                  <input
+                    placeholder="Cerca tra gli eventi con prenotazioni..."
+                    value={ricercaTab}
+                    onChange={(e) => setRicercaTab(e.target.value)}
+                    style={{ fontSize: 15, textAlign: 'left', padding: '10px 4px' }}
+                  />
+                </div>
+              )}
 
-          <div className="cards-list" style={{ marginBottom: 24 }}>
-            {tabFiltrate.map((ev) => (
-              <div
-                key={ev.id}
-                className="evento-card"
-                style={eventoAttivoId === ev.id ? { borderColor: 'var(--pink)' } : undefined}
-                onClick={() => { setEventoAttivoId(ev.id); setSottoTab('CONFERMATA'); setRicercaPrenotazioni(''); }}
-              >
-                {ev.immagine && <div className="evento-card-thumb" style={{ backgroundImage: `url(${ev.immagine})` }} />}
-                <span className="tag">{ev.genere}</span>
-                <h3>{ev.artista}</h3>
-                <p>{ev.luogo}, {ev.citta}</p>
-                <p>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
+              <div className="cards-list" style={{ marginBottom: 24 }}>
+                {tabFiltrate.map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="evento-card"
+                    style={eventoAttivoId === ev.id ? { borderColor: 'var(--pink)' } : undefined}
+                    onClick={() => { setEventoAttivoId(ev.id); setSottoTab('CONFERMATA'); setRicercaPrenotazioni(''); }}
+                  >
+                    {ev.immagine && <div className="evento-card-thumb" style={{ backgroundImage: `url(${ev.immagine})` }} />}
+                    <span className="tag">{ev.genere}</span>
+                    <h3>{ev.artista}</h3>
+                    <p>{ev.luogo}, {ev.citta}</p>
+                    <p>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
 
           {eventoAttivo && (
             <>
@@ -127,8 +169,8 @@ export function PrenotazioniScreen() {
                       <tr>
                         <th>PNR</th>
                         <th>Cliente</th>
-                        <th>Partecipanti</th>
                         <th>Passeggeri</th>
+                        <th>Metodo di pagamento</th>
                         <th>Totale</th>
                         <th>Data</th>
                         <th>Stato</th>
@@ -136,30 +178,41 @@ export function PrenotazioniScreen() {
                       </tr>
                     </thead>
                     <tbody>
-                      {righe.map((r) => (
-                        <tr key={r.id}>
-                          <td>{r.pnr}</td>
-                          <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{r.clienteEmail}{r.clienteTelefono ? ` · ${r.clienteTelefono}` : ''}</span></td>
-                          <td>
-                            {r.partecipanti.length > 0 ? (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                {r.partecipanti.map((p, i) => <span key={i} className="chip" style={{ fontSize: 11 }}>{p.nome} {p.cognome}</span>)}
-                              </div>
-                            ) : '—'}
-                          </td>
-                          <td>{r.passeggeri}</td>
-                          <td>€{Number(r.totale).toFixed(2)}</td>
-                          <td>{new Date(r.creataIl).toLocaleDateString('it-IT')}</td>
-                          <td><span className={`badge ${r.stato === 'CONFERMATA' ? 'coperta' : 'non-coperta'}`}>{r.stato === 'CONFERMATA' ? 'Confermata' : 'Cancellata'}</span></td>
-                          <td>
-                            {r.stato === 'CONFERMATA' ? (
-                              <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => cancella(r)}>Cancella</button>
-                            ) : (
-                              <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => eliminaDefinitivamente(r)}>Elimina def.</button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                      {righe.map((r) => {
+                        const stato = statoRiga(r);
+                        return (
+                          <tr key={r.id}>
+                            <td>{r.pnr}</td>
+                            <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{r.clienteEmail}{r.clienteTelefono ? ` · ${r.clienteTelefono}` : ''}</span></td>
+                            <td>
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                style={{ fontSize: 13, padding: '2px 10px', textDecoration: 'underline' }}
+                                onClick={() => setPasseggeriInModale(r)}
+                                title="Vedi nomi e dati dei passeggeri"
+                              >
+                                {r.passeggeri}
+                              </button>
+                            </td>
+                            <td>{ETICHETTA_METODO[r.metodoPagamento] ?? r.metodoPagamento}</td>
+                            <td>€{Number(r.totale).toFixed(2)}</td>
+                            <td>{new Date(r.creataIl).toLocaleDateString('it-IT')}</td>
+                            <td>
+                              <button type="button" className="btn btn-ghost" style={{ padding: 0, border: 'none', background: 'none' }} onClick={() => setStoricoInModale(r)} title="Vedi lo storico">
+                                <span className={`badge ${stato.classe}`}>{stato.etichetta}</span>
+                              </button>
+                            </td>
+                            <td>
+                              {r.stato === 'CONFERMATA' ? (
+                                <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => cancella(r)}>Cancella</button>
+                              ) : (
+                                <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => eliminaDefinitivamente(r)}>Elimina def.</button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -167,6 +220,46 @@ export function PrenotazioniScreen() {
             </>
           )}
         </>
+      )}
+
+      {passeggeriInModale && (
+        <Modale titolo={`Passeggeri — PNR ${passeggeriInModale.pnr}`} onClose={() => setPasseggeriInModale(null)}>
+          <p className="testo-intro" style={{ marginBottom: 12 }}>
+            Richiedente: <b style={{ color: 'var(--paper)' }}>{passeggeriInModale.clienteNome} {passeggeriInModale.clienteCognome ?? ''}</b>
+            <br />{passeggeriInModale.clienteEmail}{passeggeriInModale.clienteTelefono ? ` · ${passeggeriInModale.clienteTelefono}` : ''}
+          </p>
+          {passeggeriInModale.partecipanti.length > 0 ? (
+            <>
+              <p className="section-label" style={{ marginBottom: 8 }}>Altri passeggeri</p>
+              {passeggeriInModale.partecipanti.map((p, i) => (
+                <div key={i} className="riga-cliccabile" style={{ cursor: 'default' }}>
+                  <span className="riga-titolo">{p.nome} {p.cognome}</span>
+                </div>
+              ))}
+            </>
+          ) : (
+            <p className="testo-intro">Nessun altro passeggero oltre al richiedente (prenotazione per {passeggeriInModale.passeggeri} persona/e in totale — il richiedente conta come una di queste).</p>
+          )}
+        </Modale>
+      )}
+
+      {storicoInModale && (
+        <Modale titolo={`Storico — PNR ${storicoInModale.pnr}`} onClose={() => setStoricoInModale(null)}>
+          <div className="riepilogo-riga-evento"><span>Creata il</span><b>{new Date(storicoInModale.creataIl).toLocaleString('it-IT')}</b></div>
+          <div className="riepilogo-riga-evento"><span>Tipo pagamento</span><b>{storicoInModale.tipoPagamento === 'COMPLETO' ? 'Pagamento completo' : 'Acconto'}</b></div>
+          {storicoInModale.tipoPagamento === 'ACCONTO' && (
+            <div className="riepilogo-riga-evento">
+              <span>Saldo</span>
+              <b>
+                {storicoInModale.saldoPagato && storicoInModale.saldoPagatoIl
+                  ? `Completato il ${new Date(storicoInModale.saldoPagatoIl).toLocaleString('it-IT')}`
+                  : 'Non ancora completato'}
+              </b>
+            </div>
+          )}
+          <div className="riepilogo-riga-evento"><span>Metodo di pagamento</span><b>{ETICHETTA_METODO[storicoInModale.metodoPagamento] ?? storicoInModale.metodoPagamento}</b></div>
+          <div className="riepilogo-riga-evento"><span>Stato attuale</span><b>{statoRiga(storicoInModale).etichetta}</b></div>
+        </Modale>
       )}
     </div>
   );

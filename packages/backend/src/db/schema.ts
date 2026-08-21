@@ -314,6 +314,10 @@ export const prenotazioni = pgTable('prenotazioni', {
   couponCodice: text('coupon_codice'),
   tipoPagamento: tipoPagamentoEnum('tipo_pagamento').notNull().default('COMPLETO'),
   saldoPagato: boolean('saldo_pagato').notNull().default(true),
+  // Quando è stato saldato per davvero (solo per chi ha pagato ad
+  // acconto) — usata per mostrare uno storico vero nel gestionale
+  // (creata il X, saldata il Y), non solo lo stato attuale.
+  saldoPagatoIl: timestamp('saldo_pagato_il'),
   scadenzaSaldo: timestamp('scadenza_saldo', { mode: 'date' }),
   metodoPagamento: metodoPagamentoEnum('metodo_pagamento').notNull().default('CARTA'),
   utenteId: text('utente_id').notNull().references(() => utenti.id),

@@ -140,17 +140,28 @@ export const ticketService = {
 
     const token = generaTokenTicket();
     const qrDataUrl = await QRCode.toDataURL(`INBUS:TICKET:${p.pnr}:${token}`, { margin: 1, width: 300 });
-    const pdfBuffer = await generaPdfBiglietto({
-      artista: evento.artista,
-      dataEvento: evento.data,
-      fermataCitta: p.fermataCitta,
-      fermataOrario: p.fermataOrario,
-      passeggeriNomi,
-      pnr: p.pnr,
-      qrDataUrl,
-      coloreAccento: evento.ticketColoreAccento,
-      immagineSfondoUrl: evento.ticketImmagineSfondoUrl,
-    });
+
+    // Un PDF distinto per ogni passeggero (solo il proprio nome sopra,
+    // non l'elenco di tutti) — più semplice da distribuire fisicamente
+    // il giorno della partenza, ognuno ha il suo. Il QR è lo stesso su
+    // tutti (la prenotazione è una sola, resta un unico record).
+    const allegati = await Promise.all(passeggeriNomi.map(async (nomePasseggero, indice) => {
+      const pdfBuffer = await generaPdfBiglietto({
+        artista: evento.artista,
+        dataEvento: evento.data,
+        fermataCitta: p.fermataCitta,
+        fermataOrario: p.fermataOrario,
+        passeggeriNomi: [nomePasseggero],
+        pnr: p.pnr,
+        qrDataUrl,
+        coloreAccento: evento.ticketColoreAccento,
+        immagineSfondoUrl: evento.ticketImmagineSfondoUrl,
+      });
+      const nomeFile = passeggeriNomi.length > 1
+        ? `biglietto-${p.pnr}-${indice + 1}-${nomePasseggero.replace(/[^a-zA-Z0-9]+/g, '-')}.pdf`
+        : `biglietto-${p.pnr}.pdf`;
+      return { nomeFile, contenuto: pdfBuffer, tipo: 'application/pdf' };
+    }));
 
     await db.update(prenotazioni).set({
       ticketToken: token,
@@ -169,7 +180,7 @@ export const ticketService = {
         a: utente.email,
         oggetto,
         html,
-        allegati: [{ nomeFile: `biglietto-${p.pnr}.pdf`, contenuto: pdfBuffer, tipo: 'application/pdf' }],
+        allegati,
       });
     }
   },

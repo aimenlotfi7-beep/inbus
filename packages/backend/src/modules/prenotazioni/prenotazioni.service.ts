@@ -201,7 +201,7 @@ export const prenotazioniService = {
           passeggeri: String(risultato.passeggeri),
           totale: Number(risultato.totale).toFixed(2),
           evento: risultato.eventoArtista,
-          link_account: urlSito('/account'),
+          link_saldo: urlSito(`/completa-saldo/${risultato.pnr}`),
         });
         await inviaEmail({ a: input.cliente.email, oggetto, html });
       }
@@ -279,6 +279,7 @@ export const prenotazioniService = {
         tipoPagamento: prenotazioni.tipoPagamento,
         metodoPagamento: prenotazioni.metodoPagamento,
         saldoPagato: prenotazioni.saldoPagato,
+        saldoPagatoIl: prenotazioni.saldoPagatoIl,
         stato: prenotazioni.stato,
         creataIl: prenotazioni.creataIl,
         eventoId: prenotazioni.eventoId,
@@ -390,7 +391,7 @@ export const prenotazioniService = {
 
     const [aggiornata] = await db
       .update(prenotazioni)
-      .set({ saldoPagato: true, totale: totaleReale.toFixed(2) })
+      .set({ saldoPagato: true, saldoPagatoIl: new Date(), totale: totaleReale.toFixed(2) })
       .where(eq(prenotazioni.pnr, pnr))
       .returning();
 
