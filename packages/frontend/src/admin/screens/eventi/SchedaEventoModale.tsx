@@ -562,6 +562,8 @@ export function SchedaEventoModale({
     </>
   );
 
+  const numeroTratte = (form.linee ?? []).filter((l) => l.nome.trim()).length;
+
   // ---- Vista MODIFICA (evento esistente): tab Dettagli/Partenze ----
 
   if (evento) {
@@ -584,13 +586,60 @@ export function SchedaEventoModale({
         {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}
         {tabAttiva === 'dettagli' && (
           <>
-            {/* eslint-disable-next-line */}
-            {campiInfoEvento}
-            <p className="section-label" style={{ marginTop: 18 }}>Tratte</p>
-            {campiTratte}
-            <p className="section-label" style={{ marginTop: 18 }}>Immagini</p>
-            {campiImmagini}
-            <button className="btn btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={salva}>Salva evento</button>
+            <div className="wizard-stepper">
+              {STEP_WIZARD.map((s) => (
+                <div
+                  key={s.numero}
+                  className={`wizard-dot${step === s.numero ? ' active' : step > s.numero ? ' completato' : ''}`}
+                  onClick={() => setStep(s.numero)}
+                  style={{ cursor: 'pointer' }}
+                  title="Vai direttamente a questo passo"
+                >
+                  <span>{step > s.numero ? '✓' : s.numero}</span> {s.label}
+                </div>
+              ))}
+            </div>
+
+            {step === 1 && campiInfoEvento}
+
+            {step === 2 && (
+              <>
+                <p className="section-label">Tratte</p>
+                {campiTratte}
+              </>
+            )}
+
+            {step === 3 && campiImmagini}
+
+            {step === 4 && (
+              <div className="evento-riepilogo-box">
+                <div className="riepilogo-riga-evento"><span>Artista</span><b>{form.artista || '—'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Genere</span><b>{form.genere || '—'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Luogo</span><b>{form.luogo ? `${form.luogo}, ${form.citta}` : '—'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? new Date(form.data).toLocaleDateString('it-IT') : '—'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Acconto</span><b>€{Number(form.accontoEur || 10).toFixed(2)}</b></div>
+                <div className="riepilogo-riga-evento"><span>In evidenza</span><b>{form.inEvidenza ? 'Sì' : 'No'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Tratte</span><b>{numeroTratte > 0 ? `${numeroTratte} configurate` : 'Nessuna'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Immagini</span><b>{(form.immagini ?? []).length}</b></div>
+              </div>
+            )}
+
+            <div className="wizard-nav">
+              <button className="btn btn-ghost" disabled={step === 1} onClick={() => setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s))}>← Passo precedente</button>
+              {step < 4 ? (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    if (step === 1 && !infoCompleta()) { alert('Compila almeno artista, genere, luogo, città e data prima di proseguire.'); return; }
+                    setStep((s) => (s + 1) as 2 | 3 | 4);
+                  }}
+                >
+                  Avanti →
+                </button>
+              ) : (
+                <button className="btn btn-primary" onClick={salva}>Salva evento</button>
+              )}
+            </div>
           </>
         )}
       </PaginaSezione>
@@ -598,8 +647,6 @@ export function SchedaEventoModale({
   }
 
   // ---- Vista CREAZIONE (nuovo evento): wizard a step ----
-
-  const numeroTratte = (form.linee ?? []).filter((l) => l.nome.trim()).length;
 
   return (
     <PaginaSezione titolo="Nuovo evento" onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)}>
