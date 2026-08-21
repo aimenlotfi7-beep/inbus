@@ -59,6 +59,36 @@ async function generaSlugUnivoco(base: string, idDaEscludere?: string) {
   }
 }
 
+/** Calcola in automatico "pochi posti / esaurito" dai numeri veri
+ *  dell'evento (somma posti totali e disponibili su tutte le tratte) —
+ *  usata SOLO quando l'amministratore non ha impostato nulla a mano
+ *  (statoDisponibilita è vuoto). Se l'ha impostato lui, quella scelta
+ *  vince sempre, anche se i numeri reali direbbero altro (es. per una
+ *  promozione "posti quasi finiti" anche se in realtà ce ne sono
+ *  ancora). "Nuovi posti disponibili" non ha un innesco automatico
+ *  sensato (richiederebbe tener traccia della storia, non solo dello
+ *  stato attuale) — resta un'etichetta solo manuale. */
+function calcolaStatoAutomatico(linee: { postiTotali: number; postiDisponibili: number }[]): 'POCHI_POSTI' | 'ESAURITO' | null {
+  if (linee.length === 0) return null;
+  const totale = linee.reduce((s, l) => s + l.postiTotali, 0);
+  const disponibili = linee.reduce((s, l) => s + l.postiDisponibili, 0);
+  if (totale === 0) return null;
+  if (disponibili <= 0) return 'ESAURITO';
+  if (disponibili / totale <= 0.2) return 'POCHI_POSTI';
+  return null;
+}
+
+/** Applica il calcolo automatico sopra a un evento (o elenco di eventi)
+ *  destinato al SITO PUBBLICO — non va usata per i dati che tornano al
+ *  form del gestionale, altrimenti l'amministratore non riuscirebbe più
+ *  a distinguere "è in automatico" da "l'ho impostato io", e ogni volta
+ *  che salva il form "congelerebbe" per sbaglio il valore calcolato
+ *  come se fosse una scelta manuale sua. */
+function conStatoCalcolato<T extends { statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null; linee: { postiTotali: number; postiDisponibili: number }[] }>(evento: T): T {
+  if (evento.statoDisponibilita) return evento; // scelta manuale, ha sempre la precedenza
+  return { ...evento, statoDisponibilita: calcolaStatoAutomatico(evento.linee) };
+}
+
 export const eventiService = {
   async list(query: ListaEventiQuery) {
     const condizioni = [];
@@ -72,11 +102,12 @@ export const eventiService = {
     if (query.soloFuturi) condizioni.push(sql`${eventi.data} >= now()`);
     if (query.soloVisibili) condizioni.push(eq(eventi.visibileSito, true));
 
-    return db.query.eventi.findMany({
+    const risultati = await db.query.eventi.findMany({
       where: condizioni.length ? and(...condizioni) : undefined,
       with: includeCompleto,
       orderBy: (e, { asc }) => [asc(e.data)],
     });
+    return risultati.map(conStatoCalcolato);
   },
 
   getById,
@@ -91,7 +122,7 @@ export const eventiService = {
     });
     if (!evento) throw new NonTrovato('Evento');
     if (!evento.visibileSito || new Date(evento.data) < new Date()) throw new NonTrovato('Evento');
-    return evento;
+    return conStatoCalcolato(evento);
   },
 
   async create(input: CreaEventoInput) {
@@ -117,8 +148,10 @@ export const eventiService = {
           arrivoOrario: input.arrivoOrario,
           visibileSito: input.visibileSito,
           descrizione: input.descrizione,
+          descrizioneSeo: input.descrizioneSeo,
           ticketColoreAccento: input.ticketColoreAccento,
           ticketImmagineSfondoUrl: input.ticketImmagineSfondoUrl,
+          layoutBigliettoId: input.layoutBigliettoId,
         })
         .returning();
 
@@ -193,8 +226,10 @@ export const eventiService = {
           ...(input.arrivoOrario !== undefined && { arrivoOrario: input.arrivoOrario }),
           ...(input.visibileSito !== undefined && { visibileSito: input.visibileSito }),
           ...(input.descrizione !== undefined && { descrizione: input.descrizione }),
+          ...(input.descrizioneSeo !== undefined && { descrizioneSeo: input.descrizioneSeo }),
           ...(input.ticketColoreAccento !== undefined && { ticketColoreAccento: input.ticketColoreAccento }),
           ...(input.ticketImmagineSfondoUrl !== undefined && { ticketImmagineSfondoUrl: input.ticketImmagineSfondoUrl }),
+          ...(input.layoutBigliettoId !== undefined && { layoutBigliettoId: input.layoutBigliettoId }),
           aggiornatoIl: new Date(),
         })
         .where(eq(eventi.id, id));

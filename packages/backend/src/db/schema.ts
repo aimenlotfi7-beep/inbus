@@ -84,13 +84,24 @@ export const eventi = pgTable('eventi', {
   // dell'evento" applicata separatamente.
   visibileSito: boolean('visibile_sito').notNull().default(true),
   // Testo libero mostrato nella pagina pubblica dell'evento, sotto la
-  // foto — orari di ritrovo, cosa portare, regole del bus, ecc.
+  // foto — orari di ritrovo, cosa portare, regole del bus, ecc. Diverso
+  // dalla descrizione SEO qui sotto: questa è per il CLIENTE che ha già
+  // trovato la pagina, l'altra è per farla trovare su Google.
   descrizione: text('descrizione'),
+  // Testo mostrato nei risultati di Google e nelle anteprime social
+  // (WhatsApp/Facebook) quando si condivide il link — se non lo
+  // compili, il sito ne genera uno automaticamente (artista, data,
+  // città, prezzo). Facoltativo apposta: non tutti vorranno scriverne
+  // uno su misura per ogni evento.
+  descrizioneSeo: text('descrizione_seo'),
   // Personalizzazione del biglietto digitale (PDF) per questo evento
   // specifico — entrambi facoltativi: se non impostati, il biglietto usa
   // l'aspetto di base (nero su bianco).
   ticketColoreAccento: text('ticket_colore_accento'), // es. "#dc2626"
   ticketImmagineSfondoUrl: text('ticket_immagine_sfondo_url'),
+  // Quale layout (composizione grafica) usa il biglietto di questo
+  // evento — se non impostato, usa quello segnato come "predefinito".
+  layoutBigliettoId: text('layout_biglietto_id').references(() => layoutBiglietto.id, { onDelete: 'set null' }),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
   aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 });
@@ -558,6 +569,21 @@ export const contenutiSito = pgTable('contenuti_sito', {
 export const impostazioni = pgTable('impostazioni', {
   chiave: text('chiave').primaryKey(),
   valore: text('valore').notNull(),
+});
+
+// Layout (composizione grafica) del biglietto digitale PDF — salvabili,
+// nominabili, uno di questi è sempre segnato come "predefinito" (quello
+// usato da un evento che non ne ha scelto uno suo). "configurazione" è
+// un testo JSON con l'ordine delle sezioni, la dimensione/posizione del
+// QR, colori — vedi layout-biglietto.service.ts per la struttura esatta
+// e il valore di base.
+export const layoutBiglietto = pgTable('layout_biglietto', {
+  id: id(),
+  nome: text('nome').notNull(),
+  predefinito: boolean('predefinito').notNull().default(false),
+  configurazione: text('configurazione').notNull(),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+  aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 });
 
 // Modelli delle email automatiche (conferma, promemoria saldo, biglietto,

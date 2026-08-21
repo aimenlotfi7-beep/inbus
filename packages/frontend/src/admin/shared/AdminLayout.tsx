@@ -9,7 +9,7 @@ export type SezioneGestionale =
   | 'utenti' | 'promoter' | 'tourleader'
   | 'fornitori' | 'tragitti'
   | 'chat' | 'contenuti'
-  | 'amministratori' | 'ruoli' | 'impostazioni' | 'template-email';
+  | 'amministratori' | 'ruoli' | 'impostazioni' | 'template-email' | 'layout-biglietto';
 
 // Ogni voce dichiara il permesso che serve per vederla. Chi ha ruolo
 // "owner" vede sempre tutto (haPermesso lo gestisce automaticamente).
@@ -31,6 +31,8 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'offerte', label: 'Offerte', permesso: 'offerte.gestisci' },
     { id: 'vetrina', label: 'Vetrina', permesso: 'eventi.vetrina' },
     { id: 'contenuti', label: 'Contenuti sito', permesso: 'pagine.gestisci' },
+    { id: 'template-email', label: 'Testo email', permesso: 'template-email.gestisci' },
+    { id: 'layout-biglietto', label: 'Layout biglietto', permesso: 'layout-biglietto.gestisci' },
   ]},
   { titolo: 'Customer Care', voci: [
     { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
@@ -51,7 +53,6 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'amministratori', label: 'Amministratori', permesso: 'utenze.gestisci' },
     { id: 'ruoli', label: 'Ruoli', permesso: 'permessi.gestisci' },
     { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
-    { id: 'template-email', label: 'Testo email', permesso: 'template-email.gestisci' },
   ]},
 ];
 

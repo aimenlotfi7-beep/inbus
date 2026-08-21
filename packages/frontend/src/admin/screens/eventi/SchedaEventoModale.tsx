@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { eventiApi, type EventoInput, type LineaInput, type FermataInput } from '../../../api/eventi';
 import { tragittiApi, type Tragitto } from '../../../api/tragitti';
+import { layoutBigliettoApi, type LayoutBiglietto } from '../../../api/layoutBiglietto';
 import { categorieApi, type Categoria } from '../../../api/categorie';
 import { ErroreApi } from '../../../api/client';
 import type { Evento } from '../../../api/types';
@@ -49,6 +50,7 @@ export function SchedaEventoModale({
 }) {
   const [tragitti, setTragitti] = useState<Tragitto[]>([]);
   const [categorie, setCategorie] = useState<Categoria[]>([]);
+  const [layoutDisponibili, setLayoutDisponibili] = useState<LayoutBiglietto[]>([]);
   const [form, setForm] = useState<EventoInput>(VUOTO);
   const [tabAttiva, setTabAttiva] = useState<'dettagli' | 'partenze' | 'lista-attesa' | 'offerte'>(tabIniziale);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -65,6 +67,7 @@ export function SchedaEventoModale({
 
   useEffect(() => {
     tragittiApi.list().then(setTragitti);
+    layoutBigliettoApi.list().then(setLayoutDisponibili).catch(() => setLayoutDisponibili([]));
     ricaricaCategorie();
     let nuovoForm: EventoInput;
     if (evento) {
@@ -78,8 +81,10 @@ export function SchedaEventoModale({
         arrivoOrario: evento.arrivoOrario ?? undefined,
         visibileSito: evento.visibileSito,
         descrizione: evento.descrizione ?? undefined,
+        descrizioneSeo: evento.descrizioneSeo ?? undefined,
         ticketColoreAccento: evento.ticketColoreAccento ?? undefined,
         ticketImmagineSfondoUrl: evento.ticketImmagineSfondoUrl ?? undefined,
+        layoutBigliettoId: evento.layoutBigliettoId,
         immagini: [...evento.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
         linee: evento.linee.map((l) => ({
           id: l.id,
@@ -338,11 +343,16 @@ export function SchedaEventoModale({
             value={form.statoDisponibilita ?? ''}
             onChange={(e) => setForm({ ...form, statoDisponibilita: (e.target.value || null) as typeof form.statoDisponibilita })}
           >
-            <option value="">Nessuno (normale)</option>
+            <option value="">Automatico (calcolato dai posti veri)</option>
             <option value="POCHI_POSTI">Pochi posti disponibili</option>
             <option value="NUOVI_POSTI">Nuovi posti disponibili</option>
             <option value="ESAURITO">Posti terminati</option>
           </select>
+          <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
+            Lasciandolo su "Automatico", il sito mostra da solo "Pochi posti" (sotto il 20% rimasto) o "Posti
+            terminati" quando serve, senza che tu debba pensarci — scegli una delle altre opzioni solo se vuoi
+            forzarla tu (es. per una promozione), a prescindere dai numeri reali.
+          </p>
         </label>
       </div>
       {evento && (
@@ -366,13 +376,26 @@ export function SchedaEventoModale({
         </p>
       </div>
       <div className="campo">
-        <label>Informazioni per i clienti (mostrate sulla pagina dell'evento, sotto la foto)</label>
+        <label>Informazioni viaggio per i clienti (mostrate sulla pagina dell'evento, sotto la foto)</label>
         <textarea
           value={form.descrizione ?? ''}
           onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
           rows={5}
           placeholder="Es. orario e punto di ritrovo, cosa portare, regole del bus, contatti in caso di emergenza..."
         />
+      </div>
+      <div className="campo">
+        <label>Descrizione evento (visibile ai clienti sulla pagina, e usata anche per Google/social)</label>
+        <textarea
+          value={form.descrizioneSeo ?? ''}
+          onChange={(e) => setForm({ ...form, descrizioneSeo: e.target.value })}
+          rows={4}
+          placeholder="Un testo descrittivo sull'evento/artista — se la lasci vuota, per Google viene generata automaticamente (artista, data, città, prezzo), ma sulla pagina non comparirà nessuna sezione."
+        />
+        <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
+          Diversa dalle "Informazioni viaggio" sopra: questa è un testo più discorsivo su evento/artista (utile
+          anche per farsi trovare meglio su Google), quella sopra è pratica (ritrovo, regole del bus, ecc.).
+        </p>
       </div>
 
       <p className="section-label" style={{ marginTop: 18 }}>Grafica del biglietto digitale</p>
@@ -410,6 +433,25 @@ export function SchedaEventoModale({
           Compare come fascia in cima al biglietto (larga quanto la pagina, ritagliata automaticamente).
         </p>
       </div>
+      <div className="campo">
+        <label>Layout del biglietto</label>
+        <select
+          value={form.layoutBigliettoId ?? ''}
+          onChange={(e) => setForm({ ...form, layoutBigliettoId: e.target.value || null })}
+        >
+          <option value="">Predefinito {(() => {
+            const p = layoutDisponibili.find((l) => l.predefinito);
+            return p ? `(${p.nome})` : '';
+          })()}</option>
+          {layoutDisponibili.filter((l) => !l.predefinito).map((l) => (
+            <option key={l.id} value={l.id}>{l.nome}</option>
+          ))}
+        </select>
+        <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
+          Composizione grafica del PDF (ordine sezioni, posizione QR) — si gestiscono da Marketing → Layout
+          biglietto.
+        </p>
+      </div>
     </>
   );
 
@@ -434,7 +476,10 @@ export function SchedaEventoModale({
             }}
           >
             <option value="">Scegli un tragitto...</option>
-            {tragitti.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+            {tragitti.map((t) => {
+              const giaUsato = (form.linee ?? []).some((l) => l.nome === t.nome);
+              return <option key={t.id} value={t.id}>{t.nome}{giaUsato ? ' (già in uso su questo evento)' : ''}</option>;
+            })}
           </select>
         </div>
       )}

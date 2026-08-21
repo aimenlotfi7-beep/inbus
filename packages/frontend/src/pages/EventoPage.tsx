@@ -39,7 +39,7 @@ export function EventoPage() {
   useSeoTags({
     title: evento ? `${evento.artista} — ${evento.luogo}, ${evento.citta} | INBUS` : 'Evento | INBUS',
     description: evento
-      ? `Bus per ${evento.artista} il ${new Date(evento.data).toLocaleDateString('it-IT')} a ${evento.citta}${prezzoMinimo !== null ? ` — a partire da €${prezzoMinimo.toFixed(2)}` : ''}. Prenota il tuo posto con INBUS.`
+      ? (evento.descrizioneSeo?.trim() || `Bus per ${evento.artista} il ${new Date(evento.data).toLocaleDateString('it-IT')} a ${evento.citta}${prezzoMinimo !== null ? ` — a partire da €${prezzoMinimo.toFixed(2)}` : ''}. Prenota il tuo posto con INBUS.`)
       : 'Prenota il tuo bus per l\'evento con INBUS.',
     image: copertina,
     url: window.location.href,
@@ -90,8 +90,25 @@ export function EventoPage() {
                 <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, marginTop: 14 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
               )}
 
+              {/* Solo su cellulare: scorciatoie per saltare subito alle due
+                  sezioni qui sotto, dato che ora la prenotazione viene
+                  prima di loro nell'ordine visivo. */}
+              {(evento.descrizioneSeo || evento.descrizione) && (
+                <div className="salti-rapidi-mobile">
+                  {evento.descrizioneSeo && <a href="#descrizione-evento" className="btn btn-ghost">Descrizione evento</a>}
+                  {evento.descrizione && <a href="#informazioni" className="btn btn-ghost">Informazioni</a>}
+                </div>
+              )}
+
+              {evento.descrizioneSeo && (
+                <div className="sezione-info" id="descrizione-evento">
+                  <h4>Descrizione evento</h4>
+                  {evento.descrizioneSeo}
+                </div>
+              )}
+
               {evento.descrizione && (
-                <div className="sezione-info">
+                <div className="sezione-info" id="informazioni">
                   <h4>Informazioni</h4>
                   {evento.descrizione}
                 </div>

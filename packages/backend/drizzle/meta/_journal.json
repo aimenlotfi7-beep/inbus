@@ -162,6 +162,20 @@
       "when": 1787305468905,
       "tag": "0023_data_saldo_pagato",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787307172191,
+      "tag": "0024_descrizione_seo_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1787307592668,
+      "tag": "0025_layout_biglietto",
+      "breakpoints": true
     }
   ]
 }
