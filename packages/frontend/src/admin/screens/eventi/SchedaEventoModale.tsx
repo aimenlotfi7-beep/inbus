@@ -54,6 +54,8 @@ export function SchedaEventoModale({
   const [form, setForm] = useState<EventoInput>(VUOTO);
   const [tabAttiva, setTabAttiva] = useState<'dettagli' | 'partenze' | 'lista-attesa' | 'offerte'>(tabIniziale);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [subTabInfo, setSubTabInfo] = useState<'info' | 'descrizione'>('info');
+  const [subTabImmagini, setSubTabImmagini] = useState<'immagini' | 'biglietto'>('immagini');
   const [aggiustiPerTratta, setAggiustiPerTratta] = useState<Record<number, string>>({});
   const [nuovaImmagine, setNuovaImmagine] = useState('');
   const [trascinata, setTrascinata] = useState<{ linea: number; fermata: number } | null>(null);
@@ -313,145 +315,104 @@ export function SchedaEventoModale({
 
   const campiInfoEvento: ReactNode = (
     <>
-      <div className="form-grid">
-        <label>Artista <input value={form.artista} onChange={(e) => setForm({ ...form, artista: e.target.value })} /></label>
-        <label>Genere
-          <select value={form.genere} onChange={(e) => { if (e.target.value === '__nuovo__') { nuovoGenere(); return; } setForm({ ...form, genere: e.target.value }); }}>
-            <option value="" disabled>Scegli un genere...</option>
-            {categorie.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-            {form.genere && !categorie.some((c) => c.nome === form.genere) && (
-              <option value={form.genere}>{form.genere}</option>
-            )}
-            <option value="__nuovo__">+ Nuovo genere...</option>
-          </select>
-        </label>
-        <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
-        <label>Città <input value={form.citta} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>
-        <label>Data <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
-        <label>Indirizzo pubblico (facoltativo — se lo lasci vuoto, si genera da solo)
-          <input
-            value={form.slug ?? ''}
-            onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
-            placeholder={`es. ${(form.artista || 'nome-evento').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${(form.citta || 'citta').toLowerCase()}`}
-          />
-        </label>
-        <label>Acconto (€)
-          <input type="number" min={1} value={form.accontoEur ?? 10} onChange={(e) => setForm({ ...form, accontoEur: Number(e.target.value) })} />
-        </label>
-        <label>Avviso disponibilità (mostrato ai clienti al posto dei posti reali)
-          <select
-            value={form.statoDisponibilita ?? ''}
-            onChange={(e) => setForm({ ...form, statoDisponibilita: (e.target.value || null) as typeof form.statoDisponibilita })}
-          >
-            <option value="">Automatico (calcolato dai posti veri)</option>
-            <option value="POCHI_POSTI">Pochi posti disponibili</option>
-            <option value="NUOVI_POSTI">Nuovi posti disponibili</option>
-            <option value="ESAURITO">Posti terminati</option>
-          </select>
-          <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
-            Lasciandolo su "Automatico", il sito mostra da solo "Pochi posti" (sotto il 20% rimasto) o "Posti
-            terminati" quando serve, senza che tu debba pensarci — scegli una delle altre opzioni solo se vuoi
-            forzarla tu (es. per una promozione), a prescindere dai numeri reali.
-          </p>
-        </label>
-      </div>
-      {evento && (
-        <p className="testo-intro" style={{ marginTop: -8, fontSize: 12.5 }}>
-          Pagina pubblica: <code style={{ color: 'var(--paper)' }}>{window.location.origin}/eventi/{evento.slug}</code>
-        </p>
-      )}
-      <p className="testo-intro" style={{ marginTop: -8, fontSize: 12.5 }}>
-        I prezzi si impostano per fermata nello step "Tratte" (arrivano dai tragitti che applichi). Chi prenota con
-        acconto salda il resto entro 15 giorni prima della partenza. L'avviso disponibilità è solo un'etichetta
-        (per creare urgenza o scarsità): non blocca davvero le prenotazioni, quello dipende dai posti reali.
-      </p>
-      <div className="campo">
-        <label><input type="checkbox" checked={form.inEvidenza ?? false} onChange={(e) => setForm({ ...form, inEvidenza: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> In evidenza in homepage</label>
-      </div>
-      <div className="campo">
-        <label><input type="checkbox" checked={form.visibileSito ?? true} onChange={(e) => setForm({ ...form, visibileSito: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Visibile sul sito</label>
-        <p className="testo-intro" style={{ fontSize: 12, marginTop: 4, marginBottom: 0 }}>
-          Se lo disattivi, l'evento non compare mai sul sito (anche se è nel futuro). Gli eventi con data già
-          passata comunque non compaiono più sul sito, a prescindere da questo interruttore.
-        </p>
-      </div>
-      <div className="campo">
-        <label>Informazioni viaggio per i clienti (mostrate sulla pagina dell'evento, sotto la foto)</label>
-        <textarea
-          value={form.descrizione ?? ''}
-          onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
-          rows={5}
-          placeholder="Es. orario e punto di ritrovo, cosa portare, regole del bus, contatti in caso di emergenza..."
-        />
-      </div>
-      <div className="campo">
-        <label>Descrizione evento (visibile ai clienti sulla pagina, e usata anche per Google/social)</label>
-        <textarea
-          value={form.descrizioneSeo ?? ''}
-          onChange={(e) => setForm({ ...form, descrizioneSeo: e.target.value })}
-          rows={4}
-          placeholder="Un testo descrittivo sull'evento/artista — se la lasci vuota, per Google viene generata automaticamente (artista, data, città, prezzo), ma sulla pagina non comparirà nessuna sezione."
-        />
-        <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
-          Diversa dalle "Informazioni viaggio" sopra: questa è un testo più discorsivo su evento/artista (utile
-          anche per farsi trovare meglio su Google), quella sopra è pratica (ritrovo, regole del bus, ecc.).
-        </p>
+      <div className="mini-tabs" style={{ marginBottom: 14 }}>
+        <button type="button" className={`mini-tab${subTabInfo === 'info' ? ' active' : ''}`} onClick={() => setSubTabInfo('info')}>Informazioni</button>
+        <button type="button" className={`mini-tab${subTabInfo === 'descrizione' ? ' active' : ''}`} onClick={() => setSubTabInfo('descrizione')}>Descrizione</button>
       </div>
 
-      <p className="section-label" style={{ marginTop: 18 }}>Grafica del biglietto digitale</p>
-      <p className="testo-intro" style={{ fontSize: 12, marginBottom: 10 }}>
-        Facoltativo — se non li imposti, il biglietto (PDF con QR) usa l'aspetto di base.
-      </p>
-      <div className="campo">
-        <label>Colore d'accento</label>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input
-            type="color"
-            value={form.ticketColoreAccento || '#111111'}
-            onChange={(e) => setForm({ ...form, ticketColoreAccento: e.target.value })}
-            style={{ width: 44, height: 36, padding: 2, flexShrink: 0 }}
-          />
-          <input
-            placeholder="#dc2626"
-            value={form.ticketColoreAccento ?? ''}
-            onChange={(e) => setForm({ ...form, ticketColoreAccento: e.target.value || undefined })}
-          />
-        </div>
-      </div>
-      <div className="campo">
-        <label>Immagine di intestazione (facoltativa)</label>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            placeholder="https://... (o carica un file)"
-            value={form.ticketImmagineSfondoUrl ?? ''}
-            onChange={(e) => setForm({ ...form, ticketImmagineSfondoUrl: e.target.value || undefined })}
-            style={{ flex: 1 }}
-          />
-          <CaricaFile onCaricato={(url) => setForm({ ...form, ticketImmagineSfondoUrl: url })} etichetta="Carica" />
-        </div>
-        <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
-          Compare come fascia in cima al biglietto (larga quanto la pagina, ritagliata automaticamente).
-        </p>
-      </div>
-      <div className="campo">
-        <label>Layout del biglietto</label>
-        <select
-          value={form.layoutBigliettoId ?? ''}
-          onChange={(e) => setForm({ ...form, layoutBigliettoId: e.target.value || null })}
-        >
-          <option value="">Predefinito {(() => {
-            const p = layoutDisponibili.find((l) => l.predefinito);
-            return p ? `(${p.nome})` : '';
-          })()}</option>
-          {layoutDisponibili.filter((l) => !l.predefinito).map((l) => (
-            <option key={l.id} value={l.id}>{l.nome}</option>
-          ))}
-        </select>
-        <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
-          Composizione grafica del PDF (ordine sezioni, posizione QR) — si gestiscono da Marketing → Layout
-          biglietto.
-        </p>
-      </div>
+      {subTabInfo === 'info' && (
+        <>
+          <div className="form-grid">
+            <label>Artista <input value={form.artista} onChange={(e) => setForm({ ...form, artista: e.target.value })} /></label>
+            <label>Genere
+              <select value={form.genere} onChange={(e) => { if (e.target.value === '__nuovo__') { nuovoGenere(); return; } setForm({ ...form, genere: e.target.value }); }}>
+                <option value="" disabled>Scegli un genere...</option>
+                {categorie.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                {form.genere && !categorie.some((c) => c.nome === form.genere) && (
+                  <option value={form.genere}>{form.genere}</option>
+                )}
+                <option value="__nuovo__">+ Nuovo genere...</option>
+              </select>
+            </label>
+            <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
+            <label>Città <input value={form.citta} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>
+            <label>Data <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
+            <label>Indirizzo pubblico (facoltativo — se lo lasci vuoto, si genera da solo)
+              <input
+                value={form.slug ?? ''}
+                onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
+                placeholder={`es. ${(form.artista || 'nome-evento').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${(form.citta || 'citta').toLowerCase()}`}
+              />
+            </label>
+            <label>Acconto (€)
+              <input type="number" min={1} value={form.accontoEur ?? 10} onChange={(e) => setForm({ ...form, accontoEur: Number(e.target.value) })} />
+            </label>
+            <label>Avviso disponibilità (mostrato ai clienti al posto dei posti reali)
+              <select
+                value={form.statoDisponibilita ?? ''}
+                onChange={(e) => setForm({ ...form, statoDisponibilita: (e.target.value || null) as typeof form.statoDisponibilita })}
+              >
+                <option value="">Automatico (calcolato dai posti veri)</option>
+                <option value="POCHI_POSTI">Pochi posti disponibili</option>
+                <option value="NUOVI_POSTI">Nuovi posti disponibili</option>
+                <option value="ESAURITO">Posti terminati</option>
+              </select>
+              <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
+                Lasciandolo su "Automatico", il sito mostra da solo "Pochi posti" (sotto il 20% rimasto) o "Posti
+                terminati" quando serve, senza che tu debba pensarci — scegli una delle altre opzioni solo se vuoi
+                forzarla tu (es. per una promozione), a prescindere dai numeri reali.
+              </p>
+            </label>
+          </div>
+          {evento && (
+            <p className="testo-intro" style={{ marginTop: -8, fontSize: 12.5 }}>
+              Pagina pubblica: <code style={{ color: 'var(--paper)' }}>{window.location.origin}/eventi/{evento.slug}</code>
+            </p>
+          )}
+          <p className="testo-intro" style={{ marginTop: -8, fontSize: 12.5 }}>
+            I prezzi si impostano per fermata nello step "Tratte" (arrivano dai tragitti che applichi). Chi prenota con
+            acconto salda il resto entro 15 giorni prima della partenza. L'avviso disponibilità è solo un'etichetta
+            (per creare urgenza o scarsità): non blocca davvero le prenotazioni, quello dipende dai posti reali.
+          </p>
+          <div className="campo">
+            <label><input type="checkbox" checked={form.inEvidenza ?? false} onChange={(e) => setForm({ ...form, inEvidenza: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> In evidenza in homepage</label>
+          </div>
+          <div className="campo">
+            <label><input type="checkbox" checked={form.visibileSito ?? true} onChange={(e) => setForm({ ...form, visibileSito: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Visibile sul sito</label>
+            <p className="testo-intro" style={{ fontSize: 12, marginTop: 4, marginBottom: 0 }}>
+              Se lo disattivi, l'evento non compare mai sul sito (anche se è nel futuro). Gli eventi con data già
+              passata comunque non compaiono più sul sito, a prescindere da questo interruttore.
+            </p>
+          </div>
+        </>
+      )}
+
+      {subTabInfo === 'descrizione' && (
+        <>
+          <div className="campo">
+            <label>Informazioni viaggio per i clienti (mostrate sulla pagina dell'evento, sotto la foto)</label>
+            <textarea
+              value={form.descrizione ?? ''}
+              onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
+              rows={5}
+              placeholder="Es. orario e punto di ritrovo, cosa portare, regole del bus, contatti in caso di emergenza..."
+            />
+          </div>
+          <div className="campo">
+            <label>Descrizione evento (visibile ai clienti sulla pagina, e usata anche per Google/social)</label>
+            <textarea
+              value={form.descrizioneSeo ?? ''}
+              onChange={(e) => setForm({ ...form, descrizioneSeo: e.target.value })}
+              rows={4}
+              placeholder="Un testo descrittivo sull'evento/artista — se la lasci vuota, per Google viene generata automaticamente (artista, data, città, prezzo), ma sulla pagina non comparirà nessuna sezione."
+            />
+            <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
+              Diversa dalle "Informazioni viaggio" sopra: questa è un testo più discorsivo su evento/artista (utile
+              anche per farsi trovare meglio su Google), quella sopra è pratica (ritrovo, regole del bus, ecc.).
+            </p>
+          </div>
+        </>
+      )}
     </>
   );
 
@@ -546,19 +507,86 @@ export function SchedaEventoModale({
 
   const campiImmagini: ReactNode = (
     <>
-      <p className="testo-intro">Carica un'immagine, oppure incolla il link se è già online da qualche parte — vengono mostrate nella galleria della pagina evento sul sito.</p>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
-        <input placeholder="https://..." value={nuovaImmagine} onChange={(e) => setNuovaImmagine(e.target.value)} style={{ flex: 1 }} />
-        <button type="button" className="btn btn-ghost" onClick={aggiungiImmagine}>+ Aggiungi link</button>
-        <CaricaFile onCaricato={(url) => setForm({ ...form, immagini: [...(form.immagini ?? []), url] })} etichetta="+ Carica file" />
+      <div className="mini-tabs" style={{ marginBottom: 14 }}>
+        <button type="button" className={`mini-tab${subTabImmagini === 'immagini' ? ' active' : ''}`} onClick={() => setSubTabImmagini('immagini')}>Immagini</button>
+        <button type="button" className={`mini-tab${subTabImmagini === 'biglietto' ? ' active' : ''}`} onClick={() => setSubTabImmagini('biglietto')}>Biglietto</button>
       </div>
-      {(form.immagini ?? []).map((url, idx) => (
-        <div key={idx} className="riga-cliccabile" style={{ cursor: 'default' }}>
-          <span className="riga-titolo" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 380 }}>{url}</span>
-          <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => rimuoviImmagine(idx)}>Rimuovi</button>
-        </div>
-      ))}
-      {(form.immagini ?? []).length === 0 && <p className="testo-intro" style={{ fontSize: 13 }}>Nessuna immagine ancora.</p>}
+
+      {subTabImmagini === 'immagini' && (
+        <>
+          <p className="testo-intro">Carica un'immagine, oppure incolla il link se è già online da qualche parte — vengono mostrate nella galleria della pagina evento sul sito.</p>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
+            <input placeholder="https://..." value={nuovaImmagine} onChange={(e) => setNuovaImmagine(e.target.value)} style={{ flex: 1 }} />
+            <button type="button" className="btn btn-ghost" onClick={aggiungiImmagine}>+ Aggiungi link</button>
+            <CaricaFile onCaricato={(url) => setForm({ ...form, immagini: [...(form.immagini ?? []), url] })} etichetta="+ Carica file" />
+          </div>
+          {(form.immagini ?? []).map((url, idx) => (
+            <div key={idx} className="riga-cliccabile" style={{ cursor: 'default' }}>
+              <span className="riga-titolo" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 380 }}>{url}</span>
+              <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => rimuoviImmagine(idx)}>Rimuovi</button>
+            </div>
+          ))}
+          {(form.immagini ?? []).length === 0 && <p className="testo-intro" style={{ fontSize: 13 }}>Nessuna immagine ancora.</p>}
+        </>
+      )}
+
+      {subTabImmagini === 'biglietto' && (
+        <>
+          <p className="testo-intro" style={{ fontSize: 12, marginBottom: 14 }}>
+            Grafica del biglietto digitale — facoltativa, se non la imposti il PDF (con QR) usa l'aspetto di base.
+          </p>
+          <div className="campo">
+            <label>Colore d'accento</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="color"
+                value={form.ticketColoreAccento || '#111111'}
+                onChange={(e) => setForm({ ...form, ticketColoreAccento: e.target.value })}
+                style={{ width: 44, height: 36, padding: 2, flexShrink: 0 }}
+              />
+              <input
+                placeholder="#dc2626"
+                value={form.ticketColoreAccento ?? ''}
+                onChange={(e) => setForm({ ...form, ticketColoreAccento: e.target.value || undefined })}
+              />
+            </div>
+          </div>
+          <div className="campo">
+            <label>Immagine di intestazione (facoltativa)</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                placeholder="https://... (o carica un file)"
+                value={form.ticketImmagineSfondoUrl ?? ''}
+                onChange={(e) => setForm({ ...form, ticketImmagineSfondoUrl: e.target.value || undefined })}
+                style={{ flex: 1 }}
+              />
+              <CaricaFile onCaricato={(url) => setForm({ ...form, ticketImmagineSfondoUrl: url })} etichetta="Carica" />
+            </div>
+            <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
+              Compare come fascia in cima al biglietto (larga quanto la pagina, ritagliata automaticamente).
+            </p>
+          </div>
+          <div className="campo">
+            <label>Layout del biglietto</label>
+            <select
+              value={form.layoutBigliettoId ?? ''}
+              onChange={(e) => setForm({ ...form, layoutBigliettoId: e.target.value || null })}
+            >
+              <option value="">Predefinito {(() => {
+                const p = layoutDisponibili.find((l) => l.predefinito);
+                return p ? `(${p.nome})` : '';
+              })()}</option>
+              {layoutDisponibili.filter((l) => !l.predefinito).map((l) => (
+                <option key={l.id} value={l.id}>{l.nome}</option>
+              ))}
+            </select>
+            <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
+              Composizione grafica del PDF (ordine sezioni, posizione QR) — si gestiscono da Marketing → Layout
+              biglietto.
+            </p>
+          </div>
+        </>
+      )}
     </>
   );
 
@@ -641,11 +669,16 @@ export function SchedaEventoModale({
 
   return (
     <PaginaSezione titolo="Nuovo evento" onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)}>
-      <div className="wizard-stepper">
+      <div className="mini-tabs">
         {STEP_WIZARD.map((s) => (
-          <div key={s.numero} className={`wizard-dot${step === s.numero ? ' active' : step > s.numero ? ' completato' : ''}`}>
-            <span>{step > s.numero ? '✓' : s.numero}</span> {s.label}
-          </div>
+          <button
+            key={s.numero}
+            type="button"
+            className={`mini-tab${step === s.numero ? ' active' : ''}`}
+            onClick={() => setStep(s.numero)}
+          >
+            {s.label}
+          </button>
         ))}
       </div>
 

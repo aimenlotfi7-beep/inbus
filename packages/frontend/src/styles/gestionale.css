@@ -429,7 +429,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 /* ---------- FORM ---------- */
 .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px;}
 .form-grid label{
-  display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--mist);
+  display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--mist); font-weight:700;
   text-transform:uppercase; letter-spacing:.5px; grid-column:span 1;
 }
 .form-grid label.full{grid-column:1 / -1;}
@@ -557,20 +557,6 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .modal-actions{display:flex; justify-content:space-between; margin-top:22px; flex-wrap:wrap; gap:10px;}
 
 /* ---------- WIZARD A STEP (creazione/modifica evento) ---------- */
-.wizard-stepper{display:flex; align-items:center; gap:6px; margin:4px 0 26px; overflow-x:auto;}
-.wizard-dot{
-  display:flex; align-items:center; gap:8px; font-family:'Space Mono',monospace; font-size:11px;
-  color:var(--mist); white-space:nowrap; padding:6px 4px; opacity:.55;
-}
-.wizard-dot span{
-  width:22px; height:22px; border-radius:50%; border:1px solid var(--line); display:flex; align-items:center; justify-content:center;
-  font-size:11px; flex-shrink:0;
-}
-.wizard-dot.active{opacity:1; color:var(--paper);}
-.wizard-dot.active span{border-color:var(--blue); color:var(--blue);}
-.wizard-dot.completato{opacity:1; color:var(--paper);}
-.wizard-dot.completato span{background:var(--green); border-color:var(--green); color:var(--ink);}
-.wizard-dot:not(:last-child)::after{content:''; width:16px; height:1px; background:var(--line); margin-left:2px;}
 .wizard-nav{display:flex; justify-content:space-between; align-items:center; margin-top:22px;}
 .evento-riepilogo-box{background:var(--night); border:1px solid var(--line); border-radius:10px; padding:6px 18px;}
 .riepilogo-riga-evento{
@@ -617,7 +603,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 /* ---------- COMPATIBILITÀ v2: classe .campo per i form fuori da .form-grid ---------- */
 .campo{display:flex; flex-direction:column; gap:6px; margin-bottom:14px;}
 .campo label{
-  font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mist);
+  font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mist); font-weight:700;
 }
 .campo input, .campo select, .campo textarea{
   font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
