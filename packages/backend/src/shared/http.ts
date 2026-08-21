@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
+import { MulterError } from 'multer';
 import { ErroreApplicativo } from './errors.js';
 
 /** Avvolge un controller async: se lancia un errore, lo passa a next() invece
@@ -20,6 +21,13 @@ export function gestoreErrori(
 ) {
   if (err instanceof ErroreApplicativo) {
     return res.status(err.statusCode).json({ errore: err.message, codice: err.code });
+  }
+  // Multer (caricamento file) ha le sue classi di errore, non
+  // ErroreApplicativo — altrimenti "file troppo grande" mostrerebbe il
+  // generico "Errore interno del server" invece del motivo vero.
+  if (err instanceof MulterError) {
+    const messaggio = err.code === 'LIMIT_FILE_SIZE' ? 'Il file supera la dimensione massima consentita (10MB).' : `Caricamento file non riuscito: ${err.message}`;
+    return res.status(400).json({ errore: messaggio, codice: err.code });
   }
   console.error('Errore non gestito:', err);
   return res.status(500).json({ errore: 'Errore interno del server', codice: 'ERRORE_INTERNO' });

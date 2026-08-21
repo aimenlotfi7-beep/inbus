@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { templateEmailApi, type TemplateEmail } from '../../api/templateEmail';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
+import { CaricaFile } from '../shared/CaricaFile';
 
 /** Modifica del testo delle email automatiche (conferma prenotazione,
  *  promemoria saldo, biglietto, promozione lista d'attesa) — invece di
@@ -10,6 +11,8 @@ import { PanelHead } from '../shared/PanelHead';
  *  con il dato vero al momento dell'invio. */
 export function TemplateEmailScreen() {
   const [lista, setLista] = useState<TemplateEmail[]>([]);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState('');
   const [selezionato, setSelezionato] = useState<TemplateEmail | null>(null);
   const [oggetto, setOggetto] = useState('');
   const [corpo, setCorpo] = useState('');
@@ -17,12 +20,17 @@ export function TemplateEmailScreen() {
   const areaCorpoRef = useRef<HTMLTextAreaElement>(null);
 
   function ricarica() {
-    templateEmailApi.list().then((l) => {
-      setLista(l);
-      // Se stavo già modificando un modello, aggiorno anche la selezione
-      // (per riflettere l'orario di salvataggio aggiornato).
-      setSelezionato((sel) => sel ? (l.find((t) => t.chiave === sel.chiave) ?? null) : null);
-    });
+    setCaricamento(true);
+    setErrore('');
+    templateEmailApi.list()
+      .then((l) => {
+        setLista(l);
+        // Se stavo già modificando un modello, aggiorno anche la selezione
+        // (per riflettere l'orario di salvataggio aggiornato).
+        setSelezionato((sel) => sel ? (l.find((t) => t.chiave === sel.chiave) ?? null) : null);
+      })
+      .catch((e) => setErrore(e instanceof ErroreApi ? e.message : 'Impossibile caricare i modelli email. Controlla i tuoi permessi o riprova.'))
+      .finally(() => setCaricamento(false));
   }
   useEffect(ricarica, []);
 
@@ -49,11 +57,9 @@ export function TemplateEmailScreen() {
   /** Inserisce il tag <img> per un link incollato, nel punto dove si
    *  trovava il cursore nel testo — così si possono aggiungere immagini
    *  (es. un logo) senza dover scrivere l'HTML a mano. */
-  function inserisciImmagine() {
-    const url = prompt('Incolla il link (URL) dell\'immagine da inserire:');
-    if (!url?.trim()) return;
+  function inserisciTagImmagine(url: string) {
     const area = areaCorpoRef.current;
-    const tag = `<img src="${url.trim()}" alt="" style="max-width:100%;" />`;
+    const tag = `<img src="${url}" alt="" style="max-width:100%;" />`;
     if (area) {
       const inizio = area.selectionStart;
       const fine = area.selectionEnd;
@@ -64,6 +70,12 @@ export function TemplateEmailScreen() {
     } else {
       setCorpo((c) => c + tag);
     }
+  }
+
+  function inserisciImmagineDaLink() {
+    const url = prompt('Incolla il link (URL) dell\'immagine da inserire:');
+    if (!url?.trim()) return;
+    inserisciTagImmagine(url.trim());
   }
 
   function inserisciSegnaposto(chiave: string) {
@@ -79,6 +91,9 @@ export function TemplateEmailScreen() {
     }
   }
 
+  if (caricamento) return <p className="testo-intro">Carico...</p>;
+  if (errore) return <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>;
+
   return (
     <div>
       <PanelHead titolo="Testo delle email automatiche" />
@@ -87,6 +102,13 @@ export function TemplateEmailScreen() {
         vengono sostituiti automaticamente con il dato vero al momento dell'invio — non toglierli, altrimenti quel
         punto resterebbe vuoto.
       </p>
+
+      {lista.length === 0 && (
+        <p className="testo-intro">
+          Nessun modello trovato — probabilmente il server non ha ancora creato quelli di base. Riprova tra un
+          minuto (potrebbe essere ancora in fase di avvio), o ricarica la pagina.
+        </p>
+      )}
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{ flex: '0 0 260px', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -130,9 +152,12 @@ export function TemplateEmailScreen() {
             <div className="campo">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <label style={{ marginBottom: 0 }}>Corpo (HTML)</label>
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={inserisciImmagine}>
-                  + Inserisci immagine (link)
-                </button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={inserisciImmagineDaLink}>
+                    + Immagine (link)
+                  </button>
+                  <CaricaFile onCaricato={inserisciTagImmagine} etichetta="+ Carica immagine" />
+                </div>
               </div>
               <textarea
                 ref={areaCorpoRef}

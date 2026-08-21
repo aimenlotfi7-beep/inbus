@@ -18,6 +18,7 @@ import { statisticheRouter } from './modules/statistiche/statistiche.routes.js';
 import { ruoliRouter } from './modules/ruoli/ruoli.routes.js';
 import { impostazioniRouter } from './modules/impostazioni/impostazioni.routes.js';
 import { templateEmailRouter } from './modules/template-email/template-email.routes.js';
+import { uploadRouter } from './modules/upload/upload.routes.js';
 import { categorieRouter } from './modules/categorie/categorie.routes.js';
 import { listaAttesaRouter } from './modules/lista-attesa/lista-attesa.routes.js';
 import { offerteRouter } from './modules/offerte/offerte.routes.js';
@@ -50,6 +51,7 @@ export function creaApp() {
   app.use('/api/ruoli', ruoliRouter);
   app.use('/api/impostazioni', impostazioniRouter);
   app.use('/api/template-email', templateEmailRouter);
+  app.use('/api/upload', uploadRouter);
   app.use('/api/categorie', categorieRouter);
   app.use('/api/lista-attesa', listaAttesaRouter);
   app.use('/api/offerte', offerteRouter);

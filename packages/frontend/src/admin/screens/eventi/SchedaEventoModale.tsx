@@ -7,6 +7,7 @@ import type { Evento } from '../../../api/types';
 import { PaginaSezione } from '../../shared/PaginaSezione';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
+import { CaricaFile } from '../../shared/CaricaFile';
 import { PartenzeTab } from '../partenze/PartenzeTab';
 import { ListaAttesaTab } from './ListaAttesaTab';
 import { OfferteTab } from './OfferteTab';
@@ -395,12 +396,16 @@ export function SchedaEventoModale({
         </div>
       </div>
       <div className="campo">
-        <label>Immagine di intestazione (link, facoltativo)</label>
-        <input
-          placeholder="https://..."
-          value={form.ticketImmagineSfondoUrl ?? ''}
-          onChange={(e) => setForm({ ...form, ticketImmagineSfondoUrl: e.target.value || undefined })}
-        />
+        <label>Immagine di intestazione (facoltativa)</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            placeholder="https://... (o carica un file)"
+            value={form.ticketImmagineSfondoUrl ?? ''}
+            onChange={(e) => setForm({ ...form, ticketImmagineSfondoUrl: e.target.value || undefined })}
+            style={{ flex: 1 }}
+          />
+          <CaricaFile onCaricato={(url) => setForm({ ...form, ticketImmagineSfondoUrl: url })} etichetta="Carica" />
+        </div>
         <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
           Compare come fascia in cima al biglietto (larga quanto la pagina, ritagliata automaticamente).
         </p>
@@ -496,10 +501,11 @@ export function SchedaEventoModale({
 
   const campiImmagini: ReactNode = (
     <>
-      <p className="testo-intro">Aggiungi gli indirizzi (URL) delle immagini dell'evento — vengono mostrate nella galleria della pagina evento sul sito.</p>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      <p className="testo-intro">Carica un'immagine, oppure incolla il link se è già online da qualche parte — vengono mostrate nella galleria della pagina evento sul sito.</p>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
         <input placeholder="https://..." value={nuovaImmagine} onChange={(e) => setNuovaImmagine(e.target.value)} style={{ flex: 1 }} />
-        <button type="button" className="btn btn-ghost" onClick={aggiungiImmagine}>+ Aggiungi</button>
+        <button type="button" className="btn btn-ghost" onClick={aggiungiImmagine}>+ Aggiungi link</button>
+        <CaricaFile onCaricato={(url) => setForm({ ...form, immagini: [...(form.immagini ?? []), url] })} etichetta="+ Carica file" />
       </div>
       {(form.immagini ?? []).map((url, idx) => (
         <div key={idx} className="riga-cliccabile" style={{ cursor: 'default' }}>

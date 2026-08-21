@@ -26,6 +26,15 @@ const schemaEnv = z.object({
   // al posto di SMTP.
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM: z.string().optional(),
+  // Archiviazione file veri (immagini, PDF) su Cloudflare R2 — compatibile
+  // con l'API di Amazon S3, ma senza costi per il traffico in uscita.
+  // Tutte facoltative: se mancano, il caricamento file non è disponibile
+  // (il gestionale continua comunque a funzionare a link, come prima).
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET_NAME: z.string().optional(),
+  R2_PUBLIC_URL: z.string().optional(), // es. https://file.tuodominio.it oppure l'URL pubblico del bucket
   // Base per costruire i link cliccabili nelle email (es. completamento
   // lista d'attesa, saldo). Se non impostata, usa CORS_ORIGIN.
   FRONTEND_URL: z.string().optional(),
