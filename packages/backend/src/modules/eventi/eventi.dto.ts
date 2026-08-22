@@ -52,6 +52,7 @@ export const creaEventoSchema = z.object({
   arrivoIndirizzo: z.string().optional(),
   arrivoOrario: z.string().optional(),
   visibileSito: z.boolean().default(true),
+  bozza: z.boolean().optional(),
   descrizione: z.string().optional(),
   descrizioneSeo: z.string().optional(),
   ticketColoreAccento: z.string().optional(),

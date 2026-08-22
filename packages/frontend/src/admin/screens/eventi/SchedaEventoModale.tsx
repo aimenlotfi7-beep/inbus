@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { eventiApi, type EventoInput, type LineaInput, type FermataInput } from '../../../api/eventi';
 import { tragittiApi, type Tragitto } from '../../../api/tragitti';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../../api/layoutBiglietto';
@@ -56,6 +56,11 @@ export function SchedaEventoModale({
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [subTabInfo, setSubTabInfo] = useState<'info' | 'descrizione'>('info');
   const [subTabImmagini, setSubTabImmagini] = useState<'immagini' | 'biglietto'>('immagini');
+  // Id della bozza salvata in automatico durante QUESTA sessione di
+  // creazione (null finché non c'è abbastanza per salvarla la prima
+  // volta) — una volta creata, i salvataggi successivi la aggiornano
+  // invece di crearne una nuova ogni volta.
+  const bozzaIdRef = useRef<string | null>(null);
   const [aggiustiPerTratta, setAggiustiPerTratta] = useState<Record<number, string>>({});
   const [nuovaImmagine, setNuovaImmagine] = useState('');
   const [trascinata, setTrascinata] = useState<{ linea: number; fermata: number } | null>(null);
@@ -266,6 +271,35 @@ export function SchedaEventoModale({
     return Boolean(form.artista && form.genere && form.luogo && form.citta && form.data);
   }
 
+  // Auto-salvataggio in bozza — solo per un evento NUOVO (non in modifica
+  // di uno esistente): appena ci sono almeno i campi minimi, salva da
+  // sola una bozza sul server (non solo nel browser) e la tiene
+  // aggiornata mentre si continua a compilare, così un'uscita
+  // accidentale o un ricaricamento della pagina non fa perdere nulla —
+  // riaprendo "Nuovo evento" viene proposto di riprenderla.
+  useEffect(() => {
+    if (evento) return; // in modifica di un evento vero, non serve: è già salvato
+    if (!infoCompleta()) return;
+    const timeout = setTimeout(async () => {
+      try {
+        const payload = { ...form, bozza: true };
+        if (bozzaIdRef.current) {
+          await eventiApi.update(bozzaIdRef.current, payload);
+        } else {
+          const creata = await eventiApi.create(payload);
+          bozzaIdRef.current = creata.id;
+          localStorage.setItem('inbus_bozza_evento_id', creata.id);
+        }
+      } catch {
+        // Silenzioso apposta: un fallimento dell'auto-salvataggio non
+        // deve interrompere chi sta scrivendo — riproverà al prossimo
+        // cambiamento.
+      }
+    }, 1500);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
+
   async function nuovoGenere() {
     const nome = window.prompt('Nome del nuovo genere:');
     if (!nome || !nome.trim()) return;
@@ -299,8 +333,19 @@ export function SchedaEventoModale({
         .map((l) => ({ ...l, fermate: l.fermate.filter((f) => f.citta.trim() && f.indirizzo.trim()) })),
     };
     try {
-      if (evento) await eventiApi.update(evento.id, payload);
-      else await eventiApi.create(payload);
+      if (evento) {
+        // Se si tratta di una bozza ripresa e completata da qui, la
+        // "confermo" col salvataggio normale — altrimenti resterebbe
+        // segnata come bozza per sempre, anche dopo averla finita.
+        await eventiApi.update(evento.id, { ...payload, bozza: false });
+      } else if (bozzaIdRef.current) {
+        // C'era già una bozza salvata in automatico: la aggiorno e la
+        // "confermo" (bozza:false), invece di crearne una seconda.
+        await eventiApi.update(bozzaIdRef.current, { ...payload, bozza: false });
+      } else {
+        await eventiApi.create({ ...payload, bozza: false });
+      }
+      localStorage.removeItem('inbus_bozza_evento_id');
       onSalvato();
       onClose();
     } catch (e) {
@@ -315,9 +360,9 @@ export function SchedaEventoModale({
 
   const campiInfoEvento: ReactNode = (
     <>
-      <div className="mini-tabs" style={{ marginBottom: 14 }}>
-        <button type="button" className={`mini-tab${subTabInfo === 'info' ? ' active' : ''}`} onClick={() => setSubTabInfo('info')}>Informazioni</button>
-        <button type="button" className={`mini-tab${subTabInfo === 'descrizione' ? ' active' : ''}`} onClick={() => setSubTabInfo('descrizione')}>Descrizione</button>
+      <div className="sub-tabs">
+        <button type="button" className={`sub-tab${subTabInfo === 'info' ? ' active' : ''}`} onClick={() => setSubTabInfo('info')}>Informazioni</button>
+        <button type="button" className={`sub-tab${subTabInfo === 'descrizione' ? ' active' : ''}`} onClick={() => setSubTabInfo('descrizione')}>Descrizione</button>
       </div>
 
       {subTabInfo === 'info' && (
@@ -507,9 +552,9 @@ export function SchedaEventoModale({
 
   const campiImmagini: ReactNode = (
     <>
-      <div className="mini-tabs" style={{ marginBottom: 14 }}>
-        <button type="button" className={`mini-tab${subTabImmagini === 'immagini' ? ' active' : ''}`} onClick={() => setSubTabImmagini('immagini')}>Immagini</button>
-        <button type="button" className={`mini-tab${subTabImmagini === 'biglietto' ? ' active' : ''}`} onClick={() => setSubTabImmagini('biglietto')}>Biglietto</button>
+      <div className="sub-tabs">
+        <button type="button" className={`sub-tab${subTabImmagini === 'immagini' ? ' active' : ''}`} onClick={() => setSubTabImmagini('immagini')}>Immagini</button>
+        <button type="button" className={`sub-tab${subTabImmagini === 'biglietto' ? ' active' : ''}`} onClick={() => setSubTabImmagini('biglietto')}>Biglietto</button>
       </div>
 
       {subTabImmagini === 'immagini' && (
@@ -674,10 +719,10 @@ export function SchedaEventoModale({
           <button
             key={s.numero}
             type="button"
-            className={`mini-tab${step === s.numero ? ' active' : ''}`}
+            className={`mini-tab${step === s.numero ? ' active' : step > s.numero ? ' completato' : ''}`}
             onClick={() => setStep(s.numero)}
           >
-            {s.label}
+            {step > s.numero && '✓ '}{s.label}
           </button>
         ))}
       </div>

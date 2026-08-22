@@ -36,6 +36,7 @@ export interface Evento {
   arrivoIndirizzo: string | null;
   arrivoOrario: string | null;
   visibileSito: boolean;
+  bozza: boolean;
   descrizione: string | null;
   descrizioneSeo: string | null;
   ticketColoreAccento: string | null;

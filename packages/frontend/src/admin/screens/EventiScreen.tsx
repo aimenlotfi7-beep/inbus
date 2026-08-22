@@ -25,7 +25,28 @@ export function EventiScreen() {
     ? eventiTab.filter((ev) => `${ev.artista} ${ev.genere} ${ev.citta} ${ev.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : eventiTab;
 
-  function apriNuovo() { setInModifica(null); setModaleAperta(true); }
+  async function apriNuovo() {
+    const bozzaId = localStorage.getItem('inbus_bozza_evento_id');
+    if (bozzaId) {
+      const riprendi = confirm('Hai una bozza di un evento non ancora completato — vuoi riprenderla da dove l\'avevi lasciata?');
+      if (riprendi) {
+        try {
+          const bozza = await eventiApi.getById(bozzaId);
+          setInModifica(bozza);
+          setModaleAperta(true);
+          return;
+        } catch {
+          // La bozza non esiste più (es. cancellata da un altro admin) —
+          // proseguo con un evento vuoto invece di bloccare tutto qui.
+          localStorage.removeItem('inbus_bozza_evento_id');
+        }
+      } else {
+        localStorage.removeItem('inbus_bozza_evento_id');
+      }
+    }
+    setInModifica(null);
+    setModaleAperta(true);
+  }
   function apriModifica(ev: Evento) { setInModifica(ev); setModaleAperta(true); }
 
   async function elimina(ev: Evento) {
@@ -57,6 +78,7 @@ export function EventiScreen() {
         {eventiFiltrati.map((ev) => (
           <div key={ev.id} className="evento-card" onClick={() => apriModifica(ev)} style={tab === 'passati' ? { opacity: .65 } : undefined}>
             <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
+            {ev.bozza && <span className="badge attenzione" style={{ marginLeft: 8 }}>Bozza</span>}
             <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
             <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{ev.luogo}, {ev.citta}</p>
             <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>

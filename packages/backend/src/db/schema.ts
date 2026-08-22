@@ -83,6 +83,12 @@ export const eventi = pgTable('eventi', {
   // (default), vale comunque la regola "non visibile dopo la data
   // dell'evento" applicata separatamente.
   visibileSito: boolean('visibile_sito').notNull().default(true),
+  // Vero mentre l'evento è ancora in fase di creazione, non ancora
+  // confermato dall'amministratore — salvato in automatico man mano che
+  // si compila il modulo "Nuovo evento", così un'uscita accidentale (o
+  // un ricaricamento della pagina) non fa perdere il lavoro fatto. Non
+  // compare mai sul sito pubblico, a prescindere da "visibileSito".
+  bozza: boolean('bozza').notNull().default(false),
   // Testo libero mostrato nella pagina pubblica dell'evento, sotto la
   // foto — orari di ritrovo, cosa portare, regole del bus, ecc. Diverso
   // dalla descrizione SEO qui sotto: questa è per il CLIENTE che ha già

@@ -238,6 +238,19 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .mini-tab:hover{color:var(--paper); border-color:var(--blue-dim);}
 .mini-tab:focus, .mini-tab:focus-visible{outline:none; box-shadow:none;}
 .mini-tab.active{border-color:var(--blue); color:var(--paper); background:rgba(37,99,235,.1);}
+.mini-tab.completato{border-color:var(--green); color:var(--green);}
+
+/* Sotto-tab (dentro una sezione, es. Info/Descrizione dentro "Info
+   evento") — più piccole e discrete delle tab principali, per capire a
+   colpo d'occhio che sono un livello sotto, non un'altra sezione della
+   scheda. */
+.sub-tabs{display:flex; gap:6px; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--line);}
+.sub-tab{
+  font-family:'Poppins',sans-serif; font-size:12px; font-weight:600; padding:5px 12px; border-radius:999px;
+  border:1px solid transparent; color:var(--mist); background:transparent; cursor:pointer;
+}
+.sub-tab:hover{color:var(--paper);}
+.sub-tab.active{background:var(--dusk-2); color:var(--paper); border-color:var(--line);}
 
 /* ---------- CATEGORIE EVENTI ---------- */
 .categorie-list{display:flex; flex-wrap:wrap; gap:10px;}

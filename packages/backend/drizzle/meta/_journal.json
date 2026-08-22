@@ -176,6 +176,13 @@
       "when": 1787307592668,
       "tag": "0025_layout_biglietto",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787386168858,
+      "tag": "0026_campo_bozza_evento",
+      "breakpoints": true
     }
   ]
 }

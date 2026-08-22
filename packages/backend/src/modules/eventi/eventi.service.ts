@@ -100,7 +100,10 @@ export const eventiService = {
       condizioni.push(sql`(${ilike(eventi.artista, q)} OR ${ilike(eventi.luogo, q)} OR ${ilike(eventi.citta, q)})`);
     }
     if (query.soloFuturi) condizioni.push(sql`${eventi.data} >= now()`);
-    if (query.soloVisibili) condizioni.push(eq(eventi.visibileSito, true));
+    if (query.soloVisibili) {
+      condizioni.push(eq(eventi.visibileSito, true));
+      condizioni.push(eq(eventi.bozza, false)); // le bozze non compaiono mai sul sito pubblico
+    }
 
     const risultati = await db.query.eventi.findMany({
       where: condizioni.length ? and(...condizioni) : undefined,
@@ -121,7 +124,7 @@ export const eventiService = {
       with: includeCompleto,
     });
     if (!evento) throw new NonTrovato('Evento');
-    if (!evento.visibileSito || new Date(evento.data) < new Date()) throw new NonTrovato('Evento');
+    if (!evento.visibileSito || evento.bozza || new Date(evento.data) < new Date()) throw new NonTrovato('Evento');
     return conStatoCalcolato(evento);
   },
 
@@ -147,6 +150,7 @@ export const eventiService = {
           arrivoIndirizzo: input.arrivoIndirizzo,
           arrivoOrario: input.arrivoOrario,
           visibileSito: input.visibileSito,
+          bozza: input.bozza ?? false,
           descrizione: input.descrizione,
           descrizioneSeo: input.descrizioneSeo,
           ticketColoreAccento: input.ticketColoreAccento,
@@ -225,6 +229,7 @@ export const eventiService = {
           ...(input.arrivoIndirizzo !== undefined && { arrivoIndirizzo: input.arrivoIndirizzo }),
           ...(input.arrivoOrario !== undefined && { arrivoOrario: input.arrivoOrario }),
           ...(input.visibileSito !== undefined && { visibileSito: input.visibileSito }),
+          ...(input.bozza !== undefined && { bozza: input.bozza }),
           ...(input.descrizione !== undefined && { descrizione: input.descrizione }),
           ...(input.descrizioneSeo !== undefined && { descrizioneSeo: input.descrizioneSeo }),
           ...(input.ticketColoreAccento !== undefined && { ticketColoreAccento: input.ticketColoreAccento }),
