@@ -5,6 +5,8 @@ import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
+import { Modale } from '../shared/Modale';
+import { CampoCopiabile } from '../shared/CampoCopiabile';
 
 const ETICHETTE: Record<TourLeader['stato'], string> = { CANDIDATO: 'Candidato', ATTIVO: 'Attivo', ARCHIVIATO: 'Archiviato' };
 
@@ -17,6 +19,7 @@ export function TourLeaderScreen() {
   const [ricerca, setRicerca] = useState('');
   const [linkCopiato, setLinkCopiato] = useState(false);
   const [formAperto, setFormAperto] = useState(false);
+  const [credenzialiGenerate, setCredenzialiGenerate] = useState<{ nomeCompleto: string; email: string; password: string } | null>(null);
   const [form, setForm] = useState(VUOTO);
 
   function ricarica() { tourLeaderApi.list().then(setLista); }
@@ -52,7 +55,7 @@ export function TourLeaderScreen() {
     if (!confirm(`Generare (o rigenerare) le credenziali di accesso alla scansione per ${t.nome} ${t.cognome}? Se ne aveva già, quelle vecchie smettono di funzionare.`)) return;
     try {
       const { email, password } = await tourLeaderApi.attivaAccesso(t.id);
-      alert(`Credenziali per ${t.nome} ${t.cognome}:\n\nEmail: ${email}\nPassword: ${password}\n\nComunicale tu stesso (via messaggio/email) — non verranno mostrate di nuovo, e non c'è modo di recuperarle dopo: solo di generarne di nuove.\n\nPagina di accesso: ${window.location.origin}/scansione/accedi`);
+      setCredenzialiGenerate({ nomeCompleto: `${t.nome} ${t.cognome}`, email, password });
     } catch (e) {
       alert(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: errore di rete.');
     }
@@ -148,6 +151,18 @@ export function TourLeaderScreen() {
         ]}
         onElimina={elimina}
       />
+
+      {credenzialiGenerate && (
+        <Modale titolo={`Credenziali per ${credenzialiGenerate.nomeCompleto}`} onClose={() => setCredenzialiGenerate(null)}>
+          <p className="testo-intro" style={{ marginBottom: 16 }}>
+            Comunicale tu stesso (via messaggio/email) — non verranno mostrate di nuovo: solo di generarne di nuove,
+            se le perdi.
+          </p>
+          <CampoCopiabile etichetta="Pagina di accesso" valore={`${window.location.origin}/scansione/accedi`} />
+          <CampoCopiabile etichetta="Email" valore={credenzialiGenerate.email} />
+          <CampoCopiabile etichetta="Password" valore={credenzialiGenerate.password} />
+        </Modale>
+      )}
     </div>
   );
 }

@@ -334,6 +334,17 @@ export function SchedaEventoModale({
       alert('Compila almeno artista, genere, luogo, città e data.');
       return;
     }
+    if (numeroTratte === 0) {
+      alert('Aggiungi almeno una tratta prima di salvare.');
+      setStep(2);
+      return;
+    }
+    if (numeroImmagini === 0) {
+      alert('Carica almeno un\'immagine prima di salvare.');
+      setStep(3);
+      setSubTabImmagini('immagini');
+      return;
+    }
     const payload = {
       ...form,
       linee: (form.linee ?? [])
