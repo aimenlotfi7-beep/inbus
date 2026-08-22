@@ -18,6 +18,18 @@ export async function leggiPostiPerBus(): Promise<number> {
   return Number.isFinite(valore) && valore > 0 ? valore : DEFAULT_POSTI_PER_BUS;
 }
 
+/** Credito fedeltà maturato per ogni passeggero, dopo che il suo
+ *  viaggio è davvero avvenuto — modificabile dal gestionale, senza
+ *  bisogno di ripubblicare il codice per cambiare importo. */
+export const CHIAVE_CREDITO_PER_PASSEGGERO = 'credito_per_passeggero';
+const DEFAULT_CREDITO_PER_PASSEGGERO = 0.5;
+
+export async function leggiCreditoPerPasseggero(): Promise<number> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_CREDITO_PER_PASSEGGERO)).limit(1);
+  const valore = riga ? Number(riga.valore) : NaN;
+  return Number.isFinite(valore) && valore >= 0 ? valore : DEFAULT_CREDITO_PER_PASSEGGERO;
+}
+
 export const impostazioniRouter = Router();
 impostazioniRouter.use(richiedeAuth);
 

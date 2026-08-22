@@ -251,6 +251,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 }
 .sub-tab:hover{color:var(--paper);}
 .sub-tab.active{background:var(--dusk-2); color:var(--paper); border-color:var(--line);}
+.sub-tab.completato{color:var(--green);}
 
 /* ---------- CATEGORIE EVENTI ---------- */
 .categorie-list{display:flex; flex-wrap:wrap; gap:10px;}

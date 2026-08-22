@@ -183,6 +183,20 @@
       "when": 1787386168858,
       "tag": "0026_campo_bozza_evento",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1787395866709,
+      "tag": "0027_accesso_tour_leader_e_qr_per_passeggero",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1787425101458,
+      "tag": "0028_credito_fedelta",
+      "breakpoints": true
     }
   ]
 }

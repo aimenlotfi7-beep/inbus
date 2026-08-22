@@ -411,6 +411,7 @@
   .evento-pagina-info .sezione-info{
     background:var(--dusk-2); border:1px solid rgba(255,255,255,.08); border-radius:14px;
     padding:20px; margin-top:22px; white-space:pre-line; font-size:14px; line-height:1.6; color:var(--mist);
+    scroll-margin-top:80px; /* altrimenti l'header fisso (63px) copre l'inizio quando si salta con l'ancoraggio */
   }
   .evento-pagina-info .sezione-info h4{
     font-family:'Poppins',sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:.5px;
@@ -426,19 +427,59 @@
   }
   .checkout-form{display:flex; flex-direction:column; flex:1;}
 
-  /* Pulsanti "salta a" — servono solo su cellulare, dove la prenotazione
-     viene prima delle sezioni testuali (vedi order qui sotto): su
+  /* Riepilogo compatto (prezzo + pulsante Prenota) mostrato al posto del
+     modulo intero — solo su cellulare, e solo finché non lo si apre.
+     Su desktop non serve mai: c'è già spazio per il modulo per intero,
+     resta nascosto. */
+  .checkout-riepilogo-chiuso{
+    display:none; width:100%; align-items:center; justify-content:space-between;
+    background:none; border:none; padding:0; font-size:15px; cursor:pointer;
+  }
+  .checkout-riepilogo-chiuso b{font-family:'Anton',sans-serif; font-size:19px;}
+  .checkout-riepilogo-cta{
+    background:var(--pink); color:#fff; font-weight:700; padding:11px 22px; border-radius:999px; font-size:14.5px;
+  }
+  .checkout-form-wrap{display:block;}
+
+  /* Barra fissa in fondo allo schermo — nascosta di base, appare solo
+     nel media query mobile, e solo mentre il modulo è ancora chiuso
+     (gestito lato React, non qui). */
+  .barra-prenota-fissa-mobile{display:none;}
+
+  /* Pulsanti "salta a" — servono solo su cellulare, per raggiungere
+     velocemente Descrizione/Informazioni più giù nella pagina; su
      desktop è tutto già visibile fianco a fianco, non c'è bisogno di
      saltare da nessuna parte. */
   .salti-rapidi-mobile{display:none;}
 
   @media (max-width:900px){
-    .evento-pagina-corpo{grid-template-columns:1fr; gap:24px;}
-    .evento-pagina-checkout{position:static; order:1;}
-    .evento-pagina-info{order:2;}
+    .evento-pagina-corpo{grid-template-columns:1fr; gap:24px; padding-bottom:70px;}
+    .evento-pagina-checkout{position:static; padding:18px; min-height:0;}
+    .evento-pagina-checkout.aperta-mobile{padding:30px; min-height:440px;}
     .evento-pagina-hero{aspect-ratio:16/9; max-width:320px;}
     .salti-rapidi-mobile{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;}
     .salti-rapidi-mobile .btn{font-size:12.5px; padding:8px 14px; text-decoration:none;}
+
+    /* Chiuso: si vede solo il riepilogo, il modulo vero resta nascosto
+       (non smontato — resta con tutti i dati già inseriti, se qualcuno
+       lo riapre dopo averlo chiuso non perde nulla). */
+    .checkout-riepilogo-chiuso{display:flex;}
+    .checkout-form-wrap{display:none;}
+    .evento-pagina-checkout.aperta-mobile .checkout-riepilogo-chiuso{display:none;}
+    .evento-pagina-checkout.aperta-mobile .checkout-form-wrap{display:block;}
+
+    .barra-prenota-fissa-mobile{
+      display:flex; align-items:center; justify-content:space-between; gap:14px;
+      position:fixed; left:0; right:0; bottom:0; z-index:600;
+      background:var(--paper); color:var(--ink); padding:14px 18px;
+      padding-bottom:calc(14px + env(safe-area-inset-bottom)); /* iPhone con barra home */
+      box-shadow:0 -4px 18px rgba(0,0,0,.25);
+    }
+    .barra-prenota-fissa-mobile b{font-family:'Anton',sans-serif; font-size:18px;}
+    .barra-prenota-fissa-mobile button{
+      background:var(--pink); color:#fff; font-weight:700; padding:12px 26px; border-radius:999px;
+      border:none; font-size:15px; cursor:pointer; white-space:nowrap;
+    }
   }
 
   @media (max-width:760px){

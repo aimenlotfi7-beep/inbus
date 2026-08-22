@@ -271,6 +271,14 @@ export function SchedaEventoModale({
     return Boolean(form.artista && form.genere && form.luogo && form.citta && form.data);
   }
 
+  // Completamento VERO di ogni sezione/sotto-sezione — non "ci sono
+  // passato sopra", ma "ho scritto qualcosa lì dentro". Usato solo per
+  // il segno di spunta verde in creazione: non blocca mai il
+  // salvataggio, tratte/immagini/descrizione restano facoltative.
+  const numeroImmagini = (form.immagini ?? []).length;
+  const bigliettoPersonalizzato = Boolean(form.ticketColoreAccento || form.ticketImmagineSfondoUrl || form.layoutBigliettoId);
+  const descrizioneCompilata = Boolean((form.descrizione ?? '').trim() || (form.descrizioneSeo ?? '').trim());
+
   // Auto-salvataggio in bozza — solo per un evento NUOVO (non in modifica
   // di uno esistente): appena ci sono almeno i campi minimi, salva da
   // sola una bozza sul server (non solo nel browser) e la tiene
@@ -361,8 +369,8 @@ export function SchedaEventoModale({
   const campiInfoEvento: ReactNode = (
     <>
       <div className="sub-tabs">
-        <button type="button" className={`sub-tab${subTabInfo === 'info' ? ' active' : ''}`} onClick={() => setSubTabInfo('info')}>Informazioni</button>
-        <button type="button" className={`sub-tab${subTabInfo === 'descrizione' ? ' active' : ''}`} onClick={() => setSubTabInfo('descrizione')}>Descrizione</button>
+        <button type="button" className={`sub-tab${subTabInfo === 'info' ? ' active' : (!evento && infoCompleta()) ? ' completato' : ''}`} onClick={() => setSubTabInfo('info')}>Informazioni</button>
+        <button type="button" className={`sub-tab${subTabInfo === 'descrizione' ? ' active' : (!evento && descrizioneCompilata) ? ' completato' : ''}`} onClick={() => setSubTabInfo('descrizione')}>Descrizione</button>
       </div>
 
       {subTabInfo === 'info' && (
@@ -553,8 +561,8 @@ export function SchedaEventoModale({
   const campiImmagini: ReactNode = (
     <>
       <div className="sub-tabs">
-        <button type="button" className={`sub-tab${subTabImmagini === 'immagini' ? ' active' : ''}`} onClick={() => setSubTabImmagini('immagini')}>Immagini</button>
-        <button type="button" className={`sub-tab${subTabImmagini === 'biglietto' ? ' active' : ''}`} onClick={() => setSubTabImmagini('biglietto')}>Biglietto</button>
+        <button type="button" className={`sub-tab${subTabImmagini === 'immagini' ? ' active' : (!evento && numeroImmagini > 0) ? ' completato' : ''}`} onClick={() => setSubTabImmagini('immagini')}>Immagini</button>
+        <button type="button" className={`sub-tab${subTabImmagini === 'biglietto' ? ' active' : (!evento && bigliettoPersonalizzato) ? ' completato' : ''}`} onClick={() => setSubTabImmagini('biglietto')}>Biglietto</button>
       </div>
 
       {subTabImmagini === 'immagini' && (
@@ -636,6 +644,12 @@ export function SchedaEventoModale({
   );
 
   const numeroTratte = (form.linee ?? []).filter((l) => l.nome.trim()).length;
+  const stepCompleto: Record<1 | 2 | 3 | 4, boolean> = {
+    1: infoCompleta(),
+    2: numeroTratte > 0,
+    3: numeroImmagini > 0 || bigliettoPersonalizzato,
+    4: false, // il riepilogo non ha un vero "completato", è solo una vista
+  };
 
   // ---- Vista MODIFICA (evento esistente): tab Dettagli/Partenze ----
 
@@ -719,10 +733,10 @@ export function SchedaEventoModale({
           <button
             key={s.numero}
             type="button"
-            className={`mini-tab${step === s.numero ? ' active' : step > s.numero ? ' completato' : ''}`}
+            className={`mini-tab${step === s.numero ? ' active' : stepCompleto[s.numero] ? ' completato' : ''}`}
             onClick={() => setStep(s.numero)}
           >
-            {step > s.numero && '✓ '}{s.label}
+            {stepCompleto[s.numero] && step !== s.numero && '✓ '}{s.label}
           </button>
         ))}
       </div>

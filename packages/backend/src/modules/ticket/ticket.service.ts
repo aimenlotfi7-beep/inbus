@@ -7,22 +7,24 @@ import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { inviaEmail } from '../../shared/email.service.js';
 import { layoutBigliettoService, disegnaBigliettoPdf } from '../layout-biglietto/layout-biglietto.service.js';
 
-/** Genera un token casuale per il QR — apposta separato dal PNR (che è
- *  corto e già mostrato via email/sito): il QR deve restare qualcosa che
- *  non si indovina, mentre il PNR resta comodo da leggere e dettare al
- *  telefono. */
-function generaTokenTicket() {
+/** Genera un token casuale — usato sia per il "lotto" della prenotazione
+ *  (ticketToken su prenotazioni, segna che il biglietto è stato emesso)
+ *  sia, uno diverso per ciascuno, per ogni singolo passeggero (serve al
+ *  controllo accessi sul bus, per contare chi è salito davvero persona
+ *  per persona, non a gruppo intero). */
+function generaToken() {
   return crypto.randomBytes(24).toString('hex');
 }
 
 export const ticketService = {
-  /** Emette davvero il biglietto: genera token+PDF (uno per passeggero,
-   *  seguendo il layout scelto per l'evento, o quello predefinito), manda
-   *  l'email con gli allegati, salva lo stato. Va chiamata solo quando la
-   *  prenotazione è pagata per intero (subito se paga tutto, oppure dopo
-   *  che ha saldato il resto se aveva pagato ad acconto) — non prima,
-   *  altrimenti un cliente con solo l'acconto avrebbe già in mano un
-   *  biglietto "valido" per salire sul bus senza aver finito di pagare. */
+  /** Emette davvero il biglietto: genera un PDF+QR per ogni passeggero
+   *  (ognuno col proprio codice univoco, non condiviso), seguendo il
+   *  layout scelto per l'evento (o quello predefinito), manda l'email
+   *  con gli allegati. Va chiamata solo quando la prenotazione è pagata
+   *  per intero (subito se paga tutto, oppure dopo che ha saldato il
+   *  resto se aveva pagato ad acconto) — non prima, altrimenti un
+   *  cliente con solo l'acconto avrebbe già in mano un biglietto
+   *  "valido" per salire sul bus senza aver finito di pagare. */
   async emetti(pnr: string) {
     const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
     if (!p) throw new NonTrovato('Prenotazione');
@@ -33,17 +35,13 @@ export const ticketService = {
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
     if (!evento) throw new NonTrovato('Evento');
 
+    // Il richiedente conta sempre come primo partecipante (vedi
+    // prenotazioni.service.ts) — questa lista non è mai vuota.
     const partecipanti = await db
       .select()
       .from(partecipantiPrenotazione)
       .where(eq(partecipantiPrenotazione.prenotazioneId, p.id))
       .orderBy(partecipantiPrenotazione.ordine);
-    const passeggeriNomi = partecipanti.length > 0
-      ? partecipanti.map((pt) => `${pt.nome} ${pt.cognome}`)
-      : [p.referenteNome ?? 'Passeggero'];
-
-    const token = generaTokenTicket();
-    const qrDataUrl = await QRCode.toDataURL(`INBUS:TICKET:${p.pnr}:${token}`, { margin: 1, width: 300 });
 
     // Il layout (colori, ordine delle sezioni, posizione del QR) è
     // quello scelto per questo evento, o il predefinito se non ne ha
@@ -51,29 +49,36 @@ export const ticketService = {
     const config = await layoutBigliettoService.getPerEvento(evento.layoutBigliettoId);
     const configEffettiva = evento.ticketColoreAccento ? { ...config, coloreAccento: evento.ticketColoreAccento } : config;
 
-    // Un PDF distinto per ogni passeggero (solo il proprio nome sopra,
-    // non l'elenco di tutti) — più semplice da distribuire fisicamente
-    // il giorno della partenza, ognuno ha il suo. Il QR è lo stesso su
-    // tutti (la prenotazione è una sola, resta un unico record).
-    const allegati = await Promise.all(passeggeriNomi.map(async (nomePasseggero, indice) => {
+    // Un PDF distinto per ogni passeggero, con un QR proprio (diverso da
+    // quello degli altri) — così sul bus si può contare davvero chi è
+    // salito, persona per persona, non solo "la prenotazione nel suo
+    // complesso".
+    const allegati = await Promise.all(partecipanti.map(async (pt, indice) => {
+      const tokenPersonale = generaToken();
+      await db.update(partecipantiPrenotazione).set({ ticketToken: tokenPersonale }).where(eq(partecipantiPrenotazione.id, pt.id));
+
+      const qrDataUrl = await QRCode.toDataURL(`INBUS:TICKET:${p.pnr}:${tokenPersonale}`, { margin: 1, width: 300 });
       const pdfBuffer = await disegnaBigliettoPdf(configEffettiva, {
         artista: evento.artista,
         dataEvento: evento.data,
         fermataCitta: p.fermataCitta,
         fermataOrario: p.fermataOrario,
-        passeggeriNomi: [nomePasseggero],
+        passeggeriNomi: [`${pt.nome} ${pt.cognome}`],
         pnr: p.pnr,
         qrDataUrl,
         immagineIntestazioneUrl: evento.ticketImmagineSfondoUrl,
       });
-      const nomeFile = passeggeriNomi.length > 1
-        ? `biglietto-${p.pnr}-${indice + 1}-${nomePasseggero.replace(/[^a-zA-Z0-9]+/g, '-')}.pdf`
+      const nomeFile = partecipanti.length > 1
+        ? `biglietto-${p.pnr}-${indice + 1}-${pt.nome}-${pt.cognome}`.replace(/[^a-zA-Z0-9-]+/g, '-') + '.pdf'
         : `biglietto-${p.pnr}.pdf`;
       return { nomeFile, contenuto: pdfBuffer, tipo: 'application/pdf' };
     }));
 
+    // Il token sulla prenotazione resta come "lotto" — segna che
+    // l'emissione è avvenuta, non è più usato per il controllo accessi
+    // (quello guarda i token sui singoli partecipanti).
     await db.update(prenotazioni).set({
-      ticketToken: token,
+      ticketToken: generaToken(),
       ticketStato: 'EMESSO',
       ticketEmessoIl: new Date(),
     }).where(eq(prenotazioni.id, p.id));

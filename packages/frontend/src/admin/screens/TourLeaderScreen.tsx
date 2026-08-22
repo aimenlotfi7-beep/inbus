@@ -48,6 +48,16 @@ export function TourLeaderScreen() {
     ricarica();
   }
 
+  async function attivaAccesso(t: TourLeader) {
+    if (!confirm(`Generare (o rigenerare) le credenziali di accesso alla scansione per ${t.nome} ${t.cognome}? Se ne aveva già, quelle vecchie smettono di funzionare.`)) return;
+    try {
+      const { email, password } = await tourLeaderApi.attivaAccesso(t.id);
+      alert(`Credenziali per ${t.nome} ${t.cognome}:\n\nEmail: ${email}\nPassword: ${password}\n\nComunicale tu stesso (via messaggio/email) — non verranno mostrate di nuovo, e non c'è modo di recuperarle dopo: solo di generarne di nuove.\n\nPagina di accesso: ${window.location.origin}/scansione/accedi`);
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: errore di rete.');
+    }
+  }
+
   function apriNuovo() { setForm(VUOTO); setFormAperto(true); }
 
   async function salva() {
@@ -125,6 +135,14 @@ export function TourLeaderScreen() {
                   <option key={valore} value={valore}>{etichetta}</option>
                 ))}
               </select>
+            ),
+          },
+          {
+            etichetta: 'Accesso scansione',
+            render: (t) => (
+              <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => attivaAccesso(t)}>
+                {t.passwordAttiva ? 'Rigenera credenziali' : '🔑 Attiva accesso'}
+              </button>
             ),
           },
         ]}

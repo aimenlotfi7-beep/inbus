@@ -21,6 +21,10 @@ export const creaPrenotazioneSchema = z.object({
   metodoPagamento: z.enum(['CARTA', 'PAYPAL', 'SATISPAY', 'DA_CONCORDARE']).default('CARTA'),
   couponCodice: z.string().optional(),
   promoterCodice: z.string().optional(),
+  // Solo per pagamento COMPLETO (non si applica all'acconto, per non
+  // complicare il calcolo del saldo residuo) — usa TUTTO il credito
+  // disponibile del cliente fino a coprire il totale, mai di più.
+  usaCredito: z.boolean().optional(),
   // Marketing: se la prenotazione arriva da un link con offerta dedicata
   // e/o da una campagna tracciata (facoltativi, indipendenti tra loro).
   offertaId: z.string().optional(),

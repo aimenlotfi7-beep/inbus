@@ -11,6 +11,7 @@ export interface CreaPrenotazionePayload {
   couponCodice?: string;
   promoterCodice?: string;
   offertaId?: string;
+  usaCredito?: boolean;
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;

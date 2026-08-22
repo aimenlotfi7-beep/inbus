@@ -7,6 +7,8 @@ import { applicaScontoOfferta } from '../../api/prezzi';
 import { utentiApi } from '../../api/utenti';
 import { ErroreApi } from '../../api/client';
 
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'confermato-attesa' | 'errore';
 interface Partecipante { nome: string; cognome: string; }
 
@@ -47,6 +49,8 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   const [cognome, setCognome] = useState('');
   const [telefono, setTelefono] = useState('');
   const [autocompilato, setAutocompilato] = useState(false);
+  const [creditoDisponibile, setCreditoDisponibile] = useState(0);
+  const [usaCredito, setUsaCredito] = useState(false);
 
   // Un modulo nome+cognome per ogni passeggero OLTRE al richiedente.
   const [partecipanti, setPartecipanti] = useState<Partecipante[]>([]);
@@ -74,6 +78,8 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
 
   async function emailCambiata(v: string) {
     setEmail(v);
+    setCreditoDisponibile(0);
+    setUsaCredito(false);
     if (!v.includes('@')) return;
     try {
       const dati = await utentiApi.datiPerCheckout(v);
@@ -85,6 +91,15 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
       }
     } catch {
       // Preriempimento facoltativo: se fallisce, il cliente compila a mano.
+    }
+    try {
+      const r = await fetch(`${API_URL}/api/credito?email=${encodeURIComponent(v)}`);
+      if (r.ok) {
+        const { disponibile } = await r.json();
+        setCreditoDisponibile(disponibile);
+      }
+    } catch {
+      // Facoltativo anche questo: se fallisce, semplicemente non mostra il credito.
     }
   }
 
@@ -103,6 +118,12 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
     ? (offerta ? applicaScontoOfferta(opzioneScelta.prezzoEffettivo, offerta.scontoPercentuale) : opzioneScelta.prezzoEffettivo)
     : 0;
   const totale = opzioneScelta ? prezzoUnitario * passeggeri : 0;
+  // Il credito si applica solo all'acquisto completo (non all'acconto),
+  // mai oltre il totale — coerente con la stessa regola applicata dal
+  // server (che comunque la ricontrolla per conto suo, non ci si fida
+  // di questo calcolo lato cliente per l'importo vero addebitato).
+  const creditoApplicato = usaCredito ? Math.min(creditoDisponibile, totale) : 0;
+  const totaleConCredito = totale - creditoApplicato;
   const moduloRichiedenteCompleto = Boolean(email && nome && cognome && telefono);
   const partecipantiCompleti = partecipanti.every((p) => p.nome.trim() && p.cognome.trim());
 
@@ -129,6 +150,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
         partecipanti,
         ...(promoterCodice && { promoterCodice }),
         ...(offerta && { offertaId: offerta.id }),
+        ...(usaCredito && tipoPagamento === 'COMPLETO' && { usaCredito: true }),
         ...(utmSource && { utmSource }),
         ...(utmMedium && { utmMedium }),
         ...(utmCampaign && { utmCampaign }),
@@ -270,19 +292,19 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
               <p className="field-label" style={{ marginBottom: 6 }}>I tuoi dati (richiedente)</p>
               {autocompilato && <p style={{ fontSize: 12, opacity: .7, marginTop: -4, marginBottom: 8 }}>Precompilato dai tuoi dati — puoi modificarlo.</p>}
               <label className="field-label">Email</label>
-              <input type="email" value={email} onChange={(e) => emailCambiata(e.target.value)} />
+              <input type="email" autoComplete="email" value={email} onChange={(e) => emailCambiata(e.target.value)} />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
                   <label className="field-label">Nome</label>
-                  <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} />
+                  <input type="text" autoComplete="given-name" value={nome} onChange={(e) => setNome(e.target.value)} />
                 </div>
                 <div>
                   <label className="field-label">Cognome</label>
-                  <input type="text" value={cognome} onChange={(e) => setCognome(e.target.value)} />
+                  <input type="text" autoComplete="family-name" value={cognome} onChange={(e) => setCognome(e.target.value)} />
                 </div>
               </div>
               <label className="field-label">Telefono</label>
-              <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+              <input type="tel" autoComplete="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
 
               {partecipanti.length > 0 && (
                 <>
@@ -330,8 +352,31 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
                 </>
               ) : (
                 <>
-                  <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, margin: '0 0 6px' }}>€{totale.toFixed(2)}</p>
+                  <div style={{ background: '#faf7f0', border: '1px solid #e5ded0', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13 }}>
+                    <p style={{ margin: '0 0 4px', fontWeight: 700 }}>{evento.artista}</p>
+                    <p style={{ margin: 0, opacity: .75 }}>
+                      {opzioneScelta?.fermataCitta}{opzioneScelta?.fermataOrario ? ` — ore ${opzioneScelta.fermataOrario}` : ''} · {passeggeri} passeggero{passeggeri > 1 ? 'i' : ''}
+                    </p>
+                  </div>
+
+                  <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, margin: '0 0 6px' }}>
+                    {creditoApplicato > 0 ? (
+                      <>
+                        <span style={{ textDecoration: 'line-through', opacity: .5, fontSize: 16, marginRight: 8 }}>€{totale.toFixed(2)}</span>
+                        €{totaleConCredito.toFixed(2)}
+                      </>
+                    ) : (
+                      <>€{totale.toFixed(2)}</>
+                    )}
+                  </p>
                   <p style={{ fontSize: 12, opacity: .7, marginTop: -4 }}>I biglietti arriveranno via email al richiedente.</p>
+
+                  {creditoDisponibile > 0 && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '10px 0', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={usaCredito} onChange={(e) => setUsaCredito(e.target.checked)} style={{ width: 'auto' }} />
+                      Usa il tuo credito fedeltà (€{creditoDisponibile.toFixed(2)} disponibili)
+                    </label>
+                  )}
 
                   <button
                     className="search-cta"
@@ -354,6 +399,9 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
                     Con "Prenota" versi un acconto di €{Number(evento.accontoEur ?? 10).toFixed(2)} a passeggero
                     ({(Number(evento.accontoEur ?? 10) * passeggeri).toFixed(2)}€ totali ora) e salderai il resto entro
                     15 giorni prima della partenza.
+                  </p>
+                  <p style={{ fontSize: 11, opacity: .6, marginTop: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                    🔒 I tuoi dati sono trattati in modo riservato, secondo la nostra informativa privacy.
                   </p>
                 </>
               )}

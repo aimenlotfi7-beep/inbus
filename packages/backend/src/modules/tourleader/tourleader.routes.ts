@@ -28,30 +28,38 @@ const creaAmministrativoSchema = candidaturaSchema.extend({
   stato: z.enum(['CANDIDATO', 'ATTIVO', 'ARCHIVIATO']).optional(),
 });
 
+/** Non restituisce mai l'hash della password al frontend (anche se
+ *  cifrato, non deve uscire dal server) — solo se ne esiste una
+ *  impostata o no, per mostrare "Attiva accesso" o "Rigenera". */
+function senzaPassword<T extends { passwordHash: string | null }>(riga: T) {
+  const { passwordHash, ...resto } = riga;
+  return { ...resto, passwordAttiva: passwordHash !== null };
+}
+
 async function getById(id: string) {
   const [t] = await db.select().from(tourLeader).where(eq(tourLeader.id, id)).limit(1);
   if (!t) throw new NonTrovato('Tour leader');
-  return t;
+  return senzaPassword(t);
 }
 
 export const tourLeaderService = {
-  list: () => db.select().from(tourLeader),
+  list: async () => (await db.select().from(tourLeader)).map(senzaPassword),
   getById,
   candidati: async (input: z.infer<typeof candidaturaSchema>) => {
     const [nuovo] = await db.insert(tourLeader).values({ ...input, stato: 'CANDIDATO' }).returning();
-    return nuovo;
+    return senzaPassword(nuovo);
   },
   // Censimento diretto dal gestionale (non passa dal form pubblico): chi
   // lo crea decide subito lo stato, di default ATTIVO dato che è già
   // stato valutato per essere censito qui.
   creaAmministrativo: async (input: z.infer<typeof candidaturaSchema> & { stato?: 'CANDIDATO' | 'ATTIVO' | 'ARCHIVIATO' }) => {
     const [nuovo] = await db.insert(tourLeader).values({ ...input, stato: input.stato ?? 'ATTIVO' }).returning();
-    return nuovo;
+    return senzaPassword(nuovo);
   },
   update: async (id: string, input: z.infer<typeof aggiornaSchema>) => {
     await getById(id);
     const [aggiornato] = await db.update(tourLeader).set(input).where(eq(tourLeader.id, id)).returning();
-    return aggiornato;
+    return senzaPassword(aggiornato);
   },
   remove: async (id: string) => {
     await getById(id);

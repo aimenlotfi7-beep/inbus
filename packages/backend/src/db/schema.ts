@@ -298,6 +298,14 @@ export const utenti = pgTable('utenti', {
   cap: text('cap'),
   note: text('note'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
+  // Credito fedeltà: matura dopo ogni viaggio DAVVERO avvenuto (non alla
+  // prenotazione — altrimenti basterebbe prenotare e cancellare per
+  // accumularlo gratis), spendibile su qualsiasi prenotazione futura,
+  // si somma sempre alle offerte, non scade mai. Il dettaglio di ogni
+  // movimento (guadagnato/speso) sta in movimentiCredito qui sotto —
+  // questo campo è solo il saldo attuale, per non dover sommare la
+  // tabella intera ogni volta che serve mostrarlo.
+  creditoDisponibile: numeric('credito_disponibile', { precision: 10, scale: 2 }).notNull().default('0'),
   // Consensi privacy — ognuno con la propria data: il GDPR richiede di
   // poter DIMOSTRARE quando è stato dato un consenso, non solo che c'è.
   // Nullo = non ancora scelto (mai mostrare come "acconsentito" di
@@ -335,6 +343,13 @@ export const prenotazioni = pgTable('prenotazioni', {
   // acconto) — usata per mostrare uno storico vero nel gestionale
   // (creata il X, saldata il Y), non solo lo stato attuale.
   saldoPagatoIl: timestamp('saldo_pagato_il'),
+  // Credito fedeltà usato per pagare (in parte o del tutto) questa
+  // prenotazione — si somma allo sconto di un'eventuale offerta, non la
+  // sostituisce. "creditoMaturato" impedisce che lo stesso viaggio
+  // faccia guadagnare credito due volte (lo scheduler giornaliero lo
+  // controlla prima di assegnarlo).
+  creditoUsato: numeric('credito_usato', { precision: 10, scale: 2 }).notNull().default('0'),
+  creditoMaturato: boolean('credito_maturato').notNull().default(false),
   scadenzaSaldo: timestamp('scadenza_saldo', { mode: 'date' }),
   metodoPagamento: metodoPagamentoEnum('metodo_pagamento').notNull().default('CARTA'),
   utenteId: text('utente_id').notNull().references(() => utenti.id),
@@ -379,6 +394,12 @@ export const partecipantiPrenotazione = pgTable('partecipanti_prenotazione', {
   nome: text('nome').notNull(),
   cognome: text('cognome').notNull(),
   ordine: integer('ordine').notNull().default(0),
+  // QR univoco PER QUESTA PERSONA — diverso dal token sulla
+  // prenotazione (che resta per "il biglietto è stato emesso"): questo
+  // serve al controllo accessi sul bus, per contare davvero chi è
+  // salito, persona per persona, non per gruppo intero.
+  ticketToken: text('ticket_token').unique(),
+  ticketUtilizzatoIl: timestamp('ticket_utilizzato_il'),
 });
 
 // ---------------------------------------------------------------------
@@ -420,6 +441,12 @@ export const tourLeader = pgTable('tour_leader', {
   eventoRiferimento: text('evento_riferimento').references(() => eventi.id, { onDelete: 'set null' }),
   note: text('note'),
   dataCandidatura: timestamp('data_candidatura').notNull().defaultNow(),
+  // Accesso all'app di controllo scansione biglietti — vuoto finché
+  // l'amministratore non attiva le credenziali per questo tour leader
+  // (di solito quando gli assegna un bus vero). Password sempre salvata
+  // con hash, mai in chiaro — stesso meccanismo già usato per gli
+  // amministratori.
+  passwordHash: text('password_hash'),
 });
 
 // ---------------------------------------------------------------------
@@ -583,6 +610,20 @@ export const impostazioni = pgTable('impostazioni', {
 // un testo JSON con l'ordine delle sezioni, la dimensione/posizione del
 // QR, colori — vedi layout-biglietto.service.ts per la struttura esatta
 // e il valore di base.
+// Storico di ogni singolo movimento di credito fedeltà — positivo
+// quando maturato dopo un viaggio, negativo quando speso su una
+// prenotazione. Serve per trasparenza (far vedere al cliente/a te da
+// dove arriva un saldo) — utenti.creditoDisponibile resta comunque il
+// saldo "pronto all'uso", non serve sommare questa tabella ogni volta.
+export const movimentiCredito = pgTable('movimenti_credito', {
+  id: id(),
+  utenteId: text('utente_id').notNull().references(() => utenti.id, { onDelete: 'cascade' }),
+  importo: numeric('importo', { precision: 10, scale: 2 }).notNull(), // positivo = guadagnato, negativo = speso
+  motivo: text('motivo').notNull(), // es. "Viaggio completato — PNR IB1234" oppure "Usato su prenotazione IB5678"
+  prenotazioneId: text('prenotazione_id').references(() => prenotazioni.id, { onDelete: 'set null' }),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+});
+
 export const layoutBiglietto = pgTable('layout_biglietto', {
   id: id(),
   nome: text('nome').notNull(),

@@ -133,6 +133,17 @@ export const prenotazioniService = {
         telefono: input.cliente.telefono,
       });
 
+      // Il credito si applica solo a pagamento completo (non
+      // all'acconto, altrimenti si complicherebbe il calcolo del saldo
+      // residuo) — mai più di quanto disponibile davvero, verificato
+      // qui dentro la transazione (non ci si fida di un valore mandato
+      // dal browser, che potrebbe essere non aggiornato).
+      let creditoUsato = 0;
+      if (input.usaCredito && input.tipoPagamento === 'COMPLETO') {
+        const [{ creditoDisponibile }] = await tx.select({ creditoDisponibile: utenti.creditoDisponibile }).from(utenti).where(eq(utenti.id, utente.id)).limit(1);
+        creditoUsato = Math.min(Number(creditoDisponibile), totale);
+      }
+
       if (couponUsato) {
         await tx.update(coupon).set({ usiAttuali: sql`${coupon.usiAttuali} + 1` }).where(eq(coupon.id, couponUsato.id));
       }
@@ -151,8 +162,9 @@ export const prenotazioniService = {
           referenteNome: linea.referenteNome,
           referenteTelefono: linea.referenteTelefono,
           passeggeri: input.passeggeri,
-          totale: (input.tipoPagamento === 'ACCONTO' ? acconto : totale).toFixed(2),
+          totale: (input.tipoPagamento === 'ACCONTO' ? acconto : totale - creditoUsato).toFixed(2),
           sconto: sconto.toFixed(2),
+          creditoUsato: creditoUsato.toFixed(2),
           couponCodice: couponUsato?.codice,
           offertaId: input.offertaId,
           campagnaId: input.campagnaId,
@@ -168,6 +180,11 @@ export const prenotazioniService = {
           promoterCodice: input.promoterCodice,
         })
         .returning();
+
+      if (creditoUsato > 0) {
+        const { creditoService } = await import('../credito/credito.service.js');
+        await creditoService.usaCredito(tx, utente.id, creditoUsato, prenotazione.id, prenotazione.pnr);
+      }
 
       // Il richiedente conta come primo partecipante (ordine 0), poi uno
       // per ogni modulo passeggero aggiuntivo compilato al checkout.

@@ -9,6 +9,9 @@ import { FinalizzaListaAttesaPage } from './pages/FinalizzaListaAttesaPage';
 import { CompletaSaldoPage } from './pages/CompletaSaldoPage';
 import { OffertaPage } from './pages/OffertaPage';
 import { EventoPage } from './pages/EventoPage';
+import { TourLeaderLoginPage } from './pages/TourLeaderLoginPage';
+import { TourLeaderBusListPage } from './pages/TourLeaderBusListPage';
+import { TourLeaderScanPage } from './pages/TourLeaderScanPage';
 
 export function App() {
   return (
@@ -23,6 +26,9 @@ export function App() {
       <Route path="/completa-saldo/:pnr" element={<CompletaSaldoPage />} />
       <Route path="/offerta/:slug" element={<OffertaPage />} />
       <Route path="/eventi/:slug" element={<EventoPage />} />
+      <Route path="/scansione/accedi" element={<TourLeaderLoginPage />} />
+      <Route path="/scansione" element={<TourLeaderBusListPage />} />
+      <Route path="/scansione/bus/:busId" element={<TourLeaderScanPage />} />
     </Routes>
   );
 }
