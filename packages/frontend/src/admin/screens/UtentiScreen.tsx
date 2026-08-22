@@ -36,12 +36,18 @@ export function UtentiScreen() {
           { etichetta: 'Telefono', render: (u) => u.telefono ?? '—' },
           { etichetta: 'Città', render: (u) => u.citta ?? '—' },
           { etichetta: 'Cliente dal', render: (u) => new Date(u.creatoIl).toLocaleDateString('it-IT') },
+          { etichetta: 'Credito', render: (u) => Number(u.creditoDisponibile) > 0 ? <span style={{ color: 'var(--green)', fontWeight: 700 }}>€{Number(u.creditoDisponibile).toFixed(2)}</span> : '—' },
         ]}
       />
 
       {selezionato && (
         <Modale titolo={`${selezionato.nome ?? ''} ${selezionato.cognome ?? ''}`.trim() || selezionato.email} onClose={() => setSelezionato(null)}>
           <p className="testo-intro">{selezionato.email}{selezionato.telefono ? ` · ${selezionato.telefono}` : ''}</p>
+          {Number(selezionato.creditoDisponibile) > 0 && (
+            <p className="testo-intro" style={{ color: 'var(--green)', fontWeight: 700, marginTop: 4 }}>
+              Credito fedeltà disponibile: €{Number(selezionato.creditoDisponibile).toFixed(2)}
+            </p>
+          )}
           <p className="section-label">Prenotazioni</p>
           {prenotazioni === null && <p className="testo-intro">Carico...</p>}
           {prenotazioni !== null && prenotazioni.length === 0 && <p className="testo-intro">Nessuna prenotazione ancora.</p>}

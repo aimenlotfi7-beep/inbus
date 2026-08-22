@@ -8,6 +8,7 @@ export interface Utente {
   telefono: string | null;
   citta: string | null;
   creatoIl: string;
+  creditoDisponibile: string;
 }
 
 export interface PreferenzePrivacy {

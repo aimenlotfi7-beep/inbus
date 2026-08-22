@@ -10,6 +10,8 @@ import { HomePage } from './HomePage';
 import { CookieBanner, LinkPreferenzeCookie } from '../features/CookieBanner';
 import { CHIAVE_EMAIL_CLIENTE } from '../features/clienteSessione';
 
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+
 type Sezione = 'eventi' | 'profilo' | 'viaggi' | 'privacy' | 'chat';
 
 export function AccountPage() {
@@ -104,9 +106,32 @@ export function AccountPage() {
 }
 
 function SezioneProfilo({ email }: { email: string }) {
+  const [credito, setCredito] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/credito?email=${encodeURIComponent(email)}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => setCredito(d ? d.disponibile : 0))
+      .catch(() => setCredito(0));
+  }, [email]);
+
   return (
     <section className="acc-sezione">
       <h1>Il mio profilo</h1>
+
+      {credito !== null && credito > 0 && (
+        <div className="panel-box" style={{ background: 'rgba(72,214,140,.1)', borderColor: 'var(--green)' }}>
+          <h2>Il tuo credito fedeltà</h2>
+          <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 26, color: 'var(--green)', margin: '4px 0' }}>
+            €{credito.toFixed(2)}
+          </p>
+          <p style={{ color: 'var(--mist)', fontSize: 13 }}>
+            Maturato dai tuoi viaggi passati — spendibile su qualsiasi prenotazione futura, non scade mai. Potrai
+            usarlo direttamente al momento del pagamento.
+          </p>
+        </div>
+      )}
+
       <div className="panel-box">
         <h2>I miei dati</h2>
         <p style={{ color: 'var(--mist)', fontSize: 13.5 }}>
