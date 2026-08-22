@@ -5,6 +5,70 @@ import { leggiCreditoPerPasseggero } from '../impostazioni/impostazioni.routes.j
 import { ConflittoDati } from '../../shared/errors.js';
 
 export const creditoService = {
+  /** Matura subito il credito di UNA prenotazione specifica — chiamata
+   *  nel momento esatto in cui il pagamento risulta completo (biglietto
+   *  emesso), non più dopo il viaggio: ora che il cliente non può più
+   *  cancellare da solo (serve una richiesta di rimborso approvata da
+   *  un amministratore), non c'è più il rischio di prenota+cancella per
+   *  accumularlo gratis. Non fa nulla se questa prenotazione ha già
+   *  maturato il suo credito (evita doppioni se richiamata più volte). */
+  async maturaCreditoSubito(prenotazioneId: string) {
+    const creditoPerPasseggero = await leggiCreditoPerPasseggero();
+    if (creditoPerPasseggero <= 0) return;
+
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, prenotazioneId)).limit(1);
+    if (!p || p.creditoMaturato) return;
+
+    const [{ numeroPasseggeri }] = await db
+      .select({ numeroPasseggeri: sql<number>`count(*)::int` })
+      .from(partecipantiPrenotazione)
+      .where(eq(partecipantiPrenotazione.prenotazioneId, prenotazioneId));
+    const importo = (numeroPasseggeri * creditoPerPasseggero).toFixed(2);
+
+    await db.transaction(async (tx) => {
+      await tx.insert(movimentiCredito).values({
+        utenteId: p.utenteId,
+        importo,
+        motivo: `Prenotazione confermata — PNR ${p.pnr}`,
+        prenotazioneId: p.id,
+      });
+      await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} + ${importo}` }).where(eq(utenti.id, p.utenteId));
+      await tx.update(prenotazioni).set({ creditoMaturato: true }).where(eq(prenotazioni.id, p.id));
+    });
+  },
+
+  /** Toglie il credito già maturato da una prenotazione, se ce n'era —
+   *  chiamata quando un rimborso viene approvato. Non lascia mai il
+   *  saldo del cliente sotto zero (se nel frattempo l'ha già speso
+   *  altrove, si toglie solo quanto resta disponibile). */
+  async revocaCreditoSePresente(prenotazioneId: string) {
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, prenotazioneId)).limit(1);
+    if (!p || !p.creditoMaturato) return;
+
+    const [{ importo: importoOriginale }] = await db
+      .select({ importo: sql<string>`coalesce(sum(${movimentiCredito.importo}), '0')` })
+      .from(movimentiCredito)
+      .where(and(eq(movimentiCredito.prenotazioneId, prenotazioneId), sql`${movimentiCredito.importo} > 0`));
+    const importo = Number(importoOriginale);
+    if (importo <= 0) return;
+
+    const [u] = await db.select({ credito: utenti.creditoDisponibile }).from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+    const daTogliere = Math.min(importo, Number(u?.credito ?? 0));
+
+    await db.transaction(async (tx) => {
+      if (daTogliere > 0) {
+        await tx.insert(movimentiCredito).values({
+          utenteId: p.utenteId,
+          importo: (-daTogliere).toFixed(2),
+          motivo: `Rimborso approvato — PNR ${p.pnr}`,
+          prenotazioneId: p.id,
+        });
+        await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} - ${daTogliere.toFixed(2)}` }).where(eq(utenti.id, p.utenteId));
+      }
+      await tx.update(prenotazioni).set({ creditoMaturato: false }).where(eq(prenotazioni.id, p.id));
+    });
+  },
+
   /** Da chiamare una volta al giorno (scheduler): trova le prenotazioni
    *  il cui viaggio è ormai avvenuto per davvero (data evento passata),
    *  pagate per intero, non ancora "maturate" — e accredita il cliente.

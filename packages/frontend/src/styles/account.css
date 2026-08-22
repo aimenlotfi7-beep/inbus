@@ -230,3 +230,25 @@
     .mini-tabs-acc{flex-wrap:wrap;}
     .form-grid-account{gap:10px;}
   }
+
+/* ---------- ACCESSO / REGISTRAZIONE / VERIFICA EMAIL ---------- */
+.pagina-auth{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:var(--night); padding:20px;
+}
+.box-auth{
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
+  padding:32px; width:100%; max-width:400px;
+}
+.box-auth h1{font-family:'Anton',sans-serif; text-transform:uppercase; font-size:24px; margin:0 0 8px;}
+.sottotitolo-auth{color:var(--mist); font-size:13.5px; margin:0 0 20px; line-height:1.5;}
+.box-auth label{display:block; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mist); margin:14px 0 6px;}
+.box-auth input{
+  width:100%; padding:11px 12px; border-radius:8px; border:1px solid var(--line);
+  background:var(--night); color:var(--paper); font-size:15px; font-family:'Poppins',sans-serif;
+}
+.due-colonne-auth{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.errore-auth{background:rgba(255,61,122,.1); border:1px solid rgba(255,61,122,.3); border-radius:8px; padding:10px 14px; margin-top:16px;}
+.errore-auth p{color:var(--pink); font-size:13px; margin:0;}
+.link-auth{background:none; border:none; color:var(--blue); font-size:13px; text-decoration:underline; cursor:pointer; padding:6px 0 0; display:block;}
+.box-auth .search-cta{width:100%; margin-top:22px; border:none; cursor:pointer;}

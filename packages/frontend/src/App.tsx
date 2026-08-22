@@ -12,6 +12,9 @@ import { EventoPage } from './pages/EventoPage';
 import { TourLeaderLoginPage } from './pages/TourLeaderLoginPage';
 import { TourLeaderBusListPage } from './pages/TourLeaderBusListPage';
 import { TourLeaderScanPage } from './pages/TourLeaderScanPage';
+import { AccediPage } from './pages/AccediPage';
+import { RegistratiPage } from './pages/RegistratiPage';
+import { VerificaEmailPage } from './pages/VerificaEmailPage';
 
 export function App() {
   return (
@@ -29,6 +32,9 @@ export function App() {
       <Route path="/scansione/accedi" element={<TourLeaderLoginPage />} />
       <Route path="/scansione" element={<TourLeaderBusListPage />} />
       <Route path="/scansione/bus/:busId" element={<TourLeaderScanPage />} />
+      <Route path="/accedi" element={<AccediPage />} />
+      <Route path="/registrati" element={<RegistratiPage />} />
+      <Route path="/verifica-email/:token" element={<VerificaEmailPage />} />
     </Routes>
   );
 }

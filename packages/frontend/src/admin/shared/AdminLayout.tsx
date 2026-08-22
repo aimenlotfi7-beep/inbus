@@ -5,7 +5,7 @@ import { listaAttesaApi } from '../../api/listaAttesa';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'partenze'
-  | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte'
+  | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi'
   | 'utenti' | 'promoter' | 'tourleader'
   | 'fornitori' | 'tragitti'
   | 'chat' | 'contenuti'
@@ -36,6 +36,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   ]},
   { titolo: 'Customer Care', voci: [
     { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
+    { id: 'rimborsi', label: 'Rimborsi', permesso: 'prenotazioni.pagamenti' },
     { id: 'utenti', label: 'Utenti', permesso: 'utenti.visualizza' },
     { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
     { id: 'chat', label: 'Chat', permesso: 'chat.visualizza' },

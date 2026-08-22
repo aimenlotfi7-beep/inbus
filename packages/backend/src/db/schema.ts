@@ -316,6 +316,17 @@ export const utenti = pgTable('utenti', {
   consensoMarketingData: timestamp('consenso_marketing_data'),
   consensoProfilazione: boolean('consenso_profilazione'),
   consensoProfilazioneData: timestamp('consenso_profilazione_data'),
+  // Account vero — password sempre salvata con hash, mai in chiaro.
+  // Nullo per i clienti "vecchi" (creati prima di questo sistema, solo
+  // con l'email di allora) — dovranno registrarsi per la prima volta,
+  // com'è giusto che sia, dato che oggi serve un account per prenotare.
+  passwordHash: text('password_hash'),
+  // L'email va confermata cliccando un link prima che l'account sia
+  // utilizzabile per accedere — il token è quello dentro il link,
+  // valido una volta sola e con scadenza.
+  emailVerificata: boolean('email_verificata').notNull().default(false),
+  tokenVerificaEmail: text('token_verifica_email'),
+  tokenVerificaScadenza: timestamp('token_verifica_scadenza'),
 });
 
 // ---------------------------------------------------------------------
@@ -622,6 +633,23 @@ export const movimentiCredito = pgTable('movimenti_credito', {
   motivo: text('motivo').notNull(), // es. "Viaggio completato — PNR IB1234" oppure "Usato su prenotazione IB5678"
   prenotazioneId: text('prenotazione_id').references(() => prenotazioni.id, { onDelete: 'set null' }),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
+});
+
+// Richieste di rimborso — il cliente non può più cancellare da solo la
+// sua prenotazione (aveva senso finché il credito maturava dopo il
+// viaggio; ora che matura subito al pagamento, sarebbe una scappatoia
+// per farmarlo gratis prenotando e cancellando). Ogni richiesta passa
+// dall'amministratore: approvandola, la prenotazione viene cancellata
+// per davvero e l'eventuale credito già maturato viene tolto.
+export const statoRichiestaRimborsoEnum = pgEnum('stato_richiesta_rimborso', ['IN_ATTESA', 'APPROVATA', 'RIFIUTATA']);
+export const richiesteRimborso = pgTable('richieste_rimborso', {
+  id: id(),
+  prenotazioneId: text('prenotazione_id').notNull().references(() => prenotazioni.id, { onDelete: 'cascade' }),
+  motivo: text('motivo'),
+  stato: statoRichiestaRimborsoEnum('stato').notNull().default('IN_ATTESA'),
+  noteAdmin: text('note_admin'),
+  richiestaIl: timestamp('richiesta_il').notNull().defaultNow(),
+  gestitaIl: timestamp('gestita_il'),
 });
 
 export const layoutBiglietto = pgTable('layout_biglietto', {

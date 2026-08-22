@@ -1,9 +1,8 @@
 import { and, eq, sql, desc, inArray } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { prenotazioni, lineeBus, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento } from '../../db/schema.js';
-import { ConflittoDati, NonTrovato, ErroreApplicativo } from '../../shared/errors.js';
+import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
-import { utentiService } from '../utenti/utenti.service.js';
 import { env } from '../../config/env.js';
 import type { CreaPrenotazioneInput } from './prenotazioni.dto.js';
 
@@ -55,8 +54,11 @@ export const prenotazioniService = {
    * con un errore chiaro, invece di vendere due volte lo stesso posto
    * (il rischio concreto che c'era nel prototipo basato su localStorage).
    */
-  async crea(input: CreaPrenotazioneInput) {
+  async crea(input: CreaPrenotazioneInput, utenteId: string) {
     const risultato = await db.transaction(async (tx) => {
+      const [utente] = await tx.select().from(utenti).where(eq(utenti.id, utenteId)).limit(1);
+      if (!utente) throw new NonAutorizzato('Account non trovato — effettua di nuovo il login.');
+
       const [fermata] = await tx.select().from(fermate).where(eq(fermate.id, input.fermataId)).limit(1);
       if (!fermata || fermata.lineaId !== input.lineaId) throw new NonTrovato('Fermata');
 
@@ -126,12 +128,14 @@ export const prenotazioniService = {
         ? new Date(evento.data.getTime() - env.GIORNI_SCADENZA_SALDO * 24 * 3600 * 1000)
         : null;
 
-      const utente = await utentiService.upsertByEmail({
-        email: input.cliente.email,
-        nome: input.cliente.nome,
-        cognome: input.cliente.cognome,
-        telefono: input.cliente.telefono,
-      });
+      // L'account è già quello autenticato — non c'è più bisogno di
+      // creare/ricercare l'utente da un'email scritta nel corpo della
+      // richiesta. Aggiorno solo il telefono, se ne è arrivato uno
+      // diverso da quello già salvato (comodo, non obbligatorio).
+      if (input.cliente?.telefono && input.cliente.telefono !== utente.telefono) {
+        await tx.update(utenti).set({ telefono: input.cliente.telefono }).where(eq(utenti.id, utente.id));
+        utente.telefono = input.cliente.telefono;
+      }
 
       // Il credito si applica solo a pagamento completo (non
       // all'acconto, altrimenti si complicherebbe il calcolo del saldo
@@ -189,11 +193,11 @@ export const prenotazioniService = {
       // Il richiedente conta come primo partecipante (ordine 0), poi uno
       // per ogni modulo passeggero aggiuntivo compilato al checkout.
       await tx.insert(partecipantiPrenotazione).values([
-        { prenotazioneId: prenotazione.id, nome: input.cliente.nome, cognome: input.cliente.cognome, ordine: 0 },
+        { prenotazioneId: prenotazione.id, nome: utente.nome ?? '', cognome: utente.cognome ?? '', ordine: 0 },
         ...input.partecipanti.map((p, i) => ({ prenotazioneId: prenotazione.id, nome: p.nome, cognome: p.cognome, ordine: i + 1 })),
       ]);
 
-      return { ...prenotazione, totaleComplessivo: totale, eventoArtista: evento.artista };
+      return { ...prenotazione, totaleComplessivo: totale, eventoArtista: evento.artista, utenteNome: utente.nome ?? '', utenteEmail: utente.email };
     });
 
     // Fuori dalla transazione apposta: se l'invio dell'email fallisce (o
@@ -211,7 +215,7 @@ export const prenotazioniService = {
         const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
         const { templateEmailService } = await import('../template-email/template-email.service.js');
         const { oggetto, html } = await templateEmailService.renderizza('conferma_acconto', {
-          nome: input.cliente.nome,
+          nome: risultato.utenteNome,
           pnr: risultato.pnr,
           fermata: risultato.fermataCitta,
           orario: risultato.fermataOrario ?? 'da definire',
@@ -220,7 +224,7 @@ export const prenotazioniService = {
           evento: risultato.eventoArtista,
           link_saldo: urlSito(`/completa-saldo/${risultato.pnr}`),
         });
-        await inviaEmail({ a: input.cliente.email, oggetto, html });
+        await inviaEmail({ a: risultato.utenteEmail, oggetto, html });
       }
     } catch (err) {
       // Non bastava che l'email fallisse in silenzio senza lasciare
@@ -371,16 +375,6 @@ export const prenotazioniService = {
 
       return aggiornata;
     });
-  },
-
-  async richiediRimborso(pnr: string) {
-    const [aggiornata] = await db
-      .update(prenotazioni)
-      .set({ rimborsoStato: 'richiesto' })
-      .where(eq(prenotazioni.pnr, pnr))
-      .returning();
-    if (!aggiornata) throw new NonTrovato('Prenotazione');
-    return aggiornata;
   },
 
   /** Elimina DEFINITIVAMENTE una prenotazione dal database — solo se già

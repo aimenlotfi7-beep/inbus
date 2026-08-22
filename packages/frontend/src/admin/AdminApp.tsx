@@ -10,6 +10,7 @@ import { CalendarioScreen } from './screens/CalendarioScreen';
 import { CestinoScreen } from './screens/CestinoScreen';
 import { PrenotazioniScreen } from './screens/PrenotazioniScreen';
 import { PagamentiScreen } from './screens/PagamentiScreen';
+import { RimborsiScreen } from './screens/RimborsiScreen';
 import { UtentiScreen } from './screens/UtentiScreen';
 import { FornitoriScreen } from './screens/FornitoriScreen';
 import { TragittiScreen } from './screens/TragittiScreen';
@@ -41,6 +42,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   cestino: CestinoScreen,
   transazioni: PrenotazioniScreen,
   pagamenti: PagamentiScreen,
+  rimborsi: RimborsiScreen,
   utenti: UtentiScreen,
   fornitori: FornitoriScreen,
   tragitti: TragittiScreen,
@@ -71,6 +73,7 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   cestino: 'eventi.cestino',
   transazioni: 'prenotazioni.transazioni',
   pagamenti: 'prenotazioni.pagamenti',
+  rimborsi: 'prenotazioni.pagamenti',
   utenti: 'utenti.visualizza',
   fornitori: 'fornitori.visualizza',
   tragitti: 'tragitti.visualizza',

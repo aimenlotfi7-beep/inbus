@@ -12,6 +12,18 @@ import { NonTrovato } from '../../shared/errors.js';
  *  scrive/modifica il testo. */
 export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corpo: string; segnaposto: string[] }[] = [
   {
+    chiave: 'verifica_email',
+    nome: 'Conferma email (registrazione nuovo account)',
+    oggetto: 'Conferma la tua email — INBUS',
+    corpo: `
+      <p>Ciao {{nome}},</p>
+      <p>Grazie per esserti registrato su INBUS — manca solo un passaggio: conferma la tua email cliccando qui sotto.</p>
+      <p><a href="{{link}}">Conferma la tua email</a></p>
+      <p>Il link resta valido per {{ore_validita}} ore. Se non sei stato tu a registrarti, ignora pure questa email.</p>
+    `,
+    segnaposto: ['nome', 'link', 'ore_validita'],
+  },
+  {
     chiave: 'conferma_acconto',
     nome: 'Conferma prenotazione (solo acconto pagato)',
     oggetto: 'Prenotazione confermata — {{evento}}',

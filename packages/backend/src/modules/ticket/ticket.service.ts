@@ -32,6 +32,13 @@ export const ticketService = {
     if (!p.saldoPagato) throw new ConflittoDati('Il biglietto si emette solo a saldo completato.');
     if (p.ticketToken) return; // già emesso, non rifarlo (es. saldaResto chiamato due volte)
 
+    // Il pagamento è completo proprio ora — matura subito il credito
+    // fedeltà del cliente, non serve aspettare che il viaggio avvenga
+    // (il cliente non può più cancellare da solo la prenotazione: un
+    // eventuale rimborso approvato dall'amministratore lo toglierà).
+    const { creditoService } = await import('../credito/credito.service.js');
+    await creditoService.maturaCreditoSubito(p.id);
+
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
     if (!evento) throw new NonTrovato('Evento');
 

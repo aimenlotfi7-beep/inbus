@@ -35,15 +35,6 @@ export const utentiService = {
       .orderBy(desc(prenotazioni.creataIl));
   },
 
-  /** Solo nome/cognome/telefono per il preriempimento al checkout — non
-   *  l'oggetto utente completo, per non esporre più dati del necessario
-   *  da un endpoint pubblico. */
-  async datiPerCheckout(email: string) {
-    const [utente] = await db.select().from(utenti).where(eq(utenti.email, email.toLowerCase())).limit(1);
-    if (!utente) return null;
-    return { nome: utente.nome, cognome: utente.cognome, telefono: utente.telefono };
-  },
-
   /** Preferenze privacy del cliente (presa visione informativa, consenso
    *  marketing, consenso profilazione) — accesso pubblico via email,
    *  stesso principio già usato per il resto dell'area cliente (nessuna

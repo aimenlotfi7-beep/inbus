@@ -1,16 +1,14 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { CookieBanner, LinkPreferenzeCookie } from './features/CookieBanner';
-import { emailClienteLoggato } from './features/clienteSessione';
+import { clienteLoggato } from './features/clienteSessione';
 
 export function Layout({ children }: { children: ReactNode }) {
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
-  // Letto una volta al render: se un cliente ha già fatto accesso
-  // nell'area personale (stessa scheda del browser), lo segnaliamo qui
-  // invece di mostrare sempre "Accedi" — altrimenti sembra sloggato
-  // anche quando non lo è, semplicemente perché questa pagina non è
-  // dentro l'area account.
-  const emailCliente = emailClienteLoggato();
+  // Letto una volta al render: se un cliente ha già fatto accesso vero
+  // (con password, non più solo un'email "ricordata"), lo segnaliamo
+  // qui invece di mostrare sempre "Accedi".
+  const loggato = clienteLoggato();
 
   return (
     <>
@@ -23,7 +21,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <Link to="/faq">Assistenza</Link>
         </nav>
         <div className="nav-actions">
-          <Link className="btn btn-ghost desktop-only" to="/account">{emailCliente ? 'Il mio account' : 'Accedi'}</Link>
+          <Link className="btn btn-ghost desktop-only" to={loggato ? '/account' : '/accedi'}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
           <button className="burger" onClick={() => setMenuMobileAperto(!menuMobileAperto)}>☰</button>
         </div>
       </header>
@@ -32,7 +30,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <Link to="/#eventi" onClick={() => setMenuMobileAperto(false)}>Eventi</Link>
         <Link to="/#come-funziona" onClick={() => setMenuMobileAperto(false)}>Come funziona</Link>
         <Link to="/faq" onClick={() => setMenuMobileAperto(false)}>Assistenza</Link>
-        <Link className="btn btn-primary" to="/account" style={{ textAlign: 'center', marginTop: 10 }} onClick={() => setMenuMobileAperto(false)}>{emailCliente ? 'Il mio account' : 'Accedi'}</Link>
+        <Link className="btn btn-primary" to={loggato ? '/account' : '/accedi'} style={{ textAlign: 'center', marginTop: 10 }} onClick={() => setMenuMobileAperto(false)}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
       </div>
 
       {children}

@@ -4,10 +4,9 @@ import { eventiApi } from '../../api/eventi';
 import { prenotazioniApi } from '../../api/prenotazioni';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import { applicaScontoOfferta } from '../../api/prezzi';
-import { utentiApi } from '../../api/utenti';
 import { ErroreApi } from '../../api/client';
-
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+import { clienteAuthApi } from '../../api/clienteAuth';
+import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
 
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'confermato-attesa' | 'errore';
 interface Partecipante { nome: string; cognome: string; }
@@ -48,7 +47,6 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   const [nome, setNome] = useState('');
   const [cognome, setCognome] = useState('');
   const [telefono, setTelefono] = useState('');
-  const [autocompilato, setAutocompilato] = useState(false);
   const [creditoDisponibile, setCreditoDisponibile] = useState(0);
   const [usaCredito, setUsaCredito] = useState(false);
 
@@ -76,32 +74,23 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
     });
   }, [passeggeri]);
 
-  async function emailCambiata(v: string) {
-    setEmail(v);
-    setCreditoDisponibile(0);
-    setUsaCredito(false);
-    if (!v.includes('@')) return;
-    try {
-      const dati = await utentiApi.datiPerCheckout(v);
-      if (dati) {
-        if (dati.nome) setNome(dati.nome);
-        if (dati.cognome) setCognome(dati.cognome);
-        if (dati.telefono) setTelefono(dati.telefono);
-        setAutocompilato(true);
-      }
-    } catch {
-      // Preriempimento facoltativo: se fallisce, il cliente compila a mano.
-    }
-    try {
-      const r = await fetch(`${API_URL}/api/credito?email=${encodeURIComponent(v)}`);
-      if (r.ok) {
-        const { disponibile } = await r.json();
-        setCreditoDisponibile(disponibile);
-      }
-    } catch {
-      // Facoltativo anche questo: se fallisce, semplicemente non mostra il credito.
-    }
-  }
+  // Non c'è più bisogno di "indovinare" i dati digitando l'email: se il
+  // cliente è già loggato (obbligatorio per prenotare), li prendiamo
+  // direttamente dal suo account vero.
+  useEffect(() => {
+    if (!clienteLoggato()) return;
+    clienteAuthApi.me().then((dati) => {
+      setEmail(dati.email);
+      if (dati.nome) setNome(dati.nome);
+      if (dati.cognome) setCognome(dati.cognome);
+      if (dati.telefono) setTelefono(dati.telefono);
+      setCreditoDisponibile(Number(dati.creditoDisponibile));
+    }).catch(() => {
+      // Il token non è più valido — lo togliamo, il modulo mostrerà
+      // l'invito ad accedere di nuovo.
+      logoutCliente();
+    });
+  }, []);
 
   function aggiornaPartecipante(idx: number, campo: keyof Partecipante, valore: string) {
     setPartecipanti((prev) => prev.map((p, i) => i === idx ? { ...p, [campo]: valore } : p));
@@ -289,46 +278,64 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
 
           {step === 2 && (
             <>
-              <p className="field-label" style={{ marginBottom: 6 }}>I tuoi dati (richiedente)</p>
-              {autocompilato && <p style={{ fontSize: 12, opacity: .7, marginTop: -4, marginBottom: 8 }}>Precompilato dai tuoi dati — puoi modificarlo.</p>}
-              <label className="field-label">Email</label>
-              <input type="email" autoComplete="email" value={email} onChange={(e) => emailCambiata(e.target.value)} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label className="field-label">Nome</label>
-                  <input type="text" autoComplete="given-name" value={nome} onChange={(e) => setNome(e.target.value)} />
+              {!clienteLoggato() ? (
+                <div style={{ textAlign: 'center', padding: '20px 10px' }}>
+                  <p className="field-label" style={{ marginBottom: 10 }}>Serve un account per prenotare</p>
+                  <p style={{ fontSize: 13, opacity: .75, marginBottom: 18 }}>
+                    Ti serve solo un minuto — dopo aver effettuato l'accesso, tornerai qui a completare la
+                    prenotazione con la fermata e i passeggeri già scelti.
+                  </p>
+                  <a href={`/accedi?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="search-cta" style={{ display: 'block', textDecoration: 'none', textAlign: 'center', marginBottom: 10 }}>
+                    Accedi
+                  </a>
+                  <a href={`/registrati?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="search-cta-secondaria" style={{ display: 'block', textDecoration: 'none', textAlign: 'center' }}>
+                    Registrati
+                  </a>
                 </div>
-                <div>
-                  <label className="field-label">Cognome</label>
-                  <input type="text" autoComplete="family-name" value={cognome} onChange={(e) => setCognome(e.target.value)} />
-                </div>
-              </div>
-              <label className="field-label">Telefono</label>
-              <input type="tel" autoComplete="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-
-              {partecipanti.length > 0 && (
+              ) : (
                 <>
-                  <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>Altri passeggeri</p>
-                  {partecipanti.map((p, idx) => (
-                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-                      <input placeholder={`Nome passeggero ${idx + 2}`} value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} />
-                      <input placeholder="Cognome" value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} />
+                  <p className="field-label" style={{ marginBottom: 6 }}>I tuoi dati (richiedente)</p>
+                  <p style={{ fontSize: 12, opacity: .7, marginTop: -4, marginBottom: 8 }}>Presi dal tuo account.</p>
+                  <label className="field-label">Email</label>
+                  <input type="email" value={email} disabled style={{ opacity: .6 }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label className="field-label">Nome</label>
+                      <input type="text" autoComplete="given-name" value={nome} onChange={(e) => setNome(e.target.value)} />
                     </div>
-                  ))}
+                    <div>
+                      <label className="field-label">Cognome</label>
+                      <input type="text" autoComplete="family-name" value={cognome} onChange={(e) => setCognome(e.target.value)} />
+                    </div>
+                  </div>
+                  <label className="field-label">Telefono</label>
+                  <input type="tel" autoComplete="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+
+                  {partecipanti.length > 0 && (
+                    <>
+                      <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>Altri passeggeri</p>
+                      {partecipanti.map((p, idx) => (
+                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+                          <input placeholder={`Nome passeggero ${idx + 2}`} value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} />
+                          <input placeholder="Cognome" value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} />
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  <div className="checkout-step-nav">
+                    <button className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '12px 24px' }} onClick={() => setStep(1)}>← Indietro</button>
+                    <button
+                      className="search-cta"
+                      style={{ width: 'auto', margin: 0, padding: '12px 28px', opacity: (moduloRichiedenteCompleto && partecipantiCompleti) ? 1 : .5 }}
+                      disabled={!moduloRichiedenteCompleto || !partecipantiCompleti}
+                      onClick={() => setStep(3)}
+                    >
+                      Avanti →
+                    </button>
+                  </div>
                 </>
               )}
-
-              <div className="checkout-step-nav">
-                <button className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '12px 24px' }} onClick={() => setStep(1)}>← Indietro</button>
-                <button
-                  className="search-cta"
-                  style={{ width: 'auto', margin: 0, padding: '12px 28px', opacity: (moduloRichiedenteCompleto && partecipantiCompleti) ? 1 : .5 }}
-                  disabled={!moduloRichiedenteCompleto || !partecipantiCompleti}
-                  onClick={() => setStep(3)}
-                >
-                  Avanti →
-                </button>
-              </div>
             </>
           )}
 

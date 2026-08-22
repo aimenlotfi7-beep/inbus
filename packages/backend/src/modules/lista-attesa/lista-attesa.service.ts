@@ -132,6 +132,18 @@ export const listaAttesaService = {
     if (!riga) throw new NonTrovato('Link');
     if (riga.completata) throw new ConflittoDati('Questa prenotazione è già stata completata.');
 
+    // Questo flusso arriva da un link segreto mandato via email (non da
+    // un login vero) — stesso livello di identità già accettato altrove
+    // (es. richieste di rimborso): l'email combacia, è sufficiente per
+    // questo caso specifico. Se non esiste ancora un account con
+    // quell'email, ne creo uno "leggero" (senza password) — dovrà
+    // comunque registrarsi per accedere alla sua area personale in
+    // futuro, ma la prenotazione da qui non resta bloccata.
+    const { utentiService } = await import('../utenti/utenti.service.js');
+    const utente = await utentiService.upsertByEmail({
+      email: riga.email, nome: riga.nome, cognome: riga.cognome ?? '', telefono: riga.telefono ?? '',
+    });
+
     const prenotazione = await prenotazioniService.crea({
       eventoId: riga.eventoId,
       lineaId: input.lineaId,
@@ -141,7 +153,7 @@ export const listaAttesaService = {
       metodoPagamento: input.metodoPagamento,
       cliente: { email: riga.email, nome: riga.nome, cognome: riga.cognome ?? '', telefono: riga.telefono ?? '' },
       partecipanti: riga.partecipantiJson ? JSON.parse(riga.partecipantiJson) : [],
-    });
+    }, utente.id);
 
     await db.update(listaAttesa).set({ completata: true }).where(eq(listaAttesa.id, riga.id));
     return prenotazione;

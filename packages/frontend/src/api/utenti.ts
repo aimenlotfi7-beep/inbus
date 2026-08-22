@@ -33,7 +33,6 @@ export interface PrenotazioneUtente {
 export const utentiApi = {
   list: () => api.get<Utente[]>('/api/utenti'),
   getById: (id: string) => api.get<Utente & { prenotazioni: PrenotazioneUtente[] }>(`/api/utenti/${id}`),
-  datiPerCheckout: (email: string) => api.get<{ nome: string | null; cognome: string | null; telefono: string | null } | null>(`/api/utenti/dati-checkout?email=${encodeURIComponent(email)}`),
   preferenzePrivacy: (email: string) => api.get<PreferenzePrivacy>(`/api/utenti/preferenze-privacy?email=${encodeURIComponent(email)}`),
   aggiornaPreferenzePrivacy: (email: string, input: Partial<Omit<PreferenzePrivacy, never>>) =>
     api.put<PreferenzePrivacy>('/api/utenti/preferenze-privacy', { email, ...input }),

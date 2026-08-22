@@ -4,6 +4,8 @@ import { creaPrenotazioneSchema } from './prenotazioni.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
+import { richiedeAuthCliente } from '../cliente-auth/cliente-auth.middleware.js';
+import { NonAutorizzato } from '../../shared/errors.js';
 import { z } from 'zod';
 
 export const prenotazioniController = {
@@ -16,7 +18,8 @@ export const prenotazioniController = {
     }));
   },
   async crea(req: Request, res: Response) {
-    const prenotazione = await prenotazioniService.crea(req.body);
+    if (!req.cliente) throw new NonAutorizzato();
+    const prenotazione = await prenotazioniService.crea(req.body, req.cliente.sub);
     res.status(201).json(prenotazione);
   },
   async getByPnr(req: Request, res: Response) {
@@ -35,9 +38,6 @@ export const prenotazioniController = {
     await prenotazioniService.eliminaDefinitivamente(req.params.pnr);
     res.status(204).send();
   },
-  async richiediRimborso(req: Request, res: Response) {
-    res.json(await prenotazioniService.richiediRimborso(req.params.pnr));
-  },
   async differenzaSaldo(req: Request, res: Response) {
     res.json(await prenotazioniService.differenzaSaldo(req.params.pnr));
   },
@@ -55,11 +55,10 @@ prenotazioniRouter.get('/', richiedeAuth, richiedePermesso('prenotazioni.visuali
 prenotazioniRouter.get('/eventi', richiedeAuth, richiedePermesso('prenotazioni.visualizza'), asyncHandler(prenotazioniController.eventiConPrenotazioni));
 
 // Pubbliche: il checkout del sito e l'area cliente non richiedono login admin
-prenotazioniRouter.post('/', valida(creaPrenotazioneSchema), asyncHandler(prenotazioniController.crea));
+prenotazioniRouter.post('/', richiedeAuthCliente, valida(creaPrenotazioneSchema), asyncHandler(prenotazioniController.crea));
 prenotazioniRouter.get('/by-email', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.listByEmail));
 prenotazioniRouter.get('/:pnr', asyncHandler(prenotazioniController.getByPnr));
 prenotazioniRouter.post('/:pnr/cancella', asyncHandler(prenotazioniController.cancella));
-prenotazioniRouter.post('/:pnr/richiedi-rimborso', asyncHandler(prenotazioniController.richiediRimborso));
 prenotazioniRouter.get('/:pnr/saldo', asyncHandler(prenotazioniController.differenzaSaldo));
 prenotazioniRouter.post('/:pnr/salda', asyncHandler(prenotazioniController.saldaResto));
 

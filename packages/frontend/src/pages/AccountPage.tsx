@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import '../styles/account.css';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { utentiApi, type PreferenzePrivacy } from '../api/utenti';
@@ -8,17 +8,17 @@ import { chatApi, type MessaggioChat } from '../api/chat';
 import type { Prenotazione, Evento } from '../api/types';
 import { HomePage } from './HomePage';
 import { CookieBanner, LinkPreferenzeCookie } from '../features/CookieBanner';
-import { CHIAVE_EMAIL_CLIENTE } from '../features/clienteSessione';
+import { clienteLoggato, logoutCliente } from '../features/clienteSessione';
+import { clienteAuthApi } from '../api/clienteAuth';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 type Sezione = 'eventi' | 'profilo' | 'viaggi' | 'privacy' | 'chat';
 
 export function AccountPage() {
-  const [email, setEmail] = useState(() => sessionStorage.getItem(CHIAVE_EMAIL_CLIENTE) ?? '');
-  const [loggato, setLoggato] = useState(() => !!sessionStorage.getItem(CHIAVE_EMAIL_CLIENTE));
-  const [emailInput, setEmailInput] = useState('');
-  const [erroreLogin, setErroreLogin] = useState('');
+  const [email, setEmail] = useState('');
+  const [caricandoSessione, setCaricandoSessione] = useState(true);
+  const navigate = useNavigate();
   // La sezione attiva vive nell'indirizzo (?sezione=profilo), non solo
   // nello stato del componente: così se l'utente ricarica la pagina (o
   // usa avanti/indietro del browser) resta dove si trovava, invece di
@@ -32,16 +32,24 @@ export function AccountPage() {
   }
   const [menuAperto, setMenuAperto] = useState(false);
 
-  function accedi() {
-    if (!emailInput.includes('@')) { setErroreLogin('Inserisci un indirizzo email valido.'); return; }
-    sessionStorage.setItem(CHIAVE_EMAIL_CLIENTE, emailInput.toLowerCase());
-    setEmail(emailInput.toLowerCase());
-    setLoggato(true);
-  }
+  // Niente più email digitata a mano: se non c'è un accesso vero
+  // (token valido), si va dritti alla pagina di accesso — tornando qui
+  // dopo, grazie al parametro "dopo".
+  useEffect(() => {
+    if (!clienteLoggato()) {
+      navigate('/accedi?dopo=' + encodeURIComponent('/account' + (sezioneUrl ? `?sezione=${sezioneUrl}` : '')));
+      return;
+    }
+    clienteAuthApi.me()
+      .then((dati) => setEmail(dati.email))
+      .catch(() => { logoutCliente(); navigate('/accedi?dopo=' + encodeURIComponent('/account')); })
+      .finally(() => setCaricandoSessione(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function esci() {
-    sessionStorage.removeItem(CHIAVE_EMAIL_CLIENTE);
-    setLoggato(false);
-    setEmailInput('');
+    logoutCliente();
+    navigate('/accedi');
   }
 
   const vociMenu: { id: Sezione; label: string }[] = [
@@ -52,12 +60,14 @@ export function AccountPage() {
     { id: 'chat', label: 'Chat' },
   ];
 
+  if (caricandoSessione) return null; // evita un lampo della pagina prima del reindirizzamento
+
   return (
     <>
       <header>
         <Link className="logo" to="/">IN<span>BUS</span></Link>
         <div className="header-right">
-          <div className={`my-inbus-wrap${!loggato ? ' hidden' : ''}${menuAperto ? ' open' : ''}`}>
+          <div className={`my-inbus-wrap${menuAperto ? ' open' : ''}`}>
             <button className="my-inbus-btn" onClick={() => setMenuAperto(!menuAperto)}>My INBUS <span className="caret">▾</span></button>
             <div className={`my-inbus-dropdown${menuAperto ? '' : ' hidden'}`}>
               <div className="dropdown-chi">Accesso come<b>{email}</b></div>
@@ -66,40 +76,25 @@ export function AccountPage() {
               ))}
             </div>
           </div>
-          <button className={`btn btn-ghost${!loggato ? ' hidden' : ''}`} onClick={esci}>Esci</button>
+          <button className="btn btn-ghost" onClick={esci}>Esci</button>
         </div>
       </header>
 
-      {!loggato && (
-        <div className="login-wrap">
-          <div className="login-box">
-            <h2 style={{ fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', margin: 0 }}>Accedi</h2>
-            <p>Inserisci l'email usata al momento della prenotazione per accedere al tuo account.</p>
-            <input type="email" placeholder="mario.rossi@email.it" value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && accedi()} />
-            <button className="btn btn-primary" onClick={accedi}>Accedi</button>
-            <p className="errore">{erroreLogin}</p>
+      <div id="accountShell">
+        {sezione !== 'eventi' && (
+          <div className="account-content">
+            {sezione === 'profilo' && <SezioneProfilo email={email} />}
+            {sezione === 'viaggi' && <SezioneViaggi email={email} />}
+            {sezione === 'privacy' && <SezionePrivacy email={email} />}
+            {sezione === 'chat' && <SezioneChat email={email} />}
           </div>
-        </div>
-      )}
-
-      {loggato && (
-        <div id="accountShell">
-          {sezione !== 'eventi' && (
-            <div className="account-content">
-              {sezione === 'profilo' && <SezioneProfilo email={email} />}
-              {sezione === 'viaggi' && <SezioneViaggi email={email} />}
-              {sezione === 'privacy' && <SezionePrivacy email={email} />}
-              {sezione === 'chat' && <SezioneChat email={email} />}
-            </div>
-          )}
-          {sezione === 'eventi' && (
-            <section className="acc-sezione-sito">
-              <HomePage />
-            </section>
-          )}
-        </div>
-      )}
+        )}
+        {sezione === 'eventi' && (
+          <section className="acc-sezione-sito">
+            <HomePage />
+          </section>
+        )}
+      </div>
       <CookieBanner />
     </>
   );
@@ -259,10 +254,20 @@ function SezioneViaggi({ email }: { email: string }) {
     });
   }, [email]);
 
-  async function cancella(pnr: string) {
-    if (!confirm(`Cancellare la prenotazione ${pnr}?`)) return;
-    await prenotazioniApi.cancella(pnr);
-    prenotazioniApi.listByEmail(email).then(setViaggi);
+  async function richiediRimborso(pnr: string) {
+    const motivo = prompt('Vuoi aggiungere una nota per l\'amministrazione? (facoltativo, puoi lasciare vuoto)') ?? '';
+    try {
+      await fetch(`${API_URL}/api/richieste-rimborso`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pnr, email, motivo: motivo || undefined }),
+      }).then(async (r) => {
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).errore ?? 'Richiesta non riuscita.');
+      });
+      alert('Richiesta di rimborso inviata — verrà valutata al più presto.');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Richiesta non riuscita, riprova.');
+    }
   }
 
   const oggi = new Date().toISOString().slice(0, 10);
@@ -306,7 +311,7 @@ function SezioneViaggi({ email }: { email: string }) {
               <span className="totale">€{Number(p.totale).toFixed(2)}</span>
               {p.stato === 'CONFERMATA' && (
                 <div className="viaggio-azioni">
-                  <button className="btn-mini" onClick={() => cancella(p.pnr)}>Cancella prenotazione</button>
+                  <button className="btn-mini" onClick={() => richiediRimborso(p.pnr)}>Richiedi rimborso</button>
                 </div>
               )}
             </div>

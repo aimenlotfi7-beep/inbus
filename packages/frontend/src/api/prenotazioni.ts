@@ -1,4 +1,4 @@
-import { api } from './client';
+import { api, apiConToken } from './client';
 import type { Prenotazione } from './types';
 
 export interface CreaPrenotazionePayload {
@@ -33,7 +33,9 @@ export interface DifferenzaSaldo {
 }
 
 export const prenotazioniApi = {
-  crea: (payload: CreaPrenotazionePayload) => api.post<Prenotazione>('/api/prenotazioni', payload),
+  // Ora richiede l'accesso vero del cliente (non più anonimo) — usa il
+  // suo token, non quello admin.
+  crea: (payload: CreaPrenotazionePayload) => apiConToken('inbus_cliente_token').post<Prenotazione>('/api/prenotazioni', payload),
   getSaldo: (pnr: string) => api.get<DifferenzaSaldo>(`/api/prenotazioni/${pnr}/saldo`),
   saldaResto: (pnr: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`),
   getByPnr: (pnr: string) => api.get<Prenotazione>(`/api/prenotazioni/${pnr}`),
