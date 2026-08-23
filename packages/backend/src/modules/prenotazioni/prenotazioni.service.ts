@@ -3,6 +3,7 @@ import { db } from '../../db/client.js';
 import { prenotazioni, lineeBus, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
+import { couponService } from '../coupon/coupon.service.js';
 import { env } from '../../config/env.js';
 import type { CreaPrenotazioneInput } from './prenotazioni.dto.js';
 
@@ -10,18 +11,15 @@ function generaPnr() {
   return 'IB' + Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
-async function validaCoupon(codice: string | undefined, importo: number) {
-  if (!codice) return { sconto: 0, coupon: null as typeof coupon.$inferSelect | null };
-
-  const [c] = await db.select().from(coupon).where(eq(coupon.codice, codice.toUpperCase())).limit(1);
-  if (!c || !c.attivo) throw new ErroreApplicativo('Coupon non valido', 400, 'COUPON_NON_VALIDO');
-  const oggi = new Date();
-  if (c.validoDal && oggi < c.validoDal) throw new ErroreApplicativo('Coupon non ancora attivo', 400, 'COUPON_NON_VALIDO');
-  if (c.validoAl && oggi > c.validoAl) throw new ErroreApplicativo('Coupon scaduto', 400, 'COUPON_NON_VALIDO');
-  if (c.usiMax !== null && c.usiAttuali >= c.usiMax) throw new ErroreApplicativo('Coupon esaurito', 400, 'COUPON_NON_VALIDO');
-
-  const sconto = c.tipo === 'PERCENTUALE' ? importo * (Number(c.valore) / 100) : Math.min(Number(c.valore), importo);
-  return { sconto, coupon: c };
+/** Il coupon vale solo per l'acquisto pieno, non per il solo acconto —
+ *  chi prenota ad acconto potrà comunque usarlo al momento di saldare
+ *  il resto (vedi saldaResto più sotto), non qui. */
+async function validaCoupon(codice: string | undefined, importo: number, eventoId: string, tipoPagamento: 'COMPLETO' | 'ACCONTO') {
+  if (!codice) return { sconto: 0, coupon: null as Awaited<ReturnType<typeof couponService.valida>>['coupon'] | null };
+  if (tipoPagamento !== 'COMPLETO') {
+    throw new ErroreApplicativo('Il coupon si può usare solo con il pagamento completo — con l\'acconto potrai applicarlo quando salderai il resto.', 400, 'COUPON_NON_VALIDO');
+  }
+  return couponService.valida(codice, importo, eventoId);
 }
 
 /** Ricalcola il totale "vero" di una prenotazione (prezzo pieno, non
@@ -119,7 +117,7 @@ export const prenotazioniService = {
         prezzoEffettivo = applicaScontoOfferta(prezzoNormale, offerta);
       }
       const importoBase = prezzoEffettivo * input.passeggeri;
-      const { sconto, coupon: couponUsato } = await validaCoupon(input.couponCodice, importoBase);
+      const { sconto, coupon: couponUsato } = await validaCoupon(input.couponCodice, importoBase, input.eventoId, input.tipoPagamento);
 
       const acconto = evento.accontoEur ? Number(evento.accontoEur) : env.ACCONTO_FISSO_EUR;
       const totale = importoBase - sconto;
@@ -412,19 +410,32 @@ export const prenotazioniService = {
   /** Segna il saldo come pagato (simulato: non c'è un vero gateway di
    *  pagamento collegato, coerente col resto del checkout). Usato dalla
    *  pagina pubblica raggiunta tramite il link del promemoria saldo. */
-  async saldaResto(pnr: string) {
+  async saldaResto(pnr: string, couponCodice?: string) {
     const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
     if (!p) throw new NonTrovato('Prenotazione');
     if (p.stato !== 'CONFERMATA') throw new ConflittoDati('Questa prenotazione non è più valida.');
     if (p.saldoPagato) return p;
 
-    const totaleReale = await calcolaTotaleReale(p);
+    let totaleReale = await calcolaTotaleReale(p);
+    let couponUsato: Awaited<ReturnType<typeof couponService.valida>>['coupon'] | null = null;
+    if (couponCodice) {
+      const { sconto, coupon: c } = await couponService.valida(couponCodice, totaleReale, p.eventoId);
+      totaleReale = Math.max(0, totaleReale - sconto);
+      couponUsato = c;
+    }
 
     const [aggiornata] = await db
       .update(prenotazioni)
-      .set({ saldoPagato: true, saldoPagatoIl: new Date(), totale: totaleReale.toFixed(2) })
+      .set({
+        saldoPagato: true, saldoPagatoIl: new Date(), totale: totaleReale.toFixed(2),
+        ...(couponUsato && { couponCodice: couponUsato.codice }),
+      })
       .where(eq(prenotazioni.pnr, pnr))
       .returning();
+
+    if (couponUsato) {
+      await db.update(coupon).set({ usiAttuali: sql`${coupon.usiAttuali} + 1` }).where(eq(coupon.id, couponUsato.id));
+    }
 
     // Ora che ha saldato per intero, il biglietto vero (PDF+QR) può
     // essere emesso — fuori dalla transazione: se l'email fallisce, il
@@ -450,6 +461,7 @@ export const prenotazioniService = {
     const totaleReale = await calcolaTotaleReale(p);
     return {
       pnr: p.pnr,
+      eventoId: p.eventoId,
       artista: evento?.artista ?? '',
       dataEvento: evento?.data ?? null,
       saldoPagato: p.saldoPagato,

@@ -8,6 +8,8 @@ import { ErroreApi } from '../../api/client';
 import { clienteAuthApi } from '../../api/clienteAuth';
 import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
 
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'confermato-attesa' | 'errore';
 interface Partecipante { nome: string; cognome: string; }
 
@@ -50,6 +52,9 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   const [creditoDisponibile, setCreditoDisponibile] = useState(0);
   const [usaCredito, setUsaCredito] = useState(false);
   const [couponCodice, setCouponCodice] = useState('');
+  const [couponVerificato, setCouponVerificato] = useState<{ sconto: number; tipo: 'PERCENTUALE' | 'FISSO'; valore: string } | null>(null);
+  const [couponErrore, setCouponErrore] = useState('');
+  const [verificandoCoupon, setVerificandoCoupon] = useState(false);
 
   // Un modulo nome+cognome per ogni passeggero OLTRE al richiedente.
   const [partecipanti, setPartecipanti] = useState<Partecipante[]>([]);
@@ -117,6 +122,27 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   const moduloRichiedenteCompleto = Boolean(email && nome && cognome && telefono);
   const partecipantiCompleti = partecipanti.every((p) => p.nome.trim() && p.cognome.trim());
 
+  async function verificaCoupon() {
+    if (!couponCodice.trim() || !opzioneScelta) return;
+    setVerificandoCoupon(true);
+    setCouponErrore('');
+    setCouponVerificato(null);
+    try {
+      const r = await fetch(`${API_URL}/api/coupon/valida`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codice: couponCodice.trim(), importo: totale, eventoId: evento.id }),
+      });
+      const dati = await r.json();
+      if (!r.ok) throw new Error(dati.errore ?? 'Coupon non valido.');
+      setCouponVerificato(dati);
+    } catch (e) {
+      setCouponErrore(e instanceof Error ? e.message : 'Coupon non valido.');
+    } finally {
+      setVerificandoCoupon(false);
+    }
+  }
+
   async function confermaPrenotazione(tipoPagamento: 'COMPLETO' | 'ACCONTO') {
     if (!opzioneScelta) return;
     setStato('invio');
@@ -141,7 +167,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
         ...(promoterCodice && { promoterCodice }),
         ...(offerta && { offertaId: offerta.id }),
         ...(usaCredito && tipoPagamento === 'COMPLETO' && { usaCredito: true }),
-        ...(couponCodice.trim() && { couponCodice: couponCodice.trim() }),
+        ...(couponVerificato && tipoPagamento === 'COMPLETO' && { couponCodice: couponCodice.trim() }),
         ...(utmSource && { utmSource }),
         ...(utmMedium && { utmMedium }),
         ...(utmCampaign && { utmCampaign }),
@@ -405,13 +431,36 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
 
                   <div style={{ margin: '10px 0' }}>
                     <label className="field-label">Hai un codice coupon?</label>
-                    <input
-                      type="text"
-                      value={couponCodice}
-                      onChange={(e) => setCouponCodice(e.target.value.toUpperCase())}
-                      placeholder="Facoltativo"
-                      style={{ textTransform: 'uppercase' }}
-                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="text"
+                        value={couponCodice}
+                        onChange={(e) => { setCouponCodice(e.target.value.toUpperCase()); setCouponVerificato(null); setCouponErrore(''); }}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), verificaCoupon())}
+                        placeholder="Facoltativo"
+                        style={{ textTransform: 'uppercase', flex: 1 }}
+                        disabled={!!couponVerificato}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ whiteSpace: 'nowrap' }}
+                        onClick={verificaCoupon}
+                        disabled={!couponCodice.trim() || verificandoCoupon || !!couponVerificato}
+                      >
+                        {verificandoCoupon ? '...' : couponVerificato ? '✓ Applicato' : 'Applica'}
+                      </button>
+                    </div>
+                    {couponErrore && <p style={{ color: '#c0392b', fontSize: 12, marginTop: 6 }}>{couponErrore}</p>}
+                    {couponVerificato && (
+                      <p style={{ fontSize: 13, marginTop: 6 }}>
+                        Sconto: <b>-€{couponVerificato.sconto.toFixed(2)}</b> — nuovo totale (pagando tutto subito): <b>€{Math.max(0, totale - couponVerificato.sconto).toFixed(2)}</b>
+                      </p>
+                    )}
+                    <p style={{ fontSize: 11.5, opacity: .65, marginTop: 6 }}>
+                      Il coupon si applica solo pagando tutto subito ("Acquista"). Se prenoti con acconto, potrai
+                      usarlo quando salderai il resto.
+                    </p>
                   </div>
 
                   <button

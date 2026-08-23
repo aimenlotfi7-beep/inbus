@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, desc } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { prenotazioni, eventi, utenti, movimentiCredito, partecipantiPrenotazione } from '../../db/schema.js';
 import { leggiCreditoPerPasseggero } from '../impostazioni/impostazioni.routes.js';
@@ -118,6 +118,15 @@ export const creditoService = {
   async creditoDisponibile(email: string): Promise<number> {
     const [u] = await db.select({ credito: utenti.creditoDisponibile }).from(utenti).where(eq(utenti.email, email.toLowerCase())).limit(1);
     return u ? Number(u.credito) : 0;
+  },
+
+  /** Lo storico completo dei movimenti — usato per la sezione dedicata
+   *  nell'area cliente, separata in maturato (guadagnato) e utilizzato
+   *  (speso), invece del solo saldo attuale. */
+  async storicoMovimenti(email: string) {
+    const [u] = await db.select({ id: utenti.id }).from(utenti).where(eq(utenti.email, email.toLowerCase())).limit(1);
+    if (!u) return [];
+    return db.select().from(movimentiCredito).where(eq(movimentiCredito.utenteId, u.id)).orderBy(desc(movimentiCredito.creatoIl));
   },
 
   /** Scala il credito usato al momento di una prenotazione — chiamata

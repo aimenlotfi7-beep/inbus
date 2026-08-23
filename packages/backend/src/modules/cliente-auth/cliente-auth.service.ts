@@ -36,7 +36,7 @@ export const clienteAuthService = {
    *  cliente "vecchio", da prima che servisse un account), la fa
    *  diventare un account vero invece di rifiutarla: altrimenti chi ha
    *  già prenotato in passato resterebbe bloccato fuori per sempre. */
-  async registrati(input: { email: string; password: string; nome: string; cognome: string; telefono?: string }) {
+  async registrati(input: { email: string; password: string; nome: string; cognome: string; telefono?: string; citta?: string }) {
     const email = input.email.toLowerCase();
     const [esistente] = await db.select().from(utenti).where(eq(utenti.email, email)).limit(1);
     if (esistente?.passwordHash) throw new ConflittoDati('Esiste già un account con questa email — prova ad accedere, o recupera la password.');
@@ -49,11 +49,12 @@ export const clienteAuthService = {
       await db.update(utenti).set({
         passwordHash, nome: input.nome, cognome: input.cognome,
         telefono: input.telefono ?? esistente.telefono,
+        citta: input.citta ?? esistente.citta,
         emailVerificata: false, tokenVerificaEmail: token, tokenVerificaScadenza: scadenza,
       }).where(eq(utenti.id, esistente.id));
     } else {
       await db.insert(utenti).values({
-        email, passwordHash, nome: input.nome, cognome: input.cognome, telefono: input.telefono,
+        email, passwordHash, nome: input.nome, cognome: input.cognome, telefono: input.telefono, citta: input.citta,
         tokenVerificaEmail: token, tokenVerificaScadenza: scadenza,
       });
     }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { eventiApi } from '../../api/eventi';
+import { listaAttesaApi } from '../../api/listaAttesa';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
 
@@ -13,11 +14,13 @@ export function CalendarioScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [statistiche, setStatistiche] = useState<Record<string, { partecipanti: number; busCensiti: number }>>({});
   const [allerte, setAllerte] = useState<Record<string, number>>({});
+  const [inAttesaPerEvento, setInAttesaPerEvento] = useState<Record<string, number>>({});
 
   useEffect(() => {
     eventiApi.list().then(setEventi);
     eventiApi.statistichePerEvento().then(setStatistiche).catch(() => {});
     eventiApi.allertePartenzePerEvento().then(setAllerte).catch(() => {});
+    listaAttesaApi.contaInAttesaPerEvento().then(setInAttesaPerEvento).catch(() => {});
   }, []);
 
   const perMese = eventi
@@ -62,6 +65,11 @@ export function CalendarioScreen() {
                     <span className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px', cursor: 'default' }}>
                       🚌 {stat?.busCensiti ?? 0} bus censiti
                     </span>
+                    {inAttesaPerEvento[ev.id] > 0 && (
+                      <span className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px', cursor: 'default', color: '#e0a95b' }}>
+                        ⏳ {inAttesaPerEvento[ev.id]} in lista d'attesa
+                      </span>
+                    )}
                   </div>
                 </div>
               );

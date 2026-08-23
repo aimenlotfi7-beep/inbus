@@ -4,6 +4,8 @@ import { prenotazioniApi, type DifferenzaSaldo } from '../api/prenotazioni';
 import { ErroreApi } from '../api/client';
 import { Layout } from '../Layout';
 
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'completato' | 'non-trovato';
 
 export function CompletaSaldoPage() {
@@ -11,6 +13,10 @@ export function CompletaSaldoPage() {
   const [stato, setStato] = useState<Stato>('caricamento');
   const [dati, setDati] = useState<DifferenzaSaldo | null>(null);
   const [messaggioErrore, setMessaggioErrore] = useState('');
+  const [couponCodice, setCouponCodice] = useState('');
+  const [couponVerificato, setCouponVerificato] = useState<{ sconto: number } | null>(null);
+  const [couponErrore, setCouponErrore] = useState('');
+  const [verificandoCoupon, setVerificandoCoupon] = useState(false);
 
   useEffect(() => {
     if (!pnr) return;
@@ -19,12 +25,33 @@ export function CompletaSaldoPage() {
       .catch(() => setStato('non-trovato'));
   }, [pnr]);
 
+  async function verificaCoupon() {
+    if (!couponCodice.trim() || !dati) return;
+    setVerificandoCoupon(true);
+    setCouponErrore('');
+    setCouponVerificato(null);
+    try {
+      const r = await fetch(`${API_URL}/api/coupon/valida`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codice: couponCodice.trim(), importo: dati.totaleReale, eventoId: dati.eventoId }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.errore ?? 'Coupon non valido.');
+      setCouponVerificato(d);
+    } catch (e) {
+      setCouponErrore(e instanceof Error ? e.message : 'Coupon non valido.');
+    } finally {
+      setVerificandoCoupon(false);
+    }
+  }
+
   async function salda() {
     if (!pnr) return;
     setStato('invio');
     setMessaggioErrore('');
     try {
-      await prenotazioniApi.saldaResto(pnr);
+      await prenotazioniApi.saldaResto(pnr, couponVerificato ? couponCodice.trim() : undefined);
       setStato('completato');
     } catch (e) {
       setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
@@ -59,8 +86,34 @@ export function CompletaSaldoPage() {
                   Acconto già versato: €{dati.accontoVersato.toFixed(2)} su un totale di €{dati.totaleReale.toFixed(2)}.
                 </p>
                 <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 24, margin: '18px 0 6px' }}>
-                  Da saldare: €{dati.differenza.toFixed(2)}
+                  Da saldare: €{(couponVerificato ? Math.max(0, dati.differenza - couponVerificato.sconto) : dati.differenza).toFixed(2)}
                 </p>
+
+                <div style={{ margin: '14px 0' }}>
+                  <label className="field-label">Hai un codice coupon?</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="text"
+                      value={couponCodice}
+                      onChange={(e) => { setCouponCodice(e.target.value.toUpperCase()); setCouponVerificato(null); setCouponErrore(''); }}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), verificaCoupon())}
+                      placeholder="Facoltativo"
+                      style={{ textTransform: 'uppercase', flex: 1 }}
+                      disabled={!!couponVerificato}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ whiteSpace: 'nowrap' }}
+                      onClick={verificaCoupon}
+                      disabled={!couponCodice.trim() || verificandoCoupon || !!couponVerificato}
+                    >
+                      {verificandoCoupon ? '...' : couponVerificato ? '✓ Applicato' : 'Applica'}
+                    </button>
+                  </div>
+                  {couponErrore && <p style={{ color: '#c0392b', fontSize: 12, marginTop: 6 }}>{couponErrore}</p>}
+                  {couponVerificato && <p style={{ fontSize: 13, marginTop: 6 }}>Sconto applicato: <b>-€{couponVerificato.sconto.toFixed(2)}</b></p>}
+                </div>
 
                 {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
 

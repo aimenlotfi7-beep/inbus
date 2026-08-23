@@ -5,6 +5,8 @@ import { ErroreApi } from '../../../api/client';
 export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
   const [lista, setLista] = useState<IscrizioneListaAttesa[]>([]);
   const [caricamento, setCaricamento] = useState(true);
+  const [ricerca, setRicerca] = useState('');
+  const [filtroStato, setFiltroStato] = useState<'TUTTI' | 'IN_ATTESA' | 'PROMOSSA'>('TUTTI');
 
   function ricarica() {
     setCaricamento(true);
@@ -59,6 +61,13 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
   const inAttesa = lista.filter((r) => r.stato === 'IN_ATTESA');
   const promosse = lista.filter((r) => r.stato === 'PROMOSSA').length;
   const confermate = lista.filter((r) => r.completata).length;
+
+  const listaFiltrata = lista.filter((r) => {
+    if (filtroStato !== 'TUTTI' && r.stato !== filtroStato) return false;
+    const q = ricerca.trim().toLowerCase();
+    if (q && !`${r.nome} ${r.cognome ?? ''} ${r.email}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
   const perFermata = new Map<string, { passeggeri: number; iscritti: number }>();
   for (const r of inAttesa) {
     const chiave = r.fermataCitta ?? 'Nessuna fermata scelta';
@@ -120,7 +129,7 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 10 }}>
         <p className="section-label" style={{ marginBottom: 0 }}>Lista d'attesa</p>
         {inAttesa.length > 0 && (
           <button className="btn btn-primary" style={{ fontSize: 13, padding: '6px 14px' }} onClick={promuoviTutte}>
@@ -128,9 +137,28 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
           </button>
         )}
       </div>
-      {lista.length === 0 && <p className="testo-intro">Nessuna iscrizione alla lista d'attesa per questo evento.</p>}
 
-      {lista.map((riga) => (
+      {lista.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="Cerca per nome o email..."
+            value={ricerca}
+            onChange={(e) => setRicerca(e.target.value)}
+            style={{ maxWidth: 260 }}
+          />
+          <select value={filtroStato} onChange={(e) => setFiltroStato(e.target.value as typeof filtroStato)} style={{ maxWidth: 180 }}>
+            <option value="TUTTI">Tutti gli stati</option>
+            <option value="IN_ATTESA">In attesa</option>
+            <option value="PROMOSSA">Promosse</option>
+          </select>
+        </div>
+      )}
+
+      {lista.length === 0 && <p className="testo-intro">Nessuna iscrizione alla lista d'attesa per questo evento.</p>}
+      {lista.length > 0 && listaFiltrata.length === 0 && <p className="testo-intro">Nessuna iscrizione per questi filtri.</p>}
+
+      {listaFiltrata.map((riga) => (
         <div key={riga.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
           <span className="riga-titolo">
             {riga.nome} {riga.cognome ?? ''} · {riga.passeggeri} passeggero/i

@@ -103,7 +103,7 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
         <div className="stat-box"><b>€{commissione.toFixed(2)}</b><span>Commissione maturata ({promoter.commissionePercentuale}%)</span></div>
       </div>
 
-      <h2 style={{ fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: 18, margin: '24px 0 14px' }}>Revenue per evento</h2>
+      <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '24px 0 14px' }}>Revenue per evento</h2>
       <div className="mini-tabs" style={{ flexWrap: 'wrap', marginBottom: 14 }}>
         {eventiOrdinati.filter((ev) => statsPerEvento[ev.id]).map((ev) => (
           <button key={ev.id} type="button" className={`mini-tab${eventoRevenue === ev.id ? ' active' : ''}`} onClick={() => setEventoRevenue(ev.id)}>
@@ -122,7 +122,7 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
         </div>
       )}
 
-      <h2 style={{ fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: 18, margin: '24px 0 14px' }}>I tuoi link</h2>
+      <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '24px 0 14px' }}>I tuoi link</h2>
       <p style={{ color: 'var(--mist)', fontSize: 13, marginTop: -8, marginBottom: 16 }}>
         Un link per ogni evento — copialo e condividilo dove vuoi. Decidi tu quali pubblicizzare.
       </p>

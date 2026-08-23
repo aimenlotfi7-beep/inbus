@@ -481,6 +481,9 @@ export const coupon = pgTable('coupon', {
   validoDal: timestamp('valido_dal', { mode: 'date' }),
   validoAl: timestamp('valido_al', { mode: 'date' }),
   attivo: boolean('attivo').notNull().default(true),
+  // Vuoto = valido su tutti gli eventi. Se impostato, il coupon
+  // funziona solo su quello specifico.
+  eventoId: text('evento_id').references(() => eventi.id, { onDelete: 'cascade' }),
 });
 
 // ---------------------------------------------------------------------

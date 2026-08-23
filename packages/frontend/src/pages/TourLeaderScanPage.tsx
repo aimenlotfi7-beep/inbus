@@ -106,9 +106,9 @@ export function TourLeaderScanPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#000', color: '#fff', position: 'relative' }}>
+    <div style={{ minHeight: '100vh', background: '#000', color: '#fff', position: 'relative', fontFamily: "'Poppins',sans-serif" }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: '#14121f' }}>
-        <button onClick={() => navigate('/scansione')} style={{ background: 'none', border: 'none', color: '#a99fc2', fontSize: 14, cursor: 'pointer' }}>← Bus</button>
+        <button onClick={() => navigate('/scansione')} style={{ background: 'none', border: 'none', color: '#a99fc2', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>← Bus</button>
         {contatore && (
           <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>
             {contatore.saliti} / {contatore.totale} <span style={{ color: '#a99fc2', fontWeight: 400 }}>saliti — Bus {contatore.riferimento}</span>
@@ -116,7 +116,7 @@ export function TourLeaderScanPage() {
         )}
       </div>
 
-      {errore && <p style={{ color: '#ff3d7a', padding: 20, textAlign: 'center' }}>{errore}</p>}
+      {errore && <p style={{ color: '#dc2626', padding: 20, textAlign: 'center' }}>{errore}</p>}
 
       <div style={{ position: 'relative' }}>
         <video ref={videoRef} playsInline muted style={{ width: '100%', display: 'block' }} />

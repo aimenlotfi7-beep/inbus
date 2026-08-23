@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { chatApi, type Conversazione, type MessaggioChat } from '../../api/chat';
 import { PanelHead } from '../shared/PanelHead';
 
@@ -8,17 +8,36 @@ const ETICHETTA_STATO: Record<Conversazione['stato'], { testo: string; classe: s
   CHIUSA: { testo: '⚪ Chiusa', classe: 'non-coperta' },
 };
 
+/** Ogni quanto ricontrollare messaggi/conversazioni da sole, senza che
+ *  l'admin debba ricaricare la pagina a mano. */
+const INTERVALLO_AGGIORNAMENTO_MS = 4000;
+
 export function ChatScreen() {
   const [conversazioni, setConversazioni] = useState<Conversazione[] | null>(null);
   const [filtroStato, setFiltroStato] = useState<Conversazione['stato'] | 'TUTTE'>('TUTTE');
   const [selezionata, setSelezionata] = useState<Conversazione | null>(null);
   const [messaggi, setMessaggi] = useState<MessaggioChat[]>([]);
   const [testo, setTesto] = useState('');
+  const selezionataRef = useRef<Conversazione | null>(null);
+  selezionataRef.current = selezionata;
 
   function ricaricaLista() {
     chatApi.listaConversazioni(filtroStato === 'TUTTE' ? undefined : filtroStato).then(setConversazioni);
   }
   useEffect(ricaricaLista, [filtroStato]);
+
+  // Aggiornamento automatico — sia la lista (per vedere subito nuove
+  // conversazioni/messaggi non letti) sia la chat aperta al momento
+  // (per vedere le risposte del cliente senza dover ricaricare).
+  useEffect(() => {
+    const id = setInterval(() => {
+      ricaricaLista();
+      const attuale = selezionataRef.current;
+      if (attuale) chatApi.messaggiConversazione(attuale.id).then(setMessaggi);
+    }, INTERVALLO_AGGIORNAMENTO_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroStato]);
 
   function apri(c: Conversazione) {
     setSelezionata(c);
@@ -51,37 +70,39 @@ export function ChatScreen() {
   return (
     <div>
       <PanelHead titolo="Chat" />
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 18, height: '68vh' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div className="mini-tabs" style={{ marginBottom: 10, flexWrap: 'wrap' }}>
-            {(['TUTTE', 'APERTA', 'IN_CORSO', 'CHIUSA'] as const).map((s) => (
-              <button key={s} type="button" className={`mini-tab${filtroStato === s ? ' active' : ''}`} onClick={() => setFiltroStato(s)}>
-                {s === 'TUTTE' ? 'Tutte' : ETICHETTA_STATO[s].testo}
-              </button>
-            ))}
-          </div>
-          <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {conversazioni === null && <p className="testo-intro">Carico...</p>}
-            {conversazioni?.length === 0 && <p className="testo-intro">Nessuna conversazione.</p>}
-            {conversazioni?.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => apri(c)}
-                style={{
-                  textAlign: 'left', background: selezionata?.id === c.id ? 'var(--pink)' : 'var(--dusk)',
-                  border: '1px solid var(--line)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
-                  color: selezionata?.id === c.id ? '#fff' : 'var(--paper)',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <b style={{ fontSize: 13.5 }}>{c.clienteNome}</b>
-                  {c.nonLetti > 0 && <span style={{ background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 10, padding: '1px 7px' }}>{c.nonLetti}</span>}
-                </div>
-                <div style={{ fontSize: 11.5, opacity: .75 }}>{c.eventoArtista}</div>
-                <div style={{ fontSize: 10.5, opacity: .6, marginTop: 2 }}>{ETICHETTA_STATO[c.stato].testo} · {new Date(c.ultimoMessaggioIl).toLocaleString('it-IT')}</div>
-              </button>
-            ))}
-          </div>
+
+      {/* Pulsanti stato — una sola fascia ben allineata sopra l'elenco,
+          non più stretti dentro la colonna sinistra. */}
+      <div className="mini-tabs" style={{ marginBottom: 14 }}>
+        {(['TUTTE', 'APERTA', 'IN_CORSO', 'CHIUSA'] as const).map((s) => (
+          <button key={s} type="button" className={`mini-tab${filtroStato === s ? ' active' : ''}`} onClick={() => setFiltroStato(s)}>
+            {s === 'TUTTE' ? 'Tutte' : ETICHETTA_STATO[s].testo}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 18, height: '64vh' }}>
+        <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {conversazioni === null && <p className="testo-intro">Carico...</p>}
+          {conversazioni?.length === 0 && <p className="testo-intro">Nessuna conversazione.</p>}
+          {conversazioni?.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => apri(c)}
+              style={{
+                textAlign: 'left', background: selezionata?.id === c.id ? 'var(--pink)' : 'var(--dusk)',
+                border: '1px solid var(--line)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
+                color: selezionata?.id === c.id ? '#fff' : 'var(--paper)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <b style={{ fontSize: 13.5 }}>{c.clienteNome}</b>
+                {c.nonLetti > 0 && <span style={{ background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 10, padding: '1px 7px' }}>{c.nonLetti}</span>}
+              </div>
+              <div style={{ fontSize: 11.5, opacity: .75 }}>{c.eventoArtista}</div>
+              <div style={{ fontSize: 10.5, opacity: .6, marginTop: 2 }}>{ETICHETTA_STATO[c.stato].testo} · {new Date(c.ultimoMessaggioIl).toLocaleString('it-IT')}</div>
+            </button>
+          ))}
         </div>
 
         <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -114,8 +135,8 @@ export function ChatScreen() {
                 <div style={{ display: 'flex', gap: 8, padding: 12, borderTop: '1px solid var(--line)' }}>
                   <input value={testo} onChange={(e) => setTesto(e.target.value)} placeholder="Scrivi una risposta..."
                     onKeyDown={(e) => e.key === 'Enter' && invia()}
-                    style={{ flex: 1, background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 12px', color: 'var(--paper)' }} />
-                  <button className="btn btn-primary" onClick={invia}>Invia</button>
+                    style={{ flex: 1, minWidth: 0, background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 12px', color: 'var(--paper)' }} />
+                  <button className="btn btn-primary" style={{ flexShrink: 0, padding: '10px 18px' }} onClick={invia}>Invia</button>
                 </div>
               )}
               {selezionata.stato === 'CHIUSA' && (

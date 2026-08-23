@@ -36,6 +36,8 @@ export function PrenotazioniScreen() {
   const [sottoTab, setSottoTab] = useState<SottoTab>('CONFERMATA');
   const [ricercaPrenotazioni, setRicercaPrenotazioni] = useState('');
   const [righe, setRighe] = useState<PrenotazioneRiga[]>([]);
+  const [filtroPagamento, setFiltroPagamento] = useState<'TUTTI' | 'COMPLETO' | 'ACCONTO'>('TUTTI');
+  const [filtroSaldo, setFiltroSaldo] = useState<'TUTTI' | 'SALDATO' | 'DA_SALDARE'>('TUTTI');
   const [caricamento, setCaricamento] = useState(false);
   const [passeggeriInModale, setPasseggeriInModale] = useState<PrenotazioneRiga | null>(null);
   const [storicoInModale, setStoricoInModale] = useState<PrenotazioneRiga | null>(null);
@@ -43,6 +45,13 @@ export function PrenotazioniScreen() {
   useEffect(() => {
     prenotazioniAdminApi.eventiConPrenotazioni().then(setEventiConPren);
   }, []);
+
+  const righeFiltrate = righe.filter((r) => {
+    if (filtroPagamento !== 'TUTTI' && r.tipoPagamento !== filtroPagamento) return false;
+    if (filtroSaldo === 'SALDATO' && !(r.tipoPagamento === 'COMPLETO' || r.saldoPagato)) return false;
+    if (filtroSaldo === 'DA_SALDARE' && (r.tipoPagamento === 'COMPLETO' || r.saldoPagato)) return false;
+    return true;
+  });
 
   const eventoAttivo = eventiConPren.find((e) => e.id === eventoAttivoId) ?? null;
   const adesso = Date.now();
@@ -156,13 +165,26 @@ export function PrenotazioniScreen() {
 
               <RicercaSezione valore={ricercaPrenotazioni} onChange={setRicercaPrenotazioni} placeholder="Cerca per PNR, cliente o partecipante..." />
 
+              <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+                <select value={filtroPagamento} onChange={(e) => setFiltroPagamento(e.target.value as typeof filtroPagamento)} style={{ maxWidth: 200 }}>
+                  <option value="TUTTI">Tutti i pagamenti</option>
+                  <option value="COMPLETO">Pagamento completo</option>
+                  <option value="ACCONTO">Acconto</option>
+                </select>
+                <select value={filtroSaldo} onChange={(e) => setFiltroSaldo(e.target.value as typeof filtroSaldo)} style={{ maxWidth: 200 }}>
+                  <option value="TUTTI">Qualsiasi stato saldo</option>
+                  <option value="SALDATO">Saldato</option>
+                  <option value="DA_SALDARE">Da saldare</option>
+                </select>
+              </div>
+
               {caricamento && <p className="testo-intro">Carico...</p>}
 
-              {!caricamento && righe.length === 0 && (
-                <p className="testo-intro">Nessuna prenotazione {sottoTab === 'CONFERMATA' ? 'confermata' : 'cancellata'} {ricercaPrenotazioni ? 'per questa ricerca' : 'per questo evento'}.</p>
+              {!caricamento && righeFiltrate.length === 0 && (
+                <p className="testo-intro">Nessuna prenotazione {sottoTab === 'CONFERMATA' ? 'confermata' : 'cancellata'} per questi filtri.</p>
               )}
 
-              {righe.length > 0 && (
+              {righeFiltrate.length > 0 && (
                 <div className="table-scroll">
                   <table className="data-table">
                     <thead>
@@ -178,7 +200,7 @@ export function PrenotazioniScreen() {
                       </tr>
                     </thead>
                     <tbody>
-                      {righe.map((r) => {
+                      {righeFiltrate.map((r) => {
                         const stato = statoRiga(r);
                         return (
                           <tr key={r.id}>

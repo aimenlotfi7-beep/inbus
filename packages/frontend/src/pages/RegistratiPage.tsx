@@ -9,6 +9,7 @@ export function RegistratiPage() {
   const [cognome, setCognome] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [citta, setCitta] = useState('');
   const [password, setPassword] = useState('');
   const [confermaPassword, setConfermaPassword] = useState('');
   const [errore, setErrore] = useState('');
@@ -24,7 +25,7 @@ export function RegistratiPage() {
 
     setCaricamento(true);
     try {
-      await clienteAuthApi.registrati({ nome, cognome, email, telefono: telefono || undefined, password });
+      await clienteAuthApi.registrati({ nome, cognome, email, telefono: telefono || undefined, citta: citta || undefined, password });
       setInviata(true);
     } catch (err) {
       setErrore(err instanceof ErroreClienteAuth ? err.message : 'Registrazione non riuscita.');
@@ -72,6 +73,9 @@ export function RegistratiPage() {
 
         <label>Telefono (facoltativo)</label>
         <input type="tel" autoComplete="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+
+        <label>Città (facoltativo)</label>
+        <input type="text" autoComplete="address-level2" value={citta} onChange={(e) => setCitta(e.target.value)} />
 
         <label>Password (almeno 8 caratteri)</label>
         <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required />

@@ -16,7 +16,14 @@ import { calcolaStatoPrenotazione } from '../features/statoPrenotazione';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
-type Sezione = 'dashboard' | 'eventi' | 'profilo' | 'viaggi' | 'lista-attesa' | 'privacy' | 'chat';
+type Sezione = 'dashboard' | 'eventi' | 'profilo' | 'viaggi' | 'lista-attesa' | 'credito' | 'privacy' | 'chat';
+
+interface MovimentoCredito {
+  id: string;
+  importo: string;
+  motivo: string;
+  creatoIl: string;
+}
 
 export function AccountPage() {
   const [email, setEmail] = useState('');
@@ -27,7 +34,7 @@ export function AccountPage() {
   // usa avanti/indietro del browser) resta dove si trovava, invece di
   // tornare sempre alla prima sezione.
   const [searchParams, setSearchParams] = useSearchParams();
-  const sezioniValide: Sezione[] = ['dashboard', 'eventi', 'profilo', 'viaggi', 'lista-attesa', 'privacy', 'chat'];
+  const sezioniValide: Sezione[] = ['dashboard', 'eventi', 'profilo', 'viaggi', 'lista-attesa', 'credito', 'privacy', 'chat'];
   const sezioneUrl = searchParams.get('sezione') as Sezione | null;
   const sezione: Sezione = sezioneUrl && sezioniValide.includes(sezioneUrl) ? sezioneUrl : 'dashboard';
   function setSezione(nuova: Sezione) {
@@ -64,6 +71,7 @@ export function AccountPage() {
     { id: 'eventi', label: 'Scopri eventi' },
     { id: 'viaggi', label: 'I miei viaggi' },
     { id: 'lista-attesa', label: 'Lista d\'attesa' },
+    { id: 'credito', label: 'Credito fedeltà' },
     { id: 'chat', label: 'Messaggi' },
     { id: 'profilo', label: 'Il mio profilo' },
     { id: 'privacy', label: 'Preferenze Privacy' },
@@ -96,6 +104,7 @@ export function AccountPage() {
             {sezione === 'profilo' && <SezioneProfilo email={email} />}
             {sezione === 'viaggi' && <SezioneViaggi email={email} onAprireViaggio={setPnrAperto} />}
             {sezione === 'lista-attesa' && <SezioneListaAttesa email={email} />}
+            {sezione === 'credito' && <SezioneCredito email={email} />}
             {sezione === 'privacy' && <SezionePrivacy email={email} />}
             {sezione === 'chat' && <SezioneChat email={email} />}
           </div>
@@ -121,31 +130,9 @@ export function AccountPage() {
 }
 
 function SezioneProfilo({ email }: { email: string }) {
-  const [credito, setCredito] = useState<number | null>(null);
-
-  useEffect(() => {
-    fetch(`${API_URL}/api/credito?email=${encodeURIComponent(email)}`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => setCredito(d ? d.disponibile : 0))
-      .catch(() => setCredito(0));
-  }, [email]);
-
   return (
     <section className="acc-sezione">
       <h1>Il mio profilo</h1>
-
-      {credito !== null && credito > 0 && (
-        <div className="panel-box" style={{ background: 'rgba(72,214,140,.1)', borderColor: 'var(--green)' }}>
-          <h2>Il tuo credito fedeltà</h2>
-          <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 26, color: 'var(--green)', margin: '4px 0' }}>
-            €{credito.toFixed(2)}
-          </p>
-          <p style={{ color: 'var(--mist)', fontSize: 13 }}>
-            Maturato dai tuoi viaggi passati — spendibile su qualsiasi prenotazione futura, non scade mai. Potrai
-            usarlo direttamente al momento del pagamento.
-          </p>
-        </div>
-      )}
 
       <div className="panel-box">
         <h2>I miei dati</h2>
@@ -154,6 +141,89 @@ function SezioneProfilo({ email }: { email: string }) {
           telefono, indirizzo...) vengono salvati automaticamente ogni volta che completi una prenotazione.
         </p>
       </div>
+    </section>
+  );
+}
+
+/** Il credito fedeltà, in una sua sezione dedicata — diviso tra quanto
+ *  maturato in totale (guadagnato dai viaggi) e quanto già usato, non
+ *  solo il saldo attuale come prima. */
+function SezioneCredito({ email }: { email: string }) {
+  const [disponibile, setDisponibile] = useState<number | null>(null);
+  const [movimenti, setMovimenti] = useState<MovimentoCredito[] | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/credito?email=${encodeURIComponent(email)}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => setDisponibile(d ? d.disponibile : 0))
+      .catch(() => setDisponibile(0));
+    fetch(`${API_URL}/api/credito/movimenti?email=${encodeURIComponent(email)}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then(setMovimenti)
+      .catch(() => setMovimenti([]));
+  }, [email]);
+
+  const maturati = movimenti?.filter((m) => Number(m.importo) > 0) ?? [];
+  const utilizzati = movimenti?.filter((m) => Number(m.importo) < 0) ?? [];
+  const totaleMaturato = maturati.reduce((s, m) => s + Number(m.importo), 0);
+  const totaleUtilizzato = utilizzati.reduce((s, m) => s + Math.abs(Number(m.importo)), 0);
+
+  return (
+    <section className="acc-sezione">
+      <h1>Credito fedeltà</h1>
+
+      <div className="panel-box" style={{ background: 'rgba(72,214,140,.1)', borderColor: 'var(--green)' }}>
+        <h2>Disponibile ora</h2>
+        <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 30, color: 'var(--green)', margin: '4px 0' }}>
+          €{(disponibile ?? 0).toFixed(2)}
+        </p>
+        <p style={{ color: 'var(--mist)', fontSize: 13 }}>
+          Maturato dai tuoi viaggi — spendibile su qualsiasi prenotazione futura, non scade mai.
+        </p>
+      </div>
+
+      <div className="stats-row" style={{ margin: '18px 0' }}>
+        <div className="stat-box"><b style={{ color: 'var(--green)' }}>+€{totaleMaturato.toFixed(2)}</b><span>Credito maturato (totale)</span></div>
+        <div className="stat-box"><b>-€{totaleUtilizzato.toFixed(2)}</b><span>Credito utilizzato (totale)</span></div>
+      </div>
+
+      {movimenti === null && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
+
+      {maturati.length > 0 && (
+        <>
+          <p className="section-label" style={{ marginTop: 18 }}>Maturato</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {maturati.map((m) => (
+              <div key={m.id} className="viaggio-card" style={{ padding: '10px 14px' }}>
+                <div className="viaggio-main">
+                  <p style={{ margin: 0, fontSize: 13.5 }}>{m.motivo}</p>
+                  <p style={{ margin: 0, fontSize: 11.5, color: 'var(--mist)' }}>{new Date(m.creatoIl).toLocaleDateString('it-IT')}</p>
+                </div>
+                <b style={{ color: 'var(--green)' }}>+€{Number(m.importo).toFixed(2)}</b>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {utilizzati.length > 0 && (
+        <>
+          <p className="section-label" style={{ marginTop: 18 }}>Utilizzato</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {utilizzati.map((m) => (
+              <div key={m.id} className="viaggio-card" style={{ padding: '10px 14px' }}>
+                <div className="viaggio-main">
+                  <p style={{ margin: 0, fontSize: 13.5 }}>{m.motivo}</p>
+                  <p style={{ margin: 0, fontSize: 11.5, color: 'var(--mist)' }}>{new Date(m.creatoIl).toLocaleDateString('it-IT')}</p>
+                </div>
+                <b>-€{Math.abs(Number(m.importo)).toFixed(2)}</b>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {movimenti?.length === 0 && <p className="testo-intro">Nessun movimento ancora — matura dopo il tuo primo viaggio pagato per intero.</p>}
     </section>
   );
 }
@@ -521,6 +591,14 @@ function SezioneChat({ email }: { email: string }) {
   function ricarica() { chatApi.storicoCliente(email).then(setConversazioni); }
   useEffect(ricarica, [email]);
   useEffect(() => { eventiApi.list().then(setEventi); }, []);
+
+  // Aggiornamento automatico — così se lo staff risponde non serve
+  // ricaricare la pagina per vederlo.
+  useEffect(() => {
+    const id = setInterval(ricarica, 4000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email]);
 
   // La conversazione attiva è la più recente che non sia chiusa — se
   // l'ultima è stata chiusa dallo staff, il prossimo messaggio ne apre

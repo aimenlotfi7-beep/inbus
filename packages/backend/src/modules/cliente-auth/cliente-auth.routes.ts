@@ -19,6 +19,7 @@ clienteAuthRouter.post(
     nome: z.string().min(1),
     cognome: z.string().min(1),
     telefono: z.string().optional(),
+    citta: z.string().optional(),
   })),
   asyncHandler(async (req: Request, res: Response) => {
     await clienteAuthService.registrati(req.body);

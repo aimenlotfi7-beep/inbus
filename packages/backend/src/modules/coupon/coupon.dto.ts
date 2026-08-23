@@ -8,6 +8,8 @@ export const creaCouponSchema = z.object({
   validoDal: z.coerce.date().optional(),
   validoAl: z.coerce.date().optional(),
   attivo: z.boolean().default(true),
+  // Vuoto/assente = valido su tutti gli eventi.
+  eventoId: z.string().nullable().optional(),
 });
 export type CreaCouponInput = z.infer<typeof creaCouponSchema>;
 export const aggiornaCouponSchema = creaCouponSchema.partial();

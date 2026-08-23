@@ -225,6 +225,13 @@
       "when": 1787478010856,
       "tag": "0032_conversazioni_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1787495889113,
+      "tag": "0033_coupon_per_evento",
+      "breakpoints": true
     }
   ]
 }

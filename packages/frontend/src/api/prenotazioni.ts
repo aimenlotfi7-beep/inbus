@@ -24,6 +24,7 @@ export interface CreaPrenotazionePayload {
 
 export interface DifferenzaSaldo {
   pnr: string;
+  eventoId: string;
   artista: string;
   dataEvento: string | null;
   saldoPagato: boolean;
@@ -42,7 +43,7 @@ export const prenotazioniApi = {
   // suo token, non quello admin.
   crea: (payload: CreaPrenotazionePayload) => apiConToken('inbus_cliente_token').post<Prenotazione>('/api/prenotazioni', payload),
   getSaldo: (pnr: string) => api.get<DifferenzaSaldo>(`/api/prenotazioni/${pnr}/saldo`),
-  saldaResto: (pnr: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`),
+  saldaResto: (pnr: string, couponCodice?: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`, couponCodice ? { couponCodice } : undefined),
   getByPnr: (pnr: string) => api.get<Prenotazione>(`/api/prenotazioni/${pnr}`),
   listByEmail: (email: string) => api.get<Prenotazione[]>(`/api/prenotazioni/by-email?email=${encodeURIComponent(email)}`),
   dettaglioPerCliente: (pnr: string, email: string) =>

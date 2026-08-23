@@ -45,7 +45,7 @@ export const prenotazioniController = {
     res.json(await prenotazioniService.differenzaSaldo(req.params.pnr));
   },
   async saldaResto(req: Request, res: Response) {
-    res.json(await prenotazioniService.saldaResto(req.params.pnr));
+    res.json(await prenotazioniService.saldaResto(req.params.pnr, req.body?.couponCodice));
   },
   async inviaSollecitoManuale(req: Request, res: Response) {
     res.json(await prenotazioniService.inviaSollecitoManuale(req.params.pnr));

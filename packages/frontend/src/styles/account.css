@@ -176,8 +176,9 @@
   .chat-bubble-mini .meta{font-size:10px; opacity:.7; margin-top:4px;}
   .acc-chat-input-row{display:flex; gap:8px; padding:12px; border-top:1px solid var(--line);}
   .acc-chat-input-row input{
-    flex:1; background:var(--night); border:1px solid var(--line); border-radius:8px; padding:10px 12px; color:var(--paper);
+    flex:1; min-width:0; background:var(--night); border:1px solid var(--line); border-radius:8px; padding:10px 12px; color:var(--paper);
   }
+  .acc-chat-input-row button{flex-shrink:0; padding:10px 18px !important;}
 
   /* ---------- EVENTI DA ACQUISTARE ---------- */
   .acc-eventi-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:18px;}
@@ -308,3 +309,9 @@
   display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
   background:var(--dusk); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-size:13px;
 }
+
+/* ---------- CREDITO (statistiche in riga) ---------- */
+.stats-row{display:flex; gap:14px; flex-wrap:wrap;}
+.stat-box{background:var(--dusk); border:1px solid var(--line); border-radius:12px; padding:16px 20px; flex:1; min-width:150px;}
+.stat-box b{display:block; font-family:'Anton',sans-serif; font-size:20px;}
+.stat-box span{font-size:11px; color:var(--mist); text-transform:uppercase; letter-spacing:.5px;}
