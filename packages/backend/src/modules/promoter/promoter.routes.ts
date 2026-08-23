@@ -4,7 +4,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db } from '../../db/client.js';
-import { promoter, promoterEventi, prenotazioni } from '../../db/schema.js';
+import { promoter, promoterEventi, prenotazioni, eventi } from '../../db/schema.js';
 import { NonTrovato, NonAutorizzato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
@@ -50,8 +50,16 @@ export const promoterService = {
         commissionePercentuale: input.commissionePercentuale.toFixed(2),
         note: input.note,
       }).returning();
-      if (input.eventiAbilitati.length) {
-        await tx.insert(promoterEventi).values(input.eventiAbilitati.map((eventoId) => ({ promoterId: nuovo.id, eventoId })));
+      // Di default un nuovo promoter è abilitato a TUTTI gli eventi
+      // esistenti al momento — decide poi lui stesso, dalla sua area,
+      // se disattivarne qualcuno o abilitarsi anche a quelli nuovi che
+      // arriveranno dopo. Solo se l'amministratore ha scelto un elenco
+      // specifico in fase di censimento, si parte da quello invece.
+      const eventiDaAbilitare = input.eventiAbilitati.length > 0
+        ? input.eventiAbilitati
+        : (await tx.select({ id: eventi.id }).from(eventi)).map((e) => e.id);
+      if (eventiDaAbilitare.length) {
+        await tx.insert(promoterEventi).values(eventiDaAbilitare.map((eventoId) => ({ promoterId: nuovo.id, eventoId })));
       }
       return nuovo.id;
     });
@@ -96,6 +104,19 @@ export const promoterService = {
     const fatturato = righe.reduce((s, p) => s + Number(p.totale), 0);
     return { numeroPrenotazioni: righe.length, fatturato };
   },
+
+  /** Stessa cosa, ma spezzata per evento — per la revenue cliccabile
+   *  per evento nell'area promoter. */
+  async statistichePerEvento(codice: string): Promise<Record<string, { numeroPrenotazioni: number; fatturato: number }>> {
+    const righe = await db.select().from(prenotazioni).where(and(eq(prenotazioni.promoterCodice, codice), eq(prenotazioni.stato, 'CONFERMATA')));
+    const risultato: Record<string, { numeroPrenotazioni: number; fatturato: number }> = {};
+    for (const r of righe) {
+      risultato[r.eventoId] ??= { numeroPrenotazioni: 0, fatturato: 0 };
+      risultato[r.eventoId].numeroPrenotazioni++;
+      risultato[r.eventoId].fatturato += Number(r.totale);
+    }
+    return risultato;
+  },
 };
 
 export const promoterRouter = Router();
@@ -123,6 +144,10 @@ promoterRouter.get('/me', richiedeAuthPromoter, asyncHandler(async (req: Request
 promoterRouter.get('/me/statistiche', richiedeAuthPromoter, asyncHandler(async (req: Request, res: Response) => {
   const p = await promoterService.getById((req as any).promoterId);
   res.json(await promoterService.statistiche(p.codice));
+}));
+promoterRouter.get('/me/statistiche-per-evento', richiedeAuthPromoter, asyncHandler(async (req: Request, res: Response) => {
+  const p = await promoterService.getById((req as any).promoterId);
+  res.json(await promoterService.statistichePerEvento(p.codice));
 }));
 
 promoterRouter.use(richiedeAuth);

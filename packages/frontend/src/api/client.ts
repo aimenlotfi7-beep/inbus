@@ -42,5 +42,7 @@ export function apiConToken(chiaveToken: string) {
     get: <T>(path: string) => richiesta<T>(path, {}, chiaveToken),
     post: <T>(path: string, body?: unknown) =>
       richiesta<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }, chiaveToken),
+    put: <T>(path: string, body?: unknown) =>
+      richiesta<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }, chiaveToken),
   };
 }

@@ -14,9 +14,11 @@ export function PartenzeScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [selezionato, setSelezionato] = useState<Evento | null>(null);
   const [ricerca, setRicerca] = useState('');
+  const [allertePerEvento, setAllertePerEvento] = useState<Record<string, number>>({});
 
   function ricarica() {
     eventiApi.list().then(setEventi);
+    eventiApi.allertePartenzePerEvento().then(setAllertePerEvento).catch(() => {});
   }
   useEffect(ricarica, []);
 
@@ -38,6 +40,9 @@ export function PartenzeScreen() {
         {eventiFiltrati.map((ev) => (
           <div key={ev.id} className="evento-card" onClick={() => setSelezionato(ev)}>
             <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
+            {allertePerEvento[ev.id] > 0 && (
+              <span className="badge non-coperta" style={{ float: 'right' }} title={`${allertePerEvento[ev.id]} tratta/e con posti superati`}>⚠ {allertePerEvento[ev.id]}</span>
+            )}
             <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
             <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{ev.luogo}, {ev.citta}</p>
             <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{new Date(ev.data).toLocaleDateString('it-IT')}</p>

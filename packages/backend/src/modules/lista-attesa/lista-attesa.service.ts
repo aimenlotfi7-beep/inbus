@@ -72,6 +72,15 @@ export const listaAttesaService = {
     return righe.length;
   },
 
+  /** Come sopra, ma quante per OGNI evento — per il pallino di avviso
+   *  sulla card dell'evento specifico, non solo il totale nel menu. */
+  async contaInAttesaPerEvento(): Promise<Record<string, number>> {
+    const righe = await db.select({ eventoId: listaAttesa.eventoId }).from(listaAttesa).where(eq(listaAttesa.stato, 'IN_ATTESA'));
+    const risultato: Record<string, number> = {};
+    for (const r of righe) risultato[r.eventoId] = (risultato[r.eventoId] ?? 0) + 1;
+    return risultato;
+  },
+
   /** Genera un token univoco e manda l'email con il link "completa la tua
    *  prenotazione" — non crea ancora la prenotazione vera: quella viene
    *  creata solo quando il cliente clicca e finalizza davvero (così, se

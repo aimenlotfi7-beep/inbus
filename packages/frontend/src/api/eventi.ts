@@ -78,4 +78,12 @@ export const eventiApi = {
   listaPasseggeriBus: (id: string, busId: string) => api.get<PasseggeroBus[]>(`/api/eventi/${id}/bus/${busId}/passeggeri`),
   riepilogoEconomico: (id: string) => api.get<RiepilogoEconomicoTratta[]>(`/api/eventi/${id}/riepilogo-economico`),
   allertePartenze: () => api.get<{ conteggio: number }>('/api/eventi/allerte-partenze'),
+  allertePartenzePerEvento: () => api.get<Record<string, number>>('/api/eventi/allerte-partenze-per-evento'),
+  statistichePerEvento: () => api.get<Record<string, { partecipanti: number; busCensiti: number }>>('/api/eventi/statistiche-per-evento'),
+  cestino: {
+    eventi: () => api.get<(Evento & { eliminatoIl: string })[]>('/api/eventi/cestino/eventi'),
+    ripristinaEvento: (id: string) => api.post<{ ok: true }>(`/api/eventi/cestino/eventi/${id}/ripristina`),
+    tratte: () => api.get<{ id: string; nome: string; eliminatoIl: string; eventoId: string; eventoArtista: string }[]>('/api/eventi/cestino/tratte'),
+    ripristinaTratta: (id: string) => api.post<{ ok: true }>(`/api/eventi/cestino/tratte/${id}/ripristina`),
+  },
 };

@@ -12,6 +12,13 @@ eventiRouter.get('/', valida(listaEventiQuerySchema, 'query'), asyncHandler(even
 // IMPORTANTE: va registrata PRIMA di GET '/:id', altrimenti Express la
 // interpreterebbe come una richiesta per un evento con id "allerte-partenze".
 eventiRouter.get('/allerte-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenze));
+eventiRouter.get('/allerte-partenze-per-evento', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenzePerEvento));
+eventiRouter.get('/statistiche-per-evento', richiedeAuth, richiedePermesso('eventi.visualizza'), asyncHandler(eventiController.statistichePerEvento));
+// Cestino — stesso motivo, prima di GET '/:id'.
+eventiRouter.get('/cestino/eventi', richiedeAuth, richiedePermesso('eventi.cestino'), asyncHandler(eventiController.eventiEliminati));
+eventiRouter.post('/cestino/eventi/:id/ripristina', richiedeAuth, richiedePermesso('eventi.cestino'), asyncHandler(eventiController.ripristinaEvento));
+eventiRouter.get('/cestino/tratte', richiedeAuth, richiedePermesso('eventi.cestino'), asyncHandler(eventiController.tratteEliminate));
+eventiRouter.post('/cestino/tratte/:id/ripristina', richiedeAuth, richiedePermesso('eventi.cestino'), asyncHandler(eventiController.ripristinaTratta));
 // Stesso motivo: va prima di GET '/:id' per non essere interpretata come
 // una richiesta per un evento con id "slug".
 eventiRouter.get('/slug/:slug', asyncHandler(eventiController.getBySlug));

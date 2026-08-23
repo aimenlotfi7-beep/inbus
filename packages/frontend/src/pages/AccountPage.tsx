@@ -4,7 +4,7 @@ import '../styles/account.css';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { utentiApi, type PreferenzePrivacy } from '../api/utenti';
 import { eventiApi } from '../api/eventi';
-import { chatApi, type MessaggioChat } from '../api/chat';
+import { chatApi, type ConversazioneConMessaggi } from '../api/chat';
 import type { Prenotazione, Evento } from '../api/types';
 import { HomePage } from './HomePage';
 import { CookieBanner, LinkPreferenzeCookie } from '../features/CookieBanner';
@@ -323,19 +323,25 @@ function SezioneViaggi({ email }: { email: string }) {
 }
 
 function SezioneChat({ email }: { email: string }) {
-  const [messaggi, setMessaggi] = useState<MessaggioChat[] | null>(null);
+  const [conversazioni, setConversazioni] = useState<ConversazioneConMessaggi[] | null>(null);
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [eventoScelto, setEventoScelto] = useState('');
   const [testo, setTesto] = useState('');
   const [nome, setNome] = useState('');
 
-  function ricarica() { chatApi.storicoCliente(email).then(setMessaggi); }
+  function ricarica() { chatApi.storicoCliente(email).then(setConversazioni); }
   useEffect(ricarica, [email]);
   useEffect(() => { eventiApi.list().then(setEventi); }, []);
 
+  // La conversazione attiva è la più recente che non sia chiusa — se
+  // l'ultima è stata chiusa dallo staff, il prossimo messaggio ne apre
+  // una nuova (per questo serve scegliere di nuovo l'evento).
+  const attiva = conversazioni?.find((c) => c.stato !== 'CHIUSA') ?? null;
+  const chiuse = conversazioni?.filter((c) => c.stato === 'CHIUSA') ?? [];
+
   async function invia() {
     if (!testo.trim()) return;
-    const eventoId = messaggi?.length ? messaggi[messaggi.length - 1].eventoId : eventoScelto;
+    const eventoId = attiva?.eventoId ?? eventoScelto;
     if (!eventoId) { alert("Scegli l'evento su cui hai una domanda."); return; }
     await chatApi.inviaCliente({ eventoId, nome: nome || email, email, testo });
     setTesto('');
@@ -346,7 +352,7 @@ function SezioneChat({ email }: { email: string }) {
     <section className="acc-sezione">
       <h1>Chat con lo staff INBUS</h1>
       <div className="acc-chat-box">
-        {(!messaggi || !messaggi.length) && (
+        {!attiva && (
           <div id="accChatEventoScelta">
             <select value={eventoScelto} onChange={(e) => setEventoScelto(e.target.value)}>
               <option value="">Scegli l'evento...</option>
@@ -356,9 +362,9 @@ function SezioneChat({ email }: { email: string }) {
           </div>
         )}
         <div id="accChatMessages">
-          {messaggi === null && <p style={{ color: 'var(--mist)', padding: 16 }}>Carico...</p>}
-          {messaggi?.length === 0 && <p style={{ color: 'var(--mist)', padding: 16 }}>Nessun messaggio ancora. Scrivi la tua prima domanda qui sotto.</p>}
-          {messaggi?.map((m) => (
+          {conversazioni === null && <p style={{ color: 'var(--mist)', padding: 16 }}>Carico...</p>}
+          {conversazioni?.length === 0 && <p style={{ color: 'var(--mist)', padding: 16 }}>Nessun messaggio ancora. Scrivi la tua prima domanda qui sotto.</p>}
+          {attiva?.messaggi.map((m) => (
             <div className={`chat-bubble-mini ${m.autore.toLowerCase()}`} key={m.id}>
               {m.testo}
               <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff INBUS'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
@@ -370,6 +376,27 @@ function SezioneChat({ email }: { email: string }) {
           <button className="btn btn-primary" onClick={invia}>Invia</button>
         </div>
       </div>
+
+      {chiuse.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <p className="section-label">Conversazioni precedenti</p>
+          {chiuse.map((c) => (
+            <details key={c.id} style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 10, padding: '10px 14px', marginBottom: 8 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 13 }}>
+                {new Date(c.creataIl).toLocaleDateString('it-IT')} — {c.messaggi.length} messaggi
+              </summary>
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {c.messaggi.map((m) => (
+                  <div key={m.id} className={`chat-bubble-mini ${m.autore.toLowerCase()}`}>
+                    {m.testo}
+                    <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff INBUS'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

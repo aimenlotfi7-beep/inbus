@@ -31,4 +31,5 @@ export const promoterApi = {
   // Self-service: il promoter vede i propri dati col proprio token (salvato separatamente da quello admin)
   me: () => apiPromoter.get<Promoter>('/api/promoter/me'),
   meStatistiche: () => apiPromoter.get<{ numeroPrenotazioni: number; fatturato: number }>('/api/promoter/me/statistiche'),
+  meStatistichePerEvento: () => apiPromoter.get<Record<string, { numeroPrenotazioni: number; fatturato: number }>>('/api/promoter/me/statistiche-per-evento'),
 };

@@ -9,6 +9,7 @@ export interface PrenotazioneRiga {
   metodoPagamento: string;
   saldoPagato: boolean;
   saldoPagatoIl: string | null;
+  scadenzaSaldo: string | null;
   stato: 'CONFERMATA' | 'CANCELLATA';
   creataIl: string;
   eventoId: string;
@@ -36,4 +37,5 @@ export const prenotazioniAdminApi = {
   eventiConPrenotazioni: () => api.get<EventoConPrenotazioni[]>('/api/prenotazioni/eventi'),
   cancella: (pnr: string) => api.post<void>(`/api/prenotazioni/${pnr}/cancella`),
   eliminaDefinitivamente: (pnr: string) => api.delete<void>(`/api/prenotazioni/${pnr}`),
+  inviaSollecito: (pnr: string) => api.post<{ inviata: boolean }>(`/api/prenotazioni/${pnr}/sollecito`),
 };

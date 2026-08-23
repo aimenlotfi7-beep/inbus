@@ -211,6 +211,20 @@
       "when": 1787441493077,
       "tag": "0030_account_cliente_vero",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1787445894923,
+      "tag": "0031_cestino_eventi_tratte",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787478010856,
+      "tag": "0032_conversazioni_chat",
+      "breakpoints": true
     }
   ]
 }

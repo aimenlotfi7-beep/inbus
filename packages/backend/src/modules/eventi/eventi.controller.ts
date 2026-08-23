@@ -34,6 +34,21 @@ export const eventiController = {
     res.status(204).send();
   },
 
+  async eventiEliminati(_req: Request, res: Response) {
+    res.json(await eventiService.eventiEliminati());
+  },
+  async ripristinaEvento(req: Request, res: Response) {
+    await eventiService.ripristinaEvento(req.params.id);
+    res.json({ ok: true });
+  },
+  async tratteEliminate(_req: Request, res: Response) {
+    res.json(await eventiService.tratteEliminate());
+  },
+  async ripristinaTratta(req: Request, res: Response) {
+    await eventiService.ripristinaTratta(req.params.id);
+    res.json({ ok: true });
+  },
+
   async opzioniPartenza(req: Request, res: Response) {
     const opzioni = await eventiService.opzioniPartenza(req.params.id);
     res.json(opzioni);
@@ -72,5 +87,11 @@ export const eventiController = {
 
   async allertePartenze(_req: Request, res: Response) {
     res.json({ conteggio: await eventiService.contaAllertePartenze() });
+  },
+  async allertePartenzePerEvento(_req: Request, res: Response) {
+    res.json(await eventiService.allertePartenzePerEvento());
+  },
+  async statistichePerEvento(_req: Request, res: Response) {
+    res.json(await eventiService.statistichePerEvento());
   },
 };

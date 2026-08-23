@@ -66,12 +66,15 @@ export function PromoterPage() {
 function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
   const [promoter, setPromoter] = useState<Promoter | null>(null);
   const [stats, setStats] = useState<{ numeroPrenotazioni: number; fatturato: number } | null>(null);
+  const [statsPerEvento, setStatsPerEvento] = useState<Record<string, { numeroPrenotazioni: number; fatturato: number }>>({});
   const [eventi, setEventi] = useState<Evento[]>([]);
+  const [eventoRevenue, setEventoRevenue] = useState<string | null>(null);
   const [toast, setToast] = useState('');
 
   useEffect(() => {
     promoterApi.me().then(setPromoter).catch(onErroreSessione);
     promoterApi.meStatistiche().then(setStats);
+    promoterApi.meStatistichePerEvento().then(setStatsPerEvento);
     eventiApi.list().then(setEventi);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -86,10 +89,11 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
 
   if (!promoter || !stats) return <p style={{ color: 'var(--mist)' }}>Carico...</p>;
 
-  const commissione = stats.fatturato * (Number(promoter.commissionePercentuale) / 100);
-  const eventiAbilitati = eventi
-    .filter((e) => promoter.eventiAbilitati.includes(e.id))
-    .sort((a, b) => a.data.localeCompare(b.data));
+  const percentuale = Number(promoter.commissionePercentuale);
+  const commissione = stats.fatturato * (percentuale / 100);
+  const eventiOrdinati = eventi.slice().sort((a, b) => a.data.localeCompare(b.data));
+
+  const statoEventoRevenue = eventoRevenue ? statsPerEvento[eventoRevenue] : null;
 
   return (
     <>
@@ -99,13 +103,35 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
         <div className="stat-box"><b>€{commissione.toFixed(2)}</b><span>Commissione maturata ({promoter.commissionePercentuale}%)</span></div>
       </div>
 
-      <h2 style={{ fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: 18, margin: '0 0 14px' }}>I tuoi eventi</h2>
-
-      {!eventiAbilitati.length && (
-        <div className="empty-box">Non sei ancora abilitato a vendere nessun evento. Contatta lo staff INBUS per farti aggiungere.</div>
+      <h2 style={{ fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: 18, margin: '24px 0 14px' }}>Revenue per evento</h2>
+      <div className="mini-tabs" style={{ flexWrap: 'wrap', marginBottom: 14 }}>
+        {eventiOrdinati.filter((ev) => statsPerEvento[ev.id]).map((ev) => (
+          <button key={ev.id} type="button" className={`mini-tab${eventoRevenue === ev.id ? ' active' : ''}`} onClick={() => setEventoRevenue(ev.id)}>
+            {ev.artista}
+          </button>
+        ))}
+        {!eventiOrdinati.some((ev) => statsPerEvento[ev.id]) && (
+          <p style={{ color: 'var(--mist)', fontSize: 13 }}>Nessuna vendita ancora — appena arriva la prima, comparirà qui divisa per evento.</p>
+        )}
+      </div>
+      {statoEventoRevenue && (
+        <div className="stats-row" style={{ marginBottom: 24 }}>
+          <div className="stat-box"><b>{statoEventoRevenue.numeroPrenotazioni}</b><span>Vendite su questo evento</span></div>
+          <div className="stat-box"><b>€{statoEventoRevenue.fatturato.toFixed(2)}</b><span>Fatturato su questo evento</span></div>
+          <div className="stat-box"><b>€{(statoEventoRevenue.fatturato * percentuale / 100).toFixed(2)}</b><span>Tua commissione su questo evento</span></div>
+        </div>
       )}
 
-      {eventiAbilitati.map((ev) => {
+      <h2 style={{ fontFamily: "'Anton',sans-serif", textTransform: 'uppercase', fontSize: 18, margin: '24px 0 14px' }}>I tuoi link</h2>
+      <p style={{ color: 'var(--mist)', fontSize: 13, marginTop: -8, marginBottom: 16 }}>
+        Un link per ogni evento — copialo e condividilo dove vuoi. Decidi tu quali pubblicizzare.
+      </p>
+
+      {!eventiOrdinati.length && (
+        <div className="empty-box">Non ci sono eventi ancora.</div>
+      )}
+
+      {eventiOrdinati.map((ev) => {
         const link = `${window.location.origin}/?promo=${promoter.codice}&evento=${ev.id}`;
         return (
           <div className="evento-link-card" key={ev.id}>

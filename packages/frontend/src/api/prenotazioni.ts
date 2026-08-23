@@ -40,5 +40,4 @@ export const prenotazioniApi = {
   saldaResto: (pnr: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`),
   getByPnr: (pnr: string) => api.get<Prenotazione>(`/api/prenotazioni/${pnr}`),
   listByEmail: (email: string) => api.get<Prenotazione[]>(`/api/prenotazioni/by-email?email=${encodeURIComponent(email)}`),
-  cancella: (pnr: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/cancella`),
 };

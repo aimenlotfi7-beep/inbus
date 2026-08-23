@@ -3,6 +3,7 @@ import { haPermesso, type SessioneAdmin } from '../../api/auth';
 import { eventiApi } from '../../api/eventi';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import { richiesteRimborsoApi } from '../../api/richiesteRimborso';
+import { chatApi } from '../../api/chat';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'partenze'
@@ -90,6 +91,12 @@ export function AdminLayout({
     richiesteRimborsoApi.contaInAttesa().then((r) => setRimborsiInAttesa(r.conteggio)).catch(() => {});
   }, [sessione]);
 
+  const [chatNonLette, setChatNonLette] = useState(0);
+  useEffect(() => {
+    if (!haPermesso(sessione, 'chat.visualizza')) return;
+    chatApi.contaNonLette().then((r) => setChatNonLette(r.conteggio)).catch(() => {});
+  }, [sessione]);
+
   // Filtro sia i gruppi che le voci in base a ciò che l'utente loggato
   // può vedere: un gruppo compare solo se ha almeno una voce visibile.
   const gruppiVisibili = GRUPPI
@@ -128,6 +135,9 @@ export function AdminLayout({
                     )}
                     {voce.id === 'rimborsi' && rimborsiInAttesa > 0 && (
                       <span className="side-badge" title={`${rimborsiInAttesa} richiesta/e di rimborso da gestire`}>{rimborsiInAttesa}</span>
+                    )}
+                    {voce.id === 'chat' && chatNonLette > 0 && (
+                      <span className="side-badge" title={`${chatNonLette} conversazione/i con messaggi non letti`}>{chatNonLette}</span>
                     )}
                   </button>
                 ))}

@@ -89,6 +89,10 @@ export const eventi = pgTable('eventi', {
   // un ricaricamento della pagina) non fa perdere il lavoro fatto. Non
   // compare mai sul sito pubblico, a prescindere da "visibileSito".
   bozza: boolean('bozza').notNull().default(false),
+  // Cestino: un evento "eliminato" non sparisce per davvero dal
+  // database (le prenotazioni collegate resterebbero orfane) — resta
+  // lì, solo nascosto da ogni vista normale, recuperabile dal Cestino.
+  eliminatoIl: timestamp('eliminato_il'),
   // Testo libero mostrato nella pagina pubblica dell'evento, sotto la
   // foto — orari di ritrovo, cosa portare, regole del bus, ecc. Diverso
   // dalla descrizione SEO qui sotto: questa è per il CLIENTE che ha già
@@ -202,6 +206,10 @@ export const lineeBus = pgTable('linee_bus', {
   // bus necessari, che resta solo un suggerimento.
   coperta: boolean('coperta').notNull().default(false),
   noteCoperta: text('note_coperta'),
+  // Stesso principio del cestino eventi qui sopra — una tratta con
+  // prenotazioni collegate non può essere cancellata per davvero senza
+  // lasciarle orfane, quindi la si "nasconde" invece di eliminarla.
+  eliminatoIl: timestamp('eliminato_il'),
 });
 
 export const fermate = pgTable('fermate', {
@@ -478,9 +486,25 @@ export const coupon = pgTable('coupon', {
 // ---------------------------------------------------------------------
 // CHAT
 // ---------------------------------------------------------------------
+// Una conversazione per cliente — prima i messaggi finivano tutti
+// mischiati per evento, senza separare chi scriveva cosa. Quando
+// l'admin la chiude, un nuovo messaggio del cliente ne apre una NUOVA
+// (non riapre quella vecchia) — lo storico resta comunque consultabile.
+export const statoConversazioneEnum = pgEnum('stato_conversazione', ['APERTA', 'IN_CORSO', 'CHIUSA']);
+export const conversazioniChat = pgTable('conversazioni_chat', {
+  id: id(),
+  eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  clienteEmail: text('cliente_email').notNull(),
+  clienteNome: text('cliente_nome').notNull(),
+  stato: statoConversazioneEnum('stato').notNull().default('APERTA'),
+  creataIl: timestamp('creata_il').notNull().defaultNow(),
+  ultimoMessaggioIl: timestamp('ultimo_messaggio_il').notNull().defaultNow(),
+});
+
 export const messaggiChat = pgTable('messaggi_chat', {
   id: id(),
   eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  conversazioneId: text('conversazione_id').references(() => conversazioniChat.id, { onDelete: 'cascade' }),
   autore: autoreMessaggioEnum('autore').notNull(),
   nome: text('nome').notNull(),
   email: text('email'),
@@ -700,6 +724,12 @@ export const allegatiEventoRelations = relations(allegatiEvento, ({ one }) => ({
 
 export const messaggiChatRelations = relations(messaggiChat, ({ one }) => ({
   evento: one(eventi, { fields: [messaggiChat.eventoId], references: [eventi.id] }),
+  conversazione: one(conversazioniChat, { fields: [messaggiChat.conversazioneId], references: [conversazioniChat.id] }),
+}));
+
+export const conversazioniChatRelations = relations(conversazioniChat, ({ one, many }) => ({
+  evento: one(eventi, { fields: [conversazioniChat.eventoId], references: [eventi.id] }),
+  messaggi: many(messaggiChat),
 }));
 
 export const listaAttesaRelations = relations(listaAttesa, ({ one }) => ({

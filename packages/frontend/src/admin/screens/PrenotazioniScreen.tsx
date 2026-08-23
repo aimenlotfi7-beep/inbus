@@ -3,6 +3,7 @@ import { prenotazioniAdminApi, type PrenotazioneRiga, type EventoConPrenotazioni
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { Modale } from '../shared/Modale';
+import { RicercaSezione } from '../shared/RicercaSezione';
 
 type SottoTab = 'CONFERMATA' | 'CANCELLATA';
 
@@ -40,12 +41,7 @@ export function PrenotazioniScreen() {
   const [storicoInModale, setStoricoInModale] = useState<PrenotazioneRiga | null>(null);
 
   useEffect(() => {
-    prenotazioniAdminApi.eventiConPrenotazioni().then((lista) => {
-      setEventiConPren(lista);
-      const futuri = lista.filter((e) => new Date(e.data).getTime() >= Date.now());
-      const primaScelta = futuri[0] ?? lista[0];
-      if (primaScelta) setEventoAttivoId(primaScelta.id);
-    });
+    prenotazioniAdminApi.eventiConPrenotazioni().then(setEventiConPren);
   }, []);
 
   const eventoAttivo = eventiConPren.find((e) => e.id === eventoAttivoId) ?? null;
@@ -149,12 +145,7 @@ export function PrenotazioniScreen() {
                 <button type="button" className={`mini-tab${sottoTab === 'CANCELLATA' ? ' active' : ''}`} onClick={() => setSottoTab('CANCELLATA')}>Cancellate</button>
               </div>
 
-              <input
-                placeholder="Cerca per PNR, cliente o partecipante..."
-                value={ricercaPrenotazioni}
-                onChange={(e) => setRicercaPrenotazioni(e.target.value)}
-                style={{ maxWidth: 420, marginBottom: 16 }}
-              />
+              <RicercaSezione valore={ricercaPrenotazioni} onChange={setRicercaPrenotazioni} placeholder="Cerca per PNR, cliente o partecipante..." />
 
               {caricamento && <p className="testo-intro">Carico...</p>}
 

@@ -301,6 +301,7 @@ export const prenotazioniService = {
         metodoPagamento: prenotazioni.metodoPagamento,
         saldoPagato: prenotazioni.saldoPagato,
         saldoPagatoIl: prenotazioni.saldoPagatoIl,
+        scadenzaSaldo: prenotazioni.scadenzaSaldo,
         stato: prenotazioni.stato,
         creataIl: prenotazioni.creataIl,
         eventoId: prenotazioni.eventoId,
@@ -444,6 +445,33 @@ export const prenotazioniService = {
    *  gira una volta al giorno) e non hanno ancora ricevuto il promemoria,
    *  e manda l'email con il link per completare il pagamento. Va
    *  richiamata periodicamente (vedi src/shared/scheduler.ts). */
+  /** Sollecito manuale — l'amministratore lo manda quando vuole, a
+   *  differenza del promemoria automatico (che parte solo nella
+   *  finestra di 24 ore prima della scadenza). Stessa email, nessuna
+   *  data/finestra da rispettare qui. */
+  async inviaSollecitoManuale(pnr: string) {
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
+    if (!p) throw new NonTrovato('Prenotazione');
+    if (p.tipoPagamento !== 'ACCONTO' || p.saldoPagato) throw new ConflittoDati('Questa prenotazione non ha un saldo da sollecitare.');
+
+    const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+    if (!utente) throw new NonTrovato('Cliente');
+
+    const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
+    const dati = await this.differenzaSaldo(p.pnr);
+    const link = urlSito(`/completa-saldo/${p.pnr}`);
+    const { templateEmailService } = await import('../template-email/template-email.service.js');
+    const { oggetto, html } = await templateEmailService.renderizza('promemoria_saldo', {
+      nome: utente.nome ?? '',
+      evento: dati.artista,
+      differenza: dati.differenza.toFixed(2),
+      pnr: p.pnr,
+      link,
+    });
+    const { inviata } = await inviaEmail({ a: utente.email, oggetto, html });
+    return { inviata };
+  },
+
   async inviaPromemoriaSaldo() {
     const oraAdesso = new Date();
     const domani = new Date(oraAdesso.getTime() + 24 * 3600 * 1000);

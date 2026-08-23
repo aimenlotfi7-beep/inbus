@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, sql } from 'drizzle-orm';
+import { and, eq, ilike, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
   eventi,
@@ -22,7 +22,10 @@ import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './e
 // relazioni annidate, così il frontend riceve un unico oggetto completo
 // (esattamente come faceva il vecchio inbusLoadDB() nel prototipo).
 export const includeCompleto = {
-  linee: { with: { fermate: true } },
+  // Nascoste ovunque venga usata questa query condivisa (form di
+  // modifica, sito pubblico, checkout) — restano recuperabili solo
+  // tramite le funzioni dedicate del Cestino qui sotto.
+  linee: { where: isNull(lineeBus.eliminatoIl), with: { fermate: true } },
   immagini: true,
   allegati: true,
 } as const;
@@ -91,7 +94,9 @@ function conStatoCalcolato<T extends { statoDisponibilita: 'POCHI_POSTI' | 'NUOV
 
 export const eventiService = {
   async list(query: ListaEventiQuery) {
-    const condizioni = [];
+    // Nascosti sempre, sia per il gestionale sia per il sito pubblico —
+    // solo il Cestino (funzione dedicata più sotto) li fa vedere.
+    const condizioni = [isNull(eventi.eliminatoIl)];
     if (query.citta) condizioni.push(ilike(eventi.citta, `%${query.citta}%`));
     if (query.genere) condizioni.push(ilike(eventi.genere, `%${query.genere}%`));
     if (query.soloInEvidenza) condizioni.push(eq(eventi.inEvidenza, true));
@@ -106,7 +111,7 @@ export const eventiService = {
     }
 
     const risultati = await db.query.eventi.findMany({
-      where: condizioni.length ? and(...condizioni) : undefined,
+      where: and(...condizioni),
       with: includeCompleto,
       orderBy: (e, { asc }) => [asc(e.data)],
     });
@@ -124,7 +129,7 @@ export const eventiService = {
       with: includeCompleto,
     });
     if (!evento) throw new NonTrovato('Evento');
-    if (!evento.visibileSito || evento.bozza || new Date(evento.data) < new Date()) throw new NonTrovato('Evento');
+    if (!evento.visibileSito || evento.bozza || evento.eliminatoIl || new Date(evento.data) < new Date()) throw new NonTrovato('Evento');
     return conStatoCalcolato(evento);
   },
 
@@ -267,17 +272,15 @@ export const eventiService = {
       // errore. Solo le linee rimosse dal form vengono davvero cancellate,
       // e solo se non hanno prenotazioni collegate.
       if (input.linee) {
-        const lineeEsistenti = await tx.select().from(lineeBus).where(eq(lineeBus.eventoId, id));
+        const lineeEsistenti = await tx.select().from(lineeBus).where(and(eq(lineeBus.eventoId, id), isNull(lineeBus.eliminatoIl)));
         const idsInviati = new Set(input.linee.filter((l) => l.id).map((l) => l.id));
 
-        // Tratte tolte dal form: cancellale solo se libere da prenotazioni.
+        // Tratte tolte dal form: "eliminale" (cestino, non per davvero —
+        // niente più bisogno di controllare se hanno prenotazioni
+        // collegate, dato che nulla va perso sul serio).
         for (const esistente of lineeEsistenti) {
           if (idsInviati.has(esistente.id)) continue;
-          const collegate = await tx.select({ id: prenotazioni.id }).from(prenotazioni).where(eq(prenotazioni.lineaId, esistente.id)).limit(1);
-          if (collegate.length > 0) {
-            throw new ConflittoDati(`Non puoi rimuovere la tratta "${esistente.nome}": ha prenotazioni collegate. Lasciala nell'evento, anche se non la usi più per le nuove vendite.`);
-          }
-          await tx.delete(lineeBus).where(eq(lineeBus.id, esistente.id)); // cascade su fermate/bus_tratte
+          await tx.update(lineeBus).set({ eliminatoIl: new Date() }).where(eq(lineeBus.id, esistente.id));
         }
 
         for (const linea of input.linee) {
@@ -359,18 +362,54 @@ export const eventiService = {
     });
   },
 
+  /** "Elimina" un evento — non lo cancella per davvero (le prenotazioni
+   *  collegate resterebbero orfane): lo nasconde ovunque, recuperabile
+   *  dal Cestino. Nessun blocco per prenotazioni collegate, a differenza
+   *  di prima: qui non c'è più nulla da perdere per davvero. */
   async remove(id: string) {
     await getById(id);
-    const prenotazioniCollegate = await db
-      .select({ id: prenotazioni.id })
-      .from(prenotazioni)
-      .where(eq(prenotazioni.eventoId, id));
-    if (prenotazioniCollegate.length > 0) {
-      throw new ConflittoDati(
-        `Non puoi eliminare questo evento: ci sono ${prenotazioniCollegate.length} prenotazioni collegate (anche cancellate restano nello storico). Cancella prima quelle prenotazioni, se proprio necessario, oppure lascia l'evento così com'è: non comparirà più nelle nuove vendite se ne rimuovi la vetrina/evidenza.`
-      );
-    }
-    await db.delete(eventi).where(eq(eventi.id, id)); // cascade su linee/fermate/immagini/chat/lista attesa/promoter
+    await db.update(eventi).set({ eliminatoIl: new Date() }).where(eq(eventi.id, id));
+  },
+
+  /** Elenco eventi nel Cestino — solo quelli eliminati, con le tratte
+   *  che avevano (anche loro nascoste normalmente, ma qui servono per
+   *  farsi un'idea di cosa si sta per ripristinare). */
+  async eventiEliminati() {
+    return db.query.eventi.findMany({
+      where: sql`${eventi.eliminatoIl} is not null`,
+      with: { linee: true, immagini: true },
+      orderBy: (e, { desc }) => [desc(e.eliminatoIl)],
+    });
+  },
+
+  async ripristinaEvento(id: string) {
+    const [evento] = await db.select().from(eventi).where(eq(eventi.id, id)).limit(1);
+    if (!evento) throw new NonTrovato('Evento');
+    await db.update(eventi).set({ eliminatoIl: null }).where(eq(eventi.id, id));
+  },
+
+  /** Tratte nel Cestino — con il nome dell'evento a cui appartengono,
+   *  altrimenti un elenco di sole tratte senza contesto non direbbe
+   *  molto. */
+  async tratteEliminate() {
+    return db
+      .select({
+        id: lineeBus.id,
+        nome: lineeBus.nome,
+        eliminatoIl: lineeBus.eliminatoIl,
+        eventoId: lineeBus.eventoId,
+        eventoArtista: eventi.artista,
+      })
+      .from(lineeBus)
+      .innerJoin(eventi, eq(eventi.id, lineeBus.eventoId))
+      .where(sql`${lineeBus.eliminatoIl} is not null`)
+      .orderBy(sql`${lineeBus.eliminatoIl} desc`);
+  },
+
+  async ripristinaTratta(id: string) {
+    const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, id)).limit(1);
+    if (!linea) throw new NonTrovato('Tratta');
+    await db.update(lineeBus).set({ eliminatoIl: null }).where(eq(lineeBus.id, id));
   },
 
   /** Somma i posti disponibili su tutte le linee di un evento. */
@@ -695,6 +734,43 @@ export const eventiService = {
    *  voce "Partenze" nel menu del gestionale: prima segnalava "posti
    *  superati" rispetto al pianificato, ora segnala il problema
    *  operativo vero — non hai ancora censito bus a sufficienza. */
+  /** Due numeri rapidi per ogni evento — quanti passeggeri confermati e
+   *  quanti bus fisici sono stati censiti — usati dal Calendario per
+   *  dare un colpo d'occhio senza dover aprire ogni evento. */
+  async statistichePerEvento(): Promise<Record<string, { partecipanti: number; busCensiti: number }>> {
+    const righeLinee = await db.select({ lineaId: lineeBus.id, eventoId: lineeBus.eventoId }).from(lineeBus);
+    const mappaEventoDiLinea = new Map(righeLinee.map((r) => [r.lineaId, r.eventoId]));
+
+    const somme = await db
+      .select({ lineaId: prenotazioni.lineaId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
+      .from(prenotazioni)
+      .where(eq(prenotazioni.stato, 'CONFERMATA'))
+      .groupBy(prenotazioni.lineaId);
+
+    const risultato: Record<string, { partecipanti: number; busCensiti: number }> = {};
+    for (const s of somme) {
+      const eventoId = mappaEventoDiLinea.get(s.lineaId);
+      if (!eventoId) continue;
+      risultato[eventoId] ??= { partecipanti: 0, busCensiti: 0 };
+      risultato[eventoId].partecipanti += Number(s.totale);
+    }
+
+    const assegnazioni = await db.select().from(busTratte);
+    const busPerEvento = new Map<string, Set<string>>();
+    for (const a of assegnazioni) {
+      const eventoId = mappaEventoDiLinea.get(a.lineaId);
+      if (!eventoId) continue;
+      if (!busPerEvento.has(eventoId)) busPerEvento.set(eventoId, new Set());
+      busPerEvento.get(eventoId)!.add(a.busId);
+    }
+    for (const [eventoId, bus] of busPerEvento) {
+      risultato[eventoId] ??= { partecipanti: 0, busCensiti: 0 };
+      risultato[eventoId].busCensiti = bus.size;
+    }
+
+    return risultato;
+  },
+
   async contaAllertePartenze() {
     const righeLinee = await db.select({ lineaId: lineeBus.id }).from(lineeBus);
     if (righeLinee.length === 0) return 0;
@@ -722,5 +798,42 @@ export const eventiService = {
       if (postiBusCensiti < passeggeri) conteggio++;
     }
     return conteggio;
+  },
+
+  /** Come sopra, ma per singolo evento — quante tratte con posti
+   *  superati ha OGNI evento (non solo il totale generale), usata per
+   *  mostrare il pallino di avviso sulla card dell'evento specifico
+   *  nella sezione Partenze, non solo nel menu laterale. */
+  async allertePartenzePerEvento(): Promise<Record<string, number>> {
+    const righeLinee = await db.select({ lineaId: lineeBus.id, eventoId: lineeBus.eventoId }).from(lineeBus);
+    if (righeLinee.length === 0) return {};
+    const tutteLineeIds = righeLinee.map((r) => r.lineaId);
+    const mappaEventoDiLinea = new Map(righeLinee.map((r) => [r.lineaId, r.eventoId]));
+
+    const somme = await db
+      .select({ lineaId: prenotazioni.lineaId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
+      .from(prenotazioni)
+      .where(eq(prenotazioni.stato, 'CONFERMATA'))
+      .groupBy(prenotazioni.lineaId);
+    const mappaPasseggeri = new Map(somme.map((s) => [s.lineaId, Number(s.totale)]));
+
+    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.lineaId, tutteLineeIds));
+    const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
+    const bus = busIds.length ? await db.select({ id: busFisici.id, postiBus: busFisici.postiBus }).from(busFisici).where(inArray(busFisici.id, busIds)) : [];
+    const mappaBus = new Map(bus.map((b) => [b.id, b.postiBus ?? 0]));
+
+    const risultato: Record<string, number> = {};
+    for (const lineaId of tutteLineeIds) {
+      const passeggeri = mappaPasseggeri.get(lineaId) ?? 0;
+      if (passeggeri === 0) continue;
+      const postiBusCensiti = assegnazioni
+        .filter((a) => a.lineaId === lineaId)
+        .reduce((s, a) => s + (mappaBus.get(a.busId) ?? 0), 0);
+      if (postiBusCensiti < passeggeri) {
+        const eventoId = mappaEventoDiLinea.get(lineaId)!;
+        risultato[eventoId] = (risultato[eventoId] ?? 0) + 1;
+      }
+    }
+    return risultato;
   },
 };

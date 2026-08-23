@@ -44,6 +44,9 @@ export const prenotazioniController = {
   async saldaResto(req: Request, res: Response) {
     res.json(await prenotazioniService.saldaResto(req.params.pnr));
   },
+  async inviaSollecitoManuale(req: Request, res: Response) {
+    res.json(await prenotazioniService.inviaSollecitoManuale(req.params.pnr));
+  },
 };
 
 export const prenotazioniRouter = Router();
@@ -58,13 +61,18 @@ prenotazioniRouter.get('/eventi', richiedeAuth, richiedePermesso('prenotazioni.v
 prenotazioniRouter.post('/', richiedeAuthCliente, valida(creaPrenotazioneSchema), asyncHandler(prenotazioniController.crea));
 prenotazioniRouter.get('/by-email', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.listByEmail));
 prenotazioniRouter.get('/:pnr', asyncHandler(prenotazioniController.getByPnr));
-prenotazioniRouter.post('/:pnr/cancella', asyncHandler(prenotazioniController.cancella));
 prenotazioniRouter.get('/:pnr/saldo', asyncHandler(prenotazioniController.differenzaSaldo));
 prenotazioniRouter.post('/:pnr/salda', asyncHandler(prenotazioniController.saldaResto));
+
+// Amministrazione: cancellazione vera di una prenotazione — protetta
+// (era rimasta pubblica per errore: il cliente non può più cancellare
+// da solo, deve passare da una richiesta di rimborso approvata).
+prenotazioniRouter.post('/:pnr/cancella', richiedeAuth, richiedePermesso('prenotazioni.cancella'), asyncHandler(prenotazioniController.cancella));
 
 // Amministrazione: elimina DEFINITIVAMENTE una prenotazione già cancellata
 // (per ripulire dati di test o duplicati) — non tocca quelle confermate.
 prenotazioniRouter.delete('/:pnr', richiedeAuth, richiedePermesso('prenotazioni.cancella'), asyncHandler(prenotazioniController.eliminaDefinitivamente));
+prenotazioniRouter.post('/:pnr/sollecito', richiedeAuth, richiedePermesso('prenotazioni.pagamenti'), asyncHandler(prenotazioniController.inviaSollecitoManuale));
 
 // Nota: in produzione qui andrebbe aggiunto un controllo che l'email nel
 // body/query corrisponda al cliente autenticato (es. via magic-link/OTP),
