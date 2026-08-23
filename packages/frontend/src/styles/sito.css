@@ -576,3 +576,30 @@
   .link-preferenze-cookie{
     background:none; border:none; color:var(--mist); font-size:12.5px; text-decoration:underline; cursor:pointer; padding:0;
   }
+
+/* ---------- PERCORSO BUS (pagina evento) ---------- */
+.percorso-bus-blocco{margin-top:24px;}
+.percorso-bus-blocco h4{
+  font-family:'Poppins',sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:.5px;
+  color:var(--paper); margin:0 0 12px;
+}
+.percorso-nome-linea{font-size:12px; color:var(--mist); margin:0 0 8px; text-transform:uppercase; letter-spacing:.4px;}
+.percorso-linea:not(:last-child){margin-bottom:22px;}
+.percorso-tappe{position:relative; padding-left:22px;}
+.percorso-tappa{position:relative; padding-bottom:18px;}
+.percorso-tappa:last-child{padding-bottom:0;}
+.percorso-tappa-puntino{
+  position:absolute; left:-22px; top:4px; width:10px; height:10px; border-radius:50%;
+  background:var(--pink); border:2px solid var(--night);
+}
+.percorso-tappa-puntino.arrivo{background:var(--blue, #5b8dff);}
+.percorso-tappa:not(:last-child)::before{
+  content:''; position:absolute; left:-18px; top:14px; bottom:-4px; width:1px; background:rgba(255,255,255,.15);
+}
+.percorso-tappa-corpo{display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:13.5px;}
+.percorso-tappa-corpo b{font-size:14px;}
+.percorso-orario{color:var(--mist); font-size:12px;}
+.percorso-posti{font-size:11px; padding:2px 9px; border-radius:999px; font-weight:600;}
+.percorso-posti.disponibile{background:rgba(72,214,140,.15); color:#5be0a0;}
+.percorso-posti.pochi{background:rgba(255,180,80,.15); color:#e0a95b;}
+.percorso-posti.esaurito{background:rgba(255,61,122,.15); color:var(--pink);}

@@ -5,6 +5,7 @@ import type { Evento } from '../api/types';
 import { prezzoMinimoEvento } from '../api/prezzi';
 import { useSeoTags } from '../features/useSeoTags';
 import { CheckoutForm } from '../features/checkout/CheckoutForm';
+import { PercorsoBus } from '../features/PercorsoBus';
 import { Layout } from '../Layout';
 
 const ETICHETTA_STATO: Record<NonNullable<Evento['statoDisponibilita']>, string> = {
@@ -116,6 +117,8 @@ export function EventoPage() {
               {prezzoMinimo !== null && (
                 <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, marginTop: 14 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
               )}
+
+              <PercorsoBus evento={evento} />
 
               {/* Solo su cellulare: scorciatoie per saltare subito alle due
                   sezioni qui sotto, dato che ora la prenotazione viene
