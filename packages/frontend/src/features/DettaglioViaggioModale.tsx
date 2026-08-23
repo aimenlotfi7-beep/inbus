@@ -90,27 +90,35 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
           ))}
         </div>
 
-        {!!biglietti.length && (
+        {dettaglio.stato === 'CONFERMATA' && (
           <>
             <p className="section-label" style={{ marginTop: 18 }}>I miei biglietti</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {biglietti.map((b) => (
-                <div key={b.token} className="travel-biglietto-riga">
-                  <span>🎫 {b.nome} {b.cognome}</span>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <a className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px', textDecoration: 'none' }} href={ticketApi.urlDownload(b.token)} target="_blank" rel="noreferrer">
-                      Scarica
-                    </a>
-                    <PulsanteCondividi
-                      titolo={`Biglietto INBUS — ${ev?.artista ?? ''}`}
-                      testo={`Ecco il biglietto per ${b.nome} ${b.cognome} — ${ev?.artista ?? ''}`}
-                      link={ticketApi.urlDownload(b.token)}
-                      etichetta="Condividi"
-                    />
+            {biglietti.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {biglietti.map((b) => (
+                  <div key={b.token} className="travel-biglietto-riga">
+                    <span>🎫 {b.nome} {b.cognome}</span>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <a className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px', textDecoration: 'none' }} href={ticketApi.urlDownload(b.token)} target="_blank" rel="noreferrer">
+                        Scarica
+                      </a>
+                      <PulsanteCondividi
+                        titolo={`Biglietto INBUS — ${ev?.artista ?? ''}`}
+                        testo={`Ecco il biglietto per ${b.nome} ${b.cognome} — ${ev?.artista ?? ''}`}
+                        link={ticketApi.urlDownload(b.token)}
+                        etichetta="Condividi"
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: 'var(--mist)', fontSize: 13 }}>
+                {pagamentoCompleto
+                  ? 'I biglietti sono in preparazione — se non compaiono entro poco, scrivici in chat.'
+                  : 'I biglietti saranno disponibili qui non appena il saldo sarà completato.'}
+              </p>
+            )}
           </>
         )}
 
