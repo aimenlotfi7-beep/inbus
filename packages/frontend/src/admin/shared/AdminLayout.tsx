@@ -49,7 +49,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   ]},
   { titolo: 'Logistica', voci: [
     { id: 'fornitori', label: 'Fornitori', permesso: 'fornitori.visualizza' },
-    { id: 'tragitti', label: 'Tragitti', permesso: 'tragitti.visualizza' },
+    { id: 'tragitti', label: 'Percorsi salvati', permesso: 'tragitti.visualizza' },
     { id: 'impostazioni', label: 'Impostazioni', permesso: 'impostazioni.gestisci' },
   ]},
   { titolo: 'Sistema', voci: [

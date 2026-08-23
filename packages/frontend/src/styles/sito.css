@@ -613,3 +613,25 @@
 }
 .parti-da-chip:hover{border-color:var(--pink);}
 .parti-da-chip.active{background:var(--pink); border-color:var(--pink); color:#fff; font-weight:600;}
+
+/* ---------- ACCORDION EVENTO (Descrizione/Informazioni/Partenze) ---------- */
+.accordion-evento{margin-top:22px;}
+.accordion-evento-pulsanti{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+.accordion-evento-pulsanti .btn.active{background:var(--pink); border-color:var(--pink); color:#fff;}
+
+/* ---------- CHECKOUT: scelta viaggio (quando l'evento ne ha piu' di uno) ---------- */
+.checkout-viaggio-card{
+  display:flex; flex-direction:column; gap:4px; text-align:left;
+  background:#fff; border:1px solid #e5ded0; border-radius:12px; padding:16px 18px; cursor:pointer;
+  transition:border-color .15s ease;
+}
+.checkout-viaggio-card:hover{border-color:var(--pink);}
+.checkout-viaggio-card b{font-size:15px;}
+.checkout-viaggio-card span{font-size:12.5px; opacity:.7;}
+
+/* ---------- CHECKOUT: metodo di pagamento ---------- */
+.mini-tab{
+  background:#fff; border:1px solid #e5ded0; border-radius:999px; padding:9px 16px;
+  font-size:13px; color:var(--ink); cursor:pointer; opacity:.75;
+}
+.mini-tab.active{background:var(--pink); border-color:var(--pink); color:#fff; opacity:1; font-weight:600;}

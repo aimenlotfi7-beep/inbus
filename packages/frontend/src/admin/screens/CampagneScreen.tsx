@@ -68,11 +68,7 @@ export function CampagneScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Campagne" azione={<button className="btn btn-primary" onClick={apriNuova}>+ Nuova campagna</button>} />
-      <p className="testo-intro">
-        Le campagne si collegano alle Offerte (dentro la scheda di ogni evento) per dare un prezzo dedicato e
-        tracciare da dove arrivano le prenotazioni.
-      </p>
+      <PanelHead titolo="Campagne" azione={<button className="btn btn-primary" onClick={apriNuova}>+ Nuova campagna</button>} info="Le campagne si collegano alle Offerte (dentro la scheda di ogni evento) per dare un prezzo dedicato e tracciare da dove arrivano le prenotazioni." />
       <TabellaGenerica
         righe={campagne}
         colonne={[

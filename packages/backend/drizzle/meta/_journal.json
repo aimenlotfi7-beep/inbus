@@ -232,6 +232,20 @@
       "when": 1787495889113,
       "tag": "0033_coupon_per_evento",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1787498164719,
+      "tag": "0034_prodotti",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1787514516830,
+      "tag": "0035_reset_password",
+      "breakpoints": true
     }
   ]
 }

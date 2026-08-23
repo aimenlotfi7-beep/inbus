@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
 import { promoter, promoterEventi, prenotazioni, eventi } from '../../db/schema.js';
 import { NonTrovato, NonAutorizzato } from '../../shared/errors.js';
@@ -10,6 +11,12 @@ import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { env } from '../../config/env.js';
+import { inviaEmail, urlSito } from '../../shared/email.service.js';
+
+const ORE_VALIDITA_TOKEN_RESET = 2;
+function generaTokenReset() {
+  return crypto.randomBytes(24).toString('hex');
+}
 
 function generaCodice(nome: string) {
   const base = nome.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'PROMO';
@@ -98,6 +105,31 @@ export const promoterService = {
     return { token, promoter: { id: p.id, nome: p.nome, codice: p.codice } };
   },
 
+  async richiediResetPassword(email: string) {
+    const [p] = await db.select().from(promoter).where(eq(promoter.email, email.toLowerCase())).limit(1);
+    if (!p) return; // silenzioso apposta
+
+    const token = generaTokenReset();
+    const scadenza = new Date(Date.now() + ORE_VALIDITA_TOKEN_RESET * 60 * 60 * 1000);
+    await db.update(promoter).set({ tokenResetPassword: token, tokenResetPasswordScadenza: scadenza }).where(eq(promoter.id, p.id));
+
+    const link = urlSito(`/promoter/reimposta-password/${token}`);
+    const { templateEmailService } = await import('../template-email/template-email.service.js');
+    const { oggetto, html } = await templateEmailService.renderizza('reset_password', {
+      nome: p.nome, link, ore_validita: String(ORE_VALIDITA_TOKEN_RESET),
+    });
+    await inviaEmail({ a: p.email, oggetto, html });
+  },
+
+  async confermaResetPassword(token: string, nuovaPassword: string) {
+    const [p] = await db.select().from(promoter).where(eq(promoter.tokenResetPassword, token)).limit(1);
+    if (!p || !p.tokenResetPasswordScadenza || p.tokenResetPasswordScadenza < new Date()) {
+      throw new NonAutorizzato('Link scaduto o non valido — richiedine uno nuovo.');
+    }
+    const passwordHash = await bcrypt.hash(nuovaPassword, 10);
+    await db.update(promoter).set({ passwordHash, tokenResetPassword: null, tokenResetPasswordScadenza: null }).where(eq(promoter.id, p.id));
+  },
+
   /** Quante prenotazioni e quanto fatturato ha portato il codice di questo promoter. */
   async statistiche(codice: string) {
     const righe = await db.select().from(prenotazioni).where(and(eq(prenotazioni.promoterCodice, codice), eq(prenotazioni.stato, 'CONFERMATA')));
@@ -122,6 +154,14 @@ export const promoterService = {
 export const promoterRouter = Router();
 
 promoterRouter.post('/login', valida(loginPromoterSchema), asyncHandler(async (req: Request, res: Response) => res.json(await promoterService.login(req.body))));
+promoterRouter.post('/richiedi-reset', valida(z.object({ email: z.string().email() })), asyncHandler(async (req: Request, res: Response) => {
+  await promoterService.richiediResetPassword(req.body.email);
+  res.json({ ok: true });
+}));
+promoterRouter.post('/reset-password', valida(z.object({ token: z.string(), password: z.string().min(8, 'La password deve avere almeno 8 caratteri.') })), asyncHandler(async (req: Request, res: Response) => {
+  await promoterService.confermaResetPassword(req.body.token, req.body.password);
+  res.json({ ok: true });
+}));
 
 // ---- Self-service: il promoter vede i propri dati con il proprio token,
 // non serve un accesso da amministratore. ----

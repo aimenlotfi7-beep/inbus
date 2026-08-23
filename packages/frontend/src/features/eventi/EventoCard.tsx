@@ -3,15 +3,18 @@ import type { Evento } from '../../api/types';
 import { prezzoMinimoEvento } from '../../api/prezzi';
 
 function postiTotaliDisponibili(evento: Evento) {
-  return evento.linee.reduce((somma, l) => somma + l.postiDisponibili, 0);
+  const tutteLeLinee = [...evento.linee, ...evento.prodotti.flatMap((v) => v.linee)];
+  return tutteLeLinee.reduce((somma, l) => somma + l.postiDisponibili, 0);
 }
 
 /** Le città di partenza vere, dalle fermate reali — non un dato a
  *  parte da tenere aggiornato a mano, semplicemente quello che c'è
- *  già nelle tratte di questo evento. */
+ *  già nelle tratte di questo evento (comprese quelle dentro un
+ *  viaggio, se ne ha). */
 function cittaPartenzaEvento(evento: Evento): string[] {
   const insieme = new Set<string>();
-  evento.linee.forEach((l) => l.fermate.forEach((f) => insieme.add(f.citta)));
+  const tutteLeLinee = [...evento.linee, ...evento.prodotti.flatMap((v) => v.linee)];
+  tutteLeLinee.forEach((l) => l.fermate.forEach((f) => insieme.add(f.citta)));
   return Array.from(insieme);
 }
 

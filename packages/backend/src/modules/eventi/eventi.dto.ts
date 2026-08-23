@@ -17,8 +17,9 @@ const fermataSchema = z.object({
   postiMax: z.number().int().positive().optional(),
 });
 
-const lineaSchema = z.object({
+export const lineaSchema = z.object({
   id: z.string().optional(), // presente = tratta già esistente da aggiornare, assente = nuova
+  prodottoId: z.string().nullable().optional(), // vuoto/assente = tratta "libera", non appartiene a nessun viaggio
   nome: z.string().min(1),
   postiTotali: z.number().int().positive(),
   prezzoExtra: z.number().default(0),
@@ -26,6 +27,19 @@ const lineaSchema = z.object({
   referenteTelefono: z.string().optional(),
   fornitoreId: z.string().optional(),
   fermate: z.array(fermataSchema).default([]),
+});
+
+// Un "viaggio" raggruppa tragitti (tratte) — per gli eventi che
+// vendono più pacchetti bus distinti nello stesso evento (es. "arrivo
+// alle 14:00" e "arrivo alle 18:00"). Annidato dentro lo stesso
+// payload dell'evento, come i tragitti liberi: si può creare tutto
+// insieme, anche alla primissima creazione dell'evento, senza dover
+// prima salvare e poi tornare a modificare.
+const prodottoSchema = z.object({
+  id: z.string().optional(),
+  nome: z.string().min(1),
+  arrivoOrario: z.string().optional(),
+  linee: z.array(lineaSchema).default([]),
 });
 
 export const creaEventoSchema = z.object({
@@ -61,6 +75,7 @@ export const creaEventoSchema = z.object({
   immagini: z.array(z.string().url()).default([]),
   allegati: z.array(z.object({ nome: z.string(), url: z.string() })).default([]),
   linee: z.array(lineaSchema).default([]),
+  prodotti: z.array(prodottoSchema).default([]),
 });
 export type CreaEventoInput = z.infer<typeof creaEventoSchema>;
 

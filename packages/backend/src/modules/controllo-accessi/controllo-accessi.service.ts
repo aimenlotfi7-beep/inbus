@@ -105,4 +105,71 @@ export const controlloAccessiService = {
     await db.update(partecipantiPrenotazione).set({ ticketUtilizzatoIl: new Date() }).where(eq(partecipantiPrenotazione.id, partecipante.id));
     return { esito: 'valido', nome };
   },
+
+  /** Tutti i bus (di tutti gli eventi) assegnati a questo tour leader,
+   *  come coppie evento-bus — usata dalla schermata "Eventi" e dalla
+   *  ricerca, per limitare sempre e solo ai bus davvero suoi. */
+  async lineeAssegnate(tourLeaderId: string): Promise<string[]> {
+    const busIds = (await db.select({ id: busFisici.id }).from(busFisici).where(eq(busFisici.tourLeaderId, tourLeaderId))).map((b) => b.id);
+    if (!busIds.length) return [];
+    const righe = await db.select({ lineaId: busTratte.lineaId }).from(busTratte).where(inArray(busTratte.busId, busIds));
+    return Array.from(new Set(righe.map((r) => r.lineaId)));
+  },
+
+  /** Cerca un passeggero per nome, cognome, PNR o email — su tutte le
+   *  tratte assegnate a questo tour leader, non solo un bus alla volta.
+   *  Serve per il check-in manuale quando il QR non si legge o il
+   *  cliente non ce l'ha a portata di mano. */
+  async cerca(tourLeaderId: string, query: string) {
+    const lineeIds = await this.lineeAssegnate(tourLeaderId);
+    if (!lineeIds.length || query.trim().length < 2) return [];
+
+    const prenotazioniAssegnate = await db
+      .select()
+      .from(prenotazioni)
+      .where(and(inArray(prenotazioni.lineaId, lineeIds), eq(prenotazioni.stato, 'CONFERMATA')));
+    if (!prenotazioniAssegnate.length) return [];
+
+    const prenotazioniPerId = new Map(prenotazioniAssegnate.map((p) => [p.id, p]));
+    const partecipantiRighe = await db
+      .select()
+      .from(partecipantiPrenotazione)
+      .where(inArray(partecipantiPrenotazione.prenotazioneId, Array.from(prenotazioniPerId.keys())));
+
+    const q = query.trim().toLowerCase();
+    return partecipantiRighe
+      .filter((p) => {
+        const pren = prenotazioniPerId.get(p.prenotazioneId)!;
+        return `${p.nome} ${p.cognome} ${pren.pnr}`.toLowerCase().includes(q);
+      })
+      .map((p) => {
+        const pren = prenotazioniPerId.get(p.prenotazioneId)!;
+        return {
+          partecipanteId: p.id,
+          nome: p.nome,
+          cognome: p.cognome,
+          pnr: pren.pnr,
+          fermataCitta: pren.fermataCitta,
+          giaSalito: !!p.ticketUtilizzatoIl,
+        };
+      })
+      .slice(0, 20);
+  },
+
+  /** Check-in manuale — stesso identico effetto della scansione QR, ma
+   *  scelto dalla lista di ricerca invece che leggendo il codice. */
+  async checkinManuale(tourLeaderId: string, partecipanteId: string) {
+    const [partecipante] = await db.select().from(partecipantiPrenotazione).where(eq(partecipantiPrenotazione.id, partecipanteId)).limit(1);
+    if (!partecipante) throw new NonTrovato('Passeggero');
+    const [pren] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, partecipante.prenotazioneId)).limit(1);
+    if (!pren) throw new NonTrovato('Prenotazione');
+
+    const lineeIds = await this.lineeAssegnate(tourLeaderId);
+    if (!lineeIds.includes(pren.lineaId)) throw new VietatoDaiPermessi('Questo passeggero non è su una tua tratta.');
+
+    if (!partecipante.ticketUtilizzatoIl) {
+      await db.update(partecipantiPrenotazione).set({ ticketUtilizzatoIl: new Date() }).where(eq(partecipantiPrenotazione.id, partecipanteId));
+    }
+    return { nome: `${partecipante.nome} ${partecipante.cognome}` };
+  },
 };

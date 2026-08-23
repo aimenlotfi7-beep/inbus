@@ -19,7 +19,7 @@ const VUOTO: EventoInput = { artista: '', genere: '', luogo: '', citta: '', data
 
 const STEP_WIZARD = [
   { numero: 1, label: 'Info evento' },
-  { numero: 2, label: 'Tratte' },
+  { numero: 2, label: 'Tragitti' },
   { numero: 3, label: 'Immagini' },
   { numero: 4, label: 'Riepilogo' },
 ] as const;
@@ -63,6 +63,36 @@ export function SchedaEventoModale({
   // invece di crearne una nuova ogni volta.
   const bozzaIdRef = useRef<string | null>(null);
   const [aggiustiPerTratta, setAggiustiPerTratta] = useState<Record<number, string>>({});
+  // Tratte comprimibili come in Partenze — le nuove restano aperte per
+  // poterle compilare subito, le altre si possono chiudere per non
+  // dover scorrere tutto quando ce ne sono tante.
+  const [tratteAperte, setTratteAperte] = useState<Set<number>>(new Set());
+  // I viaggi — completamente locali finché non si salva tutto insieme
+  // (anche alla primissima creazione dell'evento): quelli già esistenti
+  // hanno l'id vero del server, quelli appena aggiunti hanno una
+  // chiave temporanea che il backend riconosce come "nuovo" (nessun id).
+  const [viaggi, setViaggi] = useState<{ key: string; id?: string; nome: string; arrivoOrario?: string }[]>(
+    (evento?.prodotti ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoOrario: p.arrivoOrario ?? undefined }))
+  );
+
+  function nuovoViaggio() {
+    const nome = prompt('Nome del viaggio (es. "Bus arrivo 14:00")');
+    if (!nome?.trim()) return;
+    const arrivoOrario = prompt('Orario di arrivo di questo viaggio (facoltativo, es. 14:00)') ?? undefined;
+    setViaggi((prev) => [...prev, { key: `nuovo-${Date.now()}`, nome: nome.trim(), arrivoOrario: arrivoOrario || undefined }]);
+  }
+  function eliminaViaggioConferma(key: string, nome: string) {
+    if (!confirm(`Eliminare il viaggio "${nome}"? I suoi tragitti non vengono cancellati, tornano "liberi" (senza viaggio) — si elimina davvero solo salvando.`)) return;
+    setViaggi((prev) => prev.filter((v) => v.key !== key));
+    setForm((f) => ({ ...f, linee: (f.linee ?? []).map((l) => l.prodottoId === key ? { ...l, prodottoId: null } : l) }));
+  }
+  function toggleTrattaAperta(idx: number) {
+    setTratteAperte((prev) => {
+      const nuovo = new Set(prev);
+      if (nuovo.has(idx)) nuovo.delete(idx); else nuovo.add(idx);
+      return nuovo;
+    });
+  }
   const [nuovaImmagine, setNuovaImmagine] = useState('');
   const [trascinata, setTrascinata] = useState<{ linea: number; fermata: number } | null>(null);
   const [statoRicalcolo, setStatoRicalcolo] = useState<Record<number, string>>({});
@@ -96,6 +126,7 @@ export function SchedaEventoModale({
         immagini: [...evento.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
         linee: evento.linee.map((l) => ({
           id: l.id,
+          prodottoId: l.prodottoId,
           nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra),
           // Normalizzo qui il prezzo che arriva dal server: se una fermata
           // non ne aveva uno salvato, arriva `null`, non `undefined` — va
@@ -109,6 +140,7 @@ export function SchedaEventoModale({
       setStep(1);
     }
     setForm(nuovoForm);
+    setViaggi((evento?.prodotti ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoOrario: p.arrivoOrario ?? undefined })));
     setFormIniziale(JSON.stringify(nuovoForm));
     setAggiustiPerTratta({});
     setStatoRicalcolo({});
@@ -172,9 +204,11 @@ export function SchedaEventoModale({
       prezzoExtra: 0,
       fermate: tragitto.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined })),
     };
+    setTratteAperte((prev) => new Set(prev).add((form.linee ?? []).length));
     setForm({ ...form, linee: [...(form.linee ?? []), nuovaLinea] });
   }
   function aggiungiTrattaManuale() {
+    setTratteAperte((prev) => new Set(prev).add((form.linee ?? []).length));
     setForm({ ...form, linee: [...(form.linee ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, fermate: [{ citta: '', indirizzo: '' }] }] });
   }
 
@@ -336,9 +370,20 @@ export function SchedaEventoModale({
       return;
     }
     if (numeroTratte === 0) {
-      alert('Aggiungi almeno una tratta prima di salvare.');
+      alert('Aggiungi almeno un tragitto prima di salvare.');
       setStep(2);
       return;
+    }
+    for (let i = 0; i < (form.linee ?? []).length; i++) {
+      const linea = (form.linee ?? [])[i];
+      if (!linea.nome.trim()) continue; // tratte vuote (mai compilate) vengono comunque scartate al salvataggio
+      const fermataSenzaOrario = linea.fermate.find((f) => f.citta.trim() && !f.orario?.trim());
+      if (fermataSenzaOrario) {
+        alert(`Manca l'orario per la fermata "${fermataSenzaOrario.citta}" nel tragitto "${linea.nome}" — è un campo obbligatorio, come tutti gli altri.`);
+        setStep(2);
+        setTratteAperte((prev) => new Set(prev).add(i));
+        return;
+      }
     }
     if (numeroImmagini === 0) {
       alert('Carica almeno un\'immagine prima di salvare.');
@@ -346,11 +391,20 @@ export function SchedaEventoModale({
       setSubTabImmagini('immagini');
       return;
     }
+    const tratteValide = (form.linee ?? [])
+      .filter((l) => l.nome.trim())
+      .map((l) => ({ ...l, fermate: l.fermate.filter((f) => f.citta.trim() && f.indirizzo.trim()) }));
     const payload = {
       ...form,
-      linee: (form.linee ?? [])
-        .filter((l) => l.nome.trim())
-        .map((l) => ({ ...l, fermate: l.fermate.filter((f) => f.citta.trim() && f.indirizzo.trim()) })),
+      // Solo i tragitti liberi restano qui — quelli dentro un viaggio
+      // vanno annidati sotto il loro viaggio, il server li aspetta lì.
+      linee: tratteValide.filter((l) => !l.prodottoId),
+      prodotti: viaggi.map((v) => ({
+        id: v.id, // assente = viaggio nuovo, non ancora salvato
+        nome: v.nome,
+        arrivoOrario: v.arrivoOrario,
+        linee: tratteValide.filter((l) => l.prodottoId === v.key).map((l) => ({ ...l, prodottoId: undefined })),
+      })),
     };
     try {
       if (evento) {
@@ -435,7 +489,7 @@ export function SchedaEventoModale({
             </p>
           )}
           <p className="testo-intro" style={{ marginTop: -8, fontSize: 12.5 }}>
-            I prezzi si impostano per fermata nello step "Tratte" (arrivano dai tragitti che applichi). Chi prenota con
+            I prezzi si impostano per fermata nello step "Tragitti" (arrivano dai percorsi che applichi). Chi prenota con
             acconto salda il resto entro 15 giorni prima della partenza. L'avviso disponibilità è solo un'etichetta
             (per creare urgenza o scarsità): non blocca davvero le prenotazioni, quello dipende dai posti reali.
           </p>
@@ -491,33 +545,81 @@ export function SchedaEventoModale({
         </div>
       </div>
 
+      <div className="section-card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: viaggi.length ? 10 : 0 }}>
+          <p className="section-label" style={{ marginBottom: 0 }}>
+            Viaggi {viaggi.length === 0 && <span style={{ fontWeight: 400, opacity: .7 }}>(facoltativi — solo se questo evento ha più pacchetti bus distinti, es. "arrivo 14:00" e "arrivo 18:00")</span>}
+          </p>
+          <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={nuovoViaggio}>+ Viaggio</button>
+        </div>
+        {viaggi.map((v) => (
+          <div key={v.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 13.5 }}>
+            <span>{v.nome}{v.arrivoOrario ? ` — arrivo ${v.arrivoOrario}` : ''}</span>
+            <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => eliminaViaggioConferma(v.key, v.nome)}>Elimina</button>
+          </div>
+        ))}
+      </div>
+
       {tragitti.length > 0 && (
         <div className="section-card" style={{ marginBottom: 16 }}>
-          <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi una tratta da un tragitto salvato</p>
+          <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi un tragitto da un percorso salvato</p>
           <select
             value=""
             onChange={(e) => {
               const t = tragitti.find((x) => x.id === e.target.value);
-              if (t) aggiungiTrattaDaTragitto(t);
+              if (t && !(form.linee ?? []).some((l) => l.nome === t.nome)) aggiungiTrattaDaTragitto(t);
             }}
           >
             <option value="">Scegli un tragitto...</option>
             {tragitti.map((t) => {
               const giaUsato = (form.linee ?? []).some((l) => l.nome === t.nome);
-              return <option key={t.id} value={t.id}>{t.nome}{giaUsato ? ' (già in uso su questo evento)' : ''}</option>;
+              return <option key={t.id} value={t.id} disabled={giaUsato}>{t.nome}{giaUsato ? ' (già aggiunto a questo evento)' : ''}</option>;
             })}
           </select>
         </div>
       )}
 
-      {(form.linee ?? []).map((linea, idxLinea) => (
+      {(form.linee ?? []).map((linea, idxLinea) => {
+        const espansa = tratteAperte.has(idxLinea);
+        return (
         <div key={idxLinea} className="section-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr .6fr', gap: 8, flex: 1 }}>
-              <input placeholder="Nome tratta" value={linea.nome} onChange={(e) => aggiornaLinea(idxLinea, 'nome', e.target.value)} />
-              <CampoNumero placeholder="Posti totali" value={linea.postiTotali} onChange={(v) => aggiornaLinea(idxLinea, 'postiTotali', v ?? 0)} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggleTrattaAperta(idxLinea)}>
+              <span style={{ color: 'var(--mist)', fontSize: 13 }}>{espansa ? '▾' : '▸'}</span>
+              <div style={{ flex: 1 }}>
+                <b>{linea.nome || 'Tragitto senza nome'}</b>
+                {!espansa && (
+                  <p className="section-sub" style={{ margin: '2px 0 0' }}>
+                    {linea.fermate.length} fermat{linea.fermate.length === 1 ? 'a' : 'e'}
+                    {linea.fermate.some((f) => f.citta) && ` — ${linea.fermate.filter((f) => f.citta).map((f) => `${f.citta}${f.orario ? ` (${f.orario})` : ''}`).join(', ')}`}
+                  </p>
+                )}
+              </div>
             </div>
-            <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12.5 }} onClick={() => rimuoviLinea(idxLinea)}>Rimuovi tratta</button>
+            <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12.5, flexShrink: 0 }} onClick={() => rimuoviLinea(idxLinea)}>Rimuovi tragitto</button>
+          </div>
+
+          {espansa && (
+          <>
+          {viaggi.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <label className="field-label" style={{ fontSize: 11 }}>Viaggio</label>
+              <select
+                value={linea.prodottoId ?? ''}
+                onChange={(e) => {
+                  const linee = [...(form.linee ?? [])];
+                  linee[idxLinea] = { ...linee[idxLinea], prodottoId: e.target.value || null };
+                  setForm({ ...form, linee });
+                }}
+              >
+                <option value="">Nessuno (tragitto libero)</option>
+                {viaggi.map((v) => <option key={v.key} value={v.key}>{v.nome}</option>)}
+              </select>
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr .6fr', gap: 8, marginBottom: 10 }}>
+            <input placeholder="Nome tragitto" value={linea.nome} onChange={(e) => aggiornaLinea(idxLinea, 'nome', e.target.value)} />
+            <CampoNumero placeholder="Posti totali" value={linea.postiTotali} onChange={(v) => aggiornaLinea(idxLinea, 'postiTotali', v ?? 0)} />
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
@@ -573,9 +675,11 @@ export function SchedaEventoModale({
             "Posti max" è facoltativo: mettilo solo se vuoi limitare quante persone possono salire da quella
             città specifica, indipendentemente dai posti liberi sul resto del bus.
           </p>
+          </>
+          )}
         </div>
-      ))}
-      <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTrattaManuale}>+ Aggiungi tratta manuale (senza tragitto salvato)</button>
+      );})}
+      <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTrattaManuale}>+ Aggiungi tragitto manuale (senza percorso salvato)</button>
     </>
   );
 
@@ -689,7 +793,7 @@ export function SchedaEventoModale({
           </div>
         )}
 
-        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} />}
+        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} viaggi={viaggi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} />}
         {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} />}
         {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}
         {tabAttiva === 'dettagli' && (
@@ -716,7 +820,7 @@ export function SchedaEventoModale({
 
             {step === 2 && (
               <>
-                <p className="section-label">Tratte</p>
+                <p className="section-label">Tragitti</p>
                 {campiTratte}
               </>
             )}
@@ -731,7 +835,7 @@ export function SchedaEventoModale({
                 <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? new Date(form.data).toLocaleDateString('it-IT') : '—'}</b></div>
                 <div className="riepilogo-riga-evento"><span>Acconto</span><b>€{Number(form.accontoEur || 10).toFixed(2)}</b></div>
                 <div className="riepilogo-riga-evento"><span>In evidenza</span><b>{form.inEvidenza ? 'Sì' : 'No'}</b></div>
-                <div className="riepilogo-riga-evento"><span>Tratte</span><b>{numeroTratte > 0 ? `${numeroTratte} configurate` : 'Nessuna'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Tragitti</span><b>{numeroTratte > 0 ? `${numeroTratte} configurate` : 'Nessuna'}</b></div>
                 <div className="riepilogo-riga-evento"><span>Immagini</span><b>{(form.immagini ?? []).length}</b></div>
               </div>
             )}
@@ -766,7 +870,7 @@ export function SchedaEventoModale({
 
       {step === 2 && (
         <>
-          <p className="section-label">Tratte (facoltative — puoi aggiungerle anche dopo)</p>
+          <p className="section-label">Tragitti (facoltativi — puoi aggiungerli anche dopo)</p>
           {campiTratte}
         </>
       )}
@@ -781,7 +885,7 @@ export function SchedaEventoModale({
           <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? new Date(form.data).toLocaleDateString('it-IT') : '—'}</b></div>
           <div className="riepilogo-riga-evento"><span>Acconto</span><b>€{Number(form.accontoEur || 10).toFixed(2)}</b></div>
           <div className="riepilogo-riga-evento"><span>In evidenza</span><b>{form.inEvidenza ? 'Sì' : 'No'}</b></div>
-          <div className="riepilogo-riga-evento"><span>Tratte</span><b>{numeroTratte > 0 ? `${numeroTratte} configurate` : 'Nessuna (aggiungibile dopo)'}</b></div>
+          <div className="riepilogo-riga-evento"><span>Tragitti</span><b>{numeroTratte > 0 ? `${numeroTratte} configurate` : 'Nessuna (aggiungibile dopo)'}</b></div>
           <div className="riepilogo-riga-evento"><span>Immagini</span><b>{(form.immagini ?? []).length}</b></div>
         </div>
       )}

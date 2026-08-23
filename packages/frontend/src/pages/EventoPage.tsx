@@ -5,7 +5,7 @@ import type { Evento } from '../api/types';
 import { prezzoMinimoEvento } from '../api/prezzi';
 import { useSeoTags } from '../features/useSeoTags';
 import { CheckoutForm } from '../features/checkout/CheckoutForm';
-import { PercorsoBus } from '../features/PercorsoBus';
+import { SezioniAccordion } from '../features/SezioniAccordion';
 import { PulsanteCondividi } from '../features/PulsanteCondividi';
 import { EventiCorrelati } from '../features/EventiCorrelati';
 import { Layout } from '../Layout';
@@ -41,18 +41,6 @@ export function EventoPage() {
     // display) prima di scorrere, altrimenti scrollIntoView calcola la
     // posizione sul contenuto ancora nascosto/compatto.
     setTimeout(() => checkoutRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-  }
-
-  /** Scorrimento controllato via codice (non un semplice link #ancora):
-   *  calcolo io la posizione esatta e tolgo un margine per l'intestazione
-   *  fissa in cima allo schermo, altrimenti coprirebbe l'inizio della
-   *  sezione — più affidabile del comportamento nativo del browser, che
-   *  varia tra dispositivi diversi. */
-  function scorriA(id: string) {
-    const elemento = document.getElementById(id);
-    if (!elemento) return;
-    const y = elemento.getBoundingClientRect().top + window.scrollY - 90;
-    window.scrollTo({ top: y, behavior: 'smooth' });
   }
 
   useEffect(() => {
@@ -123,35 +111,7 @@ export function EventoPage() {
                 <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, marginTop: 14 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
               )}
 
-              <PercorsoBus evento={evento} />
-
-              {/* Solo su cellulare: scorciatoie per saltare subito alle due
-                  sezioni qui sotto, dato che ora la prenotazione viene
-                  prima di loro nell'ordine visivo. */}
-              {(evento.descrizioneSeo || evento.descrizione) && (
-                <div className="salti-rapidi-mobile">
-                  {evento.descrizioneSeo && (
-                    <button type="button" className="btn btn-ghost" onClick={() => scorriA('descrizione-evento')}>Descrizione evento</button>
-                  )}
-                  {evento.descrizione && (
-                    <button type="button" className="btn btn-ghost" onClick={() => scorriA('informazioni')}>Informazioni</button>
-                  )}
-                </div>
-              )}
-
-              {evento.descrizioneSeo && (
-                <div className="sezione-info" id="descrizione-evento">
-                  <h4>Descrizione evento</h4>
-                  {evento.descrizioneSeo}
-                </div>
-              )}
-
-              {evento.descrizione && (
-                <div className="sezione-info" id="informazioni">
-                  <h4>Informazioni</h4>
-                  {evento.descrizione}
-                </div>
-              )}
+              <SezioniAccordion evento={evento} />
 
               {evento.immagini.length > 1 && (
                 <div className="galleria">

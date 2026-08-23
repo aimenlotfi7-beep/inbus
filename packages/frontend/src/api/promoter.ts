@@ -27,6 +27,8 @@ export const promoterApi = {
   // Pubblico: login del promoter stesso (nessuna autenticazione admin)
   login: (email: string, password: string) =>
     api.post<{ token: string; promoter: { id: string; nome: string; codice: string } }>('/api/promoter/login', { email, password }),
+  richiediReset: (email: string) => api.post<{ ok: true }>('/api/promoter/richiedi-reset', { email }),
+  resetPassword: (token: string, password: string) => api.post<{ ok: true }>('/api/promoter/reset-password', { token, password }),
 
   // Self-service: il promoter vede i propri dati col proprio token (salvato separatamente da quello admin)
   me: () => apiPromoter.get<Promoter>('/api/promoter/me'),

@@ -27,3 +27,20 @@ controlloAccessiRouter.post(
     res.json(await controlloAccessiService.scansiona(req.params.busId, req.tourLeader.sub, req.body.token));
   }),
 );
+
+controlloAccessiRouter.get(
+  '/cerca',
+  valida(z.object({ q: z.string() }), 'query'),
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.tourLeader) throw new NonAutorizzato();
+    res.json(await controlloAccessiService.cerca(req.tourLeader.sub, String(req.query.q)));
+  }),
+);
+controlloAccessiRouter.post(
+  '/checkin-manuale',
+  valida(z.object({ partecipanteId: z.string() })),
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.tourLeader) throw new NonAutorizzato();
+    res.json(await controlloAccessiService.checkinManuale(req.tourLeader.sub, req.body.partecipanteId));
+  }),
+);

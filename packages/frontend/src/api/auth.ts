@@ -21,6 +21,8 @@ export interface AdminLoginResponse {
 export const authApi = {
   loginAdmin: (email: string, password: string) =>
     api.post<AdminLoginResponse>('/api/auth/admin/login', { email, password }),
+  richiediReset: (email: string) => api.post<{ ok: true }>('/api/auth/admin/richiedi-reset', { email }),
+  resetPassword: (token: string, password: string) => api.post<{ ok: true }>('/api/auth/admin/reset-password', { token, password }),
   me: () => api.get<{ admin: SessioneAdmin }>('/api/auth/me'),
 };
 

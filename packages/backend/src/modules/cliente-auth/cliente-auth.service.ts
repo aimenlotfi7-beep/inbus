@@ -100,6 +100,33 @@ export const clienteAuthService = {
     await inviaEmailVerifica(u.email, u.nome ?? '', token);
   },
 
+  /** Richiede il reset — silenzioso apposta se l'email non esiste (non
+   *  fa scoprire quali email sono già registrate). */
+  async richiediResetPassword(email: string) {
+    const [u] = await db.select().from(utenti).where(eq(utenti.email, email.toLowerCase())).limit(1);
+    if (!u || !u.passwordHash) return;
+
+    const token = generaToken();
+    const scadenza = new Date(Date.now() + ORE_VALIDITA_TOKEN_VERIFICA * 60 * 60 * 1000);
+    await db.update(utenti).set({ tokenResetPassword: token, tokenResetPasswordScadenza: scadenza }).where(eq(utenti.id, u.id));
+
+    const link = urlSito(`/reimposta-password/${token}`);
+    const { templateEmailService } = await import('../template-email/template-email.service.js');
+    const { oggetto, html } = await templateEmailService.renderizza('reset_password', {
+      nome: u.nome ?? '', link, ore_validita: String(ORE_VALIDITA_TOKEN_VERIFICA),
+    });
+    await inviaEmail({ a: u.email, oggetto, html });
+  },
+
+  async confermaResetPassword(token: string, nuovaPassword: string) {
+    const [u] = await db.select().from(utenti).where(eq(utenti.tokenResetPassword, token)).limit(1);
+    if (!u || !u.tokenResetPasswordScadenza || u.tokenResetPasswordScadenza < new Date()) {
+      throw new NonAutorizzato('Link scaduto o non valido — richiedine uno nuovo.');
+    }
+    const passwordHash = await bcrypt.hash(nuovaPassword, 10);
+    await db.update(utenti).set({ passwordHash, tokenResetPassword: null, tokenResetPasswordScadenza: null }).where(eq(utenti.id, u.id));
+  },
+
   emettiToken(utenteId: string, email: string) {
     const payload: TokenCliente = { tipo: 'cliente', sub: utenteId, email };
     const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: '30d' });

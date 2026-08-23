@@ -8,45 +8,45 @@ function postiRealiFermata(fermata: { postiMax: number | null; postiPrenotati: n
 }
 
 function EtichettaDisponibilita({ posti }: { posti: number }) {
+  // Dicitura generica, non il numero esatto — solo lo stato.
   if (posti === 0) return <span className="percorso-posti esaurito">Esaurito</span>;
-  if (posti <= SOGLIA_ULTIMI_POSTI) return <span className="percorso-posti pochi">Ultimi {posti} posti</span>;
-  return <span className="percorso-posti disponibile">{posti} posti disponibili</span>;
+  if (posti <= SOGLIA_ULTIMI_POSTI) return <span className="percorso-posti pochi">Pochi posti disponibili</span>;
+  return <span className="percorso-posti disponibile">Posti disponibili</span>;
 }
 
-/** Il percorso del bus, in forma visiva — non un semplice elenco a
- *  tendina: ogni fermata mostrata come tappa, con orario e
- *  disponibilità reale (calcolata dai posti già prenotati, mai
- *  inventata). Una tappa finale per l'arrivo all'evento stesso. */
+/** Le partenze — un unico elenco (non più diviso per tratta), ordinato
+ *  per orario crescente: più facile da leggere quando ci sono più
+ *  tratte insieme. Disponibilità reale (calcolata dai posti già
+ *  prenotati) ma con dicitura generica, non il numero esatto. */
 export function PercorsoBus({ evento }: { evento: Evento }) {
-  if (!evento.linee.length) return null;
+  const tutteLeLinee = [...evento.linee, ...evento.prodotti.flatMap((v) => v.linee)];
+  if (!tutteLeLinee.length) return null;
+
+  const tappe = tutteLeLinee.flatMap((linea) =>
+    linea.fermate.map((f) => ({ ...f, posti: postiRealiFermata(f, linea.postiDisponibili), nomeLinea: linea.nome }))
+  ).sort((a, b) => (a.orario ?? '99:99').localeCompare(b.orario ?? '99:99'));
 
   return (
     <div className="percorso-bus-blocco">
-      <h4>Percorso</h4>
-      {evento.linee.map((linea) => (
-        <div className="percorso-linea" key={linea.id}>
-          {evento.linee.length > 1 && <p className="percorso-nome-linea">{linea.nome}</p>}
-          <div className="percorso-tappe">
-            {linea.fermate.map((f) => (
-              <div className="percorso-tappa" key={f.id}>
-                <div className="percorso-tappa-puntino" />
-                <div className="percorso-tappa-corpo">
-                  <b>{f.citta}</b>
-                  {f.orario && <span className="percorso-orario">{f.orario}</span>}
-                  <EtichettaDisponibilita posti={postiRealiFermata(f, linea.postiDisponibili)} />
-                </div>
-              </div>
-            ))}
-            <div className="percorso-tappa percorso-tappa-arrivo">
-              <div className="percorso-tappa-puntino arrivo" />
-              <div className="percorso-tappa-corpo">
-                <b>{evento.citta} — {evento.luogo}</b>
-                {evento.arrivoOrario && <span className="percorso-orario">{evento.arrivoOrario}</span>}
-              </div>
+      <div className="percorso-tappe">
+        {tappe.map((f) => (
+          <div className="percorso-tappa" key={f.id}>
+            <div className="percorso-tappa-puntino" />
+            <div className="percorso-tappa-corpo">
+              <b>{f.citta}</b>
+              {f.orario && <span className="percorso-orario">{f.orario}</span>}
+              <EtichettaDisponibilita posti={f.posti} />
             </div>
           </div>
+        ))}
+        <div className="percorso-tappa percorso-tappa-arrivo">
+          <div className="percorso-tappa-puntino arrivo" />
+          <div className="percorso-tappa-corpo">
+            <b>{evento.citta} — {evento.luogo}</b>
+            {evento.arrivoOrario && <span className="percorso-orario">{evento.arrivoOrario}</span>}
+          </div>
         </div>
-      ))}
+      </div>
     </div>
   );
 }

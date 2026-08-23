@@ -102,11 +102,7 @@ export function RuoliScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Ruoli" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo ruolo</button>} />
-      <p className="testo-intro">
-        Puoi creare ruoli con il nome che preferisci e scegliere esattamente cosa può fare chi lo ha.
-        Puoi assegnare solo i permessi che possiedi tu stesso.
-      </p>
+      <PanelHead titolo="Ruoli" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo ruolo</button>} info="Puoi creare ruoli con il nome che preferisci e scegliere esattamente cosa può fare chi lo ha. Puoi assegnare solo i permessi che possiedi tu stesso." />
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome ruolo..." />
       <TabellaGenerica
         righe={ruoliFiltrati}

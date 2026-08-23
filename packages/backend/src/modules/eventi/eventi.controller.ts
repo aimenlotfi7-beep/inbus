@@ -50,7 +50,7 @@ export const eventiController = {
   },
 
   async opzioniPartenza(req: Request, res: Response) {
-    const opzioni = await eventiService.opzioniPartenza(req.params.id);
+    const opzioni = await eventiService.opzioniPartenza(req.params.id, req.query.prodottoId as string | undefined);
     res.json(opzioni);
   },
 
@@ -65,6 +65,18 @@ export const eventiController = {
   async creaBus(req: Request, res: Response) {
     const busId = await eventiService.creaBus(req.params.id, req.body);
     res.status(201).json({ id: busId });
+  },
+
+  async creaProdotto(req: Request, res: Response) {
+    const nuovo = await eventiService.creaProdotto(req.params.id, req.body.nome, req.body.arrivoOrario);
+    res.status(201).json(nuovo);
+  },
+  async aggiornaProdotto(req: Request, res: Response) {
+    res.json(await eventiService.aggiornaProdotto(req.params.prodottoId, req.body));
+  },
+  async eliminaProdotto(req: Request, res: Response) {
+    await eventiService.eliminaProdotto(req.params.prodottoId);
+    res.status(204).send();
   },
 
   async aggiornaBus(req: Request, res: Response) {

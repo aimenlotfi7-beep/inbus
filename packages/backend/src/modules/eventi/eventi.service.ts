@@ -3,6 +3,7 @@ import { db } from '../../db/client.js';
 import {
   eventi,
   lineeBus,
+  prodotti,
   fermate,
   immaginiEvento,
   allegatiEvento,
@@ -17,6 +18,8 @@ import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
+import { lineaSchema } from './eventi.dto.js';
+import type { z } from 'zod';
 
 // Include standard riusato da list/getById: evento con tutte le sue
 // relazioni annidate, così il frontend riceve un unico oggetto completo
@@ -26,6 +29,10 @@ export const includeCompleto = {
   // modifica, sito pubblico, checkout) — restano recuperabili solo
   // tramite le funzioni dedicate del Cestino qui sotto.
   linee: { where: isNull(lineeBus.eliminatoIl), with: { fermate: true } },
+  // I prodotti (se l'evento ne ha) — ognuno con le proprie tratte. Un
+  // evento senza nessun prodotto (il caso normale) ha semplicemente un
+  // array vuoto qui: tutto continua a funzionare come prima.
+  prodotti: { with: { linee: { where: isNull(lineeBus.eliminatoIl), with: { fermate: true } } } },
   immagini: true,
   allegati: true,
 } as const;
@@ -92,7 +99,124 @@ function conStatoCalcolato<T extends { statoDisponibilita: 'POCHI_POSTI' | 'NUOV
   return { ...evento, statoDisponibilita: calcolaStatoAutomatico(evento.linee) };
 }
 
+/** Inserisce un tragitto (tratta) con le sue fermate — usata sia per i
+ *  tragitti liberi sia per quelli dentro un viaggio. */
+async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], eventoId: string, prodottoId: string | null, linea: z.infer<typeof lineaSchema>) {
+  const [nuovaLinea] = await tx
+    .insert(lineeBus)
+    .values({
+      eventoId,
+      prodottoId,
+      nome: linea.nome,
+      postiTotali: linea.postiTotali,
+      postiDisponibili: linea.postiTotali, // alla creazione tutti i posti sono liberi
+      prezzoExtra: linea.prezzoExtra.toFixed(2),
+      referenteNome: linea.referenteNome,
+      referenteTelefono: linea.referenteTelefono,
+      fornitoreId: linea.fornitoreId,
+    })
+    .returning();
+
+  if (linea.fermate.length) {
+    await tx.insert(fermate).values(
+      linea.fermate.map((f, ordine) => ({
+        lineaId: nuovaLinea.id,
+        ordine,
+        citta: f.citta,
+        indirizzo: f.indirizzo,
+        orario: f.orario,
+        orarioRitorno: f.orarioRitorno,
+        indirizzoRitorno: f.indirizzoRitorno,
+        postiMax: f.postiMax,
+        prezzo: f.prezzo?.toFixed(2),
+      }))
+    );
+  }
+}
+
+/** Sincronizza i tragitti di un evento (o di un viaggio dentro l'evento)
+ *  col form: quelli con un `id` vengono aggiornati sul posto (mai
+ *  cancellati e ricreati — perderebbe le prenotazioni collegate),
+ *  quelli senza sono nuovi, quelli rimasti fuori dal form vengono
+ *  "eliminati" (cestino, recuperabili). */
+async function sincronizzaTragitti(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], eventoId: string, prodottoId: string | null, tratte: z.infer<typeof lineaSchema>[]) {
+  const condizioneProdotto = prodottoId === null ? isNull(lineeBus.prodottoId) : eq(lineeBus.prodottoId, prodottoId);
+  const esistenti = await tx.select().from(lineeBus).where(and(eq(lineeBus.eventoId, eventoId), condizioneProdotto, isNull(lineeBus.eliminatoIl)));
+  const idsInviati = new Set(tratte.filter((l) => l.id).map((l) => l.id));
+
+  for (const esistente of esistenti) {
+    if (idsInviati.has(esistente.id)) continue;
+    await tx.update(lineeBus).set({ eliminatoIl: new Date() }).where(eq(lineeBus.id, esistente.id));
+  }
+
+  for (const linea of tratte) {
+    const giaEsistente = linea.id ? esistenti.find((l) => l.id === linea.id) : undefined;
+
+    if (giaEsistente) {
+      // I posti occupati (venduti) restano tali: se cambi i posti
+      // totali, i disponibili si aggiustano della stessa quantità,
+      // invece di essere resettati (perderebbe traccia di chi ha già
+      // prenotato).
+      const postiOccupati = giaEsistente.postiTotali - giaEsistente.postiDisponibili;
+      const nuoviPostiDisponibili = Math.max(0, linea.postiTotali - postiOccupati);
+
+      await tx.update(lineeBus).set({
+        prodottoId,
+        nome: linea.nome,
+        postiTotali: linea.postiTotali,
+        postiDisponibili: nuoviPostiDisponibili,
+        prezzoExtra: linea.prezzoExtra.toFixed(2),
+        referenteNome: linea.referenteNome,
+        referenteTelefono: linea.referenteTelefono,
+        fornitoreId: linea.fornitoreId,
+      }).where(eq(lineeBus.id, giaEsistente.id));
+
+      // Le fermate non hanno prenotazioni collegate direttamente (le
+      // prenotazioni salvano città/indirizzo come testo, non un
+      // riferimento), quindi qui si possono sostituire liberamente.
+      await tx.delete(fermate).where(eq(fermate.lineaId, giaEsistente.id));
+      if (linea.fermate.length) {
+        await tx.insert(fermate).values(
+          linea.fermate.map((f, ordine) => ({
+            lineaId: giaEsistente.id,
+            ordine,
+            citta: f.citta,
+            indirizzo: f.indirizzo,
+            orario: f.orario,
+            orarioRitorno: f.orarioRitorno,
+            indirizzoRitorno: f.indirizzoRitorno,
+            postiMax: f.postiMax,
+            prezzo: f.prezzo?.toFixed(2),
+          }))
+        );
+      }
+    } else {
+      await inserisciTragitto(tx, eventoId, prodottoId, linea);
+    }
+  }
+}
+
 export const eventiService = {
+  /** Crea un prodotto (pacchetto bus distinto) per un evento — da qui
+   *  in poi le tratte di quell'evento possono essere assegnate a
+   *  questo prodotto invece che restare "libere". */
+  async creaProdotto(eventoId: string, nome: string, arrivoOrario?: string) {
+    const [nuovo] = await db.insert(prodotti).values({ eventoId, nome, arrivoOrario }).returning();
+    return nuovo;
+  },
+  async aggiornaProdotto(id: string, dati: { nome?: string; arrivoOrario?: string | null }) {
+    const [aggiornato] = await db.update(prodotti).set(dati).where(eq(prodotti.id, id)).returning();
+    if (!aggiornato) throw new NonTrovato('Prodotto');
+    return aggiornato;
+  },
+  /** Eliminare un prodotto libera le sue tratte (tornano "senza
+   *  prodotto"), non le cancella — evita di perdere lavoro fatto per
+   *  errore nel censimento. */
+  async eliminaProdotto(id: string) {
+    await db.update(lineeBus).set({ prodottoId: null }).where(eq(lineeBus.prodottoId, id));
+    await db.delete(prodotti).where(eq(prodotti.id, id));
+  },
+
   async list(query: ListaEventiQuery) {
     // Nascosti sempre, sia per il gestionale sia per il sito pubblico —
     // solo il Cestino (funzione dedicata più sotto) li fa vedere.
@@ -174,35 +298,15 @@ export const eventiService = {
           input.allegati.map((a) => ({ eventoId: nuovoEvento.id, nome: a.nome, url: a.url }))
         );
       }
-      for (const linea of input.linee) {
-        const [nuovaLinea] = await tx
-          .insert(lineeBus)
-          .values({
-            eventoId: nuovoEvento.id,
-            nome: linea.nome,
-            postiTotali: linea.postiTotali,
-            postiDisponibili: linea.postiTotali, // alla creazione tutti i posti sono liberi
-            prezzoExtra: linea.prezzoExtra.toFixed(2),
-            referenteNome: linea.referenteNome,
-            referenteTelefono: linea.referenteTelefono,
-            fornitoreId: linea.fornitoreId,
-          })
-          .returning();
-
-        if (linea.fermate.length) {
-          await tx.insert(fermate).values(
-            linea.fermate.map((f, ordine) => ({
-              lineaId: nuovaLinea.id,
-              ordine,
-              citta: f.citta,
-              indirizzo: f.indirizzo,
-              orario: f.orario,
-              orarioRitorno: f.orarioRitorno,
-              indirizzoRitorno: f.indirizzoRitorno,
-              postiMax: f.postiMax,
-              prezzo: f.prezzo?.toFixed(2),
-            }))
-          );
+      for (const linea of input.linee.filter((l) => !l.prodottoId)) {
+        await inserisciTragitto(tx, nuovoEvento.id, linea.prodottoId ?? null, linea);
+      }
+      for (const viaggio of input.prodotti) {
+        const [nuovoViaggio] = await tx.insert(prodotti).values({
+          eventoId: nuovoEvento.id, nome: viaggio.nome, arrivoOrario: viaggio.arrivoOrario,
+        }).returning();
+        for (const linea of viaggio.linee) {
+          await inserisciTragitto(tx, nuovoEvento.id, nuovoViaggio.id, linea);
         }
       }
 
@@ -264,96 +368,32 @@ export const eventiService = {
         }
       }
 
-      // Le linee/fermate, se inviate: quelle con un `id` (già esistenti)
-      // vengono AGGIORNATE sul posto, non cancellate e ricreate — se le
-      // cancellassimo e quella tratta avesse già prenotazioni vere
-      // collegate, il database rifiuterebbe la cancellazione (per non
-      // perdere quei dati) e l'intero salvataggio fallirebbe con un
-      // errore. Solo le linee rimosse dal form vengono davvero cancellate,
-      // e solo se non hanno prenotazioni collegate.
+      // I tragitti liberi (non dentro nessun viaggio) — quelli dentro un
+      // viaggio si sincronizzano più sotto, insieme al viaggio stesso.
       if (input.linee) {
-        const lineeEsistenti = await tx.select().from(lineeBus).where(and(eq(lineeBus.eventoId, id), isNull(lineeBus.eliminatoIl)));
-        const idsInviati = new Set(input.linee.filter((l) => l.id).map((l) => l.id));
+        await sincronizzaTragitti(tx, id, null, input.linee.filter((l) => !l.prodottoId));
+      }
 
-        // Tratte tolte dal form: "eliminale" (cestino, non per davvero —
-        // niente più bisogno di controllare se hanno prenotazioni
-        // collegate, dato che nulla va perso sul serio).
-        for (const esistente of lineeEsistenti) {
+      // I viaggi — stessa logica di sincronizzazione dei tragitti: id
+      // esistente = aggiorna, assente = nuovo, rimasto fuori dal form =
+      // eliminato (le sue tratte tornano "libere", non si perdono).
+      if (input.prodotti) {
+        const viaggiEsistenti = await tx.select().from(prodotti).where(eq(prodotti.eventoId, id));
+        const idsInviati = new Set(input.prodotti.filter((p) => p.id).map((p) => p.id));
+
+        for (const esistente of viaggiEsistenti) {
           if (idsInviati.has(esistente.id)) continue;
-          await tx.update(lineeBus).set({ eliminatoIl: new Date() }).where(eq(lineeBus.id, esistente.id));
+          await tx.update(lineeBus).set({ prodottoId: null }).where(eq(lineeBus.prodottoId, esistente.id));
+          await tx.delete(prodotti).where(eq(prodotti.id, esistente.id));
         }
 
-        for (const linea of input.linee) {
-          const giaEsistente = linea.id ? lineeEsistenti.find((l) => l.id === linea.id) : undefined;
-
-          if (giaEsistente) {
-            // I posti occupati (venduti) restano tali: se cambi i posti
-            // totali, i disponibili si aggiustano della stessa quantità,
-            // invece di essere resettati (perderebbe traccia di chi ha
-            // già prenotato).
-            const postiOccupati = giaEsistente.postiTotali - giaEsistente.postiDisponibili;
-            const nuoviPostiDisponibili = Math.max(0, linea.postiTotali - postiOccupati);
-
-            await tx.update(lineeBus).set({
-              nome: linea.nome,
-              postiTotali: linea.postiTotali,
-              postiDisponibili: nuoviPostiDisponibili,
-              prezzoExtra: linea.prezzoExtra.toFixed(2),
-              referenteNome: linea.referenteNome,
-              referenteTelefono: linea.referenteTelefono,
-              fornitoreId: linea.fornitoreId,
-            }).where(eq(lineeBus.id, giaEsistente.id));
-
-            // Le fermate non hanno prenotazioni collegate direttamente
-            // (le prenotazioni salvano città/indirizzo come testo, non un
-            // riferimento), quindi qui si possono sostituire liberamente.
-            await tx.delete(fermate).where(eq(fermate.lineaId, giaEsistente.id));
-            if (linea.fermate.length) {
-              await tx.insert(fermate).values(
-                linea.fermate.map((f, ordine) => ({
-                  lineaId: giaEsistente.id,
-                  ordine,
-                  citta: f.citta,
-                  indirizzo: f.indirizzo,
-                  orario: f.orario,
-                  orarioRitorno: f.orarioRitorno,
-                  indirizzoRitorno: f.indirizzoRitorno,
-                  postiMax: f.postiMax,
-                  prezzo: f.prezzo?.toFixed(2),
-                }))
-              );
-            }
+        for (const viaggio of input.prodotti) {
+          if (viaggio.id) {
+            await tx.update(prodotti).set({ nome: viaggio.nome, arrivoOrario: viaggio.arrivoOrario }).where(eq(prodotti.id, viaggio.id));
+            await sincronizzaTragitti(tx, id, viaggio.id, viaggio.linee);
           } else {
-            // Tratta nuova.
-            const [nuovaLinea] = await tx
-              .insert(lineeBus)
-              .values({
-                eventoId: id,
-                nome: linea.nome,
-                postiTotali: linea.postiTotali,
-                postiDisponibili: linea.postiTotali,
-                prezzoExtra: linea.prezzoExtra.toFixed(2),
-                referenteNome: linea.referenteNome,
-                referenteTelefono: linea.referenteTelefono,
-                fornitoreId: linea.fornitoreId,
-              })
-              .returning();
-
-            if (linea.fermate.length) {
-              await tx.insert(fermate).values(
-                linea.fermate.map((f, ordine) => ({
-                  lineaId: nuovaLinea.id,
-                  ordine,
-                  citta: f.citta,
-                  indirizzo: f.indirizzo,
-                  orario: f.orario,
-                  orarioRitorno: f.orarioRitorno,
-                  indirizzoRitorno: f.indirizzoRitorno,
-                  postiMax: f.postiMax,
-                  prezzo: f.prezzo?.toFixed(2),
-                }))
-              );
-            }
+            const [nuovoViaggio] = await tx.insert(prodotti).values({ eventoId: id, nome: viaggio.nome, arrivoOrario: viaggio.arrivoOrario }).returning();
+            for (const linea of viaggio.linee) await inserisciTragitto(tx, id, nuovoViaggio.id, linea);
           }
         }
       }
@@ -420,8 +460,14 @@ export const eventiService = {
   /** Una riga per ogni fermata prenotabile, con il prezzo effettivo già
    *  calcolato (sovrascrive prezzo base+extra se la fermata ha un prezzo
    *  proprio) — usata dal checkout sul sito pubblico. */
-  async opzioniPartenza(eventoId: string) {
+  async opzioniPartenza(eventoId: string, prodottoId?: string) {
     const evento = await getById(eventoId);
+    // Se l'evento ha viaggi distinti e ne è stato scelto uno, le
+    // fermate mostrate sono solo le sue — altrimenti (evento senza
+    // viaggi, o nessuno specificato) tutte quelle libere, come sempre.
+    const lineeDaMostrare = prodottoId
+      ? evento.prodotti.find((p) => p.id === prodottoId)?.linee ?? []
+      : evento.linee.filter((l) => !l.prodottoId);
     const opzioni: Array<{
       lineaId: string;
       postiDisponibili: number;
@@ -434,7 +480,7 @@ export const eventiService = {
       prezzoEffettivo: number;
     }> = [];
 
-    for (const linea of evento.linee) {
+    for (const linea of lineeDaMostrare) {
       // Nota: prima qui si saltava del tutto la tratta se il bus era
       // esaurito — ma così il cliente non aveva modo di scegliere PER
       // QUALE fermata mettersi in lista d'attesa (il menu restava vuoto).
@@ -539,6 +585,7 @@ export const eventiService = {
 
       return {
         lineaId: linea.id,
+        prodottoId: linea.prodottoId,
         nome: linea.nome,
         postiTotali: linea.postiTotali,
         capienzaPerBus: capienza,

@@ -38,6 +38,8 @@ export const tourLeaderAuthApi = {
     localStorage.setItem(CHIAVE_NOME, r.nome);
     return r;
   },
+  richiediReset: (email: string) => chiamata<{ ok: true }>('/api/tour-leader-auth/richiedi-reset', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (token: string, password: string) => chiamata<{ ok: true }>('/api/tour-leader-auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
 };
 
 export interface BusAssegnato {
@@ -66,4 +68,16 @@ export const controlloAccessiApi = {
       method: 'POST',
       body: JSON.stringify({ token }),
     }),
+  cerca: (q: string) => chiamata<RisultatoRicerca[]>(`/api/controllo-accessi/cerca?q=${encodeURIComponent(q)}`),
+  checkinManuale: (partecipanteId: string) =>
+    chiamata<{ nome: string }>('/api/controllo-accessi/checkin-manuale', { method: 'POST', body: JSON.stringify({ partecipanteId }) }),
 };
+
+export interface RisultatoRicerca {
+  partecipanteId: string;
+  nome: string;
+  cognome: string;
+  pnr: string;
+  fermataCitta: string;
+  giaSalito: boolean;
+}

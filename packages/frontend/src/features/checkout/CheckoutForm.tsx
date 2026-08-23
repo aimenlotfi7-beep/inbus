@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Evento, OpzionePartenza } from '../../api/types';
+import type { Evento, OpzionePartenza, Prodotto } from '../../api/types';
 import { eventiApi } from '../../api/eventi';
 import { prenotazioniApi } from '../../api/prenotazioni';
 import { listaAttesaApi } from '../../api/listaAttesa';
@@ -7,6 +7,7 @@ import { applicaScontoOfferta } from '../../api/prezzi';
 import { ErroreApi } from '../../api/client';
 import { clienteAuthApi } from '../../api/clienteAuth';
 import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
+import { SelettoreFermata } from './SelettoreFermata';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -18,12 +19,6 @@ interface Partecipante { nome: string; cognome: string; }
  *  fermata scelga — non è un prezzo fisso, dato che il prezzo varia già
  *  per fermata. */
 export interface OffertaCheckout { id: string; nome: string; scontoPercentuale: number; }
-
-const STEP = [
-  { numero: 1, label: 'Fermata e passeggeri' },
-  { numero: 2, label: 'I tuoi dati' },
-  { numero: 3, label: 'Pagamento' },
-] as const;
 
 /**
  * Modulo di prenotazione a step (come la creazione evento nel
@@ -38,6 +33,11 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   // proprio questo il bug: entrambi mostravano "Invio..." a prescindere
   // da quale avesse premuto davvero il cliente).
   const [azioneInCorso, setAzioneInCorso] = useState<'acquista' | 'prenota' | 'lista-attesa' | null>(null);
+  // Se l'evento ha più di un viaggio, prima bisogna sceglierne uno —
+  // diventa a tutti gli effetti un quarto step, prima degli altri tre.
+  // Con zero o un solo viaggio, si passa dritti come sempre.
+  const multiViaggio = evento.prodotti.length >= 2;
+  const [viaggioScelto, setViaggioScelto] = useState<Prodotto | null>(multiViaggio ? null : (evento.prodotti[0] ?? null));
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [opzioni, setOpzioni] = useState<OpzionePartenza[]>([]);
   const [fermataId, setFermataId] = useState('');
@@ -61,15 +61,23 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
 
   const [messaggioErrore, setMessaggioErrore] = useState('');
   const [pnrConfermato, setPnrConfermato] = useState('');
+  // Solo interfaccia per ora — non c'è ancora un vero gateway di
+  // pagamento collegato (serve un fornitore tipo Stripe). I campi carta
+  // non vengono validati né inviati da nessuna parte.
+  const [metodoPagamento, setMetodoPagamento] = useState<'carta' | 'apple' | 'google'>('carta');
 
   useEffect(() => {
-    eventiApi.opzioniPartenza(evento.id).then((o) => {
+    // Se serve ancora scegliere il viaggio, non c'è ancora nulla da
+    // caricare — si aspetta la scelta.
+    if (multiViaggio && !viaggioScelto) { setStato('pronto'); return; }
+    setStato('caricamento');
+    eventiApi.opzioniPartenza(evento.id, viaggioScelto?.id).then((o) => {
       setOpzioni(o);
       const primaConPosti = o.find((x) => x.postiDisponibili > 0);
       setFermataId((primaConPosti ?? o[0])?.fermataId ?? '');
       setStato('pronto');
     });
-  }, [evento.id]);
+  }, [evento.id, viaggioScelto?.id, multiViaggio]);
 
   useEffect(() => {
     setPartecipanti((prev) => {
@@ -241,11 +249,17 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
       {stato !== 'caricamento' && (
         <>
           <div className="checkout-stepper">
-            {STEP.map((s) => (
-              <div key={s.numero} className={`checkout-step-dot${step === s.numero ? ' active' : step > s.numero ? ' completato' : ''}`}>
-                <span>{step > s.numero ? '✓' : s.numero}</span> {s.label}
-              </div>
-            ))}
+            {(multiViaggio
+              ? [{ numero: 0, label: 'Il tuo viaggio' }, { numero: 1, label: 'Fermata e passeggeri' }, { numero: 2, label: 'I tuoi dati' }, { numero: 3, label: 'Pagamento' }]
+              : [{ numero: 1, label: 'Fermata e passeggeri' }, { numero: 2, label: 'I tuoi dati' }, { numero: 3, label: 'Pagamento' }]
+            ).map((s) => {
+              const stepAttuale = multiViaggio ? (viaggioScelto ? step : 0) : step;
+              return (
+                <div key={s.numero} className={`checkout-step-dot${stepAttuale === s.numero ? ' active' : stepAttuale > s.numero ? ' completato' : ''}`}>
+                  <span>{stepAttuale > s.numero ? '✓' : s.numero + (multiViaggio ? 1 : 0)}</span> {s.label}
+                </div>
+              );
+            })}
           </div>
 
           {/* Riepilogo sempre visibile, in ogni step — evento, data,
@@ -257,15 +271,43 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
               <b>{evento.artista}</b>
               <span className="checkout-riepilogo-riga">
                 {new Date(evento.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
+                {viaggioScelto && ` · ${viaggioScelto.nome}`}
+                {(viaggioScelto?.arrivoOrario ?? (!multiViaggio ? evento.prodotti[0]?.arrivoOrario : null)) && (
+                  <> · arrivo {viaggioScelto?.arrivoOrario ?? evento.prodotti[0]?.arrivoOrario}</>
+                )}
                 {opzioneScelta && ` · ${opzioneScelta.fermataCitta} → ${evento.citta}`}
-                {` · ${passeggeri} passegger${passeggeri > 1 ? 'i' : 'o'}`}
+                {viaggioScelto || !multiViaggio ? ` · ${passeggeri} passegger${passeggeri > 1 ? 'i' : 'o'}` : ''}
               </span>
             </div>
             {opzioneScelta && <div className="checkout-riepilogo-totale">€{(step === 3 ? totaleConCredito : totale).toFixed(2)}</div>}
           </div>
 
+          {multiViaggio && !viaggioScelto && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <p style={{ fontSize: 13.5, opacity: .75, marginTop: -6 }}>Questo evento ha più opzioni di viaggio — scegli quella che preferisci.</p>
+              {evento.prodotti.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  className="checkout-viaggio-card"
+                  onClick={() => setViaggioScelto(v)}
+                >
+                  <b>{v.nome}</b>
+                  {v.arrivoOrario && <span>Arrivo previsto alle {v.arrivoOrario}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {(!multiViaggio || viaggioScelto) && (
+          <>
           {step === 1 && (
             <>
+              {multiViaggio && (
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, marginBottom: 12, padding: '5px 10px' }} onClick={() => setViaggioScelto(null)}>
+                  ← Cambia viaggio
+                </button>
+              )}
               {tutteEsaurite && (
                 <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
                   Al momento non ci sono posti disponibili. Puoi comunque compilare i tuoi dati e iscriverti alla
@@ -280,18 +322,17 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
               )}
 
               <label className="field-label">Fermata di partenza</label>
-              <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
-                {opzioni.map((o) => {
+              <SelettoreFermata
+                opzioni={opzioni}
+                valore={fermataId}
+                onSeleziona={setFermataId}
+                testoOpzione={(o) => {
                   const prezzoMostrato = offerta ? applicaScontoOfferta(o.prezzoEffettivo, offerta.scontoPercentuale) : o.prezzoEffettivo;
-                  return (
-                    <option key={o.fermataId} value={o.fermataId}>
-                      {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{prezzoMostrato.toFixed(2)}
-                      {offerta ? ` (invece di €${o.prezzoEffettivo.toFixed(2)})` : ''}
-                      {o.postiDisponibili === 0 ? ' — ESAURITO, lista d\'attesa' : ''}
-                    </option>
-                  );
-                })}
-              </select>
+                  return `${o.fermataCitta} (${o.fermataOrario || 'orario da definire'}) — €${prezzoMostrato.toFixed(2)}`
+                    + (offerta ? ` (invece di €${o.prezzoEffettivo.toFixed(2)})` : '')
+                    + (o.postiDisponibili === 0 ? ' — ESAURITO, lista d\'attesa' : '');
+                }}
+              />
 
               <label className="field-label">Passeggeri</label>
               <div className="qty-control">
@@ -463,6 +504,35 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
                     </p>
                   </div>
 
+                  <p className="section-label" style={{ marginTop: 18 }}>Metodo di pagamento</p>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                    <button type="button" className={`mini-tab${metodoPagamento === 'carta' ? ' active' : ''}`} onClick={() => setMetodoPagamento('carta')}>💳 Carta</button>
+                    <button type="button" className={`mini-tab${metodoPagamento === 'apple' ? ' active' : ''}`} onClick={() => setMetodoPagamento('apple')}> Apple Pay</button>
+                    <button type="button" className={`mini-tab${metodoPagamento === 'google' ? ' active' : ''}`} onClick={() => setMetodoPagamento('google')}>G Pay</button>
+                  </div>
+
+                  {metodoPagamento === 'carta' && (
+                    <div style={{ marginBottom: 14 }}>
+                      <label className="field-label">Numero carta</label>
+                      <input type="text" inputMode="numeric" placeholder="0000 0000 0000 0000" autoComplete="cc-number" />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                        <div>
+                          <label className="field-label">Scadenza</label>
+                          <input type="text" placeholder="MM/AA" autoComplete="cc-exp" />
+                        </div>
+                        <div>
+                          <label className="field-label">CVV</label>
+                          <input type="text" inputMode="numeric" placeholder="123" autoComplete="cc-csc" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {metodoPagamento !== 'carta' && (
+                    <p style={{ fontSize: 13, opacity: .7, marginBottom: 14 }}>
+                      Al momento di completare l'ordine ti verrà mostrata la richiesta di conferma di {metodoPagamento === 'apple' ? 'Apple Pay' : 'Google Pay'}.
+                    </p>
+                  )}
+
                   <button
                     className="search-cta"
                     style={{ marginTop: 10, opacity: stato === 'invio' ? .5 : 1 }}
@@ -496,6 +566,8 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
                 <span />
               </div>
             </>
+          )}
+          </>
           )}
         </>
       )}

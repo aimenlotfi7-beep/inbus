@@ -40,7 +40,7 @@ function statoTratta(linea: CalcoloBusLinea) {
 /** Sezione "Partenze" di un singolo evento: riepilogo generale, calcolo
  *  bus necessari, copertura tratte, censimento bus fisici. Va dentro la
  *  scheda dell'evento (tab). */
-export function PartenzeTab({ eventoId }: { eventoId: string }) {
+export function PartenzeTab({ eventoId, viaggi }: { eventoId: string; viaggi?: { key: string; nome: string }[] }) {
   const sessione = useSessione();
   const vedeEconomia = haPermesso(sessione, 'eventi.economia');
   const [calcolo, setCalcolo] = useState<CalcoloBusLinea[]>([]);
@@ -52,6 +52,10 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
   const [errore, setErrore] = useState('');
   const [generandoLista, setGenerandoLista] = useState<string | null>(null);
   const [aperte, setAperte] = useState<Set<string>>(new Set());
+  // Se l'evento ha più viaggi, questa sezione si comporta come se
+  // ognuno fosse un evento a parte: una tab per viaggio (più una per i
+  // tragitti liberi, se ce ne sono).
+  const [viaggioAttivo, setViaggioAttivo] = useState<string | 'liberi'>(viaggi?.[0]?.key ?? 'liberi');
 
   const [inModifica, setInModifica] = useState<BusFisico | null>(null);
   const [form, setForm] = useState<BusFisicoInput>(BUS_VUOTO);
@@ -101,17 +105,17 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
     setModaleAperta(true);
   }
 
-  function toggleLineaForm(lineaId: string) {
-    setForm((f) => ({
-      ...f,
-      lineeIds: f.lineeIds.includes(lineaId) ? f.lineeIds.filter((id) => id !== lineaId) : [...f.lineeIds, lineaId],
-    }));
-  }
-
   async function salvaBus() {
     if (!form.riferimento || form.lineeIds.length === 0) {
-      alert('Indica un riferimento per il bus e seleziona almeno una tratta che copre.');
+      alert('Indica un riferimento per il bus e seleziona almeno un tragitto che copre.');
       return;
+    }
+    if (form.tourLeaderId) {
+      const giaAssegnato = busLista.some((b) => b.tourLeaderId === form.tourLeaderId && b.id !== inModifica?.id);
+      if (giaAssegnato) {
+        alert('Questo tour leader è già assegnato a un altro bus di questo evento — un tour leader non può seguire due bus insieme.');
+        return;
+      }
     }
     try {
       if (inModifica) await eventiApi.aggiornaBus(eventoId, inModifica.id, form);
@@ -154,27 +158,47 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
   if (caricamento) return <p className="testo-intro">Caricamento...</p>;
   if (errore) return <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>;
 
-  const trattoCoperte = calcolo.filter((l) => l.coperta).length;
-  const trattoConProblemi = calcolo.filter((l) => l.totalePasseggeri > l.postiTotali).length;
+  // Se ci sono viaggi, questa sezione si comporta come se ognuno fosse
+  // un evento a parte: filtro i tragitti mostrati secondo la tab scelta.
+  const calcoloVisibile = (viaggi && viaggi.length > 0)
+    ? calcolo.filter((l) => (viaggioAttivo === 'liberi' ? !l.prodottoId : l.prodottoId === viaggioAttivo))
+    : calcolo;
+  const trattoCoperteVisibili = calcoloVisibile.filter((l) => l.coperta).length;
+  const trattoConProblemiVisibili = calcoloVisibile.filter((l) => l.totalePasseggeri > l.postiTotali).length;
 
   return (
     <div>
-      {calcolo.length === 0 && (
-        <p className="testo-intro">Questa scheda non ha ancora nessuna tratta configurata — vai nella tab "Dettagli" per aggiungerne una.</p>
-      )}
-
-      {calcolo.length > 0 && (
-        <div className="section-card" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 16 }}>
-          <span className="chip">{calcolo.length} tratt{calcolo.length === 1 ? 'a' : 'e'}</span>
-          <span className="chip">{trattoCoperte}/{calcolo.length} coperte</span>
-          <span className="chip">{busLista.length} bus censit{busLista.length === 1 ? 'o' : 'i'}</span>
-          {trattoConProblemi > 0 && (
-            <span className="badge non-coperta">⚠ {trattoConProblemi} tratt{trattoConProblemi === 1 ? 'a' : 'e'} con posti superati</span>
+      {viaggi && viaggi.length > 0 && (
+        <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+          {viaggi.map((v) => (
+            <button key={v.key} type="button" className={`mini-tab${viaggioAttivo === v.key ? ' active' : ''}`} onClick={() => setViaggioAttivo(v.key)}>
+              {v.nome}
+            </button>
+          ))}
+          {calcolo.some((l) => !l.prodottoId) && (
+            <button type="button" className={`mini-tab${viaggioAttivo === 'liberi' ? ' active' : ''}`} onClick={() => setViaggioAttivo('liberi')}>
+              Tragitti liberi
+            </button>
           )}
         </div>
       )}
 
-      {calcolo.map((linea) => {
+      {calcoloVisibile.length === 0 && (
+        <p className="testo-intro">Questa scheda non ha ancora nessun tragitto configurato — vai nella tab "Dettagli" per aggiungerne uno.</p>
+      )}
+
+      {calcoloVisibile.length > 0 && (
+        <div className="section-card" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 16 }}>
+          <span className="chip">{calcoloVisibile.length} tragitt{calcoloVisibile.length === 1 ? 'o' : 'i'}</span>
+          <span className="chip">{trattoCoperteVisibili}/{calcoloVisibile.length} coperte</span>
+          <span className="chip">{busLista.length} bus censit{busLista.length === 1 ? 'o' : 'i'}</span>
+          {trattoConProblemiVisibili > 0 && (
+            <span className="badge non-coperta">⚠ {trattoConProblemiVisibili} tragitt{trattoConProblemiVisibili === 1 ? 'o' : 'i'} con posti superati</span>
+          )}
+        </div>
+      )}
+
+      {calcoloVisibile.map((linea) => {
         const stato = statoTratta(linea);
         const busTratta = busLista.filter((b) => b.lineeIds.includes(linea.lineaId));
         const espansa = aperte.has(linea.lineaId);
@@ -216,7 +240,7 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
               <p style={{ fontSize: 13, marginBottom: 12, color: 'var(--mist)' }}>
                 {linea.postiBusCensiti > 0
                   ? <>Bus censiti: <strong style={{ color: 'var(--paper)' }}>{linea.postiBusCensiti} posti</strong> per {linea.totalePasseggeri} passeggeri confermati — la copertura si aggiorna da sola in base a quanto censisci qui sotto.</>
-                  : 'Nessun bus con posti indicati ancora censito su questa tratta — la copertura si aggiornerà da sola appena ne censisci uno.'}
+                  : 'Nessun bus con posti indicati ancora censito su questo tragitto — la copertura si aggiornerà da sola appena ne censisci uno.'}
               </p>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
@@ -255,9 +279,9 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
 
               <div className="section-divider">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                  <p className="section-label" style={{ marginBottom: 0 }}>Bus registrati su questa tratta</p>
+                  <p className="section-label" style={{ marginBottom: 0 }}>Bus registrati su questo tragitto</p>
                   <button type="button" className="btn btn-primary" style={{ fontSize: 12.5, padding: '6px 14px' }} onClick={(e) => { e.stopPropagation(); apriNuovoBus(linea.lineaId); }}>
-                    + Censisci bus per questa tratta
+                    + Censisci bus per questo tragitto
                   </button>
                 </div>
                 {busTratta.map((b) => (
@@ -311,13 +335,10 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
           <div className="campo"><label>Costo del bus (facoltativo — usato per calcolare il guadagno della tratta)</label><CampoNumero valuta min={0} value={form.costo} onChange={(v) => setForm({ ...form, costo: v })} /></div>
           <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
 
-          <p className="section-label" style={{ marginTop: 16 }}>Tratte coperte da questo bus</p>
-          {calcolo.map((linea) => (
-            <label key={linea.lineaId} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', fontSize: 14 }}>
-              <input type="checkbox" checked={form.lineeIds.includes(linea.lineaId)} onChange={() => toggleLineaForm(linea.lineaId)} />
-              {linea.nome}
-            </label>
-          ))}
+          <p className="section-label" style={{ marginTop: 16 }}>Tragitto</p>
+          <p className="testo-intro" style={{ marginTop: -6 }}>
+            {calcolo.find((l) => l.lineaId === form.lineeIds[0])?.nome ?? '—'}
+          </p>
 
           <button className="btn btn-primary" style={{ width: '100%', marginTop: 14 }} onClick={salvaBus}>Salva bus</button>
         </Modale>

@@ -30,8 +30,7 @@ export function OfferteScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Offerte" />
-      <p className="testo-intro">Scegli un evento per creare/gestire le sue offerte con sconto dedicato.</p>
+      <PanelHead titolo="Offerte" info="Scegli un evento per creare/gestire le sue offerte con sconto dedicato." />
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
 
       <div className="cards-list">

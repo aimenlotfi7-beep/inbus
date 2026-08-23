@@ -7,7 +7,8 @@ import type { Evento } from './types';
  *  nessuna parte (evento senza tratte, o tratte senza prezzi salvati). */
 export function prezzoMinimoEvento(evento: Evento): number | null {
   const prezzi: number[] = [];
-  for (const linea of evento.linee) {
+  const tutteLeLinee = [...evento.linee, ...evento.prodotti.flatMap((v) => v.linee)];
+  for (const linea of tutteLeLinee) {
     for (const f of linea.fermate) {
       if (f.prezzo) prezzi.push(Number(f.prezzo));
     }

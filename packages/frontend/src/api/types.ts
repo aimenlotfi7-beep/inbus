@@ -12,6 +12,7 @@ export interface Fermata {
 
 export interface LineaBus {
   id: string;
+  prodottoId: string | null;
   nome: string;
   postiTotali: number;
   postiDisponibili: number;
@@ -19,6 +20,15 @@ export interface LineaBus {
   referenteNome: string | null;
   referenteTelefono: string | null;
   fermate: Fermata[];
+}
+
+export interface Prodotto {
+  id: string;
+  eventoId: string;
+  nome: string;
+  arrivoOrario: string | null;
+  ordine: number;
+  linee: LineaBus[];
 }
 
 export interface Evento {
@@ -44,6 +54,7 @@ export interface Evento {
   layoutBigliettoId: string | null;
   slug: string;
   linee: LineaBus[];
+  prodotti: Prodotto[];
   immagini: { id: string; url: string; ordine: number }[];
   allegati: { id: string; nome: string; url: string }[];
 }

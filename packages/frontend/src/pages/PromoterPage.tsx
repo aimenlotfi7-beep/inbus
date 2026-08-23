@@ -54,6 +54,7 @@ export function PromoterPage() {
               onKeyDown={(e) => e.key === 'Enter' && accedi()} />
             <button className="btn btn-primary" onClick={accedi}>Accedi</button>
             <p className="errore">{errore}</p>
+            <p style={{ marginTop: 10 }}><Link to="/promoter/password-dimenticata" style={{ fontSize: 12.5 }}>Password dimenticata?</Link></p>
           </div>
         )}
 

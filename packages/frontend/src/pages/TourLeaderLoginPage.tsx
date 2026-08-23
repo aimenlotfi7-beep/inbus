@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { tourLeaderAuthApi } from '../api/tourLeaderAuth';
 
 /** Login del tour leader — separato dall'accesso amministratore, porta
@@ -61,6 +61,9 @@ export function TourLeaderLoginPage() {
         >
           {caricamento ? 'Accesso...' : 'Accedi'}
         </button>
+        <p style={{ textAlign: 'center', marginTop: 14 }}>
+          <Link to="/scansione/password-dimenticata" style={{ fontSize: 12.5, color: '#6b7280' }}>Password dimenticata?</Link>
+        </p>
       </form>
     </div>
   );

@@ -18,6 +18,23 @@ tourLeaderAuthRouter.post(
   }),
 );
 
+tourLeaderAuthRouter.post(
+  '/richiedi-reset',
+  valida(z.object({ email: z.string().email() })),
+  asyncHandler(async (req: Request, res: Response) => {
+    await tourLeaderAuthService.richiediResetPassword(req.body.email);
+    res.json({ ok: true });
+  }),
+);
+tourLeaderAuthRouter.post(
+  '/reset-password',
+  valida(z.object({ token: z.string(), password: z.string().min(8, 'La password deve avere almeno 8 caratteri.') })),
+  asyncHandler(async (req: Request, res: Response) => {
+    await tourLeaderAuthService.confermaResetPassword(req.body.token, req.body.password);
+    res.json({ ok: true });
+  }),
+);
+
 /** Attiva/rigenera le credenziali di un tour leader — SOLO
  *  amministratori con permesso di gestione tour leader (usa
  *  l'autenticazione admin, non quella tour leader). */

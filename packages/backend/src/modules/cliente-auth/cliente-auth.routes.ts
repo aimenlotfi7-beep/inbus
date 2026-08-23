@@ -50,6 +50,23 @@ clienteAuthRouter.post(
   }),
 );
 
+clienteAuthRouter.post(
+  '/richiedi-reset',
+  valida(z.object({ email: z.string().email() })),
+  asyncHandler(async (req: Request, res: Response) => {
+    await clienteAuthService.richiediResetPassword(req.body.email);
+    res.json({ ok: true }); // sempre ok — stesso motivo di sopra
+  }),
+);
+clienteAuthRouter.post(
+  '/reset-password',
+  valida(z.object({ token: z.string(), password: z.string().min(8, 'La password deve avere almeno 8 caratteri.') })),
+  asyncHandler(async (req: Request, res: Response) => {
+    await clienteAuthService.confermaResetPassword(req.body.token, req.body.password);
+    res.json({ ok: true });
+  }),
+);
+
 /** I propri dati, per l'area personale — presi dal token, mai da un
  *  parametro passato dal browser (altrimenti chiunque potrebbe vedere i
  *  dati di un altro cambiando l'indirizzo). */

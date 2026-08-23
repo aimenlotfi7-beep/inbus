@@ -6,6 +6,7 @@ export interface FermataInput {
 }
 export interface LineaInput {
   id?: string; // presente = tratta già esistente, assente = nuova
+  prodottoId?: string | null; // vuoto = tratta "libera", non appartiene a nessun prodotto
   nome: string; postiTotali: number; prezzoExtra?: number; referenteNome?: string; referenteTelefono?: string; fornitoreId?: string;
   fermate: FermataInput[];
 }
@@ -25,11 +26,16 @@ export interface EventoInput {
   ticketImmagineSfondoUrl?: string;
   layoutBigliettoId?: string | null;
   immagini?: string[]; allegati?: { nome: string; url: string }[]; linee?: LineaInput[];
+  // I viaggi (pacchetti bus distinti dentro lo stesso evento) — ognuno
+  // con i propri tragitti annidati. Facoltativo: la maggior parte degli
+  // eventi non ne ha bisogno.
+  prodotti?: { id?: string; nome: string; arrivoOrario?: string; linee: LineaInput[] }[];
 }
 
 export interface FermataConPasseggeri { fermataId: string; citta: string; passeggeri: number; }
 export interface CalcoloBusLinea {
   lineaId: string;
+  prodottoId: string | null;
   nome: string;
   postiTotali: number;
   capienzaPerBus: number;
@@ -65,7 +71,8 @@ export const eventiApi = {
   },
   getById: (id: string) => api.get<Evento>(`/api/eventi/${id}`),
   getBySlug: (slug: string) => api.get<Evento>(`/api/eventi/slug/${slug}`),
-  opzioniPartenza: (id: string) => api.get<OpzionePartenza[]>(`/api/eventi/${id}/opzioni-partenza`),
+  opzioniPartenza: (id: string, prodottoId?: string) =>
+    api.get<OpzionePartenza[]>(`/api/eventi/${id}/opzioni-partenza${prodottoId ? `?prodottoId=${prodottoId}` : ''}`),
   create: (input: EventoInput) => api.post<Evento>('/api/eventi', input),
   update: (id: string, input: Partial<EventoInput>) => api.put<Evento>(`/api/eventi/${id}`, input),
   remove: (id: string) => api.delete<void>(`/api/eventi/${id}`),

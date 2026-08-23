@@ -41,11 +41,7 @@ export function CestinoScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Cestino" />
-      <p className="testo-intro" style={{ marginBottom: 18 }}>
-        Niente viene mai cancellato per davvero — se ha prenotazioni collegate, andrebbero perse. Qui trovi tutto
-        quello che hai eliminato, sempre recuperabile.
-      </p>
+      <PanelHead titolo="Cestino" info="Niente viene mai cancellato per davvero — se ha prenotazioni collegate, andrebbero perse. Qui trovi tutto quello che hai eliminato, sempre recuperabile." />
 
       <div className="mini-tabs" style={{ marginBottom: 18 }}>
         <button type="button" className={`mini-tab${tab === 'eventi' ? ' active' : ''}`} onClick={() => setTab('eventi')}>

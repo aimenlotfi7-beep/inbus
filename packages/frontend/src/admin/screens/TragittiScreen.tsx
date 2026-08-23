@@ -53,7 +53,7 @@ export function TragittiScreen() {
   }
 
   async function salva() {
-    if (!nome.trim()) { alert('Dai un nome al tragitto prima di salvarlo.'); return; }
+    if (!nome.trim()) { alert('Dai un nome al percorso prima di salvarlo.'); return; }
     const fermateValide = fermate.filter((f) => f.citta.trim() && f.indirizzo.trim());
     if (fermateValide.length === 0) { alert('Aggiungi almeno una fermata.'); return; }
     for (const f of fermateValide) {
@@ -73,7 +73,7 @@ export function TragittiScreen() {
     }
   }
   async function elimina(t: Tragitto) {
-    if (!confirm(`Eliminare il tragitto "${t.nome}"?`)) return;
+    if (!confirm(`Eliminare il percorso "${t.nome}"?`)) return;
     await tragittiApi.remove(t.id);
     ricarica();
   }
@@ -87,8 +87,8 @@ export function TragittiScreen() {
 
   if (modaleAperta) {
     return (
-      <PaginaSezione titolo={inModifica ? 'Modifica tragitto' : 'Nuovo tragitto'} onIndietro={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
-        <div className="campo"><label>Nome tragitto</label><input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+      <PaginaSezione titolo={inModifica ? 'Modifica percorso' : 'Nuovo percorso'} onIndietro={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
+        <div className="campo"><label>Nome percorso</label><input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
 
         <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate (con prezzo — l'arrivo si imposta poi sull'evento)</p>
         {fermate.map((f, idx) => (
@@ -108,16 +108,16 @@ export function TragittiScreen() {
         ))}
         <button className="btn btn-ghost" style={{ marginBottom: 18 }} onClick={aggiungiFermata}>+ Aggiungi fermata</button>
 
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva tragitto</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva percorso</button>
       </PaginaSezione>
     );
   }
 
   return (
     <div>
-      <PanelHead titolo="Tragitti" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo tragitto</button>} />
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome tragitto o città..." />
-      {!tragittiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun tragitto trovato.' : 'Nessun tragitto ancora.'}</p>}
+      <PanelHead titolo="Percorsi salvati" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo percorso</button>} />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome percorso o città..." />
+      {!tragittiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun percorso trovato.' : 'Nessun percorso ancora.'}</p>}
       <div className="cards-list">
         {tragittiFiltrati.map((t) => (
           <div key={t.id} className="evento-card" onClick={() => apriModifica(t)}>

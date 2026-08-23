@@ -191,9 +191,28 @@ export const fornitori = pgTable('fornitori', {
 // ---------------------------------------------------------------------
 // LINEE BUS (contenitore con posti propri) + FERMATE
 // ---------------------------------------------------------------------
+// Un "prodotto" raggruppa tratte dentro lo stesso evento — serve solo
+// quando ci sono più pacchetti bus distinti (es. "Bus arrivo 14:00" e
+// "Bus arrivo 18:00", ognuno con le proprie fermate/orari/prezzi). Se
+// un evento non ha nessun prodotto, si comporta esattamente come prima
+// (checkout a 3 step, tratte tutte insieme) — è tutto facoltativo, non
+// tocca gli eventi già esistenti.
+export const prodotti = pgTable('prodotti', {
+  id: id(),
+  eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  nome: text('nome').notNull(),
+  // Ogni prodotto ha un proprio orario di arrivo (è spesso proprio
+  // quello che li distingue, es. "arrivo alle 14:00").
+  arrivoOrario: text('arrivo_orario'),
+  ordine: integer('ordine').notNull().default(0),
+});
+
 export const lineeBus = pgTable('linee_bus', {
   id: id(),
   eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  // Vuoto = tratta "libera", non appartiene a nessun prodotto (modalità
+  // di sempre, un solo pacchetto bus per l'evento).
+  prodottoId: text('prodotto_id').references(() => prodotti.id, { onDelete: 'cascade' }),
   nome: text('nome').notNull(),
   postiTotali: integer('posti_totali').notNull(),
   postiDisponibili: integer('posti_disponibili').notNull(),
@@ -335,6 +354,8 @@ export const utenti = pgTable('utenti', {
   emailVerificata: boolean('email_verificata').notNull().default(false),
   tokenVerificaEmail: text('token_verifica_email'),
   tokenVerificaScadenza: timestamp('token_verifica_scadenza'),
+  tokenResetPassword: text('token_reset_password'),
+  tokenResetPasswordScadenza: timestamp('token_reset_password_scadenza'),
 });
 
 // ---------------------------------------------------------------------
@@ -433,6 +454,8 @@ export const promoter = pgTable('promoter', {
   codice: text('codice').notNull().unique(),
   commissionePercentuale: numeric('commissione_percentuale', { precision: 5, scale: 2 }).notNull().default('10'),
   note: text('note'),
+  tokenResetPassword: text('token_reset_password'),
+  tokenResetPasswordScadenza: timestamp('token_reset_password_scadenza'),
 });
 
 export const promoterEventi = pgTable('promoter_eventi', {
@@ -466,6 +489,8 @@ export const tourLeader = pgTable('tour_leader', {
   // con hash, mai in chiaro — stesso meccanismo già usato per gli
   // amministratori.
   passwordHash: text('password_hash'),
+  tokenResetPassword: text('token_reset_password'),
+  tokenResetPasswordScadenza: timestamp('token_reset_password_scadenza'),
 });
 
 // ---------------------------------------------------------------------
@@ -592,6 +617,8 @@ export const amministratori = pgTable('amministratori', {
   passwordHash: text('password_hash').notNull(),
   ruoloId: text('ruolo_id').notNull().references(() => ruoli.id),
   attivo: boolean('attivo').notNull().default(true),
+  tokenResetPassword: text('token_reset_password'),
+  tokenResetPasswordScadenza: timestamp('token_reset_password_scadenza'),
 });
 
 // Eccezioni per singolo amministratore: se presente una riga, sovrascrive
@@ -709,6 +736,7 @@ export const eventiRelations = relations(eventi, ({ many }) => ({
   immagini: many(immaginiEvento),
   allegati: many(allegatiEvento),
   linee: many(lineeBus),
+  prodotti: many(prodotti),
   prenotazioni: many(prenotazioni),
   messaggiChat: many(messaggiChat),
   listaAttesa: many(listaAttesa),
@@ -739,8 +767,14 @@ export const listaAttesaRelations = relations(listaAttesa, ({ one }) => ({
   evento: one(eventi, { fields: [listaAttesa.eventoId], references: [eventi.id] }),
 }));
 
+export const prodottiRelations = relations(prodotti, ({ one, many }) => ({
+  evento: one(eventi, { fields: [prodotti.eventoId], references: [eventi.id] }),
+  linee: many(lineeBus),
+}));
+
 export const lineeBusRelations = relations(lineeBus, ({ one, many }) => ({
   evento: one(eventi, { fields: [lineeBus.eventoId], references: [eventi.id] }),
+  prodotto: one(prodotti, { fields: [lineeBus.prodottoId], references: [prodotti.id] }),
   fornitore: one(fornitori, { fields: [lineeBus.fornitoreId], references: [fornitori.id] }),
   fermate: many(fermate),
   prenotazioni: many(prenotazioni),

@@ -40,5 +40,10 @@ export const clienteAuthApi = {
   rimandaVerifica: (email: string) =>
     chiamata<{ ok: true }>('/api/cliente-auth/rimanda-verifica', { method: 'POST', body: JSON.stringify({ email }) }),
 
+  richiediReset: (email: string) =>
+    chiamata<{ ok: true }>('/api/cliente-auth/richiedi-reset', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (token: string, password: string) =>
+    chiamata<{ ok: true }>('/api/cliente-auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
+
   me: () => chiamata<DatiCliente>('/api/cliente-auth/me', {}, true),
 };

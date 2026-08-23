@@ -33,8 +33,7 @@ export function ListaAttesaScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Lista d'attesa" />
-      <p className="testo-intro">Scegli un evento per vedere chi è in lista d'attesa e promuovere le iscrizioni.</p>
+      <PanelHead titolo="Lista d'attesa" info="Scegli un evento per vedere chi è in lista d'attesa e promuovere le iscrizioni." />
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
 
       <div className="cards-list">

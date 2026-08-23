@@ -50,6 +50,9 @@ export function AccediPage() {
 
         <label>Password</label>
         <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <p style={{ textAlign: 'right', margin: '-6px 0 4px' }}>
+          <Link to="/password-dimenticata" style={{ fontSize: 12.5 }}>Password dimenticata?</Link>
+        </p>
 
         {errore && (
           <div className="errore-auth">
