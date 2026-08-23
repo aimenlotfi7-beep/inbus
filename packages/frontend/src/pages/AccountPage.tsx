@@ -305,29 +305,65 @@ function SezioneDashboard({ email, onNavigare, onAprireViaggio }: { email: strin
 
       {viaggi !== null && eventoProssimo && prenotazioneProssima && (
         <div className="panel-box" style={{ background: 'linear-gradient(135deg, rgba(255,61,122,.12), rgba(91,141,255,.08))', borderColor: 'var(--pink)' }}>
-          <p style={{ textTransform: 'uppercase', fontSize: 11, letterSpacing: 1, color: 'var(--mist)', margin: '0 0 6px' }}>Il tuo prossimo viaggio</p>
+          {giorniAlViaggio === 0 ? (
+            <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 20, textTransform: 'uppercase', color: 'var(--pink)', margin: '0 0 6px' }}>🚌 Il tuo viaggio è oggi!</p>
+          ) : giorniAlViaggio === 1 ? (
+            <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 20, textTransform: 'uppercase', color: 'var(--pink)', margin: '0 0 6px' }}>📍 Domani si parte!</p>
+          ) : (
+            <p style={{ textTransform: 'uppercase', fontSize: 11, letterSpacing: 1, color: 'var(--mist)', margin: '0 0 6px' }}>Il tuo prossimo viaggio</p>
+          )}
           <h2 style={{ margin: '0 0 4px' }}>{eventoProssimo.artista}</h2>
           <p style={{ color: 'var(--mist)', fontSize: 13.5, margin: '0 0 14px' }}>
-            {prenotazioneProssima.fermataCitta} → {eventoProssimo.citta} · {new Date(eventoProssimo.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}
-            {giorniAlViaggio !== null && giorniAlViaggio >= 0 && (giorniAlViaggio === 0 ? ' · si parte oggi!' : giorniAlViaggio === 1 ? ' · si parte domani!' : ` · tra ${giorniAlViaggio} giorni`)}
+            {prenotazioneProssima.fermataCitta}
+            {prenotazioneProssima.fermataOrario && ` · ore ${prenotazioneProssima.fermataOrario}`}
+            {' → '}{eventoProssimo.citta}
+            {giorniAlViaggio !== null && giorniAlViaggio > 1 && ` · tra ${giorniAlViaggio} giorni`}
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, fontSize: 13 }}>
-            <span>✓ Prenotazione confermata</span>
-            {prenotazioneProssima.tipoPagamento === 'COMPLETO' || prenotazioneProssima.saldoPagato ? (
-              <span>✓ Pagamento completato</span>
-            ) : (
-              <>
-                <span>✓ Acconto ricevuto</span>
-                <span style={{ color: calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? 'var(--pink)' : 'var(--amber, #e0a95b)' }}>
-                  {calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? '⚠ Termine per il saldo superato' : '⚠ Saldo da versare'}
-                  {prenotazioneProssima.scadenzaSaldo ? ` ${calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? 'il' : 'entro il'} ${new Date(prenotazioneProssima.scadenzaSaldo).toLocaleDateString('it-IT')}` : ''}
-                </span>
-              </>
-            )}
-          </div>
+          {/* Entro il giorno prima, un promemoria pratico invece della
+              solita mini-timeline sullo stato del pagamento — quello
+              non serve più a ridosso della partenza, quello che serve
+              è sapere cosa fare. */}
+          {giorniAlViaggio !== null && giorniAlViaggio <= 1 && giorniAlViaggio >= 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, fontSize: 13 }}>
+              <p style={{ margin: '0 0 4px', fontWeight: 600 }}>Ricordati:</p>
+              <span>• Arrivare in anticipo rispetto all'orario di partenza</span>
+              <span>• Avere un documento d'identità con te</span>
+              <span>• Avere la prenotazione a portata di mano (basta questa pagina)</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, fontSize: 13 }}>
+              <span>✓ Prenotazione confermata</span>
+              {prenotazioneProssima.tipoPagamento === 'COMPLETO' || prenotazioneProssima.saldoPagato ? (
+                <span>✓ Pagamento completato</span>
+              ) : (
+                <>
+                  <span>✓ Acconto ricevuto</span>
+                  <span style={{ color: calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? 'var(--pink)' : 'var(--amber, #e0a95b)' }}>
+                    {calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? '⚠ Termine per il saldo superato' : '⚠ Saldo da versare'}
+                    {prenotazioneProssima.scadenzaSaldo ? ` ${calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? 'il' : 'entro il'} ${new Date(prenotazioneProssima.scadenzaSaldo).toLocaleDateString('it-IT')}` : ''}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
 
-          <button className="btn btn-primary" onClick={() => onAprireViaggio(prenotazioneProssima.pnr)}>Apri il viaggio</button>
+          {giorniAlViaggio === 0 && prenotazioneProssima.fermataIndirizzo ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <a
+                className="btn btn-primary"
+                style={{ textDecoration: 'none', textAlign: 'center' }}
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prenotazioneProssima.fermataIndirizzo)}`}
+                target="_blank" rel="noreferrer"
+              >
+                🗺️ Apri mappa
+              </a>
+              <button className="btn btn-ghost" onClick={() => onNavigare('chat')}>💬 Chat</button>
+              <a className="btn btn-ghost" href="/faq">🛟 Assistenza</a>
+            </div>
+          ) : (
+            <button className="btn btn-primary" onClick={() => onAprireViaggio(prenotazioneProssima.pnr)}>Apri il viaggio</button>
+          )}
         </div>
       )}
 

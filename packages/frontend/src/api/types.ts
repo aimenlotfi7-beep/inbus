@@ -66,6 +66,7 @@ export interface Prenotazione {
   eventoId: string;
   lineaId: string;
   fermataCitta: string;
+  fermataIndirizzo: string | null;
   fermataOrario: string | null;
   passeggeri: number;
   totale: string;
