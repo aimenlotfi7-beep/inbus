@@ -32,13 +32,6 @@ export const ticketService = {
     if (!p.saldoPagato) throw new ConflittoDati('Il biglietto si emette solo a saldo completato.');
     if (p.ticketToken) return; // già emesso, non rifarlo (es. saldaResto chiamato due volte)
 
-    // Il pagamento è completo proprio ora — matura subito il credito
-    // fedeltà del cliente, non serve aspettare che il viaggio avvenga
-    // (il cliente non può più cancellare da solo la prenotazione: un
-    // eventuale rimborso approvato dall'amministratore lo toglierà).
-    const { creditoService } = await import('../credito/credito.service.js');
-    await creditoService.maturaCreditoSubito(p.id);
-
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
     if (!evento) throw new NonTrovato('Evento');
 
@@ -89,6 +82,17 @@ export const ticketService = {
       ticketStato: 'EMESSO',
       ticketEmessoIl: new Date(),
     }).where(eq(prenotazioni.id, p.id));
+
+    // Il biglietto è già emesso a questo punto — quello che succede da
+    // qui in poi (credito, email) non deve MAI più poter far sparire un
+    // biglietto già assegnato: ogni pezzo isolato col proprio try/catch,
+    // un problema in uno non deve fermare gli altri.
+    try {
+      const { creditoService } = await import('../credito/credito.service.js');
+      await creditoService.maturaCreditoSubito(p.id);
+    } catch (err) {
+      console.error(`Maturazione credito fallita per PNR ${p.pnr} (biglietto comunque emesso):`, err);
+    }
 
     const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
     if (utente?.email) {

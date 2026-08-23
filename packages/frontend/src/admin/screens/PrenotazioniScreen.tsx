@@ -84,6 +84,15 @@ export function PrenotazioniScreen() {
       alert(e instanceof ErroreApi ? `Eliminazione non riuscita: ${e.message}` : 'Eliminazione non riuscita: impossibile contattare il server.');
     }
   }
+  async function rigeneraBiglietto(r: PrenotazioneRiga) {
+    if (!confirm(`Rigenerare il biglietto per ${r.pnr}? Utile se non era mai stato emesso (es. per un problema tecnico) — non tocca il biglietto se esiste già.`)) return;
+    try {
+      await prenotazioniAdminApi.rigeneraBiglietto(r.pnr);
+      alert('Fatto — se il cliente ora apre "I miei biglietti" nella sua area, dovrebbe trovarlo.');
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: impossibile contattare il server.');
+    }
+  }
 
   return (
     <div>
@@ -196,7 +205,12 @@ export function PrenotazioniScreen() {
                             </td>
                             <td>
                               {r.stato === 'CONFERMATA' ? (
-                                <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => cancella(r)}>Cancella</button>
+                                <>
+                                  <button className="btn btn-ghost" style={{ fontSize: 12, whiteSpace: 'nowrap', marginRight: 6 }} onClick={() => rigeneraBiglietto(r)} title="Se il biglietto non è mai arrivato al cliente">
+                                    🎫 Rigenera biglietto
+                                  </button>
+                                  <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => cancella(r)}>Cancella</button>
+                                </>
                               ) : (
                                 <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => eliminaDefinitivamente(r)}>Elimina def.</button>
                               )}

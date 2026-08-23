@@ -38,4 +38,5 @@ export const prenotazioniAdminApi = {
   cancella: (pnr: string) => api.post<void>(`/api/prenotazioni/${pnr}/cancella`),
   eliminaDefinitivamente: (pnr: string) => api.delete<void>(`/api/prenotazioni/${pnr}`),
   inviaSollecito: (pnr: string) => api.post<{ inviata: boolean }>(`/api/prenotazioni/${pnr}/sollecito`),
+  rigeneraBiglietto: (pnr: string) => api.post<{ ok: true }>(`/api/prenotazioni/${pnr}/rigenera-biglietto`),
 };

@@ -50,6 +50,11 @@ export const prenotazioniController = {
   async inviaSollecitoManuale(req: Request, res: Response) {
     res.json(await prenotazioniService.inviaSollecitoManuale(req.params.pnr));
   },
+  async rigeneraBiglietto(req: Request, res: Response) {
+    const { ticketService } = await import('../ticket/ticket.service.js');
+    await ticketService.emetti(req.params.pnr);
+    res.json({ ok: true });
+  },
 };
 
 export const prenotazioniRouter = Router();
@@ -77,6 +82,7 @@ prenotazioniRouter.post('/:pnr/cancella', richiedeAuth, richiedePermesso('prenot
 // (per ripulire dati di test o duplicati) — non tocca quelle confermate.
 prenotazioniRouter.delete('/:pnr', richiedeAuth, richiedePermesso('prenotazioni.cancella'), asyncHandler(prenotazioniController.eliminaDefinitivamente));
 prenotazioniRouter.post('/:pnr/sollecito', richiedeAuth, richiedePermesso('prenotazioni.pagamenti'), asyncHandler(prenotazioniController.inviaSollecitoManuale));
+prenotazioniRouter.post('/:pnr/rigenera-biglietto', richiedeAuth, richiedePermesso('prenotazioni.pagamenti'), asyncHandler(prenotazioniController.rigeneraBiglietto));
 
 // Nota: in produzione qui andrebbe aggiunto un controllo che l'email nel
 // body/query corrisponda al cliente autenticato (es. via magic-link/OTP),
