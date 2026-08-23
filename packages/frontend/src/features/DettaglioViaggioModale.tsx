@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { prenotazioniApi, type DettaglioPrenotazione } from '../api/prenotazioni';
+import { calcolaStatoPrenotazione } from './statoPrenotazione';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -50,14 +51,15 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
   const oggi = new Date().toISOString().slice(0, 10);
   const giorniAlViaggio = ev ? Math.ceil((new Date(ev.data).getTime() - Date.now()) / (24 * 3600 * 1000)) : null;
   const pagamentoCompleto = dettaglio.tipoPagamento === 'COMPLETO' || dettaglio.saldoPagato;
+  const stato = calcolaStatoPrenotazione(dettaglio);
 
   return (
     <div className="travel-overlay" onClick={onClose}>
       <div className="travel-card" onClick={(e) => e.stopPropagation()}>
         <button className="travel-close" onClick={onClose}>✕</button>
 
-        <span className={`badge ${dettaglio.stato === 'CONFERMATA' ? 'pagato' : 'scaduto'}`}>
-          {dettaglio.stato === 'CONFERMATA' ? '✓ Prenotazione confermata' : 'Cancellata'}
+        <span className={`badge ${stato.classe}`}>
+          {stato.chiave === 'confermata' ? '✓ ' : stato.chiave === 'acconto_scaduto' ? '⚠ ' : ''}{stato.etichetta}
         </span>
 
         <h1 style={{ margin: '10px 0 2px' }}>{ev?.artista ?? 'Evento'}</h1>
@@ -92,8 +94,9 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
           ) : (
             <>
               <div className="travel-timeline-riga">✓ Acconto ricevuto</div>
-              <div className="travel-timeline-riga" style={{ color: '#e0a95b' }}>
-                ⚠ Saldo da versare{dettaglio.scadenzaSaldo ? ` entro il ${new Date(dettaglio.scadenzaSaldo).toLocaleDateString('it-IT')}` : ''}
+              <div className="travel-timeline-riga" style={{ color: stato.chiave === 'acconto_scaduto' ? 'var(--pink)' : '#e0a95b' }}>
+                {stato.chiave === 'acconto_scaduto' ? '⚠ Termine per il saldo superato' : '⚠ Saldo da versare'}
+                {dettaglio.scadenzaSaldo ? ` ${stato.chiave === 'acconto_scaduto' ? 'il' : 'entro il'} ${new Date(dettaglio.scadenzaSaldo).toLocaleDateString('it-IT')}` : ''}
               </div>
             </>
           )}

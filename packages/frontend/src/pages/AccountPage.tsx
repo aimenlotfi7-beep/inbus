@@ -12,6 +12,7 @@ import { clienteLoggato, logoutCliente } from '../features/clienteSessione';
 import { clienteAuthApi } from '../api/clienteAuth';
 import { listaAttesaApi, type MiaIscrizione } from '../api/listaAttesa';
 import { DettaglioViaggioModale } from '../features/DettaglioViaggioModale';
+import { calcolaStatoPrenotazione } from '../features/statoPrenotazione';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -318,8 +319,9 @@ function SezioneDashboard({ email, onNavigare, onAprireViaggio }: { email: strin
             ) : (
               <>
                 <span>✓ Acconto ricevuto</span>
-                <span style={{ color: 'var(--amber, #e0a95b)' }}>
-                  ⚠ Saldo da versare{prenotazioneProssima.scadenzaSaldo ? ` entro il ${new Date(prenotazioneProssima.scadenzaSaldo).toLocaleDateString('it-IT')}` : ''}
+                <span style={{ color: calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? 'var(--pink)' : 'var(--amber, #e0a95b)' }}>
+                  {calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? '⚠ Termine per il saldo superato' : '⚠ Saldo da versare'}
+                  {prenotazioneProssima.scadenzaSaldo ? ` ${calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? 'il' : 'entro il'} ${new Date(prenotazioneProssima.scadenzaSaldo).toLocaleDateString('it-IT')}` : ''}
                 </span>
               </>
             )}
@@ -458,7 +460,7 @@ function SezioneViaggi({ email, onAprireViaggio }: { email: string; onAprireViag
               </div>
             </div>
             <div className="viaggio-right">
-              <span className={`badge ${p.stato === 'CONFERMATA' ? 'pagato' : 'scaduto'}`}>{p.stato === 'CONFERMATA' ? 'Confermata' : 'Cancellata'}</span>
+              <span className={`badge ${calcolaStatoPrenotazione(p).classe}`}>{calcolaStatoPrenotazione(p).etichetta}</span>
               <span className="totale">€{Number(p.totale).toFixed(2)}</span>
               {p.stato === 'CONFERMATA' && (
                 <div className="viaggio-azioni">
