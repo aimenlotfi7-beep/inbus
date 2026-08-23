@@ -303,3 +303,8 @@
   background:var(--dusk); border:1px solid var(--line); border-radius:999px; padding:4px 12px; font-size:12.5px;
 }
 .travel-azioni{display:flex; flex-direction:column; gap:10px; margin-top:20px;}
+
+.travel-biglietto-riga{
+  display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+  background:var(--dusk); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-size:13px;
+}

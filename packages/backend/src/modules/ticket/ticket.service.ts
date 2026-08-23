@@ -105,4 +105,57 @@ export const ticketService = {
       });
     }
   },
+
+  /** L'elenco dei biglietti di una prenotazione, per il cliente che
+   *  vuole recuperarli — solo se sono stati davvero emessi (pagamento
+   *  completo). Verifica l'email come altrove: non un vero controllo
+   *  d'accesso, ma non lascia vedere prenotazioni altrui a chi non
+   *  conosce già l'email giusta. */
+  async bigliettiPerCliente(pnr: string, email: string) {
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
+    if (!p) throw new NonTrovato('Prenotazione');
+    const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+    if (!utente || utente.email.toLowerCase() !== email.toLowerCase()) throw new NonTrovato('Prenotazione');
+
+    const partecipanti = await db
+      .select()
+      .from(partecipantiPrenotazione)
+      .where(eq(partecipantiPrenotazione.prenotazioneId, p.id))
+      .orderBy(partecipantiPrenotazione.ordine);
+
+    return partecipanti
+      .filter((pt) => pt.ticketToken) // solo quelli con biglietto davvero emesso
+      .map((pt) => ({ nome: pt.nome, cognome: pt.cognome, token: pt.ticketToken as string }));
+  },
+
+  /** Ridisegna lo STESSO biglietto già emesso (stesso QR, stesso
+   *  token) — non ne genera uno nuovo: il PDF non veniva salvato da
+   *  nessuna parte dopo l'invio via email, quindi va ricreato identico
+   *  al bisogno, ma deve restare lo stesso oggetto "valido" di prima,
+   *  non uno che invalida il precedente. */
+  async rigeneraPdfPerToken(token: string) {
+    const [pt] = await db.select().from(partecipantiPrenotazione).where(eq(partecipantiPrenotazione.ticketToken, token)).limit(1);
+    if (!pt) throw new NonTrovato('Biglietto');
+
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, pt.prenotazioneId)).limit(1);
+    if (!p) throw new NonTrovato('Prenotazione');
+    const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
+    if (!evento) throw new NonTrovato('Evento');
+
+    const config = await layoutBigliettoService.getPerEvento(evento.layoutBigliettoId);
+    const configEffettiva = evento.ticketColoreAccento ? { ...config, coloreAccento: evento.ticketColoreAccento } : config;
+    const qrDataUrl = await QRCode.toDataURL(`INBUS:TICKET:${p.pnr}:${token}`, { margin: 1, width: 300 });
+    const pdfBuffer = await disegnaBigliettoPdf(configEffettiva, {
+      artista: evento.artista,
+      dataEvento: evento.data,
+      fermataCitta: p.fermataCitta,
+      fermataOrario: p.fermataOrario,
+      passeggeriNomi: [`${pt.nome} ${pt.cognome}`],
+      pnr: p.pnr,
+      qrDataUrl,
+      immagineIntestazioneUrl: evento.ticketImmagineSfondoUrl,
+    });
+    const nomeFile = `biglietto-${p.pnr}-${pt.nome}-${pt.cognome}`.replace(/[^a-zA-Z0-9-]+/g, '-') + '.pdf';
+    return { pdfBuffer, nomeFile };
+  },
 };

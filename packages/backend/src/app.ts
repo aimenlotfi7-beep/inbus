@@ -25,6 +25,7 @@ import { controlloAccessiRouter } from './modules/controllo-accessi/controllo-ac
 import { creditoRouter } from './modules/credito/credito.routes.js';
 import { richiesteRimborsoRouter } from './modules/richieste-rimborso/richieste-rimborso.routes.js';
 import { clienteAuthRouter } from './modules/cliente-auth/cliente-auth.routes.js';
+import { ticketRouter } from './modules/ticket/ticket.routes.js';
 import { categorieRouter } from './modules/categorie/categorie.routes.js';
 import { listaAttesaRouter } from './modules/lista-attesa/lista-attesa.routes.js';
 import { offerteRouter } from './modules/offerte/offerte.routes.js';
@@ -64,6 +65,7 @@ export function creaApp() {
   app.use('/api/credito', creditoRouter);
   app.use('/api/richieste-rimborso', richiesteRimborsoRouter);
   app.use('/api/cliente-auth', clienteAuthRouter);
+  app.use('/api/biglietti', ticketRouter);
   app.use('/api/categorie', categorieRouter);
   app.use('/api/lista-attesa', listaAttesaRouter);
   app.use('/api/offerte', offerteRouter);

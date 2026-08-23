@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { prenotazioniApi, type DettaglioPrenotazione } from '../api/prenotazioni';
+import { ticketApi, type Biglietto } from '../api/ticket';
 import { calcolaStatoPrenotazione } from './statoPrenotazione';
+import { PulsanteCondividi } from './PulsanteCondividi';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -16,9 +18,11 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
   onVaiAllaChat: () => void;
 }) {
   const [dettaglio, setDettaglio] = useState<DettaglioPrenotazione | null>(null);
+  const [biglietti, setBiglietti] = useState<Biglietto[]>([]);
 
   useEffect(() => {
     prenotazioniApi.dettaglioPerCliente(pnr, email).then(setDettaglio).catch(() => setDettaglio(null));
+    ticketApi.lista(pnr, email).then(setBiglietti);
   }, [pnr, email]);
 
   async function richiediRimborso() {
@@ -85,6 +89,30 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
             <span className="travel-partecipante-chip" key={i}>{p.nome} {p.cognome}</span>
           ))}
         </div>
+
+        {!!biglietti.length && (
+          <>
+            <p className="section-label" style={{ marginTop: 18 }}>I miei biglietti</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {biglietti.map((b) => (
+                <div key={b.token} className="travel-biglietto-riga">
+                  <span>🎫 {b.nome} {b.cognome}</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <a className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px', textDecoration: 'none' }} href={ticketApi.urlDownload(b.token)} target="_blank" rel="noreferrer">
+                      Scarica
+                    </a>
+                    <PulsanteCondividi
+                      titolo={`Biglietto INBUS — ${ev?.artista ?? ''}`}
+                      testo={`Ecco il biglietto per ${b.nome} ${b.cognome} — ${ev?.artista ?? ''}`}
+                      link={ticketApi.urlDownload(b.token)}
+                      etichetta="Condividi"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <p className="section-label" style={{ marginTop: 18 }}>Pagamento</p>
         <div className="travel-timeline">

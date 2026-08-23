@@ -6,6 +6,8 @@ import { prezzoMinimoEvento } from '../api/prezzi';
 import { useSeoTags } from '../features/useSeoTags';
 import { CheckoutForm } from '../features/checkout/CheckoutForm';
 import { PercorsoBus } from '../features/PercorsoBus';
+import { PulsanteCondividi } from '../features/PulsanteCondividi';
+import { EventiCorrelati } from '../features/EventiCorrelati';
 import { Layout } from '../Layout';
 
 const ETICHETTA_STATO: Record<NonNullable<Evento['statoDisponibilita']>, string> = {
@@ -107,6 +109,9 @@ export function EventoPage() {
               <h1>{evento.artista}</h1>
               <p className="meta-riga">📍 {evento.luogo}, {evento.citta}</p>
               <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <div style={{ marginTop: 10 }}>
+                <PulsanteCondividi titolo={`${evento.artista} — INBUS`} testo={`Vieni con noi in bus a vedere ${evento.artista}, ${evento.luogo} (${evento.citta})`} />
+              </div>
 
               {evento.statoDisponibilita && (
                 <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, display: 'inline-block', marginTop: 10 }}>
@@ -178,6 +183,8 @@ export function EventoPage() {
           </div>
         )}
       </div>
+
+      {stato === 'pronto' && evento && <EventiCorrelati evento={evento} />}
 
       {/* Barra fissa in fondo allo schermo, solo su cellulare e solo
           quando il modulo è ancora chiuso — resta sempre raggiungibile
