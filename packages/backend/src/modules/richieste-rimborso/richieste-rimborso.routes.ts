@@ -18,6 +18,15 @@ richiesteRimborsoRouter.post(
 );
 
 richiesteRimborsoRouter.get(
+  '/conta-in-attesa',
+  richiedeAuth,
+  richiedePermesso('prenotazioni.pagamenti'),
+  asyncHandler(async (_req: Request, res: Response) => {
+    res.json({ conteggio: await richiesteRimborsoService.contaInAttesa() });
+  }),
+);
+
+richiesteRimborsoRouter.get(
   '/',
   richiedeAuth,
   richiedePermesso('prenotazioni.pagamenti'),

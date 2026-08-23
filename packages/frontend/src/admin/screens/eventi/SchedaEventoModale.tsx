@@ -9,6 +9,7 @@ import { PaginaSezione } from '../../shared/PaginaSezione';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
 import { CaricaFile } from '../../shared/CaricaFile';
+import { CampoNumero } from '../../shared/CampoNumero';
 import { PartenzeTab } from '../partenze/PartenzeTab';
 import { ListaAttesaTab } from './ListaAttesaTab';
 import { OfferteTab } from './OfferteTab';
@@ -409,7 +410,7 @@ export function SchedaEventoModale({
               />
             </label>
             <label>Acconto (€)
-              <input type="number" min={1} value={form.accontoEur ?? 10} onChange={(e) => setForm({ ...form, accontoEur: Number(e.target.value) })} />
+              <CampoNumero valuta min={1} value={form.accontoEur} onChange={(v) => setForm({ ...form, accontoEur: v ?? 0 })} />
             </label>
             <label>Avviso disponibilità (mostrato ai clienti al posto dei posti reali)
               <select
@@ -514,7 +515,7 @@ export function SchedaEventoModale({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr .6fr', gap: 8, flex: 1 }}>
               <input placeholder="Nome tratta" value={linea.nome} onChange={(e) => aggiornaLinea(idxLinea, 'nome', e.target.value)} />
-              <input placeholder="Posti totali" type="number" value={linea.postiTotali} onChange={(e) => aggiornaLinea(idxLinea, 'postiTotali', Number(e.target.value))} />
+              <CampoNumero placeholder="Posti totali" value={linea.postiTotali} onChange={(v) => aggiornaLinea(idxLinea, 'postiTotali', v ?? 0)} />
             </div>
             <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12.5 }} onClick={() => rimuoviLinea(idxLinea)}>Rimuovi tratta</button>
           </div>
@@ -553,8 +554,17 @@ export function SchedaEventoModale({
               <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'citta', e.target.value)} />
               <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'indirizzo', e.target.value)} />
               <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxLinea, idxFermata, 'orario', v)} />
-              <input placeholder="Prezzo € *" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'prezzo', e.target.value)} />
-              <input placeholder="Posti max" title="Facoltativo: limite posti solo per questa fermata. Se vuoto, condivide i posti di tutto il bus." type="number" value={f.postiMax ?? ''} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'postiMax', e.target.value)} />
+              <CampoNumero
+                valuta placeholder="Prezzo"
+                value={f.prezzo}
+                onChange={(v) => aggiornaFermata(idxLinea, idxFermata, 'prezzo', v !== undefined ? String(v) : '')}
+              />
+              <CampoNumero
+                placeholder="Posti max"
+                title="Facoltativo: limite posti solo per questa fermata. Se vuoto, condivide i posti di tutto il bus."
+                value={f.postiMax ?? undefined}
+                onChange={(v) => aggiornaFermata(idxLinea, idxFermata, 'postiMax', v !== undefined ? String(v) : '')}
+              />
               <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxLinea, idxFermata)} title="Rimuovi fermata">✕</button>
             </div>
           ))}

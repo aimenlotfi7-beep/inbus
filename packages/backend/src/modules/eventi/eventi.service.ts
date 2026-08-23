@@ -21,7 +21,7 @@ import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './e
 // Include standard riusato da list/getById: evento con tutte le sue
 // relazioni annidate, così il frontend riceve un unico oggetto completo
 // (esattamente come faceva il vecchio inbusLoadDB() nel prototipo).
-const includeCompleto = {
+export const includeCompleto = {
   linee: { with: { fermate: true } },
   immagini: true,
   allegati: true,

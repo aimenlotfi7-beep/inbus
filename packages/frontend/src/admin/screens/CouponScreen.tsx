@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { couponApi, type Coupon, type CouponInput } from '../../api/coupon';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
+import { CampoNumero } from '../shared/CampoNumero';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
@@ -53,8 +54,8 @@ export function CouponScreen() {
             <option value="FISSO">Importo fisso</option>
           </select>
         </div>
-        <div className="campo"><label>Valore</label><input type="number" value={form.valore} onChange={(e) => setForm({ ...form, valore: Number(e.target.value) })} /></div>
-        <div className="campo"><label>Usi massimi (vuoto = illimitati)</label><input type="number" value={form.usiMax ?? ''} onChange={(e) => setForm({ ...form, usiMax: e.target.value ? Number(e.target.value) : undefined })} /></div>
+        <div className="campo"><label>Valore</label><CampoNumero valuta={form.tipo === 'FISSO'} value={form.valore} onChange={(v) => setForm({ ...form, valore: v ?? 0 })} /></div>
+        <div className="campo"><label>Usi massimi (vuoto = illimitati)</label><CampoNumero value={form.usiMax} onChange={(v) => setForm({ ...form, usiMax: v })} /></div>
         <div className="campo">
           <label><input type="checkbox" checked={form.attivo ?? true} onChange={(e) => setForm({ ...form, attivo: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Attivo</label>
         </div>

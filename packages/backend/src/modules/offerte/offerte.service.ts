@@ -2,6 +2,7 @@ import { eq, desc } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { offerteEvento, eventi } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
+import { includeCompleto } from '../eventi/eventi.service.js';
 import type { CreaOffertaInput, aggiornaOffertaSchema } from './offerte.dto.js';
 import type { z } from 'zod';
 
@@ -66,7 +67,11 @@ export const offerteService = {
     if (o.validoAl && adesso > o.validoAl) throw new ConflittoDati('Questa offerta è scaduta.');
     if (o.limiteUtilizzi !== null && o.utilizzi >= o.limiteUtilizzi) throw new ConflittoDati('Questa offerta è esaurita.');
 
-    const [evento] = await db.select().from(eventi).where(eq(eventi.id, o.eventoId)).limit(1);
+    // Query "nuda" prima (senza immagini/tratte/fermate) — la pagina
+    // pubblica dell'offerta ne ha bisogno per il prezzo e la galleria,
+    // stesso motivo per cui il resto del sito usa sempre questa forma
+    // completa quando mostra un evento a un cliente.
+    const evento = await db.query.eventi.findFirst({ where: eq(eventi.id, o.eventoId), with: includeCompleto });
     if (!evento) throw new NonTrovato('Evento');
     return { offerta: o, evento };
   },

@@ -40,6 +40,17 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
     }
   }
 
+  async function promuoviTutte() {
+    if (!confirm(`Promuovere tutte le ${inAttesa.length} iscrizioni in attesa? A ognuno arriverà un'email con il link per completare la prenotazione — chi trova i posti già esauriti nel frattempo resterà segnalato come non riuscito, senza bloccare gli altri.`)) return;
+    try {
+      const { promosse, fallite } = await listaAttesaApi.promuoviTutte(eventoId);
+      alert(`Fatto — ${promosse} promosse${fallite > 0 ? `, ${fallite} non riuscite (probabilmente posti esauriti nel frattempo)` : ''}.`);
+      ricarica();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+    }
+  }
+
   if (caricamento) return <p className="testo-intro">Carico...</p>;
 
   // Raggruppo per fermata (in attesa, non ancora promosse) — così si
@@ -109,7 +120,14 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
         </div>
       )}
 
-      <p className="section-label" style={{ marginBottom: 10 }}>Lista d'attesa</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <p className="section-label" style={{ marginBottom: 0 }}>Lista d'attesa</p>
+        {inAttesa.length > 0 && (
+          <button className="btn btn-primary" style={{ fontSize: 13, padding: '6px 14px' }} onClick={promuoviTutte}>
+            Promuovi tutte ({inAttesa.length})
+          </button>
+        )}
+      </div>
       {lista.length === 0 && <p className="testo-intro">Nessuna iscrizione alla lista d'attesa per questo evento.</p>}
 
       {lista.map((riga) => (

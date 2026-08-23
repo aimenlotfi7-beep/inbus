@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { tragittiApi, type Tragitto, type FermataTragitto } from '../../api/tragitti';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
+import { CampoNumero } from '../shared/CampoNumero';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { useAvvisoModificheNonSalvate } from '../shared/useAvvisoModificheNonSalvate';
@@ -101,7 +102,7 @@ export function TragittiScreen() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr .6fr', gap: 8 }}>
               <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idx, 'citta', e.target.value)} />
               <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
-              <input placeholder="Prezzo €" type="number" value={f.prezzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'prezzo', e.target.value)} />
+              <CampoNumero valuta placeholder="Prezzo" value={f.prezzo} onChange={(v) => aggiornaFermata(idx, 'prezzo', v !== undefined ? String(v) : '')} />
             </div>
           </div>
         ))}

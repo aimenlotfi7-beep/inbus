@@ -49,4 +49,5 @@ export const listaAttesaApi = {
   contaPartecipanti: (eventoId: string) => api.get<{ partecipanti: number }>(`/api/lista-attesa/eventi/${eventoId}/conta-partecipanti`),
   contaInAttesa: () => api.get<{ conteggio: number }>('/api/lista-attesa/allerte'),
   promuovi: (id: string) => api.post<{ ok: true; emailInviata: boolean; link: string }>(`/api/lista-attesa/${id}/promuovi`),
+  promuoviTutte: (eventoId: string) => api.post<{ promosse: number; fallite: number }>(`/api/lista-attesa/evento/${eventoId}/promuovi-tutte`),
 };

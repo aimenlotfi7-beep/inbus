@@ -29,6 +29,9 @@ export const listaAttesaController = {
   async promuovi(req: Request, res: Response) {
     res.json(await listaAttesaService.promuovi(req.params.id));
   },
+  async promuoviTutte(req: Request, res: Response) {
+    res.json(await listaAttesaService.promuoviTutte(req.params.eventoId));
+  },
   async getByToken(req: Request, res: Response) {
     res.json(await listaAttesaService.getByToken(req.params.token));
   },
@@ -50,3 +53,4 @@ listaAttesaRouter.get('/allerte', richiedeAuth, richiedePermesso('eventi.partenz
 listaAttesaRouter.get('/eventi/:eventoId', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.listByEvento));
 listaAttesaRouter.get('/eventi/:eventoId/conta-partecipanti', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.contaPartecipanti));
 listaAttesaRouter.post('/:id/promuovi', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(listaAttesaController.promuovi));
+listaAttesaRouter.post('/evento/:eventoId/promuovi-tutte', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(listaAttesaController.promuoviTutte));

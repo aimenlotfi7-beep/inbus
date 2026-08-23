@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { haPermesso, type SessioneAdmin } from '../../api/auth';
 import { eventiApi } from '../../api/eventi';
 import { listaAttesaApi } from '../../api/listaAttesa';
+import { richiesteRimborsoApi } from '../../api/richiesteRimborso';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'partenze'
@@ -70,6 +71,7 @@ export function AdminLayout({
   const [gruppiCollassati, setGruppiCollassati] = useState<Record<string, boolean>>({});
   const [allertePartenze, setAllertePartenze] = useState(0);
   const [inAttesa, setInAttesa] = useState(0);
+  const [rimborsiInAttesa, setRimborsiInAttesa] = useState(0);
 
   // Notifica sulla voce "Partenze": quante tratte, in tutti gli eventi,
   // hanno più passeggeri confermati dei posti previsti. Solo per chi ha
@@ -78,6 +80,14 @@ export function AdminLayout({
     if (!haPermesso(sessione, 'eventi.partenze')) return;
     eventiApi.allertePartenze().then((r) => setAllertePartenze(r.conteggio)).catch(() => {});
     listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
+  }, [sessione]);
+
+  // Separato dal blocco sopra apposta: i rimborsi dipendono da un
+  // permesso diverso (pagamenti, non partenze) — un amministratore
+  // potrebbe avere l'uno senza l'altro.
+  useEffect(() => {
+    if (!haPermesso(sessione, 'prenotazioni.pagamenti')) return;
+    richiesteRimborsoApi.contaInAttesa().then((r) => setRimborsiInAttesa(r.conteggio)).catch(() => {});
   }, [sessione]);
 
   // Filtro sia i gruppi che le voci in base a ciò che l'utente loggato
@@ -115,6 +125,9 @@ export function AdminLayout({
                     )}
                     {voce.id === 'lista-attesa' && inAttesa > 0 && (
                       <span className="side-badge" title={`${inAttesa} iscrizione/i in attesa di promozione`}>{inAttesa}</span>
+                    )}
+                    {voce.id === 'rimborsi' && rimborsiInAttesa > 0 && (
+                      <span className="side-badge" title={`${rimborsiInAttesa} richiesta/e di rimborso da gestire`}>{rimborsiInAttesa}</span>
                     )}
                   </button>
                 ))}

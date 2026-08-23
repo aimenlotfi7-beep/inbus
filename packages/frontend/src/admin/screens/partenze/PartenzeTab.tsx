@@ -4,6 +4,7 @@ import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import { tourLeaderApi, type TourLeader } from '../../../api/tourleader';
 import { ErroreApi } from '../../../api/client';
 import { Modale } from '../../shared/Modale';
+import { CampoNumero } from '../../shared/CampoNumero';
 import { useSessione } from '../../shared/SessioneContext';
 import { haPermesso } from '../../../api/auth';
 
@@ -306,8 +307,8 @@ export function PartenzeTab({ eventoId }: { eventoId: string }) {
               <p className="testo-intro" style={{ fontSize: 12, marginTop: 4 }}>Nessun tour leader censito — vai nella sezione "Tour Leader" per aggiungerne uno.</p>
             )}
           </div>
-          <div className="campo"><label>Posti del bus (usato per calcolare da solo se la tratta è coperta)</label><input type="number" min={0} value={form.postiBus ?? ''} onChange={(e) => setForm({ ...form, postiBus: e.target.value ? Number(e.target.value) : undefined })} /></div>
-          <div className="campo"><label>Costo del bus (€, facoltativo — usato per calcolare il guadagno della tratta)</label><input type="number" min={0} value={form.costo ?? ''} onChange={(e) => setForm({ ...form, costo: e.target.value ? Number(e.target.value) : undefined })} /></div>
+          <div className="campo"><label>Posti del bus (usato per calcolare da solo se la tratta è coperta)</label><CampoNumero min={0} value={form.postiBus} onChange={(v) => setForm({ ...form, postiBus: v })} /></div>
+          <div className="campo"><label>Costo del bus (facoltativo — usato per calcolare il guadagno della tratta)</label><CampoNumero valuta min={0} value={form.costo} onChange={(v) => setForm({ ...form, costo: v })} /></div>
           <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
 
           <p className="section-label" style={{ marginTop: 16 }}>Tratte coperte da questo bus</p>

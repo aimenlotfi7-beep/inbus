@@ -53,6 +53,7 @@ export function RimborsiScreen() {
             <thead>
               <tr>
                 <th>PNR</th>
+                <th>Evento</th>
                 <th>Cliente</th>
                 <th>Totale</th>
                 <th>Motivo del cliente</th>
@@ -65,6 +66,7 @@ export function RimborsiScreen() {
               {filtrata.map((r) => (
                 <tr key={r.id}>
                   <td>{r.pnr}</td>
+                  <td>{r.eventoArtista}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{new Date(r.eventoData).toLocaleDateString('it-IT')}</span></td>
                   <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{r.clienteEmail}</span></td>
                   <td>€{Number(r.prenotazioneTotale).toFixed(2)}</td>
                   <td style={{ maxWidth: 260 }}>{r.motivo || <span style={{ color: 'var(--mist)' }}>—</span>}</td>

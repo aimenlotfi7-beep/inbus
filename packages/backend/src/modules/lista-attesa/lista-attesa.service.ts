@@ -100,6 +100,29 @@ export const listaAttesaService = {
     return { ok: true, emailInviata: inviata, link };
   },
 
+  /** Promuove in blocco tutte le iscrizioni ancora IN_ATTESA per un
+   *  evento — utile quando si liberano molti posti insieme (es. un bus
+   *  aggiunto in più) invece di doverle promuovere una per una. Ognuna
+   *  passa comunque dal blocco posti atomico della prenotazione vera:
+   *  se i posti finiscono a metà, le successive falliscono
+   *  singolarmente (segnalate, non bloccano le altre). */
+  async promuoviTutte(eventoId: string) {
+    const righe = await db.select().from(listaAttesa)
+      .where(and(eq(listaAttesa.eventoId, eventoId), eq(listaAttesa.stato, 'IN_ATTESA')));
+
+    let promosse = 0;
+    let fallite = 0;
+    for (const riga of righe) {
+      try {
+        await this.promuovi(riga.id);
+        promosse++;
+      } catch {
+        fallite++;
+      }
+    }
+    return { promosse, fallite };
+  },
+
   async getByToken(token: string) {
     const [riga] = await db.select().from(listaAttesa).where(eq(listaAttesa.token, token)).limit(1);
     if (!riga) throw new NonTrovato('Link');

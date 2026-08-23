@@ -1,11 +1,19 @@
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { richiesteRimborso, prenotazioni, utenti } from '../../db/schema.js';
+import { richiesteRimborso, prenotazioni, utenti, eventi } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
 import { creditoService } from '../credito/credito.service.js';
 
 export const richiesteRimborsoService = {
+  /** Solo il numero, non l'elenco completo — usata per il pallino di
+   *  avviso nel menu laterale (caricato su ogni pagina del gestionale,
+   *  deve restare leggera). */
+  async contaInAttesa() {
+    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(richiesteRimborso).where(eq(richiesteRimborso.stato, 'IN_ATTESA'));
+    return n;
+  },
+
   /** Il cliente invia la richiesta — non verifichiamo una vera identità
    *  (non c'è ancora un account con password), solo che l'email
    *  combaci con quella della prenotazione: stesso livello di sicurezza
@@ -37,6 +45,8 @@ export const richiesteRimborsoService = {
         gestitaIl: richiesteRimborso.gestitaIl,
         pnr: prenotazioni.pnr,
         prenotazioneTotale: prenotazioni.totale,
+        eventoArtista: eventi.artista,
+        eventoData: eventi.data,
         clienteEmail: utenti.email,
         clienteNome: utenti.nome,
         clienteCognome: utenti.cognome,
@@ -44,6 +54,7 @@ export const richiesteRimborsoService = {
       .from(richiesteRimborso)
       .innerJoin(prenotazioni, eq(prenotazioni.id, richiesteRimborso.prenotazioneId))
       .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
+      .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
       .orderBy(desc(richiesteRimborso.richiestaIl));
   },
 

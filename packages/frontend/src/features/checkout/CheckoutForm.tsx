@@ -49,6 +49,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   const [telefono, setTelefono] = useState('');
   const [creditoDisponibile, setCreditoDisponibile] = useState(0);
   const [usaCredito, setUsaCredito] = useState(false);
+  const [couponCodice, setCouponCodice] = useState('');
 
   // Un modulo nome+cognome per ogni passeggero OLTRE al richiedente.
   const [partecipanti, setPartecipanti] = useState<Partecipante[]>([]);
@@ -140,6 +141,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
         ...(promoterCodice && { promoterCodice }),
         ...(offerta && { offertaId: offerta.id }),
         ...(usaCredito && tipoPagamento === 'COMPLETO' && { usaCredito: true }),
+        ...(couponCodice.trim() && { couponCodice: couponCodice.trim() }),
         ...(utmSource && { utmSource }),
         ...(utmMedium && { utmMedium }),
         ...(utmCampaign && { utmCampaign }),
@@ -384,6 +386,17 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
                       Usa il tuo credito fedeltà (€{creditoDisponibile.toFixed(2)} disponibili)
                     </label>
                   )}
+
+                  <div style={{ margin: '10px 0' }}>
+                    <label className="field-label">Hai un codice coupon?</label>
+                    <input
+                      type="text"
+                      value={couponCodice}
+                      onChange={(e) => setCouponCodice(e.target.value.toUpperCase())}
+                      placeholder="Facoltativo"
+                      style={{ textTransform: 'uppercase' }}
+                    />
+                  </div>
 
                   <button
                     className="search-cta"
