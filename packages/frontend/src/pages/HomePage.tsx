@@ -30,10 +30,29 @@ export function HomePage() {
 
   const consigliati = useMemo(() => eventi.filter((e) => e.inEvidenza), [eventi]);
   const generi = useMemo(() => ['Tutti', ...new Set(eventi.map((e) => e.genere))], [eventi]);
-  const eventiFiltrati = useMemo(
-    () => genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => e.genere === genereAttivo),
-    [eventi, genereAttivo]
-  );
+  const [ricercaTesto, setRicercaTesto] = useState('');
+  const eventiFiltrati = useMemo(() => {
+    let lista = genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => e.genere === genereAttivo);
+    const q = ricercaTesto.trim().toLowerCase();
+    if (q) {
+      lista = lista.filter((e) =>
+        e.artista.toLowerCase().includes(q) ||
+        e.citta.toLowerCase().includes(q) ||
+        e.luogo.toLowerCase().includes(q) ||
+        e.linee.some((l) => l.fermate.some((f) => f.citta.toLowerCase().includes(q)))
+      );
+    }
+    return lista;
+  }, [eventi, genereAttivo, ricercaTesto]);
+
+  // Numeri veri, calcolati dai dati reali — non inventati: quante
+  // tratte attive, quante città di partenza distinte tra tutte.
+  const numeroPartenze = useMemo(() => eventi.reduce((s, e) => s + e.linee.length, 0), [eventi]);
+  const cittaPartenza = useMemo(() => {
+    const insieme = new Set<string>();
+    eventi.forEach((e) => e.linee.forEach((l) => l.fermate.forEach((f) => insieme.add(f.citta))));
+    return Array.from(insieme).sort();
+  }, [eventi]);
 
   return (
     <>
@@ -44,17 +63,22 @@ export function HomePage() {
             <h1 className="hero-title"><span>Sali sul bus.</span><span className="line2">Vivi il concerto.</span></h1>
             <p className="hero-sub">Andata e ritorno in giornata, direttamente dalla tua città al palco del tuo artista preferito. Un solo biglietto, zero pensieri.</p>
             <div className="hero-stats">
-              <div className="stat"><b>180+</b><span>Partenze attive</span></div>
-              <div className="stat"><b>92</b><span>Città di partenza</span></div>
-              <div className="stat"><b>4.8/5</b><span>Su 14.200 viaggi</span></div>
+              <div className="stat"><b>{numeroPartenze}</b><span>Partenze attive</span></div>
+              <div className="stat"><b>{cittaPartenza.length}</b><span>Città di partenza</span></div>
             </div>
           </div>
           <div className="ticket">
             <div className="ticket-head"><b>Boarding Pass</b><span>Trova il tuo bus</span></div>
             <div className="field-row">
               <div className="field">
-                <label>Artista / Evento</label>
-                <input type="text" placeholder="Cerca o scegli..." list="artistiList" />
+                <label>Artista, evento o città</label>
+                <input
+                  type="text"
+                  placeholder="Cerca..."
+                  list="artistiList"
+                  value={ricercaTesto}
+                  onChange={(e) => setRicercaTesto(e.target.value)}
+                />
                 <datalist id="artistiList">{eventi.map((e) => <option key={e.id} value={e.artista} />)}</datalist>
               </div>
               <div className="field">
@@ -71,6 +95,32 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      {!!cittaPartenza.length && (
+        <section className="events-section parti-da-sezione">
+          <div className="section-head">
+            <div>
+              <h2 className="section-title">Parti <em>da</em></h2>
+              <p className="section-sub">Scegli la tua città — filtriamo subito i viaggi con una fermata lì.</p>
+            </div>
+          </div>
+          <div className="parti-da-chips">
+            {cittaPartenza.map((citta) => (
+              <button
+                key={citta}
+                type="button"
+                className={`parti-da-chip${ricercaTesto === citta ? ' active' : ''}`}
+                onClick={() => {
+                  setRicercaTesto(ricercaTesto === citta ? '' : citta);
+                  document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                {citta}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {!!consigliati.length && (
         <section className="events-section" id="consigliati">

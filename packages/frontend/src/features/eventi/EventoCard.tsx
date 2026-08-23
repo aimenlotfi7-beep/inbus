@@ -6,6 +6,15 @@ function postiTotaliDisponibili(evento: Evento) {
   return evento.linee.reduce((somma, l) => somma + l.postiDisponibili, 0);
 }
 
+/** Le città di partenza vere, dalle fermate reali — non un dato a
+ *  parte da tenere aggiornato a mano, semplicemente quello che c'è
+ *  già nelle tratte di questo evento. */
+function cittaPartenzaEvento(evento: Evento): string[] {
+  const insieme = new Set<string>();
+  evento.linee.forEach((l) => l.fermate.forEach((f) => insieme.add(f.citta)));
+  return Array.from(insieme);
+}
+
 function fmtData(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
@@ -29,6 +38,14 @@ export function EventoCard({ evento }: { evento: Evento }) {
   const posti = postiTotaliDisponibili(evento);
   const copertina = evento.immagini[0]?.url;
   const prezzoMinimo = prezzoMinimoEvento(evento);
+  const cittaPartenza = cittaPartenzaEvento(evento);
+  // L'etichetta mostrata: quella scelta a mano dal gestionale ha
+  // sempre la priorità; se non c'è nessuna etichetta ma i posti veri
+  // sono davvero zero, mostriamo comunque "Esaurito" — il cliente non
+  // deve scoprirlo solo perché la CTA è cambiata in "Lista d'attesa".
+  const etichettaStato = evento.statoDisponibilita
+    ? ETICHETTA_STATO[evento.statoDisponibilita]
+    : (posti === 0 ? 'Esaurito' : null);
 
   return (
     <Link to={`/eventi/${evento.slug}`} className="card reveal in" style={{ display: 'block', color: 'inherit' }}>
@@ -48,10 +65,17 @@ export function EventoCard({ evento }: { evento: Evento }) {
       <div className="card-body">
         <h3>{evento.artista}</h3>
         <div className="card-meta"><span>{evento.luogo}, {evento.citta}</span><span>{fmtData(evento.data)}</span></div>
-        {evento.statoDisponibilita && (
+        {!!cittaPartenza.length && (
           <div className="card-meta">
-            <span className={evento.statoDisponibilita === 'ESAURITO' ? 'posti-basso' : ''}>
-              {ETICHETTA_STATO[evento.statoDisponibilita]}
+            <span style={{ opacity: .75 }}>
+              🚌 Parte da {cittaPartenza.length === 1 ? cittaPartenza[0] : `${cittaPartenza.length} città`}
+            </span>
+          </div>
+        )}
+        {etichettaStato && (
+          <div className="card-meta">
+            <span className={etichettaStato === 'Esaurito' || evento.statoDisponibilita === 'ESAURITO' ? 'posti-basso' : ''}>
+              {etichettaStato}
             </span>
           </div>
         )}

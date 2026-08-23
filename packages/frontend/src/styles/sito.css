@@ -603,3 +603,13 @@
 .percorso-posti.disponibile{background:rgba(72,214,140,.15); color:#5be0a0;}
 .percorso-posti.pochi{background:rgba(255,180,80,.15); color:#e0a95b;}
 .percorso-posti.esaurito{background:rgba(255,61,122,.15); color:var(--pink);}
+
+/* ---------- PARTI DA (citta' di partenza, homepage) ---------- */
+.parti-da-sezione{padding-top:0;}
+.parti-da-chips{display:flex; flex-wrap:wrap; gap:10px; margin-top:18px;}
+.parti-da-chip{
+  background:var(--dusk-2); border:1px solid rgba(255,255,255,.1); border-radius:999px;
+  padding:9px 18px; font-size:13.5px; color:var(--paper); cursor:pointer; transition:border-color .15s ease, background .15s ease;
+}
+.parti-da-chip:hover{border-color:var(--pink);}
+.parti-da-chip.active{background:var(--pink); border-color:var(--pink); color:#fff; font-weight:600;}
