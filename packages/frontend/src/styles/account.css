@@ -252,3 +252,54 @@
 .errore-auth p{color:var(--pink); font-size:13px; margin:0;}
 .link-auth{background:none; border:none; color:var(--blue); font-size:13px; text-decoration:underline; cursor:pointer; padding:6px 0 0; display:block;}
 .box-auth .search-cta{width:100%; margin-top:22px; border:none; cursor:pointer;}
+
+/* ---------- DASHBOARD (centro di controllo) ---------- */
+.acc-dashboard-grid{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(140px,1fr)); gap:12px; margin-top:22px;
+}
+.acc-dashboard-tile{
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  background:var(--dusk); border:1px solid var(--line); border-radius:14px; padding:20px 10px;
+  color:var(--paper); font-size:13px; text-align:center; cursor:pointer; text-decoration:none;
+  transition:border-color .15s ease, transform .15s ease;
+}
+.acc-dashboard-tile:hover{border-color:var(--pink); transform:translateY(-2px);}
+.acc-dashboard-tile-icona{font-size:26px;}
+.badge.attenzione{background:rgba(224,169,91,.15); color:#e0a95b;}
+@media (max-width:640px){
+  .acc-dashboard-grid{grid-template-columns:repeat(3, 1fr); gap:8px;}
+  .acc-dashboard-tile{padding:14px 6px; font-size:11.5px;}
+  .acc-dashboard-tile-icona{font-size:22px;}
+}
+
+/* ---------- TRAVEL CARD (dettaglio prenotazione) ---------- */
+.travel-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000;
+  display:flex; align-items:flex-end; justify-content:center;
+}
+.travel-card{
+  background:var(--night); border:1px solid var(--line); border-radius:20px 20px 0 0;
+  width:100%; max-width:520px; max-height:92vh; overflow-y:auto; padding:26px 22px 30px;
+  animation:travelCardUp .25s ease;
+}
+@keyframes travelCardUp{ from{transform:translateY(30px); opacity:0;} to{transform:translateY(0); opacity:1;} }
+@media (min-width:640px){
+  .travel-overlay{align-items:center;}
+  .travel-card{border-radius:20px; margin:20px;}
+}
+.travel-close{
+  background:none; border:none; color:var(--mist); font-size:22px; cursor:pointer;
+  float:right; line-height:1; padding:4px;
+}
+.travel-route{
+  display:flex; align-items:center; gap:10px; font-size:14px; margin:14px 0; color:var(--paper);
+}
+.travel-route b{font-size:15px;}
+.travel-arrow{color:var(--mist);}
+.travel-timeline{display:flex; flex-direction:column; gap:9px; margin:16px 0; font-size:13.5px;}
+.travel-timeline-riga{display:flex; align-items:center; gap:8px;}
+.travel-partecipanti{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+.travel-partecipante-chip{
+  background:var(--dusk); border:1px solid var(--line); border-radius:999px; padding:4px 12px; font-size:12.5px;
+}
+.travel-azioni{display:flex; flex-direction:column; gap:10px; margin-top:20px;}

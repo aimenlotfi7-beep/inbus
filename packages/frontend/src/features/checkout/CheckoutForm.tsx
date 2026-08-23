@@ -222,6 +222,22 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
             ))}
           </div>
 
+          {/* Riepilogo sempre visibile, in ogni step — evento, data,
+              fermata (appena scelta), passeggeri, totale via via che si
+              conosce: il cliente non deve mai perdere di vista cosa sta
+              per comprare. */}
+          <div className="checkout-riepilogo-persistente">
+            <div>
+              <b>{evento.artista}</b>
+              <span className="checkout-riepilogo-riga">
+                {new Date(evento.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
+                {opzioneScelta && ` · ${opzioneScelta.fermataCitta} → ${evento.citta}`}
+                {` · ${passeggeri} passegger${passeggeri > 1 ? 'i' : 'o'}`}
+              </span>
+            </div>
+            {opzioneScelta && <div className="checkout-riepilogo-totale">€{(step === 3 ? totaleConCredito : totale).toFixed(2)}</div>}
+          </div>
+
           {step === 1 && (
             <>
               {tutteEsaurite && (

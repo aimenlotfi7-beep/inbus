@@ -25,6 +25,9 @@ export const prenotazioniController = {
   async getByPnr(req: Request, res: Response) {
     res.json(await prenotazioniService.getByPnr(req.params.pnr));
   },
+  async dettaglioPerCliente(req: Request, res: Response) {
+    res.json(await prenotazioniService.dettaglioPerCliente(req.params.pnr, String(req.query.email)));
+  },
   async listByEmail(req: Request, res: Response) {
     res.json(await prenotazioniService.listByEmail(String(req.query.email)));
   },
@@ -60,6 +63,7 @@ prenotazioniRouter.get('/eventi', richiedeAuth, richiedePermesso('prenotazioni.v
 // Pubbliche: il checkout del sito e l'area cliente non richiedono login admin
 prenotazioniRouter.post('/', richiedeAuthCliente, valida(creaPrenotazioneSchema), asyncHandler(prenotazioniController.crea));
 prenotazioniRouter.get('/by-email', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.listByEmail));
+prenotazioniRouter.get('/:pnr/dettaglio-cliente', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.dettaglioPerCliente));
 prenotazioniRouter.get('/:pnr', asyncHandler(prenotazioniController.getByPnr));
 prenotazioniRouter.get('/:pnr/saldo', asyncHandler(prenotazioniController.differenzaSaldo));
 prenotazioniRouter.post('/:pnr/salda', asyncHandler(prenotazioniController.saldaResto));

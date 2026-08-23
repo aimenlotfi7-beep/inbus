@@ -10,10 +10,12 @@ import { HomePage } from './HomePage';
 import { CookieBanner, LinkPreferenzeCookie } from '../features/CookieBanner';
 import { clienteLoggato, logoutCliente } from '../features/clienteSessione';
 import { clienteAuthApi } from '../api/clienteAuth';
+import { listaAttesaApi, type MiaIscrizione } from '../api/listaAttesa';
+import { DettaglioViaggioModale } from '../features/DettaglioViaggioModale';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
-type Sezione = 'eventi' | 'profilo' | 'viaggi' | 'privacy' | 'chat';
+type Sezione = 'dashboard' | 'eventi' | 'profilo' | 'viaggi' | 'lista-attesa' | 'privacy' | 'chat';
 
 export function AccountPage() {
   const [email, setEmail] = useState('');
@@ -24,13 +26,17 @@ export function AccountPage() {
   // usa avanti/indietro del browser) resta dove si trovava, invece di
   // tornare sempre alla prima sezione.
   const [searchParams, setSearchParams] = useSearchParams();
-  const sezioniValide: Sezione[] = ['eventi', 'profilo', 'viaggi', 'privacy', 'chat'];
+  const sezioniValide: Sezione[] = ['dashboard', 'eventi', 'profilo', 'viaggi', 'lista-attesa', 'privacy', 'chat'];
   const sezioneUrl = searchParams.get('sezione') as Sezione | null;
-  const sezione: Sezione = sezioneUrl && sezioniValide.includes(sezioneUrl) ? sezioneUrl : 'eventi';
+  const sezione: Sezione = sezioneUrl && sezioniValide.includes(sezioneUrl) ? sezioneUrl : 'dashboard';
   function setSezione(nuova: Sezione) {
-    setSearchParams(nuova === 'eventi' ? {} : { sezione: nuova });
+    setSearchParams(nuova === 'dashboard' ? {} : { sezione: nuova });
   }
   const [menuAperto, setMenuAperto] = useState(false);
+  // Quale prenotazione mostrare nella "travel card" — condiviso tra
+  // dashboard e l'elenco viaggi, così un click apre la stessa cosa da
+  // qualsiasi punto ci si trovi.
+  const [pnrAperto, setPnrAperto] = useState<string | null>(null);
 
   // Niente più email digitata a mano: se non c'è un accesso vero
   // (token valido), si va dritti alla pagina di accesso — tornando qui
@@ -53,11 +59,13 @@ export function AccountPage() {
   }
 
   const vociMenu: { id: Sezione; label: string }[] = [
-    { id: 'eventi', label: 'Eventi' },
-    { id: 'profilo', label: 'Il mio profilo' },
+    { id: 'dashboard', label: 'Il mio centro' },
+    { id: 'eventi', label: 'Scopri eventi' },
     { id: 'viaggi', label: 'I miei viaggi' },
+    { id: 'lista-attesa', label: 'Lista d\'attesa' },
+    { id: 'chat', label: 'Messaggi' },
+    { id: 'profilo', label: 'Il mio profilo' },
     { id: 'privacy', label: 'Preferenze Privacy' },
-    { id: 'chat', label: 'Chat' },
   ];
 
   if (caricandoSessione) return null; // evita un lampo della pagina prima del reindirizzamento
@@ -83,8 +91,10 @@ export function AccountPage() {
       <div id="accountShell">
         {sezione !== 'eventi' && (
           <div className="account-content">
+            {sezione === 'dashboard' && <SezioneDashboard email={email} onNavigare={setSezione} onAprireViaggio={setPnrAperto} />}
             {sezione === 'profilo' && <SezioneProfilo email={email} />}
-            {sezione === 'viaggi' && <SezioneViaggi email={email} />}
+            {sezione === 'viaggi' && <SezioneViaggi email={email} onAprireViaggio={setPnrAperto} />}
+            {sezione === 'lista-attesa' && <SezioneListaAttesa email={email} />}
             {sezione === 'privacy' && <SezionePrivacy email={email} />}
             {sezione === 'chat' && <SezioneChat email={email} />}
           </div>
@@ -95,6 +105,15 @@ export function AccountPage() {
           </section>
         )}
       </div>
+
+      {pnrAperto && (
+        <DettaglioViaggioModale
+          pnr={pnrAperto}
+          email={email}
+          onClose={() => setPnrAperto(null)}
+          onVaiAllaChat={() => { setPnrAperto(null); setSezione('chat'); }}
+        />
+      )}
       <CookieBanner />
     </>
   );
@@ -238,7 +257,139 @@ function SezionePrivacy({ email }: { email: string }) {
   );
 }
 
-function SezioneViaggi({ email }: { email: string }) {
+/** Il "centro di controllo" — prima cosa che il cliente vede entrando
+ *  nella sua area: se ha un viaggio futuro, è la prima cosa in
+ *  assoluto che vede, non deve andarselo a cercare. */
+function SezioneDashboard({ email, onNavigare, onAprireViaggio }: { email: string; onNavigare: (s: Sezione) => void; onAprireViaggio: (pnr: string) => void }) {
+  const [viaggi, setViaggi] = useState<Prenotazione[] | null>(null);
+  const [eventoProssimo, setEventoProssimo] = useState<Evento | null>(null);
+  const [nome, setNome] = useState('');
+  const [messaggiNonLetti, setMessaggiNonLetti] = useState(0);
+  const [inListaAttesa, setInListaAttesa] = useState(0);
+
+  useEffect(() => {
+    clienteAuthApi.me().then((d) => setNome(d.nome ?? ''));
+    prenotazioniApi.listByEmail(email).then(setViaggi);
+    chatApi.storicoCliente(email).then((conv) => {
+      const attiva = conv.find((c) => c.stato !== 'CHIUSA');
+      setMessaggiNonLetti(attiva?.messaggi.filter((m) => m.autore === 'ADMIN').length ?? 0);
+    });
+    listaAttesaApi.mieIscrizioni(email).then((l) => setInListaAttesa(l.length)).catch(() => {});
+  }, [email]);
+
+  useEffect(() => {
+    if (!viaggi) return;
+    const oggi = new Date().toISOString().slice(0, 10);
+    const confermati = viaggi.filter((p) => p.stato === 'CONFERMATA');
+    (async () => {
+      // Serve la data dell'EVENTO (non della prenotazione) per sapere
+      // davvero qual è il più vicino nel tempo — le carico tutte e
+      // scelgo quella con la data più vicina, non semplicemente la
+      // prima prenotazione fatta.
+      const coppie = await Promise.all(confermati.map(async (p) => ({ p, ev: await eventiApi.getById(p.eventoId).catch(() => null) })));
+      const future = coppie.filter((c) => c.ev && c.ev.data >= oggi).sort((a, b) => a.ev!.data.localeCompare(b.ev!.data));
+      setEventoProssimo(future[0]?.ev ?? null);
+    })();
+  }, [viaggi]);
+
+  const prenotazioneProssima = eventoProssimo ? viaggi?.find((p) => p.eventoId === eventoProssimo.id && p.stato === 'CONFERMATA') : null;
+
+  const giorniAlViaggio = eventoProssimo ? Math.ceil((new Date(eventoProssimo.data).getTime() - Date.now()) / (24 * 3600 * 1000)) : null;
+
+  return (
+    <section className="acc-sezione">
+      <h1>Ciao{nome ? `, ${nome}` : ''}!</h1>
+
+      {viaggi === null && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
+
+      {viaggi !== null && eventoProssimo && prenotazioneProssima && (
+        <div className="panel-box" style={{ background: 'linear-gradient(135deg, rgba(255,61,122,.12), rgba(91,141,255,.08))', borderColor: 'var(--pink)' }}>
+          <p style={{ textTransform: 'uppercase', fontSize: 11, letterSpacing: 1, color: 'var(--mist)', margin: '0 0 6px' }}>Il tuo prossimo viaggio</p>
+          <h2 style={{ margin: '0 0 4px' }}>{eventoProssimo.artista}</h2>
+          <p style={{ color: 'var(--mist)', fontSize: 13.5, margin: '0 0 14px' }}>
+            {prenotazioneProssima.fermataCitta} → {eventoProssimo.citta} · {new Date(eventoProssimo.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}
+            {giorniAlViaggio !== null && giorniAlViaggio >= 0 && (giorniAlViaggio === 0 ? ' · si parte oggi!' : giorniAlViaggio === 1 ? ' · si parte domani!' : ` · tra ${giorniAlViaggio} giorni`)}
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, fontSize: 13 }}>
+            <span>✓ Prenotazione confermata</span>
+            {prenotazioneProssima.tipoPagamento === 'COMPLETO' || prenotazioneProssima.saldoPagato ? (
+              <span>✓ Pagamento completato</span>
+            ) : (
+              <>
+                <span>✓ Acconto ricevuto</span>
+                <span style={{ color: 'var(--amber, #e0a95b)' }}>
+                  ⚠ Saldo da versare{prenotazioneProssima.scadenzaSaldo ? ` entro il ${new Date(prenotazioneProssima.scadenzaSaldo).toLocaleDateString('it-IT')}` : ''}
+                </span>
+              </>
+            )}
+          </div>
+
+          <button className="btn btn-primary" onClick={() => onAprireViaggio(prenotazioneProssima.pnr)}>Apri il viaggio</button>
+        </div>
+      )}
+
+      {viaggi !== null && !eventoProssimo && (
+        <div className="panel-box">
+          <p style={{ margin: '0 0 12px' }}>Non hai ancora un viaggio in programma.</p>
+          <button className="btn btn-primary" onClick={() => onNavigare('eventi')}>Scopri gli eventi</button>
+        </div>
+      )}
+
+      <div className="acc-dashboard-grid">
+        <button className="acc-dashboard-tile" onClick={() => onNavigare('viaggi')}>
+          <span className="acc-dashboard-tile-icona">🎫</span>
+          <span>Le mie prenotazioni</span>
+        </button>
+        <button className="acc-dashboard-tile" onClick={() => onNavigare('lista-attesa')}>
+          <span className="acc-dashboard-tile-icona">⏳</span>
+          <span>Lista d'attesa{inListaAttesa > 0 ? ` (${inListaAttesa})` : ''}</span>
+        </button>
+        <button className="acc-dashboard-tile" onClick={() => onNavigare('chat')}>
+          <span className="acc-dashboard-tile-icona">💬</span>
+          <span>Messaggi{messaggiNonLetti > 0 ? ` (${messaggiNonLetti})` : ''}</span>
+        </button>
+        <button className="acc-dashboard-tile" onClick={() => onNavigare('profilo')}>
+          <span className="acc-dashboard-tile-icona">👤</span>
+          <span>Il mio profilo</span>
+        </button>
+        <a className="acc-dashboard-tile" href="/faq">
+          <span className="acc-dashboard-tile-icona">🛟</span>
+          <span>Assistenza</span>
+        </a>
+      </div>
+    </section>
+  );
+}
+
+function SezioneListaAttesa({ email }: { email: string }) {
+  const [iscrizioni, setIscrizioni] = useState<MiaIscrizione[] | null>(null);
+
+  useEffect(() => { listaAttesaApi.mieIscrizioni(email).then(setIscrizioni); }, [email]);
+
+  return (
+    <section className="acc-sezione">
+      <h1>Lista d'attesa</h1>
+      {iscrizioni === null && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
+      {iscrizioni?.length === 0 && <div className="empty-box">Non sei in lista d'attesa per nessun evento al momento.</div>}
+      {iscrizioni?.map((i) => (
+        <div className="viaggio-card" key={i.id}>
+          <div className="viaggio-main">
+            <h3>{i.evento?.artista ?? 'Evento'}</h3>
+            <p>{i.evento ? `${i.evento.luogo}, ${i.evento.citta} · ${new Date(i.evento.data).toLocaleDateString('it-IT')}` : ''}</p>
+            <p>{i.passeggeri} passegger{i.passeggeri > 1 ? 'i' : 'o'}</p>
+          </div>
+          <div className="viaggio-right">
+            <span className="badge attenzione">Sei in lista d'attesa</span>
+            <span style={{ fontSize: 13, color: 'var(--mist)' }}>Posizione #{i.posizione}</span>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function SezioneViaggi({ email, onAprireViaggio }: { email: string; onAprireViaggio: (pnr: string) => void }) {
   const [tab, setTab] = useState<'prossimi' | 'passati'>('prossimi');
   const [viaggi, setViaggi] = useState<Prenotazione[] | null>(null);
   const [eventiPerId, setEventiPerId] = useState<Record<string, Evento>>({});
@@ -293,7 +444,7 @@ function SezioneViaggi({ email }: { email: string }) {
       {viaggiFiltrati.map((p) => {
         const ev = eventiPerId[p.eventoId];
         return (
-          <div className="viaggio-card" key={p.id}>
+          <div className="viaggio-card" key={p.id} onClick={() => onAprireViaggio(p.pnr)} style={{ cursor: 'pointer' }}>
             <div className="viaggio-main">
               <span className="tag">{ev?.genere}</span>
               <h3>{ev?.artista ?? 'Evento'}</h3>
@@ -311,7 +462,7 @@ function SezioneViaggi({ email }: { email: string }) {
               <span className="totale">€{Number(p.totale).toFixed(2)}</span>
               {p.stato === 'CONFERMATA' && (
                 <div className="viaggio-azioni">
-                  <button className="btn-mini" onClick={() => richiediRimborso(p.pnr)}>Richiedi rimborso</button>
+                  <button className="btn-mini" onClick={(e) => { e.stopPropagation(); richiediRimborso(p.pnr); }}>Richiedi rimborso</button>
                 </div>
               )}
             </div>

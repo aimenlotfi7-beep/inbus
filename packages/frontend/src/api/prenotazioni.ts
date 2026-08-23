@@ -32,6 +32,11 @@ export interface DifferenzaSaldo {
   differenza: number;
 }
 
+export interface DettaglioPrenotazione extends Prenotazione {
+  evento: { artista: string; genere: string; luogo: string; citta: string; data: string; slug: string } | null;
+  partecipanti: { nome: string; cognome: string }[];
+}
+
 export const prenotazioniApi = {
   // Ora richiede l'accesso vero del cliente (non più anonimo) — usa il
   // suo token, non quello admin.
@@ -40,4 +45,6 @@ export const prenotazioniApi = {
   saldaResto: (pnr: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`),
   getByPnr: (pnr: string) => api.get<Prenotazione>(`/api/prenotazioni/${pnr}`),
   listByEmail: (email: string) => api.get<Prenotazione[]>(`/api/prenotazioni/by-email?email=${encodeURIComponent(email)}`),
+  dettaglioPerCliente: (pnr: string, email: string) =>
+    api.get<DettaglioPrenotazione>(`/api/prenotazioni/${pnr}/dettaglio-cliente?email=${encodeURIComponent(email)}`),
 };

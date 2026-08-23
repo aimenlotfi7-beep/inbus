@@ -242,6 +242,25 @@ export const prenotazioniService = {
     return p;
   },
 
+  /** Tutto quello che serve per la "travel card" del cliente in un
+   *  colpo solo — prenotazione, evento e partecipanti (dati già nel
+   *  database, solo non ancora uniti in una risposta sola). Verifica
+   *  che l'email combaci, stesso criterio già usato per i rimborsi:
+   *  non è un vero account-check ma non lascia vedere prenotazioni
+   *  altrui a chi non conosce già l'email giusta. */
+  async dettaglioPerCliente(pnr: string, email: string) {
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
+    if (!p) throw new NonTrovato('Prenotazione');
+
+    const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+    if (!utente || utente.email.toLowerCase() !== email.toLowerCase()) throw new NonTrovato('Prenotazione');
+
+    const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
+    const partecipanti = await db.select().from(partecipantiPrenotazione).where(eq(partecipantiPrenotazione.prenotazioneId, p.id)).orderBy(partecipantiPrenotazione.ordine);
+
+    return { ...p, evento, partecipanti: partecipanti.map((pt) => ({ nome: pt.nome, cognome: pt.cognome })) };
+  },
+
   async listByEmail(email: string) {
     const utente = await db.query.utenti.findFirst({ where: (u, { eq }) => eq(u.email, email.toLowerCase()) });
     if (!utente) return [];

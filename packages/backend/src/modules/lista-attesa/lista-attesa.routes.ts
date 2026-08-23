@@ -26,6 +26,9 @@ export const listaAttesaController = {
   async contaInAttesa(_req: Request, res: Response) {
     res.json({ conteggio: await listaAttesaService.contaInAttesa() });
   },
+  async mieIscrizioni(req: Request, res: Response) {
+    res.json(await listaAttesaService.mieIscrizioni(String(req.query.email)));
+  },
   async contaInAttesaPerEvento(_req: Request, res: Response) {
     res.json(await listaAttesaService.contaInAttesaPerEvento());
   },
@@ -47,6 +50,7 @@ export const listaAttesaRouter = Router();
 
 // Pubbliche: iscrizione dal checkout del sito, finalizzazione dal link email.
 listaAttesaRouter.post('/', valida(iscrivitiListaAttesaSchema), asyncHandler(listaAttesaController.iscriviti));
+listaAttesaRouter.get('/mie', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(listaAttesaController.mieIscrizioni));
 listaAttesaRouter.get('/finalizza/:token', asyncHandler(listaAttesaController.getByToken));
 listaAttesaRouter.post('/finalizza/:token', valida(finalizzaSchema), asyncHandler(listaAttesaController.finalizza));
 

@@ -9,6 +9,15 @@ export interface IscrizioneListaAttesaPayload {
   partecipanti: { nome: string; cognome: string }[];
 }
 
+export interface MiaIscrizione {
+  id: string;
+  eventoId: string;
+  passeggeri: number;
+  dataCreazione: string;
+  posizione: number;
+  evento: { artista: string; data: string; luogo: string; citta: string } | null;
+}
+
 export interface DatiFinalizzazione {
   eventoId: string;
   artista: string;
@@ -48,6 +57,7 @@ export const listaAttesaApi = {
   listByEvento: (eventoId: string) => api.get<IscrizioneListaAttesa[]>(`/api/lista-attesa/eventi/${eventoId}`),
   contaPartecipanti: (eventoId: string) => api.get<{ partecipanti: number }>(`/api/lista-attesa/eventi/${eventoId}/conta-partecipanti`),
   contaInAttesa: () => api.get<{ conteggio: number }>('/api/lista-attesa/allerte'),
+  mieIscrizioni: (email: string) => api.get<MiaIscrizione[]>(`/api/lista-attesa/mie?email=${encodeURIComponent(email)}`),
   contaInAttesaPerEvento: () => api.get<Record<string, number>>('/api/lista-attesa/allerte-per-evento'),
   promuovi: (id: string) => api.post<{ ok: true; emailInviata: boolean; link: string }>(`/api/lista-attesa/${id}/promuovi`),
   promuoviTutte: (eventoId: string) => api.post<{ promosse: number; fallite: number }>(`/api/lista-attesa/evento/${eventoId}/promuovi-tutte`),

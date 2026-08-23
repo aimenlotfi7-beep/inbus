@@ -1,4 +1,4 @@
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
 import { listaAttesa, eventi, prenotazioni, fermate } from '../../db/schema.js';
@@ -115,6 +115,24 @@ export const listaAttesaService = {
    *  passa comunque dal blocco posti atomico della prenotazione vera:
    *  se i posti finiscono a metà, le successive falliscono
    *  singolarmente (segnalate, non bloccano le altre). */
+  /** Le iscrizioni di un cliente — con la sua posizione reale in coda
+   *  per ogni evento (calcolata dall'ordine di iscrizione, dato vero,
+   *  non inventato) e il nome dell'evento, per l'area personale. */
+  async mieIscrizioni(email: string) {
+    const mie = await db.select().from(listaAttesa)
+      .where(and(eq(listaAttesa.email, email.toLowerCase()), eq(listaAttesa.stato, 'IN_ATTESA')))
+      .orderBy(listaAttesa.dataCreazione);
+
+    const risultato = [];
+    for (const riga of mie) {
+      const [evento] = await db.select({ artista: eventi.artista, data: eventi.data, luogo: eventi.luogo, citta: eventi.citta }).from(eventi).where(eq(eventi.id, riga.eventoId)).limit(1);
+      const primaDiLei = await db.select({ id: listaAttesa.id }).from(listaAttesa)
+        .where(and(eq(listaAttesa.eventoId, riga.eventoId), eq(listaAttesa.stato, 'IN_ATTESA'), sql`${listaAttesa.dataCreazione} < ${riga.dataCreazione}`));
+      risultato.push({ ...riga, evento, posizione: primaDiLei.length + 1 });
+    }
+    return risultato;
+  },
+
   async promuoviTutte(eventoId: string) {
     const righe = await db.select().from(listaAttesa)
       .where(and(eq(listaAttesa.eventoId, eventoId), eq(listaAttesa.stato, 'IN_ATTESA')));
