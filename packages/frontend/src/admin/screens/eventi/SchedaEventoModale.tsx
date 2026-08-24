@@ -140,7 +140,7 @@ export function SchedaEventoModale({
   }
 
   useEffect(() => {
-    percorsiSalvatiApi.list().then(setPercorsiSalvati);
+    percorsiSalvatiApi.list().then(setPercorsiSalvati).catch((e) => console.error('Percorsi salvati non caricati:', e));
     layoutBigliettoApi.list().then(setLayoutDisponibili).catch(() => setLayoutDisponibili([]));
     ricaricaCategorie();
     let nuovoForm: EventoInput;

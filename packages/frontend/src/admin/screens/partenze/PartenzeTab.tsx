@@ -170,16 +170,32 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
     <div>
       {servizi && servizi.length > 0 && (
         <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-          {servizi.map((v) => (
-            <button key={v.key} type="button" className={`mini-tab${servizioAttivo === v.key ? ' active' : ''}`} onClick={() => setServizioAttivo(v.key)}>
-              {v.nome}
-            </button>
-          ))}
-          {calcolo.some((l) => !l.servizioId) && (
-            <button type="button" className={`mini-tab${servizioAttivo === 'liberi' ? ' active' : ''}`} onClick={() => setServizioAttivo('liberi')}>
-              Tragitti liberi
-            </button>
-          )}
+          {servizi.map((v) => {
+            const nonCopertiQui = calcolo.filter((l) => l.servizioId === v.key && !l.coperta).length;
+            return (
+              <button key={v.key} type="button" className={`mini-tab${servizioAttivo === v.key ? ' active' : ''}`} onClick={() => setServizioAttivo(v.key)}>
+                {v.nome}
+                {nonCopertiQui > 0 && (
+                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 10.5, padding: '1px 6px', fontWeight: 700 }}>
+                    {nonCopertiQui}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {calcolo.some((l) => !l.servizioId) && (() => {
+            const nonCopertiLiberi = calcolo.filter((l) => !l.servizioId && !l.coperta).length;
+            return (
+              <button type="button" className={`mini-tab${servizioAttivo === 'liberi' ? ' active' : ''}`} onClick={() => setServizioAttivo('liberi')}>
+                Tragitti liberi
+                {nonCopertiLiberi > 0 && (
+                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 10.5, padding: '1px 6px', fontWeight: 700 }}>
+                    {nonCopertiLiberi}
+                  </span>
+                )}
+              </button>
+            );
+          })()}
         </div>
       )}
 
