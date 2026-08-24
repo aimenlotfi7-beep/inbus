@@ -98,6 +98,8 @@ export function SchedaEventoModale({
   /** Passando a "Più servizi" per la prima volta, partono già 2 tab
    *  pronte all'uso (con nome di default) — non zero, come chiesto:
    *  è raro che serva "più servizi" per finirne con uno solo. */
+  /** Solo per la scelta iniziale, evento senza ancora nessun servizio:
+   *  partono già 2 tab pronte (non zero). */
   function passaAMultiplo() {
     setModalitaServizi('multiplo');
     if (servizi.length === 0) {
@@ -108,6 +110,16 @@ export function SchedaEventoModale({
     } else if (!servizioTabAttivo) {
       setServizioTabAttivo(servizi[0]?.key ?? 'liberi');
     }
+  }
+  /** Da "Un solo servizio" con un evento già esistente: i tragitti
+   *  attuali diventano "Tragitti liberi" (un gruppo a sé) e se ne
+   *  aggiunge SOLO uno nuovo — non due, non c'è nulla da "partire da
+   *  zero" qui, il primo gruppo esiste già. */
+  function aggiungiServizioAdEventoSingolo() {
+    setModalitaServizi('multiplo');
+    const chiave = `nuovo-${Date.now()}`;
+    setServizi((prev) => [...prev, { key: chiave, nome: 'Servizio 1', arrivoOrario: undefined }]);
+    setServizioTabAttivo(chiave);
   }
   function rinominaServizio(key: string, nome: string) {
     setServizi((prev) => prev.map((v) => v.key === key ? { ...v, nome } : v));
@@ -435,10 +447,14 @@ export function SchedaEventoModale({
       setStep(2);
       return;
     }
-    if (modalitaServizi === 'multiplo' && servizi.length < 2) {
-      alert('Hai scelto "Più servizi" ma ne hai creato solo uno — aggiungine almeno un secondo, oppure torna su "Un solo servizio".');
-      setStep(2);
-      return;
+    if (modalitaServizi === 'multiplo') {
+      const haTragittiLiberi = (form.tragitti ?? []).some((t) => !t.servizioId);
+      const gruppiTotali = servizi.length + (haTragittiLiberi ? 1 : 0);
+      if (gruppiTotali < 2) {
+        alert('Hai scelto "Più servizi" ma di fatto ne hai solo uno — aggiungine almeno un secondo, oppure torna su "Un solo servizio".');
+        setStep(2);
+        return;
+      }
     }
     const servizioSenzaNome = servizi.find((v) => !v.nome.trim());
     if (servizioSenzaNome) {
@@ -644,7 +660,7 @@ export function SchedaEventoModale({
           Solo "Un solo servizio", appena l'evento esiste davvero,
           mostra la minima voce per passare a più servizi se serve. */}
       {modalitaServizi === 'singolo' && evento && (
-        <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, marginBottom: 16, borderRadius: 999 }} onClick={passaAMultiplo}>
+        <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, marginBottom: 16, borderRadius: 999 }} onClick={aggiungiServizioAdEventoSingolo}>
           + Aggiungi un servizio
         </button>
       )}
