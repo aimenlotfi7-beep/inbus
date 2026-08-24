@@ -592,6 +592,27 @@ export function SchedaEventoModale({
 
   const campiTratte: ReactNode = (
     <>
+      {modalitaServizi === null ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
+          <div className="section-card" style={{ maxWidth: 480, width: '100%', textAlign: 'center', padding: '40px 32px' }}>
+            <p className="section-label" style={{ marginBottom: 18, fontSize: 15 }}>Quanti servizi ha questo evento?</p>
+            <div className="mini-tabs" style={{ justifyContent: 'center' }}>
+              <button type="button" className="mini-tab" style={{ padding: '14px 28px', fontSize: 14 }} onClick={() => setModalitaServizi('singolo')}>
+                Un solo servizio
+              </button>
+              <button
+                type="button"
+                className="mini-tab"
+                style={{ padding: '14px 28px', fontSize: 14 }}
+                onClick={() => { setModalitaServizi('multiplo'); if (!servizioTabAttivo) setServizioTabAttivo(servizi[0]?.key ?? 'liberi'); }}
+              >
+                Più servizi
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="section-card" style={{ marginBottom: 16, border: '1px solid var(--pink-dim)' }}>
         <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>
           {modalitaServizi === 'multiplo'
@@ -692,12 +713,6 @@ export function SchedaEventoModale({
           </>
         )}
       </div>
-
-      {modalitaServizi === null && (
-        <p className="testo-intro" style={{ marginBottom: 16 }}>
-          Scegli sopra "Un solo servizio" o "Più servizi" per iniziare ad aggiungere i tragitti.
-        </p>
-      )}
 
       {/* In "Più servizi", finché la tab scelta non ha un nome, non si
           vede ancora la sezione di compilazione — prima si nomina, poi
@@ -828,6 +843,8 @@ export function SchedaEventoModale({
         </div>
       );})}
       <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTragittoManuale}>+ Aggiungi tragitto manuale (senza percorso salvato)</button>
+      </>
+      )}
       </>
       )}
     </>
