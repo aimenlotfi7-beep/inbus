@@ -27,8 +27,9 @@ function escapeHtml(testo) {
 
 function prezzoMinimo(evento) {
   const prezzi = [];
-  for (const linea of evento.linee ?? []) {
-    for (const f of linea.fermate ?? []) {
+  const tuttiITragitti = [...(evento.tragitti ?? []), ...(evento.servizi ?? []).flatMap((s) => s.tragitti ?? [])];
+  for (const tragitto of tuttiITragitti) {
+    for (const f of tragitto.fermate ?? []) {
       if (f.prezzo) prezzi.push(Number(f.prezzo));
     }
   }
