@@ -115,11 +115,28 @@ export function SchedaEventoModale({
    *  attuali diventano "Tragitti liberi" (un gruppo a sé) e se ne
    *  aggiunge SOLO uno nuovo — non due, non c'è nulla da "partire da
    *  zero" qui, il primo gruppo esiste già. */
+  /** Da "Un solo servizio" con un evento già esistente: i tragitti
+   *  attuali (finora "liberi") diventano un vero primo servizio, con lo
+   *  stesso arrivo che avevano già — non restano "liberi", altrimenti
+   *  sul sito il checkout continuerebbe a vederlo come un solo
+   *  servizio e non farebbe mai comparire lo step di scelta. Poi se ne
+   *  aggiunge un secondo, vuoto, pronto da compilare. Il risultato deve
+   *  comportarsi in tutto e per tutto come un evento nato da subito con
+   *  più servizi — nessuna differenza. */
   function aggiungiServizioAdEventoSingolo() {
     setModalitaServizi('multiplo');
-    const chiave = `nuovo-${Date.now()}`;
-    setServizi((prev) => [...prev, { key: chiave, nome: 'Servizio 1', arrivoOrario: undefined }]);
-    setServizioTabAttivo(chiave);
+    const chiavePrimo = `nuovo-${Date.now()}`;
+    const chiaveSecondo = `nuovo-${Date.now() + 1}`;
+    setForm((f) => ({
+      ...f,
+      tragitti: (f.tragitti ?? []).map((t) => (!t.servizioId ? { ...t, servizioId: chiavePrimo } : t)),
+    }));
+    setServizi((prev) => [
+      ...prev,
+      { key: chiavePrimo, nome: 'Servizio 1', arrivoIndirizzo: form.arrivoIndirizzo, arrivoOrario: form.arrivoOrario },
+      { key: chiaveSecondo, nome: 'Servizio 2', arrivoOrario: undefined },
+    ]);
+    setServizioTabAttivo(chiaveSecondo); // porta dritto a compilare quello nuovo
   }
   function rinominaServizio(key: string, nome: string) {
     setServizi((prev) => prev.map((v) => v.key === key ? { ...v, nome } : v));
