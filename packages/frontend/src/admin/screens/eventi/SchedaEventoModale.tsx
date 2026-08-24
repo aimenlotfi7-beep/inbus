@@ -88,10 +88,26 @@ export function SchedaEventoModale({
 
   function nuovoServizio() {
     const chiave = `nuovo-${Date.now()}`;
-    setServizi((prev) => [...prev, { key: chiave, nome: '', arrivoOrario: undefined }]);
+    const numero = servizi.length + 1;
+    setServizi((prev) => [...prev, { key: chiave, nome: `Servizio ${numero}`, arrivoOrario: undefined }]);
     setModalitaServizi('multiplo');
     setServizioTabAttivo(chiave);
-    setRinominaServizioAperto(true); // si apre già pronta per scriverci il nome, niente popup
+    // Nome già pronto (default) — subito utilizzabile con un click, non
+    // serve rinominarla per forza prima di poterci lavorare.
+  }
+  /** Passando a "Più servizi" per la prima volta, partono già 2 tab
+   *  pronte all'uso (con nome di default) — non zero, come chiesto:
+   *  è raro che serva "più servizi" per finirne con uno solo. */
+  function passaAMultiplo() {
+    setModalitaServizi('multiplo');
+    if (servizi.length === 0) {
+      const chiave1 = `nuovo-${Date.now()}`;
+      const chiave2 = `nuovo-${Date.now() + 1}`;
+      setServizi([{ key: chiave1, nome: 'Servizio 1', arrivoOrario: undefined }, { key: chiave2, nome: 'Servizio 2', arrivoOrario: undefined }]);
+      setServizioTabAttivo(chiave1);
+    } else if (!servizioTabAttivo) {
+      setServizioTabAttivo(servizi[0]?.key ?? 'liberi');
+    }
   }
   function rinominaServizio(key: string, nome: string, arrivoOrario?: string) {
     setServizi((prev) => prev.map((v) => v.key === key ? { ...v, nome, arrivoOrario } : v));
@@ -600,12 +616,7 @@ export function SchedaEventoModale({
               <button type="button" className="mini-tab" style={{ padding: '14px 28px', fontSize: 14 }} onClick={() => setModalitaServizi('singolo')}>
                 Un solo servizio
               </button>
-              <button
-                type="button"
-                className="mini-tab"
-                style={{ padding: '14px 28px', fontSize: 14 }}
-                onClick={() => { setModalitaServizi('multiplo'); if (!servizioTabAttivo) setServizioTabAttivo(servizi[0]?.key ?? 'liberi'); }}
-              >
+              <button type="button" className="mini-tab" style={{ padding: '14px 28px', fontSize: 14 }} onClick={passaAMultiplo}>
                 Più servizi
               </button>
             </div>
@@ -613,20 +624,6 @@ export function SchedaEventoModale({
         </div>
       ) : (
       <>
-      <div className="section-card" style={{ marginBottom: 16, border: '1px solid var(--pink-dim)' }}>
-        <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>
-          {modalitaServizi === 'multiplo'
-            ? 'Indirizzo di arrivo — condiviso da tutti i servizi (l\'orario invece si imposta per ogni servizio, qui sotto)'
-            : 'Arrivo (destinazione) — vale per tutte le tratte di questo evento'}
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: modalitaServizi === 'multiplo' ? '1fr' : '1fr .4fr', gap: 8 }}>
-          <input placeholder="Indirizzo di arrivo" value={form.arrivoIndirizzo ?? ''} onChange={(e) => setForm({ ...form, arrivoIndirizzo: e.target.value })} />
-          {modalitaServizi === 'singolo' && (
-            <OrarioInput value={form.arrivoOrario ?? ''} onChange={(v) => setForm({ ...form, arrivoOrario: v })} placeholder="Orario" />
-          )}
-        </div>
-      </div>
-
       <div className="section-card" style={{ marginBottom: 16 }}>
         <p className="section-label" style={{ marginBottom: 10 }}>Quanti servizi ha questo evento?</p>
         <div className="mini-tabs" style={{ marginBottom: modalitaServizi === 'multiplo' ? 16 : 0 }}>
@@ -640,18 +637,16 @@ export function SchedaEventoModale({
           <button
             type="button"
             className={`mini-tab${modalitaServizi === 'multiplo' ? ' active' : ''}`}
-            onClick={() => { setModalitaServizi('multiplo'); if (!servizioTabAttivo) setServizioTabAttivo(servizi[0]?.key ?? 'liberi'); }}
+            onClick={passaAMultiplo}
           >
             Più servizi
           </button>
         </div>
 
-        {/* In "Un solo servizio" resta comunque possibile aggiungere un
-            secondo servizio in qualsiasi momento — anche a evento già
-            configurato e in vendita: passa da solo alla modalità
-            "Più servizi" con una nuova tab pronta da nominare. */}
-        {modalitaServizi === 'singolo' && (
-          <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, marginTop: 10 }} onClick={nuovoServizio}>
+        {/* Solo modificando un evento già creato — durante la primissima
+            creazione non ha ancora senso, prima si salva l'evento base. */}
+        {modalitaServizi === 'singolo' && evento && (
+          <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, marginTop: 10, borderRadius: 999 }} onClick={passaAMultiplo}>
             + Aggiungi un secondo servizio
           </button>
         )}
@@ -664,7 +659,10 @@ export function SchedaEventoModale({
                   key={v.key}
                   type="button"
                   className={`mini-tab${servizioTabAttivo === v.key ? ' active' : ''}`}
-                  onClick={() => { setServizioTabAttivo(v.key); setRinominaServizioAperto(!v.nome.trim()); }}
+                  style={{ borderRadius: 999 }}
+                  onClick={() => setServizioTabAttivo(v.key)}
+                  onDoubleClick={() => { setServizioTabAttivo(v.key); setRinominaServizioAperto(true); }}
+                  title="Un click per aprire, doppio click per rinominare"
                 >
                   {v.nome || 'Senza nome'}
                 </button>
@@ -673,12 +671,13 @@ export function SchedaEventoModale({
                 <button
                   type="button"
                   className={`mini-tab${servizioTabAttivo === 'liberi' ? ' active' : ''}`}
+                  style={{ borderRadius: 999 }}
                   onClick={() => { setServizioTabAttivo('liberi'); setRinominaServizioAperto(false); }}
                 >
                   Tragitti liberi
                 </button>
               )}
-              <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={nuovoServizio}>+ Nuovo servizio</button>
+              <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, borderRadius: 999 }} onClick={nuovoServizio}>+ Nuovo servizio</button>
             </div>
 
             {servizioTabAttivo && servizioTabAttivo !== 'liberi' && (() => {
@@ -714,9 +713,24 @@ export function SchedaEventoModale({
         )}
       </div>
 
-      {/* In "Più servizi", finché la tab scelta non ha un nome, non si
-          vede ancora la sezione di compilazione — prima si nomina, poi
-          si compila, un passo alla volta. */}
+      <div className="section-card" style={{ marginBottom: 16, border: '1px solid var(--pink-dim)' }}>
+        <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>
+          {modalitaServizi === 'multiplo'
+            ? 'Indirizzo di arrivo — condiviso da tutti i servizi (l\'orario invece si imposta per ogni servizio, qui sopra)'
+            : 'Arrivo (destinazione) — vale per tutte le tratte di questo evento'}
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: modalitaServizi === 'multiplo' ? '1fr' : '1fr .4fr', gap: 8 }}>
+          <input placeholder="Indirizzo di arrivo" value={form.arrivoIndirizzo ?? ''} onChange={(e) => setForm({ ...form, arrivoIndirizzo: e.target.value })} />
+          {modalitaServizi === 'singolo' && (
+            <OrarioInput value={form.arrivoOrario ?? ''} onChange={(v) => setForm({ ...form, arrivoOrario: v })} placeholder="Orario" />
+          )}
+        </div>
+      </div>
+
+      {/* Con i nomi di default, capita raramente — ma resta una rete di
+          sicurezza: se per caso un servizio finisse senza nome (es.
+          rinominato con un campo vuoto), la compilazione resta
+          nascosta finché non gliene dai uno. */}
       {(() => {
         if (!servizioSenzaNomeAttivo) return null;
         return <p className="testo-intro" style={{ marginBottom: 16 }}>Dai un nome a questo servizio qui sopra per iniziare a compilarlo.</p>;
