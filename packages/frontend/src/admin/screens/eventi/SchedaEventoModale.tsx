@@ -71,8 +71,8 @@ export function SchedaEventoModale({
   // (anche alla primissima creazione dell'evento): quelli già esistenti
   // hanno l'id vero del server, quelli appena aggiunti hanno una
   // chiave temporanea che il backend riconosce come "nuovo" (nessun id).
-  const [servizi, setServizi] = useState<{ key: string; id?: string; nome: string; arrivoOrario?: string }[]>(
-    (evento?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoOrario: p.arrivoOrario ?? undefined }))
+  const [servizi, setServizi] = useState<{ key: string; id?: string; nome: string; arrivoIndirizzo?: string; arrivoOrario?: string }[]>(
+    (evento?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoIndirizzo: p.arrivoIndirizzo ?? undefined, arrivoOrario: p.arrivoOrario ?? undefined }))
   );
   // Due modalità nettamente separate: con un solo servizio (o nessuno) è
   // la stessa identica interfaccia di prima, senza nessun concetto di
@@ -109,8 +109,11 @@ export function SchedaEventoModale({
       setServizioTabAttivo(servizi[0]?.key ?? 'liberi');
     }
   }
-  function rinominaServizio(key: string, nome: string, arrivoOrario?: string) {
-    setServizi((prev) => prev.map((v) => v.key === key ? { ...v, nome, arrivoOrario } : v));
+  function rinominaServizio(key: string, nome: string) {
+    setServizi((prev) => prev.map((v) => v.key === key ? { ...v, nome } : v));
+  }
+  function aggiornaArrivoServizio(key: string, campo: 'arrivoIndirizzo' | 'arrivoOrario', valore: string) {
+    setServizi((prev) => prev.map((v) => v.key === key ? { ...v, [campo]: valore } : v));
   }
   function eliminaServizioConferma(key: string, nome: string) {
     if (!confirm(`Eliminare il servizio "${nome}"? I suoi tragitti non vengono cancellati, tornano "liberi" (senza servizio) — si elimina davvero solo salvando.`)) return;
@@ -173,7 +176,7 @@ export function SchedaEventoModale({
       setStep(1);
     }
     setForm(nuovoForm);
-    const serviziCaricati = (evento?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoOrario: p.arrivoOrario ?? undefined }));
+    const serviziCaricati = (evento?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoIndirizzo: p.arrivoIndirizzo ?? undefined, arrivoOrario: p.arrivoOrario ?? undefined }));
     setServizi(serviziCaricati);
     setModalitaServizi(
       serviziCaricati.length >= 1 ? 'multiplo' : ((nuovoForm.tragitti ?? []).some((t) => !t.servizioId) ? 'singolo' : null)
@@ -290,15 +293,24 @@ export function SchedaEventoModale({
     if (!tragitto) return;
     const fermateValide = tragitto.fermate.filter((f) => f.indirizzo.trim());
     if (fermateValide.length === 0) { setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: 'Aggiungi almeno una fermata con indirizzo compilato.' })); return; }
-    if (!form.arrivoIndirizzo?.trim()) { setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: "Inserisci prima l'indirizzo di arrivo qui sopra (vale per tutte le tratte)." })); return; }
-    if (!form.arrivoOrario) { setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: "Inserisci prima l'orario di arrivo qui sopra." })); return; }
+
+    // L'arrivo giusto dipende dal contesto: se questa tratta appartiene
+    // a un servizio, usa l'arrivo di QUEL servizio (non più uno
+    // condiviso); se è una tratta libera, quello dell'evento.
+    const servizioDellaTratta = tragitto.servizioId ? servizi.find((v) => v.key === tragitto.servizioId) : null;
+    const arrivoIndirizzoContesto = servizioDellaTratta ? servizioDellaTratta.arrivoIndirizzo : form.arrivoIndirizzo;
+    const arrivoOrarioContesto = servizioDellaTratta ? servizioDellaTratta.arrivoOrario : form.arrivoOrario;
+    const doveScriverlo = servizioDellaTratta ? `nella sezione arrivo di "${servizioDellaTratta.nome}" qui sopra` : 'qui sopra (vale per tutte le tratte)';
+
+    if (!arrivoIndirizzoContesto?.trim()) { setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: `Inserisci prima l'indirizzo di arrivo ${doveScriverlo}.` })); return; }
+    if (!arrivoOrarioContesto) { setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: `Inserisci prima l'orario di arrivo ${doveScriverlo}.` })); return; }
 
     setRicalcolando((s) => ({ ...s, [idxTragitto]: true }));
     setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: 'Localizzo gli indirizzi...' }));
 
     // La sequenza da geolocalizzare è: fermate in ordine, poi l'arrivo per
     // ultimo — il viaggio finisce sempre lì.
-    const indirizziCompleti = [...fermateValide.map((f) => `${f.indirizzo}, ${f.citta}`), form.arrivoIndirizzo];
+    const indirizziCompleti = [...fermateValide.map((f) => `${f.indirizzo}, ${f.citta}`), arrivoIndirizzoContesto];
     const coordinate: (Awaited<ReturnType<typeof geocodifica>>['coordinate'])[] = [];
     let problemaRete = false;
     for (const indirizzo of indirizziCompleti) {
@@ -323,7 +335,7 @@ export function SchedaEventoModale({
 
     // Parto dall'orario di arrivo e risalgo tappa per tappa, dall'ultima
     // fermata (quella più vicina all'arrivo) fino alla prima.
-    let cursore = Number(form.arrivoOrario.split(':')[0]) * 60 + Number(form.arrivoOrario.split(':')[1]);
+    let cursore = Number(arrivoOrarioContesto.split(':')[0]) * 60 + Number(arrivoOrarioContesto.split(':')[1]);
     const orariCalcolati = new Array<string>(fermateValide.length);
     let errori = 0;
     for (let i = fermateValide.length - 1; i >= 0; i--) {
@@ -465,6 +477,7 @@ export function SchedaEventoModale({
       servizi: servizi.map((v) => ({
         id: v.id, // assente = servizio nuovo, non ancora salvato
         nome: v.nome,
+        arrivoIndirizzo: v.arrivoIndirizzo,
         arrivoOrario: v.arrivoOrario,
         tragitti: tratteValide.filter((l) => l.servizioId === v.key).map((l) => ({ ...l, servizioId: undefined })),
       })),
@@ -668,48 +681,66 @@ export function SchedaEventoModale({
             {servizioTabAttivo && servizioTabAttivo !== 'liberi' && (() => {
               const servizioCorrente = servizi.find((v) => v.key === servizioTabAttivo);
               if (!servizioCorrente) return null;
-              return rinominaServizioAperto ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr auto auto', gap: 8, marginBottom: 14, alignItems: 'center' }}>
-                  <input
-                    placeholder="Nome servizio"
-                    defaultValue={servizioCorrente.nome}
-                    onBlur={(e) => rinominaServizio(servizioCorrente.key, e.target.value, servizioCorrente.arrivoOrario)}
-                    autoFocus
-                  />
-                  <OrarioInput
-                    value={servizioCorrente.arrivoOrario ?? ''}
-                    onChange={(v) => rinominaServizio(servizioCorrente.key, servizioCorrente.nome, v)}
-                    placeholder="Arrivo"
-                  />
-                  <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setRinominaServizioAperto(false)}>✓ Fatto</button>
-                  <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome || 'senza nome')}>Elimina</button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, fontSize: 13 }}>
-                  <span>{servizioCorrente.nome}{servizioCorrente.arrivoOrario ? ` — arrivo ${servizioCorrente.arrivoOrario}` : ''}</span>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setRinominaServizioAperto(true)}>Rinomina</button>
-                    <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome)}>Elimina servizio</button>
+              return (
+                <>
+                  {rinominaServizioAperto ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, marginBottom: 14, alignItems: 'center' }}>
+                      <input
+                        placeholder="Nome servizio"
+                        defaultValue={servizioCorrente.nome}
+                        onBlur={(e) => rinominaServizio(servizioCorrente.key, e.target.value)}
+                        autoFocus
+                      />
+                      <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setRinominaServizioAperto(false)}>✓ Fatto</button>
+                      <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome || 'senza nome')}>Elimina</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, fontSize: 13 }}>
+                      <span>{servizioCorrente.nome}</span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setRinominaServizioAperto(true)}>Rinomina</button>
+                        <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome)}>Elimina servizio</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* L'arrivo (indirizzo + orario) è tutto suo, non
+                      condiviso con gli altri servizi — ognuno può
+                      arrivare in un posto e a un orario diversi. */}
+                  <div style={{ background: 'var(--night)', border: '1px solid var(--pink-dim)', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+                    <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>
+                      Arrivo di "{servizioCorrente.nome}"
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr', gap: 8 }}>
+                      <input
+                        placeholder="Indirizzo di arrivo"
+                        value={servizioCorrente.arrivoIndirizzo ?? ''}
+                        onChange={(e) => aggiornaArrivoServizio(servizioCorrente.key, 'arrivoIndirizzo', e.target.value)}
+                      />
+                      <OrarioInput
+                        value={servizioCorrente.arrivoOrario ?? ''}
+                        onChange={(v) => aggiornaArrivoServizio(servizioCorrente.key, 'arrivoOrario', v)}
+                        placeholder="Orario"
+                      />
+                    </div>
                   </div>
-                </div>
+                </>
               );
             })()}
         </div>
       )}
 
-      <div className="section-card" style={{ marginBottom: 16, border: '1px solid var(--pink-dim)' }}>
-        <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>
-          {modalitaServizi === 'multiplo'
-            ? 'Indirizzo di arrivo — condiviso da tutti i servizi (l\'orario invece si imposta per ogni servizio, qui sopra)'
-            : 'Arrivo (destinazione) — vale per tutte le tratte di questo evento'}
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: modalitaServizi === 'multiplo' ? '1fr' : '1fr .4fr', gap: 8 }}>
-          <input placeholder="Indirizzo di arrivo" value={form.arrivoIndirizzo ?? ''} onChange={(e) => setForm({ ...form, arrivoIndirizzo: e.target.value })} />
-          {modalitaServizi === 'singolo' && (
+      {modalitaServizi === 'singolo' && (
+        <div className="section-card" style={{ marginBottom: 16, border: '1px solid var(--pink-dim)' }}>
+          <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>
+            Arrivo (destinazione) — vale per tutte le tratte di questo evento
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr', gap: 8 }}>
+            <input placeholder="Indirizzo di arrivo" value={form.arrivoIndirizzo ?? ''} onChange={(e) => setForm({ ...form, arrivoIndirizzo: e.target.value })} />
             <OrarioInput value={form.arrivoOrario ?? ''} onChange={(v) => setForm({ ...form, arrivoOrario: v })} placeholder="Orario" />
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Con i nomi di default, capita raramente — ma resta una rete di
           sicurezza: se per caso un servizio finisse senza nome (es.

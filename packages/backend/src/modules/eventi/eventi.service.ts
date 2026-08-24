@@ -303,7 +303,7 @@ export const eventiService = {
       }
       for (const servizio of input.servizi) {
         const [nuovoServizio] = await tx.insert(servizi).values({
-          eventoId: nuovoEvento.id, nome: servizio.nome, arrivoOrario: servizio.arrivoOrario,
+          eventoId: nuovoEvento.id, nome: servizio.nome, arrivoIndirizzo: servizio.arrivoIndirizzo, arrivoOrario: servizio.arrivoOrario,
         }).returning();
         for (const tragitto of servizio.tragitti) {
           await inserisciTragitto(tx, nuovoEvento.id, nuovoServizio.id, tragitto);
@@ -389,10 +389,10 @@ export const eventiService = {
 
         for (const servizio of input.servizi) {
           if (servizio.id) {
-            await tx.update(servizi).set({ nome: servizio.nome, arrivoOrario: servizio.arrivoOrario }).where(eq(servizi.id, servizio.id));
+            await tx.update(servizi).set({ nome: servizio.nome, arrivoIndirizzo: servizio.arrivoIndirizzo, arrivoOrario: servizio.arrivoOrario }).where(eq(servizi.id, servizio.id));
             await sincronizzaTragitti(tx, id, servizio.id, servizio.tragitti);
           } else {
-            const [nuovoServizio] = await tx.insert(servizi).values({ eventoId: id, nome: servizio.nome, arrivoOrario: servizio.arrivoOrario }).returning();
+            const [nuovoServizio] = await tx.insert(servizi).values({ eventoId: id, nome: servizio.nome, arrivoIndirizzo: servizio.arrivoIndirizzo, arrivoOrario: servizio.arrivoOrario }).returning();
             for (const tragitto of servizio.tragitti) await inserisciTragitto(tx, id, nuovoServizio.id, tragitto);
           }
         }

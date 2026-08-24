@@ -38,6 +38,7 @@ export const tragittoSchema = z.object({
 const servizioSchema = z.object({
   id: z.string().optional(),
   nome: z.string().min(1),
+  arrivoIndirizzo: z.string().optional(),
   arrivoOrario: z.string().optional(),
   tragitti: z.array(tragittoSchema).default([]),
 });

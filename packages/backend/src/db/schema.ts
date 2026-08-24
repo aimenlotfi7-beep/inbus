@@ -201,8 +201,10 @@ export const servizi = pgTable('servizi', {
   id: id(),
   eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
   nome: text('nome').notNull(),
-  // Ogni servizio ha un proprio orario di arrivo (è spesso proprio
-  // quello che li distingue, es. "arrivo alle 14:00").
+  // Ogni servizio ha il proprio arrivo (indirizzo + orario), non
+  // condiviso — è spesso proprio quello che li distingue, es. "arrivo
+  // alle 14:00" può essere anche in un posto diverso dall'altro.
+  arrivoIndirizzo: text('arrivo_indirizzo'),
   arrivoOrario: text('arrivo_orario'),
   ordine: integer('ordine').notNull().default(0),
 });

@@ -29,7 +29,7 @@ export interface EventoInput {
   // I servizi (pacchetti bus distinti dentro lo stesso evento) — ognuno
   // con i propri tragitti annidati. Facoltativo: la maggior parte degli
   // eventi non ne ha bisogno.
-  servizi?: { id?: string; nome: string; arrivoOrario?: string; tragitti: TragittoInput[] }[];
+  servizi?: { id?: string; nome: string; arrivoIndirizzo?: string; arrivoOrario?: string; tragitti: TragittoInput[] }[];
 }
 
 export interface FermataConPasseggeri { fermataId: string; citta: string; passeggeri: number; }

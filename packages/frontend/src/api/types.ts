@@ -26,6 +26,7 @@ export interface Servizio {
   id: string;
   eventoId: string;
   nome: string;
+  arrivoIndirizzo: string | null;
   arrivoOrario: string | null;
   ordine: number;
   tragitti: Tragitto[];
