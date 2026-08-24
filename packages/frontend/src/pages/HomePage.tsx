@@ -39,7 +39,7 @@ export function HomePage() {
         e.artista.toLowerCase().includes(q) ||
         e.citta.toLowerCase().includes(q) ||
         e.luogo.toLowerCase().includes(q) ||
-        [...e.linee, ...e.prodotti.flatMap((v) => v.linee)].some((l) => l.fermate.some((f) => f.citta.toLowerCase().includes(q)))
+        [...e.tragitti, ...e.servizi.flatMap((v) => v.tragitti)].some((l) => l.fermate.some((f) => f.citta.toLowerCase().includes(q)))
       );
     }
     return lista;
@@ -47,10 +47,10 @@ export function HomePage() {
 
   // Numeri veri, calcolati dai dati reali — non inventati: quante
   // tratte attive, quante città di partenza distinte tra tutte.
-  const numeroPartenze = useMemo(() => eventi.reduce((s, e) => s + e.linee.length + e.prodotti.reduce((s2, v) => s2 + v.linee.length, 0), 0), [eventi]);
+  const numeroPartenze = useMemo(() => eventi.reduce((s, e) => s + e.tragitti.length + e.servizi.reduce((s2, v) => s2 + v.tragitti.length, 0), 0), [eventi]);
   const cittaPartenza = useMemo(() => {
     const insieme = new Set<string>();
-    eventi.forEach((e) => [...e.linee, ...e.prodotti.flatMap((v) => v.linee)].forEach((l) => l.fermate.forEach((f) => insieme.add(f.citta))));
+    eventi.forEach((e) => [...e.tragitti, ...e.servizi.flatMap((v) => v.tragitti)].forEach((l) => l.fermate.forEach((f) => insieme.add(f.citta))));
     return Array.from(insieme).sort();
   }, [eventi]);
 

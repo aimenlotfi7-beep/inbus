@@ -173,7 +173,7 @@ export const allegatiEvento = pgTable('allegati_evento', {
 });
 
 // ---------------------------------------------------------------------
-// FORNITORI (agenzie bus) — dichiarati prima delle linee per il riferimento
+// FORNITORI (agenzie bus) — dichiarati prima dei tragitti per il riferimento
 // ---------------------------------------------------------------------
 export const fornitori = pgTable('fornitori', {
   id: id(),
@@ -191,28 +191,28 @@ export const fornitori = pgTable('fornitori', {
 // ---------------------------------------------------------------------
 // LINEE BUS (contenitore con posti propri) + FERMATE
 // ---------------------------------------------------------------------
-// Un "prodotto" raggruppa tratte dentro lo stesso evento — serve solo
+// Un "servizio" raggruppa tratte dentro lo stesso evento — serve solo
 // quando ci sono più pacchetti bus distinti (es. "Bus arrivo 14:00" e
 // "Bus arrivo 18:00", ognuno con le proprie fermate/orari/prezzi). Se
-// un evento non ha nessun prodotto, si comporta esattamente come prima
+// un evento non ha nessun servizio, si comporta esattamente come prima
 // (checkout a 3 step, tratte tutte insieme) — è tutto facoltativo, non
 // tocca gli eventi già esistenti.
-export const prodotti = pgTable('prodotti', {
+export const servizi = pgTable('servizi', {
   id: id(),
   eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
   nome: text('nome').notNull(),
-  // Ogni prodotto ha un proprio orario di arrivo (è spesso proprio
+  // Ogni servizio ha un proprio orario di arrivo (è spesso proprio
   // quello che li distingue, es. "arrivo alle 14:00").
   arrivoOrario: text('arrivo_orario'),
   ordine: integer('ordine').notNull().default(0),
 });
 
-export const lineeBus = pgTable('linee_bus', {
+export const tragitti = pgTable('tragitti', {
   id: id(),
   eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
-  // Vuoto = tratta "libera", non appartiene a nessun prodotto (modalità
+  // Vuoto = tratta "libera", non appartiene a nessun servizio (modalità
   // di sempre, un solo pacchetto bus per l'evento).
-  prodottoId: text('prodotto_id').references(() => prodotti.id, { onDelete: 'cascade' }),
+  servizioId: text('servizio_id').references(() => servizi.id, { onDelete: 'cascade' }),
   nome: text('nome').notNull(),
   postiTotali: integer('posti_totali').notNull(),
   postiDisponibili: integer('posti_disponibili').notNull(),
@@ -233,7 +233,7 @@ export const lineeBus = pgTable('linee_bus', {
 
 export const fermate = pgTable('fermate', {
   id: id(),
-  lineaId: text('linea_id').notNull().references(() => lineeBus.id, { onDelete: 'cascade' }),
+  tragittoId: text('tragitto_id').notNull().references(() => tragitti.id, { onDelete: 'cascade' }),
   ordine: integer('ordine').notNull().default(0),
   citta: text('citta').notNull(),
   indirizzo: text('indirizzo').notNull(),
@@ -282,26 +282,26 @@ export const busFisici = pgTable('bus_fisici', {
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
 });
 
-// Un bus può coprire più tratte (linee) diverse; una tratta può essere
+// Un bus può coprire più tragitti diversi; un tragitto può essere
 // coperta da più bus se la capienza di uno solo non basta.
 export const busTratte = pgTable('bus_tratte', {
   busId: text('bus_id').notNull().references(() => busFisici.id, { onDelete: 'cascade' }),
-  lineaId: text('linea_id').notNull().references(() => lineeBus.id, { onDelete: 'cascade' }),
+  tragittoId: text('tragitto_id').notNull().references(() => tragitti.id, { onDelete: 'cascade' }),
 }, (t) => ({
-  pk: primaryKey({ columns: [t.busId, t.lineaId] }),
+  pk: primaryKey({ columns: [t.busId, t.tragittoId] }),
 }));
 
 // ---------------------------------------------------------------------
 // TRAGITTI (template riutilizzabili di fermate)
 // ---------------------------------------------------------------------
-export const tragitti = pgTable('tragitti', {
+export const percorsiSalvati = pgTable('percorsi_salvati', {
   id: id(),
   nome: text('nome').notNull(),
 });
 
-export const fermateTragitto = pgTable('fermate_tragitto', {
+export const fermatePercorsoSalvato = pgTable('fermate_percorso_salvato', {
   id: id(),
-  tragittoId: text('tragitto_id').notNull().references(() => tragitti.id, { onDelete: 'cascade' }),
+  percorsoSalvatoId: text('percorso_salvato_id').notNull().references(() => percorsiSalvati.id, { onDelete: 'cascade' }),
   ordine: integer('ordine').notNull().default(0),
   citta: text('citta').notNull(),
   indirizzo: text('indirizzo').notNull(),
@@ -365,7 +365,7 @@ export const prenotazioni = pgTable('prenotazioni', {
   id: id(),
   pnr: text('pnr').notNull().unique(),
   eventoId: text('evento_id').notNull().references(() => eventi.id),
-  lineaId: text('linea_id').notNull().references(() => lineeBus.id),
+  tragittoId: text('tragitto_id').notNull().references(() => tragitti.id),
   fermataCitta: text('fermata_citta').notNull(),
   fermataIndirizzo: text('fermata_indirizzo'),
   fermataOrario: text('fermata_orario'),
@@ -555,7 +555,7 @@ export const listaAttesa = pgTable('lista_attesa', {
   // Tratta/fermata preferita (facoltativa: potrebbe non essercene una
   // con posti quando si iscrive) — usata per precompilare il checkout
   // quando viene promossa.
-  lineaId: text('linea_id').references(() => lineeBus.id, { onDelete: 'set null' }),
+  tragittoId: text('tragitto_id').references(() => tragitti.id, { onDelete: 'set null' }),
   fermataId: text('fermata_id').references(() => fermate.id, { onDelete: 'set null' }),
   // Un passeggero per riga OLTRE al richiedente, come nel checkout
   // normale: [{nome,cognome}, ...]. Salvato come JSON per semplicità,
@@ -735,8 +735,8 @@ export const templateEmail = pgTable('template_email', {
 export const eventiRelations = relations(eventi, ({ many }) => ({
   immagini: many(immaginiEvento),
   allegati: many(allegatiEvento),
-  linee: many(lineeBus),
-  prodotti: many(prodotti),
+  tragitti: many(tragitti),
+  servizi: many(servizi),
   prenotazioni: many(prenotazioni),
   messaggiChat: many(messaggiChat),
   listaAttesa: many(listaAttesa),
@@ -767,22 +767,22 @@ export const listaAttesaRelations = relations(listaAttesa, ({ one }) => ({
   evento: one(eventi, { fields: [listaAttesa.eventoId], references: [eventi.id] }),
 }));
 
-export const prodottiRelations = relations(prodotti, ({ one, many }) => ({
-  evento: one(eventi, { fields: [prodotti.eventoId], references: [eventi.id] }),
-  linee: many(lineeBus),
+export const serviziRelations = relations(servizi, ({ one, many }) => ({
+  evento: one(eventi, { fields: [servizi.eventoId], references: [eventi.id] }),
+  tragitti: many(tragitti),
 }));
 
-export const lineeBusRelations = relations(lineeBus, ({ one, many }) => ({
-  evento: one(eventi, { fields: [lineeBus.eventoId], references: [eventi.id] }),
-  prodotto: one(prodotti, { fields: [lineeBus.prodottoId], references: [prodotti.id] }),
-  fornitore: one(fornitori, { fields: [lineeBus.fornitoreId], references: [fornitori.id] }),
+export const tragittiRelations = relations(tragitti, ({ one, many }) => ({
+  evento: one(eventi, { fields: [tragitti.eventoId], references: [eventi.id] }),
+  servizio: one(servizi, { fields: [tragitti.servizioId], references: [servizi.id] }),
+  fornitore: one(fornitori, { fields: [tragitti.fornitoreId], references: [fornitori.id] }),
   fermate: many(fermate),
   prenotazioni: many(prenotazioni),
   busAssegnati: many(busTratte),
 }));
 
 export const fermateRelations = relations(fermate, ({ one }) => ({
-  linea: one(lineeBus, { fields: [fermate.lineaId], references: [lineeBus.id] }),
+  tragitto: one(tragitti, { fields: [fermate.tragittoId], references: [tragitti.id] }),
 }));
 
 export const busFisiciRelations = relations(busFisici, ({ one, many }) => ({
@@ -792,20 +792,20 @@ export const busFisiciRelations = relations(busFisici, ({ one, many }) => ({
 
 export const busTratteRelations = relations(busTratte, ({ one }) => ({
   bus: one(busFisici, { fields: [busTratte.busId], references: [busFisici.id] }),
-  linea: one(lineeBus, { fields: [busTratte.lineaId], references: [lineeBus.id] }),
+  tragitto: one(tragitti, { fields: [busTratte.tragittoId], references: [tragitti.id] }),
 }));
 
-export const tragittiRelations = relations(tragitti, ({ many }) => ({
-  fermate: many(fermateTragitto),
+export const percorsiSalvatiRelations = relations(percorsiSalvati, ({ many }) => ({
+  fermate: many(fermatePercorsoSalvato),
 }));
 
-export const fermateTragittoRelations = relations(fermateTragitto, ({ one }) => ({
-  tragitto: one(tragitti, { fields: [fermateTragitto.tragittoId], references: [tragitti.id] }),
+export const fermatePercorsoSalvatoRelations = relations(fermatePercorsoSalvato, ({ one }) => ({
+  percorsoSalvato: one(percorsiSalvati, { fields: [fermatePercorsoSalvato.percorsoSalvatoId], references: [percorsiSalvati.id] }),
 }));
 
 export const prenotazioniRelations = relations(prenotazioni, ({ one, many }) => ({
   evento: one(eventi, { fields: [prenotazioni.eventoId], references: [eventi.id] }),
-  linea: one(lineeBus, { fields: [prenotazioni.lineaId], references: [lineeBus.id] }),
+  tragitto: one(tragitti, { fields: [prenotazioni.tragittoId], references: [tragitti.id] }),
   utente: one(utenti, { fields: [prenotazioni.utenteId], references: [utenti.id] }),
   partecipanti: many(partecipantiPrenotazione),
 }));

@@ -246,6 +246,34 @@
       "when": 1787514516830,
       "tag": "0035_reset_password",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1787516419083,
+      "tag": "0036_rename_prodotti_viaggi",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1787516827895,
+      "tag": "0037_rename_tragitti_percorsi_salvati",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1787549768779,
+      "tag": "0038_rename_linee_bus_tragitti",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1787568431954,
+      "tag": "0039_rename_viaggi_servizi",
+      "breakpoints": true
     }
   ]
 }

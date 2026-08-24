@@ -13,10 +13,10 @@
 export function prezzoNormaleFermata(
   fermata: { prezzo: string | null } | undefined,
   evento: { prezzo: string | null } | undefined,
-  linea: { prezzoExtra: string } | undefined,
+  tragitto: { prezzoExtra: string } | undefined,
 ): number {
   if (fermata?.prezzo) return Number(fermata.prezzo);
-  return (evento?.prezzo ? Number(evento.prezzo) : 0) + Number(linea?.prezzoExtra ?? 0);
+  return (evento?.prezzo ? Number(evento.prezzo) : 0) + Number(tragitto?.prezzoExtra ?? 0);
 }
 
 /**

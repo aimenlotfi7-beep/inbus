@@ -53,8 +53,8 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   { chiave: 'fornitori.elimina', etichetta: 'Eliminare fornitori', modulo: 'Fornitori' },
 
   // Tragitti
-  { chiave: 'tragitti.visualizza', etichetta: 'Visualizzare tragitti', modulo: 'Tragitti' },
-  { chiave: 'tragitti.gestisci', etichetta: 'Creare/modificare/eliminare tragitti', modulo: 'Tragitti' },
+  { chiave: 'tragitti.visualizza', etichetta: 'Visualizzare percorsi salvati', modulo: 'Percorsi salvati' },
+  { chiave: 'tragitti.gestisci', etichetta: 'Creare/modificare/eliminare percorsi salvati', modulo: 'Percorsi salvati' },
 
   // Promoter
   { chiave: 'promoter.visualizza', etichetta: 'Visualizzare promoter', modulo: 'Promoter' },

@@ -2,7 +2,7 @@ import { api } from './client';
 
 export interface IscrizioneListaAttesaPayload {
   eventoId: string;
-  lineaId?: string;
+  tragittoId?: string;
   fermataId?: string;
   passeggeri: number;
   cliente: { email: string; nome: string; cognome: string; telefono: string };
@@ -24,7 +24,7 @@ export interface DatiFinalizzazione {
   luogo: string;
   citta: string;
   data: string | null;
-  lineaId: string | null;
+  tragittoId: string | null;
   fermataId: string | null;
   passeggeri: number;
   nome: string;
@@ -51,7 +51,7 @@ export interface IscrizioneListaAttesa {
 export const listaAttesaApi = {
   iscriviti: (payload: IscrizioneListaAttesaPayload) => api.post<{ id: string }>('/api/lista-attesa', payload),
   getByToken: (token: string) => api.get<DatiFinalizzazione>(`/api/lista-attesa/finalizza/${token}`),
-  finalizza: (token: string, input: { lineaId: string; fermataId: string; tipoPagamento: 'COMPLETO' | 'ACCONTO'; metodoPagamento: string }) =>
+  finalizza: (token: string, input: { tragittoId: string; fermataId: string; tipoPagamento: 'COMPLETO' | 'ACCONTO'; metodoPagamento: string }) =>
     api.post<{ pnr: string }>(`/api/lista-attesa/finalizza/${token}`, input),
   // Amministrazione
   listByEvento: (eventoId: string) => api.get<IscrizioneListaAttesa[]>(`/api/lista-attesa/eventi/${eventoId}`),

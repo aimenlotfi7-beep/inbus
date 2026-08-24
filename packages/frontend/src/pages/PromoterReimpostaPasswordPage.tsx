@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { promoterApi } from '../api/promoter';
 import { ErroreApi } from '../api/client';
+import { erroreValidazionePassword } from '../features/validazionePassword';
 import '../styles/promoter.css';
 
 export function PromoterReimpostaPasswordPage() {
@@ -15,8 +16,8 @@ export function PromoterReimpostaPasswordPage() {
 
   async function invia() {
     setErrore('');
-    if (password.length < 8) { setErrore('La password deve avere almeno 8 caratteri.'); return; }
-    if (password !== conferma) { setErrore('Le due password non coincidono.'); return; }
+    const erroreValidazione = erroreValidazionePassword(password, conferma);
+    if (erroreValidazione) { setErrore(erroreValidazione); return; }
     if (!token) return;
     setCaricamento(true);
     try {

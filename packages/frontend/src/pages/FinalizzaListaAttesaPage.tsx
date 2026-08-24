@@ -43,7 +43,7 @@ export function FinalizzaListaAttesaPage() {
     setMessaggioErrore('');
     try {
       const r = await listaAttesaApi.finalizza(token, {
-        lineaId: opzioneScelta.lineaId,
+        tragittoId: opzioneScelta.tragittoId,
         fermataId: opzioneScelta.fermataId,
         tipoPagamento,
         metodoPagamento: 'CARTA',

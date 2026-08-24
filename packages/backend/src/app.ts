@@ -9,7 +9,7 @@ import { utentiRouter } from './modules/utenti/utenti.routes.js';
 import { pagineRouter, contenutiRouter } from './modules/pagine/pagine.routes.js';
 import { couponRouter } from './modules/coupon/coupon.routes.js';
 import { fornitoriRouter } from './modules/fornitori/fornitori.routes.js';
-import { tragittiRouter } from './modules/tragitti/tragitti.routes.js';
+import { percorsiSalvatiRouter } from './modules/percorsi-salvati/percorsi-salvati.routes.js';
 import { promoterRouter } from './modules/promoter/promoter.routes.js';
 import { tourLeaderRouter } from './modules/tourleader/tourleader.routes.js';
 import { chatRouter } from './modules/chat/chat.routes.js';
@@ -49,7 +49,7 @@ export function creaApp() {
   app.use('/api/contenuti', contenutiRouter);
   app.use('/api/coupon', couponRouter);
   app.use('/api/fornitori', fornitoriRouter);
-  app.use('/api/tragitti', tragittiRouter);
+  app.use('/api/percorsi-salvati', percorsiSalvatiRouter);
   app.use('/api/promoter', promoterRouter);
   app.use('/api/tour-leader', tourLeaderRouter);
   app.use('/api/chat', chatRouter);

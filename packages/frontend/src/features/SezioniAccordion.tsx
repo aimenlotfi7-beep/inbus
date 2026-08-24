@@ -13,7 +13,7 @@ export function SezioniAccordion({ evento }: { evento: Evento }) {
   const voci: { id: Voce; etichetta: string; visibile: boolean }[] = [
     { id: 'descrizione', etichetta: 'Descrizione', visibile: !!evento.descrizioneSeo },
     { id: 'informazioni', etichetta: 'Informazioni', visibile: !!evento.descrizione },
-    { id: 'partenze', etichetta: 'Partenze', visibile: evento.linee.length > 0 || evento.prodotti.some((v) => v.linee.length > 0) },
+    { id: 'partenze', etichetta: 'Partenze', visibile: evento.tragitti.length > 0 || evento.servizi.some((v) => v.tragitti.length > 0) },
   ];
 
   function toggle(id: Voce) {

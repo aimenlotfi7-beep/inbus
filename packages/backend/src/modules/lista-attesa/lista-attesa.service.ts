@@ -19,7 +19,7 @@ export const listaAttesaService = {
       email: input.cliente.email.toLowerCase(),
       telefono: input.cliente.telefono,
       passeggeri: input.passeggeri,
-      lineaId: input.lineaId,
+      tragittoId: input.tragittoId,
       fermataId: input.fermataId,
       partecipantiJson: JSON.stringify(input.partecipanti),
     }).returning();
@@ -161,7 +161,7 @@ export const listaAttesaService = {
       luogo: evento?.luogo ?? '',
       citta: evento?.citta ?? '',
       data: evento?.data ?? null,
-      lineaId: riga.lineaId,
+      tragittoId: riga.tragittoId,
       fermataId: riga.fermataId,
       passeggeri: riga.passeggeri,
       nome: riga.nome,
@@ -174,10 +174,10 @@ export const listaAttesaService = {
 
   /** Crea davvero la prenotazione (riusando la stessa logica del
    *  checkout normale, blocco posti atomico incluso) e segna l'iscrizione
-   *  come completata. `input` può correggere lineaId/fermataId scelti
+   *  come completata. `input` può correggere tragittoId/fermataId scelti
    *  dal cliente in questa pagina, se diversi da quelli preferiti in
    *  origine. */
-  async finalizza(token: string, input: { lineaId: string; fermataId: string; tipoPagamento: 'COMPLETO' | 'ACCONTO'; metodoPagamento: 'CARTA' | 'PAYPAL' | 'SATISPAY' | 'DA_CONCORDARE' }) {
+  async finalizza(token: string, input: { tragittoId: string; fermataId: string; tipoPagamento: 'COMPLETO' | 'ACCONTO'; metodoPagamento: 'CARTA' | 'PAYPAL' | 'SATISPAY' | 'DA_CONCORDARE' }) {
     const [riga] = await db.select().from(listaAttesa).where(eq(listaAttesa.token, token)).limit(1);
     if (!riga) throw new NonTrovato('Link');
     if (riga.completata) throw new ConflittoDati('Questa prenotazione è già stata completata.');
@@ -196,7 +196,7 @@ export const listaAttesaService = {
 
     const prenotazione = await prenotazioniService.crea({
       eventoId: riga.eventoId,
-      lineaId: input.lineaId,
+      tragittoId: input.tragittoId,
       fermataId: input.fermataId,
       passeggeri: riga.passeggeri,
       tipoPagamento: input.tipoPagamento,

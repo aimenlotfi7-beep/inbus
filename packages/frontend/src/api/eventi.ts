@@ -4,9 +4,9 @@ import type { Evento, OpzionePartenza } from './types';
 export interface FermataInput {
   citta: string; indirizzo: string; orario?: string; orarioRitorno?: string; indirizzoRitorno?: string; prezzo?: number; postiMax?: number;
 }
-export interface LineaInput {
+export interface TragittoInput {
   id?: string; // presente = tratta già esistente, assente = nuova
-  prodottoId?: string | null; // vuoto = tratta "libera", non appartiene a nessun prodotto
+  servizioId?: string | null; // vuoto = tratta "libera", non appartiene a nessun servizio
   nome: string; postiTotali: number; prezzoExtra?: number; referenteNome?: string; referenteTelefono?: string; fornitoreId?: string;
   fermate: FermataInput[];
 }
@@ -25,17 +25,17 @@ export interface EventoInput {
   ticketColoreAccento?: string;
   ticketImmagineSfondoUrl?: string;
   layoutBigliettoId?: string | null;
-  immagini?: string[]; allegati?: { nome: string; url: string }[]; linee?: LineaInput[];
-  // I viaggi (pacchetti bus distinti dentro lo stesso evento) — ognuno
+  immagini?: string[]; allegati?: { nome: string; url: string }[]; tragitti?: TragittoInput[];
+  // I servizi (pacchetti bus distinti dentro lo stesso evento) — ognuno
   // con i propri tragitti annidati. Facoltativo: la maggior parte degli
   // eventi non ne ha bisogno.
-  prodotti?: { id?: string; nome: string; arrivoOrario?: string; linee: LineaInput[] }[];
+  servizi?: { id?: string; nome: string; arrivoOrario?: string; tragitti: TragittoInput[] }[];
 }
 
 export interface FermataConPasseggeri { fermataId: string; citta: string; passeggeri: number; }
-export interface CalcoloBusLinea {
-  lineaId: string;
-  prodottoId: string | null;
+export interface CalcoloBusTragitto {
+  tragittoId: string;
+  servizioId: string | null;
   nome: string;
   postiTotali: number;
   capienzaPerBus: number;
@@ -56,13 +56,13 @@ export interface BusFisico {
   costo: string | null;
   postiBus: number | null;
   note: string | null;
-  lineeIds: string[];
+  tragittiIds: string[];
 }
 export interface BusFisicoInput {
-  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; lineeIds: string[];
+  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; tragittiIds: string[];
 }
 export interface PasseggeroBus { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string; }
-export interface RiepilogoEconomicoTratta { lineaId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; }
+export interface RiepilogoEconomicoTratta { tragittoId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; }
 
 export const eventiApi = {
   list: (filtri?: { citta?: string; genere?: string; ricerca?: string; soloFuturi?: boolean; soloVisibili?: boolean }) => {
@@ -71,13 +71,13 @@ export const eventiApi = {
   },
   getById: (id: string) => api.get<Evento>(`/api/eventi/${id}`),
   getBySlug: (slug: string) => api.get<Evento>(`/api/eventi/slug/${slug}`),
-  opzioniPartenza: (id: string, prodottoId?: string) =>
-    api.get<OpzionePartenza[]>(`/api/eventi/${id}/opzioni-partenza${prodottoId ? `?prodottoId=${prodottoId}` : ''}`),
+  opzioniPartenza: (id: string, servizioId?: string) =>
+    api.get<OpzionePartenza[]>(`/api/eventi/${id}/opzioni-partenza${servizioId ? `?servizioId=${servizioId}` : ''}`),
   create: (input: EventoInput) => api.post<Evento>('/api/eventi', input),
   update: (id: string, input: Partial<EventoInput>) => api.put<Evento>(`/api/eventi/${id}`, input),
   remove: (id: string) => api.delete<void>(`/api/eventi/${id}`),
 
-  calcolaBus: (id: string) => api.get<CalcoloBusLinea[]>(`/api/eventi/${id}/calcola-bus`),
+  calcolaBus: (id: string) => api.get<CalcoloBusTragitto[]>(`/api/eventi/${id}/calcola-bus`),
   listaBus: (id: string) => api.get<BusFisico[]>(`/api/eventi/${id}/bus`),
   creaBus: (id: string, input: BusFisicoInput) => api.post<{ id: string }>(`/api/eventi/${id}/bus`, input),
   aggiornaBus: (id: string, busId: string, input: Partial<BusFisicoInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/bus/${busId}`, input),

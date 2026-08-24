@@ -10,9 +10,9 @@ export interface Fermata {
   postiPrenotati: number;
 }
 
-export interface LineaBus {
+export interface Tragitto {
   id: string;
-  prodottoId: string | null;
+  servizioId: string | null;
   nome: string;
   postiTotali: number;
   postiDisponibili: number;
@@ -22,13 +22,13 @@ export interface LineaBus {
   fermate: Fermata[];
 }
 
-export interface Prodotto {
+export interface Servizio {
   id: string;
   eventoId: string;
   nome: string;
   arrivoOrario: string | null;
   ordine: number;
-  linee: LineaBus[];
+  tragitti: Tragitto[];
 }
 
 export interface Evento {
@@ -53,14 +53,14 @@ export interface Evento {
   ticketImmagineSfondoUrl: string | null;
   layoutBigliettoId: string | null;
   slug: string;
-  linee: LineaBus[];
-  prodotti: Prodotto[];
+  tragitti: Tragitto[];
+  servizi: Servizio[];
   immagini: { id: string; url: string; ordine: number }[];
   allegati: { id: string; nome: string; url: string }[];
 }
 
 export interface OpzionePartenza {
-  lineaId: string;
+  tragittoId: string;
   postiDisponibili: number;
   fermataId: string;
   fermataCitta: string;
@@ -75,7 +75,7 @@ export interface Prenotazione {
   id: string;
   pnr: string;
   eventoId: string;
-  lineaId: string;
+  tragittoId: string;
   fermataCitta: string;
   fermataIndirizzo: string | null;
   fermataOrario: string | null;

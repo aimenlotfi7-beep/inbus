@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { authApi, type SessioneAdmin } from '../api/auth';
 import { ErroreApi } from '../api/client';
+import { erroreValidazionePassword } from '../features/validazionePassword';
 
 type Vista = 'login' | 'richiedi-reset' | 'nuova-password';
 
@@ -102,8 +103,8 @@ function NuovaPassword({ token, onFatto }: { token: string; onFatto: () => void 
   async function invia(e: React.FormEvent) {
     e.preventDefault();
     setErrore('');
-    if (password.length < 8) { setErrore('La password deve avere almeno 8 caratteri.'); return; }
-    if (password !== conferma) { setErrore('Le due password non coincidono.'); return; }
+    const erroreValidazione = erroreValidazionePassword(password, conferma);
+    if (erroreValidazione) { setErrore(erroreValidazione); return; }
     setCaricamento(true);
     try {
       await authApi.resetPassword(token, password);

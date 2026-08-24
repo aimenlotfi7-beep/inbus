@@ -14,7 +14,7 @@ const partecipanteSchema = z.object({
 
 export const creaPrenotazioneSchema = z.object({
   eventoId: z.string().min(1),
-  lineaId: z.string().min(1),
+  tragittoId: z.string().min(1),
   fermataId: z.string().min(1),
   passeggeri: z.number().int().min(1).max(20),
   tipoPagamento: z.enum(['COMPLETO', 'ACCONTO']).default('COMPLETO'),

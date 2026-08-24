@@ -2,8 +2,8 @@ import { and, eq, ilike, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
   eventi,
-  lineeBus,
-  prodotti,
+  tragitti,
+  servizi,
   fermate,
   immaginiEvento,
   allegatiEvento,
@@ -18,7 +18,7 @@ import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
-import { lineaSchema } from './eventi.dto.js';
+import { tragittoSchema } from './eventi.dto.js';
 import type { z } from 'zod';
 
 // Include standard riusato da list/getById: evento con tutte le sue
@@ -28,11 +28,11 @@ export const includeCompleto = {
   // Nascoste ovunque venga usata questa query condivisa (form di
   // modifica, sito pubblico, checkout) — restano recuperabili solo
   // tramite le funzioni dedicate del Cestino qui sotto.
-  linee: { where: isNull(lineeBus.eliminatoIl), with: { fermate: true } },
-  // I prodotti (se l'evento ne ha) — ognuno con le proprie tratte. Un
-  // evento senza nessun prodotto (il caso normale) ha semplicemente un
+  tragitti: { where: isNull(tragitti.eliminatoIl), with: { fermate: true } },
+  // I servizi (se l'evento ne ha) — ognuno con le proprie tratte. Un
+  // evento senza nessun servizio (il caso normale) ha semplicemente un
   // array vuoto qui: tutto continua a funzionare come prima.
-  prodotti: { with: { linee: { where: isNull(lineeBus.eliminatoIl), with: { fermate: true } } } },
+  servizi: { with: { tragitti: { where: isNull(tragitti.eliminatoIl), with: { fermate: true } } } },
   immagini: true,
   allegati: true,
 } as const;
@@ -78,10 +78,10 @@ async function generaSlugUnivoco(base: string, idDaEscludere?: string) {
  *  ancora). "Nuovi posti disponibili" non ha un innesco automatico
  *  sensato (richiederebbe tener traccia della storia, non solo dello
  *  stato attuale) — resta un'etichetta solo manuale. */
-function calcolaStatoAutomatico(linee: { postiTotali: number; postiDisponibili: number }[]): 'POCHI_POSTI' | 'ESAURITO' | null {
-  if (linee.length === 0) return null;
-  const totale = linee.reduce((s, l) => s + l.postiTotali, 0);
-  const disponibili = linee.reduce((s, l) => s + l.postiDisponibili, 0);
+function calcolaStatoAutomatico(tragitti: { postiTotali: number; postiDisponibili: number }[]): 'POCHI_POSTI' | 'ESAURITO' | null {
+  if (tragitti.length === 0) return null;
+  const totale = tragitti.reduce((s, l) => s + l.postiTotali, 0);
+  const disponibili = tragitti.reduce((s, l) => s + l.postiDisponibili, 0);
   if (totale === 0) return null;
   if (disponibili <= 0) return 'ESAURITO';
   if (disponibili / totale <= 0.2) return 'POCHI_POSTI';
@@ -94,33 +94,33 @@ function calcolaStatoAutomatico(linee: { postiTotali: number; postiDisponibili: 
  *  a distinguere "è in automatico" da "l'ho impostato io", e ogni volta
  *  che salva il form "congelerebbe" per sbaglio il valore calcolato
  *  come se fosse una scelta manuale sua. */
-function conStatoCalcolato<T extends { statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null; linee: { postiTotali: number; postiDisponibili: number }[] }>(evento: T): T {
+function conStatoCalcolato<T extends { statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null; tragitti: { postiTotali: number; postiDisponibili: number }[] }>(evento: T): T {
   if (evento.statoDisponibilita) return evento; // scelta manuale, ha sempre la precedenza
-  return { ...evento, statoDisponibilita: calcolaStatoAutomatico(evento.linee) };
+  return { ...evento, statoDisponibilita: calcolaStatoAutomatico(evento.tragitti) };
 }
 
 /** Inserisce un tragitto (tratta) con le sue fermate — usata sia per i
- *  tragitti liberi sia per quelli dentro un viaggio. */
-async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], eventoId: string, prodottoId: string | null, linea: z.infer<typeof lineaSchema>) {
-  const [nuovaLinea] = await tx
-    .insert(lineeBus)
+ *  tragitti liberi sia per quelli dentro un servizio. */
+async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], eventoId: string, servizioId: string | null, tragitto: z.infer<typeof tragittoSchema>) {
+  const [nuovoTragitto] = await tx
+    .insert(tragitti)
     .values({
       eventoId,
-      prodottoId,
-      nome: linea.nome,
-      postiTotali: linea.postiTotali,
-      postiDisponibili: linea.postiTotali, // alla creazione tutti i posti sono liberi
-      prezzoExtra: linea.prezzoExtra.toFixed(2),
-      referenteNome: linea.referenteNome,
-      referenteTelefono: linea.referenteTelefono,
-      fornitoreId: linea.fornitoreId,
+      servizioId,
+      nome: tragitto.nome,
+      postiTotali: tragitto.postiTotali,
+      postiDisponibili: tragitto.postiTotali, // alla creazione tutti i posti sono liberi
+      prezzoExtra: tragitto.prezzoExtra.toFixed(2),
+      referenteNome: tragitto.referenteNome,
+      referenteTelefono: tragitto.referenteTelefono,
+      fornitoreId: tragitto.fornitoreId,
     })
     .returning();
 
-  if (linea.fermate.length) {
+  if (tragitto.fermate.length) {
     await tx.insert(fermate).values(
-      linea.fermate.map((f, ordine) => ({
-        lineaId: nuovaLinea.id,
+      tragitto.fermate.map((f, ordine) => ({
+        tragittoId: nuovoTragitto.id,
         ordine,
         citta: f.citta,
         indirizzo: f.indirizzo,
@@ -134,23 +134,23 @@ async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction
   }
 }
 
-/** Sincronizza i tragitti di un evento (o di un viaggio dentro l'evento)
+/** Sincronizza i tragitti di un evento (o di un servizio dentro l'evento)
  *  col form: quelli con un `id` vengono aggiornati sul posto (mai
  *  cancellati e ricreati — perderebbe le prenotazioni collegate),
  *  quelli senza sono nuovi, quelli rimasti fuori dal form vengono
  *  "eliminati" (cestino, recuperabili). */
-async function sincronizzaTragitti(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], eventoId: string, prodottoId: string | null, tratte: z.infer<typeof lineaSchema>[]) {
-  const condizioneProdotto = prodottoId === null ? isNull(lineeBus.prodottoId) : eq(lineeBus.prodottoId, prodottoId);
-  const esistenti = await tx.select().from(lineeBus).where(and(eq(lineeBus.eventoId, eventoId), condizioneProdotto, isNull(lineeBus.eliminatoIl)));
+async function sincronizzaTragitti(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], eventoId: string, servizioId: string | null, tratte: z.infer<typeof tragittoSchema>[]) {
+  const condizioneServizio = servizioId === null ? isNull(tragitti.servizioId) : eq(tragitti.servizioId, servizioId);
+  const esistenti = await tx.select().from(tragitti).where(and(eq(tragitti.eventoId, eventoId), condizioneServizio, isNull(tragitti.eliminatoIl)));
   const idsInviati = new Set(tratte.filter((l) => l.id).map((l) => l.id));
 
   for (const esistente of esistenti) {
     if (idsInviati.has(esistente.id)) continue;
-    await tx.update(lineeBus).set({ eliminatoIl: new Date() }).where(eq(lineeBus.id, esistente.id));
+    await tx.update(tragitti).set({ eliminatoIl: new Date() }).where(eq(tragitti.id, esistente.id));
   }
 
-  for (const linea of tratte) {
-    const giaEsistente = linea.id ? esistenti.find((l) => l.id === linea.id) : undefined;
+  for (const tragitto of tratte) {
+    const giaEsistente = tragitto.id ? esistenti.find((l) => l.id === tragitto.id) : undefined;
 
     if (giaEsistente) {
       // I posti occupati (venduti) restano tali: se cambi i posti
@@ -158,27 +158,27 @@ async function sincronizzaTragitti(tx: Parameters<Parameters<typeof db.transacti
       // invece di essere resettati (perderebbe traccia di chi ha già
       // prenotato).
       const postiOccupati = giaEsistente.postiTotali - giaEsistente.postiDisponibili;
-      const nuoviPostiDisponibili = Math.max(0, linea.postiTotali - postiOccupati);
+      const nuoviPostiDisponibili = Math.max(0, tragitto.postiTotali - postiOccupati);
 
-      await tx.update(lineeBus).set({
-        prodottoId,
-        nome: linea.nome,
-        postiTotali: linea.postiTotali,
+      await tx.update(tragitti).set({
+        servizioId,
+        nome: tragitto.nome,
+        postiTotali: tragitto.postiTotali,
         postiDisponibili: nuoviPostiDisponibili,
-        prezzoExtra: linea.prezzoExtra.toFixed(2),
-        referenteNome: linea.referenteNome,
-        referenteTelefono: linea.referenteTelefono,
-        fornitoreId: linea.fornitoreId,
-      }).where(eq(lineeBus.id, giaEsistente.id));
+        prezzoExtra: tragitto.prezzoExtra.toFixed(2),
+        referenteNome: tragitto.referenteNome,
+        referenteTelefono: tragitto.referenteTelefono,
+        fornitoreId: tragitto.fornitoreId,
+      }).where(eq(tragitti.id, giaEsistente.id));
 
       // Le fermate non hanno prenotazioni collegate direttamente (le
       // prenotazioni salvano città/indirizzo come testo, non un
       // riferimento), quindi qui si possono sostituire liberamente.
-      await tx.delete(fermate).where(eq(fermate.lineaId, giaEsistente.id));
-      if (linea.fermate.length) {
+      await tx.delete(fermate).where(eq(fermate.tragittoId, giaEsistente.id));
+      if (tragitto.fermate.length) {
         await tx.insert(fermate).values(
-          linea.fermate.map((f, ordine) => ({
-            lineaId: giaEsistente.id,
+          tragitto.fermate.map((f, ordine) => ({
+            tragittoId: giaEsistente.id,
             ordine,
             citta: f.citta,
             indirizzo: f.indirizzo,
@@ -191,30 +191,30 @@ async function sincronizzaTragitti(tx: Parameters<Parameters<typeof db.transacti
         );
       }
     } else {
-      await inserisciTragitto(tx, eventoId, prodottoId, linea);
+      await inserisciTragitto(tx, eventoId, servizioId, tragitto);
     }
   }
 }
 
 export const eventiService = {
-  /** Crea un prodotto (pacchetto bus distinto) per un evento — da qui
+  /** Crea un servizio (pacchetto bus distinto) per un evento — da qui
    *  in poi le tratte di quell'evento possono essere assegnate a
-   *  questo prodotto invece che restare "libere". */
-  async creaProdotto(eventoId: string, nome: string, arrivoOrario?: string) {
-    const [nuovo] = await db.insert(prodotti).values({ eventoId, nome, arrivoOrario }).returning();
+   *  questo servizio invece che restare "libere". */
+  async creaServizio(eventoId: string, nome: string, arrivoOrario?: string) {
+    const [nuovo] = await db.insert(servizi).values({ eventoId, nome, arrivoOrario }).returning();
     return nuovo;
   },
-  async aggiornaProdotto(id: string, dati: { nome?: string; arrivoOrario?: string | null }) {
-    const [aggiornato] = await db.update(prodotti).set(dati).where(eq(prodotti.id, id)).returning();
-    if (!aggiornato) throw new NonTrovato('Prodotto');
+  async aggiornaServizio(id: string, dati: { nome?: string; arrivoOrario?: string | null }) {
+    const [aggiornato] = await db.update(servizi).set(dati).where(eq(servizi.id, id)).returning();
+    if (!aggiornato) throw new NonTrovato('Servizio');
     return aggiornato;
   },
-  /** Eliminare un prodotto libera le sue tratte (tornano "senza
-   *  prodotto"), non le cancella — evita di perdere lavoro fatto per
+  /** Eliminare un servizio libera le sue tratte (tornano "senza
+   *  servizio"), non le cancella — evita di perdere lavoro fatto per
    *  errore nel censimento. */
-  async eliminaProdotto(id: string) {
-    await db.update(lineeBus).set({ prodottoId: null }).where(eq(lineeBus.prodottoId, id));
-    await db.delete(prodotti).where(eq(prodotti.id, id));
+  async eliminaServizio(id: string) {
+    await db.update(tragitti).set({ servizioId: null }).where(eq(tragitti.servizioId, id));
+    await db.delete(servizi).where(eq(servizi.id, id));
   },
 
   async list(query: ListaEventiQuery) {
@@ -298,15 +298,15 @@ export const eventiService = {
           input.allegati.map((a) => ({ eventoId: nuovoEvento.id, nome: a.nome, url: a.url }))
         );
       }
-      for (const linea of input.linee.filter((l) => !l.prodottoId)) {
-        await inserisciTragitto(tx, nuovoEvento.id, linea.prodottoId ?? null, linea);
+      for (const tragitto of input.tragitti.filter((l) => !l.servizioId)) {
+        await inserisciTragitto(tx, nuovoEvento.id, tragitto.servizioId ?? null, tragitto);
       }
-      for (const viaggio of input.prodotti) {
-        const [nuovoViaggio] = await tx.insert(prodotti).values({
-          eventoId: nuovoEvento.id, nome: viaggio.nome, arrivoOrario: viaggio.arrivoOrario,
+      for (const servizio of input.servizi) {
+        const [nuovoServizio] = await tx.insert(servizi).values({
+          eventoId: nuovoEvento.id, nome: servizio.nome, arrivoOrario: servizio.arrivoOrario,
         }).returning();
-        for (const linea of viaggio.linee) {
-          await inserisciTragitto(tx, nuovoEvento.id, nuovoViaggio.id, linea);
+        for (const tragitto of servizio.tragitti) {
+          await inserisciTragitto(tx, nuovoEvento.id, nuovoServizio.id, tragitto);
         }
       }
 
@@ -368,32 +368,32 @@ export const eventiService = {
         }
       }
 
-      // I tragitti liberi (non dentro nessun viaggio) — quelli dentro un
-      // viaggio si sincronizzano più sotto, insieme al viaggio stesso.
-      if (input.linee) {
-        await sincronizzaTragitti(tx, id, null, input.linee.filter((l) => !l.prodottoId));
+      // I tragitti liberi (non dentro nessun servizio) — quelli dentro un
+      // servizio si sincronizzano più sotto, insieme al servizio stesso.
+      if (input.tragitti) {
+        await sincronizzaTragitti(tx, id, null, input.tragitti.filter((l) => !l.servizioId));
       }
 
-      // I viaggi — stessa logica di sincronizzazione dei tragitti: id
+      // I servizi — stessa logica di sincronizzazione dei tragitti: id
       // esistente = aggiorna, assente = nuovo, rimasto fuori dal form =
       // eliminato (le sue tratte tornano "libere", non si perdono).
-      if (input.prodotti) {
-        const viaggiEsistenti = await tx.select().from(prodotti).where(eq(prodotti.eventoId, id));
-        const idsInviati = new Set(input.prodotti.filter((p) => p.id).map((p) => p.id));
+      if (input.servizi) {
+        const serviziEsistenti = await tx.select().from(servizi).where(eq(servizi.eventoId, id));
+        const idsInviati = new Set(input.servizi.filter((p) => p.id).map((p) => p.id));
 
-        for (const esistente of viaggiEsistenti) {
+        for (const esistente of serviziEsistenti) {
           if (idsInviati.has(esistente.id)) continue;
-          await tx.update(lineeBus).set({ prodottoId: null }).where(eq(lineeBus.prodottoId, esistente.id));
-          await tx.delete(prodotti).where(eq(prodotti.id, esistente.id));
+          await tx.update(tragitti).set({ servizioId: null }).where(eq(tragitti.servizioId, esistente.id));
+          await tx.delete(servizi).where(eq(servizi.id, esistente.id));
         }
 
-        for (const viaggio of input.prodotti) {
-          if (viaggio.id) {
-            await tx.update(prodotti).set({ nome: viaggio.nome, arrivoOrario: viaggio.arrivoOrario }).where(eq(prodotti.id, viaggio.id));
-            await sincronizzaTragitti(tx, id, viaggio.id, viaggio.linee);
+        for (const servizio of input.servizi) {
+          if (servizio.id) {
+            await tx.update(servizi).set({ nome: servizio.nome, arrivoOrario: servizio.arrivoOrario }).where(eq(servizi.id, servizio.id));
+            await sincronizzaTragitti(tx, id, servizio.id, servizio.tragitti);
           } else {
-            const [nuovoViaggio] = await tx.insert(prodotti).values({ eventoId: id, nome: viaggio.nome, arrivoOrario: viaggio.arrivoOrario }).returning();
-            for (const linea of viaggio.linee) await inserisciTragitto(tx, id, nuovoViaggio.id, linea);
+            const [nuovoServizio] = await tx.insert(servizi).values({ eventoId: id, nome: servizio.nome, arrivoOrario: servizio.arrivoOrario }).returning();
+            for (const tragitto of servizio.tragitti) await inserisciTragitto(tx, id, nuovoServizio.id, tragitto);
           }
         }
       }
@@ -417,7 +417,7 @@ export const eventiService = {
   async eventiEliminati() {
     return db.query.eventi.findMany({
       where: sql`${eventi.eliminatoIl} is not null`,
-      with: { linee: true, immagini: true },
+      with: { tragitti: true, immagini: true },
       orderBy: (e, { desc }) => [desc(e.eliminatoIl)],
     });
   },
@@ -434,42 +434,42 @@ export const eventiService = {
   async tratteEliminate() {
     return db
       .select({
-        id: lineeBus.id,
-        nome: lineeBus.nome,
-        eliminatoIl: lineeBus.eliminatoIl,
-        eventoId: lineeBus.eventoId,
+        id: tragitti.id,
+        nome: tragitti.nome,
+        eliminatoIl: tragitti.eliminatoIl,
+        eventoId: tragitti.eventoId,
         eventoArtista: eventi.artista,
       })
-      .from(lineeBus)
-      .innerJoin(eventi, eq(eventi.id, lineeBus.eventoId))
-      .where(sql`${lineeBus.eliminatoIl} is not null`)
-      .orderBy(sql`${lineeBus.eliminatoIl} desc`);
+      .from(tragitti)
+      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(sql`${tragitti.eliminatoIl} is not null`)
+      .orderBy(sql`${tragitti.eliminatoIl} desc`);
   },
 
   async ripristinaTratta(id: string) {
-    const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, id)).limit(1);
-    if (!linea) throw new NonTrovato('Tratta');
-    await db.update(lineeBus).set({ eliminatoIl: null }).where(eq(lineeBus.id, id));
+    const [tragitto] = await db.select().from(tragitti).where(eq(tragitti.id, id)).limit(1);
+    if (!tragitto) throw new NonTrovato('Tratta');
+    await db.update(tragitti).set({ eliminatoIl: null }).where(eq(tragitti.id, id));
   },
 
-  /** Somma i posti disponibili su tutte le linee di un evento. */
+  /** Somma i posti disponibili su tutte le tragitti di un evento. */
   postiTotaliDisponibili(evento: Awaited<ReturnType<typeof getById>>) {
-    return evento.linee.reduce((somma, l) => somma + l.postiDisponibili, 0);
+    return evento.tragitti.reduce((somma, l) => somma + l.postiDisponibili, 0);
   },
 
   /** Una riga per ogni fermata prenotabile, con il prezzo effettivo già
    *  calcolato (sovrascrive prezzo base+extra se la fermata ha un prezzo
    *  proprio) — usata dal checkout sul sito pubblico. */
-  async opzioniPartenza(eventoId: string, prodottoId?: string) {
+  async opzioniPartenza(eventoId: string, servizioId?: string) {
     const evento = await getById(eventoId);
-    // Se l'evento ha viaggi distinti e ne è stato scelto uno, le
+    // Se l'evento ha servizi distinti e ne è stato scelto uno, le
     // fermate mostrate sono solo le sue — altrimenti (evento senza
-    // viaggi, o nessuno specificato) tutte quelle libere, come sempre.
-    const lineeDaMostrare = prodottoId
-      ? evento.prodotti.find((p) => p.id === prodottoId)?.linee ?? []
-      : evento.linee.filter((l) => !l.prodottoId);
+    // servizi, o nessuno specificato) tutte quelle libere, come sempre.
+    const tragittiDaMostrare = servizioId
+      ? evento.servizi.find((p) => p.id === servizioId)?.tragitti ?? []
+      : evento.tragitti.filter((l) => !l.servizioId);
     const opzioni: Array<{
-      lineaId: string;
+      tragittoId: string;
       postiDisponibili: number;
       fermataId: string;
       fermataCitta: string;
@@ -480,25 +480,25 @@ export const eventiService = {
       prezzoEffettivo: number;
     }> = [];
 
-    for (const linea of lineeDaMostrare) {
+    for (const tragitto of tragittiDaMostrare) {
       // Nota: prima qui si saltava del tutto la tratta se il bus era
       // esaurito — ma così il cliente non aveva modo di scegliere PER
       // QUALE fermata mettersi in lista d'attesa (il menu restava vuoto).
       // Ora le fermate compaiono sempre, con posti disponibili a 0
       // quando è il caso: la scelta resta possibile, solo che porta
       // alla lista d'attesa invece che al pagamento.
-      for (const f of linea.fermate) {
-        const prezzoEffettivo = prezzoNormaleFermata(f, evento, linea);
+      for (const f of tragitto.fermate) {
+        const prezzoEffettivo = prezzoNormaleFermata(f, evento, tragitto);
         // Se questa fermata ha un limite posti suo (facoltativo), i suoi
         // posti disponibili sono il minore tra quanto le resta e quanto
         // resta sul bus in generale — così una fermata può esaurirsi da
         // sola anche se il bus nel complesso ha ancora posti altrove, ma
         // non può mai avere "più posti" di quelli davvero rimasti sul bus.
         const postiDisponibiliFermata = f.postiMax != null
-          ? Math.min(linea.postiDisponibili, Math.max(0, f.postiMax - f.postiPrenotati))
-          : linea.postiDisponibili;
+          ? Math.min(tragitto.postiDisponibili, Math.max(0, f.postiMax - f.postiPrenotati))
+          : tragitto.postiDisponibili;
         opzioni.push({
-          lineaId: linea.id,
+          tragittoId: tragitto.id,
           postiDisponibili: postiDisponibiliFermata,
           fermataId: f.id,
           fermataCitta: f.citta,
@@ -514,7 +514,7 @@ export const eventiService = {
   },
 
   /**
-   * Suggerisce quanti bus servono per ogni linea dell'evento, in base ai
+   * Suggerisce quanti bus servono per ogni tragitto dell'evento, in base ai
    * passeggeri confermati per fermata. Logica (concordata con l'utente):
    * si percorrono le fermate in ordine; se i passeggeri di UNA fermata da
    * soli riempiono (o superano) un bus, quella fermata ottiene bus dedicati
@@ -527,10 +527,10 @@ export const eventiService = {
   async calcolaBusNecessari(eventoId: string) {
     const evento = await getById(eventoId);
     const capienza = await leggiPostiPerBus();
-    const lineeIds = evento.linee.map((l) => l.id);
+    const tragittiIds = evento.tragitti.map((l) => l.id);
 
     const prenotazioniConfermate = await db
-      .select({ lineaId: prenotazioni.lineaId, fermataCitta: prenotazioni.fermataCitta, passeggeri: prenotazioni.passeggeri })
+      .select({ tragittoId: prenotazioni.tragittoId, fermataCitta: prenotazioni.fermataCitta, passeggeri: prenotazioni.passeggeri })
       .from(prenotazioni)
       .where(and(eq(prenotazioni.eventoId, eventoId), eq(prenotazioni.stato, 'CONFERMATA')));
 
@@ -538,16 +538,16 @@ export const eventiService = {
     // ogni tratta, con i loro posti (facoltativi: un bus senza posti
     // indicati non contribuisce alla somma, invece di essere ignorato
     // del tutto o contare come 0 posti per errore).
-    const assegnazioni = lineeIds.length ? await db.select().from(busTratte).where(inArray(busTratte.lineaId, lineeIds)) : [];
+    const assegnazioni = tragittiIds.length ? await db.select().from(busTratte).where(inArray(busTratte.tragittoId, tragittiIds)) : [];
     const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
     const busCensiti = busIds.length ? await db.select().from(busFisici).where(inArray(busFisici.id, busIds)) : [];
 
-    return evento.linee.map((linea) => {
-      const fermateOrdinate = [...linea.fermate].sort((a, b) => a.ordine - b.ordine);
+    return evento.tragitti.map((tragitto) => {
+      const fermateOrdinate = [...tragitto.fermate].sort((a, b) => a.ordine - b.ordine);
 
       const fermateConPasseggeri = fermateOrdinate.map((f) => {
         const passeggeri = prenotazioniConfermate
-          .filter((p) => p.lineaId === linea.id && p.fermataCitta === f.citta)
+          .filter((p) => p.tragittoId === tragitto.id && p.fermataCitta === f.citta)
           .reduce((somma, p) => somma + p.passeggeri, 0);
         return { fermataId: f.id, citta: f.citta, passeggeri };
       });
@@ -579,15 +579,15 @@ export const eventiService = {
       // quella è un'altra domanda, "sto vendendo più di quanto
       // previsto?", già visibile separatamente come "posti superati").
       const postiBusCensiti = busCensiti
-        .filter((b) => assegnazioni.some((a) => a.busId === b.id && a.lineaId === linea.id))
+        .filter((b) => assegnazioni.some((a) => a.busId === b.id && a.tragittoId === tragitto.id))
         .reduce((s, b) => s + (b.postiBus ?? 0), 0);
       const coperta = totalePasseggeri > 0 && postiBusCensiti >= totalePasseggeri;
 
       return {
-        lineaId: linea.id,
-        prodottoId: linea.prodottoId,
-        nome: linea.nome,
-        postiTotali: linea.postiTotali,
+        tragittoId: tragitto.id,
+        servizioId: tragitto.servizioId,
+        nome: tragitto.nome,
+        postiTotali: tragitto.postiTotali,
         capienzaPerBus: capienza,
         fermate: fermateConPasseggeri,
         totalePasseggeri,
@@ -598,14 +598,14 @@ export const eventiService = {
     });
   },
 
-  /** Bus fisici collegati a una qualunque linea dell'evento, con le tratte
-   *  (linee) che ciascuno copre. */
+  /** Bus fisici collegati a una qualunque tragitto dell'evento, con le tratte
+   *  (tragitti) che ciascuno copre. */
   async listaBus(eventoId: string) {
     const evento = await getById(eventoId);
-    const lineeIds = evento.linee.map((l) => l.id);
-    if (lineeIds.length === 0) return [];
+    const tragittiIds = evento.tragitti.map((l) => l.id);
+    if (tragittiIds.length === 0) return [];
 
-    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.lineaId, lineeIds));
+    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.tragittoId, tragittiIds));
     const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
     if (busIds.length === 0) return [];
 
@@ -617,17 +617,17 @@ export const eventiService = {
       const tl = tourLeaders.find((t) => t.id === b.tourLeaderId);
       return {
         ...b,
-        lineeIds: assegnazioni.filter((a) => a.busId === b.id).map((a) => a.lineaId),
+        tragittiIds: assegnazioni.filter((a) => a.busId === b.id).map((a) => a.tragittoId),
         tourLeaderNome: tl ? `${tl.nome} ${tl.cognome}` : null,
       };
     });
   },
 
-  async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus?: number; note?: string; lineeIds: string[] }) {
+  async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus?: number; note?: string; tragittiIds: string[] }) {
     const evento = await getById(eventoId);
-    const lineeValide = new Set(evento.linee.map((l) => l.id));
-    const lineeIdsFiltrate = input.lineeIds.filter((id) => lineeValide.has(id));
-    if (lineeIdsFiltrate.length === 0) throw new ConflittoDati('Seleziona almeno una tratta di questo evento per il bus.');
+    const lineeValide = new Set(evento.tragitti.map((l) => l.id));
+    const tragittiIdsFiltrate = input.tragittiIds.filter((id) => lineeValide.has(id));
+    if (tragittiIdsFiltrate.length === 0) throw new ConflittoDati('Seleziona almeno una tratta di questo evento per il bus.');
 
     return db.transaction(async (tx) => {
       const [nuovo] = await tx.insert(busFisici).values({
@@ -640,12 +640,12 @@ export const eventiService = {
         postiBus: input.postiBus,
         note: input.note,
       }).returning();
-      await tx.insert(busTratte).values(lineeIdsFiltrate.map((lineaId) => ({ busId: nuovo.id, lineaId })));
+      await tx.insert(busTratte).values(tragittiIdsFiltrate.map((tragittoId) => ({ busId: nuovo.id, tragittoId })));
       return nuovo.id;
     });
   },
 
-  async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; lineeIds?: string[] }) {
+  async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; tragittiIds?: string[] }) {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
 
@@ -662,13 +662,13 @@ export const eventiService = {
           ...(input.note !== undefined && { note: input.note }),
         }).where(eq(busFisici.id, busId));
       }
-      if (input.lineeIds !== undefined) {
+      if (input.tragittiIds !== undefined) {
         const evento = await getById(eventoId);
-        const lineeValide = new Set(evento.linee.map((l) => l.id));
-        const lineeIdsFiltrate = input.lineeIds.filter((id) => lineeValide.has(id));
+        const lineeValide = new Set(evento.tragitti.map((l) => l.id));
+        const tragittiIdsFiltrate = input.tragittiIds.filter((id) => lineeValide.has(id));
         await tx.delete(busTratte).where(eq(busTratte.busId, busId));
-        if (lineeIdsFiltrate.length > 0) {
-          await tx.insert(busTratte).values(lineeIdsFiltrate.map((lineaId) => ({ busId, lineaId })));
+        if (tragittiIdsFiltrate.length > 0) {
+          await tx.insert(busTratte).values(tragittiIdsFiltrate.map((tragittoId) => ({ busId, tragittoId })));
         }
       }
     });
@@ -688,8 +688,8 @@ export const eventiService = {
     if (!bus) throw new NonTrovato('Bus');
 
     const assegnazioni = await db.select().from(busTratte).where(eq(busTratte.busId, busId));
-    const lineeIds = assegnazioni.map((a) => a.lineaId);
-    if (lineeIds.length === 0) return [];
+    const tragittiIds = assegnazioni.map((a) => a.tragittoId);
+    if (tragittiIds.length === 0) return [];
 
     const righe = await db
       .select({
@@ -699,7 +699,7 @@ export const eventiService = {
         telefonoReferente: prenotazioni.referenteTelefono,
       })
       .from(prenotazioni)
-      .where(and(inArray(prenotazioni.lineaId, lineeIds), eq(prenotazioni.stato, 'CONFERMATA')));
+      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')));
 
     if (righe.length === 0) return [];
 
@@ -742,31 +742,31 @@ export const eventiService = {
    *  quella tratta (un bus copre sempre una tratta sola, come deciso). */
   async riepilogoEconomico(eventoId: string) {
     const evento = await getById(eventoId);
-    const lineeIds = evento.linee.map((l) => l.id);
-    if (lineeIds.length === 0) return [];
+    const tragittiIds = evento.tragitti.map((l) => l.id);
+    if (tragittiIds.length === 0) return [];
 
     const prenotazioniConfermate = await db
-      .select({ lineaId: prenotazioni.lineaId, totale: prenotazioni.totale })
+      .select({ tragittoId: prenotazioni.tragittoId, totale: prenotazioni.totale })
       .from(prenotazioni)
-      .where(and(inArray(prenotazioni.lineaId, lineeIds), eq(prenotazioni.stato, 'CONFERMATA')));
+      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')));
 
-    const assegnazioni = lineeIds.length ? await db.select().from(busTratte).where(inArray(busTratte.lineaId, lineeIds)) : [];
+    const assegnazioni = tragittiIds.length ? await db.select().from(busTratte).where(inArray(busTratte.tragittoId, tragittiIds)) : [];
     const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
     const bus = busIds.length ? await db.select().from(busFisici).where(inArray(busFisici.id, busIds)) : [];
 
-    return evento.linee.map((linea) => {
+    return evento.tragitti.map((tragitto) => {
       const incassato = prenotazioniConfermate
-        .filter((p) => p.lineaId === linea.id)
+        .filter((p) => p.tragittoId === tragitto.id)
         .reduce((s, p) => s + Number(p.totale), 0);
 
-      const busIdsTratta = assegnazioni.filter((a) => a.lineaId === linea.id).map((a) => a.busId);
+      const busIdsTratta = assegnazioni.filter((a) => a.tragittoId === tragitto.id).map((a) => a.busId);
       const busTratta = bus.filter((b) => busIdsTratta.includes(b.id));
       const costoCensito = busTratta.some((b) => b.costo !== null);
       const costo = busTratta.reduce((s, b) => s + (b.costo ? Number(b.costo) : 0), 0);
 
       return {
-        lineaId: linea.id,
-        nome: linea.nome,
+        tragittoId: tragitto.id,
+        nome: tragitto.nome,
         incassato,
         costo,
         costoCensito, // false = nessun bus ha un costo compilato: il guadagno non è affidabile, va segnalato
@@ -785,18 +785,18 @@ export const eventiService = {
    *  quanti bus fisici sono stati censiti — usati dal Calendario per
    *  dare un colpo d'occhio senza dover aprire ogni evento. */
   async statistichePerEvento(): Promise<Record<string, { partecipanti: number; busCensiti: number }>> {
-    const righeLinee = await db.select({ lineaId: lineeBus.id, eventoId: lineeBus.eventoId }).from(lineeBus);
-    const mappaEventoDiLinea = new Map(righeLinee.map((r) => [r.lineaId, r.eventoId]));
+    const righeTragitti = await db.select({ tragittoId: tragitti.id, eventoId: tragitti.eventoId }).from(tragitti);
+    const mappaEventoDiTragitto = new Map(righeTragitti.map((r) => [r.tragittoId, r.eventoId]));
 
     const somme = await db
-      .select({ lineaId: prenotazioni.lineaId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
+      .select({ tragittoId: prenotazioni.tragittoId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
       .from(prenotazioni)
       .where(eq(prenotazioni.stato, 'CONFERMATA'))
-      .groupBy(prenotazioni.lineaId);
+      .groupBy(prenotazioni.tragittoId);
 
     const risultato: Record<string, { partecipanti: number; busCensiti: number }> = {};
     for (const s of somme) {
-      const eventoId = mappaEventoDiLinea.get(s.lineaId);
+      const eventoId = mappaEventoDiTragitto.get(s.tragittoId);
       if (!eventoId) continue;
       risultato[eventoId] ??= { partecipanti: 0, busCensiti: 0 };
       risultato[eventoId].partecipanti += Number(s.totale);
@@ -805,7 +805,7 @@ export const eventiService = {
     const assegnazioni = await db.select().from(busTratte);
     const busPerEvento = new Map<string, Set<string>>();
     for (const a of assegnazioni) {
-      const eventoId = mappaEventoDiLinea.get(a.lineaId);
+      const eventoId = mappaEventoDiTragitto.get(a.tragittoId);
       if (!eventoId) continue;
       if (!busPerEvento.has(eventoId)) busPerEvento.set(eventoId, new Set());
       busPerEvento.get(eventoId)!.add(a.busId);
@@ -819,28 +819,28 @@ export const eventiService = {
   },
 
   async contaAllertePartenze() {
-    const righeLinee = await db.select({ lineaId: lineeBus.id }).from(lineeBus);
-    if (righeLinee.length === 0) return 0;
-    const tutteLineeIds = righeLinee.map((r) => r.lineaId);
+    const righeTragitti = await db.select({ tragittoId: tragitti.id }).from(tragitti);
+    if (righeTragitti.length === 0) return 0;
+    const tuttiTragittiIds = righeTragitti.map((r) => r.tragittoId);
 
     const somme = await db
-      .select({ lineaId: prenotazioni.lineaId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
+      .select({ tragittoId: prenotazioni.tragittoId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
       .from(prenotazioni)
       .where(eq(prenotazioni.stato, 'CONFERMATA'))
-      .groupBy(prenotazioni.lineaId);
-    const mappaPasseggeri = new Map(somme.map((s) => [s.lineaId, Number(s.totale)]));
+      .groupBy(prenotazioni.tragittoId);
+    const mappaPasseggeri = new Map(somme.map((s) => [s.tragittoId, Number(s.totale)]));
 
-    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.lineaId, tutteLineeIds));
+    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.tragittoId, tuttiTragittiIds));
     const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
     const bus = busIds.length ? await db.select({ id: busFisici.id, postiBus: busFisici.postiBus }).from(busFisici).where(inArray(busFisici.id, busIds)) : [];
     const mappaBus = new Map(bus.map((b) => [b.id, b.postiBus ?? 0]));
 
     let conteggio = 0;
-    for (const lineaId of tutteLineeIds) {
-      const passeggeri = mappaPasseggeri.get(lineaId) ?? 0;
+    for (const tragittoId of tuttiTragittiIds) {
+      const passeggeri = mappaPasseggeri.get(tragittoId) ?? 0;
       if (passeggeri === 0) continue; // niente da coprire, non è un allarme
       const postiBusCensiti = assegnazioni
-        .filter((a) => a.lineaId === lineaId)
+        .filter((a) => a.tragittoId === tragittoId)
         .reduce((s, a) => s + (mappaBus.get(a.busId) ?? 0), 0);
       if (postiBusCensiti < passeggeri) conteggio++;
     }
@@ -852,32 +852,32 @@ export const eventiService = {
    *  mostrare il pallino di avviso sulla card dell'evento specifico
    *  nella sezione Partenze, non solo nel menu laterale. */
   async allertePartenzePerEvento(): Promise<Record<string, number>> {
-    const righeLinee = await db.select({ lineaId: lineeBus.id, eventoId: lineeBus.eventoId }).from(lineeBus);
-    if (righeLinee.length === 0) return {};
-    const tutteLineeIds = righeLinee.map((r) => r.lineaId);
-    const mappaEventoDiLinea = new Map(righeLinee.map((r) => [r.lineaId, r.eventoId]));
+    const righeTragitti = await db.select({ tragittoId: tragitti.id, eventoId: tragitti.eventoId }).from(tragitti);
+    if (righeTragitti.length === 0) return {};
+    const tuttiTragittiIds = righeTragitti.map((r) => r.tragittoId);
+    const mappaEventoDiTragitto = new Map(righeTragitti.map((r) => [r.tragittoId, r.eventoId]));
 
     const somme = await db
-      .select({ lineaId: prenotazioni.lineaId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
+      .select({ tragittoId: prenotazioni.tragittoId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
       .from(prenotazioni)
       .where(eq(prenotazioni.stato, 'CONFERMATA'))
-      .groupBy(prenotazioni.lineaId);
-    const mappaPasseggeri = new Map(somme.map((s) => [s.lineaId, Number(s.totale)]));
+      .groupBy(prenotazioni.tragittoId);
+    const mappaPasseggeri = new Map(somme.map((s) => [s.tragittoId, Number(s.totale)]));
 
-    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.lineaId, tutteLineeIds));
+    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.tragittoId, tuttiTragittiIds));
     const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
     const bus = busIds.length ? await db.select({ id: busFisici.id, postiBus: busFisici.postiBus }).from(busFisici).where(inArray(busFisici.id, busIds)) : [];
     const mappaBus = new Map(bus.map((b) => [b.id, b.postiBus ?? 0]));
 
     const risultato: Record<string, number> = {};
-    for (const lineaId of tutteLineeIds) {
-      const passeggeri = mappaPasseggeri.get(lineaId) ?? 0;
+    for (const tragittoId of tuttiTragittiIds) {
+      const passeggeri = mappaPasseggeri.get(tragittoId) ?? 0;
       if (passeggeri === 0) continue;
       const postiBusCensiti = assegnazioni
-        .filter((a) => a.lineaId === lineaId)
+        .filter((a) => a.tragittoId === tragittoId)
         .reduce((s, a) => s + (mappaBus.get(a.busId) ?? 0), 0);
       if (postiBusCensiti < passeggeri) {
-        const eventoId = mappaEventoDiLinea.get(lineaId)!;
+        const eventoId = mappaEventoDiTragitto.get(tragittoId)!;
         risultato[eventoId] = (risultato[eventoId] ?? 0) + 1;
       }
     }

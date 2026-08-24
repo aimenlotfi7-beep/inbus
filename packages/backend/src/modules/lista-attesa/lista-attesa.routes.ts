@@ -7,7 +7,7 @@ import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 
 const finalizzaSchema = z.object({
-  lineaId: z.string().min(1),
+  tragittoId: z.string().min(1),
   fermataId: z.string().min(1),
   tipoPagamento: z.enum(['COMPLETO', 'ACCONTO']).default('COMPLETO'),
   metodoPagamento: z.enum(['CARTA', 'PAYPAL', 'SATISPAY', 'DA_CONCORDARE']).default('CARTA'),

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { eventiApi, type EventoInput, type LineaInput, type FermataInput } from '../../../api/eventi';
-import { tragittiApi, type Tragitto } from '../../../api/tragitti';
+import { eventiApi, type EventoInput, type TragittoInput, type FermataInput } from '../../../api/eventi';
+import { percorsiSalvatiApi, type PercorsoSalvato } from '../../../api/percorsiSalvati';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../../api/layoutBiglietto';
 import { categorieApi, type Categoria } from '../../../api/categorie';
 import { ErroreApi } from '../../../api/client';
@@ -15,7 +15,7 @@ import { ListaAttesaTab } from './ListaAttesaTab';
 import { OfferteTab } from './OfferteTab';
 import { geocodifica, durataViaggio, attesa } from '../../shared/geo';
 
-const VUOTO: EventoInput = { artista: '', genere: '', luogo: '', citta: '', data: '', inEvidenza: false, accontoEur: 10, immagini: [], linee: [] };
+const VUOTO: EventoInput = { artista: '', genere: '', luogo: '', citta: '', data: '', inEvidenza: false, accontoEur: 10, immagini: [], tragitti: [] };
 
 const STEP_WIZARD = [
   { numero: 1, label: 'Info evento' },
@@ -49,7 +49,7 @@ export function SchedaEventoModale({
   onClose: () => void;
   onSalvato: () => void;
 }) {
-  const [tragitti, setTragitti] = useState<Tragitto[]>([]);
+  const [percorsiSalvati, setPercorsiSalvati] = useState<PercorsoSalvato[]>([]);
   const [categorie, setCategorie] = useState<Categoria[]>([]);
   const [layoutDisponibili, setLayoutDisponibili] = useState<LayoutBiglietto[]>([]);
   const [form, setForm] = useState<EventoInput>(VUOTO);
@@ -62,39 +62,54 @@ export function SchedaEventoModale({
   // volta) — una volta creata, i salvataggi successivi la aggiornano
   // invece di crearne una nuova ogni volta.
   const bozzaIdRef = useRef<string | null>(null);
-  const [aggiustiPerTratta, setAggiustiPerTratta] = useState<Record<number, string>>({});
+  const [aggiustiPerTragitto, setAggiustiPerTratta] = useState<Record<number, string>>({});
   // Tratte comprimibili come in Partenze — le nuove restano aperte per
   // poterle compilare subito, le altre si possono chiudere per non
   // dover scorrere tutto quando ce ne sono tante.
-  const [tratteAperte, setTratteAperte] = useState<Set<number>>(new Set());
-  // I viaggi — completamente locali finché non si salva tutto insieme
+  const [tragittiAperti, setTragittiAperti] = useState<Set<number>>(new Set());
+  // I servizi — completamente locali finché non si salva tutto insieme
   // (anche alla primissima creazione dell'evento): quelli già esistenti
   // hanno l'id vero del server, quelli appena aggiunti hanno una
   // chiave temporanea che il backend riconosce come "nuovo" (nessun id).
-  const [viaggi, setViaggi] = useState<{ key: string; id?: string; nome: string; arrivoOrario?: string }[]>(
-    (evento?.prodotti ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoOrario: p.arrivoOrario ?? undefined }))
+  const [servizi, setServizi] = useState<{ key: string; id?: string; nome: string; arrivoOrario?: string }[]>(
+    (evento?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoOrario: p.arrivoOrario ?? undefined }))
   );
+  // Due modalità nettamente separate: con un solo servizio (o nessuno) è
+  // la stessa identica interfaccia di prima, senza nessun concetto di
+  // "servizio" in giro — con più servizi diventano tab, come in Partenze,
+  // ognuna con la propria sezione tragitti dedicata.
+  const [modalitaServizi, setModalitaServizi] = useState<'singolo' | 'multiplo'>(
+    (evento?.servizi ?? []).length > 1 ? 'multiplo' : 'singolo'
+  );
+  const [servizioTabAttivo, setServizioTabAttivo] = useState<string | null>(servizi[0]?.key ?? null);
+  const [rinominaServizioAperto, setRinominaServizioAperto] = useState(false);
 
-  function nuovoViaggio() {
-    const nome = prompt('Nome del viaggio (es. "Bus arrivo 14:00")');
-    if (!nome?.trim()) return;
-    const arrivoOrario = prompt('Orario di arrivo di questo viaggio (facoltativo, es. 14:00)') ?? undefined;
-    setViaggi((prev) => [...prev, { key: `nuovo-${Date.now()}`, nome: nome.trim(), arrivoOrario: arrivoOrario || undefined }]);
+  function nuovoServizio() {
+    const chiave = `nuovo-${Date.now()}`;
+    setServizi((prev) => [...prev, { key: chiave, nome: '', arrivoOrario: undefined }]);
+    setModalitaServizi('multiplo');
+    setServizioTabAttivo(chiave);
+    setRinominaServizioAperto(true); // si apre già pronta per scriverci il nome, niente popup
   }
-  function eliminaViaggioConferma(key: string, nome: string) {
-    if (!confirm(`Eliminare il viaggio "${nome}"? I suoi tragitti non vengono cancellati, tornano "liberi" (senza viaggio) — si elimina davvero solo salvando.`)) return;
-    setViaggi((prev) => prev.filter((v) => v.key !== key));
-    setForm((f) => ({ ...f, linee: (f.linee ?? []).map((l) => l.prodottoId === key ? { ...l, prodottoId: null } : l) }));
+  function rinominaServizio(key: string, nome: string, arrivoOrario?: string) {
+    setServizi((prev) => prev.map((v) => v.key === key ? { ...v, nome, arrivoOrario } : v));
   }
-  function toggleTrattaAperta(idx: number) {
-    setTratteAperte((prev) => {
+  function eliminaServizioConferma(key: string, nome: string) {
+    if (!confirm(`Eliminare il servizio "${nome}"? I suoi tragitti non vengono cancellati, tornano "liberi" (senza servizio) — si elimina davvero solo salvando.`)) return;
+    const rimasti = servizi.filter((v) => v.key !== key);
+    setServizi(rimasti);
+    setForm((f) => ({ ...f, tragitti: (f.tragitti ?? []).map((l) => l.servizioId === key ? { ...l, servizioId: null } : l) }));
+    setServizioTabAttivo(rimasti[0]?.key ?? 'liberi');
+  }
+  function toggleTragittoAperto(idx: number) {
+    setTragittiAperti((prev) => {
       const nuovo = new Set(prev);
       if (nuovo.has(idx)) nuovo.delete(idx); else nuovo.add(idx);
       return nuovo;
     });
   }
   const [nuovaImmagine, setNuovaImmagine] = useState('');
-  const [trascinata, setTrascinata] = useState<{ linea: number; fermata: number } | null>(null);
+  const [trascinata, setTrascinata] = useState<{ tragitto: number; fermata: number } | null>(null);
   const [statoRicalcolo, setStatoRicalcolo] = useState<Record<number, string>>({});
   const [ricalcolando, setRicalcolando] = useState<Record<number, boolean>>({});
   const [formIniziale, setFormIniziale] = useState('');
@@ -104,7 +119,7 @@ export function SchedaEventoModale({
   }
 
   useEffect(() => {
-    tragittiApi.list().then(setTragitti);
+    percorsiSalvatiApi.list().then(setPercorsiSalvati);
     layoutBigliettoApi.list().then(setLayoutDisponibili).catch(() => setLayoutDisponibili([]));
     ricaricaCategorie();
     let nuovoForm: EventoInput;
@@ -124,9 +139,9 @@ export function SchedaEventoModale({
         ticketImmagineSfondoUrl: evento.ticketImmagineSfondoUrl ?? undefined,
         layoutBigliettoId: evento.layoutBigliettoId,
         immagini: [...evento.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
-        linee: evento.linee.map((l) => ({
+        tragitti: evento.tragitti.map((l) => ({
           id: l.id,
-          prodottoId: l.prodottoId,
+          servizioId: l.servizioId,
           nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra),
           // Normalizzo qui il prezzo che arriva dal server: se una fermata
           // non ne aveva uno salvato, arriva `null`, non `undefined` — va
@@ -140,7 +155,10 @@ export function SchedaEventoModale({
       setStep(1);
     }
     setForm(nuovoForm);
-    setViaggi((evento?.prodotti ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoOrario: p.arrivoOrario ?? undefined })));
+    const serviziCaricati = (evento?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoOrario: p.arrivoOrario ?? undefined }));
+    setServizi(serviziCaricati);
+    setModalitaServizi(serviziCaricati.length > 1 ? 'multiplo' : 'singolo');
+    setServizioTabAttivo(serviziCaricati[0]?.key ?? null);
     setFormIniziale(JSON.stringify(nuovoForm));
     setAggiustiPerTratta({});
     setStatoRicalcolo({});
@@ -148,47 +166,47 @@ export function SchedaEventoModale({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evento?.id]);
 
-  function aggiornaLinea(idx: number, campo: keyof LineaInput, valore: string | number) {
-    const linee = [...(form.linee ?? [])];
-    linee[idx] = { ...linee[idx], [campo]: valore };
-    setForm({ ...form, linee });
+  function aggiornaTragitto(idx: number, campo: keyof TragittoInput, valore: string | number) {
+    const tragitti = [...(form.tragitti ?? [])];
+    tragitti[idx] = { ...tragitti[idx], [campo]: valore };
+    setForm({ ...form, tragitti });
   }
-  function aggiungiFermata(idxLinea: number) {
-    const linee = [...(form.linee ?? [])];
-    const fermate = [...linee[idxLinea].fermate, { citta: '', indirizzo: '' } as FermataInput];
-    linee[idxLinea] = { ...linee[idxLinea], fermate };
-    setForm({ ...form, linee });
+  function aggiungiFermata(idxTragitto: number) {
+    const tragitti = [...(form.tragitti ?? [])];
+    const fermate = [...tragitti[idxTragitto].fermate, { citta: '', indirizzo: '' } as FermataInput];
+    tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate };
+    setForm({ ...form, tragitti });
   }
-  function aggiornaFermata(idxLinea: number, idxFermata: number, campo: keyof FermataInput, valore: string) {
-    const linee = [...(form.linee ?? [])];
-    const fermate = [...linee[idxLinea].fermate];
+  function aggiornaFermata(idxTragitto: number, idxFermata: number, campo: keyof FermataInput, valore: string) {
+    const tragitti = [...(form.tragitti ?? [])];
+    const fermate = [...tragitti[idxTragitto].fermate];
     fermate[idxFermata] = { ...fermate[idxFermata], [campo]: (campo === 'prezzo' || campo === 'postiMax') ? (Number(valore) || undefined) : valore };
-    linee[idxLinea] = { ...linee[idxLinea], fermate };
-    setForm({ ...form, linee });
+    tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate };
+    setForm({ ...form, tragitti });
   }
-  function rimuoviFermata(idxLinea: number, idxFermata: number) {
-    const linee = [...(form.linee ?? [])];
-    const fermate = linee[idxLinea].fermate.filter((_, i) => i !== idxFermata);
-    linee[idxLinea] = { ...linee[idxLinea], fermate: fermate.length ? fermate : [{ citta: '', indirizzo: '' }] };
-    setForm({ ...form, linee });
+  function rimuoviFermata(idxTragitto: number, idxFermata: number) {
+    const tragitti = [...(form.tragitti ?? [])];
+    const fermate = tragitti[idxTragitto].fermate.filter((_, i) => i !== idxFermata);
+    tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate: fermate.length ? fermate : [{ citta: '', indirizzo: '' }] };
+    setForm({ ...form, tragitti });
   }
-  function rimuoviLinea(idxLinea: number) {
-    const linee = (form.linee ?? []).filter((_, i) => i !== idxLinea);
-    setForm({ ...form, linee });
+  function rimuoviTragitto(idxTragitto: number) {
+    const tragitti = (form.tragitti ?? []).filter((_, i) => i !== idxTragitto);
+    setForm({ ...form, tragitti });
   }
 
   // ---- Riordino fermate trascinandole (drag & drop nativo, senza librerie) ----
-  function onDragStart(idxLinea: number, idxFermata: number) {
-    setTrascinata({ linea: idxLinea, fermata: idxFermata });
+  function onDragStart(idxTragitto: number, idxFermata: number) {
+    setTrascinata({ tragitto: idxTragitto, fermata: idxFermata });
   }
-  function onDropSu(idxLinea: number, idxFermataDestinazione: number) {
-    if (!trascinata || trascinata.linea !== idxLinea) { setTrascinata(null); return; }
-    const linee = [...(form.linee ?? [])];
-    const fermate = [...linee[idxLinea].fermate];
+  function onDropSu(idxTragitto: number, idxFermataDestinazione: number) {
+    if (!trascinata || trascinata.tragitto !== idxTragitto) { setTrascinata(null); return; }
+    const tragitti = [...(form.tragitti ?? [])];
+    const fermate = [...tragitti[idxTragitto].fermate];
     const [spostata] = fermate.splice(trascinata.fermata, 1);
     fermate.splice(idxFermataDestinazione, 0, spostata);
-    linee[idxLinea] = { ...linee[idxLinea], fermate };
-    setForm({ ...form, linee });
+    tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate };
+    setForm({ ...form, tragitti });
     setTrascinata(null);
   }
 
@@ -197,36 +215,47 @@ export function SchedaEventoModale({
    *  modificabili liberamente senza toccare il tragitto originale. I
    *  tragitti non hanno orari: l'arrivo (unico per tutto l'evento) va
    *  compilato una volta sola nel box qui sopra. */
-  function aggiungiTrattaDaTragitto(tragitto: Tragitto) {
-    const nuovaLinea: LineaInput = {
-      nome: tragitto.nome,
+  /** Il servizioId da assegnare a un tragitto appena creato: dipende
+   *  dal contesto in cui ci si trova — nessuno in modalità "1 servizio",
+   *  quello della tab attiva in "Più servizi" (o nessuno se sei sulla
+   *  tab "Tragitti liberi"). */
+  function servizioIdContestoAttuale(): string | null {
+    if (modalitaServizi === 'singolo') return null;
+    if (servizioTabAttivo === 'liberi' || !servizioTabAttivo) return null;
+    return servizioTabAttivo;
+  }
+
+  function aggiungiTragittoDaPercorso(percorso: PercorsoSalvato) {
+    const nuovoTragitto: TragittoInput = {
+      nome: percorso.nome,
       postiTotali: 50,
       prezzoExtra: 0,
-      fermate: tragitto.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined })),
+      servizioId: servizioIdContestoAttuale(),
+      fermate: percorso.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined })),
     };
-    setTratteAperte((prev) => new Set(prev).add((form.linee ?? []).length));
-    setForm({ ...form, linee: [...(form.linee ?? []), nuovaLinea] });
+    setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
+    setForm({ ...form, tragitti: [...(form.tragitti ?? []), nuovoTragitto] });
   }
-  function aggiungiTrattaManuale() {
-    setTratteAperte((prev) => new Set(prev).add((form.linee ?? []).length));
-    setForm({ ...form, linee: [...(form.linee ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, fermate: [{ citta: '', indirizzo: '' }] }] });
+  function aggiungiTragittoManuale() {
+    setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
+    setForm({ ...form, tragitti: [...(form.tragitti ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, servizioId: servizioIdContestoAttuale(), fermate: [{ citta: '', indirizzo: '' }] }] });
   }
 
   /** Applica +/- € a tutte le fermate con un prezzo già impostato di
    *  questa tratta (es. +10 aggiunge 10€ ovunque, -5 toglie 5€, mai sotto
    *  zero). Le fermate senza prezzo proprio non vengono toccate. */
-  function aggiustaPrezziTratta(idxLinea: number) {
-    const delta = Number(aggiustiPerTratta[idxLinea]);
+  function aggiustaPrezziTragitto(idxTragitto: number) {
+    const delta = Number(aggiustiPerTragitto[idxTragitto]);
     if (!delta) return;
-    const linee = [...(form.linee ?? [])];
-    linee[idxLinea] = {
-      ...linee[idxLinea],
-      fermate: linee[idxLinea].fermate.map((f) => (
+    const tragitti = [...(form.tragitti ?? [])];
+    tragitti[idxTragitto] = {
+      ...tragitti[idxTragitto],
+      fermate: tragitti[idxTragitto].fermate.map((f) => (
         f.prezzo !== undefined ? { ...f, prezzo: Math.max(0, Number((f.prezzo + delta).toFixed(2))) } : f
       )),
     };
-    setForm({ ...form, linee });
-    setAggiustiPerTratta((s) => ({ ...s, [idxLinea]: '' }));
+    setForm({ ...form, tragitti });
+    setAggiustiPerTratta((s) => ({ ...s, [idxTragitto]: '' }));
   }
 
   /** Ricalcola gli orari di una tratta a ritroso dall'orario di arrivo
@@ -236,16 +265,16 @@ export function SchedaEventoModale({
    *  separato della tratta, non più l'ultima fermata), usando le distanze
    *  reali tra gli indirizzi via Nominatim + OSRM (gratuiti). Tutte le
    *  fermate ricevono un orario calcolato — nessuna è "l'arrivo". */
-  async function ricalcolaOrariTratta(idxLinea: number) {
-    const linea = (form.linee ?? [])[idxLinea];
-    if (!linea) return;
-    const fermateValide = linea.fermate.filter((f) => f.indirizzo.trim());
-    if (fermateValide.length === 0) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: 'Aggiungi almeno una fermata con indirizzo compilato.' })); return; }
-    if (!form.arrivoIndirizzo?.trim()) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: "Inserisci prima l'indirizzo di arrivo qui sopra (vale per tutte le tratte)." })); return; }
-    if (!form.arrivoOrario) { setStatoRicalcolo((s) => ({ ...s, [idxLinea]: "Inserisci prima l'orario di arrivo qui sopra." })); return; }
+  async function ricalcolaOrariTragitto(idxTragitto: number) {
+    const tragitto = (form.tragitti ?? [])[idxTragitto];
+    if (!tragitto) return;
+    const fermateValide = tragitto.fermate.filter((f) => f.indirizzo.trim());
+    if (fermateValide.length === 0) { setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: 'Aggiungi almeno una fermata con indirizzo compilato.' })); return; }
+    if (!form.arrivoIndirizzo?.trim()) { setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: "Inserisci prima l'indirizzo di arrivo qui sopra (vale per tutte le tratte)." })); return; }
+    if (!form.arrivoOrario) { setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: "Inserisci prima l'orario di arrivo qui sopra." })); return; }
 
-    setRicalcolando((s) => ({ ...s, [idxLinea]: true }));
-    setStatoRicalcolo((s) => ({ ...s, [idxLinea]: 'Localizzo gli indirizzi...' }));
+    setRicalcolando((s) => ({ ...s, [idxTragitto]: true }));
+    setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: 'Localizzo gli indirizzi...' }));
 
     // La sequenza da geolocalizzare è: fermate in ordine, poi l'arrivo per
     // ultimo — il viaggio finisce sempre lì.
@@ -260,8 +289,8 @@ export function SchedaEventoModale({
     }
 
     if (problemaRete) {
-      setStatoRicalcolo((s) => ({ ...s, [idxLinea]: 'Richiesta a OpenStreetMap non riuscita (rete/firewall). Apri la Console (F12) per il dettaglio.' }));
-      setRicalcolando((s) => ({ ...s, [idxLinea]: false }));
+      setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: 'Richiesta a OpenStreetMap non riuscita (rete/firewall). Apri la Console (F12) per il dettaglio.' }));
+      setRicalcolando((s) => ({ ...s, [idxTragitto]: false }));
       return;
     }
 
@@ -287,19 +316,19 @@ export function SchedaEventoModale({
     }
 
     let idxValida = 0;
-    const linee = [...(form.linee ?? [])];
-    linee[idxLinea] = {
-      ...linee[idxLinea],
-      fermate: linee[idxLinea].fermate.map((f) => {
+    const tragitti = [...(form.tragitti ?? [])];
+    tragitti[idxTragitto] = {
+      ...tragitti[idxTragitto],
+      fermate: tragitti[idxTragitto].fermate.map((f) => {
         if (!f.indirizzo.trim()) return f;
         const orario = orariCalcolati[idxValida]; idxValida++;
         return orario ? { ...f, orario } : f;
       }),
     };
-    setForm({ ...form, linee });
+    setForm({ ...form, tragitti });
 
-    setStatoRicalcolo((s) => ({ ...s, [idxLinea]: errori ? `Fatto, ma ${errori} indirizzo/i non localizzato/i: controlla a mano.` : 'Orari ricalcolati e applicati.' }));
-    setRicalcolando((s) => ({ ...s, [idxLinea]: false }));
+    setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: errori ? `Fatto, ma ${errori} indirizzo/i non localizzato/i: controlla a mano.` : 'Orari ricalcolati e applicati.' }));
+    setRicalcolando((s) => ({ ...s, [idxTragitto]: false }));
   }
 
   function infoCompleta() {
@@ -369,19 +398,28 @@ export function SchedaEventoModale({
       alert('Compila almeno artista, genere, luogo, città e data.');
       return;
     }
-    if (numeroTratte === 0) {
+    if (numeroTragitti === 0) {
       alert('Aggiungi almeno un tragitto prima di salvare.');
       setStep(2);
       return;
     }
-    for (let i = 0; i < (form.linee ?? []).length; i++) {
-      const linea = (form.linee ?? [])[i];
-      if (!linea.nome.trim()) continue; // tratte vuote (mai compilate) vengono comunque scartate al salvataggio
-      const fermataSenzaOrario = linea.fermate.find((f) => f.citta.trim() && !f.orario?.trim());
+    const servizioSenzaNome = servizi.find((v) => !v.nome.trim());
+    if (servizioSenzaNome) {
+      alert('Dai un nome a tutti i servizi prima di salvare — è un campo obbligatorio, come tutti gli altri.');
+      setStep(2);
+      setModalitaServizi('multiplo');
+      setServizioTabAttivo(servizioSenzaNome.key);
+      setRinominaServizioAperto(true);
+      return;
+    }
+    for (let i = 0; i < (form.tragitti ?? []).length; i++) {
+      const tragitto = (form.tragitti ?? [])[i];
+      if (!tragitto.nome.trim()) continue; // tratte vuote (mai compilate) vengono comunque scartate al salvataggio
+      const fermataSenzaOrario = tragitto.fermate.find((f) => f.citta.trim() && !f.orario?.trim());
       if (fermataSenzaOrario) {
-        alert(`Manca l'orario per la fermata "${fermataSenzaOrario.citta}" nel tragitto "${linea.nome}" — è un campo obbligatorio, come tutti gli altri.`);
+        alert(`Manca l'orario per la fermata "${fermataSenzaOrario.citta}" nel tragitto "${tragitto.nome}" — è un campo obbligatorio, come tutti gli altri.`);
         setStep(2);
-        setTratteAperte((prev) => new Set(prev).add(i));
+        setTragittiAperti((prev) => new Set(prev).add(i));
         return;
       }
     }
@@ -391,19 +429,19 @@ export function SchedaEventoModale({
       setSubTabImmagini('immagini');
       return;
     }
-    const tratteValide = (form.linee ?? [])
+    const tratteValide = (form.tragitti ?? [])
       .filter((l) => l.nome.trim())
       .map((l) => ({ ...l, fermate: l.fermate.filter((f) => f.citta.trim() && f.indirizzo.trim()) }));
     const payload = {
       ...form,
-      // Solo i tragitti liberi restano qui — quelli dentro un viaggio
-      // vanno annidati sotto il loro viaggio, il server li aspetta lì.
-      linee: tratteValide.filter((l) => !l.prodottoId),
-      prodotti: viaggi.map((v) => ({
-        id: v.id, // assente = viaggio nuovo, non ancora salvato
+      // Solo i tragitti liberi restano qui — quelli dentro un servizio
+      // vanno annidati sotto il loro servizio, il server li aspetta lì.
+      tragitti: tratteValide.filter((l) => !l.servizioId),
+      servizi: servizi.map((v) => ({
+        id: v.id, // assente = servizio nuovo, non ancora salvato
         nome: v.nome,
         arrivoOrario: v.arrivoOrario,
-        linee: tratteValide.filter((l) => l.prodottoId === v.key).map((l) => ({ ...l, prodottoId: undefined })),
+        tragitti: tratteValide.filter((l) => l.servizioId === v.key).map((l) => ({ ...l, servizioId: undefined })),
       })),
     };
     try {
@@ -538,88 +576,164 @@ export function SchedaEventoModale({
   const campiTratte: ReactNode = (
     <>
       <div className="section-card" style={{ marginBottom: 16, border: '1px solid var(--pink-dim)' }}>
-        <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>Arrivo (destinazione) — vale per tutte le tratte di questo evento</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr', gap: 8 }}>
+        <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>
+          {modalitaServizi === 'multiplo'
+            ? 'Indirizzo di arrivo — condiviso da tutti i servizi (l\'orario invece si imposta per ogni servizio, qui sotto)'
+            : 'Arrivo (destinazione) — vale per tutte le tratte di questo evento'}
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: modalitaServizi === 'multiplo' ? '1fr' : '1fr .4fr', gap: 8 }}>
           <input placeholder="Indirizzo di arrivo" value={form.arrivoIndirizzo ?? ''} onChange={(e) => setForm({ ...form, arrivoIndirizzo: e.target.value })} />
-          <OrarioInput value={form.arrivoOrario ?? ''} onChange={(v) => setForm({ ...form, arrivoOrario: v })} placeholder="Orario" />
+          {modalitaServizi === 'singolo' && (
+            <OrarioInput value={form.arrivoOrario ?? ''} onChange={(v) => setForm({ ...form, arrivoOrario: v })} placeholder="Orario" />
+          )}
         </div>
       </div>
 
       <div className="section-card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: viaggi.length ? 10 : 0 }}>
-          <p className="section-label" style={{ marginBottom: 0 }}>
-            Viaggi {viaggi.length === 0 && <span style={{ fontWeight: 400, opacity: .7 }}>(facoltativi — solo se questo evento ha più pacchetti bus distinti, es. "arrivo 14:00" e "arrivo 18:00")</span>}
-          </p>
-          <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={nuovoViaggio}>+ Viaggio</button>
+        <p className="section-label" style={{ marginBottom: 10 }}>Quanti servizi ha questo evento?</p>
+        <div className="mini-tabs" style={{ marginBottom: modalitaServizi === 'multiplo' ? 16 : 0 }}>
+          <button
+            type="button"
+            className={`mini-tab${modalitaServizi === 'singolo' ? ' active' : ''}`}
+            onClick={() => setModalitaServizi('singolo')}
+          >
+            Un solo servizio
+          </button>
+          <button
+            type="button"
+            className={`mini-tab${modalitaServizi === 'multiplo' ? ' active' : ''}`}
+            onClick={() => { setModalitaServizi('multiplo'); if (!servizioTabAttivo) setServizioTabAttivo(servizi[0]?.key ?? 'liberi'); }}
+          >
+            Più servizi
+          </button>
         </div>
-        {viaggi.map((v) => (
-          <div key={v.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 13.5 }}>
-            <span>{v.nome}{v.arrivoOrario ? ` — arrivo ${v.arrivoOrario}` : ''}</span>
-            <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => eliminaViaggioConferma(v.key, v.nome)}>Elimina</button>
-          </div>
-        ))}
+
+        {/* In "Un solo servizio" resta comunque possibile aggiungere un
+            secondo servizio in qualsiasi momento — anche a evento già
+            configurato e in vendita: passa da solo alla modalità
+            "Più servizi" con una nuova tab pronta da nominare. */}
+        {modalitaServizi === 'singolo' && (
+          <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, marginTop: 10 }} onClick={nuovoServizio}>
+            + Aggiungi un secondo servizio
+          </button>
+        )}
+
+        {modalitaServizi === 'multiplo' && (
+          <>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              {servizi.map((v) => (
+                <button
+                  key={v.key}
+                  type="button"
+                  className={`mini-tab${servizioTabAttivo === v.key ? ' active' : ''}`}
+                  onClick={() => { setServizioTabAttivo(v.key); setRinominaServizioAperto(false); }}
+                >
+                  {v.nome || 'Senza nome'}
+                </button>
+              ))}
+              {(form.tragitti ?? []).some((t) => !t.servizioId) && (
+                <button
+                  type="button"
+                  className={`mini-tab${servizioTabAttivo === 'liberi' ? ' active' : ''}`}
+                  onClick={() => { setServizioTabAttivo('liberi'); setRinominaServizioAperto(false); }}
+                >
+                  Tragitti liberi
+                </button>
+              )}
+              <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={nuovoServizio}>+ Nuovo servizio</button>
+            </div>
+
+            {servizioTabAttivo && servizioTabAttivo !== 'liberi' && (() => {
+              const servizioCorrente = servizi.find((v) => v.key === servizioTabAttivo);
+              if (!servizioCorrente) return null;
+              return rinominaServizioAperto ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr auto', gap: 8, marginBottom: 14, alignItems: 'center' }}>
+                  <input
+                    placeholder="Nome servizio"
+                    defaultValue={servizioCorrente.nome}
+                    onBlur={(e) => rinominaServizio(servizioCorrente.key, e.target.value, servizioCorrente.arrivoOrario)}
+                    autoFocus
+                  />
+                  <OrarioInput
+                    value={servizioCorrente.arrivoOrario ?? ''}
+                    onChange={(v) => rinominaServizio(servizioCorrente.key, servizioCorrente.nome, v)}
+                    placeholder="Arrivo"
+                  />
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setRinominaServizioAperto(false)}>✓ Fatto</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, fontSize: 13 }}>
+                  <span>{servizioCorrente.nome}{servizioCorrente.arrivoOrario ? ` — arrivo ${servizioCorrente.arrivoOrario}` : ''}</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setRinominaServizioAperto(true)}>Rinomina</button>
+                    <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome)}>Elimina servizio</button>
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        )}
       </div>
 
-      {tragitti.length > 0 && (
+      {percorsiSalvati.length > 0 && (
         <div className="section-card" style={{ marginBottom: 16 }}>
           <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi un tragitto da un percorso salvato</p>
           <select
             value=""
             onChange={(e) => {
-              const t = tragitti.find((x) => x.id === e.target.value);
-              if (t && !(form.linee ?? []).some((l) => l.nome === t.nome)) aggiungiTrattaDaTragitto(t);
+              const t = percorsiSalvati.find((x) => x.id === e.target.value);
+              // Un percorso può essere riusato su servizi diversi (es.
+              // Milano-Roma sia sul servizio delle 14:00 sia su quello
+              // delle 18:00) — non può essere doppio solo dentro lo
+              // STESSO servizio.
+              const contesto = servizioIdContestoAttuale();
+              const giaUsatoQui = (form.tragitti ?? []).some((l) => l.nome === t?.nome && (l.servizioId ?? null) === contesto);
+              if (t && !giaUsatoQui) aggiungiTragittoDaPercorso(t);
             }}
           >
             <option value="">Scegli un tragitto...</option>
-            {tragitti.map((t) => {
-              const giaUsato = (form.linee ?? []).some((l) => l.nome === t.nome);
-              return <option key={t.id} value={t.id} disabled={giaUsato}>{t.nome}{giaUsato ? ' (già aggiunto a questo evento)' : ''}</option>;
+            {percorsiSalvati.map((t) => {
+              const contesto = servizioIdContestoAttuale();
+              const giaUsatoQui = (form.tragitti ?? []).some((l) => l.nome === t.nome && (l.servizioId ?? null) === contesto);
+              return <option key={t.id} value={t.id} disabled={giaUsatoQui}>{t.nome}{giaUsatoQui ? ' (già aggiunto a questo servizio)' : ''}</option>;
             })}
           </select>
         </div>
       )}
 
-      {(form.linee ?? []).map((linea, idxLinea) => {
-        const espansa = tratteAperte.has(idxLinea);
+      {(form.tragitti ?? []).map((tragitto, idxTragitto) => {
+        // Mostra solo i tragitti del contesto giusto: in modalità
+        // "1 servizio" solo quelli liberi, in "Più servizi" solo quelli
+        // della tab scelta (o i liberi, se è quella la tab attiva).
+        if (modalitaServizi === 'singolo' && tragitto.servizioId) return null;
+        if (modalitaServizi === 'multiplo') {
+          const contestoGiusto = servizioTabAttivo === 'liberi' ? !tragitto.servizioId : tragitto.servizioId === servizioTabAttivo;
+          if (!contestoGiusto) return null;
+        }
+        const espansa = tragittiAperti.has(idxTragitto);
         return (
-        <div key={idxLinea} className="section-card">
+        <div key={idxTragitto} className="section-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggleTrattaAperta(idxLinea)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggleTragittoAperto(idxTragitto)}>
               <span style={{ color: 'var(--mist)', fontSize: 13 }}>{espansa ? '▾' : '▸'}</span>
               <div style={{ flex: 1 }}>
-                <b>{linea.nome || 'Tragitto senza nome'}</b>
+                <b>{tragitto.nome || 'Tragitto senza nome'}</b>
                 {!espansa && (
                   <p className="section-sub" style={{ margin: '2px 0 0' }}>
-                    {linea.fermate.length} fermat{linea.fermate.length === 1 ? 'a' : 'e'}
-                    {linea.fermate.some((f) => f.citta) && ` — ${linea.fermate.filter((f) => f.citta).map((f) => `${f.citta}${f.orario ? ` (${f.orario})` : ''}`).join(', ')}`}
+                    {tragitto.fermate.length} fermat{tragitto.fermate.length === 1 ? 'a' : 'e'}
+                    {tragitto.fermate.some((f) => f.citta) && ` — ${tragitto.fermate.filter((f) => f.citta).map((f) => `${f.citta}${f.orario ? ` (${f.orario})` : ''}`).join(', ')}`}
                   </p>
                 )}
               </div>
             </div>
-            <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12.5, flexShrink: 0 }} onClick={() => rimuoviLinea(idxLinea)}>Rimuovi tragitto</button>
+            <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12.5, flexShrink: 0 }} onClick={() => rimuoviTragitto(idxTragitto)}>Rimuovi tragitto</button>
           </div>
 
           {espansa && (
           <>
-          {viaggi.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <label className="field-label" style={{ fontSize: 11 }}>Viaggio</label>
-              <select
-                value={linea.prodottoId ?? ''}
-                onChange={(e) => {
-                  const linee = [...(form.linee ?? [])];
-                  linee[idxLinea] = { ...linee[idxLinea], prodottoId: e.target.value || null };
-                  setForm({ ...form, linee });
-                }}
-              >
-                <option value="">Nessuno (tragitto libero)</option>
-                {viaggi.map((v) => <option key={v.key} value={v.key}>{v.nome}</option>)}
-              </select>
-            </div>
-          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr .6fr', gap: 8, marginBottom: 10 }}>
-            <input placeholder="Nome tragitto" value={linea.nome} onChange={(e) => aggiornaLinea(idxLinea, 'nome', e.target.value)} />
-            <CampoNumero placeholder="Posti totali" value={linea.postiTotali} onChange={(v) => aggiornaLinea(idxLinea, 'postiTotali', v ?? 0)} />
+            <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} />
+            <CampoNumero placeholder="Posti totali" value={tragitto.postiTotali} onChange={(v) => aggiornaTragitto(idxTragitto, 'postiTotali', v ?? 0)} />
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
@@ -627,50 +741,50 @@ export function SchedaEventoModale({
               placeholder="es. +10 o -5"
               type="number"
               style={{ maxWidth: 130 }}
-              value={aggiustiPerTratta[idxLinea] ?? ''}
-              onChange={(e) => setAggiustiPerTratta((s) => ({ ...s, [idxLinea]: e.target.value }))}
+              value={aggiustiPerTragitto[idxTragitto] ?? ''}
+              onChange={(e) => setAggiustiPerTratta((s) => ({ ...s, [idxTragitto]: e.target.value }))}
             />
-            <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiustaPrezziTratta(idxLinea)}>
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiustaPrezziTragitto(idxTragitto)}>
               Applica € a tutte le fermate
             </button>
-            <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => ricalcolaOrariTratta(idxLinea)} disabled={ricalcolando[idxLinea]}>
-              {ricalcolando[idxLinea] ? 'Calcolo orari...' : '↻ Calcola orari dall\'arrivo'}
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => ricalcolaOrariTragitto(idxTragitto)} disabled={ricalcolando[idxTragitto]}>
+              {ricalcolando[idxTragitto] ? 'Calcolo orari...' : '↻ Calcola orari dall\'arrivo'}
             </button>
           </div>
-          {statoRicalcolo[idxLinea] && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoRicalcolo[idxLinea]}</p>}
+          {statoRicalcolo[idxTragitto] && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoRicalcolo[idxTragitto]}</p>}
 
           <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla. Ognuna ha un prezzo — l'arrivo si imposta qui sopra, separatamente.</p>
-          {linea.fermate.map((f, idxFermata) => (
+          {tragitto.fermate.map((f, idxFermata) => (
             <div
               key={idxFermata}
               draggable
-              onDragStart={() => onDragStart(idxLinea, idxFermata)}
+              onDragStart={() => onDragStart(idxTragitto, idxFermata)}
               onDragOver={(e) => e.preventDefault()}
-              onDrop={() => onDropSu(idxLinea, idxFermata)}
+              onDrop={() => onDropSu(idxTragitto, idxFermata)}
               style={{
                 display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr .55fr .55fr .55fr auto', gap: 6, marginBottom: 6, alignItems: 'center',
-                opacity: trascinata?.linea === idxLinea && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
+                opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
               }}
             >
               <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
-              <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'citta', e.target.value)} />
-              <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxLinea, idxFermata, 'indirizzo', e.target.value)} />
-              <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxLinea, idxFermata, 'orario', v)} />
+              <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
+              <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)} />
+              <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'orario', v)} />
               <CampoNumero
                 valuta placeholder="Prezzo"
                 value={f.prezzo}
-                onChange={(v) => aggiornaFermata(idxLinea, idxFermata, 'prezzo', v !== undefined ? String(v) : '')}
+                onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'prezzo', v !== undefined ? String(v) : '')}
               />
               <CampoNumero
                 placeholder="Posti max"
                 title="Facoltativo: limite posti solo per questa fermata. Se vuoto, condivide i posti di tutto il bus."
                 value={f.postiMax ?? undefined}
-                onChange={(v) => aggiornaFermata(idxLinea, idxFermata, 'postiMax', v !== undefined ? String(v) : '')}
+                onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'postiMax', v !== undefined ? String(v) : '')}
               />
-              <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxLinea, idxFermata)} title="Rimuovi fermata">✕</button>
+              <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
             </div>
           ))}
-          <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxLinea)}>+ Aggiungi fermata</button>
+          <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>
           <p className="testo-intro" style={{ fontSize: 11.5, marginTop: 6 }}>
             "Posti max" è facoltativo: mettilo solo se vuoi limitare quante persone possono salire da quella
             città specifica, indipendentemente dai posti liberi sul resto del bus.
@@ -679,7 +793,7 @@ export function SchedaEventoModale({
           )}
         </div>
       );})}
-      <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTrattaManuale}>+ Aggiungi tragitto manuale (senza percorso salvato)</button>
+      <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTragittoManuale}>+ Aggiungi tragitto manuale (senza percorso salvato)</button>
     </>
   );
 
@@ -768,10 +882,10 @@ export function SchedaEventoModale({
     </>
   );
 
-  const numeroTratte = (form.linee ?? []).filter((l) => l.nome.trim()).length;
+  const numeroTragitti = (form.tragitti ?? []).filter((l) => l.nome.trim()).length;
   const stepCompleto: Record<1 | 2 | 3 | 4, boolean> = {
     1: infoCompleta(),
-    2: numeroTratte > 0,
+    2: numeroTragitti > 0,
     3: numeroImmagini > 0 || bigliettoPersonalizzato,
     4: false, // il riepilogo non ha un vero "completato", è solo una vista
   };
@@ -793,7 +907,7 @@ export function SchedaEventoModale({
           </div>
         )}
 
-        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} viaggi={viaggi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} />}
+        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} servizi={servizi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} />}
         {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} />}
         {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}
         {tabAttiva === 'dettagli' && (
@@ -835,7 +949,7 @@ export function SchedaEventoModale({
                 <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? new Date(form.data).toLocaleDateString('it-IT') : '—'}</b></div>
                 <div className="riepilogo-riga-evento"><span>Acconto</span><b>€{Number(form.accontoEur || 10).toFixed(2)}</b></div>
                 <div className="riepilogo-riga-evento"><span>In evidenza</span><b>{form.inEvidenza ? 'Sì' : 'No'}</b></div>
-                <div className="riepilogo-riga-evento"><span>Tragitti</span><b>{numeroTratte > 0 ? `${numeroTratte} configurate` : 'Nessuna'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Tragitti</span><b>{numeroTragitti > 0 ? `${numeroTragitti} configurate` : 'Nessuna'}</b></div>
                 <div className="riepilogo-riga-evento"><span>Immagini</span><b>{(form.immagini ?? []).length}</b></div>
               </div>
             )}
@@ -885,7 +999,7 @@ export function SchedaEventoModale({
           <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? new Date(form.data).toLocaleDateString('it-IT') : '—'}</b></div>
           <div className="riepilogo-riga-evento"><span>Acconto</span><b>€{Number(form.accontoEur || 10).toFixed(2)}</b></div>
           <div className="riepilogo-riga-evento"><span>In evidenza</span><b>{form.inEvidenza ? 'Sì' : 'No'}</b></div>
-          <div className="riepilogo-riga-evento"><span>Tragitti</span><b>{numeroTratte > 0 ? `${numeroTratte} configurate` : 'Nessuna (aggiungibile dopo)'}</b></div>
+          <div className="riepilogo-riga-evento"><span>Tragitti</span><b>{numeroTragitti > 0 ? `${numeroTragitti} configurate` : 'Nessuna (aggiungibile dopo)'}</b></div>
           <div className="riepilogo-riga-evento"><span>Immagini</span><b>{(form.immagini ?? []).length}</b></div>
         </div>
       )}

@@ -52,9 +52,9 @@ eventiRouter.get('/:id/calcola-bus', richiedeAuth, richiedePermesso('eventi.part
 eventiRouter.get('/:id/bus', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaBus));
 eventiRouter.post('/:id/bus', richiedeAuth, richiedePermesso('eventi.crea'), valida(creaBusSchema), asyncHandler(eventiController.creaBus));
 
-eventiRouter.post('/:id/prodotti', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.creaProdotto));
-eventiRouter.put('/:id/prodotti/:prodottoId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.aggiornaProdotto));
-eventiRouter.delete('/:id/prodotti/:prodottoId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.eliminaProdotto));
+eventiRouter.post('/:id/servizi', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.creaServizio));
+eventiRouter.put('/:id/servizi/:servizioId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.aggiornaServizio));
+eventiRouter.delete('/:id/servizi/:servizioId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.eliminaServizio));
 eventiRouter.put('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaBusSchema), asyncHandler(eventiController.aggiornaBus));
 eventiRouter.delete('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.rimuoviBus));
 eventiRouter.get('/:id/bus/:busId/passeggeri', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaPasseggeriBus));

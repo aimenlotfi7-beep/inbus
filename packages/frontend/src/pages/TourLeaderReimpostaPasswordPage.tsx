@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { tourLeaderAuthApi } from '../api/tourLeaderAuth';
+import { erroreValidazionePassword } from '../features/validazionePassword';
 
 export function TourLeaderReimpostaPasswordPage() {
   const { token } = useParams<{ token: string }>();
@@ -14,8 +15,8 @@ export function TourLeaderReimpostaPasswordPage() {
   async function invia(e: React.FormEvent) {
     e.preventDefault();
     setErrore('');
-    if (password.length < 8) { setErrore('La password deve avere almeno 8 caratteri.'); return; }
-    if (password !== conferma) { setErrore('Le due password non coincidono.'); return; }
+    const erroreValidazione = erroreValidazionePassword(password, conferma);
+    if (erroreValidazione) { setErrore(erroreValidazione); return; }
     if (!token) return;
     setCaricamento(true);
     try {

@@ -620,14 +620,14 @@
 .accordion-evento-pulsanti .btn.active{background:var(--pink); border-color:var(--pink); color:#fff;}
 
 /* ---------- CHECKOUT: scelta viaggio (quando l'evento ne ha piu' di uno) ---------- */
-.checkout-viaggio-card{
+.checkout-servizio-card{
   display:flex; flex-direction:column; gap:4px; text-align:left;
   background:#fff; border:1px solid #e5ded0; border-radius:12px; padding:16px 18px; cursor:pointer;
   transition:border-color .15s ease;
 }
-.checkout-viaggio-card:hover{border-color:var(--pink);}
-.checkout-viaggio-card b{font-size:15px;}
-.checkout-viaggio-card span{font-size:12.5px; opacity:.7;}
+.checkout-servizio-card:hover{border-color:var(--pink);}
+.checkout-servizio-card b{font-size:15px;}
+.checkout-servizio-card span{font-size:12.5px; opacity:.7;}
 
 /* ---------- CHECKOUT: metodo di pagamento ---------- */
 .mini-tab{

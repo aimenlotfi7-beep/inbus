@@ -1,6 +1,6 @@
 import { eq, inArray, and, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { busFisici, busTratte, lineeBus, eventi, prenotazioni, partecipantiPrenotazione } from '../../db/schema.js';
+import { busFisici, busTratte, tragitti, eventi, prenotazioni, partecipantiPrenotazione } from '../../db/schema.js';
 import { NonTrovato, VietatoDaiPermessi } from '../../shared/errors.js';
 
 /** Verifica che il bus appartenga davvero a questo tour leader — ogni
@@ -14,11 +14,11 @@ async function verificaProprietaBus(busId: string, tourLeaderId: string) {
   return bus;
 }
 
-/** Id delle tratte (linee) assegnate a questo bus — i passeggeri di
+/** Id dei tragitti assegnati a questo bus — i passeggeri di
  *  QUESTE tratte sono quelli che il tour leader deve controllare. */
 async function tratteDelBus(busId: string): Promise<string[]> {
-  const righe = await db.select({ lineaId: busTratte.lineaId }).from(busTratte).where(eq(busTratte.busId, busId));
-  return righe.map((r) => r.lineaId);
+  const righe = await db.select({ tragittoId: busTratte.tragittoId }).from(busTratte).where(eq(busTratte.busId, busId));
+  return righe.map((r) => r.tragittoId);
 }
 
 export const controlloAccessiService = {
@@ -36,8 +36,8 @@ export const controlloAccessiService = {
       })
       .from(busFisici)
       .innerJoin(busTratte, eq(busTratte.busId, busFisici.id))
-      .innerJoin(lineeBus, eq(lineeBus.id, busTratte.lineaId))
-      .innerJoin(eventi, eq(eventi.id, lineeBus.eventoId))
+      .innerJoin(tragitti, eq(tragitti.id, busTratte.tragittoId))
+      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
       .where(eq(busFisici.tourLeaderId, tourLeaderId));
 
     // Un bus può avere più tratte (quindi più righe qui) — le riduco a
@@ -51,13 +51,13 @@ export const controlloAccessiService = {
    *  quanti sono già saliti (scansionati almeno una volta). */
   async statoBus(busId: string, tourLeaderId: string) {
     const bus = await verificaProprietaBus(busId, tourLeaderId);
-    const lineeIds = await tratteDelBus(busId);
-    if (lineeIds.length === 0) return { riferimento: bus.riferimento, totale: 0, saliti: 0 };
+    const tragittiIds = await tratteDelBus(busId);
+    if (tragittiIds.length === 0) return { riferimento: bus.riferimento, totale: 0, saliti: 0 };
 
     const prenotazioniBus = await db
       .select({ id: prenotazioni.id })
       .from(prenotazioni)
-      .where(and(inArray(prenotazioni.lineaId, lineeIds), eq(prenotazioni.stato, 'CONFERMATA')));
+      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')));
     const prenotazioniIds = prenotazioniBus.map((p) => p.id);
     if (prenotazioniIds.length === 0) return { riferimento: bus.riferimento, totale: 0, saliti: 0 };
 
@@ -86,7 +86,7 @@ export const controlloAccessiService = {
     | { esito: 'non_valido' }
   > {
     await verificaProprietaBus(busId, tourLeaderId);
-    const lineeIds = await tratteDelBus(busId);
+    const tragittiIds = await tratteDelBus(busId);
 
     const [partecipante] = await db
       .select()
@@ -97,7 +97,7 @@ export const controlloAccessiService = {
 
     const [pren] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, partecipante.prenotazioneId)).limit(1);
     if (!pren || pren.stato !== 'CONFERMATA') return { esito: 'non_valido' };
-    if (!lineeIds.includes(pren.lineaId)) return { esito: 'bus_sbagliato' };
+    if (!tragittiIds.includes(pren.tragittoId)) return { esito: 'bus_sbagliato' };
 
     const nome = `${partecipante.nome} ${partecipante.cognome}`;
     if (partecipante.ticketUtilizzatoIl) return { esito: 'gia_a_bordo', nome };
@@ -112,8 +112,8 @@ export const controlloAccessiService = {
   async lineeAssegnate(tourLeaderId: string): Promise<string[]> {
     const busIds = (await db.select({ id: busFisici.id }).from(busFisici).where(eq(busFisici.tourLeaderId, tourLeaderId))).map((b) => b.id);
     if (!busIds.length) return [];
-    const righe = await db.select({ lineaId: busTratte.lineaId }).from(busTratte).where(inArray(busTratte.busId, busIds));
-    return Array.from(new Set(righe.map((r) => r.lineaId)));
+    const righe = await db.select({ tragittoId: busTratte.tragittoId }).from(busTratte).where(inArray(busTratte.busId, busIds));
+    return Array.from(new Set(righe.map((r) => r.tragittoId)));
   },
 
   /** Cerca un passeggero per nome, cognome, PNR o email — su tutte le
@@ -121,13 +121,13 @@ export const controlloAccessiService = {
    *  Serve per il check-in manuale quando il QR non si legge o il
    *  cliente non ce l'ha a portata di mano. */
   async cerca(tourLeaderId: string, query: string) {
-    const lineeIds = await this.lineeAssegnate(tourLeaderId);
-    if (!lineeIds.length || query.trim().length < 2) return [];
+    const tragittiIds = await this.lineeAssegnate(tourLeaderId);
+    if (!tragittiIds.length || query.trim().length < 2) return [];
 
     const prenotazioniAssegnate = await db
       .select()
       .from(prenotazioni)
-      .where(and(inArray(prenotazioni.lineaId, lineeIds), eq(prenotazioni.stato, 'CONFERMATA')));
+      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')));
     if (!prenotazioniAssegnate.length) return [];
 
     const prenotazioniPerId = new Map(prenotazioniAssegnate.map((p) => [p.id, p]));
@@ -164,8 +164,8 @@ export const controlloAccessiService = {
     const [pren] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, partecipante.prenotazioneId)).limit(1);
     if (!pren) throw new NonTrovato('Prenotazione');
 
-    const lineeIds = await this.lineeAssegnate(tourLeaderId);
-    if (!lineeIds.includes(pren.lineaId)) throw new VietatoDaiPermessi('Questo passeggero non è su una tua tratta.');
+    const tragittiIds = await this.lineeAssegnate(tourLeaderId);
+    if (!tragittiIds.includes(pren.tragittoId)) throw new VietatoDaiPermessi('Questo passeggero non è su una tua tratta.');
 
     if (!partecipante.ticketUtilizzatoIl) {
       await db.update(partecipantiPrenotazione).set({ ticketUtilizzatoIl: new Date() }).where(eq(partecipantiPrenotazione.id, partecipanteId));

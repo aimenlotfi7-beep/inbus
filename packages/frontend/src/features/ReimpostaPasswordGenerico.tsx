@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { erroreValidazionePassword } from './validazionePassword';
 
 export function ReimpostaPasswordGenerico({ onConferma, linkDopoSuccesso, etichettaDopoSuccesso, linkIndietro }: {
   onConferma: (token: string, password: string) => Promise<unknown>;
@@ -18,8 +19,8 @@ export function ReimpostaPasswordGenerico({ onConferma, linkDopoSuccesso, etiche
   async function invia(e: React.FormEvent) {
     e.preventDefault();
     setErrore('');
-    if (password.length < 8) { setErrore('La password deve avere almeno 8 caratteri.'); return; }
-    if (password !== conferma) { setErrore('Le due password non coincidono.'); return; }
+    const erroreValidazione = erroreValidazionePassword(password, conferma);
+    if (erroreValidazione) { setErrore(erroreValidazione); return; }
     if (!token) return;
     setCaricamento(true);
     try {

@@ -47,7 +47,7 @@ async function main() {
     inEvidenza: true,
   }).returning();
 
-  const [linea] = await db.insert(schema.lineeBus).values({
+  const [tragitto] = await db.insert(schema.tragitti).values({
     eventoId: evento.id,
     nome: 'Bus Milano-Roma',
     postiTotali: 50,
@@ -56,9 +56,9 @@ async function main() {
   }).returning();
 
   await db.insert(schema.fermate).values([
-    { lineaId: linea.id, ordine: 0, citta: 'Milano', indirizzo: 'Piazzale Lotto', orario: '06:00' },
-    { lineaId: linea.id, ordine: 1, citta: 'Bologna', indirizzo: 'Stazione Centrale', orario: '08:00' },
-    { lineaId: linea.id, ordine: 2, citta: 'Roma', indirizzo: 'Stadio Olimpico', orario: '12:00' },
+    { tragittoId: tragitto.id, ordine: 0, citta: 'Milano', indirizzo: 'Piazzale Lotto', orario: '06:00' },
+    { tragittoId: tragitto.id, ordine: 1, citta: 'Bologna', indirizzo: 'Stazione Centrale', orario: '08:00' },
+    { tragittoId: tragitto.id, ordine: 2, citta: 'Roma', indirizzo: 'Stadio Olimpico', orario: '12:00' },
   ]);
 
   console.log('Creo le categorie di default...');

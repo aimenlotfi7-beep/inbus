@@ -3,7 +3,7 @@ import type { Prenotazione } from './types';
 
 export interface CreaPrenotazionePayload {
   eventoId: string;
-  lineaId: string;
+  tragittoId: string;
   fermataId: string;
   passeggeri: number;
   tipoPagamento: 'COMPLETO' | 'ACCONTO';

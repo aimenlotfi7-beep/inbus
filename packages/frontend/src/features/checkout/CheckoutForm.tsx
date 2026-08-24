@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Evento, OpzionePartenza, Prodotto } from '../../api/types';
+import type { Evento, OpzionePartenza, Servizio } from '../../api/types';
 import { eventiApi } from '../../api/eventi';
 import { prenotazioniApi } from '../../api/prenotazioni';
 import { listaAttesaApi } from '../../api/listaAttesa';
@@ -33,11 +33,11 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   // proprio questo il bug: entrambi mostravano "Invio..." a prescindere
   // da quale avesse premuto davvero il cliente).
   const [azioneInCorso, setAzioneInCorso] = useState<'acquista' | 'prenota' | 'lista-attesa' | null>(null);
-  // Se l'evento ha più di un viaggio, prima bisogna sceglierne uno —
+  // Se l'evento ha più di un servizio, prima bisogna sceglierne uno —
   // diventa a tutti gli effetti un quarto step, prima degli altri tre.
-  // Con zero o un solo viaggio, si passa dritti come sempre.
-  const multiViaggio = evento.prodotti.length >= 2;
-  const [viaggioScelto, setViaggioScelto] = useState<Prodotto | null>(multiViaggio ? null : (evento.prodotti[0] ?? null));
+  // Con zero o un solo servizio, si passa dritti come sempre.
+  const multiServizio = evento.servizi.length >= 2;
+  const [servizioScelto, setServizioScelto] = useState<Servizio | null>(multiServizio ? null : (evento.servizi[0] ?? null));
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [opzioni, setOpzioni] = useState<OpzionePartenza[]>([]);
   const [fermataId, setFermataId] = useState('');
@@ -67,17 +67,17 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
   const [metodoPagamento, setMetodoPagamento] = useState<'carta' | 'apple' | 'google'>('carta');
 
   useEffect(() => {
-    // Se serve ancora scegliere il viaggio, non c'è ancora nulla da
+    // Se serve ancora scegliere il servizio, non c'è ancora nulla da
     // caricare — si aspetta la scelta.
-    if (multiViaggio && !viaggioScelto) { setStato('pronto'); return; }
+    if (multiServizio && !servizioScelto) { setStato('pronto'); return; }
     setStato('caricamento');
-    eventiApi.opzioniPartenza(evento.id, viaggioScelto?.id).then((o) => {
+    eventiApi.opzioniPartenza(evento.id, servizioScelto?.id).then((o) => {
       setOpzioni(o);
       const primaConPosti = o.find((x) => x.postiDisponibili > 0);
       setFermataId((primaConPosti ?? o[0])?.fermataId ?? '');
       setStato('pronto');
     });
-  }, [evento.id, viaggioScelto?.id, multiViaggio]);
+  }, [evento.id, servizioScelto?.id, multiServizio]);
 
   useEffect(() => {
     setPartecipanti((prev) => {
@@ -165,7 +165,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
       const utmContent = parametriUrl.get('utm_content') || undefined;
       const prenotazione = await prenotazioniApi.crea({
         eventoId: evento.id,
-        lineaId: opzioneScelta.lineaId,
+        tragittoId: opzioneScelta.tragittoId,
         fermataId: opzioneScelta.fermataId,
         passeggeri,
         tipoPagamento,
@@ -197,7 +197,7 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
     try {
       await listaAttesaApi.iscriviti({
         eventoId: evento.id,
-        lineaId: opzioneScelta?.lineaId,
+        tragittoId: opzioneScelta?.tragittoId,
         fermataId: opzioneScelta?.fermataId,
         passeggeri,
         cliente: { email, nome, cognome, telefono },
@@ -249,14 +249,14 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
       {stato !== 'caricamento' && (
         <>
           <div className="checkout-stepper">
-            {(multiViaggio
-              ? [{ numero: 0, label: 'Il tuo viaggio' }, { numero: 1, label: 'Fermata e passeggeri' }, { numero: 2, label: 'I tuoi dati' }, { numero: 3, label: 'Pagamento' }]
+            {(multiServizio
+              ? [{ numero: 0, label: 'Il tuo servizio' }, { numero: 1, label: 'Fermata e passeggeri' }, { numero: 2, label: 'I tuoi dati' }, { numero: 3, label: 'Pagamento' }]
               : [{ numero: 1, label: 'Fermata e passeggeri' }, { numero: 2, label: 'I tuoi dati' }, { numero: 3, label: 'Pagamento' }]
             ).map((s) => {
-              const stepAttuale = multiViaggio ? (viaggioScelto ? step : 0) : step;
+              const stepAttuale = multiServizio ? (servizioScelto ? step : 0) : step;
               return (
                 <div key={s.numero} className={`checkout-step-dot${stepAttuale === s.numero ? ' active' : stepAttuale > s.numero ? ' completato' : ''}`}>
-                  <span>{stepAttuale > s.numero ? '✓' : s.numero + (multiViaggio ? 1 : 0)}</span> {s.label}
+                  <span>{stepAttuale > s.numero ? '✓' : s.numero + (multiServizio ? 1 : 0)}</span> {s.label}
                 </div>
               );
             })}
@@ -271,26 +271,26 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
               <b>{evento.artista}</b>
               <span className="checkout-riepilogo-riga">
                 {new Date(evento.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
-                {viaggioScelto && ` · ${viaggioScelto.nome}`}
-                {(viaggioScelto?.arrivoOrario ?? (!multiViaggio ? evento.prodotti[0]?.arrivoOrario : null)) && (
-                  <> · arrivo {viaggioScelto?.arrivoOrario ?? evento.prodotti[0]?.arrivoOrario}</>
+                {servizioScelto && ` · ${servizioScelto.nome}`}
+                {(servizioScelto?.arrivoOrario ?? (!multiServizio ? evento.servizi[0]?.arrivoOrario : null)) && (
+                  <> · arrivo {servizioScelto?.arrivoOrario ?? evento.servizi[0]?.arrivoOrario}</>
                 )}
                 {opzioneScelta && ` · ${opzioneScelta.fermataCitta} → ${evento.citta}`}
-                {viaggioScelto || !multiViaggio ? ` · ${passeggeri} passegger${passeggeri > 1 ? 'i' : 'o'}` : ''}
+                {servizioScelto || !multiServizio ? ` · ${passeggeri} passegger${passeggeri > 1 ? 'i' : 'o'}` : ''}
               </span>
             </div>
             {opzioneScelta && <div className="checkout-riepilogo-totale">€{(step === 3 ? totaleConCredito : totale).toFixed(2)}</div>}
           </div>
 
-          {multiViaggio && !viaggioScelto && (
+          {multiServizio && !servizioScelto && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <p style={{ fontSize: 13.5, opacity: .75, marginTop: -6 }}>Questo evento ha più opzioni di viaggio — scegli quella che preferisci.</p>
-              {evento.prodotti.map((v) => (
+              <p style={{ fontSize: 13.5, opacity: .75, marginTop: -6 }}>Questo evento ha più opzioni di servizio — scegli quella che preferisci.</p>
+              {evento.servizi.map((v) => (
                 <button
                   key={v.id}
                   type="button"
-                  className="checkout-viaggio-card"
-                  onClick={() => setViaggioScelto(v)}
+                  className="checkout-servizio-card"
+                  onClick={() => setServizioScelto(v)}
                 >
                   <b>{v.nome}</b>
                   {v.arrivoOrario && <span>Arrivo previsto alle {v.arrivoOrario}</span>}
@@ -299,13 +299,13 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
             </div>
           )}
 
-          {(!multiViaggio || viaggioScelto) && (
+          {(!multiServizio || servizioScelto) && (
           <>
           {step === 1 && (
             <>
-              {multiViaggio && (
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, marginBottom: 12, padding: '5px 10px' }} onClick={() => setViaggioScelto(null)}>
-                  ← Cambia viaggio
+              {multiServizio && (
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, marginBottom: 12, padding: '5px 10px' }} onClick={() => setServizioScelto(null)}>
+                  ← Cambia servizio
                 </button>
               )}
               {tutteEsaurite && (

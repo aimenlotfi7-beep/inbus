@@ -13,7 +13,7 @@ import { PagamentiScreen } from './screens/PagamentiScreen';
 import { RimborsiScreen } from './screens/RimborsiScreen';
 import { UtentiScreen } from './screens/UtentiScreen';
 import { FornitoriScreen } from './screens/FornitoriScreen';
-import { TragittiScreen } from './screens/TragittiScreen';
+import { PercorsiSalvatiScreen } from './screens/PercorsiSalvatiScreen';
 import { PromoterScreen } from './screens/PromoterScreen';
 import { TourLeaderScreen } from './screens/TourLeaderScreen';
 import { CouponScreen } from './screens/CouponScreen';
@@ -45,7 +45,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   rimborsi: RimborsiScreen,
   utenti: UtentiScreen,
   fornitori: FornitoriScreen,
-  tragitti: TragittiScreen,
+  tragitti: PercorsiSalvatiScreen,
   promoter: PromoterScreen,
   tourleader: TourLeaderScreen,
   coupon: CouponScreen,

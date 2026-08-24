@@ -50,7 +50,7 @@ export const eventiController = {
   },
 
   async opzioniPartenza(req: Request, res: Response) {
-    const opzioni = await eventiService.opzioniPartenza(req.params.id, req.query.prodottoId as string | undefined);
+    const opzioni = await eventiService.opzioniPartenza(req.params.id, req.query.servizioId as string | undefined);
     res.json(opzioni);
   },
 
@@ -67,15 +67,15 @@ export const eventiController = {
     res.status(201).json({ id: busId });
   },
 
-  async creaProdotto(req: Request, res: Response) {
-    const nuovo = await eventiService.creaProdotto(req.params.id, req.body.nome, req.body.arrivoOrario);
+  async creaServizio(req: Request, res: Response) {
+    const nuovo = await eventiService.creaServizio(req.params.id, req.body.nome, req.body.arrivoOrario);
     res.status(201).json(nuovo);
   },
-  async aggiornaProdotto(req: Request, res: Response) {
-    res.json(await eventiService.aggiornaProdotto(req.params.prodottoId, req.body));
+  async aggiornaServizio(req: Request, res: Response) {
+    res.json(await eventiService.aggiornaServizio(req.params.servizioId, req.body));
   },
-  async eliminaProdotto(req: Request, res: Response) {
-    await eventiService.eliminaProdotto(req.params.prodottoId);
+  async eliminaServizio(req: Request, res: Response) {
+    await eventiService.eliminaServizio(req.params.servizioId);
     res.status(204).send();
   },
 

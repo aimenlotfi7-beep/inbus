@@ -1,6 +1,6 @@
 import { and, eq, sql, desc, inArray } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { prenotazioni, lineeBus, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento } from '../../db/schema.js';
+import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { couponService } from '../coupon/coupon.service.js';
@@ -29,9 +29,9 @@ async function validaCoupon(codice: string | undefined, importo: number, eventoI
  *  sconto verrebbe chiesto il saldo pieno, senza sconto, per errore. */
 async function calcolaTotaleReale(p: typeof prenotazioni.$inferSelect) {
   const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
-  const [linea] = await db.select().from(lineeBus).where(eq(lineeBus.id, p.lineaId)).limit(1);
-  const [fermata] = await db.select().from(fermate).where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.lineaId, p.lineaId))).limit(1);
-  const prezzoNormale = prezzoNormaleFermata(fermata, evento, linea);
+  const [tragitto] = await db.select().from(tragitti).where(eq(tragitti.id, p.tragittoId)).limit(1);
+  const [fermata] = await db.select().from(fermate).where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.tragittoId, p.tragittoId))).limit(1);
+  const prezzoNormale = prezzoNormaleFermata(fermata, evento, tragitto);
 
   let prezzoEffettivo = prezzoNormale;
   if (p.offertaId) {
@@ -58,19 +58,19 @@ export const prenotazioniService = {
       if (!utente) throw new NonAutorizzato('Account non trovato — effettua di nuovo il login.');
 
       const [fermata] = await tx.select().from(fermate).where(eq(fermate.id, input.fermataId)).limit(1);
-      if (!fermata || fermata.lineaId !== input.lineaId) throw new NonTrovato('Fermata');
+      if (!fermata || fermata.tragittoId !== input.tragittoId) throw new NonTrovato('Fermata');
 
-      const [linea] = await tx.select().from(lineeBus).where(eq(lineeBus.id, input.lineaId)).limit(1);
-      if (!linea || linea.eventoId !== input.eventoId) throw new NonTrovato('Bus');
+      const [tragitto] = await tx.select().from(tragitti).where(eq(tragitti.id, input.tragittoId)).limit(1);
+      if (!tragitto || tragitto.eventoId !== input.eventoId) throw new NonTrovato('Bus');
 
       const [evento] = await tx.select().from(eventi).where(eq(eventi.id, input.eventoId)).limit(1);
       if (!evento) throw new NonTrovato('Evento');
 
       // --- Blocco posti atomico sul bus (come prima) ---
       const righeAggiornate = await tx
-        .update(lineeBus)
-        .set({ postiDisponibili: sql`${lineeBus.postiDisponibili} - ${input.passeggeri}` })
-        .where(and(eq(lineeBus.id, input.lineaId), sql`${lineeBus.postiDisponibili} >= ${input.passeggeri}`))
+        .update(tragitti)
+        .set({ postiDisponibili: sql`${tragitti.postiDisponibili} - ${input.passeggeri}` })
+        .where(and(eq(tragitti.id, input.tragittoId), sql`${tragitti.postiDisponibili} >= ${input.passeggeri}`))
         .returning();
 
       if (righeAggiornate.length === 0) {
@@ -96,14 +96,14 @@ export const prenotazioniService = {
           // Il posto sul bus l'avevamo già preso: lo restituiamo, non ha
           // senso tenerlo bloccato per una prenotazione che non va a buon fine.
           await tx
-            .update(lineeBus)
-            .set({ postiDisponibili: sql`${lineeBus.postiDisponibili} + ${input.passeggeri}` })
-            .where(eq(lineeBus.id, input.lineaId));
+            .update(tragitti)
+            .set({ postiDisponibili: sql`${tragitti.postiDisponibili} + ${input.passeggeri}` })
+            .where(eq(tragitti.id, input.tragittoId));
           throw new ConflittoDati('Posti non più disponibili su questa fermata: qualcun altro li ha appena prenotati.');
         }
       }
 
-      const prezzoNormale = prezzoNormaleFermata(fermata, evento, linea);
+      const prezzoNormale = prezzoNormaleFermata(fermata, evento, tragitto);
       // Se la prenotazione arriva da un link con offerta dedicata, lo
       // sconto percentuale dell'offerta si applica al prezzo normale
       // della fermata scelta (non è un prezzo fisso: il prezzo varia
@@ -155,14 +155,14 @@ export const prenotazioniService = {
         .values({
           pnr: generaPnr(),
           eventoId: input.eventoId,
-          lineaId: input.lineaId,
+          tragittoId: input.tragittoId,
           fermataCitta: fermata.citta,
           fermataIndirizzo: fermata.indirizzo,
           fermataOrario: fermata.orario,
           orarioRitorno: fermata.orarioRitorno,
           indirizzoRitorno: fermata.indirizzoRitorno,
-          referenteNome: linea.referenteNome,
-          referenteTelefono: linea.referenteTelefono,
+          referenteNome: tragitto.referenteNome,
+          referenteTelefono: tragitto.referenteTelefono,
           passeggeri: input.passeggeri,
           totale: (input.tipoPagamento === 'ACCONTO' ? acconto : totale - creditoUsato).toFixed(2),
           sconto: sconto.toFixed(2),
@@ -371,9 +371,9 @@ export const prenotazioniService = {
       if (p.stato === 'CANCELLATA') return p;
 
       await tx
-        .update(lineeBus)
-        .set({ postiDisponibili: sql`${lineeBus.postiDisponibili} + ${p.passeggeri}` })
-        .where(eq(lineeBus.id, p.lineaId));
+        .update(tragitti)
+        .set({ postiDisponibili: sql`${tragitti.postiDisponibili} + ${p.passeggeri}` })
+        .where(eq(tragitti.id, p.tragittoId));
 
       // Se la fermata aveva un suo limite specifico, restituisco il
       // posto anche lì, altrimenti quella fermata resterebbe segnata
@@ -383,7 +383,7 @@ export const prenotazioniService = {
       await tx
         .update(fermate)
         .set({ postiPrenotati: sql`GREATEST(0, ${fermate.postiPrenotati} - ${p.passeggeri})` })
-        .where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.lineaId, p.lineaId), sql`${fermate.postiMax} IS NOT NULL`));
+        .where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.tragittoId, p.tragittoId), sql`${fermate.postiMax} IS NOT NULL`));
 
       const [aggiornata] = await tx
         .update(prenotazioni)

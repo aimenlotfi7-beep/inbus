@@ -2,9 +2,9 @@ import type { Evento } from '../api/types';
 
 const SOGLIA_ULTIMI_POSTI = 5;
 
-function postiRealiFermata(fermata: { postiMax: number | null; postiPrenotati: number }, postiLinea: number) {
+function postiRealiFermata(fermata: { postiMax: number | null; postiPrenotati: number }, postiTragitto: number) {
   if (fermata.postiMax !== null) return Math.max(0, fermata.postiMax - fermata.postiPrenotati);
-  return postiLinea;
+  return postiTragitto;
 }
 
 function EtichettaDisponibilita({ posti }: { posti: number }) {
@@ -19,11 +19,11 @@ function EtichettaDisponibilita({ posti }: { posti: number }) {
  *  tratte insieme. Disponibilità reale (calcolata dai posti già
  *  prenotati) ma con dicitura generica, non il numero esatto. */
 export function PercorsoBus({ evento }: { evento: Evento }) {
-  const tutteLeLinee = [...evento.linee, ...evento.prodotti.flatMap((v) => v.linee)];
-  if (!tutteLeLinee.length) return null;
+  const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((v) => v.tragitti)];
+  if (!tuttiITragitti.length) return null;
 
-  const tappe = tutteLeLinee.flatMap((linea) =>
-    linea.fermate.map((f) => ({ ...f, posti: postiRealiFermata(f, linea.postiDisponibili), nomeLinea: linea.nome }))
+  const tappe = tuttiITragitti.flatMap((tragitto) =>
+    tragitto.fermate.map((f) => ({ ...f, posti: postiRealiFermata(f, tragitto.postiDisponibili), nomeTragitto: tragitto.nome }))
   ).sort((a, b) => (a.orario ?? '99:99').localeCompare(b.orario ?? '99:99'));
 
   return (
