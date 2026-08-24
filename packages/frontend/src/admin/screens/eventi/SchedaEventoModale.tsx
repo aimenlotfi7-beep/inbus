@@ -78,9 +78,11 @@ export function SchedaEventoModale({
   // la stessa identica interfaccia di prima, senza nessun concetto di
   // "servizio" in giro — con più servizi diventano tab, come in Partenze,
   // ognuna con la propria sezione tragitti dedicata.
-  const [modalitaServizi, setModalitaServizi] = useState<'singolo' | 'multiplo'>(
-    (evento?.servizi ?? []).length > 1 ? 'multiplo' : 'singolo'
-  );
+  const [modalitaServizi, setModalitaServizi] = useState<'singolo' | 'multiplo' | null>(() => {
+    if ((evento?.servizi ?? []).length >= 1) return 'multiplo';
+    if ((evento?.tragitti ?? []).some((t) => !t.servizioId)) return 'singolo';
+    return null; // evento nuovo, senza nessun tragitto ancora — aspetta la scelta
+  });
   const [servizioTabAttivo, setServizioTabAttivo] = useState<string | null>(servizi[0]?.key ?? null);
   const [rinominaServizioAperto, setRinominaServizioAperto] = useState(false);
 
@@ -157,7 +159,9 @@ export function SchedaEventoModale({
     setForm(nuovoForm);
     const serviziCaricati = (evento?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoOrario: p.arrivoOrario ?? undefined }));
     setServizi(serviziCaricati);
-    setModalitaServizi(serviziCaricati.length > 1 ? 'multiplo' : 'singolo');
+    setModalitaServizi(
+      serviziCaricati.length >= 1 ? 'multiplo' : ((nuovoForm.tragitti ?? []).some((t) => !t.servizioId) ? 'singolo' : null)
+    );
     setServizioTabAttivo(serviziCaricati[0]?.key ?? null);
     setFormIniziale(JSON.stringify(nuovoForm));
     setAggiustiPerTratta({});
@@ -647,7 +651,7 @@ export function SchedaEventoModale({
               const servizioCorrente = servizi.find((v) => v.key === servizioTabAttivo);
               if (!servizioCorrente) return null;
               return rinominaServizioAperto ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr auto', gap: 8, marginBottom: 14, alignItems: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr auto auto', gap: 8, marginBottom: 14, alignItems: 'center' }}>
                   <input
                     placeholder="Nome servizio"
                     defaultValue={servizioCorrente.nome}
@@ -660,6 +664,7 @@ export function SchedaEventoModale({
                     placeholder="Arrivo"
                   />
                   <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setRinominaServizioAperto(false)}>✓ Fatto</button>
+                  <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome || 'senza nome')}>Elimina</button>
                 </div>
               ) : (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, fontSize: 13 }}>
@@ -675,6 +680,14 @@ export function SchedaEventoModale({
         )}
       </div>
 
+      {modalitaServizi === null && (
+        <p className="testo-intro" style={{ marginBottom: 16 }}>
+          Scegli sopra "Un solo servizio" o "Più servizi" per iniziare ad aggiungere i tragitti.
+        </p>
+      )}
+
+      {modalitaServizi !== null && (
+      <>
       {percorsiSalvati.length > 0 && (
         <div className="section-card" style={{ marginBottom: 16 }}>
           <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi un tragitto da un percorso salvato</p>
@@ -794,6 +807,8 @@ export function SchedaEventoModale({
         </div>
       );})}
       <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTragittoManuale}>+ Aggiungi tragitto manuale (senza percorso salvato)</button>
+      </>
+      )}
     </>
   );
 
