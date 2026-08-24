@@ -407,6 +407,11 @@ export function SchedaEventoModale({
       setStep(2);
       return;
     }
+    if (modalitaServizi === 'multiplo' && servizi.length < 2) {
+      alert('Hai scelto "Più servizi" ma ne hai creato solo uno — aggiungine almeno un secondo, oppure torna su "Un solo servizio".');
+      setStep(2);
+      return;
+    }
     const servizioSenzaNome = servizi.find((v) => !v.nome.trim());
     if (servizioSenzaNome) {
       alert('Dai un nome a tutti i servizi prima di salvare — è un campo obbligatorio, come tutti gli altri.');
@@ -577,6 +582,14 @@ export function SchedaEventoModale({
     </>
   );
 
+  // In "Più servizi", vero solo se la tab scelta esiste ma non ha
+  // ancora un nome — a quel punto la sezione di compilazione resta
+  // nascosta finché non lo scrivi.
+  const servizioAttivoCorrente = modalitaServizi === 'multiplo' && servizioTabAttivo && servizioTabAttivo !== 'liberi'
+    ? servizi.find((v) => v.key === servizioTabAttivo)
+    : undefined;
+  const servizioSenzaNomeAttivo = !!servizioAttivoCorrente && !servizioAttivoCorrente.nome.trim();
+
   const campiTratte: ReactNode = (
     <>
       <div className="section-card" style={{ marginBottom: 16, border: '1px solid var(--pink-dim)' }}>
@@ -630,7 +643,7 @@ export function SchedaEventoModale({
                   key={v.key}
                   type="button"
                   className={`mini-tab${servizioTabAttivo === v.key ? ' active' : ''}`}
-                  onClick={() => { setServizioTabAttivo(v.key); setRinominaServizioAperto(false); }}
+                  onClick={() => { setServizioTabAttivo(v.key); setRinominaServizioAperto(!v.nome.trim()); }}
                 >
                   {v.nome || 'Senza nome'}
                 </button>
@@ -686,7 +699,15 @@ export function SchedaEventoModale({
         </p>
       )}
 
-      {modalitaServizi !== null && (
+      {/* In "Più servizi", finché la tab scelta non ha un nome, non si
+          vede ancora la sezione di compilazione — prima si nomina, poi
+          si compila, un passo alla volta. */}
+      {(() => {
+        if (!servizioSenzaNomeAttivo) return null;
+        return <p className="testo-intro" style={{ marginBottom: 16 }}>Dai un nome a questo servizio qui sopra per iniziare a compilarlo.</p>;
+      })()}
+
+      {modalitaServizi !== null && !servizioSenzaNomeAttivo && (
       <>
       {percorsiSalvati.length > 0 && (
         <div className="section-card" style={{ marginBottom: 16 }}>
