@@ -6,6 +6,7 @@ import { RicercaSezione } from '../shared/RicercaSezione';
 import { CampoNumero } from '../shared/CampoNumero';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
+import { CampoCopiabile } from '../shared/CampoCopiabile';
 
 const VUOTO: PromoterInput = { nome: '', email: '', password: '', commissionePercentuale: 10 };
 
@@ -70,6 +71,9 @@ export function PromoterScreen() {
   return (
     <div>
       <PanelHead titolo="Promoter" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo promoter</button>} />
+      <div style={{ maxWidth: 480, marginBottom: 20 }}>
+        <CampoCopiabile etichetta="Link di accesso per i promoter" valore={`${window.location.origin}/promoter`} />
+      </div>
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o codice..." />
       <TabellaGenerica
         righe={promoterFiltrati}

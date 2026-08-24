@@ -123,6 +123,9 @@ export function TourLeaderScreen() {
       <p style={{ color: 'var(--mist)', fontSize: 12.5, marginBottom: 16 }}>
         Modulo pubblico: <code style={{ color: 'var(--paper)' }}>{linkCandidatura}</code>
       </p>
+      <div style={{ maxWidth: 480, marginBottom: 20 }}>
+        <CampoCopiabile etichetta="Link di accesso per i tour leader già censiti" valore={`${window.location.origin}/scansione/accedi`} />
+      </div>
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o città..." />
       <TabellaGenerica
         righe={listaFiltrata}

@@ -6,6 +6,7 @@ import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
+import { CampoCopiabile } from '../shared/CampoCopiabile';
 
 const VUOTO: AmministratoreInput = { nome: '', email: '', password: '', ruoloId: '' };
 
@@ -184,6 +185,9 @@ export function AmministratoriScreen() {
   return (
     <div>
       <PanelHead titolo="Amministratori" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo amministratore</button>} />
+      <div style={{ maxWidth: 480, marginBottom: 20 }}>
+        <CampoCopiabile etichetta="Link di accesso al gestionale (per tutti, inclusi i Collaboratori)" valore={`${window.location.origin}/admin.html`} />
+      </div>
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o ruolo..." />
       <TabellaGenerica
         righe={adminFiltrati}
