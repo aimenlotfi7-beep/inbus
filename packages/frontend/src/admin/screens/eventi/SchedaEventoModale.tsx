@@ -624,35 +624,20 @@ export function SchedaEventoModale({
         </div>
       ) : (
       <>
-      <div className="section-card" style={{ marginBottom: 16 }}>
-        <p className="section-label" style={{ marginBottom: 10 }}>Quanti servizi ha questo evento?</p>
-        <div className="mini-tabs" style={{ marginBottom: modalitaServizi === 'multiplo' ? 16 : 0 }}>
-          <button
-            type="button"
-            className={`mini-tab${modalitaServizi === 'singolo' ? ' active' : ''}`}
-            onClick={() => setModalitaServizi('singolo')}
-          >
-            Un solo servizio
-          </button>
-          <button
-            type="button"
-            className={`mini-tab${modalitaServizi === 'multiplo' ? ' active' : ''}`}
-            onClick={passaAMultiplo}
-          >
-            Più servizi
-          </button>
-        </div>
+      {/* Nessuna domanda "quanti servizi" qui — l'hai già scelto una
+          volta sola nel pannello iniziale, non torna più indietro
+          (specialmente per "Più servizi": non ha senso poter tornare a
+          un solo servizio quando ne hai già più di uno configurati).
+          Solo "Un solo servizio", appena l'evento esiste davvero,
+          mostra la minima voce per passare a più servizi se serve. */}
+      {modalitaServizi === 'singolo' && evento && (
+        <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, marginBottom: 16, borderRadius: 999 }} onClick={passaAMultiplo}>
+          + Aggiungi un servizio
+        </button>
+      )}
 
-        {/* Solo modificando un evento già creato — durante la primissima
-            creazione non ha ancora senso, prima si salva l'evento base. */}
-        {modalitaServizi === 'singolo' && evento && (
-          <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, marginTop: 10, borderRadius: 999 }} onClick={passaAMultiplo}>
-            + Aggiungi un secondo servizio
-          </button>
-        )}
-
-        {modalitaServizi === 'multiplo' && (
-          <>
+      {modalitaServizi === 'multiplo' && (
+        <div className="section-card" style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
               {servizi.map((v) => (
                 <button
@@ -709,9 +694,8 @@ export function SchedaEventoModale({
                 </div>
               );
             })()}
-          </>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="section-card" style={{ marginBottom: 16, border: '1px solid var(--pink-dim)' }}>
         <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>
