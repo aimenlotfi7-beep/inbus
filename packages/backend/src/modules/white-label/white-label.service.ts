@@ -133,4 +133,15 @@ export const whiteLabelService = {
       },
     };
   },
+
+  /** Come getPubblicaDaWidgetId, ma con l'id interno della riga e
+   *  l'eventoId veri — usata SOLO lato server (nel checkout del
+   *  widget), mai esposta al pubblico così com'è: qui dentro non c'è
+   *  nulla di sensibile, ma l'id interno non serve al widget stesso,
+   *  solo al backend per attribuire correttamente la vendita. */
+  async getPubblicaConIdInterno(publicWidgetId: string) {
+    const [riga] = await db.select().from(whiteLabel).where(eq(whiteLabel.publicWidgetId, publicWidgetId)).limit(1);
+    if (!riga) throw new WhiteLabelNonTrovata();
+    return riga;
+  },
 };

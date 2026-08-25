@@ -7,6 +7,7 @@ import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { CampoCopiabile } from '../shared/CampoCopiabile';
 import { SelettoreEventi } from '../shared/SelettoreEventi';
+import { PannelloCommissione } from './PannelloCommissione';
 
 const VUOTO: OrganizzatoreInput = { nome: '', email: '', password: '', eventiAbilitati: [] };
 
@@ -61,6 +62,7 @@ export function OrganizzatoriScreen() {
           <SelettoreEventi selezionati={form.eventiAbilitati ?? []} onChange={(ids) => setForm({ ...form, eventiAbilitati: ids })} />
         </div>
         <button className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} onClick={salva}>Salva organizzatore</button>
+        {inModifica && <PannelloCommissione organizzatoreId={inModifica.id} />}
       </PaginaSezione>
     );
   }

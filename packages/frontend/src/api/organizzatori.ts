@@ -22,6 +22,19 @@ export interface EventoAssegnato {
   citta: string;
 }
 
+export interface RegolaCommissione {
+  id: string;
+  organizzatoreId: string;
+  percentuale: string;
+  validoDal: string;
+  validoA: string | null;
+}
+
+export const commissioniApi = {
+  get: (organizzatoreId: string) => api.get<{ attiva: RegolaCommissione | null; storico: RegolaCommissione[] }>(`/api/admin/commissioni/organizzatore/${organizzatoreId}`),
+  imposta: (organizzatoreId: string, percentuale: number) => api.post<RegolaCommissione>(`/api/admin/commissioni/organizzatore/${organizzatoreId}`, { percentuale }),
+};
+
 export const organizzatoriApi = {
   list: () => api.get<Organizzatore[]>('/api/organizzatori'),
   create: (input: OrganizzatoreInput) => api.post<Organizzatore>('/api/organizzatori', input),

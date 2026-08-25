@@ -14,6 +14,7 @@ import { promoterRouter } from './modules/promoter/promoter.routes.js';
 import { organizzatoriRouter } from './modules/organizzatori/organizzatori.routes.js';
 import { whiteLabelRouter } from './modules/white-label/white-label.routes.js';
 import { whiteLabelPubblicoRouter } from './modules/white-label/white-label-pubblico.routes.js';
+import { commissioniRouter } from './modules/commissioni/commissioni.routes.js';
 import { tourLeaderRouter } from './modules/tourleader/tourleader.routes.js';
 import { chatRouter } from './modules/chat/chat.routes.js';
 import { amministratoriRouter } from './modules/amministratori/amministratori.routes.js';
@@ -38,7 +39,16 @@ import { sitemapRouter } from './modules/sitemap/sitemap.routes.js';
 export function creaApp() {
   const app = express();
 
-  app.use(cors({ origin: env.CORS_ORIGIN }));
+  // CORS dinamico in base al percorso, non fisso: le rotte pubbliche
+  // del widget e l'accesso cliente devono funzionare da QUALSIASI sito
+  // (è il punto stesso del widget incorporato — non sappiamo in
+  // anticipo su quali domini finirà), tutto il resto (gestionale,
+  // portali promoter/organizzatore) resta ristretto solo al sito
+  // INBUS vero, come prima.
+  app.use(cors((req, callback) => {
+    const aperto = req.path.startsWith('/api/public/') || req.path.startsWith('/api/cliente-auth/');
+    callback(null, { origin: aperto ? true : env.CORS_ORIGIN });
+  }));
   app.use(express.json());
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -57,6 +67,7 @@ export function creaApp() {
   app.use('/api/organizzatori', organizzatoriRouter);
   app.use('/api/admin/white-label', whiteLabelRouter);
   app.use('/api/public/widget', whiteLabelPubblicoRouter);
+  app.use('/api/admin/commissioni', commissioniRouter);
   app.use('/api/tour-leader', tourLeaderRouter);
   app.use('/api/chat', chatRouter);
   app.use('/api/amministratori', amministratoriRouter);

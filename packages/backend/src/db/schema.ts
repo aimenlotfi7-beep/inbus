@@ -33,6 +33,7 @@ export const statoTicketEnum = pgEnum('stato_ticket', ['EMESSO', 'UTILIZZATO', '
 export const tipoPagamentoEnum = pgEnum('tipo_pagamento', ['COMPLETO', 'ACCONTO']);
 export const metodoPagamentoEnum = pgEnum('metodo_pagamento', ['CARTA', 'PAYPAL', 'SATISPAY', 'DA_CONCORDARE']);
 export const statoTourLeaderEnum = pgEnum('stato_tour_leader', ['CANDIDATO', 'ATTIVO', 'ARCHIVIATO']);
+export const canaleVenditaEnum = pgEnum('canale_vendita', ['INBUS', 'WHITE_LABEL', 'DIRECT']);
 export const tipoCouponEnum = pgEnum('tipo_coupon', ['PERCENTUALE', 'FISSO']);
 export const autoreMessaggioEnum = pgEnum('autore_messaggio', ['CLIENTE', 'ADMIN']);
 export const statoListaAttesaEnum = pgEnum('stato_lista_attesa', ['IN_ATTESA', 'PROMOSSA']);
@@ -398,6 +399,17 @@ export const prenotazioni = pgTable('prenotazioni', {
   metodoPagamento: metodoPagamentoEnum('metodo_pagamento').notNull().default('CARTA'),
   utenteId: text('utente_id').notNull().references(() => utenti.id),
   promoterCodice: text('promoter_codice'),
+  // Canale di vendita — di dove è arrivata questa prenotazione. Se è
+  // WHITE_LABEL, whiteLabelId dice esattamente quale, e i due campi di
+  // commissione sono lo SNAPSHOT della regola economica applicata in
+  // quel preciso momento — non ricalcolati mai più dopo, nemmeno se
+  // in futuro la percentuale dell'organizzatore cambia (altrimenti le
+  // vendite passate "cambierebbero" commissione retroattivamente, che
+  // è esattamente quello che non deve succedere).
+  canaleVendita: canaleVenditaEnum('canale_vendita').notNull().default('INBUS'),
+  whiteLabelId: text('white_label_id').references(() => whiteLabel.id),
+  commissionePercentualeSnapshot: numeric('commissione_percentuale_snapshot', { precision: 5, scale: 2 }),
+  commissioneImportoSnapshot: numeric('commissione_importo_snapshot', { precision: 10, scale: 2 }),
   stato: statoPrenotazioneEnum('stato').notNull().default('CONFERMATA'),
   motivoCancellazione: text('motivo_cancellazione'),
   rimborsoStato: text('rimborso_stato'), // 'richiesto' | 'approvato'
@@ -523,6 +535,25 @@ export const whiteLabel = pgTable('white_label', {
 }, (t) => ({
   unicaPerCoppia: unique('white_label_org_evento_unico').on(t.organizzatoreId, t.eventoId),
 }));
+
+// ---------------------------------------------------------------------
+// REGOLE COMMISSIONE — la percentuale che spetta a un organizzatore
+// sulle vendite White Label. Pensata da subito per più regole nel
+// tempo (validoDal/validoA): quando l'admin cambia la percentuale, la
+// vecchia regola si chiude (validoA = adesso) e ne parte una nuova, non
+// si sovrascrive mai — così ogni vendita passata resta agganciata alla
+// regola che era davvero in vigore quando è successa (lo snapshot sulla
+// prenotazione, vedi prenotazioni.commissionePercentualeSnapshot,
+// esiste proprio per questo: anche se questa tabella cambiasse dopo, le
+// vendite già fatte non cambiano commissione retroattivamente).
+// ---------------------------------------------------------------------
+export const regoleCommissione = pgTable('regole_commissione', {
+  id: id(),
+  organizzatoreId: text('organizzatore_id').notNull().references(() => organizzatori.id, { onDelete: 'cascade' }),
+  percentuale: numeric('percentuale', { precision: 5, scale: 2 }).notNull(),
+  validoDal: timestamp('valido_dal').notNull().defaultNow(),
+  validoA: timestamp('valido_a'), // null = ancora attiva
+});
 
 // ---------------------------------------------------------------------
 // TOUR LEADER
@@ -898,6 +929,10 @@ export const organizzatoreEventiRelations = relations(organizzatoreEventi, ({ on
 export const whiteLabelRelations = relations(whiteLabel, ({ one }) => ({
   organizzatore: one(organizzatori, { fields: [whiteLabel.organizzatoreId], references: [organizzatori.id] }),
   evento: one(eventi, { fields: [whiteLabel.eventoId], references: [eventi.id] }),
+}));
+
+export const regoleCommissioneRelations = relations(regoleCommissione, ({ one }) => ({
+  organizzatore: one(organizzatori, { fields: [regoleCommissione.organizzatoreId], references: [organizzatori.id] }),
 }));
 
 export const ruoliRelations = relations(ruoli, ({ many }) => ({
