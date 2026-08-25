@@ -1,4 +1,7 @@
-import { api } from './client';
+import { api, apiConToken } from './client';
+import type { OpzionePartenza } from './types';
+
+const apiClienteConToken = apiConToken('inbus_cliente_token');
 
 export type PosizioneLogo = 'in-alto-a-sinistra' | 'in-alto-al-centro' | 'in-alto-a-destra';
 export type TipoLayout = 'card' | 'hero' | 'horizontal';
@@ -77,8 +80,16 @@ export interface WhiteLabelPubblica {
   evento: { id: string; slug: string; artista: string; data: string; luogo: string; citta: string; descrizione: string | null };
 }
 
+export interface PrenotazioneCreata {
+  id: string;
+  pnr: string;
+}
+
 export const whiteLabelApi = {
   getPubblica: (publicWidgetId: string) => api.get<WhiteLabelPubblica>(`/api/public/widget/${publicWidgetId}`),
+  opzioniPartenza: (publicWidgetId: string) => api.get<OpzionePartenza[]>(`/api/public/widget/${publicWidgetId}/opzioni-partenza`),
+  prenota: (publicWidgetId: string, input: Record<string, unknown>) =>
+    apiClienteConToken.post<PrenotazioneCreata>(`/api/public/widget/${publicWidgetId}/prenota`, input),
   list: () => api.get<WhiteLabel[]>('/api/admin/white-label'),
   perEvento: (eventoId: string) => api.get<WhiteLabel[]>(`/api/admin/white-label/evento/${eventoId}`),
   getById: (id: string) => api.get<WhiteLabel>(`/api/admin/white-label/${id}`),
