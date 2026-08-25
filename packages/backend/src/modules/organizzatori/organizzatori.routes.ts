@@ -39,7 +39,14 @@ async function getById(id: string) {
 }
 
 export const organizzatoriService = {
-  list: () => db.select().from(organizzatori),
+  async list() {
+    const tutti = await db.select().from(organizzatori);
+    const tutteLeAssociazioni = await db.select().from(organizzatoreEventi);
+    return tutti.map((o) => ({
+      ...o,
+      eventiAbilitati: tutteLeAssociazioni.filter((a) => a.organizzatoreId === o.id).map((a) => a.eventoId),
+    }));
+  },
   getById,
 
   /** L'evento associato a questo organizzatore, con i dati essenziali
