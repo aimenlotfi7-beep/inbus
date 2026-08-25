@@ -1,11 +1,11 @@
 import { Router, type Request, type Response } from 'express';
-import { eq } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { organizzatori, organizzatoreEventi, eventi } from '../../db/schema.js';
+import { organizzatori, organizzatoreEventi, eventi, prenotazioni, whiteLabel } from '../../db/schema.js';
 import { NonTrovato, NonAutorizzato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
@@ -51,6 +51,40 @@ export const organizzatoriService = {
       .innerJoin(eventi, eq(organizzatoreEventi.eventoId, eventi.id))
       .where(eq(organizzatoreEventi.organizzatoreId, organizzatoreId));
     return righe.map((r) => r.evento);
+  },
+
+  /** Statistiche AGGREGATE per evento — mai una prenotazione singola,
+   *  mai un nome/email di cliente: solo numeri, come richiesto dalla
+   *  specifica (l'organizzatore non deve mai poter vedere dati
+   *  personali). Conta solo le vendite arrivate dalla White Label di
+   *  questo organizzatore (canale WHITE_LABEL), non tutte le vendite
+   *  INBUS dell'evento — quelle non sono merito/sforzo suo. */
+  async statistichePerEvento(organizzatoreId: string) {
+    return db
+      .select({
+        eventoId: eventi.id,
+        eventoArtista: eventi.artista,
+        numeroPrenotazioni: sql<number>`count(distinct ${prenotazioni.id})`,
+        viaggiatori: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)`,
+        fatturato: sql<number>`coalesce(sum(${prenotazioni.totale}), 0)`,
+        quotaOrganizzatore: sql<number>`coalesce(sum(${prenotazioni.commissioneImportoSnapshot}), 0)`,
+      })
+      .from(whiteLabel)
+      .innerJoin(eventi, eq(whiteLabel.eventoId, eventi.id))
+      .leftJoin(prenotazioni, and(eq(prenotazioni.whiteLabelId, whiteLabel.id), eq(prenotazioni.stato, 'CONFERMATA')))
+      .where(eq(whiteLabel.organizzatoreId, organizzatoreId))
+      .groupBy(eventi.id, eventi.artista);
+  },
+
+  /** Il riepilogo per la dashboard — somma di tutti gli eventi. */
+  async statisticheGenerali(organizzatoreId: string) {
+    const perEvento = await this.statistichePerEvento(organizzatoreId);
+    return {
+      eventiAttivi: perEvento.length,
+      viaggiatori: perEvento.reduce((s, e) => s + Number(e.viaggiatori), 0),
+      fatturato: perEvento.reduce((s, e) => s + Number(e.fatturato), 0),
+      quotaOrganizzatore: perEvento.reduce((s, e) => s + Number(e.quotaOrganizzatore), 0),
+    };
   },
 
   async create(input: z.infer<typeof creaOrganizzatoreSchema>) {
@@ -164,10 +198,22 @@ organizzatoriRouter.get('/me', richiedeAuthOrganizzatore, asyncHandler(async (re
 organizzatoriRouter.get('/me/eventi', richiedeAuthOrganizzatore, asyncHandler(async (req: Request, res: Response) => {
   res.json(await organizzatoriService.eventiAssegnati((req as any).organizzatoreId));
 }));
+organizzatoriRouter.get('/me/statistiche', richiedeAuthOrganizzatore, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await organizzatoriService.statisticheGenerali((req as any).organizzatoreId));
+}));
+organizzatoriRouter.get('/me/statistiche-per-evento', richiedeAuthOrganizzatore, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await organizzatoriService.statistichePerEvento((req as any).organizzatoreId));
+}));
 
 organizzatoriRouter.use(richiedeAuth);
 organizzatoriRouter.get('/', richiedePermesso('organizzatori.visualizza'), asyncHandler(async (_req: Request, res: Response) => res.json(await organizzatoriService.list())));
 organizzatoriRouter.get('/:id', richiedePermesso('organizzatori.visualizza'), asyncHandler(async (req: Request, res: Response) => res.json(await organizzatoriService.getById(req.params.id))));
+organizzatoriRouter.get('/:id/statistiche', richiedePermesso('organizzatori.visualizza'), asyncHandler(async (req: Request, res: Response) => {
+  res.json({
+    generali: await organizzatoriService.statisticheGenerali(req.params.id),
+    perEvento: await organizzatoriService.statistichePerEvento(req.params.id),
+  });
+}));
 organizzatoriRouter.post('/', richiedePermesso('organizzatori.gestisci'), valida(creaOrganizzatoreSchema), asyncHandler(async (req: Request, res: Response) => {
   const id = await organizzatoriService.create(req.body);
   res.status(201).json(await organizzatoriService.getById(id));

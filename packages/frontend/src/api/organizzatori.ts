@@ -35,6 +35,21 @@ export const commissioniApi = {
   imposta: (organizzatoreId: string, percentuale: number) => api.post<RegolaCommissione>(`/api/admin/commissioni/organizzatore/${organizzatoreId}`, { percentuale }),
 };
 
+export interface StatisticheGenerali {
+  eventiAttivi: number;
+  viaggiatori: number;
+  fatturato: number;
+  quotaOrganizzatore: number;
+}
+export interface StatisticaEvento {
+  eventoId: string;
+  eventoArtista: string;
+  numeroPrenotazioni: number;
+  viaggiatori: number;
+  fatturato: number;
+  quotaOrganizzatore: number;
+}
+
 export const organizzatoriApi = {
   list: () => api.get<Organizzatore[]>('/api/organizzatori'),
   create: (input: OrganizzatoreInput) => api.post<Organizzatore>('/api/organizzatori', input),
@@ -48,4 +63,7 @@ export const organizzatoriApi = {
 
   me: () => apiOrganizzatore.get<Organizzatore>('/api/organizzatori/me'),
   meEventi: () => apiOrganizzatore.get<EventoAssegnato[]>('/api/organizzatori/me/eventi'),
+  meStatistiche: () => apiOrganizzatore.get<StatisticheGenerali>('/api/organizzatori/me/statistiche'),
+  meStatistichePerEvento: () => apiOrganizzatore.get<StatisticaEvento[]>('/api/organizzatori/me/statistiche-per-evento'),
+  statistiche: (id: string) => api.get<{ generali: StatisticheGenerali; perEvento: StatisticaEvento[] }>(`/api/organizzatori/${id}/statistiche`),
 };

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import '../styles/promoter.css';
-import { organizzatoriApi, type Organizzatore, type EventoAssegnato } from '../api/organizzatori';
+import { organizzatoriApi, type Organizzatore, type EventoAssegnato, type StatisticheGenerali, type StatisticaEvento } from '../api/organizzatori';
 import { ErroreApi } from '../api/client';
 import { CookieBanner } from '../features/CookieBanner';
 
@@ -66,10 +66,14 @@ export function OrganizzatorePage() {
 function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void }) {
   const [organizzatore, setOrganizzatore] = useState<Organizzatore | null>(null);
   const [eventi, setEventi] = useState<EventoAssegnato[] | null>(null);
+  const [generali, setGenerali] = useState<StatisticheGenerali | null>(null);
+  const [perEvento, setPerEvento] = useState<StatisticaEvento[] | null>(null);
 
   useEffect(() => {
     organizzatoriApi.me().then(setOrganizzatore).catch(onErroreSessione);
     organizzatoriApi.meEventi().then(setEventi);
+    organizzatoriApi.meStatistiche().then(setGenerali);
+    organizzatoriApi.meStatistichePerEvento().then(setPerEvento);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -77,22 +81,44 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
 
   const eventiOrdinati = eventi.slice().sort((a, b) => a.data.localeCompare(b.data));
 
+  function statoPerEvento(eventoId: string) {
+    return perEvento?.find((s) => s.eventoId === eventoId) ?? null;
+  }
+
   return (
     <>
+      {generali && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 22 }}>
+          <div className="stat-box"><b>{generali.eventiAttivi}</b><span>Eventi attivi</span></div>
+          <div className="stat-box"><b>{generali.viaggiatori}</b><span>Viaggiatori</span></div>
+          <div className="stat-box"><b>€{generali.fatturato.toFixed(2)}</b><span>Fatturato</span></div>
+          <div className="stat-box"><b>€{generali.quotaOrganizzatore.toFixed(2)}</b><span>Tua quota</span></div>
+        </div>
+      )}
+
       <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '4px 0 14px' }}>I tuoi eventi</h2>
 
       {!eventiOrdinati.length && (
         <div className="empty-box">Non hai ancora nessun evento associato — contatta INBUS per farti assegnare i tuoi eventi.</div>
       )}
 
-      {eventiOrdinati.map((ev) => (
-        <div className="evento-link-card" key={ev.id}>
-          <div>
-            <h3>{ev.artista}</h3>
-            <p>{ev.luogo}, {ev.citta} · {fmtDataBreve(ev.data)}</p>
+      {eventiOrdinati.map((ev) => {
+        const s = statoPerEvento(ev.id);
+        return (
+          <div className="evento-link-card" key={ev.id}>
+            <div>
+              <h3>{ev.artista}</h3>
+              <p>{ev.luogo}, {ev.citta} · {fmtDataBreve(ev.data)}</p>
+              {s && (
+                <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 4 }}>
+                  {s.viaggiatori} viaggiator{s.viaggiatori === 1 ? 'e' : 'i'} · €{s.fatturato.toFixed(2)} fatturato · tua quota €{s.quotaOrganizzatore.toFixed(2)}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </>
+
   );
 }
