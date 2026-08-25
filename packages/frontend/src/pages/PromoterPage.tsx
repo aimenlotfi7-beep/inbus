@@ -35,7 +35,7 @@ export function PromoterPage() {
   }
 
   return (
-    <>
+    <div className="pagina-partner">
       <header>
         <div className="logo">IN<span>BUS</span><small>promoter</small></div>
         <Link className="back-link" to="/">← Torna al sito</Link>
@@ -60,7 +60,7 @@ export function PromoterPage() {
 
         {loggato && <AreaPromoter onErroreSessione={esci} />}
       </main>
-    </>
+    </div>
   );
 }
 

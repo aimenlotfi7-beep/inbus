@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { whiteLabelApi, type WhiteLabelPubblica } from '../api/whiteLabel';
 import { WhiteLabelPreview } from '../features/white-label/WhiteLabelPreview';
 import { ErroreApi } from '../api/client';
 
 export function WidgetPubblicoPage() {
   const { publicWidgetId } = useParams<{ publicWidgetId: string }>();
+  const navigate = useNavigate();
   const [dati, setDati] = useState<WhiteLabelPubblica | null>(null);
   const [errore, setErrore] = useState('');
 
@@ -35,25 +36,18 @@ export function WidgetPubblicoPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: dati.tema.colori.sfondo, padding: 24 }}>
       <div style={{ marginBottom: 24 }}>
-        <WhiteLabelPreview tema={dati.tema} evento={dati.evento} larghezza={400} />
+        <WhiteLabelPreview
+          tema={dati.tema}
+          evento={dati.evento}
+          larghezza={400}
+          onCtaClick={dati.attiva ? () => navigate(`/eventi/${dati.evento.slug}`) : undefined}
+        />
       </div>
 
       {!dati.attiva && (
         <p style={{ color: dati.tema.colori.testoSecondario, fontSize: 13, marginBottom: 12 }}>
           Questo viaggio non è al momento disponibile per l'acquisto.
         </p>
-      )}
-      {dati.attiva && (
-        <Link
-          to={`/eventi/${dati.evento.slug}`}
-          style={{
-            display: 'inline-block', padding: '12px 28px', borderRadius: dati.tema.stile.borderRadiusPx,
-            background: dati.tema.colori.cta, color: dati.tema.colori.testoCta, fontWeight: 700,
-            fontFamily: dati.tema.tipografia.font, textDecoration: 'none', fontSize: dati.tema.tipografia.dimensioneTestoPx,
-          }}
-        >
-          Vai alla pagina di prenotazione
-        </Link>
       )}
     </div>
   );

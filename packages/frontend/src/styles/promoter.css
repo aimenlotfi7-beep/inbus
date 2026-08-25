@@ -3,18 +3,25 @@
      bianche, blu come colore d'azione principale, Poppins come font.
      Solo l'intestazione resta scura, come la sidebar del gestionale
      (stesso principio: un'unica zona scura per l'identità visiva, il
-     resto chiaro e leggibile). */
-  :root{
+     resto chiaro e leggibile).
+
+     ATTENZIONE: legate a .pagina-partner (non più :root globale) di
+     proposito — altri fogli di stile (es. sito.css, il sito pubblico
+     scuro) definiscono le STESSE variabili con valori diversi, e in
+     un'unica app tutto finisce mescolato: usare :root qui rischiava di
+     far vincere l'ultimo foglio caricato, "rubando" i colori sbagliati
+     al portale. Con una classe dedicata questo non può più succedere. */
+  .pagina-partner{
     --night:#f3f4f6; --dusk:#ffffff; --dusk-2:#eef0f3;
     --paper:#1f2430; --ink:#ffffff; --mist:#6b7280; --line:#e3e5ea;
     --pink:#dc2626; --pink-dim:#dc262633; --amber:#f59e0b; --blue:#2563eb; --green:#16a34a;
     --sidebar-bg:#14121f; --sidebar-text:#e7e5f0; --sidebar-mist:#a99fc2;
     --radius:12px;
+    background:var(--night); color:var(--paper); font-family:'Poppins',sans-serif;
+    min-height:100vh;
   }
-  *{box-sizing:border-box;}
-  html,body{margin:0; padding:0;}
-  body{background:var(--night); color:var(--paper); font-family:'Poppins',sans-serif;}
-  a{color:inherit; text-decoration:none;}
+  .pagina-partner *{box-sizing:border-box;}
+  .pagina-partner a{color:inherit; text-decoration:none;}
 
   header{
     display:flex; align-items:center; justify-content:space-between; gap:16px;

@@ -31,7 +31,7 @@ export function PromoterReimpostaPasswordPage() {
   }
 
   return (
-    <>
+    <div className="pagina-partner">
       <header>
         <div className="logo">IN<span>BUS</span><small>promoter</small></div>
         <Link className="back-link" to="/promoter">← Torna al login</Link>
@@ -55,6 +55,6 @@ export function PromoterReimpostaPasswordPage() {
           )}
         </div>
       </main>
-    </>
+    </div>
   );
 }

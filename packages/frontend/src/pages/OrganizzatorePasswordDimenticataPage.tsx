@@ -19,7 +19,7 @@ export function OrganizzatorePasswordDimenticataPage() {
   }
 
   return (
-    <>
+    <div className="pagina-partner">
       <header>
         <div className="logo">IN<span>BUS</span><small>organizzatore</small></div>
         <Link className="back-link" to="/organizzatore">← Torna al login</Link>
@@ -38,6 +38,6 @@ export function OrganizzatorePasswordDimenticataPage() {
           )}
         </div>
       </main>
-    </>
+    </div>
   );
 }

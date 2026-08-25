@@ -16,7 +16,7 @@ interface DatiEventoPreview {
  * copie separate — altrimenti l'anteprima "mentirebbe" rispetto a
  * cosa vede davvero il cliente sul sito dell'organizzatore.
  */
-export function WhiteLabelPreview({ tema, evento, larghezza = 360 }: { tema: WhiteLabelTheme; evento: DatiEventoPreview; larghezza?: number }) {
+export function WhiteLabelPreview({ tema, evento, larghezza = 360, onCtaClick }: { tema: WhiteLabelTheme; evento: DatiEventoPreview; larghezza?: number; onCtaClick?: () => void }) {
   const { branding, colori, tipografia, stile, layout, elementiVisibili } = tema;
 
   const stilePulsante: React.CSSProperties = {
@@ -29,7 +29,7 @@ export function WhiteLabelPreview({ tema, evento, larghezza = 360 }: { tema: Whi
     fontWeight: 700,
     fontSize: tipografia.dimensioneTestoPx,
     width: '100%',
-    cursor: 'default',
+    cursor: onCtaClick ? 'pointer' : 'default',
   };
 
   const dataFormattata = new Date(evento.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -102,7 +102,7 @@ export function WhiteLabelPreview({ tema, evento, larghezza = 360 }: { tema: Whi
       </div>
 
       {elementiVisibili.cta && (
-        <button style={stilePulsante} disabled>Prenota ora</button>
+        <button style={stilePulsante} disabled={!onCtaClick} onClick={onCtaClick}>Prenota ora</button>
       )}
 
       {elementiVisibili.informazioni && (

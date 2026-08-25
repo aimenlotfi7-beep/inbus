@@ -19,7 +19,7 @@ export function PromoterPasswordDimenticataPage() {
   }
 
   return (
-    <>
+    <div className="pagina-partner">
       <header>
         <div className="logo">IN<span>BUS</span><small>promoter</small></div>
         <Link className="back-link" to="/promoter">← Torna al login</Link>
@@ -38,6 +38,6 @@ export function PromoterPasswordDimenticataPage() {
           )}
         </div>
       </main>
-    </>
+    </div>
   );
 }

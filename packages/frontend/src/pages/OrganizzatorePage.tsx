@@ -33,7 +33,7 @@ export function OrganizzatorePage() {
   }
 
   return (
-    <>
+    <div className="pagina-partner">
       <header>
         <div className="logo">IN<span>BUS</span><small>organizzatore</small></div>
         <Link className="back-link" to="/">← Torna al sito</Link>
@@ -59,7 +59,7 @@ export function OrganizzatorePage() {
         {loggato && <AreaOrganizzatore onErroreSessione={esci} />}
       </main>
       <CookieBanner />
-    </>
+    </div>
   );
 }
 
