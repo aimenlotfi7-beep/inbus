@@ -59,6 +59,10 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   // Promoter
   { chiave: 'promoter.visualizza', etichetta: 'Visualizzare promoter', modulo: 'Promoter' },
   { chiave: 'promoter.gestisci', etichetta: 'Creare/modificare/eliminare promoter', modulo: 'Promoter' },
+  { chiave: 'organizzatori.visualizza', etichetta: 'Visualizzare organizzatori', modulo: 'Organizzatori' },
+  { chiave: 'organizzatori.gestisci', etichetta: 'Creare/modificare/eliminare organizzatori', modulo: 'Organizzatori' },
+  { chiave: 'white-label.visualizza', etichetta: 'Visualizzare White Label', modulo: 'White Label' },
+  { chiave: 'white-label.gestisci', etichetta: 'Creare/modificare/attivare/disattivare White Label', modulo: 'White Label' },
 
   // Tour leader
   { chiave: 'tourleader.visualizza', etichetta: 'Visualizzare candidature tour leader', modulo: 'Tour Leader' },

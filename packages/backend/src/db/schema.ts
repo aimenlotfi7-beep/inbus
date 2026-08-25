@@ -16,6 +16,8 @@ import {
   numeric,
   pgEnum,
   primaryKey,
+  unique,
+  jsonb,
   doublePrecision,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
@@ -468,6 +470,61 @@ export const promoterEventi = pgTable('promoter_eventi', {
 }));
 
 // ---------------------------------------------------------------------
+// ORGANIZZATORI — concetto separato dai promoter: un promoter promuove
+// con un codice sconto, un organizzatore ha un proprio sito e (in
+// futuro) una White Label con widget embedded per vendere biglietti
+// direttamente dal proprio sito. L'evento resta sempre di proprietà di
+// INBUS — l'organizzatore vede solo i suoi eventi associati, mai tutti.
+// ---------------------------------------------------------------------
+export const organizzatori = pgTable('organizzatori', {
+  id: id(),
+  nome: text('nome').notNull(),
+  email: text('email').notNull().unique(),
+  telefono: text('telefono'),
+  passwordHash: text('password_hash').notNull(),
+  note: text('note'),
+  tokenResetPassword: text('token_reset_password'),
+  tokenResetPasswordScadenza: timestamp('token_reset_password_scadenza'),
+});
+
+export const organizzatoreEventi = pgTable('organizzatore_eventi', {
+  organizzatoreId: text('organizzatore_id').notNull().references(() => organizzatori.id, { onDelete: 'cascade' }),
+  eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.organizzatoreId, t.eventoId] }),
+}));
+
+// ---------------------------------------------------------------------
+// WHITE LABEL — sempre legata a UNA associazione organizzatore+evento
+// specifica (mai una pagina generica scollegata). L'evento resta
+// sempre di INBUS: la White Label è solo il "vestito" con cui
+// l'organizzatore vende quello specifico viaggio sul proprio sito,
+// tramite il widget incorporato (pubblico, vedi publicWidgetId).
+// Il tema è tipizzato (vedi white-label.theme.ts) e salvato come jsonb
+// — se una proprietà manca, il widget usa il default INBUS, mai un
+// errore o un buco visivo.
+// ---------------------------------------------------------------------
+export const whiteLabel = pgTable('white_label', {
+  id: id(),
+  organizzatoreId: text('organizzatore_id').notNull().references(() => organizzatori.id, { onDelete: 'cascade' }),
+  eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  // Identificativo pubblico, mai un ID interno sequenziale — è quello
+  // che finisce nel codice embed sul sito dell'organizzatore, quindi
+  // deve essere opaco e non indovinabile.
+  publicWidgetId: text('public_widget_id').notNull().unique(),
+  attiva: boolean('attiva').notNull().default(true),
+  // Domini da cui il widget può essere caricato — controllo aggiuntivo,
+  // mai l'unico: la vera sicurezza sta nelle autorizzazioni server-side
+  // di ogni endpoint, non in questo elenco.
+  dominiAutorizzati: jsonb('domini_autorizzati').notNull().default('[]'),
+  tema: jsonb('tema').notNull().default('{}'),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+  aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
+}, (t) => ({
+  unicaPerCoppia: unique('white_label_org_evento_unico').on(t.organizzatoreId, t.eventoId),
+}));
+
+// ---------------------------------------------------------------------
 // TOUR LEADER
 // ---------------------------------------------------------------------
 export const tourLeader = pgTable('tour_leader', {
@@ -827,6 +884,20 @@ export const promoterRelations = relations(promoter, ({ many }) => ({
 export const promoterEventiRelations = relations(promoterEventi, ({ one }) => ({
   promoter: one(promoter, { fields: [promoterEventi.promoterId], references: [promoter.id] }),
   evento: one(eventi, { fields: [promoterEventi.eventoId], references: [eventi.id] }),
+}));
+
+export const organizzatoriRelations = relations(organizzatori, ({ many }) => ({
+  eventiAbilitati: many(organizzatoreEventi),
+}));
+
+export const organizzatoreEventiRelations = relations(organizzatoreEventi, ({ one }) => ({
+  organizzatore: one(organizzatori, { fields: [organizzatoreEventi.organizzatoreId], references: [organizzatori.id] }),
+  evento: one(eventi, { fields: [organizzatoreEventi.eventoId], references: [eventi.id] }),
+}));
+
+export const whiteLabelRelations = relations(whiteLabel, ({ one }) => ({
+  organizzatore: one(organizzatori, { fields: [whiteLabel.organizzatoreId], references: [organizzatori.id] }),
+  evento: one(eventi, { fields: [whiteLabel.eventoId], references: [eventi.id] }),
 }));
 
 export const ruoliRelations = relations(ruoli, ({ many }) => ({

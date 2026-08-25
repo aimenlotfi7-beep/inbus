@@ -6,11 +6,15 @@ import { PaginaPage } from './pages/PaginaPage';
 import { PromoterPage } from './pages/PromoterPage';
 import { PromoterPasswordDimenticataPage } from './pages/PromoterPasswordDimenticataPage';
 import { PromoterReimpostaPasswordPage } from './pages/PromoterReimpostaPasswordPage';
+import { OrganizzatorePage } from './pages/OrganizzatorePage';
+import { OrganizzatorePasswordDimenticataPage } from './pages/OrganizzatorePasswordDimenticataPage';
+import { OrganizzatoreReimpostaPasswordPage } from './pages/OrganizzatoreReimpostaPasswordPage';
 import { TourLeaderPage } from './pages/TourLeaderPage';
 import { FinalizzaListaAttesaPage } from './pages/FinalizzaListaAttesaPage';
 import { CompletaSaldoPage } from './pages/CompletaSaldoPage';
 import { OffertaPage } from './pages/OffertaPage';
 import { EventoPage } from './pages/EventoPage';
+import { WidgetPubblicoPage } from './pages/WidgetPubblicoPage';
 import { TourLeaderLoginPage } from './pages/TourLeaderLoginPage';
 import { TourLeaderCercaPage } from './pages/TourLeaderCercaPage';
 import { TourLeaderPasswordDimenticataPage } from './pages/TourLeaderPasswordDimenticataPage';
@@ -33,11 +37,15 @@ export function App() {
       <Route path="/promoter" element={<PromoterPage />} />
       <Route path="/promoter/password-dimenticata" element={<PromoterPasswordDimenticataPage />} />
       <Route path="/promoter/reimposta-password/:token" element={<PromoterReimpostaPasswordPage />} />
+      <Route path="/organizzatore" element={<OrganizzatorePage />} />
+      <Route path="/organizzatore/password-dimenticata" element={<OrganizzatorePasswordDimenticataPage />} />
+      <Route path="/organizzatore/reimposta-password/:token" element={<OrganizzatoreReimpostaPasswordPage />} />
       <Route path="/tour-leader" element={<TourLeaderPage />} />
       <Route path="/finalizza/:token" element={<FinalizzaListaAttesaPage />} />
       <Route path="/completa-saldo/:pnr" element={<CompletaSaldoPage />} />
       <Route path="/offerta/:slug" element={<OffertaPage />} />
       <Route path="/eventi/:slug" element={<EventoPage />} />
+      <Route path="/w/:publicWidgetId" element={<WidgetPubblicoPage />} />
       <Route path="/scansione/accedi" element={<TourLeaderLoginPage />} />
       <Route path="/scansione/password-dimenticata" element={<TourLeaderPasswordDimenticataPage />} />
       <Route path="/scansione/reimposta-password/:token" element={<TourLeaderReimpostaPasswordPage />} />

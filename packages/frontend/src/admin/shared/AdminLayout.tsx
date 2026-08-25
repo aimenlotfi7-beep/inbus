@@ -8,7 +8,7 @@ import { chatApi } from '../../api/chat';
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'partenze'
   | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi'
-  | 'utenti' | 'promoter' | 'tourleader'
+  | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
   | 'fornitori' | 'tragitti'
   | 'chat' | 'contenuti'
   | 'amministratori' | 'ruoli' | 'impostazioni' | 'template-email' | 'layout-biglietto';
@@ -45,6 +45,8 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   ]},
   { titolo: 'Persone', voci: [
     { id: 'promoter', label: 'Promoter', permesso: 'promoter.visualizza' },
+    { id: 'organizzatori', label: 'Organizzatori', permesso: 'organizzatori.visualizza' },
+    { id: 'white-label', label: 'White Label', permesso: 'white-label.visualizza' },
     { id: 'tourleader', label: 'Tour Leader', permesso: 'tourleader.visualizza' },
   ]},
   { titolo: 'Logistica', voci: [

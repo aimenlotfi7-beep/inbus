@@ -1,0 +1,98 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import '../styles/promoter.css';
+import { organizzatoriApi, type Organizzatore, type EventoAssegnato } from '../api/organizzatori';
+import { ErroreApi } from '../api/client';
+import { CookieBanner } from '../features/CookieBanner';
+
+const CHIAVE_TOKEN = 'inbus_organizzatore_token';
+
+function fmtDataBreve(iso: string) {
+  return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+export function OrganizzatorePage() {
+  const [loggato, setLoggato] = useState(() => !!localStorage.getItem(CHIAVE_TOKEN));
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [errore, setErrore] = useState('');
+
+  async function accedi() {
+    setErrore('');
+    try {
+      const { token } = await organizzatoriApi.login(email, password);
+      localStorage.setItem(CHIAVE_TOKEN, token);
+      setLoggato(true);
+    } catch (e) {
+      setErrore(e instanceof ErroreApi ? e.message : 'Impossibile contattare il server');
+    }
+  }
+  function esci() {
+    localStorage.removeItem(CHIAVE_TOKEN);
+    setLoggato(false);
+  }
+
+  return (
+    <>
+      <header>
+        <div className="logo">IN<span>BUS</span><small>organizzatore</small></div>
+        <Link className="back-link" to="/">← Torna al sito</Link>
+        <button className={`btn btn-ghost${!loggato ? ' hidden' : ''}`} onClick={esci}>Esci</button>
+      </header>
+
+      <main>
+        <h1 className="page-title">Area Organizzatore</h1>
+        <p className="page-sub">Accedi per vedere gli eventi che INBUS ti ha associato.</p>
+
+        {!loggato && (
+          <div className="login-box">
+            <p>Inserisci email e password che ti ha fornito lo staff INBUS.</p>
+            <input type="email" placeholder="La tua email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && accedi()} />
+            <button className="btn btn-primary" onClick={accedi}>Accedi</button>
+            <p className="errore">{errore}</p>
+            <p style={{ marginTop: 10 }}><Link to="/organizzatore/password-dimenticata" style={{ fontSize: 12.5 }}>Password dimenticata?</Link></p>
+          </div>
+        )}
+
+        {loggato && <AreaOrganizzatore onErroreSessione={esci} />}
+      </main>
+      <CookieBanner />
+    </>
+  );
+}
+
+function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void }) {
+  const [organizzatore, setOrganizzatore] = useState<Organizzatore | null>(null);
+  const [eventi, setEventi] = useState<EventoAssegnato[] | null>(null);
+
+  useEffect(() => {
+    organizzatoriApi.me().then(setOrganizzatore).catch(onErroreSessione);
+    organizzatoriApi.meEventi().then(setEventi);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!organizzatore || !eventi) return <p style={{ color: 'var(--mist)' }}>Carico...</p>;
+
+  const eventiOrdinati = eventi.slice().sort((a, b) => a.data.localeCompare(b.data));
+
+  return (
+    <>
+      <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '4px 0 14px' }}>I tuoi eventi</h2>
+
+      {!eventiOrdinati.length && (
+        <div className="empty-box">Non hai ancora nessun evento associato — contatta INBUS per farti assegnare i tuoi eventi.</div>
+      )}
+
+      {eventiOrdinati.map((ev) => (
+        <div className="evento-link-card" key={ev.id}>
+          <div>
+            <h3>{ev.artista}</h3>
+            <p>{ev.luogo}, {ev.citta} · {fmtDataBreve(ev.data)}</p>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}

@@ -288,6 +288,20 @@
       "when": 1787608487603,
       "tag": "0040_arrivo_per_servizio",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1787636855193,
+      "tag": "0041_organizzatori",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1787638692182,
+      "tag": "0042_white_label",
+      "breakpoints": true
     }
   ]
 }

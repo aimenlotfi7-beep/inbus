@@ -15,6 +15,8 @@ import { UtentiScreen } from './screens/UtentiScreen';
 import { FornitoriScreen } from './screens/FornitoriScreen';
 import { PercorsiSalvatiScreen } from './screens/PercorsiSalvatiScreen';
 import { PromoterScreen } from './screens/PromoterScreen';
+import { OrganizzatoriScreen } from './screens/OrganizzatoriScreen';
+import { WhiteLabelScreen } from './screens/WhiteLabelScreen';
 import { TourLeaderScreen } from './screens/TourLeaderScreen';
 import { CouponScreen } from './screens/CouponScreen';
 import { CampagneScreen } from './screens/CampagneScreen';
@@ -47,6 +49,8 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   fornitori: FornitoriScreen,
   tragitti: PercorsiSalvatiScreen,
   promoter: PromoterScreen,
+  organizzatori: OrganizzatoriScreen,
+  'white-label': WhiteLabelScreen,
   tourleader: TourLeaderScreen,
   coupon: CouponScreen,
   campagne: CampagneScreen,
@@ -78,6 +82,8 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   fornitori: 'fornitori.visualizza',
   tragitti: 'tragitti.visualizza',
   promoter: 'promoter.visualizza',
+  organizzatori: 'organizzatori.visualizza',
+  'white-label': 'white-label.visualizza',
   tourleader: 'tourleader.visualizza',
   coupon: 'coupon.visualizza',
   campagne: 'campagne.gestisci',
