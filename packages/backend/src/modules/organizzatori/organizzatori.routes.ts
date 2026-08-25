@@ -67,20 +67,35 @@ export const organizzatoriService = {
    *  questo organizzatore (canale WHITE_LABEL), non tutte le vendite
    *  INBUS dell'evento — quelle non sono merito/sforzo suo. */
   async statistichePerEvento(organizzatoreId: string) {
-    return db
+    // Postgres restituisce le somme (sum/count) come testo, non come
+    // numero vero — TypeScript qui sopra "mentiva" dicendo <number>,
+    // ma a runtime arrivano stringhe. Convertite esplicitamente qui,
+    // una volta sola, così chi la usa dopo (sia il riepilogo generale
+    // che il dettaglio per evento) riceve sempre numeri veri, mai un
+    // crash tipo ".toFixed non è una funzione" su una stringa.
+    const righe = await db
       .select({
         eventoId: eventi.id,
         eventoArtista: eventi.artista,
-        numeroPrenotazioni: sql<number>`count(distinct ${prenotazioni.id})`,
-        viaggiatori: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)`,
-        fatturato: sql<number>`coalesce(sum(${prenotazioni.totale}), 0)`,
-        quotaOrganizzatore: sql<number>`coalesce(sum(${prenotazioni.commissioneImportoSnapshot}), 0)`,
+        numeroPrenotazioni: sql<string>`count(distinct ${prenotazioni.id})`,
+        viaggiatori: sql<string>`coalesce(sum(${prenotazioni.passeggeri}), 0)`,
+        fatturato: sql<string>`coalesce(sum(${prenotazioni.totale}), 0)`,
+        quotaOrganizzatore: sql<string>`coalesce(sum(${prenotazioni.commissioneImportoSnapshot}), 0)`,
       })
       .from(whiteLabel)
       .innerJoin(eventi, eq(whiteLabel.eventoId, eventi.id))
       .leftJoin(prenotazioni, and(eq(prenotazioni.whiteLabelId, whiteLabel.id), eq(prenotazioni.stato, 'CONFERMATA')))
       .where(eq(whiteLabel.organizzatoreId, organizzatoreId))
       .groupBy(eventi.id, eventi.artista);
+
+    return righe.map((r) => ({
+      eventoId: r.eventoId,
+      eventoArtista: r.eventoArtista,
+      numeroPrenotazioni: Number(r.numeroPrenotazioni),
+      viaggiatori: Number(r.viaggiatori),
+      fatturato: Number(r.fatturato),
+      quotaOrganizzatore: Number(r.quotaOrganizzatore),
+    }));
   },
 
   /** Il riepilogo per la dashboard — somma di tutti gli eventi. */
