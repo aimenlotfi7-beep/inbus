@@ -29,12 +29,12 @@ export const statisticheService = {
 
   /** Incasso per evento (per il grafico "eventi più venduti"). */
   async perEvento() {
-    return db
+    const righe = await db
       .select({
         eventoId: prenotazioni.eventoId,
         artista: eventi.artista,
-        incasso: sql<number>`sum(${prenotazioni.totale})`,
-        biglietti: sql<number>`sum(${prenotazioni.passeggeri})`,
+        incasso: sql<string>`sum(${prenotazioni.totale})`,
+        biglietti: sql<string>`sum(${prenotazioni.passeggeri})`,
       })
       .from(prenotazioni)
       .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
@@ -42,6 +42,7 @@ export const statisticheService = {
       .groupBy(prenotazioni.eventoId, eventi.artista)
       .orderBy(sql`sum(${prenotazioni.totale}) desc`)
       .limit(10);
+    return righe.map((r) => ({ ...r, incasso: Number(r.incasso), biglietti: Number(r.biglietti) }));
   },
 
   /** Confronto incasso mese corrente vs mese precedente. */
