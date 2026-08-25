@@ -46,7 +46,7 @@ export function WhiteLabelScreen() {
           <WhiteLabelEditor
             whiteLabel={whiteLabelAttiva}
             evento={{ artista: ev.artista, data: ev.data, luogo: ev.luogo, citta: ev.citta, descrizione: ev.descrizione }}
-            onSalvato={(wl) => setWhiteLabelAttiva(wl)}
+            onSalvato={() => { ricarica(); setVista('lista'); }}
           />
         )}
       </PaginaSezione>

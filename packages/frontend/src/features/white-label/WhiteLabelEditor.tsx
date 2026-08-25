@@ -24,6 +24,8 @@ export function WhiteLabelEditor({ whiteLabel, evento, onSalvato }: { whiteLabel
       const dominiPuliti = domini.split('\n').map((d) => d.trim()).filter(Boolean);
       const aggiornata = await whiteLabelApi.update(whiteLabel.id, { tema, dominiAutorizzati: dominiPuliti });
       onSalvato(aggiornata);
+    } catch (e) {
+      alert(e instanceof Error ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito, riprova.');
     } finally {
       setSalvando(false);
     }
