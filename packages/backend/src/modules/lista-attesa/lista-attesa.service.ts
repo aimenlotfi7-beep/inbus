@@ -1,7 +1,7 @@
 import { eq, and, desc, sql } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { listaAttesa, eventi, prenotazioni, fermate } from '../../db/schema.js';
+import { listaAttesa, eventi, prenotazioni, fermate, tragitti } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
@@ -44,9 +44,11 @@ export const listaAttesaService = {
         completata: listaAttesa.completata,
         dataCreazione: listaAttesa.dataCreazione,
         fermataCitta: fermate.citta,
+        servizioId: tragitti.servizioId,
       })
       .from(listaAttesa)
       .leftJoin(fermate, eq(fermate.id, listaAttesa.fermataId))
+      .leftJoin(tragitti, eq(tragitti.id, listaAttesa.tragittoId))
       .where(eq(listaAttesa.eventoId, eventoId))
       .orderBy(desc(listaAttesa.dataCreazione));
     return righe;

@@ -383,6 +383,14 @@ export const eventiService = {
 
         for (const esistente of serviziEsistenti) {
           if (idsInviati.has(esistente.id)) continue;
+          const tragittiDelServizio = await tx.select({ id: tragitti.id }).from(tragitti).where(eq(tragitti.servizioId, esistente.id));
+          if (tragittiDelServizio.length) {
+            const [conPrenotazioni] = await tx.select({ id: prenotazioni.id }).from(prenotazioni)
+              .where(and(inArray(prenotazioni.tragittoId, tragittiDelServizio.map((t) => t.id)), eq(prenotazioni.stato, 'CONFERMATA'))).limit(1);
+            if (conPrenotazioni) {
+              throw new ConflittoDati(`Il servizio "${esistente.nome}" ha prenotazioni confermate — non può essere eliminato. Rimuovilo dal form solo se prima annulli o sposti quelle prenotazioni.`);
+            }
+          }
           await tx.update(tragitti).set({ servizioId: null }).where(eq(tragitti.servizioId, esistente.id));
           await tx.delete(servizi).where(eq(servizi.id, esistente.id));
         }
@@ -408,6 +416,11 @@ export const eventiService = {
    *  di prima: qui non c'è più nulla da perdere per davvero. */
   async remove(id: string) {
     await getById(id);
+    const [conPrenotazioni] = await db.select({ id: prenotazioni.id }).from(prenotazioni)
+      .where(and(eq(prenotazioni.eventoId, id), eq(prenotazioni.stato, 'CONFERMATA'))).limit(1);
+    if (conPrenotazioni) {
+      throw new ConflittoDati('Questo evento ha prenotazioni confermate — non può essere eliminato. Contatta i clienti o cancella prima le loro prenotazioni.');
+    }
     await db.update(eventi).set({ eliminatoIl: new Date() }).where(eq(eventi.id, id));
   },
 

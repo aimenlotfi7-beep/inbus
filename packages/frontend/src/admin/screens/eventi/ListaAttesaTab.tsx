@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { listaAttesaApi, type IscrizioneListaAttesa } from '../../../api/listaAttesa';
 import { ErroreApi } from '../../../api/client';
 
-export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
+export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; servizi?: { key: string; nome: string }[] }) {
   const [lista, setLista] = useState<IscrizioneListaAttesa[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [ricerca, setRicerca] = useState('');
   const [filtroStato, setFiltroStato] = useState<'TUTTI' | 'IN_ATTESA' | 'PROMOSSA'>('TUTTI');
+  const [servizioAttivo, setServizioAttivo] = useState<string | 'liberi'>(servizi?.[0]?.key ?? 'liberi');
 
   function ricarica() {
     setCaricamento(true);
@@ -55,14 +56,23 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
 
   if (caricamento) return <p className="testo-intro">Carico...</p>;
 
+  // Se ci sono più servizi, ogni tab mostra solo le iscrizioni di quel
+  // servizio (o quelle senza preferenza, sotto "Liberi") — stessa
+  // logica delle Partenze: un badge segnala quante persone sono ancora
+  // "in attesa" (da promuovere) per ciascuno, così si vede subito dove
+  // serve intervenire senza doverle aprire una per una.
+  const listaVisibile = servizi && servizi.length > 0
+    ? lista.filter((r) => (servizioAttivo === 'liberi' ? !r.servizioId : r.servizioId === servizioAttivo))
+    : lista;
+
   // Raggruppo per fermata (in attesa, non ancora promosse) — così si
   // vede subito quante persone aspettano e per quale città, senza
   // doverle contare a mano scorrendo l'elenco.
-  const inAttesa = lista.filter((r) => r.stato === 'IN_ATTESA');
-  const promosse = lista.filter((r) => r.stato === 'PROMOSSA').length;
-  const confermate = lista.filter((r) => r.completata).length;
+  const inAttesa = listaVisibile.filter((r) => r.stato === 'IN_ATTESA');
+  const promosse = listaVisibile.filter((r) => r.stato === 'PROMOSSA').length;
+  const confermate = listaVisibile.filter((r) => r.completata).length;
 
-  const listaFiltrata = lista.filter((r) => {
+  const listaFiltrata = listaVisibile.filter((r) => {
     if (filtroStato !== 'TUTTI' && r.stato !== filtroStato) return false;
     const q = ricerca.trim().toLowerCase();
     if (q && !`${r.nome} ${r.cognome ?? ''} ${r.email}`.toLowerCase().includes(q)) return false;
@@ -77,6 +87,37 @@ export function ListaAttesaTab({ eventoId }: { eventoId: string }) {
 
   return (
     <div>
+      {servizi && servizi.length > 0 && (
+        <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+          {servizi.map((s) => {
+            const inAttesaQui = lista.filter((r) => r.servizioId === s.key && r.stato === 'IN_ATTESA').length;
+            return (
+              <button key={s.key} type="button" className={`mini-tab${servizioAttivo === s.key ? ' active' : ''}`} onClick={() => setServizioAttivo(s.key)}>
+                {s.nome}
+                {inAttesaQui > 0 && (
+                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 10.5, padding: '1px 6px', fontWeight: 700 }}>
+                    {inAttesaQui}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {lista.some((r) => !r.servizioId) && (() => {
+            const inAttesaLiberi = lista.filter((r) => !r.servizioId && r.stato === 'IN_ATTESA').length;
+            return (
+              <button type="button" className={`mini-tab${servizioAttivo === 'liberi' ? ' active' : ''}`} onClick={() => setServizioAttivo('liberi')}>
+                Senza preferenza
+                {inAttesaLiberi > 0 && (
+                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 10.5, padding: '1px 6px', fontWeight: 700 }}>
+                    {inAttesaLiberi}
+                  </span>
+                )}
+              </button>
+            );
+          })()}
+        </div>
+      )}
+
       {linkDaCopiare && (
         <div className="section-card" style={{ marginBottom: 16, borderColor: 'var(--pink)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>

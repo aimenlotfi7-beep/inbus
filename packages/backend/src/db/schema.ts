@@ -632,6 +632,29 @@ export const messaggiChat = pgTable('messaggi_chat', {
 });
 
 // ---------------------------------------------------------------------
+// COMUNICAZIONI — messaggi mirati ai clienti quando cambia qualcosa
+// (orario, luogo di una fermata, ecc), filtrati per evento e
+// facoltativamente per servizio/tratta/fermata specifica. Salvate qui
+// per tenerne traccia — "cosa ho scritto e a chi, e quando" — non solo
+// per inviarle e dimenticarle.
+// ---------------------------------------------------------------------
+export const comunicazioni = pgTable('comunicazioni', {
+  id: id(),
+  eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  oggetto: text('oggetto').notNull(),
+  corpo: text('corpo').notNull(),
+  // Il filtro usato per scegliere i destinatari — salvato così com'era
+  // al momento dell'invio, non ricalcolato dopo (se in futuro cambiano
+  // le prenotazioni, questo record resta la fotografia di allora).
+  filtroServizioIds: jsonb('filtro_servizio_ids').notNull().default('[]'),
+  filtroTragittoId: text('filtro_tragitto_id'),
+  filtroFermataId: text('filtro_fermata_id'),
+  canali: jsonb('canali').notNull().default('[]'), // es. ["EMAIL","CHAT"]
+  numeroDestinatari: integer('numero_destinatari').notNull().default(0),
+  creataIl: timestamp('creata_il').notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------
 // LISTA D'ATTESA
 // ---------------------------------------------------------------------
 export const listaAttesa = pgTable('lista_attesa', {

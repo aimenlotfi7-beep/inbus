@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { eventiApi } from '../api/eventi';
 import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
@@ -6,6 +6,10 @@ import { EventoCard } from '../features/eventi/EventoCard';
 import { CheckoutModal } from '../features/checkout/CheckoutModal';
 
 export function HomePage() {
+  const caroselloRef = useRef<HTMLDivElement>(null);
+  function scorriCarosello(direzione: 1 | -1) {
+    caroselloRef.current?.scrollBy({ left: direzione * 600, behavior: 'smooth' });
+  }
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
@@ -129,9 +133,13 @@ export function HomePage() {
               <h2 className="section-title">Eventi <em>consigliati</em></h2>
               <p className="section-sub">La nostra selezione dei viaggi più caldi del momento.</p>
             </div>
+            <div className="carosello-frecce">
+              <button type="button" onClick={() => scorriCarosello(-1)} aria-label="Scorri a sinistra">‹</button>
+              <button type="button" onClick={() => scorriCarosello(1)} aria-label="Scorri a destra">›</button>
+            </div>
           </div>
           <div className="carosello-wrap">
-            <div className="carosello">
+            <div className="carosello" ref={caroselloRef}>
               {consigliati.map((ev) => <EventoCard key={ev.id} evento={ev} />)}
             </div>
           </div>

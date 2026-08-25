@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Evento, OpzionePartenza, Servizio } from '../../api/types';
 import { eventiApi } from '../../api/eventi';
 import { prenotazioniApi } from '../../api/prenotazioni';
+import { whiteLabelApi } from '../../api/whiteLabel';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import { applicaScontoOfferta } from '../../api/prezzi';
 import { ErroreApi } from '../../api/client';
@@ -26,7 +27,7 @@ export interface OffertaCheckout { id: string; nome: string; scontoPercentuale: 
  * partecipanti, 3) pagamento — usato sia dentro il popup della home
  * (CheckoutModal) sia direttamente nella pagina dedicata dell'evento.
  */
-export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; offerta?: OffertaCheckout; onChiudi?: () => void }) {
+export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId }: { evento: Evento; offerta?: OffertaCheckout; onChiudi?: () => void; publicWidgetId?: string }) {
   const [stato, setStato] = useState<Stato>('caricamento');
   // Quale pulsante specifico è stato premuto — 'invio' da solo non basta,
   // altrimenti "Acquista" e "Prenota" si accenderebbero insieme (era
@@ -163,13 +164,13 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
       const utmMedium = parametriUrl.get('utm_medium') || undefined;
       const utmCampaign = parametriUrl.get('utm_campaign') || undefined;
       const utmContent = parametriUrl.get('utm_content') || undefined;
-      const prenotazione = await prenotazioniApi.crea({
+      const payloadPrenotazione = {
         eventoId: evento.id,
         tragittoId: opzioneScelta.tragittoId,
         fermataId: opzioneScelta.fermataId,
         passeggeri,
         tipoPagamento,
-        metodoPagamento: 'CARTA',
+        metodoPagamento: 'CARTA' as const,
         cliente: { email, nome, cognome, telefono },
         partecipanti,
         ...(promoterCodice && { promoterCodice }),
@@ -180,7 +181,15 @@ export function CheckoutForm({ evento, offerta, onChiudi }: { evento: Evento; of
         ...(utmMedium && { utmMedium }),
         ...(utmCampaign && { utmCampaign }),
         ...(utmContent && { utmContent }),
-      });
+      };
+      // Dentro il widget White Label la prenotazione passa da un
+      // endpoint diverso (stessa identica logica lato server — stesso
+      // calcolo prezzo, stesso blocco posti — solo con l'aggiunta
+      // dell'attribuzione del canale di vendita sopra), non dal
+      // normale endpoint del sito.
+      const prenotazione = publicWidgetId
+        ? await whiteLabelApi.prenota(publicWidgetId, payloadPrenotazione)
+        : await prenotazioniApi.crea(payloadPrenotazione);
       setPnrConfermato(prenotazione.pnr);
       setStato('confermato');
     } catch (e) {

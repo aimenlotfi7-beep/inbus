@@ -12,6 +12,7 @@ import { CaricaFile } from '../../shared/CaricaFile';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { PartenzeTab } from '../partenze/PartenzeTab';
 import { ListaAttesaTab } from './ListaAttesaTab';
+import { ComunicazioniTab } from './ComunicazioniTab';
 import { OfferteTab } from './OfferteTab';
 import { geocodifica, durataViaggio, attesa } from '../../shared/geo';
 
@@ -40,7 +41,7 @@ export function SchedaEventoModale({
   evento, tabIniziale = 'dettagli', soloQuestaTab = false, onClose, onSalvato,
 }: {
   evento: Evento | null; // null = nuovo evento
-  tabIniziale?: 'dettagli' | 'partenze' | 'lista-attesa' | 'offerte';
+  tabIniziale?: 'dettagli' | 'partenze' | 'lista-attesa' | 'offerte' | 'comunicazioni';
   // Se vero, nasconde del tutto le altre tab — usato dalle sezioni
   // principali del menu (Partenze, Lista d'attesa, Offerte), che devono
   // occuparsi solo della propria competenza, senza poter navigare per
@@ -53,7 +54,7 @@ export function SchedaEventoModale({
   const [categorie, setCategorie] = useState<Categoria[]>([]);
   const [layoutDisponibili, setLayoutDisponibili] = useState<LayoutBiglietto[]>([]);
   const [form, setForm] = useState<EventoInput>(VUOTO);
-  const [tabAttiva, setTabAttiva] = useState<'dettagli' | 'partenze' | 'lista-attesa' | 'offerte'>(tabIniziale);
+  const [tabAttiva, setTabAttiva] = useState<'dettagli' | 'partenze' | 'lista-attesa' | 'offerte' | 'comunicazioni'>(tabIniziale);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [subTabInfo, setSubTabInfo] = useState<'info' | 'descrizione'>('info');
   const [subTabImmagini, setSubTabImmagini] = useState<'immagini' | 'biglietto'>('immagini');
@@ -717,22 +718,29 @@ export function SchedaEventoModale({
               return (
                 <>
                   {rinominaServizioAperto ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, marginBottom: 14, alignItems: 'center' }}>
+                    <div style={{
+                      display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap',
+                      background: 'var(--dusk)', border: '1.5px solid var(--blue)', borderRadius: 999, padding: '6px 6px 6px 16px',
+                    }}>
                       <input
                         placeholder="Nome servizio"
                         defaultValue={servizioCorrente.nome}
                         onBlur={(e) => rinominaServizio(servizioCorrente.key, e.target.value)}
                         autoFocus
+                        style={{ flex: 1, minWidth: 120, border: 'none', background: 'transparent', padding: '6px 0' }}
                       />
-                      <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setRinominaServizioAperto(false)}>✓ Fatto</button>
-                      <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome || 'senza nome')}>Elimina</button>
+                      <button type="button" className="btn btn-ghost" style={{ fontSize: 12, borderRadius: 999 }} onClick={() => setRinominaServizioAperto(false)}>✓ Fatto</button>
+                      <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12, borderRadius: 999 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome || 'senza nome')}>Elimina</button>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, fontSize: 13 }}>
-                      <span>{servizioCorrente.nome}</span>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setRinominaServizioAperto(true)}>Rinomina</button>
-                        <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome)}>Elimina servizio</button>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14, fontSize: 13, flexWrap: 'wrap',
+                      background: 'var(--dusk)', border: '1.5px solid var(--blue)', borderRadius: 999, padding: '8px 8px 8px 16px',
+                    }}>
+                      <span style={{ fontWeight: 600 }}>{servizioCorrente.nome}</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button type="button" className="btn btn-ghost" style={{ fontSize: 12, borderRadius: 999 }} onClick={() => setRinominaServizioAperto(true)}>Rinomina</button>
+                        <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12, borderRadius: 999 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome)}>Elimina servizio</button>
                       </div>
                     </div>
                   )}
@@ -1009,7 +1017,7 @@ export function SchedaEventoModale({
 
   if (evento) {
     const titoloTab = soloQuestaTab
-      ? { dettagli: 'Modifica evento', partenze: 'Partenze', 'lista-attesa': "Lista d'attesa", offerte: 'Offerte' }[tabIniziale]
+      ? { dettagli: 'Modifica evento', partenze: 'Partenze', 'lista-attesa': "Lista d'attesa", offerte: 'Offerte', comunicazioni: 'Comunicazioni' }[tabIniziale]
       : 'Modifica evento';
     return (
       <PaginaSezione titolo={`${titoloTab} — ${evento.artista}`} onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)} larga={tabAttiva === 'partenze'}>
@@ -1018,12 +1026,14 @@ export function SchedaEventoModale({
             <button type="button" className={`mini-tab${tabAttiva === 'dettagli' ? ' active' : ''}`} onClick={() => setTabAttiva('dettagli')}>Dettagli</button>
             <button type="button" className={`mini-tab${tabAttiva === 'partenze' ? ' active' : ''}`} onClick={() => setTabAttiva('partenze')}>Partenze</button>
             <button type="button" className={`mini-tab${tabAttiva === 'lista-attesa' ? ' active' : ''}`} onClick={() => setTabAttiva('lista-attesa')}>Lista d'attesa</button>
+            {evento && <button type="button" className={`mini-tab${tabAttiva === 'comunicazioni' ? ' active' : ''}`} onClick={() => setTabAttiva('comunicazioni')}>Comunicazioni</button>}
             <button type="button" className={`mini-tab${tabAttiva === 'offerte' ? ' active' : ''}`} onClick={() => setTabAttiva('offerte')}>Offerte</button>
           </div>
         )}
 
         {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} servizi={servizi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} />}
-        {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} />}
+        {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} servizi={(evento.servizi ?? []).map((s) => ({ key: s.id, nome: s.nome }))} />}
+        {tabAttiva === 'comunicazioni' && evento && <ComunicazioniTab evento={evento} />}
         {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}
         {tabAttiva === 'dettagli' && (
           <>

@@ -46,6 +46,7 @@ export interface IscrizioneListaAttesa {
   completata: boolean;
   dataCreazione: string;
   fermataCitta: string | null;
+  servizioId: string | null;
 }
 
 export const listaAttesaApi = {

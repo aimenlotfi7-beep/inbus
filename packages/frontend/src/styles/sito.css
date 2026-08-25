@@ -462,8 +462,13 @@
 
     /* Chiuso: si vede solo il riepilogo, il modulo vero resta nascosto
        (non smontato — resta con tutti i dati già inseriti, se qualcuno
-       lo riapre dopo averlo chiuso non perde nulla). */
-    .checkout-riepilogo-chiuso{display:flex;}
+       lo riapre dopo averlo chiuso non perde nulla).
+       Su mobile però il riepilogo-chiuso inline NON si vede — c'è già
+       la barra fissa in fondo allo schermo che fa esattamente lo
+       stesso lavoro ("da €X ... Prenota"), sempre raggiungibile col
+       pollice: mostrare entrambi era una vera ripetizione, lo stesso
+       pulsante due volte sullo schermo mentre si scorre. */
+    .checkout-riepilogo-chiuso{display:none;}
     .checkout-form-wrap{display:none;}
     .evento-pagina-checkout.aperta-mobile .checkout-riepilogo-chiuso{display:none;}
     .evento-pagina-checkout.aperta-mobile .checkout-form-wrap{display:block;}

@@ -15,6 +15,7 @@ import { organizzatoriRouter } from './modules/organizzatori/organizzatori.route
 import { whiteLabelRouter } from './modules/white-label/white-label.routes.js';
 import { whiteLabelPubblicoRouter } from './modules/white-label/white-label-pubblico.routes.js';
 import { commissioniRouter } from './modules/commissioni/commissioni.routes.js';
+import { comunicazioniRouter } from './modules/comunicazioni/comunicazioni.routes.js';
 import { tourLeaderRouter } from './modules/tourleader/tourleader.routes.js';
 import { chatRouter } from './modules/chat/chat.routes.js';
 import { amministratoriRouter } from './modules/amministratori/amministratori.routes.js';
@@ -68,6 +69,7 @@ export function creaApp() {
   app.use('/api/admin/white-label', whiteLabelRouter);
   app.use('/api/public/widget', whiteLabelPubblicoRouter);
   app.use('/api/admin/commissioni', commissioniRouter);
+  app.use('/api/comunicazioni', comunicazioniRouter);
   app.use('/api/tour-leader', tourLeaderRouter);
   app.use('/api/chat', chatRouter);
   app.use('/api/amministratori', amministratoriRouter);
