@@ -10,6 +10,7 @@ export function HomePage() {
   function scorriCarosello(direzione: 1 | -1) {
     caroselloRef.current?.scrollBy({ left: direzione * 600, behavior: 'smooth' });
   }
+  const caroselloHeroRef = useRef<HTMLDivElement>(null);
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
@@ -33,6 +34,24 @@ export function HomePage() {
   }, []);
 
   const consigliati = useMemo(() => eventi.filter((e) => e.inEvidenza), [eventi]);
+
+  // Scorrimento automatico del carosello nell'hero — ogni 2 secondi
+  // avanza di una card, e torna all'inizio una volta arrivato in fondo
+  // (invece di restare bloccato contro il bordo destro).
+  useEffect(() => {
+    if (eventi.length < 2) return;
+    const intervallo = setInterval(() => {
+      const el = caroselloHeroRef.current;
+      if (!el) return;
+      const allaFine = el.scrollLeft + el.clientWidth >= el.scrollWidth - 10;
+      if (allaFine) {
+        el.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        el.scrollBy({ left: 300, behavior: 'smooth' });
+      }
+    }, 2000);
+    return () => clearInterval(intervallo);
+  }, [eventi.length]);
   const generi = useMemo(() => ['Tutti', ...new Set(eventi.map((e) => e.genere))], [eventi]);
   const [ricercaTesto, setRicercaTesto] = useState('');
   const eventiFiltrati = useMemo(() => {
@@ -61,6 +80,29 @@ export function HomePage() {
   return (
     <>
       <section className="hero">
+        {/* Ricerca in alto, centrata — non più dentro un "biglietto" a
+            fianco: un'unica barra semplice, ben visibile appena si
+            apre il sito. */}
+        <div className="hero-ricerca-top">
+          <div className="hero-ricerca-campo">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+            <input
+              type="text"
+              placeholder="Cerca artista, evento o città..."
+              list="artistiList"
+              value={ricercaTesto}
+              onChange={(e) => setRicercaTesto(e.target.value)}
+            />
+            <datalist id="artistiList">{eventi.map((e) => <option key={e.id} value={e.artista} />)}</datalist>
+          </div>
+          <select value={genereAttivo} onChange={(e) => setGenereAttivo(e.target.value)} className="hero-ricerca-genere">
+            {generi.map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
+          <button className="search-cta" onClick={() => document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' })}>
+            Cerca il bus
+          </button>
+        </div>
+
         <div className="hero-grid">
           <div>
             <div className="eyebrow">Bus per concerti in tutta Italia</div>
@@ -71,31 +113,13 @@ export function HomePage() {
               <div className="stat"><b>{cittaPartenza.length}</b><span>Città di partenza</span></div>
             </div>
           </div>
-          <div className="ticket">
-            <div className="ticket-head"><b>Boarding Pass</b><span>Trova il tuo bus</span></div>
-            <div className="field-row">
-              <div className="field">
-                <label>Artista, evento o città</label>
-                <input
-                  type="text"
-                  placeholder="Cerca..."
-                  list="artistiList"
-                  value={ricercaTesto}
-                  onChange={(e) => setRicercaTesto(e.target.value)}
-                />
-                <datalist id="artistiList">{eventi.map((e) => <option key={e.id} value={e.artista} />)}</datalist>
-              </div>
-              <div className="field">
-                <label>Genere</label>
-                <select value={genereAttivo} onChange={(e) => setGenereAttivo(e.target.value)}>
-                  {generi.map((g) => <option key={g} value={g}>{g}</option>)}
-                </select>
-              </div>
+
+          {/* Tutti gli eventi, che scorrono da soli ogni 2 secondi —
+              al posto del vecchio modulo di ricerca, ora spostato sopra. */}
+          <div className="hero-carosello-wrap">
+            <div className="hero-carosello" ref={caroselloHeroRef}>
+              {eventi.map((ev) => <EventoCard key={ev.id} evento={ev} />)}
             </div>
-            <button className="search-cta" onClick={() => document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' })}>
-              <svg viewBox="0 0 24 24"><path d="M21 11l-18-8 4 8-4 8z" /></svg>
-              Cerca il bus
-            </button>
           </div>
         </div>
       </section>

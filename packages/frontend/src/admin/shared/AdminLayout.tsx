@@ -10,7 +10,7 @@ export type SezioneGestionale =
   | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi'
   | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
   | 'fornitori' | 'tragitti'
-  | 'chat' | 'contenuti'
+  | 'chat' | 'contenuti' | 'comunicazioni'
   | 'amministratori' | 'ruoli' | 'impostazioni' | 'template-email' | 'layout-biglietto';
 
 // Ogni voce dichiara il permesso che serve per vederla. Chi ha ruolo
@@ -42,6 +42,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'utenti', label: 'Utenti', permesso: 'utenti.visualizza' },
     { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
     { id: 'chat', label: 'Chat', permesso: 'chat.visualizza' },
+    { id: 'comunicazioni', label: 'Comunicazioni', permesso: 'eventi.crea' },
   ]},
   { titolo: 'Persone', voci: [
     { id: 'promoter', label: 'Promoter', permesso: 'promoter.visualizza' },

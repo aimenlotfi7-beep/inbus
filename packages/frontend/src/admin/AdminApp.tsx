@@ -21,6 +21,7 @@ import { TourLeaderScreen } from './screens/TourLeaderScreen';
 import { CouponScreen } from './screens/CouponScreen';
 import { CampagneScreen } from './screens/CampagneScreen';
 import { ChatScreen } from './screens/ChatScreen';
+import { ComunicazioniScreen } from './screens/ComunicazioniScreen';
 import { ContenutiScreen } from './screens/ContenutiScreen';
 import { AmministratoriScreen } from './screens/AmministratoriScreen';
 import { RuoliScreen } from './screens/RuoliScreen';
@@ -57,6 +58,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   'lista-attesa': ListaAttesaScreen,
   offerte: OfferteScreen,
   chat: ChatScreen,
+  comunicazioni: ComunicazioniScreen,
   contenuti: ContenutiScreen,
   amministratori: AmministratoriScreen,
   ruoli: RuoliScreen,
@@ -90,6 +92,7 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   'lista-attesa': 'eventi.partenze',
   offerte: 'offerte.gestisci',
   chat: 'chat.visualizza',
+  comunicazioni: 'eventi.crea',
   contenuti: 'pagine.gestisci',
   amministratori: 'utenze.gestisci',
   ruoli: 'permessi.gestisci',

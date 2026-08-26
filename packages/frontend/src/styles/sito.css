@@ -101,6 +101,37 @@
   }
   @media (max-width:980px){ .hero-grid{grid-template-columns:1fr;} }
 
+  /* Ricerca centrata in alto — sostituisce il vecchio modulo dentro il
+     "biglietto" a fianco: una barra sola, ben visibile appena arrivi. */
+  .hero-ricerca-top{
+    display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap;
+    max-width:720px; margin:0 auto 48px; position:relative; z-index:1;
+  }
+  .hero-ricerca-campo{
+    display:flex; align-items:center; gap:10px; background:var(--paper); color:var(--ink);
+    border-radius:999px; padding:12px 20px; flex:1; min-width:220px; box-shadow:0 12px 30px -10px rgba(0,0,0,.5);
+  }
+  .hero-ricerca-campo svg{flex-shrink:0; opacity:.6;}
+  .hero-ricerca-campo input{
+    border:none; outline:none; background:transparent; font-family:'Poppins',sans-serif;
+    font-size:15px; font-weight:500; color:var(--ink); width:100%;
+  }
+  .hero-ricerca-genere{
+    background:var(--paper); color:var(--ink); border:none; border-radius:999px; padding:12px 18px;
+    font-family:'Poppins',sans-serif; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  @media (max-width:600px){ .hero-ricerca-top{flex-direction:column; align-items:stretch;} }
+
+  /* Tutti gli eventi, al posto del vecchio "biglietto" — scorrono da
+     soli (gestito via JS, ogni 2 secondi), oltre a poter scorrere a
+     mano col dito/trackpad in qualsiasi momento. */
+  .hero-carosello-wrap{overflow:hidden; border-radius:18px;}
+  .hero-carosello{
+    display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; padding-bottom:4px;
+  }
+  .hero-carosello::-webkit-scrollbar{display:none;}
+  .hero-carosello .card{flex:0 0 auto; width:240px; scroll-snap-align:start;}
+
   .eyebrow{
     font-family:'Space Mono',monospace; font-size:12px; letter-spacing:3px; text-transform:uppercase;
     color:var(--amber); display:flex; align-items:center; gap:10px; margin-bottom:22px;
