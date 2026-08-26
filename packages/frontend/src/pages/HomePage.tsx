@@ -16,7 +16,6 @@ export function HomePage() {
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
   const [eventoInCheckout, setEventoInCheckout] = useState<Evento | null>(null);
-  const [genereAttivo, setGenereAttivo] = useState('Tutti');
 
   useEffect(() => {
     eventiApi.list({ soloFuturi: true, soloVisibili: true })
@@ -56,9 +55,15 @@ export function HomePage() {
   const generi = useMemo(() => ['Tutti', ...new Set(eventi.map((e) => e.genere))], [eventi]);
   const [searchParams, setSearchParams] = useSearchParams();
   const ricercaTesto = searchParams.get('q') ?? '';
+  const genereAttivo = searchParams.get('genere') ?? 'Tutti';
   function setRicercaTesto(valore: string) {
     const nuovi = new URLSearchParams(searchParams);
     if (valore) nuovi.set('q', valore); else nuovi.delete('q');
+    setSearchParams(nuovi, { replace: true });
+  }
+  function setGenereAttivo(g: string) {
+    const nuovi = new URLSearchParams(searchParams);
+    if (g === 'Tutti') nuovi.delete('genere'); else nuovi.set('genere', g);
     setSearchParams(nuovi, { replace: true });
   }
   const eventiFiltrati = useMemo(() => {
@@ -86,24 +91,6 @@ export function HomePage() {
 
   return (
     <>
-      {/* Solo le categorie — la ricerca vera ora vive nell'header
-          (sempre visibile lì, su ogni scroll), non serve ripeterla
-          anche qui. */}
-      <div className="hero-ricerca-top">
-        <div className="hero-ricerca-categorie">
-          {['Tutti', 'Concerti', 'Festival', 'Sport'].map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              className={`categoria-chip${genereAttivo === cat ? ' active' : ''}`}
-              onClick={() => setGenereAttivo(cat)}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <section className="hero">
         <div className="hero-grid">
           <div>

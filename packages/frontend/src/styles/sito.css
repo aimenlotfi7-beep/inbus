@@ -104,10 +104,13 @@
 
   /* Ricerca compatta dentro l'header stesso — solo sulla homepage
      (vedi Layout.tsx), nello spazio tra le voci di menu e "Accedi". */
+  .header-ricerca-gruppo{
+    display:flex; align-items:center; gap:12px;
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  }
   .header-ricerca{
     display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.08); color:var(--paper);
-    border:1px solid var(--line); border-radius:999px; padding:6px 16px; width:340px; max-width:36vw;
-    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    border:1px solid var(--line); border-radius:999px; padding:6px 16px; width:280px; max-width:26vw;
   }
   .header-ricerca button{
     display:flex; background:none; border:none; padding:0; margin:0; color:var(--paper); opacity:.65; cursor:pointer; flex-shrink:0;
@@ -118,17 +121,13 @@
     font-size:13.5px; font-weight:500; color:var(--paper); width:100%;
   }
   .header-ricerca input::placeholder{color:var(--mist);}
-  @media (max-width:1100px){ .header-ricerca{display:none;} }
+  .header-categorie{display:flex; gap:6px; flex-shrink:0;}
+  @media (max-width:1300px){ .header-categorie{display:none;} }
+  @media (max-width:1100px){ .header-ricerca-gruppo{display:none;} }
 
-  /* Solo le categorie, sotto l'hero — la ricerca vera ormai sta
-     nell'header sopra, sempre visibile, non serve ripeterla qui. */
-  .hero-ricerca-top{
-    display:flex; padding:0 clamp(20px,5vw,64px); margin-bottom:32px;
-  }
-  .hero-ricerca-categorie{display:flex; gap:8px; flex-wrap:wrap;}
   .categoria-chip{
     background:transparent; border:1px solid var(--line); color:var(--mist);
-    border-radius:999px; padding:6px 16px; font-family:'Poppins',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer;
+    border-radius:999px; padding:6px 14px; font-family:'Poppins',sans-serif; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;
   }
   .categoria-chip.active{background:var(--pink); border-color:var(--pink); color:#fff;}
   .categoria-chip:hover:not(.active){border-color:var(--pink); color:var(--paper);}

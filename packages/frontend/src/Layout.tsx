@@ -15,6 +15,12 @@ export function Layout({ children }: { children: ReactNode }) {
   // HomePage è solo una di quelle).
   const [searchParams, setSearchParams] = useSearchParams();
   const testoRicerca = searchParams.get('q') ?? '';
+  const genereAttivo = searchParams.get('genere') ?? 'Tutti';
+  function impostaGenere(g: string) {
+    const nuovi = new URLSearchParams(searchParams);
+    if (g === 'Tutti') nuovi.delete('genere'); else nuovi.set('genere', g);
+    setSearchParams(nuovi, { replace: true });
+  }
 
   return (
     <>
@@ -27,24 +33,38 @@ export function Layout({ children }: { children: ReactNode }) {
           </nav>
         </div>
         {inHomepage && (
-          <form
-            className="header-ricerca"
-            onSubmit={(e) => { e.preventDefault(); document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' }); }}
-          >
-            <button type="submit" aria-label="Cerca">
-              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
-            </button>
-            <input
-              type="text"
-              placeholder="Cerca artista, evento o città..."
-              value={testoRicerca}
-              onChange={(e) => {
-                const nuovi = new URLSearchParams(searchParams);
-                if (e.target.value) nuovi.set('q', e.target.value); else nuovi.delete('q');
-                setSearchParams(nuovi, { replace: true });
-              }}
-            />
-          </form>
+          <div className="header-ricerca-gruppo">
+            <form
+              className="header-ricerca"
+              onSubmit={(e) => { e.preventDefault(); document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' }); }}
+            >
+              <button type="submit" aria-label="Cerca">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+              </button>
+              <input
+                type="text"
+                placeholder="Cerca artista, evento o città..."
+                value={testoRicerca}
+                onChange={(e) => {
+                  const nuovi = new URLSearchParams(searchParams);
+                  if (e.target.value) nuovi.set('q', e.target.value); else nuovi.delete('q');
+                  setSearchParams(nuovi, { replace: true });
+                }}
+              />
+            </form>
+            <div className="header-categorie">
+              {['Tutti', 'Concerti', 'Festival', 'Sport'].map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`categoria-chip${genereAttivo === cat ? ' active' : ''}`}
+                  onClick={() => impostaGenere(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         <div className="nav-actions">
           <Link className="btn btn-ghost desktop-only" to={loggato ? '/account' : '/accedi'}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
