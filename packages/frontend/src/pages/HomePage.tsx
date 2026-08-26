@@ -79,11 +79,12 @@ export function HomePage() {
 
   return (
     <>
-      <section className="hero">
-        {/* Ricerca in alto, centrata — non più dentro un "biglietto" a
-            fianco: un'unica barra semplice, ben visibile appena si
-            apre il sito. */}
-        <div className="hero-ricerca-top">
+      {/* Ricerca fissa in alto, trasparente — fuori da .hero apposta
+          (che ha overflow:hidden per i gradienti decorativi, e
+          romperebbe lo "sticky" se fosse dentro): così resta visibile
+          scorrendo tutta la pagina, non solo dentro l'hero. */}
+      <div className="hero-ricerca-top">
+        <div className="hero-ricerca-riga">
           <div className="hero-ricerca-campo">
             <svg viewBox="0 0 24 24" width="18" height="18"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
             <input
@@ -95,14 +96,25 @@ export function HomePage() {
             />
             <datalist id="artistiList">{eventi.map((e) => <option key={e.id} value={e.artista} />)}</datalist>
           </div>
-          <select value={genereAttivo} onChange={(e) => setGenereAttivo(e.target.value)} className="hero-ricerca-genere">
-            {generi.map((g) => <option key={g} value={g}>{g}</option>)}
-          </select>
           <button className="search-cta" onClick={() => document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' })}>
             Cerca il bus
-          </button>
+            </button>
+          </div>
+          <div className="hero-ricerca-categorie">
+            {['Tutti', 'Concerti', 'Festival', 'Sport'].map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                className={`categoria-chip${genereAttivo === cat ? ' active' : ''}`}
+                onClick={() => setGenereAttivo(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
 
+      <section className="hero">
         <div className="hero-grid">
           <div>
             <div className="eyebrow">Bus per concerti in tutta Italia</div>
