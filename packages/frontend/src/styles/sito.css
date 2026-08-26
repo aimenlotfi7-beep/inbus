@@ -14,7 +14,7 @@
     --radius: 14px;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
+  html,body{margin:0;padding:0; overflow-x:hidden;}
   body{
     background:var(--night);
     color:var(--paper);
@@ -85,6 +85,8 @@
   .mobile-nav.open{display:flex;}
   .mobile-nav a{padding:13px 10px; border-radius:8px; font-size:15.5px; color:var(--paper);}
   .mobile-nav a:active{background:rgba(255,61,122,.1);}
+  .mobile-nav .header-ricerca.mobile-ricerca{width:100%; max-width:none; margin-bottom:10px;}
+  .mobile-categorie{flex-wrap:wrap; margin-bottom:14px;}
   @media (min-width:901px){ .mobile-nav{display:none !important;} }
 
   /* ---------- HERO ---------- */
@@ -135,9 +137,10 @@
   /* Tutti gli eventi, al posto del vecchio "biglietto" — scorrono da
      soli (gestito via JS, ogni 2 secondi), oltre a poter scorrere a
      mano col dito/trackpad in qualsiasi momento. */
-  .hero-carosello-wrap{overflow:hidden; border-radius:18px;}
+  .hero-carosello-wrap{overflow:hidden; border-radius:18px; min-width:0;}
   .hero-carosello{
     display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; padding-bottom:4px;
+    width:100%; min-width:0;
   }
   .hero-carosello::-webkit-scrollbar{display:none;}
   .hero-carosello .card{flex:0 0 auto; width:240px; scroll-snap-align:start;}
