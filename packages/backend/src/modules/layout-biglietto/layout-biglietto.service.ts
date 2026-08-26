@@ -4,29 +4,56 @@ import { db } from '../../db/client.js';
 import { layoutBiglietto } from '../../db/schema.js';
 import { NonTrovato, ErroreApplicativo } from '../../shared/errors.js';
 
-/** Le sezioni disponibili per comporre il biglietto — l'ordine in cui
- *  compaiono nell'array "ordineElementi" della configurazione è l'ordine
- *  in cui vengono disegnate sul PDF, dall'alto in basso. Non è un
- *  posizionamento libero pixel-per-pixel (rischierebbe sovrapposizioni
- *  strane cambiando i dati) — ma riordinare le sezioni, spostare il QR,
- *  cambiarne la dimensione/allineamento e i colori copre comunque bene
- *  "spostare posizione QR code, scritte e immagini". */
+/** Le sezioni disponibili per comporre il biglietto — ognuna ha una
+ *  posizione e una dimensione LIBERE (in percentuale della pagina, non
+ *  pixel fissi: così l'editor funziona identico a qualunque zoom/
+ *  risoluzione, e il PDF vero — sempre alla stessa dimensione A5 — si
+ *  ottiene moltiplicando la percentuale per le dimensioni reali della
+ *  pagina). L'admin trascina/ridimensiona ogni sezione dove vuole. */
 export const SEZIONI_DISPONIBILI = ['intestazione_immagine', 'titolo', 'evento', 'partenza', 'passeggero', 'pnr', 'qr', 'nota'] as const;
 export type SezioneBiglietto = typeof SEZIONI_DISPONIBILI[number];
 
+export interface Posizione {
+  x: number; // percentuale da sinistra (0-100)
+  y: number; // percentuale dall'alto (0-100)
+  larghezza: number; // percentuale della larghezza pagina
+  altezza: number; // percentuale dell'altezza pagina
+}
+
 export interface ConfigurazioneLayout {
   coloreAccento: string; // usato se l'evento non ne ha impostato uno suo
-  ordineElementi: SezioneBiglietto[];
-  qr: { dimensione: number; allineamento: 'sinistra' | 'centro' | 'destra' };
-  spaziaturaSezioni: number; // moltiplicatore della spaziatura verticale tra sezioni (1 = normale)
+  posizioni: Record<SezioneBiglietto, Posizione>;
+  qr: { dimensione: number }; // percentuale della larghezza pagina — l'allineamento non serve più, la posizione libera lo sostituisce
+  sfondoImmagineUrl: string | null;
+  // Quanto è visibile lo sfondo importato — 1 = pieno, 0 = del tutto
+  // sbiadito verso il bianco (utile per non "coprire" il testo sopra).
+  sfondoOpacita: number;
+  spaziaturaSezioni: number; // tenuto per compatibilità, non più usato attivamente col posizionamento libero
 }
+
+/** Posizioni di partenza — ricalcano grosso modo il vecchio ordine
+ *  "a flusso" dall'alto in basso, così un layout esistente aggiornato
+ *  a questo nuovo formato parte già da qualcosa di sensato invece che
+ *  da zero. */
+const POSIZIONI_BASE: Record<SezioneBiglietto, Posizione> = {
+  intestazione_immagine: { x: 0, y: 0, larghezza: 100, altezza: 22 },
+  titolo: { x: 8, y: 26, larghezza: 84, altezza: 9 },
+  evento: { x: 8, y: 37, larghezza: 84, altezza: 15 },
+  partenza: { x: 8, y: 54, larghezza: 84, altezza: 8 },
+  passeggero: { x: 8, y: 64, larghezza: 84, altezza: 8 },
+  pnr: { x: 8, y: 74, larghezza: 84, altezza: 8 },
+  qr: { x: 35, y: 82, larghezza: 30, altezza: 15 },
+  nota: { x: 8, y: 92, larghezza: 84, altezza: 6 },
+};
 
 /** Configurazione di base — usata per il layout "predefinito" creato al
  *  primo avvio, e come riferimento per capire la struttura attesa. */
 export const CONFIG_BASE: ConfigurazioneLayout = {
   coloreAccento: '#111111',
-  ordineElementi: ['intestazione_immagine', 'titolo', 'evento', 'partenza', 'passeggero', 'pnr', 'qr', 'nota'],
-  qr: { dimensione: 140, allineamento: 'centro' },
+  posizioni: POSIZIONI_BASE,
+  qr: { dimensione: 33 },
+  sfondoImmagineUrl: null,
+  sfondoOpacita: 1,
   spaziaturaSezioni: 1,
 };
 
@@ -44,6 +71,12 @@ export async function sincronizzaLayoutBiglietto() {
   }
 }
 
+function validaPosizione(p: unknown): p is Posizione {
+  if (!p || typeof p !== 'object') return false;
+  const q = p as Partial<Posizione>;
+  return typeof q.x === 'number' && typeof q.y === 'number' && typeof q.larghezza === 'number' && typeof q.altezza === 'number';
+}
+
 function validaConfigurazione(testo: string): ConfigurazioneLayout {
   let dati: unknown;
   try {
@@ -52,19 +85,29 @@ function validaConfigurazione(testo: string): ConfigurazioneLayout {
     throw new ErroreApplicativo('La configurazione non è un JSON valido.');
   }
   const c = dati as Partial<ConfigurazioneLayout>;
-  if (!c.ordineElementi || !Array.isArray(c.ordineElementi) || c.ordineElementi.some((e) => !SEZIONI_DISPONIBILI.includes(e))) {
-    throw new ErroreApplicativo(`"ordineElementi" deve essere un elenco con solo questi valori: ${SEZIONI_DISPONIBILI.join(', ')}.`);
-  }
   if (!c.coloreAccento || typeof c.coloreAccento !== 'string') {
     throw new ErroreApplicativo('"coloreAccento" mancante o non valido.');
   }
-  if (!c.qr || typeof c.qr.dimensione !== 'number' || !['sinistra', 'centro', 'destra'].includes(c.qr.allineamento as string)) {
-    throw new ErroreApplicativo('"qr" mancante o non valido (servono dimensione e allineamento).');
+  if (!c.qr || typeof c.qr.dimensione !== 'number') {
+    throw new ErroreApplicativo('"qr" mancante o non valido (serve la dimensione).');
+  }
+  // Le posizioni mancanti prendono quella di base — così un layout
+  // vecchio (dal formato precedente) o con una sezione nuova aggiunta
+  // in futuro non va mai in errore, semplicemente parte da un punto
+  // di partenza sensato invece di rompersi.
+  const posizioni: Record<SezioneBiglietto, Posizione> = { ...POSIZIONI_BASE };
+  if (c.posizioni && typeof c.posizioni === 'object') {
+    for (const sezione of SEZIONI_DISPONIBILI) {
+      const p = (c.posizioni as Record<string, unknown>)[sezione];
+      if (validaPosizione(p)) posizioni[sezione] = p;
+    }
   }
   return {
     coloreAccento: c.coloreAccento,
-    ordineElementi: c.ordineElementi,
-    qr: c.qr,
+    posizioni,
+    qr: { dimensione: c.qr.dimensione },
+    sfondoImmagineUrl: typeof c.sfondoImmagineUrl === 'string' ? c.sfondoImmagineUrl : null,
+    sfondoOpacita: typeof c.sfondoOpacita === 'number' ? Math.max(0, Math.min(1, c.sfondoOpacita)) : 1,
     spaziaturaSezioni: typeof c.spaziaturaSezioni === 'number' ? c.spaziaturaSezioni : 1,
   };
 }
@@ -79,14 +122,18 @@ async function scaricaImmagine(url: string): Promise<Buffer | null> {
   }
 }
 
-/** Disegna davvero il PDF del biglietto, seguendo l'ordine e lo stile
- *  della configurazione. Usata sia per l'emissione vera (ticket.service)
- *  sia per l'anteprima di prova nell'editor del layout. */
+/** Disegna davvero il PDF del biglietto, ogni sezione nella posizione
+ *  libera scelta dall'admin nell'editor (percentuale della pagina,
+ *  convertita qui in punti reali). Usata sia per l'emissione vera
+ *  (ticket.service) sia per l'anteprima di prova nell'editor. */
 export async function disegnaBigliettoPdf(config: ConfigurazioneLayout, dati: {
   artista: string; dataEvento: Date; fermataCitta: string; fermataOrario: string | null;
   passeggeriNomi: string[]; pnr: string; qrDataUrl: string; immagineIntestazioneUrl: string | null;
 }): Promise<Buffer> {
-  const immagineBuffer = dati.immagineIntestazioneUrl ? await scaricaImmagine(dati.immagineIntestazioneUrl) : null;
+  const [immagineIntestazioneBuffer, sfondoBuffer] = await Promise.all([
+    dati.immagineIntestazioneUrl ? scaricaImmagine(dati.immagineIntestazioneUrl) : Promise.resolve(null),
+    config.sfondoImmagineUrl ? scaricaImmagine(config.sfondoImmagineUrl) : Promise.resolve(null),
+  ]);
   const colore = config.coloreAccento;
 
   return new Promise((resolve, reject) => {
@@ -96,69 +143,65 @@ export async function disegnaBigliettoPdf(config: ConfigurazioneLayout, dati: {
     doc.on('end', () => resolve(Buffer.concat(chunk)));
     doc.on('error', reject);
 
-    const margine = 36;
-    const spazio = () => doc.moveDown(1 * config.spaziaturaSezioni);
-    let primaSezioneTesto = true;
+    const W = doc.page.width;
+    const H = doc.page.height;
+    // Percentuale -> punti reali della pagina, sempre la stessa
+    // formula usata dall'editor per calcolare l'anteprima — così
+    // "quello che vedi è quello che ottieni".
+    const px = (p: Posizione) => ({ x: (p.x / 100) * W, y: (p.y / 100) * H, larghezza: (p.larghezza / 100) * W, altezza: (p.altezza / 100) * H });
 
-    for (const sezione of config.ordineElementi) {
-      if (sezione === 'intestazione_immagine') {
-        if (immagineBuffer) {
-          const altezzaFascia = 130;
-          try {
-            doc.image(immagineBuffer, 0, 0, { width: doc.page.width, height: altezzaFascia, cover: [doc.page.width, altezzaFascia] });
-            doc.x = margine;
-            doc.y = altezzaFascia + 20;
-          } catch {
-            doc.x = margine;
-            doc.y = margine;
-          }
+    // Sfondo importato — disegnato per primo, sotto a tutto il resto,
+    // poi sfumato verso il bianco in base all'opacità scelta (1 =
+    // pieno, 0 = quasi invisibile) così il testo sopra resta leggibile
+    // anche con un'immagine vivace.
+    if (sfondoBuffer) {
+      try {
+        doc.image(sfondoBuffer, 0, 0, { width: W, height: H, cover: [W, H] });
+        if (config.sfondoOpacita < 1) {
+          doc.fillOpacity(1 - config.sfondoOpacita).rect(0, 0, W, H).fill('#ffffff');
+          doc.fillOpacity(1);
         }
-        continue;
-      }
+      } catch { /* sfondo non caricabile, si prosegue senza */ }
+    }
 
-      if (!primaSezioneTesto || doc.y < margine) doc.x = margine;
-      if (doc.y < margine) doc.y = margine;
+    for (const sezione of SEZIONI_DISPONIBILI) {
+      const pos = px(config.posizioni[sezione]);
 
-      if (sezione === 'titolo') {
-        doc.fillColor(colore).font('Helvetica-Bold').fontSize(22).text('INBUS', margine, doc.y);
-        doc.font('Helvetica').fontSize(11).fillColor('#666').text('BIGLIETTO DIGITALE', margine, doc.y);
-        spazio();
+      if (sezione === 'intestazione_immagine') {
+        if (immagineIntestazioneBuffer) {
+          try {
+            doc.image(immagineIntestazioneBuffer, pos.x, pos.y, { width: pos.larghezza, height: pos.altezza, cover: [pos.larghezza, pos.altezza] });
+          } catch { /* immagine non caricabile, si salta */ }
+        }
+      } else if (sezione === 'titolo') {
+        doc.fillColor(colore).font('Helvetica-Bold').fontSize(22).text('INBUS', pos.x, pos.y, { width: pos.larghezza });
+        doc.font('Helvetica').fontSize(11).fillColor('#666').text('BIGLIETTO DIGITALE', pos.x, doc.y, { width: pos.larghezza });
       } else if (sezione === 'evento') {
-        doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('EVENTO', margine, doc.y);
-        doc.fillColor('#000').font('Helvetica-Bold').fontSize(18).text(dati.artista, margine, doc.y);
+        doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('EVENTO', pos.x, pos.y, { width: pos.larghezza });
+        doc.fillColor('#000').font('Helvetica-Bold').fontSize(18).text(dati.artista, pos.x, doc.y, { width: pos.larghezza });
         doc.font('Helvetica').fontSize(12).text(
           dati.dataEvento.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
-          margine, doc.y,
+          pos.x, doc.y, { width: pos.larghezza },
         );
-        spazio();
       } else if (sezione === 'partenza') {
-        doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('PARTENZA', margine, doc.y);
-        doc.fillColor('#000').font('Helvetica').fontSize(13).text(`${dati.fermataCitta}${dati.fermataOrario ? ` — ore ${dati.fermataOrario}` : ''}`, margine, doc.y);
-        spazio();
+        doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('PARTENZA', pos.x, pos.y, { width: pos.larghezza });
+        doc.fillColor('#000').font('Helvetica').fontSize(13).text(`${dati.fermataCitta}${dati.fermataOrario ? ` — ore ${dati.fermataOrario}` : ''}`, pos.x, doc.y, { width: pos.larghezza });
       } else if (sezione === 'passeggero') {
-        doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('PASSEGGER' + (dati.passeggeriNomi.length > 1 ? 'I' : 'O'), margine, doc.y);
-        doc.fillColor('#000').font('Helvetica').fontSize(12).text(dati.passeggeriNomi.join('\n'), margine, doc.y);
-        spazio();
+        doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('PASSEGGER' + (dati.passeggeriNomi.length > 1 ? 'I' : 'O'), pos.x, pos.y, { width: pos.larghezza });
+        doc.fillColor('#000').font('Helvetica').fontSize(12).text(dati.passeggeriNomi.join('\n'), pos.x, doc.y, { width: pos.larghezza });
       } else if (sezione === 'pnr') {
-        doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('PNR', margine, doc.y);
-        doc.fillColor('#000').font('Helvetica-Bold').fontSize(16).text(dati.pnr, margine, doc.y);
-        spazio();
+        doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('PNR', pos.x, pos.y, { width: pos.larghezza });
+        doc.fillColor('#000').font('Helvetica-Bold').fontSize(16).text(dati.pnr, pos.x, doc.y, { width: pos.larghezza });
       } else if (sezione === 'qr') {
         const qrBuffer = Buffer.from(dati.qrDataUrl.split(',')[1], 'base64');
-        const dim = config.qr.dimensione;
-        const x = config.qr.allineamento === 'sinistra' ? margine
-          : config.qr.allineamento === 'destra' ? doc.page.width - margine - dim
-          : doc.page.width / 2 - dim / 2;
-        doc.image(qrBuffer, x, doc.y, { width: dim, height: dim });
-        doc.y += dim + 10;
+        const dim = (config.qr.dimensione / 100) * W;
+        doc.image(qrBuffer, pos.x, pos.y, { width: dim, height: dim });
       } else if (sezione === 'nota') {
         doc.font('Helvetica').fontSize(9).fillColor('#666').text(
           'Conserva questo biglietto e mostralo al momento della salita sul bus.',
-          margine, doc.y, { align: 'center', width: doc.page.width - margine * 2 },
+          pos.x, pos.y, { align: 'center', width: pos.larghezza },
         );
-        spazio();
       }
-      primaSezioneTesto = false;
     }
 
     doc.end();
