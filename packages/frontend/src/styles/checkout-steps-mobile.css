@@ -1,0 +1,90 @@
+/*
+ * checkout-steps-mobile.css
+ *
+ * Mobile checkout stepper:
+ * - step attivo: mostra etichetta
+ * - step non attivo: mostra solo il pallino
+ * - step completato: mantiene il pallino con la spunta
+ */
+
+@media (max-width: 768px) {
+
+  .checkout-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    overflow-x: auto;
+    width: 100%;
+    padding: 4px 0;
+  }
+
+  .checkout-step-dot {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /*
+   * Il primo span è il pallino numerato/spunta.
+   */
+  .checkout-step-dot > span:first-child {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+
+    border: 1px solid #d8d0c0;
+    border-radius: 50%;
+
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  /*
+   * Etichetta nascosta sugli step non attivi.
+   */
+  .checkout-step-etichetta {
+    display: none;
+    white-space: nowrap;
+    margin-left: 8px;
+  }
+
+  /*
+   * STEP ATTIVO:
+   * mostra etichetta e nasconde il pallino.
+   */
+  .checkout-step-dot.active > span:first-child {
+    display: none;
+  }
+
+  .checkout-step-dot.active .checkout-step-etichetta {
+    display: inline;
+  }
+
+  /*
+   * STEP COMPLETATO:
+   * pallino rosa con spunta bianca.
+   */
+  .checkout-step-dot.completato > span:first-child {
+    background: var(--pink);
+    border-color: var(--pink);
+    color: #fff;
+  }
+
+  /*
+   * Collegamento visivo tra gli step.
+   */
+  .checkout-step-dot:not(:last-child)::after {
+    content: '';
+    width: 14px;
+    height: 1px;
+    background: #d8d0bf;
+    margin-left: 6px;
+  }
+}
