@@ -508,8 +508,12 @@
 
   @media (max-width:900px){
     .evento-pagina-corpo{grid-template-columns:1fr; gap:24px; padding-bottom:70px;}
-    .evento-pagina-checkout{position:static; padding:18px; min-height:0;}
-    .evento-pagina-checkout.aperta-mobile{padding:30px; min-height:440px;}
+    /* Chiuso: il contenitore intero sparisce (niente sfondo/padding
+       vuoti in giro) — la barra fissa in fondo allo schermo fa già da
+       sola il lavoro di "prezzo + Prenota". Si apre solo quando il
+       cliente tocca quella barra. */
+    .evento-pagina-checkout{display:none;}
+    .evento-pagina-checkout.aperta-mobile{display:block; position:static; padding:30px; min-height:440px;}
     .evento-pagina-hero{aspect-ratio:16/9; max-width:320px;}
     .salti-rapidi-mobile{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;}
     .salti-rapidi-mobile .btn{font-size:12.5px; padding:8px 14px; text-decoration:none;}
