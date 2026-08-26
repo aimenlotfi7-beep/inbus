@@ -609,8 +609,8 @@
   /* Sotto i 480px le etichette di testo sparirebbero facilmente (4
      step per gli eventi con più servizi) — restano solo i pallini
      numerati, sempre tutti visibili senza dover scorrere. */
-  @media (max-width:480px){ .checkout-step-etichetta{display:none;} .checkout-stepper{gap:10px;} }
-  .checkout-step-dot span{
+  
+  .checkout-step-dot span:first-child{
     width:24px; height:24px; border-radius:50%; border:1.5px solid #d8d0bf; display:flex; align-items:center;
     justify-content:center; font-size:11px; color:#a89f8c; flex-shrink:0;
   }
@@ -723,3 +723,6 @@
   font-size:13px; color:var(--ink); cursor:pointer; opacity:.75;
 }
 .mini-tab.active{background:var(--pink); border-color:var(--pink); color:#fff; opacity:1; font-weight:600;}
+
+
+
