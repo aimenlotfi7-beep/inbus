@@ -212,8 +212,10 @@ export function HomePage() {
         {!caricamento && !errore && !eventiFiltrati.length && (
           <p style={{ color: 'var(--mist)', padding: 40, textAlign: 'center' }}>Nessun evento per questo filtro.</p>
         )}
-        <div className="grid">
-          {eventiFiltrati.map((ev) => <EventoCard key={ev.id} evento={ev} />)}
+        <div className="carosello-wrap">
+          <div className="carosello carosello-compatto">
+            {eventiFiltrati.map((ev) => <EventoCard key={ev.id} evento={ev} />)}
+          </div>
         </div>
       </section>
 

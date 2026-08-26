@@ -259,13 +259,13 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId }: { ev
         <>
           <div className="checkout-stepper">
             {(multiServizio
-              ? [{ numero: 0, label: 'Il tuo servizio' }, { numero: 1, label: 'Fermata e passeggeri' }, { numero: 2, label: 'I tuoi dati' }, { numero: 3, label: 'Pagamento' }]
-              : [{ numero: 1, label: 'Fermata e passeggeri' }, { numero: 2, label: 'I tuoi dati' }, { numero: 3, label: 'Pagamento' }]
+              ? [{ numero: 0, label: 'Servizio' }, { numero: 1, label: 'Fermata' }, { numero: 2, label: 'Dati' }, { numero: 3, label: 'Pagamento' }]
+              : [{ numero: 1, label: 'Fermata' }, { numero: 2, label: 'Dati' }, { numero: 3, label: 'Pagamento' }]
             ).map((s) => {
               const stepAttuale = multiServizio ? (servizioScelto ? step : 0) : step;
               return (
                 <div key={s.numero} className={`checkout-step-dot${stepAttuale === s.numero ? ' active' : stepAttuale > s.numero ? ' completato' : ''}`}>
-                  <span className="checkout-step-numero">{stepAttuale > s.numero ? '✓' : s.numero + (multiServizio ? 1 : 0)}</span> <span className="checkout-step-etichetta">{s.label}</span>
+                  <span className="checkout-step-numero">{s.numero + (multiServizio ? 1 : 0)}</span> <span className="checkout-step-etichetta">{s.label}</span>
                 </div>
               );
             })}
