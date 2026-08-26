@@ -39,6 +39,11 @@ export function PartenzeScreen() {
       <div className="cards-list">
         {eventiFiltrati.map((ev) => (
           <div key={ev.id} className="evento-card" onClick={() => setSelezionato(ev)}>
+            {ev.immagini[0]?.url && (
+              <div style={{ width: '100%', aspectRatio: '1080 / 1350', borderRadius: 8, overflow: 'hidden', marginBottom: 10, background: 'var(--night)' }}>
+                <img src={ev.immagini[0].url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              </div>
+            )}
             <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
             {allertePerEvento[ev.id] > 0 && (
               <span className="badge non-coperta" style={{ float: 'right' }} title={`${allertePerEvento[ev.id]} tratta/e con posti superati`}>⚠ {allertePerEvento[ev.id]}</span>

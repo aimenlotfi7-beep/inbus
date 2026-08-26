@@ -77,6 +77,11 @@ export function EventiScreen() {
       <div className="cards-list">
         {eventiFiltrati.map((ev) => (
           <div key={ev.id} className="evento-card" onClick={() => apriModifica(ev)} style={tab === 'passati' ? { opacity: .65 } : undefined}>
+            {ev.immagini[0]?.url && (
+              <div style={{ width: '100%', aspectRatio: '1080 / 1350', borderRadius: 8, overflow: 'hidden', marginBottom: 10, background: 'var(--night)' }}>
+                <img src={ev.immagini[0].url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              </div>
+            )}
             <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
             {ev.bozza && <span className="badge attenzione" style={{ marginLeft: 8 }}>Bozza</span>}
             <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
