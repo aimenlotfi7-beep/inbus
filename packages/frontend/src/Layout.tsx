@@ -2,10 +2,12 @@ import { useState, type ReactNode } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { CookieBanner, LinkPreferenzeCookie } from './features/CookieBanner';
 import { clienteLoggato } from './features/clienteSessione';
+import { useCarrello } from './features/carrello/CarrelloContext';
 
 export function Layout({ children }: { children: ReactNode }) {
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
   const loggato = clienteLoggato();
+  const { numeroArticoli } = useCarrello();
   const location = useLocation();
   const inHomepage = location.pathname === '/';
   // La ricerca vive nell'URL (?q=...), non in uno stato locale — così
@@ -67,6 +69,13 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         )}
         <div className="nav-actions">
+          <Link className="carrello-icona" to="/carrello" aria-label="Carrello">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+            {numeroArticoli > 0 && <span className="carrello-badge">{numeroArticoli}</span>}
+          </Link>
           <Link className="btn btn-ghost desktop-only" to={loggato ? '/account' : '/accedi'}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
           <button className="burger" onClick={() => setMenuMobileAperto(!menuMobileAperto)}>☰</button>
         </div>

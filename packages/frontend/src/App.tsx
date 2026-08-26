@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { Layout } from './Layout';
 import { HomePage } from './pages/HomePage';
 import { AccountPage } from './pages/AccountPage';
+import { CarrelloPage } from './pages/CarrelloPage';
 import { PaginaPage } from './pages/PaginaPage';
 import { PromoterPage } from './pages/PromoterPage';
 import { PromoterPasswordDimenticataPage } from './pages/PromoterPasswordDimenticataPage';
@@ -41,6 +42,7 @@ export function App() {
     <Routes>
       <Route path="/" element={<Layout><HomePage /></Layout>} />
       <Route path="/account" element={<AccountPage />} />
+      <Route path="/carrello" element={<Layout><CarrelloPage /></Layout>} />
       <Route path="/faq" element={<PaginaPage chiaveFissa="faq" />} />
       <Route path="/pagina/:chiave" element={<PaginaPage />} />
       <Route path="/promoter" element={<PromoterPage />} />

@@ -42,6 +42,11 @@ export const prenotazioniApi = {
   // Ora richiede l'accesso vero del cliente (non più anonimo) — usa il
   // suo token, non quello admin.
   crea: (payload: CreaPrenotazionePayload) => apiConToken('inbus_cliente_token').post<Prenotazione>('/api/prenotazioni', payload),
+  /** Il carrello — più articoli insieme, un'unica conferma. Ogni
+   *  articolo ha la stessa forma di una prenotazione singola (il
+   *  server la ricalcola e la valida esattamente allo stesso modo). */
+  creaOrdine: (articoli: CreaPrenotazionePayload[]) =>
+    apiConToken('inbus_cliente_token').post<{ ordine: { id: string; totale: string }; prenotazioni: Prenotazione[] }>('/api/prenotazioni/ordine', { articoli }),
   getSaldo: (pnr: string) => api.get<DifferenzaSaldo>(`/api/prenotazioni/${pnr}/saldo`),
   saldaResto: (pnr: string, couponCodice?: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`, couponCodice ? { couponCodice } : undefined),
   getByPnr: (pnr: string) => api.get<Prenotazione>(`/api/prenotazioni/${pnr}`),

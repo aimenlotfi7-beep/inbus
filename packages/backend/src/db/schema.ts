@@ -364,6 +364,23 @@ export const utenti = pgTable('utenti', {
 });
 
 // ---------------------------------------------------------------------
+// ORDINI — raggruppano più prenotazioni create insieme in un unico
+// checkout con carrello (più eventi/tratte/fermate in una volta sola).
+// Ogni prenotazione resta esattamente com'è sempre stata — il vero
+// biglietto, con il suo PNR, il suo QR, scansionato dai tour leader —
+// solo con un riferimento in più (ordineId) per sapere che è stata
+// creata insieme ad altre nello stesso carrello. Un ordine SENZA
+// nessuna prenotazione collegata non esiste mai: si crea sempre
+// un'unica transazione atomica, tutto o niente.
+// ---------------------------------------------------------------------
+export const ordini = pgTable('ordini', {
+  id: id(),
+  utenteId: text('utente_id').notNull().references(() => utenti.id),
+  totale: numeric('totale', { precision: 10, scale: 2 }).notNull(),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------
 // PRENOTAZIONI (transazioni)
 // ---------------------------------------------------------------------
 export const prenotazioni = pgTable('prenotazioni', {
@@ -399,6 +416,11 @@ export const prenotazioni = pgTable('prenotazioni', {
   metodoPagamento: metodoPagamentoEnum('metodo_pagamento').notNull().default('CARTA'),
   utenteId: text('utente_id').notNull().references(() => utenti.id),
   promoterCodice: text('promoter_codice'),
+  // Se questa prenotazione è nata da un checkout con carrello (più
+  // prodotti insieme), qui c'è l'ordine a cui appartiene — nullo per
+  // le prenotazioni singole normali (come sono sempre state finora,
+  // nessuna differenza per quelle vecchie).
+  ordineId: text('ordine_id').references(() => ordini.id),
   // Canale di vendita — di dove è arrivata questa prenotazione. Se è
   // WHITE_LABEL, whiteLabelId dice esattamente quale, e i due campi di
   // commissione sono lo SNAPSHOT della regola economica applicata in
@@ -530,6 +552,14 @@ export const whiteLabel = pgTable('white_label', {
   // di ogni endpoint, non in questo elenco.
   dominiAutorizzati: jsonb('domini_autorizzati').notNull().default('[]'),
   tema: jsonb('tema').notNull().default('{}'),
+  // Layout del biglietto (PDF) proprio di questa White Label — se non
+  // impostato (null), il biglietto usa quello dell'evento, come è
+  // sempre stato: nessuna differenza per le White Label già create.
+  // Se impostato, chi compra da QUESTA White Label riceve un biglietto
+  // diverso (es. con i loghi sponsor propri dell'organizzatore),
+  // mentre chi compra dal sito INBUS o da un'altra White Label per lo
+  // stesso evento continua a vedere il layout che gli compete.
+  layoutBigliettoId: text('layout_biglietto_id').references(() => layoutBiglietto.id, { onDelete: 'set null' }),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
   aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 }, (t) => ({

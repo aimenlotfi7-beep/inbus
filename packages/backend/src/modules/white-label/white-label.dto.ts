@@ -59,10 +59,12 @@ export const creaWhiteLabelSchema = z.object({
   eventoId: z.string().min(1),
   dominiAutorizzati: z.array(dominioSchema).default([]),
   tema: temaSchema.optional(),
+  layoutBigliettoId: z.string().nullable().optional(),
 });
 
 export const aggiornaWhiteLabelSchema = z.object({
   attiva: z.boolean().optional(),
   dominiAutorizzati: z.array(dominioSchema).optional(),
   tema: temaSchema.optional(),
+  layoutBigliettoId: z.string().nullable().optional(),
 });

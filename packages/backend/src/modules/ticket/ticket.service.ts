@@ -2,10 +2,22 @@ import crypto from 'node:crypto';
 import QRCode from 'qrcode';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { prenotazioni, eventi, utenti, partecipantiPrenotazione } from '../../db/schema.js';
+import { prenotazioni, eventi, utenti, partecipantiPrenotazione, whiteLabel } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { inviaEmail } from '../../shared/email.service.js';
 import { layoutBigliettoService, disegnaBigliettoPdf } from '../layout-biglietto/layout-biglietto.service.js';
+
+/** Il layout del biglietto da usare per QUESTA prenotazione — se è
+ *  arrivata da una White Label che ha un suo layout proprio impostato,
+ *  usa quello (il cliente che compra tramite l'organizzatore vede il
+ *  biglietto con i suoi loghi sponsor); altrimenti, come sempre, quello
+ *  scelto per l'evento. Una prenotazione dal sito INBUS normale (senza
+ *  whiteLabelId) va sempre e solo sul layout dell'evento. */
+async function risolviLayoutBigliettoId(whiteLabelId: string | null, eventoLayoutBigliettoId: string | null): Promise<string | null> {
+  if (!whiteLabelId) return eventoLayoutBigliettoId;
+  const [wl] = await db.select({ layoutBigliettoId: whiteLabel.layoutBigliettoId }).from(whiteLabel).where(eq(whiteLabel.id, whiteLabelId)).limit(1);
+  return wl?.layoutBigliettoId ?? eventoLayoutBigliettoId;
+}
 
 /** Genera un token casuale — usato sia per il "lotto" della prenotazione
  *  (ticketToken su prenotazioni, segna che il biglietto è stato emesso)
@@ -46,7 +58,8 @@ export const ticketService = {
     // Il layout (colori, ordine delle sezioni, posizione del QR) è
     // quello scelto per questo evento, o il predefinito se non ne ha
     // scelto uno — calcolato una sola volta, riusato per ogni passeggero.
-    const config = await layoutBigliettoService.getPerEvento(evento.layoutBigliettoId);
+    const layoutIdEffettivo = await risolviLayoutBigliettoId(p.whiteLabelId, evento.layoutBigliettoId);
+    const config = await layoutBigliettoService.getPerEvento(layoutIdEffettivo);
     const configEffettiva = evento.ticketColoreAccento ? { ...config, coloreAccento: evento.ticketColoreAccento } : config;
 
     // Un PDF distinto per ogni passeggero, con un QR proprio (diverso da
@@ -146,7 +159,8 @@ export const ticketService = {
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
     if (!evento) throw new NonTrovato('Evento');
 
-    const config = await layoutBigliettoService.getPerEvento(evento.layoutBigliettoId);
+    const layoutIdEffettivo = await risolviLayoutBigliettoId(p.whiteLabelId, evento.layoutBigliettoId);
+    const config = await layoutBigliettoService.getPerEvento(layoutIdEffettivo);
     const configEffettiva = evento.ticketColoreAccento ? { ...config, coloreAccento: evento.ticketColoreAccento } : config;
     const qrDataUrl = await QRCode.toDataURL(`INBUS:TICKET:${p.pnr}:${token}`, { margin: 1, width: 300 });
     const pdfBuffer = await disegnaBigliettoPdf(configEffettiva, {

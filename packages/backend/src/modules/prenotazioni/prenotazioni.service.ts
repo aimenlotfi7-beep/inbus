@@ -1,11 +1,16 @@
 import { and, eq, sql, desc, inArray } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento } from '../../db/schema.js';
+import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { couponService } from '../coupon/coupon.service.js';
 import { env } from '../../config/env.js';
 import type { CreaPrenotazioneInput } from './prenotazioni.dto.js';
+
+// Il tipo esatto di "tx" dentro una db.transaction(async (tx) => ...) —
+// derivato direttamente da db invece di scritto a mano, così se
+// cambiasse la configurazione di drizzle non andrebbe mai fuori sync.
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 function generaPnr() {
   return 'IB' + Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -42,6 +47,197 @@ async function calcolaTotaleReale(p: typeof prenotazioni.$inferSelect) {
   return prezzoEffettivo * p.passeggeri - Number(p.sconto);
 }
 
+/** La vera logica di creazione di UNA prenotazione (blocco posti,
+ *  calcolo prezzo, coupon, credito, inserimento) — prende "tx" come
+ *  parametro invece di aprire una propria transazione, così può
+ *  essere chiamata sia da sola (crea, sotto) sia più volte di fila
+ *  DENTRO la stessa transazione per un intero carrello (creaOrdine,
+ *  più sotto): se un articolo del carrello fallisce, tutto quello
+ *  creato prima nello stesso giro va indietro insieme a lui — mai
+ *  un ordine "a metà". */
+async function creaRigaInterna(tx: Tx, input: CreaPrenotazioneInput, utenteId: string) {
+  const [utente] = await tx.select().from(utenti).where(eq(utenti.id, utenteId)).limit(1);
+  if (!utente) throw new NonAutorizzato('Account non trovato — effettua di nuovo il login.');
+
+  const [fermata] = await tx.select().from(fermate).where(eq(fermate.id, input.fermataId)).limit(1);
+  if (!fermata || fermata.tragittoId !== input.tragittoId) throw new NonTrovato('Fermata');
+
+  const [tragitto] = await tx.select().from(tragitti).where(eq(tragitti.id, input.tragittoId)).limit(1);
+  if (!tragitto || tragitto.eventoId !== input.eventoId) throw new NonTrovato('Bus');
+
+  const [evento] = await tx.select().from(eventi).where(eq(eventi.id, input.eventoId)).limit(1);
+  if (!evento) throw new NonTrovato('Evento');
+
+  // --- Blocco posti atomico sul bus (come prima) ---
+  const righeAggiornate = await tx
+    .update(tragitti)
+    .set({ postiDisponibili: sql`${tragitti.postiDisponibili} - ${input.passeggeri}` })
+    .where(and(eq(tragitti.id, input.tragittoId), sql`${tragitti.postiDisponibili} >= ${input.passeggeri}`))
+    .returning();
+
+  if (righeAggiornate.length === 0) {
+    throw new ConflittoDati('Posti non più disponibili su questo bus: qualcun altro li ha appena prenotati.');
+  }
+
+  // --- Blocco posti atomico sulla fermata, SOLO se questa fermata ha
+  // un limite specifico impostato (altrimenti condivide semplicemente
+  // i posti del bus, appena verificati sopra). Stesso principio del
+  // controllo sul bus: se la UPDATE non tocca righe, vuol dire che
+  // qualcun altro ha appena preso l'ultimo posto di questa fermata.
+  if (fermata.postiMax !== null) {
+    const fermataAggiornata = await tx
+      .update(fermate)
+      .set({ postiPrenotati: sql`${fermate.postiPrenotati} + ${input.passeggeri}` })
+      .where(and(
+        eq(fermate.id, input.fermataId),
+        sql`${fermate.postiPrenotati} + ${input.passeggeri} <= ${fermate.postiMax}`
+      ))
+      .returning();
+
+    if (fermataAggiornata.length === 0) {
+      // Il posto sul bus l'avevamo già preso: lo restituiamo, non ha
+      // senso tenerlo bloccato per una prenotazione che non va a buon fine.
+      await tx
+        .update(tragitti)
+        .set({ postiDisponibili: sql`${tragitti.postiDisponibili} + ${input.passeggeri}` })
+        .where(eq(tragitti.id, input.tragittoId));
+      throw new ConflittoDati('Posti non più disponibili su questa fermata: qualcun altro li ha appena prenotati.');
+    }
+  }
+
+  const prezzoNormale = prezzoNormaleFermata(fermata, evento, tragitto);
+  // Se la prenotazione arriva da un link con offerta dedicata, lo
+  // sconto percentuale dell'offerta si applica al prezzo normale
+  // della fermata scelta (non è un prezzo fisso: il prezzo varia
+  // già per fermata). Verificata qui (dentro la transazione, subito
+  // prima di confermare) per essere sicuri che sia ancora valida in
+  // questo preciso istante, non solo quando l'ha vista sulla pagina.
+  let prezzoEffettivo = prezzoNormale;
+  if (input.offertaId) {
+    const { offerteService } = await import('../offerte/offerte.service.js');
+    const offerta = await offerteService.verificaEIncrementaUtilizzo(input.offertaId, input.eventoId);
+    prezzoEffettivo = applicaScontoOfferta(prezzoNormale, offerta);
+  }
+  const importoBase = prezzoEffettivo * input.passeggeri;
+  const { sconto, coupon: couponUsato } = await validaCoupon(input.couponCodice, importoBase, input.eventoId, input.tipoPagamento);
+
+  const acconto = evento.accontoEur ? Number(evento.accontoEur) : env.ACCONTO_FISSO_EUR;
+  const totale = importoBase - sconto;
+  const saldoPagato = input.tipoPagamento === 'COMPLETO';
+  const scadenzaSaldo = input.tipoPagamento === 'ACCONTO'
+    ? new Date(evento.data.getTime() - env.GIORNI_SCADENZA_SALDO * 24 * 3600 * 1000)
+    : null;
+
+  // L'account è già quello autenticato — non c'è più bisogno di
+  // creare/ricercare l'utente da un'email scritta nel corpo della
+  // richiesta. Aggiorno solo il telefono, se ne è arrivato uno
+  // diverso da quello già salvato (comodo, non obbligatorio).
+  if (input.cliente?.telefono && input.cliente.telefono !== utente.telefono) {
+    await tx.update(utenti).set({ telefono: input.cliente.telefono }).where(eq(utenti.id, utente.id));
+    utente.telefono = input.cliente.telefono;
+  }
+
+  // Il credito si applica solo a pagamento completo (non
+  // all'acconto, altrimenti si complicherebbe il calcolo del saldo
+  // residuo) — mai più di quanto disponibile davvero, verificato
+  // qui dentro la transazione (non ci si fida di un valore mandato
+  // dal browser, che potrebbe essere non aggiornato).
+  let creditoUsato = 0;
+  if (input.usaCredito && input.tipoPagamento === 'COMPLETO') {
+    const [{ creditoDisponibile }] = await tx.select({ creditoDisponibile: utenti.creditoDisponibile }).from(utenti).where(eq(utenti.id, utente.id)).limit(1);
+    creditoUsato = Math.min(Number(creditoDisponibile), totale);
+  }
+
+  if (couponUsato) {
+    await tx.update(coupon).set({ usiAttuali: sql`${coupon.usiAttuali} + 1` }).where(eq(coupon.id, couponUsato.id));
+  }
+
+  const [prenotazione] = await tx
+    .insert(prenotazioni)
+    .values({
+      pnr: generaPnr(),
+      eventoId: input.eventoId,
+      tragittoId: input.tragittoId,
+      fermataCitta: fermata.citta,
+      fermataIndirizzo: fermata.indirizzo,
+      fermataOrario: fermata.orario,
+      orarioRitorno: fermata.orarioRitorno,
+      indirizzoRitorno: fermata.indirizzoRitorno,
+      referenteNome: tragitto.referenteNome,
+      referenteTelefono: tragitto.referenteTelefono,
+      passeggeri: input.passeggeri,
+      totale: (input.tipoPagamento === 'ACCONTO' ? acconto : totale - creditoUsato).toFixed(2),
+      sconto: sconto.toFixed(2),
+      creditoUsato: creditoUsato.toFixed(2),
+      couponCodice: couponUsato?.codice,
+      offertaId: input.offertaId,
+      campagnaId: input.campagnaId,
+      utmSource: input.utmSource,
+      utmMedium: input.utmMedium,
+      utmCampaign: input.utmCampaign,
+      utmContent: input.utmContent,
+      tipoPagamento: input.tipoPagamento,
+      saldoPagato,
+      scadenzaSaldo,
+      metodoPagamento: input.metodoPagamento,
+      utenteId: utente.id,
+      promoterCodice: input.promoterCodice,
+    })
+    .returning();
+
+  if (creditoUsato > 0) {
+    const { creditoService } = await import('../credito/credito.service.js');
+    await creditoService.usaCredito(tx, utente.id, creditoUsato, prenotazione.id, prenotazione.pnr);
+  }
+
+  // Il richiedente conta come primo partecipante (ordine 0), poi uno
+  // per ogni modulo passeggero aggiuntivo compilato al checkout.
+  await tx.insert(partecipantiPrenotazione).values([
+    { prenotazioneId: prenotazione.id, nome: utente.nome ?? '', cognome: utente.cognome ?? '', ordine: 0 },
+    ...input.partecipanti.map((p, i) => ({ prenotazioneId: prenotazione.id, nome: p.nome, cognome: p.cognome, ordine: i + 1 })),
+  ]);
+
+  return { ...prenotazione, totaleComplessivo: totale, eventoArtista: evento.artista, utenteNome: utente.nome ?? '', utenteEmail: utente.email };
+}
+
+/** Manda l'email/biglietto giusto dopo che una prenotazione è stata
+ *  creata — SEMPRE fuori dalla transazione (se l'invio fallisce o
+ *  impiega tempo, la prenotazione resta comunque salvata, il cliente
+ *  non deve mai perdere il posto per un problema di posta). Riusata
+ *  sia per una prenotazione singola sia per ognuna di un ordine con
+ *  più articoli. */
+async function inviaConfermaPrenotazione(risultato: Awaited<ReturnType<typeof creaRigaInterna>>) {
+  try {
+    if (risultato.tipoPagamento === 'COMPLETO') {
+      // Pagamento pieno subito: il biglietto vero (PDF+QR) parte
+      // immediatamente, non serve una email di conferma separata.
+      const { ticketService } = await import('../ticket/ticket.service.js');
+      await ticketService.emetti(risultato.pnr);
+    } else {
+      // Solo acconto: nessun biglietto ancora (si emette solo a saldo
+      // completato) — mando la conferma "normale", senza allegato.
+      const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
+      const { templateEmailService } = await import('../template-email/template-email.service.js');
+      const { oggetto, html } = await templateEmailService.renderizza('conferma_acconto', {
+        nome: risultato.utenteNome,
+        pnr: risultato.pnr,
+        fermata: risultato.fermataCitta,
+        orario: risultato.fermataOrario ?? 'da definire',
+        passeggeri: String(risultato.passeggeri),
+        totale: Number(risultato.totale).toFixed(2),
+        evento: risultato.eventoArtista,
+        link_saldo: urlSito(`/completa-saldo/${risultato.pnr}`),
+      });
+      await inviaEmail({ a: risultato.utenteEmail, oggetto, html });
+    }
+  } catch (err) {
+    // Non bastava che l'email fallisse in silenzio senza lasciare
+    // traccia: così almeno compare nei log di Railway, anche se al
+    // cliente non arriva nulla.
+    console.error('Invio email di conferma prenotazione non riuscito:', err);
+  }
+}
+
 export const prenotazioniService = {
   /**
    * Crea una prenotazione bloccando i posti in modo atomico: l'UPDATE con
@@ -53,186 +249,45 @@ export const prenotazioniService = {
    * (il rischio concreto che c'era nel prototipo basato su localStorage).
    */
   async crea(input: CreaPrenotazioneInput, utenteId: string) {
-    const risultato = await db.transaction(async (tx) => {
-      const [utente] = await tx.select().from(utenti).where(eq(utenti.id, utenteId)).limit(1);
-      if (!utente) throw new NonAutorizzato('Account non trovato — effettua di nuovo il login.');
-
-      const [fermata] = await tx.select().from(fermate).where(eq(fermate.id, input.fermataId)).limit(1);
-      if (!fermata || fermata.tragittoId !== input.tragittoId) throw new NonTrovato('Fermata');
-
-      const [tragitto] = await tx.select().from(tragitti).where(eq(tragitti.id, input.tragittoId)).limit(1);
-      if (!tragitto || tragitto.eventoId !== input.eventoId) throw new NonTrovato('Bus');
-
-      const [evento] = await tx.select().from(eventi).where(eq(eventi.id, input.eventoId)).limit(1);
-      if (!evento) throw new NonTrovato('Evento');
-
-      // --- Blocco posti atomico sul bus (come prima) ---
-      const righeAggiornate = await tx
-        .update(tragitti)
-        .set({ postiDisponibili: sql`${tragitti.postiDisponibili} - ${input.passeggeri}` })
-        .where(and(eq(tragitti.id, input.tragittoId), sql`${tragitti.postiDisponibili} >= ${input.passeggeri}`))
-        .returning();
-
-      if (righeAggiornate.length === 0) {
-        throw new ConflittoDati('Posti non più disponibili su questo bus: qualcun altro li ha appena prenotati.');
-      }
-
-      // --- Blocco posti atomico sulla fermata, SOLO se questa fermata ha
-      // un limite specifico impostato (altrimenti condivide semplicemente
-      // i posti del bus, appena verificati sopra). Stesso principio del
-      // controllo sul bus: se la UPDATE non tocca righe, vuol dire che
-      // qualcun altro ha appena preso l'ultimo posto di questa fermata.
-      if (fermata.postiMax !== null) {
-        const fermataAggiornata = await tx
-          .update(fermate)
-          .set({ postiPrenotati: sql`${fermate.postiPrenotati} + ${input.passeggeri}` })
-          .where(and(
-            eq(fermate.id, input.fermataId),
-            sql`${fermate.postiPrenotati} + ${input.passeggeri} <= ${fermate.postiMax}`
-          ))
-          .returning();
-
-        if (fermataAggiornata.length === 0) {
-          // Il posto sul bus l'avevamo già preso: lo restituiamo, non ha
-          // senso tenerlo bloccato per una prenotazione che non va a buon fine.
-          await tx
-            .update(tragitti)
-            .set({ postiDisponibili: sql`${tragitti.postiDisponibili} + ${input.passeggeri}` })
-            .where(eq(tragitti.id, input.tragittoId));
-          throw new ConflittoDati('Posti non più disponibili su questa fermata: qualcun altro li ha appena prenotati.');
-        }
-      }
-
-      const prezzoNormale = prezzoNormaleFermata(fermata, evento, tragitto);
-      // Se la prenotazione arriva da un link con offerta dedicata, lo
-      // sconto percentuale dell'offerta si applica al prezzo normale
-      // della fermata scelta (non è un prezzo fisso: il prezzo varia
-      // già per fermata). Verificata qui (dentro la transazione, subito
-      // prima di confermare) per essere sicuri che sia ancora valida in
-      // questo preciso istante, non solo quando l'ha vista sulla pagina.
-      let prezzoEffettivo = prezzoNormale;
-      if (input.offertaId) {
-        const { offerteService } = await import('../offerte/offerte.service.js');
-        const offerta = await offerteService.verificaEIncrementaUtilizzo(input.offertaId, input.eventoId);
-        prezzoEffettivo = applicaScontoOfferta(prezzoNormale, offerta);
-      }
-      const importoBase = prezzoEffettivo * input.passeggeri;
-      const { sconto, coupon: couponUsato } = await validaCoupon(input.couponCodice, importoBase, input.eventoId, input.tipoPagamento);
-
-      const acconto = evento.accontoEur ? Number(evento.accontoEur) : env.ACCONTO_FISSO_EUR;
-      const totale = importoBase - sconto;
-      const saldoPagato = input.tipoPagamento === 'COMPLETO';
-      const scadenzaSaldo = input.tipoPagamento === 'ACCONTO'
-        ? new Date(evento.data.getTime() - env.GIORNI_SCADENZA_SALDO * 24 * 3600 * 1000)
-        : null;
-
-      // L'account è già quello autenticato — non c'è più bisogno di
-      // creare/ricercare l'utente da un'email scritta nel corpo della
-      // richiesta. Aggiorno solo il telefono, se ne è arrivato uno
-      // diverso da quello già salvato (comodo, non obbligatorio).
-      if (input.cliente?.telefono && input.cliente.telefono !== utente.telefono) {
-        await tx.update(utenti).set({ telefono: input.cliente.telefono }).where(eq(utenti.id, utente.id));
-        utente.telefono = input.cliente.telefono;
-      }
-
-      // Il credito si applica solo a pagamento completo (non
-      // all'acconto, altrimenti si complicherebbe il calcolo del saldo
-      // residuo) — mai più di quanto disponibile davvero, verificato
-      // qui dentro la transazione (non ci si fida di un valore mandato
-      // dal browser, che potrebbe essere non aggiornato).
-      let creditoUsato = 0;
-      if (input.usaCredito && input.tipoPagamento === 'COMPLETO') {
-        const [{ creditoDisponibile }] = await tx.select({ creditoDisponibile: utenti.creditoDisponibile }).from(utenti).where(eq(utenti.id, utente.id)).limit(1);
-        creditoUsato = Math.min(Number(creditoDisponibile), totale);
-      }
-
-      if (couponUsato) {
-        await tx.update(coupon).set({ usiAttuali: sql`${coupon.usiAttuali} + 1` }).where(eq(coupon.id, couponUsato.id));
-      }
-
-      const [prenotazione] = await tx
-        .insert(prenotazioni)
-        .values({
-          pnr: generaPnr(),
-          eventoId: input.eventoId,
-          tragittoId: input.tragittoId,
-          fermataCitta: fermata.citta,
-          fermataIndirizzo: fermata.indirizzo,
-          fermataOrario: fermata.orario,
-          orarioRitorno: fermata.orarioRitorno,
-          indirizzoRitorno: fermata.indirizzoRitorno,
-          referenteNome: tragitto.referenteNome,
-          referenteTelefono: tragitto.referenteTelefono,
-          passeggeri: input.passeggeri,
-          totale: (input.tipoPagamento === 'ACCONTO' ? acconto : totale - creditoUsato).toFixed(2),
-          sconto: sconto.toFixed(2),
-          creditoUsato: creditoUsato.toFixed(2),
-          couponCodice: couponUsato?.codice,
-          offertaId: input.offertaId,
-          campagnaId: input.campagnaId,
-          utmSource: input.utmSource,
-          utmMedium: input.utmMedium,
-          utmCampaign: input.utmCampaign,
-          utmContent: input.utmContent,
-          tipoPagamento: input.tipoPagamento,
-          saldoPagato,
-          scadenzaSaldo,
-          metodoPagamento: input.metodoPagamento,
-          utenteId: utente.id,
-          promoterCodice: input.promoterCodice,
-        })
-        .returning();
-
-      if (creditoUsato > 0) {
-        const { creditoService } = await import('../credito/credito.service.js');
-        await creditoService.usaCredito(tx, utente.id, creditoUsato, prenotazione.id, prenotazione.pnr);
-      }
-
-      // Il richiedente conta come primo partecipante (ordine 0), poi uno
-      // per ogni modulo passeggero aggiuntivo compilato al checkout.
-      await tx.insert(partecipantiPrenotazione).values([
-        { prenotazioneId: prenotazione.id, nome: utente.nome ?? '', cognome: utente.cognome ?? '', ordine: 0 },
-        ...input.partecipanti.map((p, i) => ({ prenotazioneId: prenotazione.id, nome: p.nome, cognome: p.cognome, ordine: i + 1 })),
-      ]);
-
-      return { ...prenotazione, totaleComplessivo: totale, eventoArtista: evento.artista, utenteNome: utente.nome ?? '', utenteEmail: utente.email };
-    });
-
-    // Fuori dalla transazione apposta: se l'invio dell'email fallisce (o
-    // impiega tempo), la prenotazione resta comunque salvata — il
-    // cliente non deve mai perdere il posto per un problema di posta.
-    try {
-      if (risultato.tipoPagamento === 'COMPLETO') {
-        // Pagamento pieno subito: il biglietto vero (PDF+QR) parte
-        // immediatamente, non serve una email di conferma separata.
-        const { ticketService } = await import('../ticket/ticket.service.js');
-        await ticketService.emetti(risultato.pnr);
-      } else {
-        // Solo acconto: nessun biglietto ancora (si emette solo a saldo
-        // completato) — mando la conferma "normale", senza allegato.
-        const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
-        const { templateEmailService } = await import('../template-email/template-email.service.js');
-        const { oggetto, html } = await templateEmailService.renderizza('conferma_acconto', {
-          nome: risultato.utenteNome,
-          pnr: risultato.pnr,
-          fermata: risultato.fermataCitta,
-          orario: risultato.fermataOrario ?? 'da definire',
-          passeggeri: String(risultato.passeggeri),
-          totale: Number(risultato.totale).toFixed(2),
-          evento: risultato.eventoArtista,
-          link_saldo: urlSito(`/completa-saldo/${risultato.pnr}`),
-        });
-        await inviaEmail({ a: risultato.utenteEmail, oggetto, html });
-      }
-    } catch (err) {
-      // Non bastava che l'email fallisse in silenzio senza lasciare
-      // traccia: così almeno compare nei log di Railway, anche se al
-      // cliente non arriva nulla.
-      console.error('Invio email di conferma prenotazione non riuscito:', err);
-    }
-
+    const risultato = await db.transaction((tx) => creaRigaInterna(tx, input, utenteId));
+    await inviaConfermaPrenotazione(risultato);
     return risultato;
   },
+
+  /** Crea un intero ORDINE con più prodotti (carrello) in un'unica
+   *  transazione atomica — se anche un solo articolo fallisce (posti
+   *  esauriti, coupon non valido, ecc), va tutto indietro, nessuna
+   *  prenotazione a metà creata. Ogni articolo resta comunque una vera
+   *  prenotazione a sé, con il suo PNR, il suo biglietto, la sua email
+   *  — semplicemente in più raggruppate sotto lo stesso ordine. */
+  async creaOrdine(articoli: CreaPrenotazioneInput[], utenteId: string) {
+    if (articoli.length === 0) {
+      throw new ErroreApplicativo('Il carrello è vuoto.', 400, 'CARRELLO_VUOTO');
+    }
+    if (articoli.length > 20) {
+      throw new ErroreApplicativo('Troppi articoli in un unico ordine (massimo 20).', 400, 'CARRELLO_TROPPO_GRANDE');
+    }
+
+    const { ordine, righe } = await db.transaction(async (tx) => {
+      const righeCreate = [];
+      for (const articolo of articoli) {
+        righeCreate.push(await creaRigaInterna(tx, articolo, utenteId));
+      }
+      const totaleOrdine = righeCreate.reduce((somma, r) => somma + Number(r.totale), 0);
+      const [nuovoOrdine] = await tx.insert(ordini).values({ utenteId, totale: totaleOrdine.toFixed(2) }).returning();
+      await tx.update(prenotazioni).set({ ordineId: nuovoOrdine.id }).where(inArray(prenotazioni.id, righeCreate.map((r) => r.id)));
+      return { ordine: nuovoOrdine, righe: righeCreate };
+    });
+
+    // Fuori dalla transazione, come per la prenotazione singola — un
+    // biglietto/email per ciascun articolo dell'ordine.
+    for (const riga of righe) {
+      await inviaConfermaPrenotazione(riga);
+    }
+
+    return { ordine, prenotazioni: righe.map((r) => ({ ...r, ordineId: ordine.id })) };
+  },
+
 
   async getByPnr(pnr: string) {
     const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);

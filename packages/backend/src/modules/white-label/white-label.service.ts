@@ -80,6 +80,7 @@ export const whiteLabelService = {
       publicWidgetId: generaPublicWidgetId(),
       dominiAutorizzati: input.dominiAutorizzati,
       tema: temaCompleto,
+      layoutBigliettoId: input.layoutBigliettoId ?? null,
     }).returning();
     return getRigaCompleta(nuova.id);
   },
@@ -89,6 +90,7 @@ export const whiteLabelService = {
     const aggiornamenti: Record<string, unknown> = { aggiornatoIl: new Date() };
     if (input.attiva !== undefined) aggiornamenti.attiva = input.attiva;
     if (input.dominiAutorizzati !== undefined) aggiornamenti.dominiAutorizzati = input.dominiAutorizzati;
+    if (input.layoutBigliettoId !== undefined) aggiornamenti.layoutBigliettoId = input.layoutBigliettoId;
     if (input.tema !== undefined) {
       const attuale = await getRigaCompleta(id);
       aggiornamenti.tema = normalizzaTema({ ...attuale.tema, ...input.tema });

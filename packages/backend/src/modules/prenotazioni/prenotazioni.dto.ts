@@ -44,6 +44,13 @@ export const creaPrenotazioneSchema = z.object({
 );
 export type CreaPrenotazioneInput = z.infer<typeof creaPrenotazioneSchema>;
 
+/** Il carrello — un elenco di articoli, ognuno validato con le stesse
+ *  identiche regole di una prenotazione singola (min 1, max 20 per non
+ *  permettere carrelli assurdi). */
+export const creaOrdineSchema = z.object({
+  articoli: z.array(creaPrenotazioneSchema).min(1, 'Il carrello è vuoto.').max(20, 'Troppi articoli in un unico ordine.'),
+});
+
 export const richiediRimborsoSchema = z.object({
   motivo: z.string().optional(),
 });

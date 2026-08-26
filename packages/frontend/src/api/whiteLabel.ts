@@ -62,6 +62,7 @@ export interface WhiteLabel {
   attiva: boolean;
   dominiAutorizzati: string[];
   tema: WhiteLabelTheme;
+  layoutBigliettoId: string | null;
   organizzatoreNome: string;
   eventoArtista: string;
 }
@@ -71,6 +72,7 @@ export interface WhiteLabelInput {
   attiva?: boolean;
   dominiAutorizzati?: string[];
   tema?: Partial<WhiteLabelTheme>;
+  layoutBigliettoId?: string | null;
 }
 
 export interface WhiteLabelPubblica {

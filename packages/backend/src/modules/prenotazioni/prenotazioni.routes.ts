@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { prenotazioniService } from './prenotazioni.service.js';
-import { creaPrenotazioneSchema } from './prenotazioni.dto.js';
+import { creaPrenotazioneSchema, creaOrdineSchema } from './prenotazioni.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
@@ -21,6 +21,16 @@ export const prenotazioniController = {
     if (!req.cliente) throw new NonAutorizzato();
     const prenotazione = await prenotazioniService.crea(req.body, req.cliente.sub);
     res.status(201).json(prenotazione);
+  },
+  /** Il carrello — più articoli insieme, un'unica conferma/pagamento.
+   *  Ogni articolo viene validato dal server esattamente come una
+   *  prenotazione singola (stessa funzione, stesso controllo prezzo/
+   *  posti) — il corpo della richiesta non passa mai un totale, il
+   *  server lo ricalcola sempre da zero sommando ogni articolo. */
+  async creaOrdine(req: Request, res: Response) {
+    if (!req.cliente) throw new NonAutorizzato();
+    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente.sub);
+    res.status(201).json(risultato);
   },
   async getByPnr(req: Request, res: Response) {
     res.json(await prenotazioniService.getByPnr(req.params.pnr));
@@ -67,6 +77,7 @@ prenotazioniRouter.get('/eventi', richiedeAuth, richiedePermesso('prenotazioni.v
 
 // Pubbliche: il checkout del sito e l'area cliente non richiedono login admin
 prenotazioniRouter.post('/', richiedeAuthCliente, valida(creaPrenotazioneSchema), asyncHandler(prenotazioniController.crea));
+prenotazioniRouter.post('/ordine', richiedeAuthCliente, valida(creaOrdineSchema), asyncHandler(prenotazioniController.creaOrdine));
 prenotazioniRouter.get('/by-email', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.listByEmail));
 prenotazioniRouter.get('/:pnr/dettaglio-cliente', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.dettaglioPerCliente));
 prenotazioniRouter.get('/:pnr', asyncHandler(prenotazioniController.getByPnr));

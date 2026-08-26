@@ -52,6 +52,11 @@
   nav.links{display:flex; gap:32px; font-size:14px; color:var(--mist);}
   nav.links a:hover{color:var(--paper);}
   .nav-actions{display:flex; align-items:center; gap:14px;}
+  .carrello-icona{position:relative; display:flex; align-items:center; color:var(--paper); padding:6px;}
+  .carrello-badge{
+    position:absolute; top:-2px; right:-2px; background:var(--pink); color:#fff; font-size:10px; font-weight:700;
+    min-width:16px; height:16px; border-radius:999px; display:flex; align-items:center; justify-content:center; padding:0 3px;
+  }
   .btn{
     font-family:'Poppins',sans-serif;
     font-weight:600; font-size:13.5px;

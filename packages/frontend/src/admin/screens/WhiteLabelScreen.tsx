@@ -7,6 +7,7 @@ import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { CampoCopiabile } from '../shared/CampoCopiabile';
+import { layoutBigliettoApi, type LayoutBiglietto } from '../../api/layoutBiglietto';
 import { WhiteLabelEditor } from '../../features/white-label/WhiteLabelEditor';
 
 /** EVENTO -> ORGANIZZATORI -> White Label, come richiesto — qui si
@@ -43,11 +44,14 @@ export function WhiteLabelScreen() {
           />
         </div>
         {ev && (
-          <WhiteLabelEditor
-            whiteLabel={whiteLabelAttiva}
-            evento={{ artista: ev.artista, data: ev.data, luogo: ev.luogo, citta: ev.citta, descrizione: ev.descrizione }}
-            onSalvato={() => { ricarica(); setVista('lista'); }}
-          />
+          <>
+            <SelettoreLayoutBiglietto whiteLabel={whiteLabelAttiva} onSalvato={(wl) => setWhiteLabelAttiva(wl)} />
+            <WhiteLabelEditor
+              whiteLabel={whiteLabelAttiva}
+              evento={{ artista: ev.artista, data: ev.data, luogo: ev.luogo, citta: ev.citta, descrizione: ev.descrizione }}
+              onSalvato={() => { ricarica(); setVista('lista'); }}
+            />
+          </>
         )}
       </PaginaSezione>
     );
@@ -142,5 +146,41 @@ function NuovaWhiteLabel({ organizzatori, onIndietro, onCreata }: { organizzator
         {caricamento ? 'Creazione...' : 'Crea White Label'}
       </button>
     </PaginaSezione>
+  );
+}
+
+/** Il layout del BIGLIETTO (PDF) — cosa riceve davvero il cliente via
+ *  email/download, con i suoi loghi sponsor. Volutamente separato e
+ *  ben etichettato rispetto al "tema" del widget qui sotto (quello è
+ *  l'aspetto della pagina/vetrina online, questo è il documento vero)
+ *  — per non far confondere all'amministratore i due layout diversi.
+ *  Nessuna scelta = usa il layout dell'evento, come è sempre stato. */
+function SelettoreLayoutBiglietto({ whiteLabel, onSalvato }: { whiteLabel: WhiteLabel; onSalvato: (wl: WhiteLabel) => void }) {
+  const [layout, setLayout] = useState<LayoutBiglietto[]>([]);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => { layoutBigliettoApi.list().then(setLayout); }, []);
+
+  async function cambia(id: string) {
+    setSalvando(true);
+    try {
+      const aggiornata = await whiteLabelApi.update(whiteLabel.id, { layoutBigliettoId: id || null });
+      onSalvato(aggiornata);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="section-card" style={{ maxWidth: 480, marginBottom: 20 }}>
+      <p className="section-label" style={{ marginBottom: 8 }}>Layout biglietto (PDF) di questa White Label</p>
+      <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 10 }}>
+        Diverso dal tema qui sotto — questo è il vero documento che il cliente riceve. Se non scegli nulla, usa il layout impostato per l'evento.
+      </p>
+      <select value={whiteLabel.layoutBigliettoId ?? ''} onChange={(e) => cambia(e.target.value)} disabled={salvando}>
+        <option value="">— Usa il layout dell'evento —</option>
+        {layout.map((l) => <option key={l.id} value={l.id}>{l.nome}{l.predefinito ? ' (predefinito)' : ''}</option>)}
+      </select>
+    </div>
   );
 }
