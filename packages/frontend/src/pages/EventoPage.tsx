@@ -134,7 +134,7 @@ export function EventoPage() {
                 <span>
                   {prezzoMinimo !== null ? <>da <b>€{prezzoMinimo.toFixed(2)}</b> /persona</> : 'Vedi disponibilità'}
                 </span>
-                <span className="checkout-riepilogo-cta">Prenota</span>
+                <span className="checkout-riepilogo-cta">Acquista ora</span>
               </button>
               <div className="checkout-form-wrap">
                 <CheckoutForm evento={evento} />
@@ -153,7 +153,7 @@ export function EventoPage() {
       {evento && !prenotazioneAperta && (
         <div className="barra-prenota-fissa-mobile">
           <span>{prezzoMinimo !== null ? <>da <b>€{prezzoMinimo.toFixed(2)}</b> /persona</> : ''}</span>
-          <button type="button" onClick={apriPrenotazione}>Prenota</button>
+          <button type="button" onClick={apriPrenotazione}>Acquista ora</button>
         </div>
       )}
     </Layout>

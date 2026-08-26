@@ -479,7 +479,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                         }
                       }}
                     >
-                      {publicWidgetId ? 'Avanti →' : 'Prenota →'}
+                      {publicWidgetId ? 'Avanti →' : 'Acquista ora →'}
                     </button>
                   </div>
                 </>
