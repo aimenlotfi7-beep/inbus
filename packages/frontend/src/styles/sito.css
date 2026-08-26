@@ -595,10 +595,18 @@
   }
 
   /* ---------- CHECKOUT A STEP (fermata+passeggeri → dati → pagamento) ---------- */
-  .checkout-stepper{display:flex; align-items:center; gap:6px; margin:2px 0 24px;}
-  .checkout-step-dot{
-    display:flex; align-items:center; gap:6px; font-size:11px; color:#a89f8c; font-weight:600;
+  .checkout-stepper{
+    display:flex; align-items:center; gap:6px; margin:2px 0 24px;
+    overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:2px;
   }
+  .checkout-stepper::-webkit-scrollbar{display:none;}
+  .checkout-step-dot{
+    display:flex; align-items:center; gap:6px; font-size:11px; color:#a89f8c; font-weight:600; flex-shrink:0; white-space:nowrap;
+  }
+  /* Sotto i 480px le etichette di testo sparirebbero facilmente (4
+     step per gli eventi con più servizi) — restano solo i pallini
+     numerati, sempre tutti visibili senza dover scorrere. */
+  @media (max-width:480px){ .checkout-step-etichetta{display:none;} .checkout-stepper{gap:10px;} }
   .checkout-step-dot span{
     width:24px; height:24px; border-radius:50%; border:1.5px solid #d8d0bf; display:flex; align-items:center;
     justify-content:center; font-size:11px; color:#a89f8c; flex-shrink:0;

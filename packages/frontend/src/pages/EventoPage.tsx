@@ -92,14 +92,14 @@ export function EventoPage() {
             <div className="evento-pagina-info">
               <div className={`evento-pagina-hero${copertina ? '' : ' senza-foto'}`} style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
                 <span className="tag">{evento.genere}</span>
+                <div style={{ position: 'absolute', top: 14, right: 14 }}>
+                  <PulsanteCondividi soloIcona titolo={`${evento.artista} — INBUS`} testo={`Vieni con noi in bus a vedere ${evento.artista}, ${evento.luogo} (${evento.citta})`} />
+                </div>
               </div>
 
               <h1>{evento.artista}</h1>
               <p className="meta-riga">📍 {evento.luogo}, {evento.citta}</p>
               <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-              <div style={{ marginTop: 10 }}>
-                <PulsanteCondividi titolo={`${evento.artista} — INBUS`} testo={`Vieni con noi in bus a vedere ${evento.artista}, ${evento.luogo} (${evento.citta})`} />
-              </div>
 
               {evento.statoDisponibilita && (
                 <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, display: 'inline-block', marginTop: 10 }}>

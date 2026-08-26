@@ -265,7 +265,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId }: { ev
               const stepAttuale = multiServizio ? (servizioScelto ? step : 0) : step;
               return (
                 <div key={s.numero} className={`checkout-step-dot${stepAttuale === s.numero ? ' active' : stepAttuale > s.numero ? ' completato' : ''}`}>
-                  <span>{stepAttuale > s.numero ? '✓' : s.numero + (multiServizio ? 1 : 0)}</span> {s.label}
+                  <span>{stepAttuale > s.numero ? '✓' : s.numero + (multiServizio ? 1 : 0)}</span> <span className="checkout-step-etichetta">{s.label}</span>
                 </div>
               );
             })}
