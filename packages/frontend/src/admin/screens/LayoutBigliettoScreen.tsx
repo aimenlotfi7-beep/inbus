@@ -271,7 +271,7 @@ export function LayoutBigliettoScreen() {
 
         {(selezionato || nome) && (
           <>
-            <div style={{ flex: '0 0 auto' }}>
+            <div style={{ flex: '0 0 auto', position: 'sticky', top: 20 }}>
               <div
                 ref={canvasRef}
                 onMouseDown={() => setAttivoId(null)}
@@ -356,7 +356,7 @@ export function LayoutBigliettoScreen() {
               )}
             </div>
 
-            <div className="section-card" style={{ flex: 1, minWidth: 260 }}>
+            <div className="section-card" style={{ flex: 1, minWidth: 260, maxHeight: 'calc(100vh - 140px)', overflowY: 'auto' }}>
               <div className="campo">
                 <label>Nome del layout</label>
                 <input value={nome} onChange={(e) => setNome(e.target.value)} />
@@ -379,15 +379,34 @@ export function LayoutBigliettoScreen() {
               </div>
 
               <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>Immagine di sfondo</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <CaricaFile etichetta={config.sfondoImmagineUrl ? 'Cambia immagine' : '+ Importa immagine'} onCaricato={(url) => setConfig({ ...config, sfondoImmagineUrl: url })} />
                 {config.sfondoImmagineUrl && (
                   <button type="button" className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)' }} onClick={() => setConfig({ ...config, sfondoImmagineUrl: null })}>Rimuovi</button>
                 )}
               </div>
+              <input
+                placeholder="...oppure incolla qui il link di un'immagine"
+                value={config.sfondoImmagineUrl ?? ''}
+                onChange={(e) => setConfig({ ...config, sfondoImmagineUrl: e.target.value || null })}
+                style={{ fontSize: 12.5, marginBottom: 10 }}
+              />
 
               <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>Loghi / immagini aggiuntive</p>
-              <CaricaFile etichetta="+ Aggiungi logo" onCaricato={aggiungiLogo} />
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+                <CaricaFile etichetta="+ Aggiungi logo" onCaricato={aggiungiLogo} />
+                <span style={{ fontSize: 11.5, color: 'var(--mist)' }}>oppure</span>
+                <input
+                  placeholder="incolla un link e premi Invio"
+                  style={{ fontSize: 12.5, flex: 1, minWidth: 160 }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                      aggiungiLogo(e.currentTarget.value.trim());
+                      e.currentTarget.value = '';
+                    }
+                  }}
+                />
+              </div>
               {config.immaginiExtra.length > 0 && (
                 <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 6 }}>
                   {config.immaginiExtra.length} logo{config.immaginiExtra.length === 1 ? '' : ''} sul biglietto — clicca uno sul canvas per spostarlo, ridimensionarlo o rimuoverlo.

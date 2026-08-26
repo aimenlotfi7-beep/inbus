@@ -1,4 +1,5 @@
-import { Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { Layout } from './Layout';
 import { HomePage } from './pages/HomePage';
 import { AccountPage } from './pages/AccountPage';
@@ -28,6 +29,14 @@ import { RegistratiPage } from './pages/RegistratiPage';
 import { VerificaEmailPage } from './pages/VerificaEmailPage';
 
 export function App() {
+  const location = useLocation();
+  // React Router, di suo, NON riporta mai lo scroll in cima quando
+  // cambi pagina (a differenza dei siti "tradizionali") — se eri
+  // scorso in basso sulla pagina precedente, la nuova pagina si apre
+  // restando a quella stessa altezza, invece che dall'inizio.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
   return (
     <Routes>
       <Route path="/" element={<Layout><HomePage /></Layout>} />
@@ -44,7 +53,7 @@ export function App() {
       <Route path="/finalizza/:token" element={<FinalizzaListaAttesaPage />} />
       <Route path="/completa-saldo/:pnr" element={<CompletaSaldoPage />} />
       <Route path="/offerta/:slug" element={<OffertaPage />} />
-      <Route path="/eventi/:slug" element={<EventoPage />} />
+      <Route path="/eventi/:slug" element={<EventoPage key={location.pathname} />} />
       <Route path="/w/:publicWidgetId" element={<WidgetPubblicoPage />} />
       <Route path="/scansione/accedi" element={<TourLeaderLoginPage />} />
       <Route path="/scansione/password-dimenticata" element={<TourLeaderPasswordDimenticataPage />} />
