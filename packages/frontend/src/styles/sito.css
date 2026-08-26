@@ -48,6 +48,7 @@
     display:flex; align-items:baseline; gap:4px;
   }
   .logo span{color:var(--pink);}
+  .header-sinistra{display:flex; align-items:center; gap:40px;}
   nav.links{display:flex; gap:32px; font-size:14px; color:var(--mist);}
   nav.links a:hover{color:var(--paper);}
   .nav-actions{display:flex; align-items:center; gap:14px;}

@@ -19,11 +19,13 @@ export function Layout({ children }: { children: ReactNode }) {
   return (
     <>
       <header>
-        <Link to="/" className="logo">IN<span>BUS</span></Link>
-        <nav className="links">
-          <Link to="/#consigliati">Eventi Consigliati</Link>
-          <Link to="/#eventi">Eventi</Link>
-        </nav>
+        <div className="header-sinistra">
+          <Link to="/" className="logo">IN<span>BUS</span></Link>
+          <nav className="links">
+            <Link to="/#consigliati">Eventi Consigliati</Link>
+            <Link to="/#eventi">Eventi</Link>
+          </nav>
+        </div>
         {inHomepage && (
           <form
             className="header-ricerca"
