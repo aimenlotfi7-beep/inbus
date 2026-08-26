@@ -277,7 +277,7 @@
   }
   .card:hover{transform:translateY(-5px); border-color:var(--pink-dim);}
   .card-visual{
-    height:150px; position:relative; overflow:hidden;
+    aspect-ratio:1080/1350; position:relative; overflow:hidden;
     background:linear-gradient(135deg, var(--dusk-2), #3a2050);
     background-size:cover; background-position:center;
     display:flex; align-items:flex-end; padding:14px;
@@ -594,7 +594,6 @@
     .events-section{padding:50px 16px;}
     .footer-grid{grid-template-columns:1fr; gap:28px;}
     footer{padding:50px 16px 24px;}
-    .card-visual{height:130px;}
     .search-cta{font-size:14px; padding:14px;}
   }
 
