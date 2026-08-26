@@ -621,10 +621,10 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 
 /* ---------- COMPATIBILITÀ v2: classe .campo per i form fuori da .form-grid ---------- */
 .campo{display:flex; flex-direction:column; gap:6px; margin-bottom:14px;}
-.campo label{
+.campo > label{
   font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mist); font-weight:700;
 }
-.campo input, .campo select, .campo textarea{
+.campo input:not([type="checkbox"]):not([type="radio"]), .campo select, .campo textarea{
   font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
   background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
   min-width:0; box-sizing:border-box; width:100%;
