@@ -96,8 +96,6 @@
   .mobile-nav.open{display:flex;}
   .mobile-nav a{padding:13px 10px; border-radius:8px; font-size:15.5px; color:var(--paper);}
   .mobile-nav a:active{background:rgba(255,61,122,.1);}
-  .mobile-nav .header-ricerca.mobile-ricerca{width:100%; max-width:none; margin-bottom:10px;}
-  .mobile-categorie{flex-wrap:wrap; margin-bottom:14px;}
   @media (min-width:901px){ .mobile-nav{display:none !important;} }
 
   /* ---------- HERO ---------- */
@@ -115,15 +113,19 @@
   }
   @media (max-width:980px){ .hero-grid{grid-template-columns:1fr;} }
 
-  /* Ricerca compatta dentro l'header stesso — solo sulla homepage
-     (vedi Layout.tsx), nello spazio tra le voci di menu e "Accedi". */
-  .header-ricerca-gruppo{
-    display:flex; align-items:center; gap:12px;
-    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  /* Ricerca + categorie — fascia propria sotto l'header (non più
+     incastrata dentro la riga del menu, dove sopra i 1100px spariva
+     del tutto): larghezza piena, sempre visibile su ogni schermo,
+     scorre in verticale in colonna sui telefoni più stretti. */
+  .ricerca-categorie-fascia{
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+    padding:14px clamp(20px,5vw,64px);
+    background:rgba(16,14,28,.72); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
   }
   .header-ricerca{
     display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.08); color:var(--paper);
-    border:1px solid var(--line); border-radius:999px; padding:6px 16px; width:280px; max-width:26vw;
+    border:1px solid var(--line); border-radius:999px; padding:8px 16px; flex:1; min-width:200px; max-width:360px;
   }
   .header-ricerca button{
     display:flex; background:none; border:none; padding:0; margin:0; color:var(--paper); opacity:.65; cursor:pointer; flex-shrink:0;
@@ -134,16 +136,8 @@
     font-size:13.5px; font-weight:500; color:var(--paper); width:100%;
   }
   .header-ricerca input::placeholder{color:var(--mist);}
-  .header-categorie{display:flex; gap:6px; flex-shrink:0;}
-  @media (max-width:1300px){ .header-categorie{display:none;} }
-  @media (max-width:1100px){ .header-ricerca-gruppo{display:none;} }
-
-  .categoria-chip{
-    background:transparent; border:1px solid var(--line); color:var(--mist);
-    border-radius:999px; padding:6px 14px; font-family:'Poppins',sans-serif; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;
-  }
-  .categoria-chip.active{background:var(--pink); border-color:var(--pink); color:#fff;}
-  .categoria-chip:hover:not(.active){border-color:var(--pink); color:var(--paper);}
+  .ricerca-categorie-chips{margin-top:0;}
+  @media (max-width:600px){ .ricerca-categorie-fascia{flex-direction:column; align-items:stretch;} .header-ricerca{max-width:none;} }
 
   /* Tutti gli eventi, al posto del vecchio "biglietto" — scorrono da
      soli (gestito via JS, ogni 2 secondi), oltre a poter scorrere a
@@ -718,7 +712,6 @@
 .percorso-posti.esaurito{background:rgba(255,61,122,.15); color:var(--pink);}
 
 /* ---------- PARTI DA (citta' di partenza, homepage) ---------- */
-.parti-da-sezione{padding-top:0;}
 .parti-da-chips{display:flex; flex-wrap:wrap; gap:10px; margin-top:18px;}
 .parti-da-chip{
   background:var(--dusk-2); border:1px solid rgba(255,255,255,.1); border-radius:999px;

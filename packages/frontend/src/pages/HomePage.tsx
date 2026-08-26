@@ -87,11 +87,6 @@ export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const ricercaTesto = searchParams.get('q') ?? '';
   const genereAttivo = searchParams.get('genere') ?? 'Tutti';
-  function setRicercaTesto(valore: string) {
-    const nuovi = new URLSearchParams(searchParams);
-    if (valore) nuovi.set('q', valore); else nuovi.delete('q');
-    setSearchParams(nuovi, { replace: true });
-  }
   function setGenereAttivo(g: string) {
     const nuovi = new URLSearchParams(searchParams);
     if (g === 'Tutti') nuovi.delete('genere'); else nuovi.set('genere', g);
@@ -147,32 +142,6 @@ export function HomePage() {
           </div>
         </div>
       </section>
-
-      {!!cittaPartenza.length && (
-        <section className="events-section parti-da-sezione">
-          <div className="section-head">
-            <div>
-              <h2 className="section-title">Parti <em>da</em></h2>
-              <p className="section-sub">Scegli la tua città — filtriamo subito i viaggi con una fermata lì.</p>
-            </div>
-          </div>
-          <div className="parti-da-chips">
-            {cittaPartenza.map((citta) => (
-              <button
-                key={citta}
-                type="button"
-                className={`parti-da-chip${ricercaTesto === citta ? ' active' : ''}`}
-                onClick={() => {
-                  setRicercaTesto(ricercaTesto === citta ? '' : citta);
-                  document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-              >
-                {citta}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
 
       {!!consigliati.length && (
         <section className="events-section" id="consigliati">

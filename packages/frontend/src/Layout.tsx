@@ -34,40 +34,6 @@ export function Layout({ children }: { children: ReactNode }) {
             <Link to="/#eventi">Eventi</Link>
           </nav>
         </div>
-        {inHomepage && (
-          <div className="header-ricerca-gruppo">
-            <form
-              className="header-ricerca"
-              onSubmit={(e) => { e.preventDefault(); document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' }); }}
-            >
-              <button type="submit" aria-label="Cerca">
-                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
-              </button>
-              <input
-                type="text"
-                placeholder="Cerca artista, evento o città..."
-                value={testoRicerca}
-                onChange={(e) => {
-                  const nuovi = new URLSearchParams(searchParams);
-                  if (e.target.value) nuovi.set('q', e.target.value); else nuovi.delete('q');
-                  setSearchParams(nuovi, { replace: true });
-                }}
-              />
-            </form>
-            <div className="header-categorie">
-              {['Tutti', 'Concerti', 'Festival', 'Sport'].map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  className={`categoria-chip${genereAttivo === cat ? ' active' : ''}`}
-                  onClick={() => impostaGenere(cat)}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
         <div className="nav-actions">
           <Link className="carrello-icona" to="/carrello" aria-label="Carrello">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -80,41 +46,47 @@ export function Layout({ children }: { children: ReactNode }) {
           <button className="burger" onClick={() => setMenuMobileAperto(!menuMobileAperto)}>☰</button>
         </div>
       </header>
-      <div className={`mobile-nav${menuMobileAperto ? ' open' : ''}`}>
-        {inHomepage && (
-          <>
-            <form
-              className="header-ricerca mobile-ricerca"
-              onSubmit={(e) => { e.preventDefault(); setMenuMobileAperto(false); document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' }); }}
-            >
-              <button type="submit" aria-label="Cerca">
-                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+
+      {/* Ricerca + categorie — fascia propria sotto l'header, sempre
+          visibile su qualunque schermo (niente più nascosta dietro il
+          menu ☰ su mobile: era il problema segnalato). Solo in
+          homepage, dove hanno senso. */}
+      {inHomepage && (
+        <div className="ricerca-categorie-fascia">
+          <form
+            className="header-ricerca"
+            onSubmit={(e) => { e.preventDefault(); document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' }); }}
+          >
+            <button type="submit" aria-label="Cerca">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+            </button>
+            <input
+              type="text"
+              placeholder="Cerca artista, evento o città..."
+              value={testoRicerca}
+              onChange={(e) => {
+                const nuovi = new URLSearchParams(searchParams);
+                if (e.target.value) nuovi.set('q', e.target.value); else nuovi.delete('q');
+                setSearchParams(nuovi, { replace: true });
+              }}
+            />
+          </form>
+          <div className="parti-da-chips ricerca-categorie-chips">
+            {['Tutti', 'Concerti', 'Festival', 'Sport'].map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                className={`parti-da-chip${genereAttivo === cat ? ' active' : ''}`}
+                onClick={() => impostaGenere(cat)}
+              >
+                {cat}
               </button>
-              <input
-                type="text"
-                placeholder="Cerca artista, evento o città..."
-                value={testoRicerca}
-                onChange={(e) => {
-                  const nuovi = new URLSearchParams(searchParams);
-                  if (e.target.value) nuovi.set('q', e.target.value); else nuovi.delete('q');
-                  setSearchParams(nuovi, { replace: true });
-                }}
-              />
-            </form>
-            <div className="header-categorie mobile-categorie">
-              {['Tutti', 'Concerti', 'Festival', 'Sport'].map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  className={`categoria-chip${genereAttivo === cat ? ' active' : ''}`}
-                  onClick={() => impostaGenere(cat)}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className={`mobile-nav${menuMobileAperto ? ' open' : ''}`}>
         <Link to="/#consigliati" onClick={() => setMenuMobileAperto(false)}>Eventi Consigliati</Link>
         <Link to="/#eventi" onClick={() => setMenuMobileAperto(false)}>Eventi</Link>
         <Link className="btn btn-primary" to={loggato ? '/account' : '/accedi'} style={{ textAlign: 'center', marginTop: 10 }} onClick={() => setMenuMobileAperto(false)}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
