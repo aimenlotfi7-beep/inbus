@@ -5,7 +5,6 @@ import type { Evento } from '../api/types';
 import { prezzoMinimoEvento } from '../api/prezzi';
 import { useSeoTags } from '../features/useSeoTags';
 import { CheckoutForm } from '../features/checkout/CheckoutForm';
-import { AggiungiAlCarrelloWidget } from '../features/carrello/AggiungiAlCarrelloWidget';
 import { SezioniAccordion } from '../features/SezioniAccordion';
 import { PulsanteCondividi } from '../features/PulsanteCondividi';
 import { EventiCorrelati } from '../features/EventiCorrelati';
@@ -34,10 +33,6 @@ export function EventoPage() {
   // standard per il checkout mobile: CTA sempre raggiungibile invece di
   // un modulo lungo subito in mezzo alla pagina.
   const [prenotazioneAperta, setPrenotazioneAperta] = useState(false);
-  // Il carrello è il percorso principale — il checkout diretto (con
-  // coupon/acconto/credito) resta disponibile per chi lo preferisce,
-  // dietro un link "modalità classica", senza duplicarne la logica.
-  const [checkoutDiretto, setCheckoutDiretto] = useState(false);
   const checkoutRef = useRef<HTMLDivElement>(null);
 
   function apriPrenotazione() {
@@ -142,19 +137,7 @@ export function EventoPage() {
                 <span className="checkout-riepilogo-cta">Prenota</span>
               </button>
               <div className="checkout-form-wrap">
-                {checkoutDiretto ? (
-                  <>
-                    <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, marginBottom: 10 }} onClick={() => setCheckoutDiretto(false)}>← Torna al carrello</button>
-                    <CheckoutForm evento={evento} />
-                  </>
-                ) : (
-                  <>
-                    <AggiungiAlCarrelloWidget evento={evento} />
-                    <button type="button" className="btn btn-ghost" style={{ fontSize: 12, marginTop: 10, width: '100%', textAlign: 'center' }} onClick={() => setCheckoutDiretto(true)}>
-                      Hai un coupon o preferisci pagare ora? Checkout diretto
-                    </button>
-                  </>
-                )}
+                <CheckoutForm evento={evento} />
               </div>
             </div>
           </div>

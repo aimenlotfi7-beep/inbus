@@ -11,13 +11,17 @@ export interface ArticoloCarrello {
   fermataOrario: string | null;
   prezzoStimato: number;
   passeggeri: number;
+  offertaId?: string;
+  // Raccolti nella tab di prenotazione (step "I tuoi dati") — arrivano
+  // già completi al carrello, non si richiedono di nuovo lì.
+  cliente: { email: string; nome: string; cognome: string; telefono: string };
+  partecipanti: { nome: string; cognome: string }[];
 }
 
 interface CarrelloContesto {
   articoli: ArticoloCarrello[];
   aggiungi: (articolo: Omit<ArticoloCarrello, 'id'>) => void;
   rimuovi: (id: string) => void;
-  aggiornaPasseggeri: (id: string, passeggeri: number) => void;
   svuota: () => void;
   numeroArticoli: number;
   totaleStimato: number;
@@ -41,19 +45,10 @@ export function CarrelloProvider({ children }: { children: ReactNode }) {
   }, [articoli]);
 
   function aggiungi(articolo: Omit<ArticoloCarrello, 'id'>) {
-    setArticoli((prev) => {
-      const esistente = prev.find((a) => a.eventoId === articolo.eventoId && a.fermataId === articolo.fermataId);
-      if (esistente) {
-        return prev.map((a) => a.id === esistente.id ? { ...a, passeggeri: a.passeggeri + articolo.passeggeri } : a);
-      }
-      return [...prev, { ...articolo, id: `art-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }];
-    });
+    setArticoli((prev) => [...prev, { ...articolo, id: `art-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }]);
   }
   function rimuovi(id: string) {
     setArticoli((prev) => prev.filter((a) => a.id !== id));
-  }
-  function aggiornaPasseggeri(id: string, passeggeri: number) {
-    setArticoli((prev) => prev.map((a) => a.id === id ? { ...a, passeggeri: Math.max(1, passeggeri) } : a));
   }
   function svuota() {
     setArticoli([]);
@@ -63,7 +58,7 @@ export function CarrelloProvider({ children }: { children: ReactNode }) {
   const totaleStimato = articoli.reduce((s, a) => s + a.prezzoStimato * a.passeggeri, 0);
 
   return (
-    <Contesto.Provider value={{ articoli, aggiungi, rimuovi, aggiornaPasseggeri, svuota, numeroArticoli, totaleStimato }}>
+    <Contesto.Provider value={{ articoli, aggiungi, rimuovi, svuota, numeroArticoli, totaleStimato }}>
       {children}
     </Contesto.Provider>
   );

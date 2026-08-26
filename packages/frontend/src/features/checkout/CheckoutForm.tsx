@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Evento, OpzionePartenza, Servizio } from '../../api/types';
 import { eventiApi } from '../../api/eventi';
 import { prenotazioniApi } from '../../api/prenotazioni';
@@ -8,6 +9,7 @@ import { applicaScontoOfferta } from '../../api/prezzi';
 import { ErroreApi } from '../../api/client';
 import { clienteAuthApi } from '../../api/clienteAuth';
 import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
+import { useCarrello } from '../carrello/CarrelloContext';
 import { SelettoreFermata } from './SelettoreFermata';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
@@ -46,6 +48,8 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   // diventa a tutti gli effetti un quarto step, prima degli altri tre.
   // Con zero o un solo servizio, si passa dritti come sempre.
   const multiServizio = evento.servizi.length >= 2;
+  const navigate = useNavigate();
+  const { aggiungi: aggiungiAlCarrello } = useCarrello();
 
   // Le variabili CSS del tema White Label, se presente — sovrascritte
   // qui (non nel foglio di stile) così restano scoped a QUESTO modulo
@@ -445,9 +449,37 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                       className="search-cta"
                       style={{ width: 'auto', margin: 0, padding: '12px 28px', opacity: (moduloRichiedenteCompleto && partecipantiCompleti) ? 1 : .5 }}
                       disabled={!moduloRichiedenteCompleto || !partecipantiCompleti}
-                      onClick={() => setStep(3)}
+                      onClick={() => {
+                        // Sul sito principale il pagamento non avviene
+                        // più qui nella tab — l'articolo, con tutti i
+                        // dati già compilati (fermata, passeggeri con i
+                        // loro nomi veri, dati del richiedente), va dritto
+                        // nel carrello, e si passa subito lì a
+                        // completarlo. Nella White Label invece resta
+                        // tutto come prima: un solo prodotto, pagamento
+                        // diretto in questa stessa tab (vedi 'else').
+                        if (!publicWidgetId && opzioneScelta) {
+                          aggiungiAlCarrello({
+                            eventoId: evento.id,
+                            eventoArtista: evento.artista,
+                            eventoData: evento.data,
+                            tragittoId: opzioneScelta.tragittoId,
+                            fermataId: opzioneScelta.fermataId,
+                            fermataCitta: opzioneScelta.fermataCitta,
+                            fermataOrario: opzioneScelta.fermataOrario,
+                            prezzoStimato: opzioneScelta.prezzoEffettivo,
+                            passeggeri,
+                            offertaId: offerta?.id,
+                            cliente: { email, nome, cognome, telefono },
+                            partecipanti,
+                          });
+                          navigate('/carrello');
+                        } else {
+                          setStep(3);
+                        }
+                      }}
                     >
-                      Avanti →
+                      {publicWidgetId ? 'Avanti →' : 'Prenota →'}
                     </button>
                   </div>
                 </>
