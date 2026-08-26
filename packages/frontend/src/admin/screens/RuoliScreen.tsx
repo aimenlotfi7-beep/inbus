@@ -107,7 +107,7 @@ export function RuoliScreen() {
       <TabellaGenerica
         righe={ruoliFiltrati}
         colonne={[
-          { etichetta: 'Nome', render: (r) => r.owner ? `${r.nome} (proprietario)` : r.nome },
+          { etichetta: 'Nome', render: (r) => <b>{r.owner ? `${r.nome} (proprietario)` : r.nome}</b> },
           { etichetta: 'Descrizione', render: (r) => r.descrizione ?? '—' },
           { etichetta: 'Permessi', render: (r) => r.owner ? 'Tutti (presenti e futuri)' : `${r.permessi.length} assegnati` },
         ]}

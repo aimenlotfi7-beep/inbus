@@ -78,9 +78,9 @@ export function PromoterScreen() {
       <TabellaGenerica
         righe={promoterFiltrati}
         colonne={[
-          { etichetta: 'Nome', render: (p) => p.nome },
+          { etichetta: 'Nome', render: (p) => <b>{p.nome}</b> },
           { etichetta: 'Email', render: (p) => p.email },
-          { etichetta: 'Codice', render: (p) => p.codice },
+          { etichetta: 'Codice', render: (p) => <b>{p.codice}</b> },
           { etichetta: 'Commissione', render: (p) => `${p.commissionePercentuale}%` },
         ]}
         onModifica={apriModifica}

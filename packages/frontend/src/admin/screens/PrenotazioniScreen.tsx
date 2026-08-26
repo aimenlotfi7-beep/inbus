@@ -191,9 +191,9 @@ export function PrenotazioniScreen() {
                       <tr>
                         <th>PNR</th>
                         <th>Cliente</th>
-                        <th>Passeggeri</th>
+                        <th style={{ textAlign: 'right' }}>Passeggeri</th>
                         <th>Metodo di pagamento</th>
-                        <th>Totale</th>
+                        <th style={{ textAlign: 'right' }}>Totale</th>
                         <th>Data</th>
                         <th>Stato</th>
                         <th></th>
@@ -204,9 +204,9 @@ export function PrenotazioniScreen() {
                         const stato = statoRiga(r);
                         return (
                           <tr key={r.id}>
-                            <td>{r.pnr}</td>
+                            <td><b>{r.pnr}</b></td>
                             <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{r.clienteEmail}{r.clienteTelefono ? ` · ${r.clienteTelefono}` : ''}</span></td>
-                            <td>
+                            <td style={{ textAlign: 'right' }}>
                               <button
                                 type="button"
                                 className="btn btn-ghost"
@@ -218,7 +218,7 @@ export function PrenotazioniScreen() {
                               </button>
                             </td>
                             <td>{ETICHETTA_METODO[r.metodoPagamento] ?? r.metodoPagamento}</td>
-                            <td>€{Number(r.totale).toFixed(2)}</td>
+                            <td style={{ textAlign: 'right' }}><b>€{Number(r.totale).toFixed(2)}</b></td>
                             <td>{new Date(r.creataIl).toLocaleDateString('it-IT')}</td>
                             <td>
                               <button type="button" className="btn btn-ghost" style={{ padding: 0, border: 'none', background: 'none' }} onClick={() => setStoricoInModale(r)} title="Vedi lo storico">

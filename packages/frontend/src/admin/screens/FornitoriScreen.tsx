@@ -64,7 +64,7 @@ export function FornitoriScreen() {
       <TabellaGenerica
         righe={fornitoriFiltrati}
         colonne={[
-          { etichetta: 'Nome', render: (f) => f.nome },
+          { etichetta: 'Nome', render: (f) => <b>{f.nome}</b> },
           { etichetta: 'Referente', render: (f) => f.referente ?? '—' },
           { etichetta: 'Telefono', render: (f) => f.telefono ?? '—' },
           { etichetta: 'Indirizzo', render: (f) => f.indirizzo ?? '—' },

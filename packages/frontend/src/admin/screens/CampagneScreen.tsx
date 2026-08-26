@@ -72,7 +72,7 @@ export function CampagneScreen() {
       <TabellaGenerica
         righe={campagne}
         colonne={[
-          { etichetta: 'Nome', render: (c) => c.nome },
+          { etichetta: 'Nome', render: (c) => <b>{c.nome}</b> },
           { etichetta: 'Piattaforma', render: (c) => c.piattaforma ?? '—' },
           { etichetta: 'Tipo', render: (c) => c.tipo ?? '—' },
           { etichetta: 'Stato', render: (c) => c.attiva ? 'Attiva' : 'Disattiva' },

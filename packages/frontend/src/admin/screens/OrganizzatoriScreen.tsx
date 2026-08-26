@@ -77,7 +77,7 @@ export function OrganizzatoriScreen() {
       <TabellaGenerica
         righe={organizzatoriFiltrati}
         colonne={[
-          { etichetta: 'Nome', render: (o) => o.nome },
+          { etichetta: 'Nome', render: (o) => <b>{o.nome}</b> },
           { etichetta: 'Email', render: (o) => o.email },
           { etichetta: 'Eventi associati', render: (o) => String(o.eventiAbilitati.length) },
         ]}

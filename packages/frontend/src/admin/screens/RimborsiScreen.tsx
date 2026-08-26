@@ -55,7 +55,7 @@ export function RimborsiScreen() {
                 <th>PNR</th>
                 <th>Evento</th>
                 <th>Cliente</th>
-                <th>Totale</th>
+                <th style={{ textAlign: 'right' }}>Totale</th>
                 <th>Motivo del cliente</th>
                 <th>Richiesta il</th>
                 <th>Stato</th>
@@ -65,10 +65,10 @@ export function RimborsiScreen() {
             <tbody>
               {filtrata.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.pnr}</td>
+                  <td><b>{r.pnr}</b></td>
                   <td>{r.eventoArtista}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{new Date(r.eventoData).toLocaleDateString('it-IT')}</span></td>
                   <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{r.clienteEmail}</span></td>
-                  <td>€{Number(r.prenotazioneTotale).toFixed(2)}</td>
+                  <td style={{ textAlign: 'right' }}><b>€{Number(r.prenotazioneTotale).toFixed(2)}</b></td>
                   <td style={{ maxWidth: 260 }}>{r.motivo || <span style={{ color: 'var(--mist)' }}>—</span>}</td>
                   <td>{new Date(r.richiestaIl).toLocaleString('it-IT')}</td>
                   <td><span className={`badge ${ETICHETTA_STATO[r.stato].classe}`}>{ETICHETTA_STATO[r.stato].testo}</span></td>

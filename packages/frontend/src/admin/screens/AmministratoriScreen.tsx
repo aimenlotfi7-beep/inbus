@@ -192,7 +192,7 @@ export function AmministratoriScreen() {
       <TabellaGenerica
         righe={adminFiltrati}
         colonne={[
-          { etichetta: 'Nome', render: (a) => a.nome },
+          { etichetta: 'Nome', render: (a) => <b>{a.nome}</b> },
           { etichetta: 'Email', render: (a) => a.email },
           { etichetta: 'Ruolo', render: (a) => nomeRuolo(a.ruoloId) },
           { etichetta: 'Stato', render: (a) => a.attivo ? 'Attivo' : 'Disattivo' },
@@ -206,7 +206,7 @@ export function AmministratoriScreen() {
       <TabellaGenerica
         righe={log.map((l) => ({ ...l, id: l.id }))}
         colonne={[
-          { etichetta: 'Azione', render: (l) => l.azione },
+          { etichetta: 'Azione', render: (l) => <b>{l.azione}</b> },
           { etichetta: 'Dettaglio', render: (l) => l.dettaglio ?? '—' },
           { etichetta: 'Quando', render: (l) => new Date(l.data).toLocaleString('it-IT') },
         ]}

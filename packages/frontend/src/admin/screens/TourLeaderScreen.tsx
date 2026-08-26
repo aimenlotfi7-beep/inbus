@@ -130,7 +130,7 @@ export function TourLeaderScreen() {
       <TabellaGenerica
         righe={listaFiltrata}
         colonne={[
-          { etichetta: 'Nome', render: (t) => `${t.nome} ${t.cognome}` },
+          { etichetta: 'Nome', render: (t) => <b>{t.nome} {t.cognome}</b> },
           { etichetta: 'Contatti', render: (t) => `${t.email}${t.telefono ? ' · ' + t.telefono : ''}` },
           { etichetta: 'Città', render: (t) => t.citta ?? '—' },
           {

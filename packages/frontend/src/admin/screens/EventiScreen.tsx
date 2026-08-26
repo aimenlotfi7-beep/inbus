@@ -83,7 +83,7 @@ export function EventiScreen() {
             <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{ev.luogo}, {ev.citta}</p>
             <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>
               {new Date(ev.data).toLocaleDateString('it-IT')}
-              {(() => { const p = prezzoMinimoEvento(ev); return p !== null ? ` · da €${p.toFixed(2)}` : ''; })()}
+              {(() => { const p = prezzoMinimoEvento(ev); return p !== null ? <> · <b style={{ color: 'var(--paper)' }}>da €{p.toFixed(2)}</b></> : ''; })()}
               {!ev.visibileSito && ' · nascosto dal sito'}
             </p>
             <button className="btn btn-ghost" style={{ marginTop: 10, fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(ev); }}>Elimina</button>

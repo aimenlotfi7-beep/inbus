@@ -82,8 +82,8 @@ export function CouponScreen() {
       <TabellaGenerica
         righe={couponFiltrati}
         colonne={[
-          { etichetta: 'Codice', render: (c) => c.codice },
-          { etichetta: 'Sconto', render: (c) => c.tipo === 'PERCENTUALE' ? `${c.valore}%` : `€${c.valore}` },
+          { etichetta: 'Codice', render: (c) => <b>{c.codice}</b> },
+          { etichetta: 'Sconto', render: (c) => <b>{c.tipo === 'PERCENTUALE' ? `${c.valore}%` : `€${c.valore}`}</b> },
           { etichetta: 'Usi', render: (c) => `${c.usiAttuali} / ${c.usiMax ?? '∞'}` },
           { etichetta: 'Valido per', render: (c) => c.eventoId ? (eventi.find((ev) => ev.id === c.eventoId)?.artista ?? 'Evento eliminato') : 'Tutti gli eventi' },
           { etichetta: 'Stato', render: (c) => c.attivo ? 'Attivo' : 'Disattivo' },
