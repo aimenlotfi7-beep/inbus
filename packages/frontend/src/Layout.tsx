@@ -1,14 +1,20 @@
 import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { CookieBanner, LinkPreferenzeCookie } from './features/CookieBanner';
 import { clienteLoggato } from './features/clienteSessione';
 
 export function Layout({ children }: { children: ReactNode }) {
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
-  // Letto una volta al render: se un cliente ha già fatto accesso vero
-  // (con password, non più solo un'email "ricordata"), lo segnaliamo
-  // qui invece di mostrare sempre "Accedi".
   const loggato = clienteLoggato();
+  const location = useLocation();
+  const inHomepage = location.pathname === '/';
+  // La ricerca vive nell'URL (?q=...), non in uno stato locale — così
+  // header (qui) e homepage possono leggerla e scriverla entrambe,
+  // senza doverla far viaggiare come prop tra due componenti che
+  // altrimenti non si parlerebbero (Layout avvolge OGNI pagina,
+  // HomePage è solo una di quelle).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const testoRicerca = searchParams.get('q') ?? '';
 
   return (
     <>
@@ -20,6 +26,21 @@ export function Layout({ children }: { children: ReactNode }) {
           <Link to="/#come-funziona">Come funziona</Link>
           <Link to="/faq">Assistenza</Link>
         </nav>
+        {inHomepage && (
+          <div className="header-ricerca">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+            <input
+              type="text"
+              placeholder="Cerca artista, evento o città..."
+              value={testoRicerca}
+              onChange={(e) => {
+                const nuovi = new URLSearchParams(searchParams);
+                if (e.target.value) nuovi.set('q', e.target.value); else nuovi.delete('q');
+                setSearchParams(nuovi, { replace: true });
+              }}
+            />
+          </div>
+        )}
         <div className="nav-actions">
           <Link className="btn btn-ghost desktop-only" to={loggato ? '/account' : '/accedi'}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
           <button className="burger" onClick={() => setMenuMobileAperto(!menuMobileAperto)}>☰</button>

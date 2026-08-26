@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { eventiApi } from '../api/eventi';
 import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
@@ -53,7 +54,13 @@ export function HomePage() {
     return () => clearInterval(intervallo);
   }, [eventi.length]);
   const generi = useMemo(() => ['Tutti', ...new Set(eventi.map((e) => e.genere))], [eventi]);
-  const [ricercaTesto, setRicercaTesto] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ricercaTesto = searchParams.get('q') ?? '';
+  function setRicercaTesto(valore: string) {
+    const nuovi = new URLSearchParams(searchParams);
+    if (valore) nuovi.set('q', valore); else nuovi.delete('q');
+    setSearchParams(nuovi, { replace: true });
+  }
   const eventiFiltrati = useMemo(() => {
     let lista = genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => e.genere === genereAttivo);
     const q = ricercaTesto.trim().toLowerCase();
@@ -79,40 +86,23 @@ export function HomePage() {
 
   return (
     <>
-      {/* Ricerca fissa in alto, trasparente — fuori da .hero apposta
-          (che ha overflow:hidden per i gradienti decorativi, e
-          romperebbe lo "sticky" se fosse dentro): così resta visibile
-          scorrendo tutta la pagina, non solo dentro l'hero. */}
+      {/* Solo le categorie — la ricerca vera ora vive nell'header
+          (sempre visibile lì, su ogni scroll), non serve ripeterla
+          anche qui. */}
       <div className="hero-ricerca-top">
-        <div className="hero-ricerca-riga">
-          <div className="hero-ricerca-campo">
-            <svg viewBox="0 0 24 24" width="18" height="18"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
-            <input
-              type="text"
-              placeholder="Cerca artista, evento o città..."
-              list="artistiList"
-              value={ricercaTesto}
-              onChange={(e) => setRicercaTesto(e.target.value)}
-            />
-            <datalist id="artistiList">{eventi.map((e) => <option key={e.id} value={e.artista} />)}</datalist>
-          </div>
-          <button className="search-cta" onClick={() => document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' })}>
-            Cerca il bus
+        <div className="hero-ricerca-categorie">
+          {['Tutti', 'Concerti', 'Festival', 'Sport'].map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              className={`categoria-chip${genereAttivo === cat ? ' active' : ''}`}
+              onClick={() => setGenereAttivo(cat)}
+            >
+              {cat}
             </button>
-          </div>
-          <div className="hero-ricerca-categorie">
-            {['Tutti', 'Concerti', 'Festival', 'Sport'].map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                className={`categoria-chip${genereAttivo === cat ? ' active' : ''}`}
-                onClick={() => setGenereAttivo(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
+      </div>
 
       <section className="hero">
         <div className="hero-grid">
