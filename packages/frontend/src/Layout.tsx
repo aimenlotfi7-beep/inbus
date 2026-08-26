@@ -23,12 +23,15 @@ export function Layout({ children }: { children: ReactNode }) {
         <nav className="links">
           <Link to="/#consigliati">Eventi Consigliati</Link>
           <Link to="/#eventi">Eventi</Link>
-          <Link to="/#come-funziona">Come funziona</Link>
-          <Link to="/faq">Assistenza</Link>
         </nav>
         {inHomepage && (
-          <div className="header-ricerca">
-            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+          <form
+            className="header-ricerca"
+            onSubmit={(e) => { e.preventDefault(); document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' }); }}
+          >
+            <button type="submit" aria-label="Cerca">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+            </button>
             <input
               type="text"
               placeholder="Cerca artista, evento o città..."
@@ -39,7 +42,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 setSearchParams(nuovi, { replace: true });
               }}
             />
-          </div>
+          </form>
         )}
         <div className="nav-actions">
           <Link className="btn btn-ghost desktop-only" to={loggato ? '/account' : '/accedi'}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
@@ -49,8 +52,6 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className={`mobile-nav${menuMobileAperto ? ' open' : ''}`}>
         <Link to="/#consigliati" onClick={() => setMenuMobileAperto(false)}>Eventi Consigliati</Link>
         <Link to="/#eventi" onClick={() => setMenuMobileAperto(false)}>Eventi</Link>
-        <Link to="/#come-funziona" onClick={() => setMenuMobileAperto(false)}>Come funziona</Link>
-        <Link to="/faq" onClick={() => setMenuMobileAperto(false)}>Assistenza</Link>
         <Link className="btn btn-primary" to={loggato ? '/account' : '/accedi'} style={{ textAlign: 'center', marginTop: 10 }} onClick={() => setMenuMobileAperto(false)}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
       </div>
 

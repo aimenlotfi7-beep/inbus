@@ -105,9 +105,13 @@
      (vedi Layout.tsx), nello spazio tra le voci di menu e "Accedi". */
   .header-ricerca{
     display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.08); color:var(--paper);
-    border:1px solid var(--line); border-radius:999px; padding:8px 16px; flex:1; max-width:320px; margin:0 20px;
+    border:1px solid var(--line); border-radius:999px; padding:6px 16px; width:340px; max-width:36vw;
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
   }
-  .header-ricerca svg{flex-shrink:0; opacity:.6;}
+  .header-ricerca button{
+    display:flex; background:none; border:none; padding:0; margin:0; color:var(--paper); opacity:.65; cursor:pointer; flex-shrink:0;
+  }
+  .header-ricerca button:hover{opacity:1;}
   .header-ricerca input{
     border:none; outline:none; background:transparent; font-family:'Poppins',sans-serif;
     font-size:13.5px; font-weight:500; color:var(--paper); width:100%;
