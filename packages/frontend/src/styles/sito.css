@@ -137,13 +137,23 @@
   /* Tutti gli eventi, al posto del vecchio "biglietto" — scorrono da
      soli (gestito via JS, ogni 2 secondi), oltre a poter scorrere a
      mano col dito/trackpad in qualsiasi momento. */
-  .hero-carosello-wrap{overflow:hidden; border-radius:18px; min-width:0;}
+  .hero-carosello-wrap{min-width:0;}
   .hero-carosello{
-    display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; padding-bottom:4px;
-    width:100%; min-width:0;
+    display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none;
+    width:100%; min-width:0; padding:24px 4px 40px;
   }
   .hero-carosello::-webkit-scrollbar{display:none;}
-  .hero-carosello .card{flex:0 0 auto; width:240px; scroll-snap-align:start;}
+  .hero-carosello-card{
+    flex:0 0 auto; width:240px; scroll-snap-align:center;
+    transform:scale(.9); opacity:.6; transition:transform .35s ease, opacity .35s ease, filter .35s ease;
+    filter:brightness(.85);
+  }
+  .hero-carosello-card.centro{
+    transform:scale(1.08); opacity:1; filter:brightness(1);
+    box-shadow:0 30px 40px -14px rgba(0,0,0,.55);
+    z-index:2;
+  }
+  .hero-carosello-card .card{width:100%;}
 
   .eyebrow{
     font-family:'Space Mono',monospace; font-size:12px; letter-spacing:3px; text-transform:uppercase;

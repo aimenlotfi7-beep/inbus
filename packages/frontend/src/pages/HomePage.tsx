@@ -12,7 +12,38 @@ export function HomePage() {
     caroselloRef.current?.scrollBy({ left: direzione * 600, behavior: 'smooth' });
   }
   const caroselloHeroRef = useRef<HTMLDivElement>(null);
+  const [eventoCentraleId, setEventoCentraleId] = useState<string | null>(null);
   const [eventi, setEventi] = useState<Evento[]>([]);
+
+  // Quale card è più vicina al centro del carosello — ricalcolato ogni
+  // volta che si scorre (a mano o da soli, ogni 2 secondi), non solo
+  // all'avvio: così la card "in primo piano" resta sempre quella
+  // davvero al centro, anche scorrendo col dito.
+  function aggiornaCardCentrale() {
+    const contenitore = caroselloHeroRef.current;
+    if (!contenitore) return;
+    const centroContenitore = contenitore.getBoundingClientRect().left + contenitore.clientWidth / 2;
+    let vicinaId: string | null = null;
+    let distanzaMinima = Infinity;
+    for (const card of Array.from(contenitore.children)) {
+      const rect = (card as HTMLElement).getBoundingClientRect();
+      const centroCard = rect.left + rect.width / 2;
+      const distanza = Math.abs(centroCard - centroContenitore);
+      if (distanza < distanzaMinima) {
+        distanzaMinima = distanza;
+        vicinaId = (card as HTMLElement).dataset.eventoId ?? null;
+      }
+    }
+    setEventoCentraleId(vicinaId);
+  }
+  useEffect(() => {
+    const contenitore = caroselloHeroRef.current;
+    if (!contenitore) return;
+    contenitore.addEventListener('scroll', aggiornaCardCentrale, { passive: true });
+    aggiornaCardCentrale();
+    return () => contenitore.removeEventListener('scroll', aggiornaCardCentrale);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventi.length]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
   const [eventoInCheckout, setEventoInCheckout] = useState<Evento | null>(null);
@@ -107,7 +138,11 @@ export function HomePage() {
               al posto del vecchio modulo di ricerca, ora spostato sopra. */}
           <div className="hero-carosello-wrap">
             <div className="hero-carosello" ref={caroselloHeroRef}>
-              {eventi.map((ev) => <EventoCard key={ev.id} evento={ev} />)}
+              {eventi.map((ev) => (
+                <div key={ev.id} data-evento-id={ev.id} className={`hero-carosello-card${ev.id === eventoCentraleId ? ' centro' : ''}`}>
+                  <EventoCard evento={ev} />
+                </div>
+              ))}
             </div>
           </div>
         </div>
