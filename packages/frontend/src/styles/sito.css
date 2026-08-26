@@ -606,19 +606,30 @@
   .checkout-step-dot{
     display:flex; align-items:center; gap:6px; font-size:11px; color:#a89f8c; font-weight:600; flex-shrink:0; white-space:nowrap;
   }
-  /* Sotto i 480px le etichette di testo sparirebbero facilmente (4
-     step per gli eventi con più servizi) — restano solo i pallini
-     numerati, sempre tutti visibili senza dover scorrere. */
-  
-  .checkout-step-dot span:first-child{
+  /* Il pallino tondo col numero — selettore sulla SUA classe, non su
+     "span" in generale (altro span dentro lo stesso step è l'etichetta
+     di testo, che NON deve diventare anche lei un tondino 24x24). */
+  .checkout-step-numero{
     width:24px; height:24px; border-radius:50%; border:1.5px solid #d8d0bf; display:flex; align-items:center;
     justify-content:center; font-size:11px; color:#a89f8c; flex-shrink:0;
   }
   .checkout-step-dot.active{color:var(--ink);}
-  .checkout-step-dot.active span{border-color:var(--pink); color:var(--pink);}
+  .checkout-step-dot.active .checkout-step-numero{border-color:var(--pink); color:var(--pink);}
   .checkout-step-dot.completato{color:var(--ink);}
-  .checkout-step-dot.completato span{background:var(--pink); border-color:var(--pink); color:#fff;}
+  .checkout-step-dot.completato .checkout-step-numero{background:var(--pink); border-color:var(--pink); color:#fff;}
   .checkout-step-dot:not(:last-child)::after{content:''; width:14px; height:1px; background:#d8d0bf; margin-left:2px;}
+
+  /* Su schermi stretti: si vede SOLO l'etichetta dello step attivo
+     (senza il suo pallino), tutti gli altri step mostrano SOLO il
+     pallino (senza etichetta) — così cambiando step sparisce la
+     scritta di quello vecchio e ricompare il suo pallino, mentre il
+     nuovo step attivo mostra la sua scritta al posto del pallino. */
+  @media (max-width:600px){
+    .checkout-step-dot .checkout-step-etichetta{display:none;}
+    .checkout-step-dot.active .checkout-step-numero{display:none;}
+    .checkout-step-dot.active .checkout-step-etichetta{display:inline; font-size:13px;}
+    .checkout-stepper{gap:8px;}
+  }
   .checkout-riepilogo-persistente{
     display:flex; justify-content:space-between; align-items:center; gap:10px;
     background:#faf7f0; border:1px solid #e5ded0; border-radius:10px; padding:10px 14px; margin-bottom:20px;
@@ -723,6 +734,3 @@
   font-size:13px; color:var(--ink); cursor:pointer; opacity:.75;
 }
 .mini-tab.active{background:var(--pink); border-color:var(--pink); color:#fff; opacity:1; font-weight:600;}
-
-
-
