@@ -27,7 +27,15 @@ export interface OffertaCheckout { id: string; nome: string; scontoPercentuale: 
  * partecipanti, 3) pagamento — usato sia dentro il popup della home
  * (CheckoutModal) sia direttamente nella pagina dedicata dell'evento.
  */
-export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId }: { evento: Evento; offerta?: OffertaCheckout; onChiudi?: () => void; publicWidgetId?: string }) {
+export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaColori }: {
+  evento: Evento; offerta?: OffertaCheckout; onChiudi?: () => void; publicWidgetId?: string;
+  // Se il checkout arriva da una White Label con un suo tema, questi
+  // colori sovrascrivono quelli del sito per TUTTO il modulo — non
+  // solo la vetrina/anteprima come prima, anche lo stepper, i
+  // pulsanti, i pallini. Facoltativo: senza, il checkout resta uguale
+  // a sempre (i colori standard del sito INBUS).
+  temaColori?: { sfondo: string; superficie: string; testoPrincipale: string; testoSecondario: string; cta: string; testoCta: string; bordi: string };
+}) {
   const [stato, setStato] = useState<Stato>('caricamento');
   // Quale pulsante specifico è stato premuto — 'invio' da solo non basta,
   // altrimenti "Acquista" e "Prenota" si accenderebbero insieme (era
@@ -38,6 +46,20 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId }: { ev
   // diventa a tutti gli effetti un quarto step, prima degli altri tre.
   // Con zero o un solo servizio, si passa dritti come sempre.
   const multiServizio = evento.servizi.length >= 2;
+
+  // Le variabili CSS del tema White Label, se presente — sovrascritte
+  // qui (non nel foglio di stile) così restano scoped a QUESTO modulo
+  // soltanto, senza toccare il resto della pagina che lo ospita.
+  const styleTema: React.CSSProperties | undefined = temaColori ? {
+    '--paper': temaColori.superficie,
+    '--ink': temaColori.testoPrincipale,
+    '--mist': temaColori.testoSecondario,
+    '--line': temaColori.bordi,
+    '--pink': temaColori.cta,
+    '--cta-sfondo': temaColori.cta,
+    '--cta-testo': temaColori.testoCta,
+  } as React.CSSProperties : undefined;
+
   const [servizioScelto, setServizioScelto] = useState<Servizio | null>(multiServizio ? null : (evento.servizi[0] ?? null));
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [opzioni, setOpzioni] = useState<OpzionePartenza[]>([]);
@@ -222,7 +244,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId }: { ev
 
   if (stato === 'confermato') {
     return (
-      <div className="checkout-form">
+      <div className="checkout-form" style={styleTema}>
         <h3>Prenotazione confermata 🎉</h3>
         <div className="checkout-summary">Il tuo PNR è <b>{pnrConfermato}</b>. I biglietti arriveranno all'email <b>{email}</b>.</div>
         {onChiudi && <button className="search-cta" onClick={onChiudi}>Chiudi</button>}
@@ -232,7 +254,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId }: { ev
 
   if (stato === 'confermato-attesa') {
     return (
-      <div className="checkout-form">
+      <div className="checkout-form" style={styleTema}>
         <h3>Sei in lista d'attesa 📩</h3>
         <div className="checkout-summary">
           Ti scriveremo a <b>{email}</b> appena si libera un posto per <b>{evento.artista}</b>, con un link per
@@ -244,7 +266,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId }: { ev
   }
 
   return (
-    <div className="checkout-form">
+    <div className="checkout-form" style={styleTema}>
       <h3>Prenota</h3>
 
       {offerta && (

@@ -12,6 +12,12 @@
     --mist-dim:#a99fc288;
     --line: rgba(246,241,231,0.12);
     --radius: 14px;
+    /* Colori dedicati al pulsante CTA principale del checkout — separati
+       da --night/--paper (che servono anche ad altro, come lo sfondo
+       della card stessa) apposta per poter essere sovrascritti dal tema
+       di una White Label senza intaccare nient'altro attorno. */
+    --cta-sfondo: var(--night);
+    --cta-testo: var(--paper);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0; overflow-x:hidden;}
@@ -218,7 +224,7 @@
     font-size:18px; cursor:pointer; line-height:1; color:var(--ink);
   }
   .search-cta{
-    width:100%; margin-top:14px; background:var(--night); color:var(--paper);
+    width:100%; margin-top:14px; background:var(--cta-sfondo); color:var(--cta-testo);
     font-family:'Poppins',sans-serif; font-weight:800; letter-spacing:1px; font-size:16px; text-transform:uppercase;
     padding:15px; border-radius:10px; border:none; cursor:pointer;
     display:flex; align-items:center; justify-content:center; gap:10px;

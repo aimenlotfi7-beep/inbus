@@ -49,9 +49,9 @@ export function WidgetPubblicoPage() {
 
   if (vista === 'checkout' && eventoCompleto) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--night)', padding: '40px 20px' }}>
+      <div style={{ minHeight: '100vh', background: dati.tema.colori.sfondo, padding: '40px 20px' }}>
         <div style={{ maxWidth: 480, margin: '0 auto' }}>
-          <CheckoutForm evento={eventoCompleto} publicWidgetId={publicWidgetId} />
+          <CheckoutForm evento={eventoCompleto} publicWidgetId={publicWidgetId} temaColori={dati.tema.colori} />
         </div>
       </div>
     );
