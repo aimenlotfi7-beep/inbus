@@ -18,12 +18,23 @@ const ETICHETTE_SEZIONI: Record<SezioneBiglietto, string> = {
 const TUTTE_LE_SEZIONI = Object.keys(ETICHETTE_SEZIONI) as SezioneBiglietto[];
 
 interface Posizione { x: number; y: number; larghezza: number; altezza: number }
+interface ImmagineExtra { id: string; url: string; posizione: Posizione }
+interface Sfumatura {
+  attiva: boolean;
+  tipo: 'lineare' | 'radiale';
+  colore: string;
+  direzioneGradi: number;
+  raggio: number;
+  opacita: number;
+}
 interface Configurazione {
   coloreAccento: string;
+  coloreSfondo: string;
   posizioni: Record<SezioneBiglietto, Posizione>;
+  immaginiExtra: ImmagineExtra[];
   qr: { dimensione: number };
   sfondoImmagineUrl: string | null;
-  sfondoOpacita: number;
+  sfumatura: Sfumatura;
   spaziaturaSezioni: number;
 }
 
@@ -39,10 +50,12 @@ const POSIZIONI_DEFAULT: Record<SezioneBiglietto, Posizione> = {
 };
 const CONFIG_DEFAULT: Configurazione = {
   coloreAccento: '#111111',
+  coloreSfondo: '#ffffff',
   posizioni: POSIZIONI_DEFAULT,
+  immaginiExtra: [],
   qr: { dimensione: 33 },
   sfondoImmagineUrl: null,
-  sfondoOpacita: 1,
+  sfumatura: { attiva: false, tipo: 'lineare', colore: '#ffffff', direzioneGradi: 90, raggio: 60, opacita: 0.6 },
   spaziaturaSezioni: 1,
 };
 
@@ -60,10 +73,15 @@ function analizzaConfigurazione(testo: string): Configurazione {
     }
     return {
       coloreAccento: typeof c.coloreAccento === 'string' ? c.coloreAccento : CONFIG_DEFAULT.coloreAccento,
+      coloreSfondo: typeof c.coloreSfondo === 'string' ? c.coloreSfondo : '#ffffff',
       posizioni,
+      immaginiExtra: Array.isArray(c.immaginiExtra) ? c.immaginiExtra.filter((i: unknown): i is ImmagineExtra => {
+        const x = i as Partial<ImmagineExtra>;
+        return !!x && typeof x.id === 'string' && typeof x.url === 'string' && !!x.posizione;
+      }) : [],
       qr: { dimensione: typeof c.qr?.dimensione === 'number' ? c.qr.dimensione : CONFIG_DEFAULT.qr.dimensione },
       sfondoImmagineUrl: typeof c.sfondoImmagineUrl === 'string' ? c.sfondoImmagineUrl : null,
-      sfondoOpacita: typeof c.sfondoOpacita === 'number' ? c.sfondoOpacita : 1,
+      sfumatura: c.sfumatura && typeof c.sfumatura === 'object' ? { ...CONFIG_DEFAULT.sfumatura, ...c.sfumatura } : CONFIG_DEFAULT.sfumatura,
       spaziaturaSezioni: typeof c.spaziaturaSezioni === 'number' ? c.spaziaturaSezioni : 1,
     };
   } catch {
@@ -84,10 +102,13 @@ export function LayoutBigliettoScreen() {
   const [config, setConfig] = useState<Configurazione>(CONFIG_DEFAULT);
   const [salvando, setSalvando] = useState(false);
   const [generandoAnteprima, setGenerandoAnteprima] = useState(false);
-  const [sezioneAttiva, setSezioneAttiva] = useState<SezioneBiglietto | null>(null);
+  // "sezione:titolo" per una sezione fissa, "extra:ID" per un logo
+  // aggiunto — un solo stato per entrambi, così il resto del codice
+  // (trascinamento, ridimensionamento) è lo stesso per entrambi i tipi.
+  const [attivoId, setAttivoId] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
-  const trascinamento = useRef<{ sezione: SezioneBiglietto; modo: 'sposta' | 'ridimensiona'; inizioMouseX: number; inizioMouseY: number; posizioneIniziale: Posizione } | null>(null);
+  const trascinamento = useRef<{ id: string; modo: 'sposta' | 'ridimensiona'; inizioMouseX: number; inizioMouseY: number; posizioneIniziale: Posizione } | null>(null);
 
   function ricarica() {
     setCaricamento(true);
@@ -106,13 +127,13 @@ export function LayoutBigliettoScreen() {
     setSelezionato(l);
     setNome(l.nome);
     setConfig(analizzaConfigurazione(l.configurazione));
-    setSezioneAttiva(null);
+    setAttivoId(null);
   }
   function nuovo() {
     setSelezionato(null);
     setNome('Nuovo layout');
     setConfig(CONFIG_DEFAULT);
-    setSezioneAttiva(null);
+    setAttivoId(null);
   }
 
   async function salva() {
@@ -160,15 +181,39 @@ export function LayoutBigliettoScreen() {
     }
   }
 
-  function aggiornaPosizione(sezione: SezioneBiglietto, nuova: Partial<Posizione>) {
-    setConfig((c) => ({ ...c, posizioni: { ...c.posizioni, [sezione]: { ...c.posizioni[sezione], ...nuova } } }));
+  function posizioneDi(id: string): Posizione {
+    if (id.startsWith('extra:')) {
+      const extraId = id.slice(6);
+      return config.immaginiExtra.find((i) => i.id === extraId)?.posizione ?? { x: 10, y: 10, larghezza: 20, altezza: 20 };
+    }
+    return config.posizioni[id as SezioneBiglietto];
+  }
+  function aggiornaPosizione(id: string, nuova: Partial<Posizione>) {
+    if (id.startsWith('extra:')) {
+      const extraId = id.slice(6);
+      setConfig((c) => ({ ...c, immaginiExtra: c.immaginiExtra.map((i) => i.id === extraId ? { ...i, posizione: { ...i.posizione, ...nuova } } : i) }));
+    } else {
+      const sezione = id as SezioneBiglietto;
+      setConfig((c) => ({ ...c, posizioni: { ...c.posizioni, [sezione]: { ...c.posizioni[sezione], ...nuova } } }));
+    }
+  }
+  function aggiungiLogo(url: string) {
+    const id = `logo-${Date.now()}`;
+    setConfig((c) => ({ ...c, immaginiExtra: [...c.immaginiExtra, { id, url, posizione: { x: 10, y: 10, larghezza: 25, altezza: 12 } }] }));
+    setAttivoId(`extra:${id}`);
+  }
+  function rimuoviLogoAttivo() {
+    if (!attivoId?.startsWith('extra:')) return;
+    const extraId = attivoId.slice(6);
+    setConfig((c) => ({ ...c, immaginiExtra: c.immaginiExtra.filter((i) => i.id !== extraId) }));
+    setAttivoId(null);
   }
 
-  function iniziaTrascinamento(e: React.MouseEvent, sezione: SezioneBiglietto, modo: 'sposta' | 'ridimensiona') {
+  function iniziaTrascinamento(e: React.MouseEvent, id: string, modo: 'sposta' | 'ridimensiona') {
     e.preventDefault();
     e.stopPropagation();
-    setSezioneAttiva(sezione);
-    trascinamento.current = { sezione, modo, inizioMouseX: e.clientX, inizioMouseY: e.clientY, posizioneIniziale: { ...config.posizioni[sezione] } };
+    setAttivoId(id);
+    trascinamento.current = { id, modo, inizioMouseX: e.clientX, inizioMouseY: e.clientY, posizioneIniziale: { ...posizioneDi(id) } };
     window.addEventListener('mousemove', duranteTrascinamento);
     window.addEventListener('mouseup', fineTrascinamento);
   }
@@ -182,11 +227,11 @@ export function LayoutBigliettoScreen() {
     if (t.modo === 'sposta') {
       const nuovaX = Math.max(0, Math.min(100 - t.posizioneIniziale.larghezza, t.posizioneIniziale.x + deltaXPercento));
       const nuovaY = Math.max(0, Math.min(100 - t.posizioneIniziale.altezza, t.posizioneIniziale.y + deltaYPercento));
-      aggiornaPosizione(t.sezione, { x: nuovaX, y: nuovaY });
+      aggiornaPosizione(t.id, { x: nuovaX, y: nuovaY });
     } else {
       const nuovaLarghezza = Math.max(6, Math.min(100 - t.posizioneIniziale.x, t.posizioneIniziale.larghezza + deltaXPercento));
       const nuovaAltezza = Math.max(4, Math.min(100 - t.posizioneIniziale.y, t.posizioneIniziale.altezza + deltaYPercento));
-      aggiornaPosizione(t.sezione, { larghezza: nuovaLarghezza, altezza: nuovaAltezza });
+      aggiornaPosizione(t.id, { larghezza: nuovaLarghezza, altezza: nuovaAltezza });
     }
   }
   function fineTrascinamento() {
@@ -229,19 +274,51 @@ export function LayoutBigliettoScreen() {
             <div style={{ flex: '0 0 auto' }}>
               <div
                 ref={canvasRef}
-                onMouseDown={() => setSezioneAttiva(null)}
+                onMouseDown={() => setAttivoId(null)}
                 style={{
                   position: 'relative', width: LARGHEZZA_CANVAS, height: ALTEZZA_CANVAS,
-                  background: config.sfondoImmagineUrl ? `url(${config.sfondoImmagineUrl}) center/cover` : '#fff',
+                  background: config.sfondoImmagineUrl ? `url(${config.sfondoImmagineUrl}) center/cover, ${config.coloreSfondo}` : config.coloreSfondo,
                   border: '1px solid var(--line)', borderRadius: 4, overflow: 'hidden', boxShadow: '0 10px 30px -10px rgba(0,0,0,.4)',
                 }}
               >
-                {config.sfondoImmagineUrl && config.sfondoOpacita < 1 && (
-                  <div style={{ position: 'absolute', inset: 0, background: '#fff', opacity: 1 - config.sfondoOpacita }} />
+                {/* Sfumatura — anteprima approssimata via gradiente CSS, il PDF vero usa la stessa direzione/colore/raggio con la formula esatta di PDFKit */}
+                {config.sfumatura.attiva && (
+                  <div style={{
+                    position: 'absolute', inset: 0, pointerEvents: 'none',
+                    background: config.sfumatura.tipo === 'lineare'
+                      ? `linear-gradient(${config.sfumatura.direzioneGradi}deg, transparent, ${config.sfumatura.colore}${Math.round(config.sfumatura.opacita * 255).toString(16).padStart(2, '0')})`
+                      : `radial-gradient(circle ${config.sfumatura.raggio}% at center, transparent, ${config.sfumatura.colore}${Math.round(config.sfumatura.opacita * 255).toString(16).padStart(2, '0')})`,
+                  }} />
                 )}
+
+                {config.immaginiExtra.map((extra) => {
+                  const id = `extra:${extra.id}`;
+                  const attivo = attivoId === id;
+                  return (
+                    <div
+                      key={id}
+                      onMouseDown={(e) => iniziaTrascinamento(e, id, 'sposta')}
+                      style={{
+                        position: 'absolute',
+                        left: `${extra.posizione.x}%`, top: `${extra.posizione.y}%`, width: `${extra.posizione.larghezza}%`, height: `${extra.posizione.altezza}%`,
+                        border: attivo ? '2px solid var(--blue)' : '1px dashed rgba(37,99,235,.5)',
+                        backgroundImage: `url(${extra.url})`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+                        cursor: 'move', boxSizing: 'border-box',
+                      }}
+                    >
+                      {attivo && (
+                        <div
+                          onMouseDown={(e) => iniziaTrascinamento(e, id, 'ridimensiona')}
+                          style={{ position: 'absolute', right: -5, bottom: -5, width: 12, height: 12, borderRadius: '50%', background: 'var(--blue)', border: '2px solid #fff', cursor: 'nwse-resize' }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+
                 {TUTTE_LE_SEZIONI.map((s) => {
                   const p = config.posizioni[s];
-                  const attiva = sezioneAttiva === s;
+                  const attiva = attivoId === s;
                   return (
                     <div
                       key={s}
@@ -270,8 +347,13 @@ export function LayoutBigliettoScreen() {
                 })}
               </div>
               <p style={{ fontSize: 11, color: 'var(--mist)', marginTop: 8, textAlign: 'center' }}>
-                Clicca una sezione per selezionarla — trascina il pallino per ridimensionarla.
+                Clicca un elemento per selezionarlo — trascina il pallino per ridimensionarlo.
               </p>
+              {attivoId?.startsWith('extra:') && (
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', width: '100%', marginTop: 6 }} onClick={rimuoviLogoAttivo}>
+                  Rimuovi questo logo
+                </button>
+              )}
             </div>
 
             <div className="section-card" style={{ flex: 1, minWidth: 260 }}>
@@ -288,18 +370,67 @@ export function LayoutBigliettoScreen() {
                 </div>
               </div>
 
-              <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>Sfondo del biglietto</p>
+              <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>Colore sfondo</p>
+              <div className="campo">
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input type="color" value={config.coloreSfondo} onChange={(e) => setConfig({ ...config, coloreSfondo: e.target.value })} style={{ width: 44, padding: 2 }} />
+                  <input value={config.coloreSfondo} onChange={(e) => setConfig({ ...config, coloreSfondo: e.target.value })} />
+                </div>
+              </div>
+
+              <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>Immagine di sfondo</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                 <CaricaFile etichetta={config.sfondoImmagineUrl ? 'Cambia immagine' : '+ Importa immagine'} onCaricato={(url) => setConfig({ ...config, sfondoImmagineUrl: url })} />
                 {config.sfondoImmagineUrl && (
                   <button type="button" className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)' }} onClick={() => setConfig({ ...config, sfondoImmagineUrl: null })}>Rimuovi</button>
                 )}
               </div>
-              {config.sfondoImmagineUrl && (
-                <div className="campo">
-                  <label>Sfumatura sfondo ({Math.round(config.sfondoOpacita * 100)}% visibile)</label>
-                  <input type="range" min={0} max={1} step={0.05} value={config.sfondoOpacita} onChange={(e) => setConfig({ ...config, sfondoOpacita: Number(e.target.value) })} />
-                </div>
+
+              <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>Loghi / immagini aggiuntive</p>
+              <CaricaFile etichetta="+ Aggiungi logo" onCaricato={aggiungiLogo} />
+              {config.immaginiExtra.length > 0 && (
+                <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 6 }}>
+                  {config.immaginiExtra.length} logo{config.immaginiExtra.length === 1 ? '' : ''} sul biglietto — clicca uno sul canvas per spostarlo, ridimensionarlo o rimuoverlo.
+                </p>
+              )}
+
+              <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>Sfumatura</p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 10 }}>
+                <input type="checkbox" checked={config.sfumatura.attiva} onChange={(e) => setConfig({ ...config, sfumatura: { ...config.sfumatura, attiva: e.target.checked } })} />
+                Attiva sfumatura sopra lo sfondo
+              </label>
+              {config.sfumatura.attiva && (
+                <>
+                  <div className="campo">
+                    <label>Tipo</label>
+                    <select value={config.sfumatura.tipo} onChange={(e) => setConfig({ ...config, sfumatura: { ...config.sfumatura, tipo: e.target.value as Sfumatura['tipo'] } })}>
+                      <option value="lineare">Lineare</option>
+                      <option value="radiale">Radiale</option>
+                    </select>
+                  </div>
+                  <div className="campo">
+                    <label>Colore</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input type="color" value={config.sfumatura.colore} onChange={(e) => setConfig({ ...config, sfumatura: { ...config.sfumatura, colore: e.target.value } })} style={{ width: 44, padding: 2 }} />
+                      <input value={config.sfumatura.colore} onChange={(e) => setConfig({ ...config, sfumatura: { ...config.sfumatura, colore: e.target.value } })} />
+                    </div>
+                  </div>
+                  {config.sfumatura.tipo === 'lineare' ? (
+                    <div className="campo">
+                      <label>Direzione ({config.sfumatura.direzioneGradi}°)</label>
+                      <input type="range" min={0} max={360} value={config.sfumatura.direzioneGradi} onChange={(e) => setConfig({ ...config, sfumatura: { ...config.sfumatura, direzioneGradi: Number(e.target.value) } })} />
+                    </div>
+                  ) : (
+                    <div className="campo">
+                      <label>Raggio ({config.sfumatura.raggio}%)</label>
+                      <input type="range" min={10} max={150} value={config.sfumatura.raggio} onChange={(e) => setConfig({ ...config, sfumatura: { ...config.sfumatura, raggio: Number(e.target.value) } })} />
+                    </div>
+                  )}
+                  <div className="campo">
+                    <label>Intensità ({Math.round(config.sfumatura.opacita * 100)}%)</label>
+                    <input type="range" min={0} max={1} step={0.05} value={config.sfumatura.opacita} onChange={(e) => setConfig({ ...config, sfumatura: { ...config.sfumatura, opacita: Number(e.target.value) } })} />
+                  </div>
+                </>
               )}
 
               <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>QR code</p>

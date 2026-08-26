@@ -20,14 +20,32 @@ export interface Posizione {
   altezza: number; // percentuale dell'altezza pagina
 }
 
+/** Un'immagine/logo aggiuntivo — a differenza delle sezioni fisse
+ *  (sempre le stesse 8), qui l'admin ne può aggiungere quante ne
+ *  vuole, ognuna con la sua posizione libera. */
+export interface ImmagineExtra {
+  id: string;
+  url: string;
+  posizione: Posizione;
+}
+
+export interface Sfumatura {
+  attiva: boolean;
+  tipo: 'lineare' | 'radiale';
+  colore: string;
+  direzioneGradi: number; // solo per "lineare" — 0 = da sinistra a destra, 90 = dall'alto in basso
+  raggio: number; // solo per "radiale" — percentuale della pagina
+  opacita: number; // 0-1, quanto è intensa la sfumatura al suo punto più forte
+}
+
 export interface ConfigurazioneLayout {
   coloreAccento: string; // usato se l'evento non ne ha impostato uno suo
+  coloreSfondo: string; // colore di base della pagina, sotto a tutto (immagine compresa, se semi-trasparente)
   posizioni: Record<SezioneBiglietto, Posizione>;
+  immaginiExtra: ImmagineExtra[];
   qr: { dimensione: number }; // percentuale della larghezza pagina — l'allineamento non serve più, la posizione libera lo sostituisce
   sfondoImmagineUrl: string | null;
-  // Quanto è visibile lo sfondo importato — 1 = pieno, 0 = del tutto
-  // sbiadito verso il bianco (utile per non "coprire" il testo sopra).
-  sfondoOpacita: number;
+  sfumatura: Sfumatura;
   spaziaturaSezioni: number; // tenuto per compatibilità, non più usato attivamente col posizionamento libero
 }
 
@@ -37,23 +55,25 @@ export interface ConfigurazioneLayout {
  *  da zero. */
 const POSIZIONI_BASE: Record<SezioneBiglietto, Posizione> = {
   intestazione_immagine: { x: 0, y: 0, larghezza: 100, altezza: 22 },
-  titolo: { x: 8, y: 26, larghezza: 84, altezza: 9 },
-  evento: { x: 8, y: 37, larghezza: 84, altezza: 15 },
-  partenza: { x: 8, y: 54, larghezza: 84, altezza: 8 },
-  passeggero: { x: 8, y: 64, larghezza: 84, altezza: 8 },
-  pnr: { x: 8, y: 74, larghezza: 84, altezza: 8 },
+  titolo: { x: 8, y: 25, larghezza: 84, altezza: 8 },
+  evento: { x: 8, y: 34, larghezza: 84, altezza: 17 },
+  partenza: { x: 8, y: 53, larghezza: 84, altezza: 8 },
+  passeggero: { x: 8, y: 63, larghezza: 84, altezza: 9 },
+  pnr: { x: 8, y: 74, larghezza: 84, altezza: 7 },
   qr: { x: 35, y: 82, larghezza: 30, altezza: 15 },
-  nota: { x: 8, y: 92, larghezza: 84, altezza: 6 },
+  nota: { x: 8, y: 93, larghezza: 84, altezza: 5 },
 };
 
 /** Configurazione di base — usata per il layout "predefinito" creato al
  *  primo avvio, e come riferimento per capire la struttura attesa. */
 export const CONFIG_BASE: ConfigurazioneLayout = {
   coloreAccento: '#111111',
+  coloreSfondo: '#ffffff',
   posizioni: POSIZIONI_BASE,
+  immaginiExtra: [],
   qr: { dimensione: 33 },
   sfondoImmagineUrl: null,
-  sfondoOpacita: 1,
+  sfumatura: { attiva: false, tipo: 'lineare', colore: '#ffffff', direzioneGradi: 90, raggio: 60, opacita: 0.6 },
   spaziaturaSezioni: 1,
 };
 
@@ -104,11 +124,27 @@ function validaConfigurazione(testo: string): ConfigurazioneLayout {
   }
   return {
     coloreAccento: c.coloreAccento,
+    coloreSfondo: typeof c.coloreSfondo === 'string' ? c.coloreSfondo : '#ffffff',
     posizioni,
+    immaginiExtra: Array.isArray(c.immaginiExtra) ? c.immaginiExtra.filter((i) => i && typeof i.id === 'string' && typeof i.url === 'string' && validaPosizione(i.posizione)) : [],
     qr: { dimensione: c.qr.dimensione },
     sfondoImmagineUrl: typeof c.sfondoImmagineUrl === 'string' ? c.sfondoImmagineUrl : null,
-    sfondoOpacita: typeof c.sfondoOpacita === 'number' ? Math.max(0, Math.min(1, c.sfondoOpacita)) : 1,
+    sfumatura: validaSfumatura(c.sfumatura),
     spaziaturaSezioni: typeof c.spaziaturaSezioni === 'number' ? c.spaziaturaSezioni : 1,
+  };
+}
+
+function validaSfumatura(s: unknown): Sfumatura {
+  const base = CONFIG_BASE.sfumatura;
+  if (!s || typeof s !== 'object') return base;
+  const q = s as Partial<Sfumatura>;
+  return {
+    attiva: typeof q.attiva === 'boolean' ? q.attiva : base.attiva,
+    tipo: q.tipo === 'radiale' ? 'radiale' : 'lineare',
+    colore: typeof q.colore === 'string' ? q.colore : base.colore,
+    direzioneGradi: typeof q.direzioneGradi === 'number' ? q.direzioneGradi : base.direzioneGradi,
+    raggio: typeof q.raggio === 'number' ? q.raggio : base.raggio,
+    opacita: typeof q.opacita === 'number' ? Math.max(0, Math.min(1, q.opacita)) : base.opacita,
   };
 }
 
@@ -130,9 +166,10 @@ export async function disegnaBigliettoPdf(config: ConfigurazioneLayout, dati: {
   artista: string; dataEvento: Date; fermataCitta: string; fermataOrario: string | null;
   passeggeriNomi: string[]; pnr: string; qrDataUrl: string; immagineIntestazioneUrl: string | null;
 }): Promise<Buffer> {
-  const [immagineIntestazioneBuffer, sfondoBuffer] = await Promise.all([
+  const [immagineIntestazioneBuffer, sfondoBuffer, buffersImmaginiExtra] = await Promise.all([
     dati.immagineIntestazioneUrl ? scaricaImmagine(dati.immagineIntestazioneUrl) : Promise.resolve(null),
     config.sfondoImmagineUrl ? scaricaImmagine(config.sfondoImmagineUrl) : Promise.resolve(null),
+    Promise.all(config.immaginiExtra.map((extra) => scaricaImmagine(extra.url))),
   ]);
   const colore = config.coloreAccento;
 
@@ -150,18 +187,48 @@ export async function disegnaBigliettoPdf(config: ConfigurazioneLayout, dati: {
     // "quello che vedi è quello che ottieni".
     const px = (p: Posizione) => ({ x: (p.x / 100) * W, y: (p.y / 100) * H, larghezza: (p.larghezza / 100) * W, altezza: (p.altezza / 100) * H });
 
-    // Sfondo importato — disegnato per primo, sotto a tutto il resto,
-    // poi sfumato verso il bianco in base all'opacità scelta (1 =
-    // pieno, 0 = quasi invisibile) così il testo sopra resta leggibile
-    // anche con un'immagine vivace.
+    // Colore di base — sempre disegnato per primo, sotto a tutto
+    // (anche sotto l'immagine importata, se questa avesse trasparenza).
+    doc.rect(0, 0, W, H).fill(config.coloreSfondo);
+
+    // Sfondo importato, sopra al colore di base.
     if (sfondoBuffer) {
       try {
         doc.image(sfondoBuffer, 0, 0, { width: W, height: H, cover: [W, H] });
-        if (config.sfondoOpacita < 1) {
-          doc.fillOpacity(1 - config.sfondoOpacita).rect(0, 0, W, H).fill('#ffffff');
-          doc.fillOpacity(1);
-        }
       } catch { /* sfondo non caricabile, si prosegue senza */ }
+    }
+
+    // Sfumatura vera (lineare o radiale) sopra tutto lo sfondo — non
+    // un semplice velo piatto: un vero gradiente, con colore,
+    // direzione (lineare) o raggio (radiale) scelti dall'admin. Serve
+    // soprattutto a far risaltare il testo sopra un'immagine vivace,
+    // sfumando solo dove serve invece di coprire tutto uniformemente.
+    if (config.sfumatura.attiva && (sfondoBuffer || config.sfumatura.opacita > 0)) {
+      const s = config.sfumatura;
+      if (s.tipo === 'lineare') {
+        const rad = (s.direzioneGradi * Math.PI) / 180;
+        const x0 = W / 2 - (Math.cos(rad) * W) / 2, y0 = H / 2 - (Math.sin(rad) * H) / 2;
+        const x1 = W / 2 + (Math.cos(rad) * W) / 2, y1 = H / 2 + (Math.sin(rad) * H) / 2;
+        const grad = doc.linearGradient(x0, y0, x1, y1);
+        grad.stop(0, s.colore, 0).stop(1, s.colore, s.opacita);
+        doc.rect(0, 0, W, H).fill(grad);
+      } else {
+        const raggioPt = (s.raggio / 100) * Math.max(W, H);
+        const grad = doc.radialGradient(W / 2, H / 2, 0, W / 2, H / 2, raggioPt);
+        grad.stop(0, s.colore, 0).stop(1, s.colore, s.opacita);
+        doc.rect(0, 0, W, H).fill(grad);
+      }
+    }
+
+    // Loghi/immagini extra — quanti l'admin ne ha aggiunti, ognuno
+    // nella sua posizione libera.
+    for (let i = 0; i < config.immaginiExtra.length; i++) {
+      const buffer = buffersImmaginiExtra[i];
+      if (!buffer) continue;
+      const pos = px(config.immaginiExtra[i].posizione);
+      try {
+        doc.image(buffer, pos.x, pos.y, { width: pos.larghezza, height: pos.altezza, fit: [pos.larghezza, pos.altezza] });
+      } catch { /* immagine non caricabile, si salta */ }
     }
 
     for (const sezione of SEZIONI_DISPONIBILI) {
