@@ -465,6 +465,30 @@ export function SchedaEventoModale({
     }
   }
 
+  async function eliminaGenere() {
+    const trovato = categorie.find((c) => c.nome === form.genere);
+    if (!trovato) return;
+    if (!confirm(`Eliminare il genere "${trovato.nome}"? Gli eventi che lo usano già lo mantengono comunque scritto, semplicemente non comparirà più nell'elenco per sceglierlo su altri eventi.`)) return;
+    try {
+      await categorieApi.remove(trovato.id);
+      ricaricaCategorie();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
+    }
+  }
+
+  async function eliminaCategoria() {
+    const trovata = categorieEvento.find((c) => c.nome === form.categoria);
+    if (!trovata) return;
+    if (!confirm(`Eliminare la categoria "${trovata.nome}"? Sparirà anche dai pulsanti in alto sul sito. Gli eventi che la usano già la mantengono comunque scritta, semplicemente non comparirà più nell'elenco per sceglierla su altri eventi.`)) return;
+    try {
+      await categorieEventoApi.remove(trovata.id);
+      ricaricaCategorieEvento();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
+    }
+  }
+
   function aggiungiImmagine() {
     if (!nuovaImmagine.trim()) return;
     setForm({ ...form, immagini: [...(form.immagini ?? []), nuovaImmagine.trim()] });
@@ -573,27 +597,37 @@ export function SchedaEventoModale({
           <div className="form-grid">
             <label>Artista <input value={form.artista} onChange={(e) => setForm({ ...form, artista: e.target.value })} /></label>
             <label>Genere
-              <select value={form.genere} onChange={(e) => { if (e.target.value === '__nuovo__') { nuovoGenere(); return; } setForm({ ...form, genere: e.target.value }); }}>
-                <option value="" disabled>Scegli un genere...</option>
-                {categorie.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                {form.genere && !categorie.some((c) => c.nome === form.genere) && (
-                  <option value={form.genere}>{form.genere}</option>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <select value={form.genere} onChange={(e) => { if (e.target.value === '__nuovo__') { nuovoGenere(); return; } setForm({ ...form, genere: e.target.value }); }}>
+                  <option value="" disabled>Scegli un genere...</option>
+                  {categorie.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                  {form.genere && !categorie.some((c) => c.nome === form.genere) && (
+                    <option value={form.genere}>{form.genere}</option>
+                  )}
+                  <option value="__nuovo__">+ Nuovo genere...</option>
+                </select>
+                {categorie.some((c) => c.nome === form.genere) && (
+                  <button type="button" className="btn btn-ghost" style={{ padding: '0 10px', color: 'var(--pink)', flexShrink: 0 }} onClick={eliminaGenere} title="Elimina questo genere">✕</button>
                 )}
-                <option value="__nuovo__">+ Nuovo genere...</option>
-              </select>
+              </div>
             </label>
             <label>Categoria<InfoTooltip>I pulsanti in alto sul sito.</InfoTooltip>
-              <select
-                value={form.categoria ?? ''}
-                onChange={(e) => { if (e.target.value === '__nuova__') { nuovaCategoria(); return; } setForm({ ...form, categoria: e.target.value || null }); }}
-              >
-                <option value="">— Nessuna —</option>
-                {categorieEvento.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                {form.categoria && !categorieEvento.some((c) => c.nome === form.categoria) && (
-                  <option value={form.categoria}>{form.categoria}</option>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <select
+                  value={form.categoria ?? ''}
+                  onChange={(e) => { if (e.target.value === '__nuova__') { nuovaCategoria(); return; } setForm({ ...form, categoria: e.target.value || null }); }}
+                >
+                  <option value="">— Nessuna —</option>
+                  {categorieEvento.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                  {form.categoria && !categorieEvento.some((c) => c.nome === form.categoria) && (
+                    <option value={form.categoria}>{form.categoria}</option>
+                  )}
+                  <option value="__nuova__">+ Nuova categoria...</option>
+                </select>
+                {categorieEvento.some((c) => c.nome === form.categoria) && (
+                  <button type="button" className="btn btn-ghost" style={{ padding: '0 10px', color: 'var(--pink)', flexShrink: 0 }} onClick={eliminaCategoria} title="Elimina questa categoria">✕</button>
                 )}
-                <option value="__nuova__">+ Nuova categoria...</option>
-              </select>
+              </div>
             </label>
             <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
             <label>Città <input value={form.citta} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>

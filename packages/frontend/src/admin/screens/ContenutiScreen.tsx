@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { pagineApi, type PaginaCms, type ContenutoSito } from '../../api/pagine';
+import { categorieApi, type Categoria } from '../../api/categorie';
+import { categorieEventoApi, type CategoriaEvento } from '../../api/categorieEvento';
 import { PanelHead } from '../shared/PanelHead';
+import { ErroreApi } from '../../api/client';
 
 const CHIAVI_PAGINE = ['faq', 'privacy', 'cookie', 'termini', 'lavora', 'chisiamo', 'contatti'];
 
@@ -10,6 +13,55 @@ export function ContenutiScreen() {
   const [chiaveSelezionata, setChiaveSelezionata] = useState('faq');
   const [titolo, setTitolo] = useState('');
   const [contenuto, setContenuto] = useState('');
+
+  // Generi (testo libero associato agli eventi) e Categorie (i
+  // pulsanti fissi in alto sul sito) — stessa idea, due elenchi
+  // separati, entrambi gestibili anche direttamente qui invece che
+  // solo al volo mentre si modifica un evento.
+  const [generi, setGeneri] = useState<Categoria[]>([]);
+  const [categorieEvento, setCategorieEvento] = useState<CategoriaEvento[]>([]);
+  function ricaricaGeneri() { categorieApi.list().then(setGeneri); }
+  function ricaricaCategorieEvento() { categorieEventoApi.list().then(setCategorieEvento); }
+  useEffect(() => { ricaricaGeneri(); ricaricaCategorieEvento(); }, []);
+
+  async function nuovoGenere() {
+    const nome = window.prompt('Nome del nuovo genere:');
+    if (!nome || !nome.trim()) return;
+    try {
+      await categorieApi.create(nome.trim());
+      ricaricaGeneri();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Impossibile creare: ${e.message}` : 'Impossibile creare: errore di rete.');
+    }
+  }
+  async function eliminaGenere(g: Categoria) {
+    if (!confirm(`Eliminare il genere "${g.nome}"? Gli eventi che lo usano già lo mantengono comunque scritto, semplicemente non comparirà più nell'elenco per sceglierlo su altri eventi.`)) return;
+    try {
+      await categorieApi.remove(g.id);
+      ricaricaGeneri();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
+    }
+  }
+  async function nuovaCategoriaEvento() {
+    const nome = window.prompt('Nome della nuova categoria (comparirà come pulsante in alto sul sito):');
+    if (!nome || !nome.trim()) return;
+    try {
+      await categorieEventoApi.create(nome.trim());
+      ricaricaCategorieEvento();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Impossibile creare: ${e.message}` : 'Impossibile creare: errore di rete.');
+    }
+  }
+  async function eliminaCategoriaEvento(c: CategoriaEvento) {
+    if (!confirm(`Eliminare la categoria "${c.nome}"? Sparirà anche dai pulsanti in alto sul sito. Gli eventi che la usano già la mantengono comunque scritta.`)) return;
+    try {
+      await categorieEventoApi.remove(c.id);
+      ricaricaCategorieEvento();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
+    }
+  }
 
   function ricarica() {
     pagineApi.list().then(setPagine);
@@ -51,6 +103,36 @@ export function ContenutiScreen() {
             style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, color: 'var(--paper)', fontFamily: 'monospace', fontSize: 13 }} />
         </div>
         <button className="btn btn-primary" onClick={salvaPagina}>Salva pagina</button>
+      </div>
+
+      <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
+        <h3 style={{ fontSize: 15, marginBottom: 4 }}>Categorie (i pulsanti in alto sul sito)</h3>
+        <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 14 }}>Si associano a un evento dalla sua scheda, sezione Informazioni.</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+          {categorieEvento.map((c) => (
+            <span key={c.id} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {c.nome}
+              <button type="button" onClick={() => eliminaCategoriaEvento(c)} title="Elimina" style={{ background: 'none', border: 'none', color: 'var(--pink)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
+            </span>
+          ))}
+          {!categorieEvento.length && <p style={{ color: 'var(--mist)', fontSize: 13 }}>Nessuna categoria ancora.</p>}
+        </div>
+        <button className="btn btn-ghost" onClick={nuovaCategoriaEvento}>+ Nuova categoria</button>
+      </div>
+
+      <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
+        <h3 style={{ fontSize: 15, marginBottom: 4 }}>Generi</h3>
+        <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 14 }}>Testo libero associato a ogni evento — diverso dalle categorie qui sopra.</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+          {generi.map((g) => (
+            <span key={g.id} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {g.nome}
+              <button type="button" onClick={() => eliminaGenere(g)} title="Elimina" style={{ background: 'none', border: 'none', color: 'var(--pink)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
+            </span>
+          ))}
+          {!generi.length && <p style={{ color: 'var(--mist)', fontSize: 13 }}>Nessun genere ancora.</p>}
+        </div>
+        <button className="btn btn-ghost" onClick={nuovoGenere}>+ Nuovo genere</button>
       </div>
 
       <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
