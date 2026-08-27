@@ -1037,7 +1037,14 @@ export function SchedaEventoModale({
     </>
   );
 
-  const numeroTragitti = (form.tragitti ?? []).filter((l) => l.nome.trim()).length;
+  // Conta sia i tragitti "liberi" (senza servizio) sia quelli dentro
+  // ogni servizio — un evento a più servizi spesso non ha nessun
+  // tragitto libero, tutti vivono dentro i suoi servizi: contare solo
+  // i liberi farebbe risultare "0 tragitti" anche quando l'evento è
+  // configurato benissimo (bug trovato: il sito li vede giustamente
+  // sommando entrambe le fonti, il gestionale prima no).
+  const numeroTragitti = (form.tragitti ?? []).filter((l) => l.nome.trim()).length
+    + (form.servizi ?? []).reduce((somma, s) => somma + (s.tragitti ?? []).filter((l) => l.nome.trim()).length, 0);
   const stepCompleto: Record<1 | 2 | 3 | 4, boolean> = {
     1: infoCompleta(),
     2: numeroTragitti > 0,
