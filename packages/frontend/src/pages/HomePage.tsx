@@ -7,6 +7,15 @@ import type { Evento } from '../api/types';
 import { EventoCard } from '../features/eventi/EventoCard';
 import { CheckoutModal } from '../features/checkout/CheckoutModal';
 
+// Quante card clonare a inizio/fine del carosello hero, per l'effetto
+// circolare — abbastanza da coprire anche uno schermo largo (mai più
+// di quante card ci sono davvero, per eventi con pochi risultati).
+const NUM_CLONI_CAROSELLO = 5;
+// Larghezza di una card più lo spazio dopo di lei (dal CSS,
+// .hero-carosello-card + gap) — usata per tutti i calcoli di
+// posizione dello scroll qui sotto.
+const LARGHEZZA_CARD_CAROSELLO = 256;
+
 export function HomePage() {
   const caroselloRef = useRef<HTMLDivElement>(null);
   function scorriCarosello(direzione: 1 | -1) {
@@ -37,12 +46,50 @@ export function HomePage() {
     }
     setEventoCentraleId(vicinaId);
   }
+  // Il cuore dell'effetto "giro infinito" — appena lo scroll (manuale o
+  // automatico, non importa: questa funzione gira a ogni scroll
+  // qualunque ne sia la causa) entra nella zona clonata a un capo,
+  // salta all'istante (nessuna animazione — invisibile all'occhio) al
+  // punto corrispondente tra le card vere, dall'altro capo. Chi guarda
+  // vede solo un giro che non finisce mai, mai uno scatto indietro.
+  function salvaguardiaGiroInfinito() {
+    const el = caroselloHeroRef.current;
+    if (!el || eventi.length < 2) return;
+    const numCloni = Math.min(NUM_CLONI_CAROSELLO, eventi.length);
+    const inizioZonaVera = numCloni * LARGHEZZA_CARD_CAROSELLO;
+    const fineZonaVera = inizioZonaVera + eventi.length * LARGHEZZA_CARD_CAROSELLO;
+    const unGiro = eventi.length * LARGHEZZA_CARD_CAROSELLO;
+    if (el.scrollLeft >= fineZonaVera) {
+      el.scrollLeft -= unGiro;
+    } else if (el.scrollLeft < inizioZonaVera) {
+      el.scrollLeft += unGiro;
+    }
+  }
   useEffect(() => {
     const contenitore = caroselloHeroRef.current;
     if (!contenitore) return;
-    contenitore.addEventListener('scroll', aggiornaCardCentrale, { passive: true });
+    function alloScroll() {
+      aggiornaCardCentrale();
+    }
+    // "scrollend" (non il normale "scroll") apposta — controllare il
+    // salto a OGNI istante dello scorrimento, mentre l'animazione
+    // "smooth" è ancora in corso, rischierebbe di interromperla a
+    // metà con uno scatto visibile. Aspettando che lo scroll si sia
+    // davvero fermato, il salto (quando serve) è pulito e invisibile.
+    function alloScrollFermo() {
+      salvaguardiaGiroInfinito();
+    }
+    contenitore.addEventListener('scroll', alloScroll, { passive: true });
+    contenitore.addEventListener('scrollend', alloScrollFermo, { passive: true });
+    // Parte già dalla prima card vera (salta i cloni iniziali) — mai
+    // dallo zero assoluto, che mostrerebbe prima i cloni.
+    const numCloni = Math.min(NUM_CLONI_CAROSELLO, eventi.length);
+    contenitore.scrollLeft = numCloni * LARGHEZZA_CARD_CAROSELLO;
     aggiornaCardCentrale();
-    return () => contenitore.removeEventListener('scroll', aggiornaCardCentrale);
+    return () => {
+      contenitore.removeEventListener('scroll', alloScroll);
+      contenitore.removeEventListener('scrollend', alloScrollFermo);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventi.length]);
   const [caricamento, setCaricamento] = useState(true);
@@ -90,17 +137,11 @@ export function HomePage() {
       if (inPausaCarosello.current) return;
       const el = caroselloHeroRef.current;
       if (!el) return;
-      const allaFine = el.scrollLeft + el.clientWidth >= el.scrollWidth - 10;
-      if (allaFine) {
-        el.scrollTo({ left: 0, behavior: 'smooth' });
-      } else {
-        // 240px la card + 16px di spazio tra una e l'altra (valori del
-        // CSS, .hero-carosello-card) — prima era un 300px fisso, che
-        // non corrispondeva: lo scorrimento si disallineava un po' di
-        // più a ogni passo, invece di fermarsi sempre esattamente su
-        // ogni card una per una.
-        el.scrollBy({ left: 256, behavior: 'smooth' });
-      }
+      // Avanza sempre, mai un controllo "sono alla fine?" qui — il
+      // giro infinito (cloni + salto invisibile, vedi
+      // salvaguardiaGiroInfinito più sopra, agganciata allo scroll)
+      // se ne occupa da sola qualunque sia la posizione attuale.
+      el.scrollBy({ left: LARGHEZZA_CARD_CAROSELLO, behavior: 'smooth' });
     }, 2000);
     return () => clearInterval(intervallo);
   }, [eventi.length]);
@@ -196,11 +237,24 @@ export function HomePage() {
               onTouchEnd={pianificaRipresaCarosello}
               onClick={pianificaRipresaCarosello}
             >
-              {eventi.map((ev) => (
-                <div key={ev.id} data-evento-id={ev.id} className={`hero-carosello-card${ev.id === eventoCentraleId ? ' centro' : ''}`}>
-                  <EventoCard evento={ev} />
-                </div>
-              ))}
+              {(() => {
+                // Cloni a inizio e fine — la stessa card ripetuta, mai
+                // più di quante ce ne sono davvero. Servono solo per
+                // l'illusione visiva: appena lo scroll ci entra dentro,
+                // si salta all'istante (senza animazione, invisibile)
+                // al punto corrispondente tra le card vere, dando
+                // l'effetto di un giro infinito senza soluzione di
+                // continuità, invece di uno scatto indietro a fine giro.
+                const numCloni = Math.min(NUM_CLONI_CAROSELLO, eventi.length);
+                const cloniInizio = eventi.slice(-numCloni).map((ev, i) => ({ ev, chiave: `clone-inizio-${i}-${ev.id}` }));
+                const veri = eventi.map((ev) => ({ ev, chiave: ev.id }));
+                const cloniFine = eventi.slice(0, numCloni).map((ev, i) => ({ ev, chiave: `clone-fine-${i}-${ev.id}` }));
+                return [...cloniInizio, ...veri, ...cloniFine].map(({ ev, chiave }) => (
+                  <div key={chiave} data-evento-id={ev.id} className={`hero-carosello-card${ev.id === eventoCentraleId ? ' centro' : ''}`}>
+                    <EventoCard evento={ev} />
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         </div>
