@@ -64,7 +64,6 @@ export function Layout({ children }: { children: ReactNode }) {
           <Link to="/" className="logo">IN<span>BUS</span></Link>
           <nav className="links">
             <Link to="/#consigliati">Eventi Consigliati</Link>
-            <Link to="/#eventi">Eventi</Link>
           </nav>
         </div>
 
@@ -134,7 +133,6 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <div className={`mobile-nav${menuMobileAperto ? ' open' : ''}`}>
         <Link to="/#consigliati" onClick={() => setMenuMobileAperto(false)}>Eventi Consigliati</Link>
-        <Link to="/#eventi" onClick={() => setMenuMobileAperto(false)}>Eventi</Link>
         <Link className="btn btn-primary" to={loggato ? '/account' : '/accedi'} style={{ textAlign: 'center', marginTop: 10 }} onClick={() => setMenuMobileAperto(false)}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
       </div>
 

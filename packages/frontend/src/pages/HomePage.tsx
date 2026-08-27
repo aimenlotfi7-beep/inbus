@@ -83,7 +83,6 @@ export function HomePage() {
     }, 2000);
     return () => clearInterval(intervallo);
   }, [eventi.length]);
-  const generi = useMemo(() => ['Tutti', ...new Set(eventi.map((e) => e.genere))], [eventi]);
   const [searchParams, setSearchParams] = useSearchParams();
   const ricercaTesto = searchParams.get('q') ?? '';
   const genereAttivo = searchParams.get('genere') ?? 'Tutti';
@@ -97,6 +96,16 @@ export function HomePage() {
   // nella pagina). Parametro separato apposta, così i due filtri non
   // si accavallano mai per coincidenza.
   const categoriaAttiva = searchParams.get('categoria');
+  // I generi mostrati qui sono SOLO quelli davvero presenti tra gli
+  // eventi della categoria selezionata — se clicchi "Festival" e c'è
+  // solo un evento Techno, vedi solo "Techno" come filtro genere, non
+  // tutti i generi esistenti nel sito (che magari appartengono a
+  // eventi di un'altra categoria, irrilevanti qui).
+  const eventiDellaCategoria = useMemo(
+    () => categoriaAttiva ? eventi.filter((e) => e.categoria === categoriaAttiva) : eventi,
+    [eventi, categoriaAttiva]
+  );
+  const generi = useMemo(() => ['Tutti', ...new Set(eventiDellaCategoria.map((e) => e.genere))], [eventiDellaCategoria]);
   const eventiFiltrati = useMemo(() => {
     let lista = genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => e.genere === genereAttivo);
     if (categoriaAttiva) lista = lista.filter((e) => e.categoria === categoriaAttiva);
