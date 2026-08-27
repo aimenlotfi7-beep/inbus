@@ -4,6 +4,7 @@ import { listaAttesaApi } from '../../api/listaAttesa';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
+import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 
 /**
@@ -38,15 +39,13 @@ export function ListaAttesaScreen() {
 
       <div className="cards-list">
         {eventiFiltrati.map((ev) => (
-          <div key={ev.id} className="evento-card" onClick={() => setSelezionato(ev)}>
-            <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
-            {inAttesaPerEvento[ev.id] > 0 && (
-              <span className="badge attenzione" style={{ float: 'right' }} title={`${inAttesaPerEvento[ev.id]} in attesa`}>{inAttesaPerEvento[ev.id]} in attesa</span>
-            )}
-            <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
-            <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{ev.luogo}, {ev.citta}</p>
-            <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
-          </div>
+          <EventoCardCompatta
+            key={ev.id}
+            evento={{ ...ev, immagineUrl: ev.immagini[0]?.url ?? null }}
+            onClick={() => setSelezionato(ev)}
+            richiedeIntervento={inAttesaPerEvento[ev.id] > 0}
+            badge={inAttesaPerEvento[ev.id] > 0 ? <>{inAttesaPerEvento[ev.id]} in attesa</> : undefined}
+          />
         ))}
         {!eventiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun evento trovato.' : 'Nessun evento ancora — creane uno dalla sezione Eventi.'}</p>}
       </div>

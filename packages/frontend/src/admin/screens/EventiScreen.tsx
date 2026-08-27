@@ -5,6 +5,7 @@ import { prezzoMinimoEvento } from '../../api/prezzi';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
+import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 
 export function EventiScreen() {
@@ -76,35 +77,28 @@ export function EventiScreen() {
 
       <div className="cards-list">
         {eventiFiltrati.map((ev) => (
-          <div key={ev.id} className="evento-card" onClick={() => apriModifica(ev)} style={tab === 'passati' ? { opacity: .65 } : undefined}>
-            {ev.immagini[0]?.url && (
-              <div style={{ position: 'relative', width: '100%', aspectRatio: '1080 / 1350', borderRadius: 8, overflow: 'hidden', marginBottom: 10, background: 'var(--night)' }}>
-                <img src={ev.immagini[0].url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                <button
-                  type="button"
-                  title="Apri la pagina pubblica dell'evento"
-                  onClick={(e) => { e.stopPropagation(); window.open(`${window.location.origin}/eventi/${ev.slug}`, '_blank'); }}
-                  style={{
-                    position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: '50%',
-                    background: 'rgba(16,14,28,.72)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,.2)',
-                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13,
-                  }}
-                >
-                  ↗
-                </button>
-              </div>
-            )}
-            <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
-            {ev.bozza && <span className="badge attenzione" style={{ marginLeft: 8 }}>Bozza</span>}
-            <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
-            <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{ev.luogo}, {ev.citta}</p>
-            <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>
-              {new Date(ev.data).toLocaleDateString('it-IT')}
-              {(() => { const p = prezzoMinimoEvento(ev); return p !== null ? <> · <b style={{ color: 'var(--paper)' }}>da €{p.toFixed(2)}</b></> : ''; })()}
-              {!ev.visibileSito && ' · nascosto dal sito'}
-            </p>
-            <button className="btn btn-ghost" style={{ marginTop: 10, fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(ev); }}>Elimina</button>
-          </div>
+          <EventoCardCompatta
+            key={ev.id}
+            evento={{ ...ev, immagineUrl: ev.immagini[0]?.url ?? null }}
+            onClick={() => apriModifica(ev)}
+            opacitaRidotta={tab === 'passati'}
+            mostraLinkPubblico
+            badge={ev.bozza ? 'Bozza' : undefined}
+            extra={(() => {
+              const p = prezzoMinimoEvento(ev);
+              return (
+                <p>
+                  {p !== null ? <b style={{ color: 'var(--paper)' }}>da €{p.toFixed(2)}</b> : ''}
+                  {!ev.visibileSito && ' · nascosto'}
+                </p>
+              );
+            })()}
+            footer={
+              <button className="btn btn-ghost" style={{ marginTop: 8, fontSize: 10.5, color: 'var(--pink)', padding: 0 }} onClick={(e) => { e.stopPropagation(); elimina(ev); }}>
+                Elimina
+              </button>
+            }
+          />
         ))}
         {!eventiFiltrati.length && (
           <p style={{ color: 'var(--mist)' }}>

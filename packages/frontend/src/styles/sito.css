@@ -109,7 +109,7 @@
     overflow:hidden;
   }
   .hero-grid{
-    display:grid; grid-template-columns: 1.1fr .9fr; gap:56px; align-items:end;
+    display:grid; grid-template-columns: 1.1fr .9fr; gap:56px; align-items:start;
   }
   @media (max-width:980px){ .hero-grid{grid-template-columns:1fr;} }
 
@@ -150,7 +150,7 @@
     display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; max-width:340px; padding-bottom:2px;
   }
   .header-categorie-desktop::-webkit-scrollbar{display:none;}
-  @media (max-width:900px){ .header-centro{display:none;} }
+  @media (max-width:900px){ .header-categorie-desktop{display:none;} }
 
   /* Categorie — fascia propria SOTTO l'header su mobile (mai insieme
      al carrello/ricerca): sfondo trasparente, e sparisce scorrendo

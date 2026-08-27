@@ -6,6 +6,7 @@ import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
 import { EventoCard } from '../features/eventi/EventoCard';
 import { CheckoutModal } from '../features/checkout/CheckoutModal';
+import { pagineApi } from '../api/pagine';
 
 // Quante card clonare a inizio/fine del carosello hero, per l'effetto
 // circolare — abbastanza da coprire anche uno schermo largo (mai più
@@ -24,6 +25,18 @@ export function HomePage() {
   const caroselloHeroRef = useRef<HTMLDivElement>(null);
   const [eventoCentraleId, setEventoCentraleId] = useState<string | null>(null);
   const [eventi, setEventi] = useState<Evento[]>([]);
+  // Testi della sezione hero — modificabili dal gestionale (Contenuti
+  // sito → Testi Hero homepage). Questi qui sono i default: se non
+  // sono mai stati personalizzati, si vede semplicemente questo testo.
+  const [testiHero, setTestiHero] = useState<Record<string, string>>({});
+  useEffect(() => {
+    pagineApi.listContenuti().then((lista) => {
+      const mappa: Record<string, string> = {};
+      for (const c of lista) mappa[c.chiave] = c.valore;
+      setTestiHero(mappa);
+    });
+  }, []);
+  const t = (chiave: string, valoreDefault: string) => testiHero[chiave] || valoreDefault;
 
   // Quale card è più vicina al centro del carosello — ricalcolato ogni
   // volta che si scorre (a mano o da soli, ogni 2 secondi), non solo
@@ -206,12 +219,12 @@ export function HomePage() {
       <section className="hero">
         <div className="hero-grid">
           <div>
-            <div className="eyebrow">Bus per concerti in tutta Italia</div>
-            <h1 className="hero-title"><span>Sali sul bus.</span><span className="line2">Vivi il concerto.</span></h1>
-            <p className="hero-sub">Andata e ritorno in giornata, direttamente dalla tua città al palco del tuo artista preferito. Un solo biglietto, zero pensieri.</p>
+            <div className="eyebrow">{t('hero_eyebrow', 'Bus per concerti in tutta Italia')}</div>
+            <h1 className="hero-title"><span>{t('hero_titolo_riga1', 'Sali sul bus.')}</span><span className="line2">{t('hero_titolo_riga2', 'Vivi il concerto.')}</span></h1>
+            <p className="hero-sub">{t('hero_sottotitolo', 'Andata e ritorno in giornata, direttamente dalla tua città al palco del tuo artista preferito. Un solo biglietto, zero pensieri.')}</p>
             <div className="hero-stats">
-              <div className="stat"><b>{numeroPartenze}</b><span>Partenze attive</span></div>
-              <div className="stat"><b>{cittaPartenza.length}</b><span>Città di partenza</span></div>
+              <div className="stat"><b>{numeroPartenze}</b><span>{t('hero_statistica1_etichetta', 'Partenze attive')}</span></div>
+              <div className="stat"><b>{cittaPartenza.length}</b><span>{t('hero_statistica2_etichetta', 'Città di partenza')}</span></div>
             </div>
           </div>
 

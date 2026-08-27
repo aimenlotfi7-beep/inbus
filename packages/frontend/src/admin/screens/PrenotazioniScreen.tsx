@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { prenotazioniAdminApi, type PrenotazioneRiga, type EventoConPrenotazioni } from '../../api/prenotazioniAdmin';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
+import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { Modale } from '../shared/Modale';
 import { RicercaSezione } from '../shared/RicercaSezione';
 
@@ -135,18 +136,12 @@ export function PrenotazioniScreen() {
 
               <div className="cards-list" style={{ marginBottom: 24 }}>
                 {tabFiltrate.map((ev) => (
-                  <div
+                  <EventoCardCompatta
                     key={ev.id}
-                    className="evento-card"
-                    style={eventoAttivoId === ev.id ? { borderColor: 'var(--pink)' } : undefined}
+                    evento={{ ...ev, immagineUrl: ev.immagine }}
+                    selezionato={eventoAttivoId === ev.id}
                     onClick={() => { setEventoAttivoId(ev.id); setSottoTab('CONFERMATA'); setRicercaPrenotazioni(''); }}
-                  >
-                    {ev.immagine && <div className="evento-card-thumb" style={{ backgroundImage: `url(${ev.immagine})` }} />}
-                    <span className="tag">{ev.genere}</span>
-                    <h3>{ev.artista}</h3>
-                    <p>{ev.luogo}, {ev.citta}</p>
-                    <p>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
-                  </div>
+                  />
                 ))}
               </div>
             </>

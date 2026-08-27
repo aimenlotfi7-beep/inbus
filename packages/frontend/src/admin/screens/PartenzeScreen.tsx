@@ -3,6 +3,7 @@ import { eventiApi } from '../../api/eventi';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
+import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 
 /**
@@ -38,20 +39,13 @@ export function PartenzeScreen() {
 
       <div className="cards-list">
         {eventiFiltrati.map((ev) => (
-          <div key={ev.id} className="evento-card" onClick={() => setSelezionato(ev)}>
-            {ev.immagini[0]?.url && (
-              <div style={{ width: '100%', aspectRatio: '1080 / 1350', borderRadius: 8, overflow: 'hidden', marginBottom: 10, background: 'var(--night)' }}>
-                <img src={ev.immagini[0].url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              </div>
-            )}
-            <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
-            {allertePerEvento[ev.id] > 0 && (
-              <span className="badge non-coperta" style={{ float: 'right' }} title={`${allertePerEvento[ev.id]} tratta/e con posti superati`}>⚠ {allertePerEvento[ev.id]}</span>
-            )}
-            <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
-            <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{ev.luogo}, {ev.citta}</p>
-            <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
-          </div>
+          <EventoCardCompatta
+            key={ev.id}
+            evento={{ ...ev, immagineUrl: ev.immagini[0]?.url ?? null }}
+            onClick={() => setSelezionato(ev)}
+            richiedeIntervento={allertePerEvento[ev.id] > 0}
+            badge={allertePerEvento[ev.id] > 0 ? <>⚠ {allertePerEvento[ev.id]}</> : undefined}
+          />
         ))}
         {!eventiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun evento trovato.' : 'Nessun evento ancora — creane uno dalla sezione Eventi.'}</p>}
       </div>

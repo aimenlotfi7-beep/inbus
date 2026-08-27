@@ -136,6 +136,27 @@ export function ContenutiScreen() {
       </div>
 
       <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
+        <h3 style={{ fontSize: 15, marginBottom: 4 }}>Testi Hero homepage</h3>
+        <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 14 }}>Il primo blocco che si vede aprendo il sito — titolo, sottotitolo, etichette delle statistiche.</p>
+        {[
+          { chiave: 'hero_eyebrow', etichetta: 'Etichetta sopra il titolo', default: 'Bus per concerti in tutta Italia' },
+          { chiave: 'hero_titolo_riga1', etichetta: 'Titolo — prima riga', default: 'Sali sul bus.' },
+          { chiave: 'hero_titolo_riga2', etichetta: 'Titolo — seconda riga (colorata)', default: 'Vivi il concerto.' },
+          { chiave: 'hero_sottotitolo', etichetta: 'Sottotitolo', default: 'Andata e ritorno in giornata, direttamente dalla tua città al palco del tuo artista preferito. Un solo biglietto, zero pensieri.' },
+          { chiave: 'hero_statistica1_etichetta', etichetta: 'Etichetta statistica 1 (il numero è calcolato da solo)', default: 'Partenze attive' },
+          { chiave: 'hero_statistica2_etichetta', etichetta: 'Etichetta statistica 2 (il numero è calcolato da solo)', default: 'Città di partenza' },
+        ].map(({ chiave, etichetta, default: valoreDefault }) => (
+          <div className="campo" key={chiave}>
+            <label>{etichetta}</label>
+            <input
+              defaultValue={contenuti.find((c) => c.chiave === chiave)?.valore ?? valoreDefault}
+              onBlur={(e) => salvaContenuto(chiave, e.target.value)}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
         <h3 style={{ fontSize: 15, marginBottom: 14 }}>Sfondo homepage</h3>
         <div className="campo">
           <label>URL immagine di sfondo</label>
@@ -149,7 +170,7 @@ export function ContenutiScreen() {
 
       <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
         <h3 style={{ fontSize: 15, marginBottom: 14 }}>Testi configurabili (hero, statistiche, ecc.)</h3>
-        {contenuti.filter((c) => c.chiave !== 'sfondoUrl').map((c) => (
+        {contenuti.filter((c) => c.chiave !== 'sfondoUrl' && !c.chiave.startsWith('hero_') && !c.chiave.startsWith('tooltip_')).map((c) => (
           <div className="campo" key={c.chiave}>
             <label>{c.chiave}</label>
             <input defaultValue={c.valore} onBlur={(e) => salvaContenuto(c.chiave, e.target.value)} />
