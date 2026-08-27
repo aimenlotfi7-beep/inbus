@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PercorsoBus } from '../PercorsoBus';
 import type { Evento, OpzionePartenza, Servizio } from '../../api/types';
 import { eventiApi } from '../../api/eventi';
 import { prenotazioniApi } from '../../api/prenotazioni';
@@ -50,6 +51,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   const multiServizio = evento.servizi.length >= 2;
   const navigate = useNavigate();
   const { aggiungi: aggiungiAlCarrello } = useCarrello();
+  const [percorsoAperto, setPercorsoAperto] = useState(false);
 
   // Le variabili CSS del tema White Label, se presente — sovrascritte
   // qui (non nel foglio di stile) così restano scoped a QUESTO modulo
@@ -304,18 +306,44 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
           <div className="checkout-riepilogo-persistente">
             <div>
               <b>{evento.artista}</b>
+              {(servizioScelto?.arrivoOrario ?? evento.arrivoOrario) && (
+                <span style={{ fontWeight: 400, fontSize: 12, marginLeft: 8, color: 'var(--mist)' }}>
+                  Arrivo {servizioScelto?.arrivoOrario ?? evento.arrivoOrario}
+                </span>
+              )}
               <span className="checkout-riepilogo-riga">
                 {new Date(evento.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
                 {servizioScelto && ` · ${servizioScelto.nome}`}
-                {(servizioScelto?.arrivoOrario ?? (!multiServizio ? evento.servizi[0]?.arrivoOrario : null)) && (
-                  <> · arrivo {servizioScelto?.arrivoOrario ?? evento.servizi[0]?.arrivoOrario}</>
+                {opzioneScelta && (
+                  <>
+                    {' · '}
+                    <button
+                      type="button"
+                      onClick={() => setPercorsoAperto(true)}
+                      style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
+                    >
+                      {opzioneScelta.fermataCitta} → {evento.citta} 🗺️
+                    </button>
+                  </>
                 )}
-                {opzioneScelta && ` · ${opzioneScelta.fermataCitta} → ${evento.citta}`}
                 {servizioScelto || !multiServizio ? ` · ${passeggeri} passegger${passeggeri > 1 ? 'i' : 'o'}` : ''}
               </span>
             </div>
             {opzioneScelta && <div className="checkout-riepilogo-totale">€{(step === 3 ? totaleConCredito : totale).toFixed(2)}</div>}
           </div>
+
+          {/* Il tragitto completo della fermata scelta, con lei
+              evidenziata — così il cliente vede subito tutte le altre
+              tappe di quel percorso, non solo la propria. */}
+          {percorsoAperto && opzioneScelta && (
+            <div className="travel-overlay" onClick={() => setPercorsoAperto(false)}>
+              <div className="travel-card" onClick={(e) => e.stopPropagation()}>
+                <button className="travel-close" onClick={() => setPercorsoAperto(false)}>✕</button>
+                <h3 style={{ marginTop: 0 }}>Il percorso del tuo bus</h3>
+                <PercorsoBus evento={evento} soloTragittoId={opzioneScelta.tragittoId} fermataEvidenziataId={opzioneScelta.fermataId} />
+              </div>
+            </div>
+          )}
 
           {multiServizio && !servizioScelto && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

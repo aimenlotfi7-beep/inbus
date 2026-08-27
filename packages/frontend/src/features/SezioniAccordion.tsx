@@ -1,19 +1,21 @@
 import { useState } from 'react';
 import type { Evento } from '../api/types';
-import { PercorsoBus } from './PercorsoBus';
 
-type Voce = 'descrizione' | 'informazioni' | 'partenze';
+type Voce = 'descrizione' | 'informazioni';
 
-/** Descrizione, Informazioni e Partenze racchiuse in pulsanti — invece
- *  di mostrare tutto sempre aperto (pagina lunga da scorrere), ognuno
- *  apre solo la propria sezione. */
+/** Descrizione e Informazioni racchiuse in pulsanti — invece di
+ *  mostrare tutto sempre aperto (pagina lunga da scorrere), ognuno
+ *  apre solo la propria sezione. La sezione "Partenze" (che c'era
+ *  qui) è stata tolta — il percorso completo si vede ora dentro il
+ *  checkout, cliccando sulla fermata scelta (più utile lì: mostra
+ *  solo il tragitto pertinente, con la fermata scelta evidenziata,
+ *  proprio mentre stai prenotando). */
 export function SezioniAccordion({ evento }: { evento: Evento }) {
   const [aperta, setAperta] = useState<Voce | null>(null);
 
   const voci: { id: Voce; etichetta: string; visibile: boolean }[] = [
     { id: 'descrizione', etichetta: 'Descrizione', visibile: !!evento.descrizioneSeo },
     { id: 'informazioni', etichetta: 'Informazioni', visibile: !!evento.descrizione },
-    { id: 'partenze', etichetta: 'Partenze', visibile: evento.tragitti.length > 0 || evento.servizi.some((v) => v.tragitti.length > 0) },
   ];
 
   function toggle(id: Voce) {
@@ -40,11 +42,6 @@ export function SezioniAccordion({ evento }: { evento: Evento }) {
       )}
       {aperta === 'informazioni' && (
         <div className="sezione-info">{evento.descrizione}</div>
-      )}
-      {aperta === 'partenze' && (
-        <div className="sezione-info">
-          <PercorsoBus evento={evento} />
-        </div>
       )}
     </div>
   );
