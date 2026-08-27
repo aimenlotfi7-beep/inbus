@@ -93,7 +93,12 @@ export function HomePage() {
       if (allaFine) {
         el.scrollTo({ left: 0, behavior: 'smooth' });
       } else {
-        el.scrollBy({ left: 300, behavior: 'smooth' });
+        // 240px la card + 16px di spazio tra una e l'altra (valori del
+        // CSS, .hero-carosello-card) — prima era un 300px fisso, che
+        // non corrispondeva: lo scorrimento si disallineava un po' di
+        // più a ogni passo, invece di fermarsi sempre esattamente su
+        // ogni card una per una.
+        el.scrollBy({ left: 256, behavior: 'smooth' });
       }
     }, 2000);
     return () => clearInterval(intervallo);

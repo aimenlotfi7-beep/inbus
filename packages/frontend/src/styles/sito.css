@@ -172,7 +172,7 @@
   .hero-carosello-wrap{min-width:0;}
   .hero-carosello{
     display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none;
-    width:100%; min-width:0; padding:24px 4px 40px;
+    width:100%; min-width:0; padding:24px clamp(20px,calc(50% - 140px),300px) 40px;
   }
   .hero-carosello::-webkit-scrollbar{display:none;}
   .hero-carosello-card{
