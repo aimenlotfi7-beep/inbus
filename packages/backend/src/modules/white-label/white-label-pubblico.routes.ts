@@ -52,18 +52,17 @@ whiteLabelPubblicoRouter.post(
       throw new ErroreApplicativo('Questo widget può prenotare solo il proprio evento.', 400, 'EVENT_NOT_AVAILABLE');
     }
 
-    const nuova = await prenotazioniService.crea(req.body, req.cliente!.sub);
+    const nuova = await prenotazioniService.crea(req.body, req.cliente!.sub, { canale: 'WHITE_LABEL', whiteLabelId: wl.id });
 
-    // Attribuzione canale + snapshot commissione — passaggio separato
-    // apposta: la creazione vera (blocco posti, prezzo, coupon) resta
-    // identica al sito principale, questo è solo un tag e un calcolo
-    // aggiunti sopra. Lo snapshot si scatta ORA, una volta sola: se in
-    // futuro la percentuale dell'organizzatore cambia, questa vendita
-    // non cambia commissione retroattivamente.
+    // Snapshot commissione — resta un passaggio separato dopo (a
+    // differenza di canale/whiteLabelId, spostati sopra: la commissione
+    // serve solo per i conti dell'organizzatore, non per il biglietto,
+    // quindi non c'è urgenza di averla prima che il biglietto parta).
+    // Si scatta ORA, una volta sola: se in futuro la percentuale
+    // dell'organizzatore cambia, questa vendita non cambia commissione
+    // retroattivamente.
     const { percentuale, importo } = await commissioniService.calcolaSnapshot(wl.organizzatoreId, nuova.totaleComplessivo);
     await db.update(prenotazioni).set({
-      canaleVendita: 'WHITE_LABEL',
-      whiteLabelId: wl.id,
       commissionePercentualeSnapshot: String(percentuale),
       commissioneImportoSnapshot: String(importo),
     }).where(eq(prenotazioni.id, nuova.id));

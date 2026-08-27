@@ -55,7 +55,19 @@ async function calcolaTotaleReale(p: typeof prenotazioni.$inferSelect) {
  *  più sotto): se un articolo del carrello fallisce, tutto quello
  *  creato prima nello stesso giro va indietro insieme a lui — mai
  *  un ordine "a metà". */
-async function creaRigaInterna(tx: Tx, input: CreaPrenotazioneInput, utenteId: string) {
+async function creaRigaInterna(
+  tx: Tx,
+  input: CreaPrenotazioneInput,
+  utenteId: string,
+  // Canale di vendita — passato QUI, alla creazione vera, non con un
+  // update separato dopo (come succedeva prima per la White Label):
+  // il biglietto (PDF con il layout giusto) si genera più sotto in
+  // questa stessa funzione, appena creata la prenotazione — se
+  // whiteLabelId arrivasse solo dopo, il biglietto partirebbe già col
+  // layout sbagliato (quello dell'evento, mai quello della White
+  // Label), esattamente il bug segnalato.
+  canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }
+) {
   const [utente] = await tx.select().from(utenti).where(eq(utenti.id, utenteId)).limit(1);
   if (!utente) throw new NonAutorizzato('Account non trovato — effettua di nuovo il login.');
 
@@ -182,6 +194,7 @@ async function creaRigaInterna(tx: Tx, input: CreaPrenotazioneInput, utenteId: s
       metodoPagamento: input.metodoPagamento,
       utenteId: utente.id,
       promoterCodice: input.promoterCodice,
+      ...(canaleVendita && { canaleVendita: canaleVendita.canale, whiteLabelId: canaleVendita.whiteLabelId }),
     })
     .returning();
 
@@ -248,8 +261,8 @@ export const prenotazioniService = {
    * con un errore chiaro, invece di vendere due volte lo stesso posto
    * (il rischio concreto che c'era nel prototipo basato su localStorage).
    */
-  async crea(input: CreaPrenotazioneInput, utenteId: string) {
-    const risultato = await db.transaction((tx) => creaRigaInterna(tx, input, utenteId));
+  async crea(input: CreaPrenotazioneInput, utenteId: string, canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }) {
+    const risultato = await db.transaction((tx) => creaRigaInterna(tx, input, utenteId, canaleVendita));
     await inviaConfermaPrenotazione(risultato);
     return risultato;
   },
