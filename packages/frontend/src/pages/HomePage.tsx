@@ -172,7 +172,17 @@ export function HomePage() {
               ref={caroselloHeroRef}
               onMouseEnter={() => { inPausaCarosello.current = true; if (timerRipresaCarosello.current) clearTimeout(timerRipresaCarosello.current); }}
               onMouseLeave={() => { inPausaCarosello.current = false; }}
-              onTouchStart={() => { inPausaCarosello.current = true; if (timerRipresaCarosello.current) clearTimeout(timerRipresaCarosello.current); }}
+              onTouchStart={() => {
+                inPausaCarosello.current = true;
+                // Rete di sicurezza: la ripresa parte già da qui, non
+                // solo al rilascio del dito (onTouchEnd, sotto) — su
+                // alcuni telefoni quell'evento può non arrivare in modo
+                // pulito (es. lo scroll del dito viene interpretato
+                // diversamente dal browser). Così il carosello riparte
+                // comunque entro 3 secondi al massimo dal tocco,
+                // qualunque cosa succeda dopo.
+                pianificaRipresaCarosello();
+              }}
               onTouchEnd={pianificaRipresaCarosello}
               onClick={pianificaRipresaCarosello}
             >
