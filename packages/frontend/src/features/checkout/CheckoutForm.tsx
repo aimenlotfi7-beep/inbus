@@ -318,7 +318,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
               </span>
               {opzioneScelta && (
                 <button type="button" className="mini-tab active" style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setPercorsoAperto(true)}>
-                  🗺️ Tragitto: {opzioneScelta.fermataCitta} → {evento.citta}
+                  🗺️ Tragitto
                 </button>
               )}
             </div>
