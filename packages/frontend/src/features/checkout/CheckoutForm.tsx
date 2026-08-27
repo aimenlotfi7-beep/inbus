@@ -440,36 +440,26 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 </div>
               ) : (
                 <>
-                  <p className="field-label" style={{ marginBottom: 6 }}>I tuoi dati (richiedente)</p>
-                  <p style={{ fontSize: 12, opacity: .7, marginTop: -4, marginBottom: 8 }}>Presi dal tuo account.</p>
                   <label className="field-label">Email</label>
                   <input type="email" value={email} disabled style={{ opacity: .6 }} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div>
-                      <label className="field-label">Nome</label>
-                      <input type="text" autoComplete="given-name" value={nome} onChange={(e) => setNome(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="field-label">Cognome</label>
-                      <input type="text" autoComplete="family-name" value={cognome} onChange={(e) => setCognome(e.target.value)} />
-                    </div>
-                  </div>
-                  <label className="field-label">Telefono</label>
-                  <input type="tel" autoComplete="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+                  <p className="hint">I biglietti verranno inviati a questa email.</p>
 
-                  {partecipanti.length > 0 && (
-                    <>
-                      <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>Altri passeggeri</p>
-                      <div className="checkout-passeggeri-scorrevole">
-                        {partecipanti.map((p, idx) => (
-                          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-                            <input placeholder={`Nome passeggero ${idx + 2}`} value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} />
-                            <input placeholder="Cognome" value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} />
-                          </div>
-                        ))}
+                  <label className="field-label">Telefono</label>
+                  <input type="tel" value={telefono} disabled style={{ opacity: .6 }} />
+
+                  <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>Lista passeggeri</p>
+                  <div className="checkout-passeggeri-scorrevole">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+                      <input placeholder="Nome passeggero 1" autoComplete="given-name" value={nome} onChange={(e) => setNome(e.target.value)} />
+                      <input placeholder="Cognome" autoComplete="family-name" value={cognome} onChange={(e) => setCognome(e.target.value)} />
+                    </div>
+                    {partecipanti.map((p, idx) => (
+                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+                        <input placeholder={`Nome passeggero ${idx + 2}`} value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} />
+                        <input placeholder="Cognome" value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} />
                       </div>
-                    </>
-                  )}
+                    ))}
+                  </div>
 
                   <div className="checkout-step-nav">
                     <button className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '12px 24px' }} onClick={() => setStep(1)}>← Indietro</button>
