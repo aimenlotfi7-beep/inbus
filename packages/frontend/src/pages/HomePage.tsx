@@ -73,6 +73,16 @@ export function HomePage() {
   // (mobile) — così lo scorrimento automatico non gli porta via da
   // sotto l'evento che sta guardando/scegliendo.
   const inPausaCarosello = useRef(false);
+  const timerRipresaCarosello = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Su mobile il tocco mette in pausa ma non c'è un "esco col mouse"
+  // che la tolga da solo come su desktop — qui la si toglie da sola
+  // dopo qualche secondo senza altre interazioni, così il carosello
+  // riprende a girare dopo che il cliente ha guardato/scelto l'evento,
+  // invece di restare fermo per sempre.
+  function pianificaRipresaCarosello() {
+    if (timerRipresaCarosello.current) clearTimeout(timerRipresaCarosello.current);
+    timerRipresaCarosello.current = setTimeout(() => { inPausaCarosello.current = false; }, 3000);
+  }
   useEffect(() => {
     if (eventi.length < 2) return;
     const intervallo = setInterval(() => {
@@ -155,9 +165,11 @@ export function HomePage() {
             <div
               className="hero-carosello"
               ref={caroselloHeroRef}
-              onMouseEnter={() => { inPausaCarosello.current = true; }}
+              onMouseEnter={() => { inPausaCarosello.current = true; if (timerRipresaCarosello.current) clearTimeout(timerRipresaCarosello.current); }}
               onMouseLeave={() => { inPausaCarosello.current = false; }}
-              onTouchStart={() => { inPausaCarosello.current = true; }}
+              onTouchStart={() => { inPausaCarosello.current = true; if (timerRipresaCarosello.current) clearTimeout(timerRipresaCarosello.current); }}
+              onTouchEnd={pianificaRipresaCarosello}
+              onClick={pianificaRipresaCarosello}
             >
               {eventi.map((ev) => (
                 <div key={ev.id} data-evento-id={ev.id} className={`hero-carosello-card${ev.id === eventoCentraleId ? ' centro' : ''}`}>

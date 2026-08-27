@@ -145,7 +145,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   // per mostrare il messaggio giusto e proporre la lista d'attesa solo
   // quando serve davvero.
   const tutteEsaurite = opzioni.length === 0 || opzioni.every((o) => o.postiDisponibili === 0);
-  const fermataEsaurita = !opzioneScelta || opzioneScelta.postiDisponibili === 0;
+  const fermataEsaurita = !!opzioneScelta && opzioneScelta.postiDisponibili === 0;
   const prezzoUnitario = opzioneScelta
     ? (offerta ? applicaScontoOfferta(opzioneScelta.prezzoEffettivo, offerta.scontoPercentuale) : opzioneScelta.prezzoEffettivo)
     : 0;

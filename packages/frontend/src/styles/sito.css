@@ -739,12 +739,14 @@
 .percorso-tappa{position:relative; padding-bottom:18px;}
 .percorso-tappa:last-child{padding-bottom:0;}
 /* La fermata scelta dal cliente, messa in risalto nel popup del
-   checkout — sfondo tenue + bordo rosa, per distinguerla a colpo
-   d'occhio dalle altre tappe dello stesso percorso. */
-.percorso-tappa.evidenziata{
-  background:rgba(255,61,122,.1); border:1px solid var(--pink); border-radius:10px; padding:10px 14px 10px 30px; margin:0 0 6px -14px;
+   checkout — SOLO sul contenuto (testo/pallini), mai sulla riga
+   intera: quella contiene anche il puntino posizionato in modo
+   assoluto rispetto a lei, spostarla avrebbe disallineato la linea
+   dei puntini rispetto a tutte le altre tappe (bug trovato/segnalato:
+   uno spostamento con margine negativo rompeva l'allineamento). */
+.percorso-tappa.evidenziata .percorso-tappa-corpo{
+  background:rgba(255,61,122,.12); border:1px solid var(--pink); border-radius:8px; padding:8px 12px;
 }
-.percorso-tappa.evidenziata .percorso-tappa-puntino{left:8px; top:14px;}
 .percorso-tappa-puntino{
   position:absolute; left:-22px; top:4px; width:10px; height:10px; border-radius:50%;
   background:var(--pink); border:2px solid var(--night);
