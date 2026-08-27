@@ -96,7 +96,7 @@ export function HomePage() {
   // "genere" qui sopra (quello resta libero, i filtri poco più sotto
   // nella pagina). Parametro separato apposta, così i due filtri non
   // si accavallano mai per coincidenza.
-  const categoriaAttiva = (searchParams.get('categoria') as 'CONCERTI' | 'FESTIVAL' | 'SPORT' | null) ?? null;
+  const categoriaAttiva = searchParams.get('categoria');
   const eventiFiltrati = useMemo(() => {
     let lista = genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => e.genere === genereAttivo);
     if (categoriaAttiva) lista = lista.filter((e) => e.categoria === categoriaAttiva);

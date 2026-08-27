@@ -26,7 +26,17 @@ export function Layout({ children }: { children: ReactNode }) {
   const categoriaAttiva = searchParams.get('categoria');
   function impostaCategoria(nome: string) {
     const nuovi = new URLSearchParams(searchParams);
-    if (nome === 'Tutti') nuovi.delete('categoria'); else nuovi.set('categoria', nome);
+    if (nome === 'Tutti') {
+      // "Tutti" deve azzerare DAVVERO ogni filtro — se restasse attivo
+      // anche il filtro genere separato (più in basso nella pagina),
+      // il risultato sembrerebbe ancora filtrato nonostante "Tutti"
+      // fosse selezionato.
+      nuovi.delete('categoria');
+      nuovi.delete('genere');
+    } else {
+      nuovi.set('categoria', nome);
+      nuovi.delete('genere');
+    }
     setSearchParams(nuovi, { replace: true });
     document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' });
   }
