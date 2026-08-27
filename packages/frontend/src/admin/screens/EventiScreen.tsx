@@ -78,8 +78,20 @@ export function EventiScreen() {
         {eventiFiltrati.map((ev) => (
           <div key={ev.id} className="evento-card" onClick={() => apriModifica(ev)} style={tab === 'passati' ? { opacity: .65 } : undefined}>
             {ev.immagini[0]?.url && (
-              <div style={{ width: '100%', aspectRatio: '1080 / 1350', borderRadius: 8, overflow: 'hidden', marginBottom: 10, background: 'var(--night)' }}>
+              <div style={{ position: 'relative', width: '100%', aspectRatio: '1080 / 1350', borderRadius: 8, overflow: 'hidden', marginBottom: 10, background: 'var(--night)' }}>
                 <img src={ev.immagini[0].url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <button
+                  type="button"
+                  title="Apri la pagina pubblica dell'evento"
+                  onClick={(e) => { e.stopPropagation(); window.open(`${window.location.origin}/eventi/${ev.slug}`, '_blank'); }}
+                  style={{
+                    position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: '50%',
+                    background: 'rgba(16,14,28,.72)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,.2)',
+                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13,
+                  }}
+                >
+                  ↗
+                </button>
               </div>
             )}
             <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>

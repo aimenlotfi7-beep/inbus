@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { InfoTooltip } from '../../shared/InfoTooltip';
 import { eventiApi, type EventoInput, type TragittoInput, type FermataInput } from '../../../api/eventi';
 import { percorsiSalvatiApi, type PercorsoSalvato } from '../../../api/percorsiSalvati';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../../api/layoutBiglietto';
@@ -607,7 +608,11 @@ export function SchedaEventoModale({
             <label>Acconto (€)
               <CampoNumero valuta min={1} value={form.accontoEur} onChange={(v) => setForm({ ...form, accontoEur: v ?? 0 })} />
             </label>
-            <label>Avviso disponibilità (mostrato ai clienti al posto dei posti reali)
+            <label style={{ gridColumn: '1 / -1' }}>
+              Avviso disponibilità (mostrato ai clienti al posto dei posti reali)
+              <InfoTooltip>
+                Lasciandolo su "Automatico", il sito mostra da solo "Pochi posti" (sotto il 20% rimasto) o "Posti terminati" quando serve, senza che tu debba pensarci — scegli una delle altre opzioni solo se vuoi forzarla tu (es. per una promozione), a prescindere dai numeri reali.
+              </InfoTooltip>
               <select
                 value={form.statoDisponibilita ?? ''}
                 onChange={(e) => setForm({ ...form, statoDisponibilita: (e.target.value || null) as typeof form.statoDisponibilita })}
@@ -617,32 +622,18 @@ export function SchedaEventoModale({
                 <option value="NUOVI_POSTI">Nuovi posti disponibili</option>
                 <option value="ESAURITO">Posti terminati</option>
               </select>
-              <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
-                Lasciandolo su "Automatico", il sito mostra da solo "Pochi posti" (sotto il 20% rimasto) o "Posti
-                terminati" quando serve, senza che tu debba pensarci — scegli una delle altre opzioni solo se vuoi
-                forzarla tu (es. per una promozione), a prescindere dai numeri reali.
-              </p>
             </label>
           </div>
-          {evento && (
-            <p className="testo-intro" style={{ marginTop: -8, fontSize: 12.5 }}>
-              Pagina pubblica: <code style={{ color: 'var(--paper)' }}>{window.location.origin}/eventi/{evento.slug}</code>
-            </p>
-          )}
-          <p className="testo-intro" style={{ marginTop: -8, fontSize: 12.5 }}>
-            I prezzi si impostano per fermata nello step "Tragitti" (arrivano dai percorsi che applichi). Chi prenota con
-            acconto salda il resto entro 15 giorni prima della partenza. L'avviso disponibilità è solo un'etichetta
-            (per creare urgenza o scarsità): non blocca davvero le prenotazioni, quello dipende dai posti reali.
-          </p>
           <div className="campo">
             <label><input type="checkbox" checked={form.inEvidenza ?? false} onChange={(e) => setForm({ ...form, inEvidenza: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> In evidenza in homepage</label>
           </div>
           <div className="campo">
-            <label><input type="checkbox" checked={form.visibileSito ?? true} onChange={(e) => setForm({ ...form, visibileSito: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Visibile sul sito</label>
-            <p className="testo-intro" style={{ fontSize: 12, marginTop: 4, marginBottom: 0 }}>
-              Se lo disattivi, l'evento non compare mai sul sito (anche se è nel futuro). Gli eventi con data già
-              passata comunque non compaiono più sul sito, a prescindere da questo interruttore.
-            </p>
+            <label>
+              <input type="checkbox" checked={form.visibileSito ?? true} onChange={(e) => setForm({ ...form, visibileSito: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Visibile sul sito
+              <InfoTooltip>
+                Se lo disattivi, l'evento non compare mai sul sito (anche se è nel futuro). Gli eventi con data già passata comunque non compaiono più sul sito, a prescindere da questo interruttore.
+              </InfoTooltip>
+            </label>
           </div>
         </>
       )}
@@ -1140,7 +1131,12 @@ export function SchedaEventoModale({
 
       {step === 2 && (
         <>
-          <p className="section-label">Tragitti (facoltativi — puoi aggiungerli anche dopo)</p>
+          <p className="section-label">
+            Tragitti (facoltativi — puoi aggiungerli anche dopo)
+            <InfoTooltip>
+              I prezzi si impostano per fermata proprio qui (arrivano dai percorsi che applichi). Chi prenota con acconto salda il resto entro 15 giorni prima della partenza. L'avviso disponibilità (nella sezione Informazioni) è solo un'etichetta — non blocca davvero le prenotazioni, quello dipende dai posti reali qui sotto.
+            </InfoTooltip>
+          </p>
           {campiTratte}
         </>
       )}
