@@ -99,9 +99,20 @@ function calcolaStatoAutomatico(tragitti: { postiTotali: number; postiDisponibil
  *  a distinguere "è in automatico" da "l'ho impostato io", e ogni volta
  *  che salva il form "congelerebbe" per sbaglio il valore calcolato
  *  come se fosse una scelta manuale sua. */
-function conStatoCalcolato<T extends { statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null; tragitti: { postiTotali: number; postiDisponibili: number }[] }>(evento: T): T {
+function conStatoCalcolato<T extends {
+  statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
+  tragitti: { postiTotali: number; postiDisponibili: number }[];
+  servizi: { tragitti: { postiTotali: number; postiDisponibili: number }[] }[];
+}>(evento: T): T {
   if (evento.statoDisponibilita) return evento; // scelta manuale, ha sempre la precedenza
-  return { ...evento, statoDisponibilita: calcolaStatoAutomatico(evento.tragitti) };
+  // Il calcolo considera SIA i tragitti liberi SIA quelli di ogni
+  // servizio (altrimenti un evento a servizi, dove i tragitti veri
+  // vivono tutti dentro i servizi, risulterebbe sempre senza dati per
+  // il calcolo automatico) — ma il campo "tragitti" restituito al sito
+  // resta quello originale, invariato: il frontend li combina già da
+  // solo dove serve, sommarli anche qui li farebbe contare due volte.
+  const tuttiPerIlCalcolo = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
+  return { ...evento, statoDisponibilita: calcolaStatoAutomatico(tuttiPerIlCalcolo) };
 }
 
 /** Inserisce un tragitto (tratta) con le sue fermate — usata sia per i
@@ -473,9 +484,11 @@ export const eventiService = {
     await db.update(tragitti).set({ eliminatoIl: null }).where(eq(tragitti.id, id));
   },
 
-  /** Somma i posti disponibili su tutte le tragitti di un evento. */
+  /** Somma i posti disponibili su tutte le tragitti di un evento —
+   *  liberi E dentro ogni servizio, stesso motivo delle altre funzioni
+   *  qui sopra corrette allo stesso modo. */
   postiTotaliDisponibili(evento: Awaited<ReturnType<typeof getById>>) {
-    return evento.tragitti.reduce((somma, l) => somma + l.postiDisponibili, 0);
+    return [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].reduce((somma, l) => somma + l.postiDisponibili, 0);
   },
 
   /** Una riga per ogni fermata prenotabile, con il prezzo effettivo già
@@ -548,7 +561,13 @@ export const eventiService = {
   async calcolaBusNecessari(eventoId: string) {
     const evento = await getById(eventoId);
     const capienza = await leggiPostiPerBus();
-    const tragittiIds = evento.tragitti.map((l) => l.id);
+    // Stesso identico problema già risolto altrove in questo file: qui
+    // servono TUTTI i tragitti dell'evento, sia quelli liberi che quelli
+    // di ogni servizio — evento.tragitti da solo (dopo la correzione
+    // che esclude correttamente i tragitti già assegnati a un servizio,
+    // per non farli comparire duplicati) non li conteneva più tutti.
+    const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
+    const tragittiIds = tuttiITragitti.map((l) => l.id);
 
     const prenotazioniConfermate = await db
       .select({ tragittoId: prenotazioni.tragittoId, fermataCitta: prenotazioni.fermataCitta, passeggeri: prenotazioni.passeggeri })
@@ -563,7 +582,7 @@ export const eventiService = {
     const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
     const busCensiti = busIds.length ? await db.select().from(busFisici).where(inArray(busFisici.id, busIds)) : [];
 
-    return evento.tragitti.map((tragitto) => {
+    return tuttiITragitti.map((tragitto) => {
       const fermateOrdinate = [...tragitto.fermate].sort((a, b) => a.ordine - b.ordine);
 
       const fermateConPasseggeri = fermateOrdinate.map((f) => {
@@ -623,7 +642,7 @@ export const eventiService = {
    *  (tragitti) che ciascuno copre. */
   async listaBus(eventoId: string) {
     const evento = await getById(eventoId);
-    const tragittiIds = evento.tragitti.map((l) => l.id);
+    const tragittiIds = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((l) => l.id);
     if (tragittiIds.length === 0) return [];
 
     const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.tragittoId, tragittiIds));
@@ -646,7 +665,7 @@ export const eventiService = {
 
   async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus?: number; note?: string; tragittiIds: string[] }) {
     const evento = await getById(eventoId);
-    const lineeValide = new Set(evento.tragitti.map((l) => l.id));
+    const lineeValide = new Set([...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((l) => l.id));
     const tragittiIdsFiltrate = input.tragittiIds.filter((id) => lineeValide.has(id));
     if (tragittiIdsFiltrate.length === 0) throw new ConflittoDati('Seleziona almeno una tratta di questo evento per il bus.');
 
@@ -685,7 +704,7 @@ export const eventiService = {
       }
       if (input.tragittiIds !== undefined) {
         const evento = await getById(eventoId);
-        const lineeValide = new Set(evento.tragitti.map((l) => l.id));
+        const lineeValide = new Set([...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((l) => l.id));
         const tragittiIdsFiltrate = input.tragittiIds.filter((id) => lineeValide.has(id));
         await tx.delete(busTratte).where(eq(busTratte.busId, busId));
         if (tragittiIdsFiltrate.length > 0) {
@@ -763,7 +782,8 @@ export const eventiService = {
    *  quella tratta (un bus copre sempre una tratta sola, come deciso). */
   async riepilogoEconomico(eventoId: string) {
     const evento = await getById(eventoId);
-    const tragittiIds = evento.tragitti.map((l) => l.id);
+    const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
+    const tragittiIds = tuttiITragitti.map((l) => l.id);
     if (tragittiIds.length === 0) return [];
 
     const prenotazioniConfermate = await db
@@ -775,7 +795,7 @@ export const eventiService = {
     const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
     const bus = busIds.length ? await db.select().from(busFisici).where(inArray(busFisici.id, busIds)) : [];
 
-    return evento.tragitti.map((tragitto) => {
+    return tuttiITragitti.map((tragitto) => {
       const incassato = prenotazioniConfermate
         .filter((p) => p.tragittoId === tragitto.id)
         .reduce((s, p) => s + Number(p.totale), 0);
