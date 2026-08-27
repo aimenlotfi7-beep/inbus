@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { InfoTooltip } from '../../shared/InfoTooltip';
+import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
+import { pagineApi } from '../../../api/pagine';
 import { eventiApi, type EventoInput, type TragittoInput, type FermataInput } from '../../../api/eventi';
 import { percorsiSalvatiApi, type PercorsoSalvato } from '../../../api/percorsiSalvati';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../../api/layoutBiglietto';
@@ -168,6 +169,14 @@ export function SchedaEventoModale({
   const [formIniziale, setFormIniziale] = useState('');
 
   const [categorieEvento, setCategorieEvento] = useState<CategoriaEvento[]>([]);
+  const [mappaTooltip, setMappaTooltip] = useState<Record<string, string>>({});
+  useEffect(() => {
+    pagineApi.listContenuti().then((lista) => {
+      const mappa: Record<string, string> = {};
+      for (const c of lista) if (c.chiave.startsWith('tooltip_')) mappa[c.chiave.slice(8)] = c.valore;
+      setMappaTooltip(mappa);
+    });
+  }, []);
   function ricaricaCategorie() {
     categorieApi.list().then(setCategorie);
   }
@@ -465,29 +474,6 @@ export function SchedaEventoModale({
     }
   }
 
-  async function eliminaGenere() {
-    const trovato = categorie.find((c) => c.nome === form.genere);
-    if (!trovato) return;
-    if (!confirm(`Eliminare il genere "${trovato.nome}"? Gli eventi che lo usano già lo mantengono comunque scritto, semplicemente non comparirà più nell'elenco per sceglierlo su altri eventi.`)) return;
-    try {
-      await categorieApi.remove(trovato.id);
-      ricaricaCategorie();
-    } catch (e) {
-      alert(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
-    }
-  }
-
-  async function eliminaCategoria() {
-    const trovata = categorieEvento.find((c) => c.nome === form.categoria);
-    if (!trovata) return;
-    if (!confirm(`Eliminare la categoria "${trovata.nome}"? Sparirà anche dai pulsanti in alto sul sito. Gli eventi che la usano già la mantengono comunque scritta, semplicemente non comparirà più nell'elenco per sceglierla su altri eventi.`)) return;
-    try {
-      await categorieEventoApi.remove(trovata.id);
-      ricaricaCategorieEvento();
-    } catch (e) {
-      alert(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
-    }
-  }
 
   function aggiungiImmagine() {
     if (!nuovaImmagine.trim()) return;
@@ -595,44 +581,36 @@ export function SchedaEventoModale({
       {subTabInfo === 'info' && (
         <>
           <div className="form-grid">
-            <label>Artista <input value={form.artista} onChange={(e) => setForm({ ...form, artista: e.target.value })} /></label>
+            <label style={{ gridColumn: '1 / -1' }}>Artista <input value={form.artista} onChange={(e) => setForm({ ...form, artista: e.target.value })} /></label>
             <label>Genere
-              <div style={{ display: 'flex', gap: 6 }}>
-                <select value={form.genere} onChange={(e) => { if (e.target.value === '__nuovo__') { nuovoGenere(); return; } setForm({ ...form, genere: e.target.value }); }}>
-                  <option value="" disabled>Scegli un genere...</option>
-                  {categorie.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                  {form.genere && !categorie.some((c) => c.nome === form.genere) && (
-                    <option value={form.genere}>{form.genere}</option>
-                  )}
-                  <option value="__nuovo__">+ Nuovo genere...</option>
-                </select>
-                {categorie.some((c) => c.nome === form.genere) && (
-                  <button type="button" className="btn btn-ghost" style={{ padding: '0 10px', color: 'var(--pink)', flexShrink: 0 }} onClick={eliminaGenere} title="Elimina questo genere">✕</button>
+              <select value={form.genere} onChange={(e) => { if (e.target.value === '__nuovo__') { nuovoGenere(); return; } setForm({ ...form, genere: e.target.value }); }}>
+                <option value="" disabled>Scegli un genere...</option>
+                {categorie.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                {form.genere && !categorie.some((c) => c.nome === form.genere) && (
+                  <option value={form.genere}>{form.genere}</option>
                 )}
-              </div>
+                <option value="__nuovo__">+ Nuovo genere...</option>
+              </select>
             </label>
-            <label>Categoria<InfoTooltip>I pulsanti in alto sul sito.</InfoTooltip>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <select
-                  value={form.categoria ?? ''}
-                  onChange={(e) => { if (e.target.value === '__nuova__') { nuovaCategoria(); return; } setForm({ ...form, categoria: e.target.value || null }); }}
-                >
-                  <option value="">— Nessuna —</option>
-                  {categorieEvento.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                  {form.categoria && !categorieEvento.some((c) => c.nome === form.categoria) && (
-                    <option value={form.categoria}>{form.categoria}</option>
-                  )}
-                  <option value="__nuova__">+ Nuova categoria...</option>
-                </select>
-                {categorieEvento.some((c) => c.nome === form.categoria) && (
-                  <button type="button" className="btn btn-ghost" style={{ padding: '0 10px', color: 'var(--pink)', flexShrink: 0 }} onClick={eliminaCategoria} title="Elimina questa categoria">✕</button>
+            <label>
+              <EtichettaTooltip testo="Categoria" chiave="categoria" mappaTooltip={mappaTooltip} />
+              <select
+                value={form.categoria ?? ''}
+                onChange={(e) => { if (e.target.value === '__nuova__') { nuovaCategoria(); return; } setForm({ ...form, categoria: e.target.value || null }); }}
+              >
+                <option value="">— Nessuna —</option>
+                {categorieEvento.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                {form.categoria && !categorieEvento.some((c) => c.nome === form.categoria) && (
+                  <option value={form.categoria}>{form.categoria}</option>
                 )}
-              </div>
+                <option value="__nuova__">+ Nuova categoria...</option>
+              </select>
             </label>
             <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
             <label>Città <input value={form.citta} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>
             <label>Data <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
-            <label>URL<InfoTooltip>Facoltativo — se lo lasci vuoto, si genera da solo.</InfoTooltip>
+            <label>
+              <EtichettaTooltip testo="URL" chiave="url" mappaTooltip={mappaTooltip} />
               <input
                 value={form.slug ?? ''}
                 onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
@@ -643,9 +621,7 @@ export function SchedaEventoModale({
               <CampoNumero valuta min={1} value={form.accontoEur} onChange={(v) => setForm({ ...form, accontoEur: v ?? 0 })} />
             </label>
             <label>
-              Avviso disponibilità<InfoTooltip>
-                Mostrato ai clienti al posto dei posti reali. Lasciandolo su "Automatico", il sito mostra da solo "Pochi posti" (sotto il 20% rimasto) o "Posti terminati" quando serve, senza che tu debba pensarci — scegli una delle altre opzioni solo se vuoi forzarla tu (es. per una promozione), a prescindere dai numeri reali.
-              </InfoTooltip>
+              <EtichettaTooltip testo="Avviso disponibilità" chiave="avviso_disponibilita" mappaTooltip={mappaTooltip} />
               <select
                 value={form.statoDisponibilita ?? ''}
                 onChange={(e) => setForm({ ...form, statoDisponibilita: (e.target.value || null) as typeof form.statoDisponibilita })}
@@ -662,10 +638,8 @@ export function SchedaEventoModale({
           </div>
           <div className="campo">
             <label>
-              <input type="checkbox" checked={form.visibileSito ?? true} onChange={(e) => setForm({ ...form, visibileSito: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Visibile sul sito
-              <InfoTooltip>
-                Se lo disattivi, l'evento non compare mai sul sito (anche se è nel futuro). Gli eventi con data già passata comunque non compaiono più sul sito, a prescindere da questo interruttore.
-              </InfoTooltip>
+              <input type="checkbox" checked={form.visibileSito ?? true} onChange={(e) => setForm({ ...form, visibileSito: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} />
+              <EtichettaTooltip testo="Visibile sul sito" chiave="visibile_sito" mappaTooltip={mappaTooltip} />
             </label>
           </div>
         </>
@@ -674,7 +648,7 @@ export function SchedaEventoModale({
       {subTabInfo === 'descrizione' && (
         <>
           <div className="campo">
-            <label>Informazioni viaggio per i clienti<InfoTooltip>Mostrate sulla pagina dell'evento, sotto la foto.</InfoTooltip></label>
+            <label><EtichettaTooltip testo="Informazioni viaggio per i clienti" chiave="informazioni_viaggio" mappaTooltip={mappaTooltip} /></label>
             <textarea
               value={form.descrizione ?? ''}
               onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
@@ -683,7 +657,7 @@ export function SchedaEventoModale({
             />
           </div>
           <div className="campo">
-            <label>Descrizione evento<InfoTooltip>Visibile ai clienti sulla pagina, e usata anche per Google/social.</InfoTooltip></label>
+            <label><EtichettaTooltip testo="Descrizione evento" chiave="descrizione_evento" mappaTooltip={mappaTooltip} /></label>
             <textarea
               value={form.descrizioneSeo ?? ''}
               onChange={(e) => setForm({ ...form, descrizioneSeo: e.target.value })}
@@ -905,9 +879,12 @@ export function SchedaEventoModale({
 
           {espansa && (
           <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr .6fr', gap: 8, marginBottom: 10 }}>
-            <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} />
-            <CampoNumero placeholder="Posti totali" value={tragitto.postiTotali} onChange={(v) => aggiornaTragitto(idxTragitto, 'postiTotali', v ?? 0)} />
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-end' }}>
+            <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} style={{ flex: 1 }} />
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, color: 'var(--mist)', flexShrink: 0 }}>
+              Posti
+              <CampoNumero value={tragitto.postiTotali} onChange={(v) => aggiornaTragitto(idxTragitto, 'postiTotali', v ?? 0)} style={{ width: 80 }} />
+            </label>
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
@@ -1022,7 +999,7 @@ export function SchedaEventoModale({
             </div>
           </div>
           <div className="campo">
-            <label>Immagine di intestazione<InfoTooltip>Facoltativa.</InfoTooltip></label>
+            <label><EtichettaTooltip testo="Immagine di intestazione" chiave="immagine_intestazione" mappaTooltip={mappaTooltip} /></label>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 placeholder="https://... (o carica un file)"
@@ -1165,9 +1142,7 @@ export function SchedaEventoModale({
       {step === 2 && (
         <>
           <p className="section-label">
-            Tragitti<InfoTooltip>
-              Facoltativi — puoi aggiungerli anche dopo. I prezzi si impostano per fermata proprio qui (arrivano dai percorsi che applichi). Chi prenota con acconto salda il resto entro 15 giorni prima della partenza. L'avviso disponibilità (nella sezione Informazioni) è solo un'etichetta — non blocca davvero le prenotazioni, quello dipende dai posti reali qui sotto.
-            </InfoTooltip>
+            <EtichettaTooltip testo="Tragitti" chiave="tragitti" mappaTooltip={mappaTooltip} />
           </p>
           {campiTratte}
         </>

@@ -38,6 +38,24 @@ export function App() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
+
+  // React Router NON gestisce da solo lo scorrimento a un'ancora
+  // (es. "/#consigliati") quando resti sulla stessa pagina — cliccare
+  // un link del genere dalla homepage stessa, senza cambiare rotta,
+  // non faceva assolutamente nulla (il comportamento nativo del
+  // browser scatta solo al caricamento di una pagina vera, non con la
+  // navigazione "finta" a schede singole di un sito come questo).
+  useEffect(() => {
+    if (!location.hash) return;
+    // Il piccolo ritardo dà tempo al contenuto della pagina di essere
+    // già renderizzato (altrimenti l'elemento con quell'id potrebbe
+    // non esistere ancora nel DOM nell'istante esatto in cui gira
+    // questo effetto, subito dopo il cambio di rotta).
+    const id = setTimeout(() => {
+      document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: 'smooth' });
+    }, 80);
+    return () => clearTimeout(id);
+  }, [location.pathname, location.hash]);
   return (
     <Routes>
       <Route path="/" element={<Layout><HomePage /></Layout>} />

@@ -11,7 +11,7 @@ export type SezioneGestionale =
   | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
   | 'fornitori' | 'tragitti'
   | 'chat' | 'contenuti' | 'comunicazioni'
-  | 'amministratori' | 'ruoli' | 'impostazioni' | 'template-email' | 'layout-biglietto';
+  | 'amministratori' | 'ruoli' | 'impostazioni' | 'template-email' | 'layout-biglietto' | 'testi-tooltip';
 
 // Ogni voce dichiara il permesso che serve per vederla. Chi ha ruolo
 // "owner" vede sempre tutto (haPermesso lo gestisce automaticamente).
@@ -59,6 +59,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'amministratori', label: 'Amministratori', permesso: 'utenze.gestisci' },
     { id: 'ruoli', label: 'Ruoli', permesso: 'permessi.gestisci' },
     { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
+    { id: 'testi-tooltip', label: 'Testi tooltip', permesso: 'impostazioni.gestisci' },
   ]},
 ];
 

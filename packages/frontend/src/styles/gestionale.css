@@ -42,6 +42,14 @@ a{color:inherit;}
    input in una griglia stretta (es. riga fermata) possono imporre una
    larghezza minima maggiore delle colonne e far sbordare il contenitore. */
 input, select, textarea{ min-width:0; box-sizing:border-box; }
+/* Rete di sicurezza: qualunque select nel gestionale che non rientri
+   in una classe più specifica (.campo, .form-grid, ecc) prende almeno
+   questo aspetto di base — mai il menu a tendina bianco nativo del
+   browser, stonato col resto scuro dell'interfaccia. */
+select{
+  font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
+  background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:10px 12px; cursor:pointer;
+}
 
 .logo{font-family:'Poppins',sans-serif; font-weight:800; font-size:22px; display:flex; align-items:baseline; gap:6px;}
 .logo span{color:var(--blue);}
@@ -452,7 +460,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
   text-transform:uppercase; letter-spacing:.5px; grid-column:span 1;
 }
 .form-grid label.full{grid-column:1 / -1;}
-.form-grid input, .form-grid textarea{
+.form-grid input, .form-grid select, .form-grid textarea{
   font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
   background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
 }
