@@ -582,7 +582,7 @@ export function SchedaEventoModale({
                 <option value="__nuovo__">+ Nuovo genere...</option>
               </select>
             </label>
-            <label>Categoria (i pulsanti in alto sul sito)
+            <label>Categoria<InfoTooltip>I pulsanti in alto sul sito.</InfoTooltip>
               <select
                 value={form.categoria ?? ''}
                 onChange={(e) => { if (e.target.value === '__nuova__') { nuovaCategoria(); return; } setForm({ ...form, categoria: e.target.value || null }); }}
@@ -598,7 +598,7 @@ export function SchedaEventoModale({
             <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
             <label>Città <input value={form.citta} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>
             <label>Data <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
-            <label>Indirizzo pubblico (facoltativo — se lo lasci vuoto, si genera da solo)
+            <label>URL<InfoTooltip>Facoltativo — se lo lasci vuoto, si genera da solo.</InfoTooltip>
               <input
                 value={form.slug ?? ''}
                 onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
@@ -608,10 +608,9 @@ export function SchedaEventoModale({
             <label>Acconto (€)
               <CampoNumero valuta min={1} value={form.accontoEur} onChange={(v) => setForm({ ...form, accontoEur: v ?? 0 })} />
             </label>
-            <label style={{ gridColumn: '1 / -1' }}>
-              Avviso disponibilità (mostrato ai clienti al posto dei posti reali)
-              <InfoTooltip>
-                Lasciandolo su "Automatico", il sito mostra da solo "Pochi posti" (sotto il 20% rimasto) o "Posti terminati" quando serve, senza che tu debba pensarci — scegli una delle altre opzioni solo se vuoi forzarla tu (es. per una promozione), a prescindere dai numeri reali.
+            <label>
+              Avviso disponibilità<InfoTooltip>
+                Mostrato ai clienti al posto dei posti reali. Lasciandolo su "Automatico", il sito mostra da solo "Pochi posti" (sotto il 20% rimasto) o "Posti terminati" quando serve, senza che tu debba pensarci — scegli una delle altre opzioni solo se vuoi forzarla tu (es. per una promozione), a prescindere dai numeri reali.
               </InfoTooltip>
               <select
                 value={form.statoDisponibilita ?? ''}
@@ -641,7 +640,7 @@ export function SchedaEventoModale({
       {subTabInfo === 'descrizione' && (
         <>
           <div className="campo">
-            <label>Informazioni viaggio per i clienti (mostrate sulla pagina dell'evento, sotto la foto)</label>
+            <label>Informazioni viaggio per i clienti<InfoTooltip>Mostrate sulla pagina dell'evento, sotto la foto.</InfoTooltip></label>
             <textarea
               value={form.descrizione ?? ''}
               onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
@@ -650,7 +649,7 @@ export function SchedaEventoModale({
             />
           </div>
           <div className="campo">
-            <label>Descrizione evento (visibile ai clienti sulla pagina, e usata anche per Google/social)</label>
+            <label>Descrizione evento<InfoTooltip>Visibile ai clienti sulla pagina, e usata anche per Google/social.</InfoTooltip></label>
             <textarea
               value={form.descrizioneSeo ?? ''}
               onChange={(e) => setForm({ ...form, descrizioneSeo: e.target.value })}
@@ -989,7 +988,7 @@ export function SchedaEventoModale({
             </div>
           </div>
           <div className="campo">
-            <label>Immagine di intestazione (facoltativa)</label>
+            <label>Immagine di intestazione<InfoTooltip>Facoltativa.</InfoTooltip></label>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 placeholder="https://... (o carica un file)"
@@ -1132,9 +1131,8 @@ export function SchedaEventoModale({
       {step === 2 && (
         <>
           <p className="section-label">
-            Tragitti (facoltativi — puoi aggiungerli anche dopo)
-            <InfoTooltip>
-              I prezzi si impostano per fermata proprio qui (arrivano dai percorsi che applichi). Chi prenota con acconto salda il resto entro 15 giorni prima della partenza. L'avviso disponibilità (nella sezione Informazioni) è solo un'etichetta — non blocca davvero le prenotazioni, quello dipende dai posti reali qui sotto.
+            Tragitti<InfoTooltip>
+              Facoltativi — puoi aggiungerli anche dopo. I prezzi si impostano per fermata proprio qui (arrivano dai percorsi che applichi). Chi prenota con acconto salda il resto entro 15 giorni prima della partenza. L'avviso disponibilità (nella sezione Informazioni) è solo un'etichetta — non blocca davvero le prenotazioni, quello dipende dai posti reali qui sotto.
             </InfoTooltip>
           </p>
           {campiTratte}
