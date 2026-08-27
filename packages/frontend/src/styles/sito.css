@@ -668,7 +668,15 @@
   .checkout-riepilogo-persistente{
     display:flex; justify-content:space-between; align-items:center; gap:10px;
     background:#faf7f0; border:1px solid #e5ded0; border-radius:10px; padding:10px 14px; margin-bottom:20px;
-    position:sticky; top:96px; z-index:5;
+  }
+  /* Con tanti passeggeri (es. 15+) questa era la vera causa del
+     riepilogo che "spariva" scorrendo — l'intera card cresceva a
+     dismisura. Ora è quest'area soltanto a scorrere al suo interno,
+     con un'altezza massima fissa: il riepilogo sopra (e il resto del
+     modulo sotto, pulsanti compresi) restano sempre fermi e visibili,
+     qualunque sia il numero di passeggeri. */
+  .checkout-passeggeri-scorrevole{
+    max-height:280px; overflow-y:auto; padding-right:6px; margin-right:-6px;
   }
   .checkout-riepilogo-persistente b{font-size:13.5px;}
   .checkout-riepilogo-riga{font-size:11.5px; color:#8a8171; display:block; margin-top:2px;}

@@ -455,12 +455,14 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                   {partecipanti.length > 0 && (
                     <>
                       <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>Altri passeggeri</p>
-                      {partecipanti.map((p, idx) => (
-                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-                          <input placeholder={`Nome passeggero ${idx + 2}`} value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} />
-                          <input placeholder="Cognome" value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} />
-                        </div>
-                      ))}
+                      <div className="checkout-passeggeri-scorrevole">
+                        {partecipanti.map((p, idx) => (
+                          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+                            <input placeholder={`Nome passeggero ${idx + 2}`} value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} />
+                            <input placeholder="Cognome" value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} />
+                          </div>
+                        ))}
+                      </div>
                     </>
                   )}
 
