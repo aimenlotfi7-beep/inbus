@@ -401,7 +401,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 <input
                   type="text"
                   inputMode="numeric"
-                  style={{ width: 40, textAlign: 'center' }}
+                  style={{ width: 56, textAlign: 'center', padding: '10px 4px' }}
                   value={passeggeri}
                   onChange={(e) => {
                     const v = e.target.value.replace(/\D/g, '');
