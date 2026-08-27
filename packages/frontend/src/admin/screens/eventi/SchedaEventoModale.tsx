@@ -206,7 +206,16 @@ export function SchedaEventoModale({
         ticketImmagineSfondoUrl: evento.ticketImmagineSfondoUrl ?? undefined,
         layoutBigliettoId: evento.layoutBigliettoId,
         immagini: [...evento.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
-        tragitti: evento.tragitti.map((l) => ({
+        // "form.tragitti" è un unico elenco piatto — sia i tragitti
+        // "liberi" (senza servizio) sia quelli di ogni servizio, distinti
+        // solo dal campo servizioId su ognuno (è così che il resto del
+        // componente li filtra/salva, vedi più sotto). Prima qui veniva
+        // caricato SOLO evento.tragitti (i liberi): per un evento con
+        // servizi, dove i tragitti veri vivono tutti dentro i servizi,
+        // il form restava vuoto — sparivano dalla vista in modifica pur
+        // restando intatti sul server (il sito li vede/vende comunque,
+        // legge direttamente da lì). Ora si combinano entrambe le fonti.
+        tragitti: [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((l) => ({
           id: l.id,
           servizioId: l.servizioId,
           nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra),
@@ -1037,14 +1046,10 @@ export function SchedaEventoModale({
     </>
   );
 
-  // Conta sia i tragitti "liberi" (senza servizio) sia quelli dentro
-  // ogni servizio — un evento a più servizi spesso non ha nessun
-  // tragitto libero, tutti vivono dentro i suoi servizi: contare solo
-  // i liberi farebbe risultare "0 tragitti" anche quando l'evento è
-  // configurato benissimo (bug trovato: il sito li vede giustamente
-  // sommando entrambe le fonti, il gestionale prima no).
-  const numeroTragitti = (form.tragitti ?? []).filter((l) => l.nome.trim()).length
-    + (form.servizi ?? []).reduce((somma, s) => somma + (s.tragitti ?? []).filter((l) => l.nome.trim()).length, 0);
+  // "form.tragitti" contiene già sia i tragitti liberi sia quelli di
+  // ogni servizio (vedi sopra dove si carica il form) — basta contare
+  // qui, nessuna somma aggiuntiva necessaria.
+  const numeroTragitti = (form.tragitti ?? []).filter((l) => l.nome.trim()).length;
   const stepCompleto: Record<1 | 2 | 3 | 4, boolean> = {
     1: infoCompleta(),
     2: numeroTragitti > 0,
