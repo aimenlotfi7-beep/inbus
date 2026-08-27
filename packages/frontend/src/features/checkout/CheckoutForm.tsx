@@ -314,13 +314,18 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
               <span className="checkout-riepilogo-riga">
                 {new Date(evento.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
                 {servizioScelto && ` · ${servizioScelto.nome}`}
-                {servizioScelto || !multiServizio ? ` · ${passeggeri} passegger${passeggeri > 1 ? 'i' : 'o'}` : ''}
+                {servizioScelto || !multiServizio ? <> · 👥 {passeggeri}</> : ''}
+                {opzioneScelta && (
+                  <button
+                    type="button"
+                    className="mini-tab active"
+                    style={{ marginLeft: 8, padding: '3px 10px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, verticalAlign: 'middle' }}
+                    onClick={() => setPercorsoAperto(true)}
+                  >
+                    🗺️ Tragitto
+                  </button>
+                )}
               </span>
-              {opzioneScelta && (
-                <button type="button" className="mini-tab active" style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setPercorsoAperto(true)}>
-                  🗺️ Tragitto
-                </button>
-              )}
             </div>
             {opzioneScelta && <div className="checkout-riepilogo-totale">€{(step === 3 ? totaleConCredito : totale).toFixed(2)}</div>}
           </div>
