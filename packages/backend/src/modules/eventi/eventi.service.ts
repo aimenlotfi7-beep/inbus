@@ -223,6 +223,7 @@ export const eventiService = {
     const condizioni = [isNull(eventi.eliminatoIl)];
     if (query.citta) condizioni.push(ilike(eventi.citta, `%${query.citta}%`));
     if (query.genere) condizioni.push(ilike(eventi.genere, `%${query.genere}%`));
+    if (query.categoria) condizioni.push(eq(eventi.categoria, query.categoria));
     if (query.soloInEvidenza) condizioni.push(eq(eventi.inEvidenza, true));
     if (query.ricerca?.trim()) {
       const q = `%${query.ricerca.trim()}%`;
@@ -266,6 +267,7 @@ export const eventiService = {
           slug,
           artista: input.artista,
           genere: input.genere,
+          categoria: input.categoria ?? null,
           luogo: input.luogo,
           citta: input.citta,
           data: input.data,
@@ -324,6 +326,7 @@ export const eventiService = {
         .set({
           ...(input.artista !== undefined && { artista: input.artista }),
           ...(input.genere !== undefined && { genere: input.genere }),
+          ...(input.categoria !== undefined && { categoria: input.categoria }),
           ...(input.luogo !== undefined && { luogo: input.luogo }),
           ...(input.citta !== undefined && { citta: input.citta }),
           ...(input.data !== undefined && { data: input.data }),

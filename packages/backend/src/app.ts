@@ -32,6 +32,7 @@ import { richiesteRimborsoRouter } from './modules/richieste-rimborso/richieste-
 import { clienteAuthRouter } from './modules/cliente-auth/cliente-auth.routes.js';
 import { ticketRouter } from './modules/ticket/ticket.routes.js';
 import { categorieRouter } from './modules/categorie/categorie.routes.js';
+import { categorieEventoRouter } from './modules/categorie-evento/categorie-evento.routes.js';
 import { listaAttesaRouter } from './modules/lista-attesa/lista-attesa.routes.js';
 import { offerteRouter } from './modules/offerte/offerte.routes.js';
 import { campagneRouter } from './modules/campagne/campagne.routes.js';
@@ -86,6 +87,7 @@ export function creaApp() {
   app.use('/api/cliente-auth', clienteAuthRouter);
   app.use('/api/biglietti', ticketRouter);
   app.use('/api/categorie', categorieRouter);
+  app.use('/api/categorie-evento', categorieEventoRouter);
   app.use('/api/lista-attesa', listaAttesaRouter);
   app.use('/api/offerte', offerteRouter);
   app.use('/api/campagne', campagneRouter);

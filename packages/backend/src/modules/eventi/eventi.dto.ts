@@ -49,6 +49,7 @@ export const creaEventoSchema = z.object({
   // scrivi, viene generato da solo dal nome dell'artista e dalla città.
   slug: z.string().regex(/^[a-z0-9-]*$/, 'Solo lettere minuscole, numeri e trattini, senza spazi.').optional(),
   genere: z.string().min(1),
+  categoria: z.string().nullable().optional(),
   luogo: z.string().min(1),
   citta: z.string().min(1),
   data: z.coerce.date(),
@@ -86,6 +87,7 @@ export type AggiornaEventoInput = z.infer<typeof aggiornaEventoSchema>;
 export const listaEventiQuerySchema = z.object({
   citta: z.string().optional(),
   genere: z.string().optional(),
+  categoria: z.string().optional(),
   soloInEvidenza: z.coerce.boolean().optional(),
   // Ricerca testuale libera (artista/luogo/città), usata dalla barra di
   // ricerca eventi nel gestionale (sezione Prenotazioni) e sul sito.

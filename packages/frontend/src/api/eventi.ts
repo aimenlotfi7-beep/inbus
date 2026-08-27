@@ -11,7 +11,7 @@ export interface TragittoInput {
   fermate: FermataInput[];
 }
 export interface EventoInput {
-  artista: string; genere: string; luogo: string; citta: string; data: string; prezzo?: number;
+  artista: string; genere: string; categoria?: string | null; luogo: string; citta: string; data: string; prezzo?: number;
   slug?: string;
   inEvidenza?: boolean; ordineEvidenza?: number; accontoEur?: number;
   statoDisponibilita?: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;

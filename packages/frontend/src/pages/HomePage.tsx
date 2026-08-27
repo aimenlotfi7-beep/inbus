@@ -92,8 +92,14 @@ export function HomePage() {
     if (g === 'Tutti') nuovi.delete('genere'); else nuovi.set('genere', g);
     setSearchParams(nuovi, { replace: true });
   }
+  // Le 3 categorie fisse dei pulsanti in alto sul sito — diverse dal
+  // "genere" qui sopra (quello resta libero, i filtri poco più sotto
+  // nella pagina). Parametro separato apposta, così i due filtri non
+  // si accavallano mai per coincidenza.
+  const categoriaAttiva = (searchParams.get('categoria') as 'CONCERTI' | 'FESTIVAL' | 'SPORT' | null) ?? null;
   const eventiFiltrati = useMemo(() => {
     let lista = genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => e.genere === genereAttivo);
+    if (categoriaAttiva) lista = lista.filter((e) => e.categoria === categoriaAttiva);
     const q = ricercaTesto.trim().toLowerCase();
     if (q) {
       lista = lista.filter((e) =>
@@ -104,7 +110,7 @@ export function HomePage() {
       );
     }
     return lista;
-  }, [eventi, genereAttivo, ricercaTesto]);
+  }, [eventi, genereAttivo, categoriaAttiva, ricercaTesto]);
 
   // Numeri veri, calcolati dai dati reali — non inventati: quante
   // tratte attive, quante città di partenza distinte tra tutte.

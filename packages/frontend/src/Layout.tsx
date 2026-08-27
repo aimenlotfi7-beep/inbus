@@ -1,8 +1,9 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { CookieBanner, LinkPreferenzeCookie } from './features/CookieBanner';
 import { clienteLoggato } from './features/clienteSessione';
 import { useCarrello } from './features/carrello/CarrelloContext';
+import { categorieEventoApi, type CategoriaEvento } from './api/categorieEvento';
 
 export function Layout({ children }: { children: ReactNode }) {
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
@@ -17,12 +18,34 @@ export function Layout({ children }: { children: ReactNode }) {
   // HomePage è solo una di quelle).
   const [searchParams, setSearchParams] = useSearchParams();
   const testoRicerca = searchParams.get('q') ?? '';
-  const genereAttivo = searchParams.get('genere') ?? 'Tutti';
-  function impostaGenere(g: string) {
+  // Le categorie non sono più fisse — arrivano dal gestionale, dove se
+  // ne possono aggiungere quante se ne vogliono. Il pulsante "Tutti" è
+  // sempre il primo, aggiunto qui, non fa parte dell'elenco vero.
+  const [categorie, setCategorie] = useState<CategoriaEvento[]>([]);
+  useEffect(() => { categorieEventoApi.list().then(setCategorie); }, []);
+  const categoriaAttiva = searchParams.get('categoria');
+  function impostaCategoria(nome: string) {
     const nuovi = new URLSearchParams(searchParams);
-    if (g === 'Tutti') nuovi.delete('genere'); else nuovi.set('genere', g);
+    if (nome === 'Tutti') nuovi.delete('categoria'); else nuovi.set('categoria', nome);
     setSearchParams(nuovi, { replace: true });
+    document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' });
   }
+
+  // Su mobile la fascia delle categorie si nasconde scorrendo verso il
+  // basso (per non rubare spazio mentre si legge), e ricompare
+  // scorrendo verso l'alto — comportamento richiesto solo lì: su
+  // desktop resta sempre ferma, non serve nasconderla.
+  const [categorieNascoste, setCategorieNascoste] = useState(false);
+  const ultimoScrollY = useRef(0);
+  useEffect(() => {
+    function alloScroll() {
+      const y = window.scrollY;
+      setCategorieNascoste(y > ultimoScrollY.current && y > 80);
+      ultimoScrollY.current = y;
+    }
+    window.addEventListener('scroll', alloScroll, { passive: true });
+    return () => window.removeEventListener('scroll', alloScroll);
+  }, []);
 
   return (
     <>
@@ -34,6 +57,42 @@ export function Layout({ children }: { children: ReactNode }) {
             <Link to="/#eventi">Eventi</Link>
           </nav>
         </div>
+
+        {inHomepage && (
+          <div className="header-centro">
+            <form
+              className="header-ricerca"
+              onSubmit={(e) => { e.preventDefault(); document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' }); }}
+            >
+              <button type="submit" aria-label="Cerca">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+              </button>
+              <input
+                type="text"
+                placeholder="Cerca artista, evento o città..."
+                value={testoRicerca}
+                onChange={(e) => {
+                  const nuovi = new URLSearchParams(searchParams);
+                  if (e.target.value) nuovi.set('q', e.target.value); else nuovi.delete('q');
+                  setSearchParams(nuovi, { replace: true });
+                }}
+              />
+            </form>
+            {/* Categorie desktop — dentro l'header stesso, accanto alla
+                ricerca. Su mobile questa copia resta nascosta (vedi
+                CSS): lì le categorie stanno in una fascia propria
+                subito sotto, mai dentro questa riga col carrello. */}
+            <div className="header-categorie-desktop">
+              <button type="button" className={`categoria-chip${!categoriaAttiva ? ' active' : ''}`} onClick={() => impostaCategoria('Tutti')}>Tutti</button>
+              {categorie.map((c) => (
+                <button key={c.id} type="button" className={`categoria-chip${categoriaAttiva === c.nome ? ' active' : ''}`} onClick={() => impostaCategoria(c.nome)}>
+                  {c.nome}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="nav-actions">
           <Link className="carrello-icona" to="/carrello" aria-label="Carrello">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -47,42 +106,19 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      {/* Ricerca + categorie — fascia propria sotto l'header, sempre
-          visibile su qualunque schermo (niente più nascosta dietro il
-          menu ☰ su mobile: era il problema segnalato). Solo in
-          homepage, dove hanno senso. */}
+      {/* Categorie mobile — fascia propria, FUORI dall'header (mai
+          insieme al carrello/ricerca), sfondo trasparente, sparisce
+          scorrendo verso il basso. Su desktop questa copia resta
+          nascosta (vedi CSS): lì le categorie sono già nell'header
+          sopra. */}
       {inHomepage && (
-        <div className="ricerca-categorie-fascia">
-          <form
-            className="header-ricerca"
-            onSubmit={(e) => { e.preventDefault(); document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' }); }}
-          >
-            <button type="submit" aria-label="Cerca">
-              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+        <div className={`header-categorie-mobile${categorieNascoste ? ' nascosta' : ''}`}>
+          <button type="button" className={`categoria-chip${!categoriaAttiva ? ' active' : ''}`} onClick={() => impostaCategoria('Tutti')}>Tutti</button>
+          {categorie.map((c) => (
+            <button key={c.id} type="button" className={`categoria-chip${categoriaAttiva === c.nome ? ' active' : ''}`} onClick={() => impostaCategoria(c.nome)}>
+              {c.nome}
             </button>
-            <input
-              type="text"
-              placeholder="Cerca artista, evento o città..."
-              value={testoRicerca}
-              onChange={(e) => {
-                const nuovi = new URLSearchParams(searchParams);
-                if (e.target.value) nuovi.set('q', e.target.value); else nuovi.delete('q');
-                setSearchParams(nuovi, { replace: true });
-              }}
-            />
-          </form>
-          <div className="parti-da-chips ricerca-categorie-chips">
-            {['Tutti', 'Concerti', 'Festival', 'Sport'].map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                className={`parti-da-chip${genereAttivo === cat ? ' active' : ''}`}
-                onClick={() => impostaGenere(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
       )}
 

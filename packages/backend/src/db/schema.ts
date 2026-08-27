@@ -58,6 +58,7 @@ export const eventi = pgTable('eventi', {
   slug: text('slug').notNull().unique(),
   artista: text('artista').notNull(),
   genere: text('genere').notNull(),
+  categoria: text('categoria'),
   luogo: text('luogo').notNull(),
   citta: text('citta').notNull(),
   data: timestamp('data', { mode: 'date' }).notNull(),
@@ -789,6 +790,16 @@ export const logAttivita = pgTable('log_attivita', {
 // CATEGORIE EVENTI
 // ---------------------------------------------------------------------
 export const categorie = pgTable('categorie', {
+  id: id(),
+  nome: text('nome').notNull().unique(),
+});
+
+// Le categorie del sito (Concerti/Festival/Sport, ma se ne possono
+// aggiungere altre) — diverse dai "generi" qui sopra: stesso identico
+// pattern (id+nome), tabella separata perché sono due concetti diversi
+// mostrati in punti diversi del sito (i pulsanti fissi in alto contro
+// il filtro genere più in basso nella pagina).
+export const categorieEvento = pgTable('categorie_evento', {
   id: id(),
   nome: text('nome').notNull().unique(),
 });

@@ -36,6 +36,7 @@ export interface Evento {
   id: string;
   artista: string;
   genere: string;
+  categoria: string | null;
   luogo: string;
   citta: string;
   data: string;

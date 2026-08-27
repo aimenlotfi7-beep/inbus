@@ -3,6 +3,7 @@ import { eventiApi, type EventoInput, type TragittoInput, type FermataInput } fr
 import { percorsiSalvatiApi, type PercorsoSalvato } from '../../../api/percorsiSalvati';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../../api/layoutBiglietto';
 import { categorieApi, type Categoria } from '../../../api/categorie';
+import { categorieEventoApi, type CategoriaEvento } from '../../../api/categorieEvento';
 import { ErroreApi } from '../../../api/client';
 import type { Evento } from '../../../api/types';
 import { PaginaSezione } from '../../shared/PaginaSezione';
@@ -16,7 +17,7 @@ import { ComunicazioniTab } from './ComunicazioniTab';
 import { OfferteTab } from './OfferteTab';
 import { geocodifica, durataViaggio, attesa } from '../../shared/geo';
 
-const VUOTO: EventoInput = { artista: '', genere: '', luogo: '', citta: '', data: '', inEvidenza: false, accontoEur: 10, immagini: [], tragitti: [] };
+const VUOTO: EventoInput = { artista: '', genere: '', categoria: null, luogo: '', citta: '', data: '', inEvidenza: false, accontoEur: 10, immagini: [], tragitti: [] };
 
 const STEP_WIZARD = [
   { numero: 1, label: 'Info evento' },
@@ -165,18 +166,23 @@ export function SchedaEventoModale({
   const [ricalcolando, setRicalcolando] = useState<Record<number, boolean>>({});
   const [formIniziale, setFormIniziale] = useState('');
 
+  const [categorieEvento, setCategorieEvento] = useState<CategoriaEvento[]>([]);
   function ricaricaCategorie() {
     categorieApi.list().then(setCategorie);
+  }
+  function ricaricaCategorieEvento() {
+    categorieEventoApi.list().then(setCategorieEvento);
   }
 
   useEffect(() => {
     percorsiSalvatiApi.list().then(setPercorsiSalvati).catch((e) => console.error('Percorsi salvati non caricati:', e));
     layoutBigliettoApi.list().then(setLayoutDisponibili).catch(() => setLayoutDisponibili([]));
     ricaricaCategorie();
+    ricaricaCategorieEvento();
     let nuovoForm: EventoInput;
     if (evento) {
       nuovoForm = {
-        artista: evento.artista, genere: evento.genere, luogo: evento.luogo, citta: evento.citta,
+        artista: evento.artista, genere: evento.genere, categoria: evento.categoria, luogo: evento.luogo, citta: evento.citta,
         data: evento.data.slice(0, 10), inEvidenza: evento.inEvidenza,
         slug: evento.slug,
         accontoEur: evento.accontoEur ? Number(evento.accontoEur) : 10,
@@ -446,6 +452,18 @@ export function SchedaEventoModale({
     }
   }
 
+  async function nuovaCategoria() {
+    const nome = window.prompt('Nome della nuova categoria (comparirà come pulsante in alto sul sito):');
+    if (!nome || !nome.trim()) return;
+    try {
+      const creata = await categorieEventoApi.create(nome.trim());
+      ricaricaCategorieEvento();
+      setForm((f) => ({ ...f, categoria: creata.nome }));
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Impossibile creare la categoria: ${e.message}` : 'Impossibile creare la categoria: errore di rete.');
+    }
+  }
+
   function aggiungiImmagine() {
     if (!nuovaImmagine.trim()) return;
     setForm({ ...form, immagini: [...(form.immagini ?? []), nuovaImmagine.trim()] });
@@ -561,6 +579,19 @@ export function SchedaEventoModale({
                   <option value={form.genere}>{form.genere}</option>
                 )}
                 <option value="__nuovo__">+ Nuovo genere...</option>
+              </select>
+            </label>
+            <label>Categoria (i pulsanti in alto sul sito)
+              <select
+                value={form.categoria ?? ''}
+                onChange={(e) => { if (e.target.value === '__nuova__') { nuovaCategoria(); return; } setForm({ ...form, categoria: e.target.value || null }); }}
+              >
+                <option value="">— Nessuna —</option>
+                {categorieEvento.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                {form.categoria && !categorieEvento.some((c) => c.nome === form.categoria) && (
+                  <option value={form.categoria}>{form.categoria}</option>
+                )}
+                <option value="__nuova__">+ Nuova categoria...</option>
               </select>
             </label>
             <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
