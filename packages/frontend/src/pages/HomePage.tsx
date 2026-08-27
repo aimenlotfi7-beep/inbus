@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { eventiApi } from '../api/eventi';
+import { categorieEventoApi, type CategoriaEvento } from '../api/categorieEvento';
 import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
 import { EventoCard } from '../features/eventi/EventoCard';
@@ -116,6 +117,15 @@ export function HomePage() {
   // nella pagina). Parametro separato apposta, così i due filtri non
   // si accavallano mai per coincidenza.
   const categoriaAttiva = searchParams.get('categoria');
+  // Le categorie servono qui — non solo nell'header — per il primo
+  // livello della cascata sotto: Tutti → Categorie → Generi.
+  const [categorie, setCategorie] = useState<CategoriaEvento[]>([]);
+  useEffect(() => { categorieEventoApi.list().then(setCategorie); }, []);
+  function impostaCategoria(nome: string) {
+    const nuovi = new URLSearchParams(searchParams);
+    if (nome === 'Tutti') { nuovi.delete('categoria'); nuovi.delete('genere'); } else { nuovi.set('categoria', nome); nuovi.delete('genere'); }
+    setSearchParams(nuovi, { replace: true });
+  }
   // I generi mostrati qui sono SOLO quelli davvero presenti tra gli
   // eventi della categoria selezionata — se clicchi "Festival" e c'è
   // solo un evento Techno, vedi solo "Techno" come filtro genere, non
@@ -224,11 +234,28 @@ export function HomePage() {
           </div>
         </div>
         <div className="filter-bar">
-          {generi.map((g) => (
-            <button key={g} className={`chip${g === genereAttivo ? ' active' : ''}`} onClick={() => setGenereAttivo(g)}>
-              {g === 'Tutti' ? (categoriaAttiva ? <b>{categoriaAttiva}</b> : 'Tutti') : g}
-            </button>
-          ))}
+          {!categoriaAttiva ? (
+            // Primo livello della cascata — nessuna categoria ancora
+            // scelta: si vedono le categorie, non i generi (che
+            // avrebbero poco senso mischiati tra categorie diverse).
+            <>
+              <button className="chip active" disabled>Tutti</button>
+              {categorie.map((c) => (
+                <button key={c.id} className="chip" onClick={() => impostaCategoria(c.nome)}>{c.nome}</button>
+              ))}
+            </>
+          ) : (
+            // Secondo livello — una categoria è scelta: ora si vedono i
+            // generi presenti SOLO in quella categoria. "Tutti" qui
+            // azzera il genere (resta comunque dentro la categoria
+            // scelta — per uscirne del tutto si usa il pulsante
+            // categoria nell'header, sopra).
+            generi.map((g) => (
+              <button key={g} className={`chip${g === genereAttivo ? ' active' : ''}`} onClick={() => setGenereAttivo(g)}>
+                {g === 'Tutti' ? <b>{categoriaAttiva}</b> : g}
+              </button>
+            ))
+          )}
         </div>
 
         {caricamento && <p style={{ color: 'var(--mist)', padding: 40, textAlign: 'center' }}>Carico gli eventi...</p>}
