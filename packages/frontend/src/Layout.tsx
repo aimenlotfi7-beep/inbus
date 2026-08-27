@@ -92,7 +92,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 CSS): lì le categorie stanno in una fascia propria
                 subito sotto, mai dentro questa riga col carrello. */}
             <div className="header-categorie-desktop">
-              <button type="button" className={`categoria-chip${!categoriaAttiva ? ' active' : ''}`} onClick={() => impostaCategoria('Tutti')}>{categoriaAttiva || 'Tutti'}</button>
+              <button type="button" className={`categoria-chip${!categoriaAttiva ? ' active' : ''}`} onClick={() => impostaCategoria('Tutti')}>Tutti</button>
               {categorie.map((c) => (
                 <button key={c.id} type="button" className={`categoria-chip${categoriaAttiva === c.nome ? ' active' : ''}`} onClick={() => impostaCategoria(c.nome)}>
                   {c.nome}
@@ -122,7 +122,7 @@ export function Layout({ children }: { children: ReactNode }) {
           sopra. */}
       {inHomepage && (
         <div className={`header-categorie-mobile${categorieNascoste ? ' nascosta' : ''}`}>
-          <button type="button" className={`categoria-chip${!categoriaAttiva ? ' active' : ''}`} onClick={() => impostaCategoria('Tutti')}>{categoriaAttiva || 'Tutti'}</button>
+          <button type="button" className={`categoria-chip${!categoriaAttiva ? ' active' : ''}`} onClick={() => impostaCategoria('Tutti')}>Tutti</button>
           {categorie.map((c) => (
             <button key={c.id} type="button" className={`categoria-chip${categoriaAttiva === c.nome ? ' active' : ''}`} onClick={() => impostaCategoria(c.nome)}>
               {c.nome}

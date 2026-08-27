@@ -181,7 +181,9 @@ export function HomePage() {
       <section className="events-section" id="eventi">
         <div className="section-head">
           <div>
-            <h2 className="section-title">Tutti gli <em>eventi</em></h2>
+            <h2 className="section-title">
+              {categoriaAttiva ? <>Eventi <em>{categoriaAttiva}</em></> : <>Tutti gli <em>eventi</em></>}
+            </h2>
             <p className="section-sub">Scegli il concerto, scegli la tua fermata, il resto lo pensiamo noi.</p>
           </div>
         </div>
