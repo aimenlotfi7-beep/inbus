@@ -68,10 +68,15 @@ export function HomePage() {
 
   // Scorrimento automatico del carosello nell'hero — ogni 2 secondi
   // avanza di una card, e torna all'inizio una volta arrivato in fondo
-  // (invece di restare bloccato contro il bordo destro).
+  // (invece di restare bloccato contro il bordo destro). In pausa
+  // finché il cliente ci passa sopra col mouse (desktop) o lo tocca
+  // (mobile) — così lo scorrimento automatico non gli porta via da
+  // sotto l'evento che sta guardando/scegliendo.
+  const inPausaCarosello = useRef(false);
   useEffect(() => {
     if (eventi.length < 2) return;
     const intervallo = setInterval(() => {
+      if (inPausaCarosello.current) return;
       const el = caroselloHeroRef.current;
       if (!el) return;
       const allaFine = el.scrollLeft + el.clientWidth >= el.scrollWidth - 10;
@@ -147,7 +152,13 @@ export function HomePage() {
           {/* Tutti gli eventi, che scorrono da soli ogni 2 secondi —
               al posto del vecchio modulo di ricerca, ora spostato sopra. */}
           <div className="hero-carosello-wrap">
-            <div className="hero-carosello" ref={caroselloHeroRef}>
+            <div
+              className="hero-carosello"
+              ref={caroselloHeroRef}
+              onMouseEnter={() => { inPausaCarosello.current = true; }}
+              onMouseLeave={() => { inPausaCarosello.current = false; }}
+              onTouchStart={() => { inPausaCarosello.current = true; }}
+            >
               {eventi.map((ev) => (
                 <div key={ev.id} data-evento-id={ev.id} className={`hero-carosello-card${ev.id === eventoCentraleId ? ' centro' : ''}`}>
                   <EventoCard evento={ev} />
@@ -188,7 +199,7 @@ export function HomePage() {
         <div className="filter-bar">
           {generi.map((g) => (
             <button key={g} className={`chip${g === genereAttivo ? ' active' : ''}`} onClick={() => setGenereAttivo(g)}>
-              {g === 'Tutti' ? (categoriaAttiva || 'Tutti') : g}
+              {g === 'Tutti' ? (categoriaAttiva ? <b>{categoriaAttiva}</b> : 'Tutti') : g}
             </button>
           ))}
         </div>

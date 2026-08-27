@@ -25,14 +25,26 @@ function EtichettaDisponibilita({ posti }: { posti: number }) {
  *  questi due, il comportamento resta quello di sempre (tutte le
  *  tappe di tutti i tragitti, nessuna evidenziata). */
 export function PercorsoBus({ evento, soloTragittoId, fermataEvidenziataId }: { evento: Evento; soloTragittoId?: string; fermataEvidenziataId?: string }) {
-  const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((v) => v.tragitti)];
+  // Deduplicato per id — se lo stesso tragitto finisse per sbaglio sia
+  // tra quelli "liberi" dell'evento sia annidato dentro un servizio
+  // (dato arrivato così dal server), qui non conterebbe comunque due
+  // volte: ogni tragitto compare al massimo una sola volta.
+  const mappaTragitti = new Map<string, Evento['tragitti'][number]>();
+  for (const t of [...evento.tragitti, ...evento.servizi.flatMap((v) => v.tragitti)]) mappaTragitti.set(t.id, t);
+  const tuttiITragitti = [...mappaTragitti.values()];
   if (!tuttiITragitti.length) return null;
 
   const tragittiDaMostrare = soloTragittoId ? tuttiITragitti.filter((t) => t.id === soloTragittoId) : tuttiITragitti;
 
-  const tappe = tragittiDaMostrare.flatMap((tragitto) =>
-    tragitto.fermate.map((f) => ({ ...f, posti: postiRealiFermata(f, tragitto.postiDisponibili), nomeTragitto: tragitto.nome }))
-  ).sort((a, b) => (a.orario ?? '99:99').localeCompare(b.orario ?? '99:99'));
+  // Stessa idea anche sulle singole fermate — mai due righe con lo
+  // stesso id, qualunque sia la causa a monte del doppione.
+  const mappaTappe = new Map<string, { id: string; citta: string; orario: string | null; posti: number; nomeTragitto: string }>();
+  for (const tragitto of tragittiDaMostrare) {
+    for (const f of tragitto.fermate) {
+      mappaTappe.set(f.id, { ...f, posti: postiRealiFermata(f, tragitto.postiDisponibili), nomeTragitto: tragitto.nome });
+    }
+  }
+  const tappe = [...mappaTappe.values()].sort((a, b) => (a.orario ?? '99:99').localeCompare(b.orario ?? '99:99'));
 
   return (
     <div className="percorso-bus-blocco">

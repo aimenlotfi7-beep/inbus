@@ -712,6 +712,21 @@
   }
 
 /* ---------- PERCORSO BUS (pagina evento) ---------- */
+/* Popup "il percorso del tuo bus" nel checkout — classi proprie (non
+   riuso .travel-overlay/.travel-card di account.css: quel foglio di
+   stile non è caricato nella pagina evento, risultavano senza NESSUNO
+   stile, illeggibili). */
+.percorso-popup-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000;
+  display:flex; align-items:center; justify-content:center; padding:20px;
+}
+.percorso-popup-card{
+  background:var(--night); border:1px solid var(--line); border-radius:16px;
+  width:100%; max-width:480px; max-height:85vh; overflow-y:auto; padding:26px 22px; color:var(--paper);
+}
+.percorso-popup-close{
+  background:none; border:none; color:var(--mist); font-size:20px; cursor:pointer; float:right; line-height:1; padding:4px;
+}
 .percorso-bus-blocco{margin-top:24px;}
 .percorso-bus-blocco h4{
   font-family:'Poppins',sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:.5px;
@@ -737,8 +752,8 @@
 .percorso-tappa:not(:last-child)::before{
   content:''; position:absolute; left:-18px; top:14px; bottom:-4px; width:1px; background:rgba(255,255,255,.15);
 }
-.percorso-tappa-corpo{display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:13.5px;}
-.percorso-tappa-corpo b{font-size:14px;}
+.percorso-tappa-corpo{display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:13.5px; color:var(--paper);}
+.percorso-tappa-corpo b{font-size:14px; color:var(--paper);}
 .percorso-orario{color:var(--mist); font-size:12px;}
 .percorso-posti{font-size:11px; padding:2px 9px; border-radius:999px; font-weight:600;}
 .percorso-posti.disponibile{background:rgba(72,214,140,.15); color:#5be0a0;}

@@ -102,8 +102,8 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
     setStato('caricamento');
     eventiApi.opzioniPartenza(evento.id, servizioScelto?.id).then((o) => {
       setOpzioni(o);
-      const primaConPosti = o.find((x) => x.postiDisponibili > 0);
-      setFermataId((primaConPosti ?? o[0])?.fermataId ?? '');
+      // Nessuna fermata preselezionata di default — il cliente sceglie
+      // lui, il campo parte vuoto con "Seleziona una fermata".
       setStato('pronto');
     });
   }, [evento.id, servizioScelto?.id, multiServizio]);
@@ -336,9 +336,9 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
               evidenziata — così il cliente vede subito tutte le altre
               tappe di quel percorso, non solo la propria. */}
           {percorsoAperto && opzioneScelta && (
-            <div className="travel-overlay" onClick={() => setPercorsoAperto(false)}>
-              <div className="travel-card" onClick={(e) => e.stopPropagation()}>
-                <button className="travel-close" onClick={() => setPercorsoAperto(false)}>✕</button>
+            <div className="percorso-popup-overlay" onClick={() => setPercorsoAperto(false)}>
+              <div className="percorso-popup-card" onClick={(e) => e.stopPropagation()}>
+                <button className="percorso-popup-close" onClick={() => setPercorsoAperto(false)}>✕</button>
                 <h3 style={{ marginTop: 0 }}>Il percorso del tuo bus</h3>
                 <PercorsoBus evento={evento} soloTragittoId={opzioneScelta.tragittoId} fermataEvidenziataId={opzioneScelta.fermataId} />
               </div>

@@ -45,7 +45,7 @@ export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }:
     <div ref={contenitoreRef} style={{ position: 'relative' }}>
       <input
         type="text"
-        placeholder="Scrivi la tua città..."
+        placeholder="Seleziona una fermata..."
         value={testo}
         onChange={(e) => { setTesto(e.target.value); setAperto(true); }}
         onFocus={() => setAperto(true)}

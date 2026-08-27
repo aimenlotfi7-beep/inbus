@@ -28,7 +28,12 @@ export const includeCompleto = {
   // Nascoste ovunque venga usata questa query condivisa (form di
   // modifica, sito pubblico, checkout) — restano recuperabili solo
   // tramite le funzioni dedicate del Cestino qui sotto.
-  tragitti: { where: isNull(tragitti.eliminatoIl), with: { fermate: true } },
+  // "Tragitti liberi" veri — SOLO quelli senza un servizio assegnato
+  // (servizioId nullo). Prima mancava questa condizione: un tragitto
+  // con servizioId impostato finiva ANCHE qui (oltre che dentro il suo
+  // servizio, sotto), duplicando ogni sua fermata ovunque venga
+  // mostrato il percorso completo.
+  tragitti: { where: and(isNull(tragitti.eliminatoIl), isNull(tragitti.servizioId)), with: { fermate: true } },
   // I servizi (se l'evento ne ha) — ognuno con le proprie tratte. Un
   // evento senza nessun servizio (il caso normale) ha semplicemente un
   // array vuoto qui: tutto continua a funzionare come prima.
