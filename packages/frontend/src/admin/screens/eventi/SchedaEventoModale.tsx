@@ -935,63 +935,70 @@ export function SchedaEventoModale({
 
           <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla. Ognuna ha un prezzo — l'arrivo si imposta qui sopra, separatamente.</p>
           {tragitto.fermate.map((f, idxFermata) => (
-            <div
-              key={idxFermata}
-              draggable
-              onDragStart={() => onDragStart(idxTragitto, idxFermata)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => onDropSu(idxTragitto, idxFermata)}
-              style={{
-                display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr .55fr .55fr .55fr auto', gap: 6, marginBottom: 6, alignItems: 'center',
-                opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
-              }}
-            >
-              <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
-              {f.fermataAnagraficaId ? (
-                // Scelta dall'anagrafica — città/indirizzo arrivano da
-                // lì, mostrati qui solo come promemoria (non editabili
-                // direttamente: per cambiarli davvero si sceglie
-                // un'altra fermata, o si passa a "Scrivi manualmente").
-                <select
-                  style={{ gridColumn: 'span 2' }}
-                  value={f.fermataAnagraficaId}
-                  onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
-                >
-                  {fermateAnagrafica.map((fa) => <option key={fa.id} value={fa.id}>{fa.nome} — {fa.citta}</option>)}
-                  <option value="__manuale__">✎ Scrivi manualmente...</option>
-                </select>
-              ) : (
-                <>
-                  <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
-                  <div style={{ display: 'flex', gap: 4 }}>
+            <div key={idxFermata} style={{ marginBottom: 6 }}>
+              <div
+                draggable
+                onDragStart={() => onDragStart(idxTragitto, idxFermata)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => onDropSu(idxTragitto, idxFermata)}
+                style={{
+                  display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr .55fr .55fr .55fr auto', gap: 6, alignItems: 'center',
+                  opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
+                }}
+              >
+                <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
+                {f.fermataAnagraficaId !== null ? (
+                  // Di default (e finché non si sceglie "scrivi
+                  // manualmente") si parte da qui — un elenco leggibile,
+                  // non un'iconcina minuscola. Città/indirizzo arrivano
+                  // dall'anagrafica quando si sceglie una voce vera.
+                  <select
+                    style={{ gridColumn: 'span 2' }}
+                    value={f.fermataAnagraficaId ?? ''}
+                    onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
+                  >
+                    <option value="" disabled>— Scegli una fermata dall'anagrafica —</option>
+                    {fermateAnagrafica.map((fa) => (
+                      <option key={fa.id} value={fa.id}>{fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}</option>
+                    ))}
+                    <option value="__manuale__">✎ Scrivi manualmente, senza anagrafica...</option>
+                  </select>
+                ) : (
+                  <>
+                    <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
                     <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)} />
-                    {fermateAnagrafica.length > 0 && (
-                      <select
-                        style={{ width: 32, flexShrink: 0, padding: 0 }}
-                        value=""
-                        title="Scegli dall'anagrafica invece di scrivere a mano"
-                        onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
-                      >
-                        <option value="" disabled>📍</option>
-                        {fermateAnagrafica.map((fa) => <option key={fa.id} value={fa.id}>{fa.nome} — {fa.citta}</option>)}
-                      </select>
-                    )}
-                  </div>
-                </>
+                  </>
+                )}
+                <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'orario', v)} />
+                <CampoNumero
+                  valuta placeholder="Prezzo"
+                  value={f.prezzo}
+                  onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'prezzo', v !== undefined ? String(v) : '')}
+                />
+                <CampoNumero
+                  placeholder="Posti max"
+                  title="Facoltativo: limite posti solo per questa fermata. Se vuoto, condivide i posti di tutto il bus."
+                  value={f.postiMax ?? undefined}
+                  onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'postiMax', v !== undefined ? String(v) : '')}
+                />
+                <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
+              </div>
+              {f.fermataAnagraficaId === null && fermateAnagrafica.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ fontSize: 11, marginLeft: 22, marginTop: 2, padding: 0 }}
+                  onClick={() => setForm((prev) => {
+                    const tragitti = [...(prev.tragitti ?? [])];
+                    const fermate = [...tragitti[idxTragitto].fermate];
+                    fermate[idxFermata] = { ...fermate[idxFermata], fermataAnagraficaId: undefined };
+                    tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate };
+                    return { ...prev, tragitti };
+                  })}
+                >
+                  ← Torna a scegliere dall'anagrafica
+                </button>
               )}
-              <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'orario', v)} />
-              <CampoNumero
-                valuta placeholder="Prezzo"
-                value={f.prezzo}
-                onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'prezzo', v !== undefined ? String(v) : '')}
-              />
-              <CampoNumero
-                placeholder="Posti max"
-                title="Facoltativo: limite posti solo per questa fermata. Se vuoto, condivide i posti di tutto il bus."
-                value={f.postiMax ?? undefined}
-                onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'postiMax', v !== undefined ? String(v) : '')}
-              />
-              <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
             </div>
           ))}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>
