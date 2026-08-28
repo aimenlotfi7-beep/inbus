@@ -170,6 +170,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 }
 .btn-primary{background:var(--blue); color:var(--ink);}
 .btn-ghost{border-color:var(--line); color:var(--paper); background:transparent;}
+.btn-ghost.active{border-color:var(--blue); color:var(--blue); background:rgba(37,99,235,.1);}
 .btn-ghost:hover{border-color:var(--mist);}
 .btn-danger{background:transparent; border-color:var(--pink-dim); color:var(--pink);}
 

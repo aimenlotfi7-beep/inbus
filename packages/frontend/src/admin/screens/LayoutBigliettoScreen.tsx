@@ -106,6 +106,16 @@ export function LayoutBigliettoScreen() {
   // aggiunto — un solo stato per entrambi, così il resto del codice
   // (trascinamento, ridimensionamento) è lo stesso per entrambi i tipi.
   const [attivoId, setAttivoId] = useState<string | null>(null);
+  // Griglia — solo visiva, aiuta a valutare gli spazi a colpo d'occhio,
+  // attivabile/disattivabile perché con lo sfondo carico può disturbare.
+  const [mostraGriglia, setMostraGriglia] = useState(true);
+  // Linee guida "intelligenti" (come Figma/Canva/PowerPoint) — appaiono
+  // solo MENTRE trascini o ridimensioni, quando un bordo o il centro
+  // dell'elemento attivo si allinea con quello di un altro elemento, o
+  // con il centro/i bordi della pagina — e l'elemento si "aggancia" lì
+  // da solo, per allineamenti sempre precisi senza doverlo fare a
+  // occhio pixel per pixel.
+  const [guideAttive, setGuideAttive] = useState<{ verticali: number[]; orizzontali: number[] }>({ verticali: [], orizzontali: [] });
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const trascinamento = useRef<{ id: string; modo: 'sposta' | 'ridimensiona'; inizioMouseX: number; inizioMouseY: number; posizioneIniziale: Posizione } | null>(null);
@@ -217,6 +227,56 @@ export function LayoutBigliettoScreen() {
     window.addEventListener('mousemove', duranteTrascinamento);
     window.addEventListener('mouseup', fineTrascinamento);
   }
+  // Tutti gli elementi ATTUALMENTE sul canvas, tranne quello che si sta
+  // trascinando — sono i "candidati" contro cui controllare gli
+  // allineamenti. Le posizioni della pagina (bordi e centro) sono
+  // sempre candidate a parte, aggiunte a valle di questa funzione.
+  function posizioniAltriElementi(idEscluso: string): Posizione[] {
+    const risultato: Posizione[] = [];
+    for (const s of TUTTE_LE_SEZIONI) if (s !== idEscluso) risultato.push(config.posizioni[s]);
+    for (const extra of config.immaginiExtra) if (`extra:${extra.id}` !== idEscluso) risultato.push(extra.posizione);
+    return risultato;
+  }
+  const SOGLIA_AGGANCIO = 0.8; // punti percentuale del canvas — abbastanza stretta da non "tirare" involontariamente, abbastanza larga da agganciare senza doverci mirare al pixel
+  /** Confronta i bordi/centro dell'elemento in movimento con quelli di
+   *  tutti gli altri elementi e con bordi/centro della pagina — se
+   *  qualcuno è abbastanza vicino (sotto la soglia), restituisce la
+   *  correzione da applicare (l'aggancio vero e proprio) e le
+   *  coordinate delle linee guida da disegnare. */
+  function calcolaAggancio(idAttivo: string, pos: Posizione, modo: 'sposta' | 'ridimensiona') {
+    const altri = posizioniAltriElementi(idAttivo);
+    const candidatiX = [0, 50, 100, ...altri.flatMap((p) => [p.x, p.x + p.larghezza / 2, p.x + p.larghezza])];
+    const candidatiY = [0, 50, 100, ...altri.flatMap((p) => [p.y, p.y + p.altezza / 2, p.y + p.altezza])];
+
+    // In "sposta" controlliamo i 3 bordi/centro orizzontali e verticali
+    // dell'elemento; in "ridimensiona" solo il bordo che si sta
+    // davvero muovendo (destro/basso), gli altri restano fermi.
+    const puntiXPropri = modo === 'sposta'
+      ? [pos.x, pos.x + pos.larghezza / 2, pos.x + pos.larghezza]
+      : [pos.x + pos.larghezza];
+    const puntiYPropri = modo === 'sposta'
+      ? [pos.y, pos.y + pos.altezza / 2, pos.y + pos.altezza]
+      : [pos.y + pos.altezza];
+
+    let correzioneX = 0;
+    let correzioneY = 0;
+    const guideV: number[] = [];
+    const guideH: number[] = [];
+
+    for (const valore of puntiXPropri) {
+      let migliore: number | null = null;
+      for (const c of candidatiX) if (Math.abs(valore - c) < SOGLIA_AGGANCIO && (migliore === null || Math.abs(valore - c) < Math.abs(valore - migliore))) migliore = c;
+      if (migliore !== null) { correzioneX = migliore - valore; guideV.push(migliore); break; } // un solo aggancio orizzontale alla volta, il primo trovato
+    }
+    for (const valore of puntiYPropri) {
+      let migliore: number | null = null;
+      for (const c of candidatiY) if (Math.abs(valore - c) < SOGLIA_AGGANCIO && (migliore === null || Math.abs(valore - c) < Math.abs(valore - migliore))) migliore = c;
+      if (migliore !== null) { correzioneY = migliore - valore; guideH.push(migliore); break; }
+    }
+
+    return { correzioneX, correzioneY, guideV, guideH };
+  }
+
   function duranteTrascinamento(e: MouseEvent) {
     const t = trascinamento.current;
     if (!t || !canvasRef.current) return;
@@ -227,15 +287,22 @@ export function LayoutBigliettoScreen() {
     if (t.modo === 'sposta') {
       const nuovaX = Math.max(0, Math.min(100 - t.posizioneIniziale.larghezza, t.posizioneIniziale.x + deltaXPercento));
       const nuovaY = Math.max(0, Math.min(100 - t.posizioneIniziale.altezza, t.posizioneIniziale.y + deltaYPercento));
-      aggiornaPosizione(t.id, { x: nuovaX, y: nuovaY });
+      const bozza = { x: nuovaX, y: nuovaY, larghezza: t.posizioneIniziale.larghezza, altezza: t.posizioneIniziale.altezza };
+      const { correzioneX, correzioneY, guideV, guideH } = calcolaAggancio(t.id, bozza, 'sposta');
+      setGuideAttive({ verticali: guideV, orizzontali: guideH });
+      aggiornaPosizione(t.id, { x: nuovaX + correzioneX, y: nuovaY + correzioneY });
     } else {
       const nuovaLarghezza = Math.max(6, Math.min(100 - t.posizioneIniziale.x, t.posizioneIniziale.larghezza + deltaXPercento));
       const nuovaAltezza = Math.max(4, Math.min(100 - t.posizioneIniziale.y, t.posizioneIniziale.altezza + deltaYPercento));
-      aggiornaPosizione(t.id, { larghezza: nuovaLarghezza, altezza: nuovaAltezza });
+      const bozza = { x: t.posizioneIniziale.x, y: t.posizioneIniziale.y, larghezza: nuovaLarghezza, altezza: nuovaAltezza };
+      const { correzioneX, correzioneY, guideV, guideH } = calcolaAggancio(t.id, bozza, 'ridimensiona');
+      setGuideAttive({ verticali: guideV, orizzontali: guideH });
+      aggiornaPosizione(t.id, { larghezza: nuovaLarghezza + correzioneX, altezza: nuovaAltezza + correzioneY });
     }
   }
   function fineTrascinamento() {
     trascinamento.current = null;
+    setGuideAttive({ verticali: [], orizzontali: [] });
     window.removeEventListener('mousemove', duranteTrascinamento);
     window.removeEventListener('mouseup', fineTrascinamento);
   }
@@ -251,7 +318,7 @@ export function LayoutBigliettoScreen() {
     <div>
       <PanelHead titolo="Layout biglietto" azione={<button type="button" className="btn btn-primary" onClick={nuovo}>+ Nuovo layout</button>} />
       <p className="testo-intro" style={{ marginBottom: 16 }}>
-        Trascina ogni sezione dove vuoi sul biglietto; trascina l'angolo in basso a destra per ridimensionarla. Ogni evento usa il layout <b>predefinito</b> a meno che, dalla sua scheda, tu non ne scelga uno diverso.
+        Trascina ogni sezione dove vuoi sul biglietto; trascina l'angolo in basso a destra per ridimensionarla — mentre trascini, delle linee rosa ti avvisano quando ti allinei con un altro elemento o con centro/bordi della pagina, e ci si "aggancia" da sole per allineamenti sempre precisi. Ogni evento usa il layout <b>predefinito</b> a meno che, dalla sua scheda, tu non ne scelga uno diverso.
       </p>
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -272,6 +339,17 @@ export function LayoutBigliettoScreen() {
         {(selezionato || nome) && (
           <>
             <div style={{ flex: '0 0 auto', position: 'sticky', top: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                <button
+                  type="button"
+                  className={`btn btn-ghost${mostraGriglia ? ' active' : ''}`}
+                  style={{ fontSize: 12 }}
+                  onClick={() => setMostraGriglia((v) => !v)}
+                  title="Mostra/nascondi la griglia di riferimento sul canvas"
+                >
+                  ⊞ Griglia {mostraGriglia ? 'attiva' : 'disattivata'}
+                </button>
+              </div>
               <div
                 ref={canvasRef}
                 onMouseDown={() => setAttivoId(null)}
@@ -281,6 +359,29 @@ export function LayoutBigliettoScreen() {
                   border: '1px solid var(--line)', borderRadius: 4, overflow: 'hidden', boxShadow: '0 10px 30px -10px rgba(0,0,0,.4)',
                 }}
               >
+                {/* Griglia di riferimento — solo visiva, mai stampata sul
+                    biglietto vero, serve solo per valutare a colpo
+                    d'occhio spazi e margini mentre componi il layout. */}
+                {mostraGriglia && (
+                  <div style={{
+                    position: 'absolute', inset: 0, pointerEvents: 'none',
+                    backgroundImage:
+                      'linear-gradient(to right, rgba(0,0,0,.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,.08) 1px, transparent 1px)',
+                    backgroundSize: '10% 10%',
+                  }} />
+                )}
+                {/* Linee guida "intelligenti" — appaiono solo mentre si
+                    trascina/ridimensiona un elemento, quando si allinea
+                    con un altro elemento o con centro/bordi pagina. Zindex
+                    alto apposta: devono sempre stare sopra agli elementi,
+                    a differenza della griglia sopra (che invece deve
+                    restare sotto, sfrutta solo l'ordine naturale nel DOM). */}
+                {guideAttive.verticali.map((x, i) => (
+                  <div key={`v${i}`} style={{ position: 'absolute', left: `${x}%`, top: 0, bottom: 0, width: 1, background: 'var(--pink)', zIndex: 50, pointerEvents: 'none' }} />
+                ))}
+                {guideAttive.orizzontali.map((y, i) => (
+                  <div key={`h${i}`} style={{ position: 'absolute', top: `${y}%`, left: 0, right: 0, height: 1, background: 'var(--pink)', zIndex: 50, pointerEvents: 'none' }} />
+                ))}
                 {/* Sfumatura — anteprima approssimata via gradiente CSS, il PDF vero usa la stessa direzione/colore/raggio con la formula esatta di PDFKit */}
                 {config.sfumatura.attiva && (
                   <div style={{
