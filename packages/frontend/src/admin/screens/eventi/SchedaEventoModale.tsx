@@ -312,9 +312,29 @@ export function SchedaEventoModale({
     }
   }
 
-  function rimuoviTragitto(idxTragitto: number) {
+  async function rimuoviTragitto(idxTragitto: number) {
     const tuttiTragitti = form.tragitti ?? [];
     const tragittoRimosso = tuttiTragitti[idxTragitto];
+
+    // Un tragitto già salvato (ha un id vero) potrebbe avere
+    // prenotazioni confermate — controllo subito, al click, invece di
+    // farlo scoprire solo al salvataggio: stesso identico controllo
+    // che il server rifarebbe comunque da solo più avanti, qui solo
+    // anticipato per un riscontro immediato. Una riga appena aggiunta
+    // (senza id, mai salvata) non può averne, si salta il controllo.
+    if (tragittoRimosso?.id) {
+      try {
+        const { haPrenotazioni, quante } = await eventiApi.tragittoHaPrenotazioniConfermate(tragittoRimosso.id);
+        if (haPrenotazioni) {
+          alert(`Questo tragitto ha ${quante} prenotazion${quante > 1 ? 'i' : 'e'} confermat${quante > 1 ? 'e' : 'a'} — non può essere rimosso. Annulla o sposta quelle prenotazioni prima di rimuoverlo.`);
+          return;
+        }
+      } catch {
+        alert('Impossibile verificare le prenotazioni di questo tragitto — controlla la connessione e riprova.');
+        return;
+      }
+    }
+
     const nuoviTragitti = tuttiTragitti.filter((_, i) => i !== idxTragitto);
 
     // Un servizio non si elimina più con un pulsante a parte — si
@@ -1024,51 +1044,54 @@ export function SchedaEventoModale({
           {espansa && (
           <>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-end' }}>
-            <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} style={{ flex: 1 }} />
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, color: 'var(--mist)', flexShrink: 0 }}>
-              Posti
-              <CampoNumero value={tragitto.postiTotali} onChange={(v) => aggiornaTragitto(idxTragitto, 'postiTotali', v ?? 0)} style={{ width: 80 }} />
-            </label>
+            <div className="fermata-editor-campo" style={{ flex: 1 }}>
+              <label>Nome tragitto</label>
+              <input placeholder="es. Bologna — Modena — Parma" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} />
+            </div>
+            <div className="fermata-editor-campo" style={{ flexShrink: 0, width: 90 }}>
+              <label>Posti bus</label>
+              <CampoNumero value={tragitto.postiTotali} onChange={(v) => aggiornaTragitto(idxTragitto, 'postiTotali', v ?? 0)} />
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
-            <input
-              placeholder="es. +10 o -5"
-              type="number"
-              style={{ maxWidth: 130 }}
-              value={aggiustiPerTragitto[idxTragitto] ?? ''}
-              onChange={(e) => setAggiustiPerTratta((s) => ({ ...s, [idxTragitto]: e.target.value }))}
-            />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 14, flexWrap: 'wrap' }}>
+            <div className="fermata-editor-campo" style={{ width: 130 }}>
+              <label>Aggiusta € a tutte</label>
+              <input
+                placeholder="es. +10 o -5"
+                type="number"
+                value={aggiustiPerTragitto[idxTragitto] ?? ''}
+                onChange={(e) => setAggiustiPerTratta((s) => ({ ...s, [idxTragitto]: e.target.value }))}
+              />
+            </div>
             <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiustaPrezziTragitto(idxTragitto)}>
-              Applica € a tutte le fermate
+              Applica alle fermate
             </button>
             <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => ricalcolaOrariTragitto(idxTragitto)} disabled={ricalcolando[idxTragitto]}>
               {ricalcolando[idxTragitto] ? 'Calcolo orari...' : '↻ Calcola orari dall\'arrivo'}
             </button>
           </div>
-          {statoRicalcolo[idxTragitto] && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoRicalcolo[idxTragitto]}</p>}
+          {statoRicalcolo[idxTragitto] && <p className="testo-intro" style={{ fontSize: 12, marginTop: -8, marginBottom: 10 }}>{statoRicalcolo[idxTragitto]}</p>}
 
-          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla. Ognuna ha un prezzo — l'arrivo si imposta qui sopra, separatamente.</p>
+          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 8 }}>Trascina una fermata per riordinarla.</p>
           {tragitto.fermate.map((f, idxFermata) => (
-            <div key={idxFermata} style={{ marginBottom: 6 }}>
-              <div
-                draggable
-                onDragStart={() => onDragStart(idxTragitto, idxFermata)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => onDropSu(idxTragitto, idxFermata)}
-                style={{
-                  display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr .55fr .55fr .55fr auto', gap: 6, alignItems: 'center',
-                  opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
-                }}
-              >
-                <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
+            <div
+              key={idxFermata}
+              className={`fermata-editor${trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? ' in-trascinamento' : ''}`}
+              draggable
+              onDragStart={() => onDragStart(idxTragitto, idxFermata)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => onDropSu(idxTragitto, idxFermata)}
+            >
+              <div className="fermata-editor-riga1">
+                <span className="fermata-editor-maniglia" title="Trascina per riordinare">⠿</span>
                 {f.fermataAnagraficaId !== null ? (
                   // Di default (e finché non si sceglie "scrivi
                   // manualmente") si parte da qui — un elenco leggibile,
                   // non un'iconcina minuscola. Città/indirizzo arrivano
                   // dall'anagrafica quando si sceglie una voce vera.
                   <select
-                    style={{ gridColumn: 'span 2' }}
+                    className="fermata-editor-selettore"
                     value={f.fermataAnagraficaId ?? ''}
                     onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
                   >
@@ -1079,30 +1102,19 @@ export function SchedaEventoModale({
                     <option value="__manuale__">✎ Scrivi manualmente, senza anagrafica...</option>
                   </select>
                 ) : (
-                  <>
+                  <div className="fermata-editor-manuale">
                     <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
                     <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)} />
-                  </>
+                  </div>
                 )}
-                <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'orario', v)} />
-                <CampoNumero
-                  valuta placeholder="Prezzo"
-                  value={f.prezzo}
-                  onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'prezzo', v !== undefined ? String(v) : '')}
-                />
-                <CampoNumero
-                  placeholder="Posti max"
-                  title="Facoltativo: limite posti solo per questa fermata. Se vuoto, condivide i posti di tutto il bus."
-                  value={f.postiMax ?? undefined}
-                  onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'postiMax', v !== undefined ? String(v) : '')}
-                />
-                <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
+                <button type="button" className="fermata-editor-rimuovi" onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
               </div>
+
               {f.fermataAnagraficaId === null && fermateAnagrafica.length > 0 && (
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  style={{ fontSize: 11, marginLeft: 22, marginTop: 2, padding: 0 }}
+                  style={{ fontSize: 11, marginBottom: 8, padding: 0 }}
                   onClick={() => setForm((prev) => {
                     const tragitti = [...(prev.tragitti ?? [])];
                     const fermate = [...tragitti[idxTragitto].fermate];
@@ -1114,6 +1126,30 @@ export function SchedaEventoModale({
                   ← Torna a scegliere dall'anagrafica
                 </button>
               )}
+
+              <div className="fermata-editor-campi">
+                <div className="fermata-editor-campo">
+                  <label>Orario</label>
+                  <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'orario', v)} />
+                </div>
+                <div className="fermata-editor-campo">
+                  <label>Prezzo (€)</label>
+                  <CampoNumero
+                    valuta placeholder="es. 30"
+                    value={f.prezzo}
+                    onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'prezzo', v !== undefined ? String(v) : '')}
+                  />
+                </div>
+                <div className="fermata-editor-campo">
+                  <label>Posti max</label>
+                  <CampoNumero
+                    placeholder="facolt."
+                    title="Facoltativo: limite posti solo per questa fermata. Se vuoto, condivide i posti di tutto il bus."
+                    value={f.postiMax ?? undefined}
+                    onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'postiMax', v !== undefined ? String(v) : '')}
+                  />
+                </div>
+              </div>
             </div>
           ))}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>

@@ -88,6 +88,7 @@ export const eventiApi = {
   allertePartenze: () => api.get<{ conteggio: number }>('/api/eventi/allerte-partenze'),
   allertePartenzePerEvento: () => api.get<Record<string, number>>('/api/eventi/allerte-partenze-per-evento'),
   statistichePerEvento: () => api.get<Record<string, { partecipanti: number; busCensiti: number }>>('/api/eventi/statistiche-per-evento'),
+  tragittoHaPrenotazioniConfermate: (tragittoId: string) => api.get<{ haPrenotazioni: boolean; quante: number }>(`/api/eventi/tragitti/${tragittoId}/prenotazioni-confermate`),
   cestino: {
     eventi: () => api.get<(Evento & { eliminatoIl: string })[]>('/api/eventi/cestino/eventi'),
     ripristinaEvento: (id: string) => api.post<{ ok: true }>(`/api/eventi/cestino/eventi/${id}/ripristina`),

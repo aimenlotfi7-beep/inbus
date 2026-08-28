@@ -14,6 +14,7 @@ eventiRouter.get('/', valida(listaEventiQuerySchema, 'query'), asyncHandler(even
 eventiRouter.get('/allerte-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenze));
 eventiRouter.get('/allerte-partenze-per-evento', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenzePerEvento));
 eventiRouter.get('/statistiche-per-evento', richiedeAuth, richiedePermesso('eventi.visualizza'), asyncHandler(eventiController.statistichePerEvento));
+eventiRouter.get('/tragitti/:tragittoId/prenotazioni-confermate', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.tragittoHaPrenotazioniConfermate));
 // Cestino — stesso motivo, prima di GET '/:id'.
 eventiRouter.get('/cestino/eventi', richiedeAuth, richiedePermesso('eventi.cestino'), asyncHandler(eventiController.eventiEliminati));
 eventiRouter.post('/cestino/eventi/:id/ripristina', richiedeAuth, richiedePermesso('eventi.cestino'), asyncHandler(eventiController.ripristinaEvento));

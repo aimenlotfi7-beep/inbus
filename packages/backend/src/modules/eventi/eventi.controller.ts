@@ -106,4 +106,7 @@ export const eventiController = {
   async statistichePerEvento(_req: Request, res: Response) {
     res.json(await eventiService.statistichePerEvento());
   },
+  async tragittoHaPrenotazioniConfermate(req: Request, res: Response) {
+    res.json(await eventiService.tragittoHaPrenotazioniConfermate(req.params.tragittoId));
+  },
 };

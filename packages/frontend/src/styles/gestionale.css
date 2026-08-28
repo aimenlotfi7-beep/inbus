@@ -578,6 +578,27 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 }
 .maps-btn:hover{border-color:var(--blue-dim);}
 .linea-fermate-add{margin-top:9px; font-size:11.5px !important; padding:6px 12px !important;}
+
+/* Editor fermata dentro un tragitto (SchedaEventoModale) — stesso
+   aspetto identico sia che la fermata sia scelta dall'anagrafica sia
+   che sia scritta a mano (prima due grafiche diverse, ora una sola):
+   un contenitore con bordo, la scelta città/indirizzo in cima, e sotto
+   una riga con etichette chiare per orario/prezzo/posti — invece di
+   una griglia stretta di soli placeholder facili da confondere. */
+.fermata-editor{
+  background:var(--dusk); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px;
+}
+.fermata-editor.in-trascinamento{opacity:.4;}
+.fermata-editor-riga1{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+.fermata-editor-maniglia{color:var(--mist); font-size:14px; cursor:grab; flex-shrink:0;}
+.fermata-editor-selettore{flex:1; min-width:0;}
+.fermata-editor-manuale{flex:1; display:flex; gap:6px; min-width:0;}
+.fermata-editor-manuale input{flex:1; min-width:0;}
+.fermata-editor-rimuovi{flex-shrink:0; color:var(--pink); background:none; border:none; cursor:pointer; padding:4px 6px; font-size:13px;}
+.fermata-editor-campi{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;}
+.fermata-editor-campo{display:flex; flex-direction:column; gap:4px;}
+.fermata-editor-campo label{font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--mist); font-weight:600;}
+@media (max-width:700px){ .fermata-editor-campi{grid-template-columns:1fr 1fr;} }
 @media (max-width:900px){
   .linea-riga{grid-template-columns:1fr 1fr;}
   .fermata-riga{grid-template-columns:1fr 1fr;}

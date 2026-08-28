@@ -841,6 +841,18 @@ export const eventiService = {
   /** Due numeri rapidi per ogni evento — quanti passeggeri confermati e
    *  quanti bus fisici sono stati censiti — usati dal Calendario per
    *  dare un colpo d'occhio senza dover aprire ogni evento. */
+  /** Un tragitto ha prenotazioni confermate? Usata per avvisare subito
+   *  al click su "Rimuovi tragitto", prima ancora di tentare il
+   *  salvataggio — lo stesso identico controllo che il salvataggio fa
+   *  comunque da solo (vedi sincronizzaTragitti), qui solo anticipato
+   *  per dare un riscontro immediato invece di scoprirlo dopo. */
+  async tragittoHaPrenotazioniConfermate(tragittoId: string): Promise<{ haPrenotazioni: boolean; quante: number }> {
+    const righe = await db.select({ passeggeri: prenotazioni.passeggeri }).from(prenotazioni)
+      .where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA')));
+    const quante = righe.reduce((somma, r) => somma + r.passeggeri, 0);
+    return { haPrenotazioni: quante > 0, quante };
+  },
+
   async statistichePerEvento(): Promise<Record<string, { partecipanti: number; busCensiti: number }>> {
     const righeTragitti = await db.select({ tragittoId: tragitti.id, eventoId: tragitti.eventoId }).from(tragitti);
     const mappaEventoDiTragitto = new Map(righeTragitti.map((r) => [r.tragittoId, r.eventoId]));
