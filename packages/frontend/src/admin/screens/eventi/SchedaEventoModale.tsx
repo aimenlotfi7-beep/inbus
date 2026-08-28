@@ -179,29 +179,32 @@ export function SchedaEventoModale({
     categorieEventoApi.list().then(setCategorieEvento);
   }
 
-  useEffect(() => {
-    percorsiSalvatiApi.list().then(setPercorsiSalvati).catch((e) => console.error('Percorsi salvati non caricati:', e));
-    fermateAnagraficaApi.list().then(setFermateAnagrafica).catch((e) => console.error('Anagrafica fermate non caricata:', e));
-    layoutBigliettoApi.list().then(setLayoutDisponibili).catch(() => setLayoutDisponibili([]));
-    ricaricaCategorie();
-    ricaricaCategorieEvento();
+  // Estratta in una funzione a sé (non solo dentro l'useEffect) — serve
+  // anche altrove: se un salvataggio fallisce perché nel frattempo
+  // qualcosa sul server è cambiato (es. un tragitto che si voleva
+  // togliere ha in realtà prenotazioni confermate, il server rifiuta
+  // e non tocca nulla), il modulo locale resta comunque "sfasato" con
+  // quel tragitto già tolto qui ma mai davvero eliminato là — bisogna
+  // ricaricare i dati veri per rimetterli allineati, altrimenti sembra
+  // sparito anche se sul server è ancora perfettamente intatto.
+  function caricaDaEvento(sorgente: Evento | null) {
     let nuovoForm: EventoInput;
-    if (evento) {
+    if (sorgente) {
       nuovoForm = {
-        artista: evento.artista, genere: evento.genere, categoria: evento.categoria, luogo: evento.luogo, citta: evento.citta,
-        data: evento.data.slice(0, 10), inEvidenza: evento.inEvidenza,
-        slug: evento.slug,
-        accontoEur: evento.accontoEur ? Number(evento.accontoEur) : 10,
-        statoDisponibilita: evento.statoDisponibilita,
-        arrivoIndirizzo: evento.arrivoIndirizzo ?? undefined,
-        arrivoOrario: evento.arrivoOrario ?? undefined,
-        visibileSito: evento.visibileSito,
-        descrizione: evento.descrizione ?? undefined,
-        descrizioneSeo: evento.descrizioneSeo ?? undefined,
-        ticketColoreAccento: evento.ticketColoreAccento ?? undefined,
-        ticketImmagineSfondoUrl: evento.ticketImmagineSfondoUrl ?? undefined,
-        layoutBigliettoId: evento.layoutBigliettoId,
-        immagini: [...evento.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
+        artista: sorgente.artista, genere: sorgente.genere, categoria: sorgente.categoria, luogo: sorgente.luogo, citta: sorgente.citta,
+        data: sorgente.data.slice(0, 10), inEvidenza: sorgente.inEvidenza,
+        slug: sorgente.slug,
+        accontoEur: sorgente.accontoEur ? Number(sorgente.accontoEur) : 10,
+        statoDisponibilita: sorgente.statoDisponibilita,
+        arrivoIndirizzo: sorgente.arrivoIndirizzo ?? undefined,
+        arrivoOrario: sorgente.arrivoOrario ?? undefined,
+        visibileSito: sorgente.visibileSito,
+        descrizione: sorgente.descrizione ?? undefined,
+        descrizioneSeo: sorgente.descrizioneSeo ?? undefined,
+        ticketColoreAccento: sorgente.ticketColoreAccento ?? undefined,
+        ticketImmagineSfondoUrl: sorgente.ticketImmagineSfondoUrl ?? undefined,
+        layoutBigliettoId: sorgente.layoutBigliettoId,
+        immagini: [...sorgente.immagini].sort((a, b) => a.ordine - b.ordine).map((i) => i.url),
         // "form.tragitti" è un unico elenco piatto — sia i tragitti
         // "liberi" (senza servizio) sia quelli di ogni servizio, distinti
         // solo dal campo servizioId su ognuno (è così che il resto del
@@ -211,7 +214,7 @@ export function SchedaEventoModale({
         // il form restava vuoto — sparivano dalla vista in modifica pur
         // restando intatti sul server (il sito li vede/vende comunque,
         // legge direttamente da lì). Ora si combinano entrambe le fonti.
-        tragitti: [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((l) => ({
+        tragitti: [...sorgente.tragitti, ...sorgente.servizi.flatMap((s) => s.tragitti)].map((l) => ({
           id: l.id,
           servizioId: l.servizioId,
           nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra), attivo: l.attivo,
@@ -227,13 +230,22 @@ export function SchedaEventoModale({
       setStep(1);
     }
     setForm(nuovoForm);
-    const serviziCaricati = (evento?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoIndirizzo: p.arrivoIndirizzo ?? undefined, arrivoOrario: p.arrivoOrario ?? undefined }));
+    const serviziCaricati = (sorgente?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoIndirizzo: p.arrivoIndirizzo ?? undefined, arrivoOrario: p.arrivoOrario ?? undefined }));
     setServizi(serviziCaricati);
     setModalitaServizi(
       serviziCaricati.length >= 1 ? 'multiplo' : ((nuovoForm.tragitti ?? []).some((t) => !t.servizioId) ? 'singolo' : null)
     );
     setServizioTabAttivo(serviziCaricati[0]?.key ?? null);
     setFormIniziale(JSON.stringify(nuovoForm));
+  }
+
+  useEffect(() => {
+    percorsiSalvatiApi.list().then(setPercorsiSalvati).catch((e) => console.error('Percorsi salvati non caricati:', e));
+    fermateAnagraficaApi.list().then(setFermateAnagrafica).catch((e) => console.error('Anagrafica fermate non caricata:', e));
+    layoutBigliettoApi.list().then(setLayoutDisponibili).catch(() => setLayoutDisponibili([]));
+    ricaricaCategorie();
+    ricaricaCategorieEvento();
+    caricaDaEvento(evento ?? null);
     setAggiustiPerTratta({});
     setStatoRicalcolo({});
     setTabAttiva(tabIniziale);
@@ -634,6 +646,20 @@ export function SchedaEventoModale({
       onClose();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server. Controlla che il backend sia acceso.');
+      // Il salvataggio è fallito — sul server non è cambiato nulla,
+      // ma qui in modulo potevano già esserci modifiche locali (es.
+      // un tragitto tolto perché si voleva eliminare, poi rifiutato
+      // dal server perché ha prenotazioni confermate): senza
+      // ricaricare i dati veri, sembrerebbe sparito anche se è ancora
+      // perfettamente intatto sul server. Solo per un evento già
+      // esistente — per uno nuovo, non salvato ancora, non c'è nessun
+      // dato "vero" da recuperare.
+      if (evento) {
+        try {
+          const fresco = await eventiApi.getById(evento.id);
+          caricaDaEvento(fresco);
+        } catch { /* se anche il ricaricamento fallisce, il modulo resta com'è — meglio di niente */ }
+      }
     }
   }
 
