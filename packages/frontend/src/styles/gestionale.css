@@ -58,6 +58,13 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="
   background:var(--dusk); border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 14px;
 }
 input[type="checkbox"], input[type="radio"], input[type="color"], input[type="range"]{ min-width:0; box-sizing:border-box; }
+/* Due campi "Cerca" (SelettoreEventi, ListaAttesaTab) restavano senza
+   nessuno stile dedicato anche prima di oggi — presi per errore dalla
+   nuova regola universale qui sopra. Ripristinati esattamente com'erano:
+   nessun bordo/sfondo/raggio impostato da qui, solo il minimo indispensabile. */
+.campo-cerca-originale{
+  background:initial; border:initial; border-radius:0; padding:initial;
+}
 /* Rete di sicurezza: qualunque select nel gestionale che non rientri
    in una classe più specifica (.campo, .form-grid, ecc) prende almeno
    questo aspetto di base — mai il menu a tendina bianco nativo del
@@ -357,7 +364,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 /* ---------- MODAL WIDE (partecipanti) ---------- */
 .modal-wide{max-width:920px;}
 #partecipantiCerca, #pagamentiCerca, #pagamentiFiltroEvento{
-  background:var(--night); border:1px solid var(--line); border-radius:var(--input-radius); padding:10px 13px; color:var(--paper); font-size:13px; min-width:220px;
+  background:var(--night); border:1px solid var(--line); border-radius:8px; padding:9px 12px; color:var(--paper); font-size:13px; min-width:220px;
 }
 
 /* ---------- CODICE + AZIONE (promoter/coupon link) ---------- */

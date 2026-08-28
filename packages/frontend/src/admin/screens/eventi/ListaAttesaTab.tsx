@@ -184,6 +184,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
           <input
             type="text"
             placeholder="Cerca per nome o email..."
+            className="campo-cerca-originale"
             value={ricerca}
             onChange={(e) => setRicerca(e.target.value)}
             style={{ maxWidth: 260 }}

@@ -39,6 +39,7 @@ export function SelettoreEventi({ selezionati, onChange }: { selezionati: string
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: espanso ? 8 : 0 }}>
         <input
           placeholder="Cerca evento da associare..."
+          className="campo-cerca-originale"
           value={ricerca}
           onChange={(e) => { setRicerca(e.target.value); if (!espanso) setEspanso(true); }}
           style={{ flex: 1 }}
