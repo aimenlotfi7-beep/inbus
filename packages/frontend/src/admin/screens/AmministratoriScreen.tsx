@@ -186,7 +186,7 @@ export function AmministratoriScreen() {
     <div>
       <PanelHead titolo="Amministratori" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo amministratore</button>} />
       <div style={{ maxWidth: 480, marginBottom: 20 }}>
-        <CampoCopiabile etichetta="Link di accesso al gestionale (per tutti, inclusi i Collaboratori)" valore={`${window.location.origin}/admin.html`} />
+        <CampoCopiabile etichetta="Link di accesso al gestionale (per tutti, inclusi i Collaboratori)" valore={`${window.location.origin}/admin.html`} link />
       </div>
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o ruolo..." />
       <TabellaGenerica

@@ -124,7 +124,7 @@ export function TourLeaderScreen() {
         Modulo pubblico: <code style={{ color: 'var(--paper)' }}>{linkCandidatura}</code>
       </p>
       <div style={{ maxWidth: 480, marginBottom: 20 }}>
-        <CampoCopiabile etichetta="Link di accesso per i tour leader già censiti" valore={`${window.location.origin}/scansione/accedi`} />
+        <CampoCopiabile etichetta="Link di accesso per i tour leader già censiti" valore={`${window.location.origin}/scansione/accedi`} link />
       </div>
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o città..." />
       <TabellaGenerica
@@ -161,7 +161,7 @@ export function TourLeaderScreen() {
             Comunicale tu stesso (via messaggio/email) — non verranno mostrate di nuovo: solo di generarne di nuove,
             se le perdi.
           </p>
-          <CampoCopiabile etichetta="Pagina di accesso" valore={`${window.location.origin}/scansione/accedi`} />
+          <CampoCopiabile etichetta="Pagina di accesso" valore={`${window.location.origin}/scansione/accedi`} link />
           <CampoCopiabile etichetta="Email" valore={credenzialiGenerate.email} />
           <CampoCopiabile etichetta="Password" valore={credenzialiGenerate.password} />
         </Modale>

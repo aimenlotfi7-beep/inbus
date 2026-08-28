@@ -72,7 +72,7 @@ export function PromoterScreen() {
     <div>
       <PanelHead titolo="Promoter" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo promoter</button>} />
       <div style={{ maxWidth: 480, marginBottom: 20 }}>
-        <CampoCopiabile etichetta="Link di accesso per i promoter" valore={`${window.location.origin}/promoter`} />
+        <CampoCopiabile etichetta="Link di accesso per i promoter" valore={`${window.location.origin}/promoter`} link />
       </div>
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o codice..." />
       <TabellaGenerica

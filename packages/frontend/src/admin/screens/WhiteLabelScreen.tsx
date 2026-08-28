@@ -37,7 +37,7 @@ export function WhiteLabelScreen() {
     return (
       <PaginaSezione titolo={`White Label — ${whiteLabelAttiva.organizzatoreNome} · ${whiteLabelAttiva.eventoArtista}`} onIndietro={() => { ricarica(); setVista('lista'); }}>
         <div style={{ maxWidth: 480, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <CampoCopiabile etichetta="Link diretto" valore={`${window.location.origin}/w/${whiteLabelAttiva.publicWidgetId}`} />
+          <CampoCopiabile etichetta="Link diretto" valore={`${window.location.origin}/w/${whiteLabelAttiva.publicWidgetId}`} link />
           <CampoCopiabile
             etichetta="Codice embed"
             valore={`<div id="inbus-widget"></div>\n<script src="${window.location.origin}/embed.js" data-inbus-widget="${whiteLabelAttiva.publicWidgetId}"></script>`}

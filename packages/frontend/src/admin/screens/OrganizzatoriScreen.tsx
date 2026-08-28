@@ -71,7 +71,7 @@ export function OrganizzatoriScreen() {
     <div>
       <PanelHead titolo="Organizzatori" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo organizzatore</button>} />
       <div style={{ maxWidth: 480, marginBottom: 20 }}>
-        <CampoCopiabile etichetta="Link di accesso per gli organizzatori" valore={`${window.location.origin}/organizzatore`} />
+        <CampoCopiabile etichetta="Link di accesso per gli organizzatori" valore={`${window.location.origin}/organizzatore`} link />
       </div>
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome o email..." />
       <TabellaGenerica
