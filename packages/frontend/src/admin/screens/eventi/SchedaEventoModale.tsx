@@ -329,7 +329,12 @@ export function SchedaEventoModale({
       postiTotali: 50,
       prezzoExtra: 0,
       servizioId: servizioIdContestoAttuale(),
-      fermate: percorso.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined })),
+      // fermataAnagraficaId: null (non lasciato indefinito) — così la
+      // riga mostra subito città/indirizzo già compilati dal percorso,
+      // invece del menu a tendina vuoto pensato per una riga nuova
+      // ancora da scegliere (quello si attiva solo quando è
+      // indefinito, vedi il rendering della riga fermata più sotto).
+      fermate: percorso.fermate.map((f) => ({ fermataAnagraficaId: null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined })),
     };
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
     setForm({ ...form, tragitti: [...(form.tragitti ?? []), nuovoTragitto] });
