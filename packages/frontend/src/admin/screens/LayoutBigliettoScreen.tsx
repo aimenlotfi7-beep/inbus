@@ -93,6 +93,22 @@ const RAPPORTO_A5 = 420 / 595;
 const LARGHEZZA_CANVAS = 380;
 const ALTEZZA_CANVAS = LARGHEZZA_CANVAS / RAPPORTO_A5;
 
+/** Le 4 maniglie d'angolo di un elemento selezionato — ognuna avvia il
+ *  ridimensionamento dal proprio angolo (l'angolo opposto resta fermo
+ *  come "perno"), per un ridimensionamento libero in ogni direzione
+ *  invece che solo dal basso a destra. */
+function ManigliaAngoli({ colore, onInizia }: { colore: string; onInizia: (e: React.MouseEvent, angolo: 'nw' | 'ne' | 'sw' | 'se') => void }) {
+  const stileBase: React.CSSProperties = { position: 'absolute', width: 12, height: 12, borderRadius: '50%', background: colore, border: '2px solid #fff' };
+  return (
+    <>
+      <div onMouseDown={(e) => onInizia(e, 'nw')} style={{ ...stileBase, left: -5, top: -5, cursor: 'nwse-resize' }} />
+      <div onMouseDown={(e) => onInizia(e, 'ne')} style={{ ...stileBase, right: -5, top: -5, cursor: 'nesw-resize' }} />
+      <div onMouseDown={(e) => onInizia(e, 'sw')} style={{ ...stileBase, left: -5, bottom: -5, cursor: 'nesw-resize' }} />
+      <div onMouseDown={(e) => onInizia(e, 'se')} style={{ ...stileBase, right: -5, bottom: -5, cursor: 'nwse-resize' }} />
+    </>
+  );
+}
+
 export function LayoutBigliettoScreen() {
   const [lista, setLista] = useState<LayoutBiglietto[]>([]);
   const [caricamento, setCaricamento] = useState(true);
@@ -118,7 +134,7 @@ export function LayoutBigliettoScreen() {
   const [guideAttive, setGuideAttive] = useState<{ verticali: number[]; orizzontali: number[] }>({ verticali: [], orizzontali: [] });
 
   const canvasRef = useRef<HTMLDivElement>(null);
-  const trascinamento = useRef<{ id: string; modo: 'sposta' | 'ridimensiona'; inizioMouseX: number; inizioMouseY: number; posizioneIniziale: Posizione } | null>(null);
+  const trascinamento = useRef<{ id: string; modo: 'sposta' | 'ridimensiona-nw' | 'ridimensiona-ne' | 'ridimensiona-sw' | 'ridimensiona-se'; inizioMouseX: number; inizioMouseY: number; posizioneIniziale: Posizione } | null>(null);
 
   function ricarica() {
     setCaricamento(true);
@@ -219,7 +235,7 @@ export function LayoutBigliettoScreen() {
     setAttivoId(null);
   }
 
-  function iniziaTrascinamento(e: React.MouseEvent, id: string, modo: 'sposta' | 'ridimensiona') {
+  function iniziaTrascinamento(e: React.MouseEvent, id: string, modo: 'sposta' | 'ridimensiona-nw' | 'ridimensiona-ne' | 'ridimensiona-sw' | 'ridimensiona-se') {
     e.preventDefault();
     e.stopPropagation();
     setAttivoId(id);
@@ -243,20 +259,22 @@ export function LayoutBigliettoScreen() {
    *  qualcuno è abbastanza vicino (sotto la soglia), restituisce la
    *  correzione da applicare (l'aggancio vero e proprio) e le
    *  coordinate delle linee guida da disegnare. */
-  function calcolaAggancio(idAttivo: string, pos: Posizione, modo: 'sposta' | 'ridimensiona') {
+  function calcolaAggancio(idAttivo: string, pos: Posizione, modo: 'sposta' | 'ridimensiona-nw' | 'ridimensiona-ne' | 'ridimensiona-sw' | 'ridimensiona-se') {
     const altri = posizioniAltriElementi(idAttivo);
     const candidatiX = [0, 50, 100, ...altri.flatMap((p) => [p.x, p.x + p.larghezza / 2, p.x + p.larghezza])];
     const candidatiY = [0, 50, 100, ...altri.flatMap((p) => [p.y, p.y + p.altezza / 2, p.y + p.altezza])];
 
     // In "sposta" controlliamo i 3 bordi/centro orizzontali e verticali
-    // dell'elemento; in "ridimensiona" solo il bordo che si sta
-    // davvero muovendo (destro/basso), gli altri restano fermi.
+    // dell'elemento; ridimensionando da un angolo, solo il bordo che
+    // quell'angolo sta davvero muovendo (es. dall'angolo in alto a
+    // sinistra si muovono il bordo sinistro e quello superiore, gli
+    // altri due restano fermi).
     const puntiXPropri = modo === 'sposta'
       ? [pos.x, pos.x + pos.larghezza / 2, pos.x + pos.larghezza]
-      : [pos.x + pos.larghezza];
+      : (modo === 'ridimensiona-nw' || modo === 'ridimensiona-sw') ? [pos.x] : [pos.x + pos.larghezza];
     const puntiYPropri = modo === 'sposta'
       ? [pos.y, pos.y + pos.altezza / 2, pos.y + pos.altezza]
-      : [pos.y + pos.altezza];
+      : (modo === 'ridimensiona-nw' || modo === 'ridimensiona-ne') ? [pos.y] : [pos.y + pos.altezza];
 
     let correzioneX = 0;
     let correzioneY = 0;
@@ -292,12 +310,43 @@ export function LayoutBigliettoScreen() {
       setGuideAttive({ verticali: guideV, orizzontali: guideH });
       aggiornaPosizione(t.id, { x: nuovaX + correzioneX, y: nuovaY + correzioneY });
     } else {
-      const nuovaLarghezza = Math.max(6, Math.min(100 - t.posizioneIniziale.x, t.posizioneIniziale.larghezza + deltaXPercento));
-      const nuovaAltezza = Math.max(4, Math.min(100 - t.posizioneIniziale.y, t.posizioneIniziale.altezza + deltaYPercento));
-      const bozza = { x: t.posizioneIniziale.x, y: t.posizioneIniziale.y, larghezza: nuovaLarghezza, altezza: nuovaAltezza };
-      const { correzioneX, correzioneY, guideV, guideH } = calcolaAggancio(t.id, bozza, 'ridimensiona');
+      // I 4 angoli si comportano diversamente: da quello in alto a
+      // sinistra si muovono sia il bordo sinistro che quello
+      // superiore (l'angolo opposto, in basso a destra, resta fermo);
+      // dagli altri 3 angoli, solo i due bordi corrispondenti.
+      const p0 = t.posizioneIniziale;
+      const bordoDestroFisso = p0.x + p0.larghezza;
+      const bordoBassoFisso = p0.y + p0.altezza;
+      const muoveSinistra = t.modo === 'ridimensiona-nw' || t.modo === 'ridimensiona-sw';
+      const muoveAlto = t.modo === 'ridimensiona-nw' || t.modo === 'ridimensiona-ne';
+
+      let nuovaX = p0.x;
+      let nuovaLarghezza = p0.larghezza;
+      if (muoveSinistra) {
+        nuovaX = Math.max(0, Math.min(bordoDestroFisso - 6, p0.x + deltaXPercento));
+        nuovaLarghezza = bordoDestroFisso - nuovaX;
+      } else {
+        nuovaLarghezza = Math.max(6, Math.min(100 - p0.x, p0.larghezza + deltaXPercento));
+      }
+      let nuovaY = p0.y;
+      let nuovaAltezza = p0.altezza;
+      if (muoveAlto) {
+        nuovaY = Math.max(0, Math.min(bordoBassoFisso - 4, p0.y + deltaYPercento));
+        nuovaAltezza = bordoBassoFisso - nuovaY;
+      } else {
+        nuovaAltezza = Math.max(4, Math.min(100 - p0.y, p0.altezza + deltaYPercento));
+      }
+
+      const bozza = { x: nuovaX, y: nuovaY, larghezza: nuovaLarghezza, altezza: nuovaAltezza };
+      const { correzioneX, correzioneY, guideV, guideH } = calcolaAggancio(t.id, bozza, t.modo);
       setGuideAttive({ verticali: guideV, orizzontali: guideH });
-      aggiornaPosizione(t.id, { larghezza: nuovaLarghezza + correzioneX, altezza: nuovaAltezza + correzioneY });
+
+      const xFinale = muoveSinistra ? nuovaX + correzioneX : nuovaX;
+      const larghezzaFinale = muoveSinistra ? bordoDestroFisso - xFinale : nuovaLarghezza + correzioneX;
+      const yFinale = muoveAlto ? nuovaY + correzioneY : nuovaY;
+      const altezzaFinale = muoveAlto ? bordoBassoFisso - yFinale : nuovaAltezza + correzioneY;
+
+      aggiornaPosizione(t.id, { x: xFinale, y: yFinale, larghezza: larghezzaFinale, altezza: altezzaFinale });
     }
   }
   function fineTrascinamento() {
@@ -407,12 +456,7 @@ export function LayoutBigliettoScreen() {
                         cursor: 'move', boxSizing: 'border-box',
                       }}
                     >
-                      {attivo && (
-                        <div
-                          onMouseDown={(e) => iniziaTrascinamento(e, id, 'ridimensiona')}
-                          style={{ position: 'absolute', right: -5, bottom: -5, width: 12, height: 12, borderRadius: '50%', background: 'var(--blue)', border: '2px solid #fff', cursor: 'nwse-resize' }}
-                        />
-                      )}
+                      {attivo && <ManigliaAngoli colore="var(--blue)" onInizia={(e, angolo) => iniziaTrascinamento(e, id, `ridimensiona-${angolo}`)} />}
                     </div>
                   );
                 })}
@@ -434,15 +478,7 @@ export function LayoutBigliettoScreen() {
                       }}
                     >
                       {ETICHETTE_SEZIONI[s]}
-                      {attiva && (
-                        <div
-                          onMouseDown={(e) => iniziaTrascinamento(e, s, 'ridimensiona')}
-                          style={{
-                            position: 'absolute', right: -5, bottom: -5, width: 12, height: 12, borderRadius: '50%',
-                            background: config.coloreAccento, border: '2px solid #fff', cursor: 'nwse-resize',
-                          }}
-                        />
-                      )}
+                      {attiva && <ManigliaAngoli colore={config.coloreAccento} onInizia={(e, angolo) => iniziaTrascinamento(e, s, `ridimensiona-${angolo}`)} />}
                     </div>
                   );
                 })}
