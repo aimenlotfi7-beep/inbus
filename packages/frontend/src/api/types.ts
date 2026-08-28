@@ -1,5 +1,6 @@
 export interface Fermata {
   id: string;
+  fermataAnagraficaId: string | null;
   citta: string;
   indirizzo: string;
   orario: string | null;

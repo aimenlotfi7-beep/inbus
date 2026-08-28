@@ -6,6 +6,9 @@ import { z } from 'zod';
 const prezzoFermataSchema = z.number().positive().nullable().optional().transform((v) => v ?? undefined);
 
 const fermataSchema = z.object({
+  // Da quale voce dell'anagrafica arriva — facoltativo, resta possibile
+  // scrivere una fermata al volo senza passare dall'anagrafica.
+  fermataAnagraficaId: z.string().nullable().optional(),
   citta: z.string().min(1),
   indirizzo: z.string().min(1),
   orario: z.string().optional(),

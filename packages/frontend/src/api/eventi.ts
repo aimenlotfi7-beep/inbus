@@ -2,6 +2,7 @@ import { api } from './client';
 import type { Evento, OpzionePartenza } from './types';
 
 export interface FermataInput {
+  fermataAnagraficaId?: string | null;
   citta: string; indirizzo: string; orario?: string; orarioRitorno?: string; indirizzoRitorno?: string; prezzo?: number; postiMax?: number;
 }
 export interface TragittoInput {

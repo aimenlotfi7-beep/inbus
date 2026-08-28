@@ -9,7 +9,7 @@ export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'partenze'
   | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi'
   | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
-  | 'fornitori' | 'tragitti'
+  | 'fornitori' | 'fermate' | 'tragitti'
   | 'chat' | 'contenuti' | 'comunicazioni'
   | 'amministratori' | 'ruoli' | 'impostazioni' | 'template-email' | 'layout-biglietto' | 'testi-tooltip';
 
@@ -52,6 +52,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   ]},
   { titolo: 'Logistica', voci: [
     { id: 'fornitori', label: 'Fornitori', permesso: 'fornitori.visualizza' },
+    { id: 'fermate', label: 'Fermate', permesso: 'tragitti.visualizza' },
     { id: 'tragitti', label: 'Percorsi salvati', permesso: 'tragitti.visualizza' },
     { id: 'impostazioni', label: 'Impostazioni', permesso: 'impostazioni.gestisci' },
   ]},

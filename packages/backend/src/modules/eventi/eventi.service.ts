@@ -138,6 +138,7 @@ async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction
       tragitto.fermate.map((f, ordine) => ({
         tragittoId: nuovoTragitto.id,
         ordine,
+        fermataAnagraficaId: f.fermataAnagraficaId,
         citta: f.citta,
         indirizzo: f.indirizzo,
         orario: f.orario,
@@ -196,6 +197,7 @@ async function sincronizzaTragitti(tx: Parameters<Parameters<typeof db.transacti
           tragitto.fermate.map((f, ordine) => ({
             tragittoId: giaEsistente.id,
             ordine,
+            fermataAnagraficaId: f.fermataAnagraficaId,
             citta: f.citta,
             indirizzo: f.indirizzo,
             orario: f.orario,

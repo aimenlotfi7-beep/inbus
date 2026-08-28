@@ -237,9 +237,34 @@ export const tragitti = pgTable('tragitti', {
   eliminatoIl: timestamp('eliminato_il'),
 });
 
+// Anagrafica fermate — il luogo fisico, riutilizzabile in quanti
+// tragitti si vuole (Milano Lambrate esiste una volta sola qui,
+// anche se la usi per Vasco, Olly, un festival e una partita).
+// Separata apposta da "fermate" qui sotto (che resta il suo USO
+// specifico in UN tragitto, con orario/prezzo/posti propri) — così
+// modificare l'orario di una fermata in un singolo tragitto non
+// tocca mai il luogo fisico master, e viceversa.
+export const fermateAnagrafica = pgTable('fermate_anagrafica', {
+  id: id(),
+  nome: text('nome').notNull(), // es. "Milano Lambrate" — può differire dalla città (vedi sotto)
+  citta: text('citta').notNull(),
+  indirizzo: text('indirizzo').notNull(),
+  lat: doublePrecision('lat'),
+  lng: doublePrecision('lng'),
+  note: text('note'),
+});
+
 export const fermate = pgTable('fermate', {
   id: id(),
   tragittoId: text('tragitto_id').notNull().references(() => tragitti.id, { onDelete: 'cascade' }),
+  // Da quale voce dell'anagrafica arriva questa fermata — facoltativo:
+  // resta possibile scrivere una fermata "al volo" senza passare
+  // dall'anagrafica (un indirizzo usato una volta sola, che non vale
+  // la pena salvare come luogo riutilizzabile). Se impostato, città/
+  // indirizzo/coordinate qui sotto arrivano da lì al momento della
+  // scelta, ma restano comunque MODIFICABILI qui senza mai riscrivere
+  // l'anagrafica stessa.
+  fermataAnagraficaId: text('fermata_anagrafica_id').references(() => fermateAnagrafica.id),
   ordine: integer('ordine').notNull().default(0),
   citta: text('citta').notNull(),
   indirizzo: text('indirizzo').notNull(),

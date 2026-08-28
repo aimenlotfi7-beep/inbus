@@ -3,6 +3,7 @@ import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
 import { pagineApi } from '../../../api/pagine';
 import { eventiApi, type EventoInput, type TragittoInput, type FermataInput } from '../../../api/eventi';
 import { percorsiSalvatiApi, type PercorsoSalvato } from '../../../api/percorsiSalvati';
+import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../../api/layoutBiglietto';
 import { categorieApi, type Categoria } from '../../../api/categorie';
 import { categorieEventoApi, type CategoriaEvento } from '../../../api/categorieEvento';
@@ -54,6 +55,7 @@ export function SchedaEventoModale({
   onSalvato: () => void;
 }) {
   const [percorsiSalvati, setPercorsiSalvati] = useState<PercorsoSalvato[]>([]);
+  const [fermateAnagrafica, setFermateAnagrafica] = useState<FermataAnagrafica[]>([]);
   const [categorie, setCategorie] = useState<Categoria[]>([]);
   const [layoutDisponibili, setLayoutDisponibili] = useState<LayoutBiglietto[]>([]);
   const [form, setForm] = useState<EventoInput>(VUOTO);
@@ -186,6 +188,7 @@ export function SchedaEventoModale({
 
   useEffect(() => {
     percorsiSalvatiApi.list().then(setPercorsiSalvati).catch((e) => console.error('Percorsi salvati non caricati:', e));
+    fermateAnagraficaApi.list().then(setFermateAnagrafica).catch((e) => console.error('Anagrafica fermate non caricata:', e));
     layoutBigliettoApi.list().then(setLayoutDisponibili).catch(() => setLayoutDisponibili([]));
     ricaricaCategorie();
     ricaricaCategorieEvento();
@@ -223,7 +226,7 @@ export function SchedaEventoModale({
           // non ne aveva uno salvato, arriva `null`, non `undefined` — va
           // convertito subito, altrimenti finirebbe di nuovo a rimbalzare
           // in giro come null fino a far fallire la validazione al salvataggio.
-          fermate: l.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ? Number(f.prezzo) : undefined, postiMax: f.postiMax ?? undefined })),
+          fermate: l.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ? Number(f.prezzo) : undefined, postiMax: f.postiMax ?? undefined })),
         })),
       };
     } else {
@@ -259,6 +262,23 @@ export function SchedaEventoModale({
     const tragitti = [...(form.tragitti ?? [])];
     const fermate = [...tragitti[idxTragitto].fermate];
     fermate[idxFermata] = { ...fermate[idxFermata], [campo]: (campo === 'prezzo' || campo === 'postiMax') ? (Number(valore) || undefined) : valore };
+    tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate };
+    setForm({ ...form, tragitti });
+  }
+  // Scegliendo dall'anagrafica si riempiono insieme città+indirizzo+id
+  // — se invece si sceglie "Scrivi manualmente", si azzera solo l'id,
+  // lasciando i campi liberi da compilare a mano (vedi il rendering
+  // della riga fermata più sotto).
+  function selezionaFermataAnagrafica(idxTragitto: number, idxFermata: number, anagraficaId: string) {
+    const tragitti = [...(form.tragitti ?? [])];
+    const fermate = [...tragitti[idxTragitto].fermate];
+    if (anagraficaId === '__manuale__') {
+      fermate[idxFermata] = { ...fermate[idxFermata], fermataAnagraficaId: null };
+    } else {
+      const trovata = fermateAnagrafica.find((f) => f.id === anagraficaId);
+      if (!trovata) return;
+      fermate[idxFermata] = { ...fermate[idxFermata], fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo };
+    }
     tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate };
     setForm({ ...form, tragitti });
   }
@@ -927,8 +947,38 @@ export function SchedaEventoModale({
               }}
             >
               <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
-              <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
-              <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)} />
+              {f.fermataAnagraficaId ? (
+                // Scelta dall'anagrafica — città/indirizzo arrivano da
+                // lì, mostrati qui solo come promemoria (non editabili
+                // direttamente: per cambiarli davvero si sceglie
+                // un'altra fermata, o si passa a "Scrivi manualmente").
+                <select
+                  style={{ gridColumn: 'span 2' }}
+                  value={f.fermataAnagraficaId}
+                  onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
+                >
+                  {fermateAnagrafica.map((fa) => <option key={fa.id} value={fa.id}>{fa.nome} — {fa.citta}</option>)}
+                  <option value="__manuale__">✎ Scrivi manualmente...</option>
+                </select>
+              ) : (
+                <>
+                  <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)} />
+                    {fermateAnagrafica.length > 0 && (
+                      <select
+                        style={{ width: 32, flexShrink: 0, padding: 0 }}
+                        value=""
+                        title="Scegli dall'anagrafica invece di scrivere a mano"
+                        onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
+                      >
+                        <option value="" disabled>📍</option>
+                        {fermateAnagrafica.map((fa) => <option key={fa.id} value={fa.id}>{fa.nome} — {fa.citta}</option>)}
+                      </select>
+                    )}
+                  </div>
+                </>
+              )}
               <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'orario', v)} />
               <CampoNumero
                 valuta placeholder="Prezzo"
