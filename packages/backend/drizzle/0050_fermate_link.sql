@@ -1,0 +1,1 @@
+ALTER TABLE "fermate_anagrafica" ADD COLUMN "link" text;

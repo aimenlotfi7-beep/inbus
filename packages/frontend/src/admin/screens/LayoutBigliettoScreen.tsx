@@ -590,10 +590,9 @@ export function LayoutBigliettoScreen() {
               )}
 
               <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>QR code</p>
-              <div className="campo">
-                <label>Dimensione (% larghezza pagina)</label>
-                <input type="number" min={10} max={70} value={config.qr.dimensione} onChange={(e) => setConfig({ ...config, qr: { dimensione: Number(e.target.value) || 33 } })} />
-              </div>
+              <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: -4 }}>
+                Dimensione e posizione si controllano trascinandolo sul canvas, come ogni altro elemento — resta sempre un quadrato (usa il lato più corto, se lo trascini in un rettangolo).
+              </p>
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
                 <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva'}</button>

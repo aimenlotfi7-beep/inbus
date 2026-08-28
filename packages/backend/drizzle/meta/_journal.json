@@ -351,6 +351,13 @@
       "when": 1787917207774,
       "tag": "0049_fermate_anagrafica",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1787939008911,
+      "tag": "0050_fermate_link",
+      "breakpoints": true
     }
   ]
 }

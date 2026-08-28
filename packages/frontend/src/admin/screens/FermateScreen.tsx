@@ -5,7 +5,7 @@ import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { Modale } from '../shared/Modale';
 
-const VUOTA: FermataAnagraficaInput = { nome: '', citta: '', indirizzo: '', lat: undefined, lng: undefined, note: '' };
+const VUOTA: FermataAnagraficaInput = { nome: '', citta: '', indirizzo: '', lat: undefined, lng: undefined, note: '', link: '' };
 
 /**
  * L'anagrafica delle fermate: il luogo fisico, a se' stante da come
@@ -36,7 +36,7 @@ export function FermateScreen() {
   }
   function apriModifica(f: FermataAnagrafica) {
     setInModifica(f);
-    setForm({ nome: f.nome, citta: f.citta, indirizzo: f.indirizzo, lat: f.lat, lng: f.lng, note: f.note ?? '' });
+    setForm({ nome: f.nome, citta: f.citta, indirizzo: f.indirizzo, lat: f.lat, lng: f.lng, note: f.note ?? '', link: f.link ?? '' });
     setModaleAperta(true);
   }
 
@@ -86,26 +86,30 @@ export function FermateScreen() {
           {ricerca ? 'Nessuna fermata trovata.' : 'Nessuna fermata in anagrafica ancora.'}
         </p>
       ) : (
-        <div className="cards-list">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {fermateFiltrate.map((f) => (
-            <div key={f.id} className="section-card" style={{ cursor: 'pointer' }} onClick={() => apriModifica(f)}>
-              <b>{f.nome}</b>
-              <p style={{ color: 'var(--mist)', fontSize: 12.5, margin: '4px 0 0' }}>{f.citta}</p>
-              <p style={{ color: 'var(--mist)', fontSize: 12, margin: '2px 0 0' }}>{f.indirizzo}</p>
-              {f.lat && f.lng && (
-                <p style={{ color: 'var(--mist)', fontSize: 11, margin: '4px 0 0' }}>
-                  {f.lat.toFixed(4)}, {f.lng.toFixed(4)}
-                </p>
-              )}
-              <button
-                type="button"
-                className="btn btn-ghost"
-                style={{ marginTop: 8, fontSize: 11, color: 'var(--pink)', padding: 0 }}
+            <button
+              key={f.id}
+              type="button"
+              className="riga-cliccabile"
+              style={{ textAlign: 'left', border: 'none', width: '100%', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
+              onClick={() => apriModifica(f)}
+            >
+              <span>
+                <span className="riga-titolo">{f.nome}</span>
+                <span style={{ color: 'var(--mist)', fontSize: 12.5, marginLeft: 10 }}>{f.citta} · {f.indirizzo}</span>
+                {f.link && <span style={{ color: 'var(--blue)', fontSize: 12, marginLeft: 10 }}>🔗</span>}
+              </span>
+              <span
+                role="button"
+                tabIndex={0}
                 onClick={(e) => { e.stopPropagation(); elimina(f); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); elimina(f); } }}
+                style={{ fontSize: 11, color: 'var(--pink)', flexShrink: 0 }}
               >
                 Elimina
-              </button>
-            </div>
+              </span>
+            </button>
           ))}
         </div>
       )}
@@ -143,6 +147,10 @@ export function FermateScreen() {
                 placeholder="es. 9.1900"
               />
             </label>
+          </div>
+          <div className="campo">
+            <label>Link (facoltativo)<span style={{ opacity: .6, fontWeight: 400 }}> — es. Google Maps, punto di ritrovo</span></label>
+            <input type="url" placeholder="https://..." value={form.link ?? ''} onChange={(e) => setForm({ ...form, link: e.target.value })} />
           </div>
           <div className="campo">
             <label>Note (facoltative)</label>

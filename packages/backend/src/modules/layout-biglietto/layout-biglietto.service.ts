@@ -261,7 +261,15 @@ export async function disegnaBigliettoPdf(config: ConfigurazioneLayout, dati: {
         doc.fillColor('#000').font('Helvetica-Bold').fontSize(16).text(dati.pnr, pos.x, doc.y, { width: pos.larghezza });
       } else if (sezione === 'qr') {
         const qrBuffer = Buffer.from(dati.qrDataUrl.split(',')[1], 'base64');
-        const dim = (config.qr.dimensione / 100) * W;
+        // La dimensione arriva da qui — dalla stessa larghezza/altezza
+        // trascinata sul canvas come ogni altro elemento — non più dal
+        // campo numerico separato "config.qr.dimensione" (che con lo
+        // scorrere del tempo si era scollegato: ridimensionare il QR
+        // col mouse cambiava solo l'anteprima, mai il PDF vero). Il QR
+        // resta sempre un quadrato — se il trascinamento lo ha reso un
+        // rettangolo, si usa il lato più corto, altrimenti risulterebbe
+        // deformato e più difficile da scansionare.
+        const dim = Math.min(pos.larghezza, pos.altezza);
         doc.image(qrBuffer, pos.x, pos.y, { width: dim, height: dim });
       } else if (sezione === 'nota') {
         doc.font('Helvetica').fontSize(9).fillColor('#666').text(

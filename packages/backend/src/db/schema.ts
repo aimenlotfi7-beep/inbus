@@ -252,6 +252,7 @@ export const fermateAnagrafica = pgTable('fermate_anagrafica', {
   lat: doublePrecision('lat'),
   lng: doublePrecision('lng'),
   note: text('note'),
+  link: text('link'), // facoltativo — es. Google Maps, sito del punto di ritrovo, ecc.
 });
 
 export const fermate = pgTable('fermate', {

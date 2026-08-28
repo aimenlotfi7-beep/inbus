@@ -8,6 +8,7 @@ export interface FermataAnagrafica {
   lat: number | null;
   lng: number | null;
   note: string | null;
+  link: string | null;
 }
 
 export interface FermataAnagraficaInput {
@@ -17,6 +18,7 @@ export interface FermataAnagraficaInput {
   lat?: number | null;
   lng?: number | null;
   note?: string | null;
+  link?: string | null;
 }
 
 export const fermateAnagraficaApi = {

@@ -15,6 +15,7 @@ const fermataAnagraficaSchema = z.object({
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
   note: z.string().nullable().optional(),
+  link: z.string().nullable().optional(),
 });
 
 export const fermateAnagraficaRouter = Router();
