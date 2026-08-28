@@ -18,6 +18,7 @@ export interface Tragitto {
   postiTotali: number;
   postiDisponibili: number;
   prezzoExtra: string;
+  attivo: boolean;
   referenteNome: string | null;
   referenteTelefono: string | null;
   fermate: Fermata[];

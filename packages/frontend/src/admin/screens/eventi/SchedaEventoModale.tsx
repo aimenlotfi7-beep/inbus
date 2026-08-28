@@ -150,13 +150,6 @@ export function SchedaEventoModale({
   function aggiornaArrivoServizio(key: string, campo: 'arrivoIndirizzo' | 'arrivoOrario', valore: string) {
     setServizi((prev) => prev.map((v) => v.key === key ? { ...v, [campo]: valore } : v));
   }
-  function eliminaServizioConferma(key: string, nome: string) {
-    if (!confirm(`Eliminare il servizio "${nome}"? I suoi tragitti non vengono cancellati, tornano "liberi" (senza servizio) — si elimina davvero solo salvando.`)) return;
-    const rimasti = servizi.filter((v) => v.key !== key);
-    setServizi(rimasti);
-    setForm((f) => ({ ...f, tragitti: (f.tragitti ?? []).map((l) => l.servizioId === key ? { ...l, servizioId: null } : l) }));
-    setServizioTabAttivo(rimasti[0]?.key ?? 'liberi');
-  }
   function toggleTragittoAperto(idx: number) {
     setTragittiAperti((prev) => {
       const nuovo = new Set(prev);
@@ -221,7 +214,7 @@ export function SchedaEventoModale({
         tragitti: [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((l) => ({
           id: l.id,
           servizioId: l.servizioId,
-          nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra),
+          nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra), attivo: l.attivo,
           // Normalizzo qui il prezzo che arriva dal server: se una fermata
           // non ne aveva uno salvato, arriva `null`, non `undefined` — va
           // convertito subito, altrimenti finirebbe di nuovo a rimbalzare
@@ -247,7 +240,7 @@ export function SchedaEventoModale({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evento?.id]);
 
-  function aggiornaTragitto(idx: number, campo: keyof TragittoInput, valore: string | number) {
+  function aggiornaTragitto(idx: number, campo: keyof TragittoInput, valore: string | number | boolean) {
     const tragitti = [...(form.tragitti ?? [])];
     tragitti[idx] = { ...tragitti[idx], [campo]: valore };
     setForm({ ...form, tragitti });
@@ -288,9 +281,40 @@ export function SchedaEventoModale({
     tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate: fermate.length ? fermate : [{ citta: '', indirizzo: '' }] };
     setForm({ ...form, tragitti });
   }
+  // Condivisa da entrambi i punti che possono far sparire un servizio:
+  // "Annulla" su uno ancora vuoto, e rimuoviTragitto quando arriva a
+  // zero tragitti — stessa identica regola in entrambi i casi (incluso
+  // il ritorno automatico "a un servizio" se ne resta uno solo).
+  function rimuoviServizio(key: string, tragittiCorrenti: TragittoInput[]) {
+    const serviziRimasti = servizi.filter((v) => v.key !== key);
+    if (serviziRimasti.length === 1) {
+      const ultimoKey = serviziRimasti[0].key;
+      setForm({ ...form, tragitti: tragittiCorrenti.map((t) => (t.servizioId === ultimoKey ? { ...t, servizioId: null } : t)) });
+      setServizi([]);
+      setModalitaServizi('singolo');
+      setServizioTabAttivo(null);
+    } else {
+      setForm({ ...form, tragitti: tragittiCorrenti });
+      setServizi(serviziRimasti);
+      setServizioTabAttivo(serviziRimasti[0]?.key ?? null);
+    }
+  }
+
   function rimuoviTragitto(idxTragitto: number) {
-    const tragitti = (form.tragitti ?? []).filter((_, i) => i !== idxTragitto);
-    setForm({ ...form, tragitti });
+    const tuttiTragitti = form.tragitti ?? [];
+    const tragittoRimosso = tuttiTragitti[idxTragitto];
+    const nuoviTragitti = tuttiTragitti.filter((_, i) => i !== idxTragitto);
+
+    // Un servizio non si elimina più con un pulsante a parte — si
+    // "svuota" rimuovendo i suoi tragitti uno a uno (anche tutti
+    // insieme, ma sempre da qui): appena non gliene resta più
+    // nessuno, il servizio stesso sparisce da solo.
+    const servizioIdRimosso = tragittoRimosso?.servizioId;
+    if (servizioIdRimosso && !nuoviTragitti.some((t) => t.servizioId === servizioIdRimosso)) {
+      rimuoviServizio(servizioIdRimosso, nuoviTragitti);
+      return;
+    }
+    setForm({ ...form, tragitti: nuoviTragitti });
   }
 
   // ---- Riordino fermate trascinandole (drag & drop nativo, senza librerie) ----
@@ -328,6 +352,7 @@ export function SchedaEventoModale({
       nome: percorso.nome,
       postiTotali: 50,
       prezzoExtra: 0,
+      attivo: true,
       servizioId: servizioIdContestoAttuale(),
       // fermataAnagraficaId: null (non lasciato indefinito) — così la
       // riga mostra subito città/indirizzo già compilati dal percorso,
@@ -341,7 +366,7 @@ export function SchedaEventoModale({
   }
   function aggiungiTragittoManuale() {
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
-    setForm({ ...form, tragitti: [...(form.tragitti ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, servizioId: servizioIdContestoAttuale(), fermate: [{ citta: '', indirizzo: '' }] }] });
+    setForm({ ...form, tragitti: [...(form.tragitti ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, attivo: true, servizioId: servizioIdContestoAttuale(), fermate: [{ citta: '', indirizzo: '' }] }] });
   }
 
   /** Applica +/- € a tutte le fermate con un prezzo già impostato di
@@ -544,6 +569,18 @@ export function SchedaEventoModale({
       setModalitaServizi('multiplo');
       setServizioTabAttivo(servizioSenzaNome.key);
       setRinominaServizioAperto(true);
+      return;
+    }
+    // Un servizio senza nessun tragitto (nemmeno uno con un nome vero
+    // — quelli senza nome vengono comunque scartati al salvataggio,
+    // vedi sotto) non può essere salvato così: o lo si completa, o lo
+    // si annulla dal pulsante apposta mentre è ancora vuoto.
+    const servizioVuoto = servizi.find((v) => !(form.tragitti ?? []).some((t) => t.servizioId === v.key && t.nome.trim()));
+    if (servizioVuoto) {
+      alert(`Il servizio "${servizioVuoto.nome}" non ha ancora nessun tragitto — aggiungine almeno uno, oppure annullalo dal pulsante "Annulla" mentre è ancora vuoto.`);
+      setStep(2);
+      setModalitaServizi('multiplo');
+      setServizioTabAttivo(servizioVuoto.key);
       return;
     }
     for (let i = 0; i < (form.tragitti ?? []).length; i++) {
@@ -793,7 +830,6 @@ export function SchedaEventoModale({
                         style={{ flex: 1, minWidth: 120, border: 'none', background: 'transparent', padding: '6px 0' }}
                       />
                       <button type="button" className="btn btn-ghost" style={{ fontSize: 12, borderRadius: 999 }} onClick={() => setRinominaServizioAperto(false)}>✓ Fatto</button>
-                      <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12, borderRadius: 999 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome || 'senza nome')}>Elimina</button>
                     </div>
                   ) : (
                     <div style={{
@@ -803,7 +839,23 @@ export function SchedaEventoModale({
                       <span style={{ fontWeight: 600 }}>{servizioCorrente.nome}</span>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button type="button" className="btn btn-ghost" style={{ fontSize: 12, borderRadius: 999 }} onClick={() => setRinominaServizioAperto(true)}>Rinomina</button>
-                        <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12, borderRadius: 999 }} onClick={() => eliminaServizioConferma(servizioCorrente.key, servizioCorrente.nome)}>Elimina servizio</button>
+                        {/* Un servizio CON tragitti si "svuota" rimuovendoli
+                            uno a uno (sparisce da solo quando arriva a
+                            zero) — ma uno ancora vuoto, appena creato, non
+                            ne ha nessuno da rimuovere: questo pulsante
+                            serve solo per quel caso, per poterlo annullare
+                            subito senza dover prima aggiungere e poi
+                            togliere un tragitto finto. */}
+                        {!(form.tragitti ?? []).some((t) => t.servizioId === servizioCorrente.key) && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            style={{ color: 'var(--pink)', fontSize: 12, borderRadius: 999 }}
+                            onClick={() => rimuoviServizio(servizioCorrente.key, form.tragitti ?? [])}
+                          >
+                            Annulla (è ancora vuoto)
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -893,13 +945,15 @@ export function SchedaEventoModale({
           if (!contestoGiusto) return null;
         }
         const espansa = tragittiAperti.has(idxTragitto);
+        const disattivato = tragitto.attivo === false;
         return (
-        <div key={idxTragitto} className="section-card">
+        <div key={idxTragitto} className="section-card" style={disattivato ? { opacity: .55, background: 'repeating-linear-gradient(135deg, var(--dusk), var(--dusk) 10px, var(--dusk-2) 10px, var(--dusk-2) 20px)' } : undefined}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggleTragittoAperto(idxTragitto)}>
               <span style={{ color: 'var(--mist)', fontSize: 13 }}>{espansa ? '▾' : '▸'}</span>
               <div style={{ flex: 1 }}>
                 <b>{tragitto.nome || 'Tragitto senza nome'}</b>
+                {disattivato && <span className="badge attenzione" style={{ marginLeft: 8 }}>Disattivato</span>}
                 {!espansa && (
                   <p className="section-sub" style={{ margin: '2px 0 0' }}>
                     {tragitto.fermate.length} fermat{tragitto.fermate.length === 1 ? 'a' : 'e'}
@@ -908,8 +962,38 @@ export function SchedaEventoModale({
                 )}
               </div>
             </div>
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--mist)', cursor: 'pointer', flexShrink: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              title="Disattivato: resta configurato, ma non è più prenotabile sul sito"
+            >
+              <input
+                type="checkbox"
+                checked={!disattivato}
+                onChange={(e) => aggiornaTragitto(idxTragitto, 'attivo', e.target.checked)}
+                style={{ width: 'auto' }}
+              />
+              Attivo
+            </label>
             <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12.5, flexShrink: 0 }} onClick={() => rimuoviTragitto(idxTragitto)}>Rimuovi tragitto</button>
           </div>
+
+          {/* Solo qui, nella tab "Tragitti liberi" — un modo diretto per
+              organizzarli dentro un servizio vero, senza doverli
+              ricreare da zero (utile qualunque sia la causa per cui un
+              tragitto è finito qui invece che in un servizio con nome). */}
+          {modalitaServizi === 'multiplo' && !tragitto.servizioId && servizi.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <select
+                value=""
+                onChange={(e) => { if (e.target.value) aggiornaTragitto(idxTragitto, 'servizioId', e.target.value); }}
+                style={{ fontSize: 12.5, maxWidth: 260 }}
+              >
+                <option value="" disabled>↳ Sposta in un servizio...</option>
+                {servizi.map((v) => <option key={v.key} value={v.key}>{v.nome || 'Senza nome'}</option>)}
+              </select>
+            </div>
+          )}
 
           {espansa && (
           <>

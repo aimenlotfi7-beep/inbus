@@ -8,7 +8,7 @@ export interface FermataInput {
 export interface TragittoInput {
   id?: string; // presente = tratta già esistente, assente = nuova
   servizioId?: string | null; // vuoto = tratta "libera", non appartiene a nessun servizio
-  nome: string; postiTotali: number; prezzoExtra?: number; referenteNome?: string; referenteTelefono?: string; fornitoreId?: string;
+  nome: string; postiTotali: number; prezzoExtra?: number; attivo?: boolean; referenteNome?: string; referenteTelefono?: string; fornitoreId?: string;
   fermate: FermataInput[];
 }
 export interface EventoInput {

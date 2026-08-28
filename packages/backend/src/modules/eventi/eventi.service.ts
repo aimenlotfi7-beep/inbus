@@ -101,8 +101,8 @@ function calcolaStatoAutomatico(tragitti: { postiTotali: number; postiDisponibil
  *  come se fosse una scelta manuale sua. */
 function conStatoCalcolato<T extends {
   statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
-  tragitti: { postiTotali: number; postiDisponibili: number }[];
-  servizi: { tragitti: { postiTotali: number; postiDisponibili: number }[] }[];
+  tragitti: { postiTotali: number; postiDisponibili: number; attivo: boolean }[];
+  servizi: { tragitti: { postiTotali: number; postiDisponibili: number; attivo: boolean }[] }[];
 }>(evento: T): T {
   if (evento.statoDisponibilita) return evento; // scelta manuale, ha sempre la precedenza
   // Il calcolo considera SIA i tragitti liberi SIA quelli di ogni
@@ -111,7 +111,10 @@ function conStatoCalcolato<T extends {
   // il calcolo automatico) — ma il campo "tragitti" restituito al sito
   // resta quello originale, invariato: il frontend li combina già da
   // solo dove serve, sommarli anche qui li farebbe contare due volte.
-  const tuttiPerIlCalcolo = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
+  // Un tragitto disattivato non contribuisce: i suoi posti non sono
+  // davvero acquistabili, includerli darebbe un falso senso di
+  // disponibilità ancora ampia.
+  const tuttiPerIlCalcolo = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].filter((t) => t.attivo);
   return { ...evento, statoDisponibilita: calcolaStatoAutomatico(tuttiPerIlCalcolo) };
 }
 
@@ -127,6 +130,7 @@ async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction
       postiTotali: tragitto.postiTotali,
       postiDisponibili: tragitto.postiTotali, // alla creazione tutti i posti sono liberi
       prezzoExtra: tragitto.prezzoExtra.toFixed(2),
+      attivo: tragitto.attivo,
       referenteNome: tragitto.referenteNome,
       referenteTelefono: tragitto.referenteTelefono,
       fornitoreId: tragitto.fornitoreId,
@@ -163,6 +167,16 @@ async function sincronizzaTragitti(tx: Parameters<Parameters<typeof db.transacti
 
   for (const esistente of esistenti) {
     if (idsInviati.has(esistente.id)) continue;
+    // Un tragitto con prenotazioni confermate non si può rimuovere —
+    // stesso identico controllo che c'era prima solo a livello di
+    // intero servizio, spostato qui alla singola tratta: è la
+    // granularità giusta, un servizio si "svuota" rimuovendo i suoi
+    // tragitti uno a uno, non tutti insieme con un pulsante a parte.
+    const [conPrenotazioni] = await tx.select({ id: prenotazioni.id }).from(prenotazioni)
+      .where(and(eq(prenotazioni.tragittoId, esistente.id), eq(prenotazioni.stato, 'CONFERMATA'))).limit(1);
+    if (conPrenotazioni) {
+      throw new ConflittoDati(`Il tragitto "${esistente.nome}" ha prenotazioni confermate — non può essere rimosso. Annulla o sposta quelle prenotazioni prima di rimuoverlo.`);
+    }
     await tx.update(tragitti).set({ eliminatoIl: new Date() }).where(eq(tragitti.id, esistente.id));
   }
 
@@ -183,6 +197,7 @@ async function sincronizzaTragitti(tx: Parameters<Parameters<typeof db.transacti
         postiTotali: tragitto.postiTotali,
         postiDisponibili: nuoviPostiDisponibili,
         prezzoExtra: tragitto.prezzoExtra.toFixed(2),
+        attivo: tragitto.attivo,
         referenteNome: tragitto.referenteNome,
         referenteTelefono: tragitto.referenteTelefono,
         fornitoreId: tragitto.fornitoreId,
@@ -395,24 +410,22 @@ export const eventiService = {
         await sincronizzaTragitti(tx, id, null, input.tragitti.filter((l) => !l.servizioId));
       }
 
-      // I servizi — stessa logica di sincronizzazione dei tragitti: id
-      // esistente = aggiorna, assente = nuovo, rimasto fuori dal form =
-      // eliminato (le sue tratte tornano "libere", non si perdono).
+      // I servizi — id esistente = aggiorna, assente = nuovo, rimasto
+      // fuori dal form = eliminato INSIEME ai suoi tragitti, passando
+      // da sincronizzaTragitti con un elenco vuoto: stessa identica
+      // funzione (e stesso controllo prenotazioni) già usata per
+      // rimuovere le singole tratte qui sotto — un servizio non si
+      // elimina più "tutto insieme", si svuota rimuovendo i suoi
+      // tragitti uno a uno (anche tutti insieme, ma sempre passando
+      // da lì): se anche uno solo ha prenotazioni confermate, blocca
+      // e basta quella riga, non serve più un controllo a parte qui.
       if (input.servizi) {
         const serviziEsistenti = await tx.select().from(servizi).where(eq(servizi.eventoId, id));
         const idsInviati = new Set(input.servizi.filter((p) => p.id).map((p) => p.id));
 
         for (const esistente of serviziEsistenti) {
           if (idsInviati.has(esistente.id)) continue;
-          const tragittiDelServizio = await tx.select({ id: tragitti.id }).from(tragitti).where(eq(tragitti.servizioId, esistente.id));
-          if (tragittiDelServizio.length) {
-            const [conPrenotazioni] = await tx.select({ id: prenotazioni.id }).from(prenotazioni)
-              .where(and(inArray(prenotazioni.tragittoId, tragittiDelServizio.map((t) => t.id)), eq(prenotazioni.stato, 'CONFERMATA'))).limit(1);
-            if (conPrenotazioni) {
-              throw new ConflittoDati(`Il servizio "${esistente.nome}" ha prenotazioni confermate — non può essere eliminato. Rimuovilo dal form solo se prima annulli o sposti quelle prenotazioni.`);
-            }
-          }
-          await tx.update(tragitti).set({ servizioId: null }).where(eq(tragitti.servizioId, esistente.id));
+          await sincronizzaTragitti(tx, id, esistente.id, []);
           await tx.delete(servizi).where(eq(servizi.id, esistente.id));
         }
 
@@ -501,9 +514,10 @@ export const eventiService = {
     // Se l'evento ha servizi distinti e ne è stato scelto uno, le
     // fermate mostrate sono solo le sue — altrimenti (evento senza
     // servizi, o nessuno specificato) tutte quelle libere, come sempre.
-    const tragittiDaMostrare = servizioId
+    const tragittiDaMostrare = (servizioId
       ? evento.servizi.find((p) => p.id === servizioId)?.tragitti ?? []
-      : evento.tragitti.filter((l) => !l.servizioId);
+      : evento.tragitti.filter((l) => !l.servizioId)
+    ).filter((l) => l.attivo); // un tragitto disattivato non è più prenotabile, resta configurato ma sospeso
     const opzioni: Array<{
       tragittoId: string;
       postiDisponibili: number;

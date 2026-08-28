@@ -1,0 +1,1 @@
+ALTER TABLE "tragitti" ADD COLUMN "attivo" boolean DEFAULT true NOT NULL;

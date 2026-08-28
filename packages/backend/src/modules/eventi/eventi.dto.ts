@@ -26,6 +26,7 @@ export const tragittoSchema = z.object({
   nome: z.string().min(1),
   postiTotali: z.number().int().positive(),
   prezzoExtra: z.number().default(0),
+  attivo: z.boolean().default(true),
   referenteNome: z.string().optional(),
   referenteTelefono: z.string().optional(),
   fornitoreId: z.string().optional(),

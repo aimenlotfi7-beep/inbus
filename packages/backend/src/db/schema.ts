@@ -223,6 +223,12 @@ export const tragitti = pgTable('tragitti', {
   postiTotali: integer('posti_totali').notNull(),
   postiDisponibili: integer('posti_disponibili').notNull(),
   prezzoExtra: numeric('prezzo_extra', { precision: 10, scale: 2 }).notNull().default('0'),
+  // Il tragitto resta visibile e modificabile nel gestionale, ma se
+  // disattivato non compare più tra le fermate prenotabili sul sito —
+  // diverso dall'eliminazione (quella lo toglie del tutto): qui serve
+  // per sospendere temporaneamente una tratta senza perdere la
+  // configurazione (utile se un bus salta per un giro ma tornerà).
+  attivo: boolean('attivo').notNull().default(true),
   referenteNome: text('referente_nome'),
   referenteTelefono: text('referente_telefono'),
   fornitoreId: text('fornitore_id').references(() => fornitori.id),
