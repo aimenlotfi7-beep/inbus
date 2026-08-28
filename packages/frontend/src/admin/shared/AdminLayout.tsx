@@ -150,7 +150,10 @@ export function AdminLayout({
             </div>
           ))}
         </nav>
-        <button className="btn btn-ghost side-logout" onClick={onLogout}>Esci</button>
+        <div className="side-utente-riga">
+          <span className="side-utente-nome" title={sessione.email}>{sessione.nome}</span>
+          <button className="btn btn-ghost side-logout" onClick={onLogout}>Esci</button>
+        </div>
       </aside>
 
       <div className="main-wrap">
