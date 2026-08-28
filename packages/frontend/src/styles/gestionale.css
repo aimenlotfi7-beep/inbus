@@ -424,7 +424,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 /* La card "richiede intervento" — bordo rosso ben visibile, pensato
    apposta per quando ci sono tanti eventi in elenco e il piccolo badge
    da solo rischia di passare inosservato scorrendo la griglia. */
-.evento-card-compatta.richiede-intervento{border:2px solid var(--pink); box-shadow:0 0 0 1px var(--pink);}
+.evento-card-compatta.richiede-intervento{border:1px solid var(--pink); box-shadow:0 0 14px 1px rgba(255,61,122,.45);}
 .evento-card-compatta.selezionata{border-color:var(--pink);}
 
 .vetrina-row{

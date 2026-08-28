@@ -83,6 +83,20 @@ export const listaAttesaService = {
     return risultato;
   },
 
+  /** Come sopra ma entrambi gli stati insieme — usata dalla schermata
+   *  gestionale per distinguere "Da lavorare" (in attesa > 0) da
+   *  "Promosse" (evento con iscrizioni, ma tutte già promosse). */
+  async contaPerEventoEStato(): Promise<Record<string, { inAttesa: number; promosse: number }>> {
+    const righe = await db.select({ eventoId: listaAttesa.eventoId, stato: listaAttesa.stato }).from(listaAttesa);
+    const risultato: Record<string, { inAttesa: number; promosse: number }> = {};
+    for (const r of righe) {
+      if (!risultato[r.eventoId]) risultato[r.eventoId] = { inAttesa: 0, promosse: 0 };
+      if (r.stato === 'IN_ATTESA') risultato[r.eventoId].inAttesa++;
+      else risultato[r.eventoId].promosse++;
+    }
+    return risultato;
+  },
+
   /** Genera un token univoco e manda l'email con il link "completa la tua
    *  prenotazione" — non crea ancora la prenotazione vera: quella viene
    *  creata solo quando il cliente clicca e finalizza davvero (così, se

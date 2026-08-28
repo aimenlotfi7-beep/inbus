@@ -32,6 +32,9 @@ export const listaAttesaController = {
   async contaInAttesaPerEvento(_req: Request, res: Response) {
     res.json(await listaAttesaService.contaInAttesaPerEvento());
   },
+  async contaPerEventoEStato(_req: Request, res: Response) {
+    res.json(await listaAttesaService.contaPerEventoEStato());
+  },
   async promuovi(req: Request, res: Response) {
     res.json(await listaAttesaService.promuovi(req.params.id));
   },
@@ -58,6 +61,7 @@ listaAttesaRouter.post('/finalizza/:token', valida(finalizzaSchema), asyncHandle
 // scheda evento) e promozione (manda l'email con il link).
 listaAttesaRouter.get('/allerte', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.contaInAttesa));
 listaAttesaRouter.get('/allerte-per-evento', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.contaInAttesaPerEvento));
+listaAttesaRouter.get('/conta-per-evento-e-stato', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.contaPerEventoEStato));
 listaAttesaRouter.get('/eventi/:eventoId', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.listByEvento));
 listaAttesaRouter.get('/eventi/:eventoId/conta-partecipanti', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.contaPartecipanti));
 listaAttesaRouter.post('/:id/promuovi', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(listaAttesaController.promuovi));
