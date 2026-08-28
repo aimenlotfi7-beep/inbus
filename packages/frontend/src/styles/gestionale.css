@@ -45,12 +45,25 @@ a{color:inherit;}
 /* Base minima per ogni input/select del gestionale: senza questa, gli
    input in una griglia stretta (es. riga fermata) possono imporre una
    larghezza minima maggiore delle colonne e far sbordare il contenitore. */
-input, select, textarea{ min-width:0; box-sizing:border-box; }
+/* Stile visivo di base per QUALUNQUE input/textarea del gestionale,
+   anche quelli senza contenitore .campo/.form-grid intorno (es. i
+   campi orario/prezzo/posti dentro la riga di una fermata) — prima
+   quei campi restavano bianchi, col bordo di default del browser,
+   perché non ricadevano in nessuna delle regole più specifiche.
+   .campo/.form-grid restano comunque liberi di override per la loro
+   densità (padding/font-size), qui c'è solo la base condivisa. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), textarea{
+  min-width:0; box-sizing:border-box;
+  font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 14px;
+}
+input[type="checkbox"], input[type="radio"], input[type="color"], input[type="range"]{ min-width:0; box-sizing:border-box; }
 /* Rete di sicurezza: qualunque select nel gestionale che non rientri
    in una classe più specifica (.campo, .form-grid, ecc) prende almeno
    questo aspetto di base — mai il menu a tendina bianco nativo del
    browser, stonato col resto scuro dell'interfaccia. */
 select{
+  min-width:0; box-sizing:border-box;
   font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
   background:var(--dusk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
   border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 36px 11px 14px; cursor:pointer;
