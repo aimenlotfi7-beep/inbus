@@ -10,6 +10,7 @@ export interface RichiestaRimborso {
   pnr: string;
   prenotazioneTotale: string;
   eventoArtista: string;
+  eventoCategoria: string | null;
   eventoData: string;
   clienteEmail: string;
   clienteNome: string | null;

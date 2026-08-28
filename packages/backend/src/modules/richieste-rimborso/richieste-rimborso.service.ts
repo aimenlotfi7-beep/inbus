@@ -46,6 +46,7 @@ export const richiesteRimborsoService = {
         pnr: prenotazioni.pnr,
         prenotazioneTotale: prenotazioni.totale,
         eventoArtista: eventi.artista,
+        eventoCategoria: eventi.categoria,
         eventoData: eventi.data,
         clienteEmail: utenti.email,
         clienteNome: utenti.nome,

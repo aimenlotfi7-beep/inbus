@@ -52,11 +52,18 @@ a{color:inherit;}
    perché non ricadevano in nessuna delle regole più specifiche.
    .campo/.form-grid restano comunque liberi di override per la loro
    densità (padding/font-size), qui c'è solo la base condivisa. */
-input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), textarea{
+input, textarea{
   min-width:0; box-sizing:border-box;
   font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
   background:var(--dusk); border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 14px;
 }
+/* Tipi che renderebbero male con lo stile sopra (color/range hanno un
+   proprio aspetto nativo, checkbox/radio pure) — specificità di
+   [type="…"] (0,1,1) più alta della bare "input" (0,0,1) qui sopra,
+   vince sempre lei senza bisogno di accumulare tanti :not() nella
+   regola base (quell'accumulo aveva reso la base PIÙ specifica di
+   classi come .home-search-box, rompendo per errore le sezioni cerca
+   "vere" — corretto qui). */
 input[type="checkbox"], input[type="radio"], input[type="color"], input[type="range"]{ min-width:0; box-sizing:border-box; }
 /* Due campi "Cerca" (SelettoreEventi, ListaAttesaTab) restavano senza
    nessuno stile dedicato anche prima di oggi — presi per errore dalla
