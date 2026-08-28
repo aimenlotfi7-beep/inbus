@@ -379,19 +379,39 @@ export function SchedaEventoModale({
     return servizioTabAttivo;
   }
 
-  function aggiungiTragittoDaPercorso(percorso: PercorsoSalvato) {
+  async function aggiungiTragittoDaPercorso(percorso: PercorsoSalvato) {
+    // Ogni fermata del percorso deve diventare una scelta vera
+    // dall'anagrafica — mai più testo libero, come richiesto: se
+    // esiste già una voce con la stessa città+indirizzo (senza badare
+    // a maiuscole/spazi in eccesso) la riuso, altrimenti la creo al
+    // volo (nome = città, stesso criterio già usato per popolare
+    // l'anagrafica automaticamente dai tragitti esistenti).
+    const fermateConAnagrafica: FermataInput[] = await Promise.all(percorso.fermate.map(async (f) => {
+      const match = fermateAnagrafica.find((fa) =>
+        fa.citta.trim().toLowerCase() === f.citta.trim().toLowerCase()
+        && fa.indirizzo.trim().toLowerCase() === f.indirizzo.trim().toLowerCase()
+      );
+      if (match) return { fermataAnagraficaId: match.id, citta: match.citta, indirizzo: match.indirizzo, prezzo: f.prezzo ?? undefined };
+      try {
+        const nuova = await fermateAnagraficaApi.create({ nome: f.citta, citta: f.citta, indirizzo: f.indirizzo });
+        setFermateAnagrafica((prev) => [...prev, nuova]);
+        return { fermataAnagraficaId: nuova.id, citta: nuova.citta, indirizzo: nuova.indirizzo, prezzo: f.prezzo ?? undefined };
+      } catch {
+        // Se la creazione fallisce (es. problema di rete), meglio non
+        // bloccare tutto il tragitto — questa singola fermata resta
+        // testuale, modificabile e sistemabile a mano dall'admin,
+        // invece di far fallire l'intera applicazione del percorso.
+        return { fermataAnagraficaId: null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined };
+      }
+    }));
+
     const nuovoTragitto: TragittoInput = {
       nome: percorso.nome,
       postiTotali: 50,
       prezzoExtra: 0,
       attivo: true,
       servizioId: servizioIdContestoAttuale(),
-      // fermataAnagraficaId: null (non lasciato indefinito) — così la
-      // riga mostra subito città/indirizzo già compilati dal percorso,
-      // invece del menu a tendina vuoto pensato per una riga nuova
-      // ancora da scegliere (quello si attiva solo quando è
-      // indefinito, vedi il rendering della riga fermata più sotto).
-      fermate: percorso.fermate.map((f) => ({ fermataAnagraficaId: null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined })),
+      fermate: fermateConAnagrafica,
     };
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
     setForm({ ...form, tragitti: [...(form.tragitti ?? []), nuovoTragitto] });
@@ -1044,54 +1064,51 @@ export function SchedaEventoModale({
           {espansa && (
           <>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-end' }}>
-            <div className="fermata-editor-campo" style={{ flex: 1 }}>
-              <label>Nome tragitto</label>
-              <input placeholder="es. Bologna — Modena — Parma" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} />
-            </div>
-            <div className="fermata-editor-campo" style={{ flexShrink: 0, width: 90 }}>
-              <label>Posti bus</label>
-              <CampoNumero value={tragitto.postiTotali} onChange={(v) => aggiornaTragitto(idxTragitto, 'postiTotali', v ?? 0)} />
-            </div>
+            <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} style={{ flex: 1 }} />
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, color: 'var(--mist)', flexShrink: 0 }}>
+              Posti
+              <CampoNumero value={tragitto.postiTotali} onChange={(v) => aggiornaTragitto(idxTragitto, 'postiTotali', v ?? 0)} style={{ width: 80 }} />
+            </label>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 14, flexWrap: 'wrap' }}>
-            <div className="fermata-editor-campo" style={{ width: 130 }}>
-              <label>Aggiusta € a tutte</label>
-              <input
-                placeholder="es. +10 o -5"
-                type="number"
-                value={aggiustiPerTragitto[idxTragitto] ?? ''}
-                onChange={(e) => setAggiustiPerTratta((s) => ({ ...s, [idxTragitto]: e.target.value }))}
-              />
-            </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+            <input
+              placeholder="es. +10 o -5"
+              type="number"
+              style={{ maxWidth: 130 }}
+              value={aggiustiPerTragitto[idxTragitto] ?? ''}
+              onChange={(e) => setAggiustiPerTratta((s) => ({ ...s, [idxTragitto]: e.target.value }))}
+            />
             <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiustaPrezziTragitto(idxTragitto)}>
-              Applica alle fermate
+              Applica € a tutte le fermate
             </button>
             <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => ricalcolaOrariTragitto(idxTragitto)} disabled={ricalcolando[idxTragitto]}>
               {ricalcolando[idxTragitto] ? 'Calcolo orari...' : '↻ Calcola orari dall\'arrivo'}
             </button>
           </div>
-          {statoRicalcolo[idxTragitto] && <p className="testo-intro" style={{ fontSize: 12, marginTop: -8, marginBottom: 10 }}>{statoRicalcolo[idxTragitto]}</p>}
+          {statoRicalcolo[idxTragitto] && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoRicalcolo[idxTragitto]}</p>}
 
-          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 8 }}>Trascina una fermata per riordinarla.</p>
+          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla. Ognuna ha un prezzo — l'arrivo si imposta qui sopra, separatamente.</p>
           {tragitto.fermate.map((f, idxFermata) => (
-            <div
-              key={idxFermata}
-              className={`fermata-editor${trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? ' in-trascinamento' : ''}`}
-              draggable
-              onDragStart={() => onDragStart(idxTragitto, idxFermata)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => onDropSu(idxTragitto, idxFermata)}
-            >
-              <div className="fermata-editor-riga1">
-                <span className="fermata-editor-maniglia" title="Trascina per riordinare">⠿</span>
+            <div key={idxFermata} style={{ marginBottom: 6 }}>
+              <div
+                draggable
+                onDragStart={() => onDragStart(idxTragitto, idxFermata)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => onDropSu(idxTragitto, idxFermata)}
+                style={{
+                  display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr .55fr .55fr .55fr auto', gap: 6, alignItems: 'center',
+                  opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
+                }}
+              >
+                <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
                 {f.fermataAnagraficaId !== null ? (
                   // Di default (e finché non si sceglie "scrivi
                   // manualmente") si parte da qui — un elenco leggibile,
                   // non un'iconcina minuscola. Città/indirizzo arrivano
                   // dall'anagrafica quando si sceglie una voce vera.
                   <select
-                    className="fermata-editor-selettore"
+                    style={{ gridColumn: 'span 2' }}
                     value={f.fermataAnagraficaId ?? ''}
                     onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
                   >
@@ -1102,19 +1119,30 @@ export function SchedaEventoModale({
                     <option value="__manuale__">✎ Scrivi manualmente, senza anagrafica...</option>
                   </select>
                 ) : (
-                  <div className="fermata-editor-manuale">
+                  <>
                     <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
                     <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)} />
-                  </div>
+                  </>
                 )}
-                <button type="button" className="fermata-editor-rimuovi" onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
+                <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'orario', v)} />
+                <CampoNumero
+                  valuta placeholder="Prezzo"
+                  value={f.prezzo}
+                  onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'prezzo', v !== undefined ? String(v) : '')}
+                />
+                <CampoNumero
+                  placeholder="Posti max"
+                  title="Facoltativo: limite posti solo per questa fermata. Se vuoto, condivide i posti di tutto il bus."
+                  value={f.postiMax ?? undefined}
+                  onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'postiMax', v !== undefined ? String(v) : '')}
+                />
+                <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
               </div>
-
               {f.fermataAnagraficaId === null && fermateAnagrafica.length > 0 && (
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  style={{ fontSize: 11, marginBottom: 8, padding: 0 }}
+                  style={{ fontSize: 11, marginLeft: 22, marginTop: 2, padding: 0 }}
                   onClick={() => setForm((prev) => {
                     const tragitti = [...(prev.tragitti ?? [])];
                     const fermate = [...tragitti[idxTragitto].fermate];
@@ -1126,30 +1154,6 @@ export function SchedaEventoModale({
                   ← Torna a scegliere dall'anagrafica
                 </button>
               )}
-
-              <div className="fermata-editor-campi">
-                <div className="fermata-editor-campo">
-                  <label>Orario</label>
-                  <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'orario', v)} />
-                </div>
-                <div className="fermata-editor-campo">
-                  <label>Prezzo (€)</label>
-                  <CampoNumero
-                    valuta placeholder="es. 30"
-                    value={f.prezzo}
-                    onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'prezzo', v !== undefined ? String(v) : '')}
-                  />
-                </div>
-                <div className="fermata-editor-campo">
-                  <label>Posti max</label>
-                  <CampoNumero
-                    placeholder="facolt."
-                    title="Facoltativo: limite posti solo per questa fermata. Se vuoto, condivide i posti di tutto il bus."
-                    value={f.postiMax ?? undefined}
-                    onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'postiMax', v !== undefined ? String(v) : '')}
-                  />
-                </div>
-              </div>
             </div>
           ))}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>

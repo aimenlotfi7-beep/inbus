@@ -28,6 +28,10 @@
   --sidebar-hover: rgba(37,99,235,0.18);
   --sidebar-accent:#5b8dff;
   --radius:12px;
+  /* Forma condivisa di TUTTI gli input/select del gestionale — un
+     solo valore, cambiarlo qui li aggiorna ovunque insieme, invece di
+     inseguire lo stesso numero sparso in una decina di regole diverse. */
+  --input-radius:14px;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
@@ -48,7 +52,9 @@ input, select, textarea{ min-width:0; box-sizing:border-box; }
    browser, stonato col resto scuro dell'interfaccia. */
 select{
   font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
-  background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:10px 12px; cursor:pointer;
+  background:var(--dusk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+  border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 36px 11px 14px; cursor:pointer;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
 }
 
 .logo{font-family:'Poppins',sans-serif; font-weight:800; font-size:22px; display:flex; align-items:baseline; gap:6px;}
@@ -66,7 +72,7 @@ select{
 }
 .login-box p{color:var(--mist); font-size:13.5px; margin:14px 0 18px;}
 .login-box input{
-  width:100%; padding:11px 14px; border-radius:8px; border:1px solid var(--line);
+  width:100%; padding:13px 16px; border-radius:var(--input-radius); border:1px solid var(--line);
   background:var(--dusk-2); color:var(--paper); font-size:14px; margin-bottom:14px;
 }
 .error-msg{color:var(--pink); font-size:13px; min-height:16px;}
@@ -201,7 +207,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .chat-layout{display:grid; grid-template-columns:280px 1fr; gap:16px; height:60vh; min-height:420px;}
 .chat-eventi-col{display:flex; flex-direction:column; gap:10px;}
 .chat-eventi-col input{
-  background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:9px 12px; color:var(--paper); font-size:13px;
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--input-radius); padding:10px 13px; color:var(--paper); font-size:13px;
 }
 .chat-eventi-list{flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px;}
 .chat-evento-item{
@@ -226,7 +232,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 }
 .chat-quick-btn:hover{border-color:var(--blue); color:var(--paper);}
 .chat-input-row input{
-  flex:1; background:var(--night); border:1px solid var(--line); border-radius:8px; padding:10px 12px; color:var(--paper);
+  flex:1; background:var(--night); border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 14px; color:var(--paper);
 }
 @media (max-width:760px){ .chat-layout{grid-template-columns:1fr; height:auto;} }
 
@@ -325,7 +331,9 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
   background:var(--dusk); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:22px;
 }
 .link-generator-box select{
-  background:var(--night); border:1px solid var(--line); border-radius:8px; padding:9px 12px; color:var(--paper); font-size:13px; min-width:220px;
+  background:var(--night) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+  border:1px solid var(--line); border-radius:var(--input-radius); padding:10px 36px 10px 13px; color:var(--paper); font-size:13px; min-width:220px;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none; cursor:pointer;
 }
 
 /* ---------- LOG / STORICO ---------- */
@@ -336,7 +344,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 /* ---------- MODAL WIDE (partecipanti) ---------- */
 .modal-wide{max-width:920px;}
 #partecipantiCerca, #pagamentiCerca, #pagamentiFiltroEvento{
-  background:var(--night); border:1px solid var(--line); border-radius:8px; padding:9px 12px; color:var(--paper); font-size:13px; min-width:220px;
+  background:var(--night); border:1px solid var(--line); border-radius:var(--input-radius); padding:10px 13px; color:var(--paper); font-size:13px; min-width:220px;
 }
 
 /* ---------- CODICE + AZIONE (promoter/coupon link) ---------- */
@@ -493,9 +501,15 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
   text-transform:uppercase; letter-spacing:.5px; grid-column:span 1;
 }
 .form-grid label.full{grid-column:1 / -1;}
-.form-grid input, .form-grid select, .form-grid textarea{
+.form-grid input, .form-grid textarea{
   font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
-  background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 14px;
+}
+.form-grid select{
+  font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
+  background:var(--dusk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+  border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 36px 11px 14px;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none; cursor:pointer;
 }
 .form-grid textarea{min-height:70px; resize:vertical;}
 @media (max-width:700px){ .form-grid{grid-template-columns:1fr;} }
@@ -566,9 +580,15 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .fermata-drag.drag-over{border-color:var(--blue); border-style:dashed;}
 .fermata-riga{display:grid; grid-template-columns:1fr 1.4fr .7fr; gap:8px; margin-bottom:8px;}
 .fermata-riga:last-child{margin-bottom:0; grid-template-columns:.8fr 1.3fr;}
-.fermata-riga input, .fermata-riga select{
+.fermata-riga input{
   font-family:'Poppins',sans-serif; font-size:12px; color:var(--paper);
-  background:var(--dusk-2); border:1px solid var(--line); border-radius:6px; padding:7px 8px; width:100%;
+  background:var(--dusk-2); border:1px solid var(--line); border-radius:var(--input-radius); padding:7px 10px; width:100%;
+}
+.fermata-riga select{
+  font-family:'Poppins',sans-serif; font-size:12px; color:var(--paper);
+  background:var(--dusk-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+  border:1px solid var(--line); border-radius:var(--input-radius); padding:7px 28px 7px 10px; width:100%;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none; cursor:pointer;
 }
 .indirizzo-con-maps{display:flex; gap:6px; align-items:center;}
 .indirizzo-con-maps input{flex:1; min-width:0;}
@@ -578,27 +598,6 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 }
 .maps-btn:hover{border-color:var(--blue-dim);}
 .linea-fermate-add{margin-top:9px; font-size:11.5px !important; padding:6px 12px !important;}
-
-/* Editor fermata dentro un tragitto (SchedaEventoModale) — stesso
-   aspetto identico sia che la fermata sia scelta dall'anagrafica sia
-   che sia scritta a mano (prima due grafiche diverse, ora una sola):
-   un contenitore con bordo, la scelta città/indirizzo in cima, e sotto
-   una riga con etichette chiare per orario/prezzo/posti — invece di
-   una griglia stretta di soli placeholder facili da confondere. */
-.fermata-editor{
-  background:var(--dusk); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px;
-}
-.fermata-editor.in-trascinamento{opacity:.4;}
-.fermata-editor-riga1{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
-.fermata-editor-maniglia{color:var(--mist); font-size:14px; cursor:grab; flex-shrink:0;}
-.fermata-editor-selettore{flex:1; min-width:0;}
-.fermata-editor-manuale{flex:1; display:flex; gap:6px; min-width:0;}
-.fermata-editor-manuale input{flex:1; min-width:0;}
-.fermata-editor-rimuovi{flex-shrink:0; color:var(--pink); background:none; border:none; cursor:pointer; padding:4px 6px; font-size:13px;}
-.fermata-editor-campi{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;}
-.fermata-editor-campo{display:flex; flex-direction:column; gap:4px;}
-.fermata-editor-campo label{font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--mist); font-weight:600;}
-@media (max-width:700px){ .fermata-editor-campi{grid-template-columns:1fr 1fr;} }
 @media (max-width:900px){
   .linea-riga{grid-template-columns:1fr 1fr;}
   .fermata-riga{grid-template-columns:1fr 1fr;}
@@ -616,7 +615,9 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .badge.confermata{background:rgba(255,179,71,.15); color:var(--amber);}
 .badge.cancellata{background:rgba(255,61,122,.15); color:var(--pink);}
 .filters select{
-  background:var(--dusk); color:var(--paper); border:1px solid var(--line); border-radius:8px; padding:8px 12px;
+  background:var(--dusk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+  color:var(--paper); border:1px solid var(--line); border-radius:var(--input-radius); padding:9px 32px 9px 13px;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none; cursor:pointer;
 }
 
 /* ---------- MODALE ---------- */
@@ -686,9 +687,16 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .campo > label{
   font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mist); font-weight:700;
 }
-.campo input:not([type="checkbox"]):not([type="radio"]), .campo select, .campo textarea{
+.campo input:not([type="checkbox"]):not([type="radio"]), .campo textarea{
   font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
-  background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 14px;
+  min-width:0; box-sizing:border-box; width:100%;
+}
+.campo select{
+  font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
+  background:var(--dusk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+  border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 36px 11px 14px;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none; cursor:pointer;
   min-width:0; box-sizing:border-box; width:100%;
 }
 .campo textarea{min-height:70px; resize:vertical;}
