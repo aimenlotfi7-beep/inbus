@@ -349,6 +349,12 @@ export const prenotazioniService = {
       })
       .from(prenotazioni)
       .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
+      // Solo le CONFERMATA contano come "ha prenotazioni" — un evento
+      // con prenotazioni solo cancellate non ha più nulla di attivo da
+      // gestire qui, non deve comparire (le cancellate restano comunque
+      // visibili nella tab "Cancellate" DENTRO la scheda di un evento
+      // che ha ALMENO una prenotazione ancora confermata).
+      .where(eq(prenotazioni.stato, 'CONFERMATA'))
       .orderBy(desc(eventi.data));
 
     if (base.length === 0) return [];

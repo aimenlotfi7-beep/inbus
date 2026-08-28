@@ -24,16 +24,21 @@ export function PartenzeScreen() {
   const [selezionato, setSelezionato] = useState<Evento | null>(null);
   const [ricerca, setRicerca] = useState('');
   const [allertePerEvento, setAllertePerEvento] = useState<Record<string, number>>({});
+  const [statistiche, setStatistiche] = useState<Record<string, { partecipanti: number; busCensiti: number }>>({});
   const [tab, setTab] = useState<Tab>('da-lavorare');
 
   function ricarica() {
     eventiApi.list().then(setEventi);
     eventiApi.allertePartenzePerEvento().then(setAllertePerEvento).catch(() => {});
+    eventiApi.statistichePerEvento().then(setStatistiche).catch(() => {});
   }
   useEffect(ricarica, []);
 
   const adesso = Date.now();
-  const eventiPerTab = eventi.filter((ev) => {
+  // Come già in Prenotazioni: un evento senza nessuna prenotazione
+  // confermata non ha ancora nulla da gestire qui, non compare.
+  const eventiConPrenotazioni = eventi.filter((ev) => (statistiche[ev.id]?.partecipanti ?? 0) > 0);
+  const eventiPerTab = eventiConPrenotazioni.filter((ev) => {
     const passato = new Date(ev.data).getTime() < adesso;
     if (tab === 'passate') return passato;
     if (passato) return false; // un evento passato vive solo nella tab "Passate", mai nelle altre due
@@ -71,7 +76,7 @@ export function PartenzeScreen() {
         ))}
         {!eventiFiltrati.length && (
           <p style={{ color: 'var(--mist)' }}>
-            {ricerca ? 'Nessun evento trovato.' : tab === 'da-lavorare' ? 'Nessuna partenza da lavorare al momento.' : tab === 'lavorate' ? 'Nessuna partenza già lavorata.' : 'Nessun evento passato ancora.'}
+            {ricerca ? 'Nessun evento trovato.' : eventiConPrenotazioni.length === 0 ? 'Nessun evento con prenotazioni ancora.' : tab === 'da-lavorare' ? 'Nessuna partenza da lavorare al momento.' : tab === 'lavorate' ? 'Nessuna partenza già lavorata.' : 'Nessun evento passato ancora.'}
           </p>
         )}
       </div>

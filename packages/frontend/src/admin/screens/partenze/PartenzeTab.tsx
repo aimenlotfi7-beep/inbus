@@ -28,11 +28,16 @@ function scaricaListaCsv(riferimentoBus: string, righe: { pnr: string; nome: str
 
 /** Un solo indicatore di stato per tratta (invece di due badge separati
  *  che si accavallavano): rosso se ha posti superati (il problema più
- *  urgente, ha sempre la precedenza), giallo se manca ancora la
- *  copertura, verde se tutto ok. */
+ *  urgente, ha sempre la precedenza), giallo se ha passeggeri ma manca
+ *  ancora copertura sufficiente, verde se tutto ok. Con ZERO
+ *  passeggeri confermati non c'è nessun avviso — è solo presto,
+ *  nessuno ha ancora prenotato, non è un problema da segnalare come se
+ *  qualcosa non andasse (prima mostrava "Non ancora coperta" anche
+ *  qui, sembrava un avviso pur non essendoci davvero nulla da fare). */
 function statoTragitto(tragitto: CalcoloBusTragitto) {
   const postiSuperati = tragitto.totalePasseggeri > tragitto.postiTotali;
   if (postiSuperati) return { classe: 'non-coperta', etichetta: `⚠ Posti superati di ${tragitto.totalePasseggeri - tragitto.postiTotali}` };
+  if (tragitto.totalePasseggeri === 0) return { classe: 'neutro', etichetta: 'Nessuna prenotazione ancora' };
   if (!tragitto.coperta) return { classe: 'attenzione', etichetta: 'Non ancora coperta' };
   return { classe: 'coperta', etichetta: '✓ Coperta' };
 }
@@ -76,6 +81,22 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
         // Se c'è una sola tratta, tanto vale aprirla subito — altrimenti
         // partono tutte chiuse, per non dover scorrere un elenco lungo.
         setAperte((prev) => prev.size === 0 && c.length === 1 ? new Set([c[0].tragittoId]) : prev);
+        // Il servizio scelto di default (il primo dell'elenco) potrebbe
+        // non avere nessuna prenotazione — la sua tab, in quel caso, non
+        // compare più (vedi sopra): sposto la selezione sul primo
+        // servizio che ne ha davvero, altrimenti si vedrebbe "nessun
+        // tragitto configurato" anche quando in realtà ce ne sono,
+        // semplicemente non nel servizio selezionato di default.
+        setServizioAttivo((attuale) => {
+          const attualeHaPrenotazioni = attuale === 'liberi'
+            ? c.some((l) => !l.servizioId && l.totalePasseggeri > 0)
+            : c.some((l) => l.servizioId === attuale && l.totalePasseggeri > 0);
+          if (attualeHaPrenotazioni) return attuale;
+          const primoServizioConPrenotazioni = servizi?.find((v) => c.some((l) => l.servizioId === v.key && l.totalePasseggeri > 0));
+          if (primoServizioConPrenotazioni) return primoServizioConPrenotazioni.key;
+          if (c.some((l) => !l.servizioId && l.totalePasseggeri > 0)) return 'liberi';
+          return attuale; // nessun servizio ha prenotazioni — resta così, comparirà il messaggio "nessun tragitto"
+        });
       })
       .catch((e) => setErrore(e instanceof ErroreApi ? e.message : 'Impossibile caricare la sezione Partenze. Controlla i tuoi permessi o riprova.'))
       .finally(() => setCaricamento(false));
@@ -170,8 +191,14 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
     <div>
       {servizi && servizi.length > 0 && (
         <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-          {servizi.map((v) => {
-            const nonCopertiQui = calcolo.filter((l) => l.servizioId === v.key && !l.coperta).length;
+          {servizi
+            // Un servizio senza nessuna prenotazione confermata su
+            // nessuna delle sue tratte non ha ancora nulla da gestire
+            // qui — stesso principio già applicato all'evento intero
+            // nell'elenco di prima.
+            .filter((v) => calcolo.some((l) => l.servizioId === v.key && l.totalePasseggeri > 0))
+            .map((v) => {
+            const nonCopertiQui = calcolo.filter((l) => l.servizioId === v.key && l.totalePasseggeri > 0 && !l.coperta).length;
             return (
               <button key={v.key} type="button" className={`mini-tab${servizioAttivo === v.key ? ' active' : ''}`} onClick={() => setServizioAttivo(v.key)}>
                 {v.nome}
@@ -183,8 +210,8 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
               </button>
             );
           })}
-          {calcolo.some((l) => !l.servizioId) && (() => {
-            const nonCopertiLiberi = calcolo.filter((l) => !l.servizioId && !l.coperta).length;
+          {calcolo.some((l) => !l.servizioId && l.totalePasseggeri > 0) && (() => {
+            const nonCopertiLiberi = calcolo.filter((l) => !l.servizioId && l.totalePasseggeri > 0 && !l.coperta).length;
             return (
               <button type="button" className={`mini-tab${servizioAttivo === 'liberi' ? ' active' : ''}`} onClick={() => setServizioAttivo('liberi')}>
                 Tragitti liberi

@@ -709,6 +709,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 /* ---------- BADGE: stati aggiuntivi (copertura tratte, permessi) ---------- */
 .badge.coperta{background:rgba(72,214,140,.15); color:var(--green);}
 .badge.attenzione{background:rgba(255,179,71,.15); color:var(--amber);}
+.badge.neutro{background:rgba(255,255,255,.06); color:var(--mist);}
 .badge.non-coperta{background:rgba(255,61,122,.15); color:var(--pink);}
 .badge.dal-ruolo{background:rgba(169,159,194,.15); color:var(--mist);}
 .badge.concesso-extra{background:rgba(72,214,140,.15); color:var(--green);}
