@@ -277,6 +277,12 @@ export const eventiService = {
     if (query.soloVisibili) {
       condizioni.push(eq(eventi.visibileSito, true));
       condizioni.push(eq(eventi.bozza, false)); // le bozze non compaiono mai sul sito pubblico
+      // Un evento senza nemmeno un tragitto confermato (nessun bus vero
+      // registrato) non compare affatto — come se non esistesse ancora,
+      // non solo "senza niente da prenotare". Basta UN tragitto
+      // confermato in un servizio qualsiasi (o libero) perché l'evento
+      // torni visibile.
+      condizioni.push(sql`EXISTS (SELECT 1 FROM ${tragitti} WHERE ${tragitti.eventoId} = ${eventi.id} AND ${tragitti.stato} = 'CONFERMATO' AND ${tragitti.attivo} = true)`);
     }
 
     const risultati = await db.query.eventi.findMany({
@@ -299,6 +305,11 @@ export const eventiService = {
     });
     if (!evento) throw new NonTrovato('Evento');
     if (!evento.visibileSito || evento.bozza || evento.eliminatoIl || new Date(evento.data) < new Date()) throw new NonTrovato('Evento');
+    // Stessa regola della lista: senza nemmeno un tragitto confermato,
+    // l'evento non esiste ancora per il sito — nemmeno con un link
+    // diretto allo slug.
+    const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
+    if (!tuttiITragitti.some((t) => t.attivo && t.stato === 'CONFERMATO')) throw new NonTrovato('Evento');
     return conStatoCalcolato(evento);
   },
 

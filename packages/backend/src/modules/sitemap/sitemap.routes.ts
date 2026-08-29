@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { db } from '../../db/client.js';
-import { eventi } from '../../db/schema.js';
-import { eq, and, gte } from 'drizzle-orm';
+import { eventi, tragitti } from '../../db/schema.js';
+import { eq, and, gte, sql } from 'drizzle-orm';
 import { urlSito } from '../../shared/email.service.js';
 
 export const sitemapRouter = Router();
@@ -15,7 +15,15 @@ sitemapRouter.get('/sitemap.xml', async (_req: Request, res: Response) => {
   const eventiVisibili = await db
     .select({ slug: eventi.slug, aggiornatoIl: eventi.aggiornatoIl })
     .from(eventi)
-    .where(and(eq(eventi.visibileSito, true), gte(eventi.data, new Date())));
+    .where(and(
+      eq(eventi.visibileSito, true),
+      gte(eventi.data, new Date()),
+      // Stessa regola già applicata alla lista/pagina pubblica: senza
+      // nemmeno un tragitto confermato, l'evento non esiste ancora per
+      // il sito — non ha senso indicizzarlo se poi il link restituisce
+      // "non trovato".
+      sql`EXISTS (SELECT 1 FROM ${tragitti} WHERE ${tragitti.eventoId} = ${eventi.id} AND ${tragitti.stato} = 'CONFERMATO' AND ${tragitti.attivo} = true)`
+    ));
 
   const paginaFissa = (percorso: string, priorita: string) =>
     `<url><loc>${urlSito(percorso)}</loc><priority>${priorita}</priority></url>`;
