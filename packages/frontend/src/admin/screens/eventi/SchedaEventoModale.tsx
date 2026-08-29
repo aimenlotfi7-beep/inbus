@@ -83,12 +83,16 @@ export function SchedaEventoModale({
   // Due modalità nettamente separate: con un solo servizio (o nessuno) è
   // la stessa identica interfaccia di prima, senza nessun concetto di
   // "servizio" in giro — con più servizi diventano tab, come in Partenze,
-  // ognuna con la propria sezione tragitti dedicata.
-  const [modalitaServizi, setModalitaServizi] = useState<'singolo' | 'multiplo' | null>(() => {
-    if ((evento?.servizi ?? []).length >= 1) return 'multiplo';
-    if ((evento?.tragitti ?? []).some((t) => !t.servizioId)) return 'singolo';
-    return null; // evento nuovo, senza nessun tragitto ancora — aspetta la scelta
-  });
+  // ognuna con la propria sezione tragitti dedicata. Ogni evento parte
+  // sempre "a un servizio" (niente più domanda iniziale "quanti
+  // servizi ha?") — "+ Aggiungi un servizio" è l'UNICO modo per
+  // passare a più servizi, sia in creazione sia in modifica: un solo
+  // percorso di codice invece di due, meno posti dove un bug può
+  // nascondersi (la maggior parte dei bug di questa sezione nasceva
+  // proprio dalla dualità tra i due percorsi).
+  const [modalitaServizi, setModalitaServizi] = useState<'singolo' | 'multiplo'>(
+    (evento?.servizi ?? []).length >= 1 ? 'multiplo' : 'singolo'
+  );
   const [servizioTabAttivo, setServizioTabAttivo] = useState<string | null>(servizi[0]?.key ?? null);
   const [rinominaServizioAperto, setRinominaServizioAperto] = useState(false);
 
@@ -106,27 +110,17 @@ export function SchedaEventoModale({
    *  è raro che serva "più servizi" per finirne con uno solo. */
   /** Solo per la scelta iniziale, evento senza ancora nessun servizio:
    *  partono già 2 tab pronte (non zero). */
-  function passaAMultiplo() {
-    setModalitaServizi('multiplo');
-    if (servizi.length === 0) {
-      const chiave1 = `nuovo-${Date.now()}`;
-      const chiave2 = `nuovo-${Date.now() + 1}`;
-      setServizi([{ key: chiave1, nome: 'Servizio 1', arrivoOrario: undefined }, { key: chiave2, nome: 'Servizio 2', arrivoOrario: undefined }]);
-      setServizioTabAttivo(chiave1);
-    } else if (!servizioTabAttivo) {
-      setServizioTabAttivo(servizi[0]?.key ?? 'liberi');
-    }
-  }
-  /** Da "Un solo servizio" con un evento già esistente: i tragitti
-   *  attuali diventano "Tragitti liberi" (un gruppo a sé) e se ne
-   *  aggiunge SOLO uno nuovo — non due, non c'è nulla da "partire da
-   *  zero" qui, il primo gruppo esiste già. */
-  /** Da "Un solo servizio" con un evento già esistente: i tragitti
-   *  attuali (finora "liberi") diventano un vero primo servizio, con lo
-   *  stesso arrivo che avevano già — non restano "liberi", altrimenti
-   *  sul sito il checkout continuerebbe a vederlo come un solo
-   *  servizio e non farebbe mai comparire lo step di scelta. Poi se ne
-   *  aggiunge un secondo, vuoto, pronto da compilare. Il risultato deve
+  /** Da "Un solo servizio" (o da un evento nuovo, ancora senza nessun
+   *  tragitto — la .map() qui sotto in quel caso semplicemente non
+   *  itera su nulla): i tragitti attuali (finora "liberi") diventano
+   *  un vero primo servizio, con lo stesso arrivo che avevano già —
+   *  non restano "liberi", altrimenti sul sito il checkout
+   *  continuerebbe a vederlo come un solo servizio e non farebbe mai
+   *  comparire lo step di scelta. Poi se ne aggiunge un secondo,
+   *  vuoto, pronto da compilare. Il risultato deve comportarsi
+   *  esattamente come un evento nativamente a più servizi — stessa
+   *  identica funzione usata sia in creazione sia in modifica, un
+   *  solo percorso di codice invece di due.
    *  comportarsi in tutto e per tutto come un evento nato da subito con
    *  più servizi — nessuna differenza. */
   function aggiungiServizioAdEventoSingolo() {
@@ -232,9 +226,7 @@ export function SchedaEventoModale({
     setForm(nuovoForm);
     const serviziCaricati = (sorgente?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoIndirizzo: p.arrivoIndirizzo ?? undefined, arrivoOrario: p.arrivoOrario ?? undefined }));
     setServizi(serviziCaricati);
-    setModalitaServizi(
-      serviziCaricati.length >= 1 ? 'multiplo' : ((nuovoForm.tragitti ?? []).some((t) => !t.servizioId) ? 'singolo' : null)
-    );
+    setModalitaServizi(serviziCaricati.length >= 1 ? 'multiplo' : 'singolo');
     setServizioTabAttivo(serviziCaricati[0]?.key ?? null);
     setFormIniziale(JSON.stringify(nuovoForm));
   }
@@ -821,29 +813,11 @@ export function SchedaEventoModale({
 
   const campiTratte: ReactNode = (
     <>
-      {modalitaServizi === null ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
-          <div className="section-card" style={{ maxWidth: 480, width: '100%', textAlign: 'center', padding: '40px 32px' }}>
-            <p className="section-label" style={{ marginBottom: 18, fontSize: 15 }}>Quanti servizi ha questo evento?</p>
-            <div className="mini-tabs" style={{ justifyContent: 'center' }}>
-              <button type="button" className="mini-tab" style={{ padding: '14px 28px', fontSize: 14 }} onClick={() => setModalitaServizi('singolo')}>
-                Un solo servizio
-              </button>
-              <button type="button" className="mini-tab" style={{ padding: '14px 28px', fontSize: 14 }} onClick={passaAMultiplo}>
-                Più servizi
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-      <>
-      {/* Nessuna domanda "quanti servizi" qui — l'hai già scelto una
-          volta sola nel pannello iniziale, non torna più indietro
-          (specialmente per "Più servizi": non ha senso poter tornare a
-          un solo servizio quando ne hai già più di uno configurati).
-          Solo "Un solo servizio", appena l'evento esiste davvero,
-          mostra la minima voce per passare a più servizi se serve. */}
-      {modalitaServizi === 'singolo' && evento && (
+      {/* Nessuna domanda "quanti servizi" — ogni evento parte "a un
+          servizio", "+ Aggiungi un servizio" è l'unico modo per
+          passare a più servizi, disponibile fin da subito (anche per
+          un evento non ancora salvato). */}
+      {modalitaServizi === 'singolo' && (
         <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, marginBottom: 16, borderRadius: 999 }} onClick={aggiungiServizioAdEventoSingolo}>
           + Aggiungi un servizio
         </button>
@@ -1166,8 +1140,6 @@ export function SchedaEventoModale({
         </div>
       );})}
       <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTragittoManuale}>+ Aggiungi tragitto manuale (senza percorso salvato)</button>
-      </>
-      )}
       </>
       )}
     </>
