@@ -10,7 +10,6 @@ import { categorieEventoApi, type CategoriaEvento } from '../../../api/categorie
 import { ErroreApi } from '../../../api/client';
 import type { Evento } from '../../../api/types';
 import { PaginaSezione } from '../../shared/PaginaSezione';
-import { OrarioInput } from '../../shared/OrarioInput';
 import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
 import { CaricaFile } from '../../shared/CaricaFile';
 import { CampoNumero } from '../../shared/CampoNumero';
@@ -18,7 +17,6 @@ import { PartenzeTab } from '../partenze/PartenzeTab';
 import { ListaAttesaTab } from './ListaAttesaTab';
 import { ComunicazioniTab } from './ComunicazioniTab';
 import { OfferteTab } from './OfferteTab';
-import { geocodifica, durataViaggio, attesa } from '../../shared/geo';
 
 const VUOTO: EventoInput = { artista: '', genere: '', categoria: null, luogo: '', citta: '', data: '', inEvidenza: false, accontoEur: 10, immagini: [], tragitti: [] };
 
@@ -68,7 +66,6 @@ export function SchedaEventoModale({
   // volta) — una volta creata, i salvataggi successivi la aggiornano
   // invece di crearne una nuova ogni volta.
   const bozzaIdRef = useRef<string | null>(null);
-  const [aggiustiPerTragitto, setAggiustiPerTratta] = useState<Record<number, string>>({});
   // Tratte comprimibili come in Partenze — le nuove restano aperte per
   // poterle compilare subito, le altre si possono chiudere per non
   // dover scorrere tutto quando ce ne sono tante.
@@ -141,9 +138,6 @@ export function SchedaEventoModale({
   function rinominaServizio(key: string, nome: string) {
     setServizi((prev) => prev.map((v) => v.key === key ? { ...v, nome } : v));
   }
-  function aggiornaArrivoServizio(key: string, campo: 'arrivoIndirizzo' | 'arrivoOrario', valore: string) {
-    setServizi((prev) => prev.map((v) => v.key === key ? { ...v, [campo]: valore } : v));
-  }
   function toggleTragittoAperto(idx: number) {
     setTragittiAperti((prev) => {
       const nuovo = new Set(prev);
@@ -153,8 +147,6 @@ export function SchedaEventoModale({
   }
   const [nuovaImmagine, setNuovaImmagine] = useState('');
   const [trascinata, setTrascinata] = useState<{ tragitto: number; fermata: number } | null>(null);
-  const [statoRicalcolo, setStatoRicalcolo] = useState<Record<number, string>>({});
-  const [ricalcolando, setRicalcolando] = useState<Record<number, boolean>>({});
   const [formIniziale, setFormIniziale] = useState('');
 
   const [categorieEvento, setCategorieEvento] = useState<CategoriaEvento[]>([]);
@@ -238,8 +230,6 @@ export function SchedaEventoModale({
     ricaricaCategorie();
     ricaricaCategorieEvento();
     caricaDaEvento(evento ?? null);
-    setAggiustiPerTratta({});
-    setStatoRicalcolo({});
     setTabAttiva(tabIniziale);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evento?.id]);
@@ -413,104 +403,6 @@ export function SchedaEventoModale({
     setForm({ ...form, tragitti: [...(form.tragitti ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, attivo: true, servizioId: servizioIdContestoAttuale(), fermate: [{ citta: '', indirizzo: '' }] }] });
   }
 
-  /** Applica +/- € a tutte le fermate con un prezzo già impostato di
-   *  questa tratta (es. +10 aggiunge 10€ ovunque, -5 toglie 5€, mai sotto
-   *  zero). Le fermate senza prezzo proprio non vengono toccate. */
-  function aggiustaPrezziTragitto(idxTragitto: number) {
-    const delta = Number(aggiustiPerTragitto[idxTragitto]);
-    if (!delta) return;
-    const tragitti = [...(form.tragitti ?? [])];
-    tragitti[idxTragitto] = {
-      ...tragitti[idxTragitto],
-      fermate: tragitti[idxTragitto].fermate.map((f) => (
-        f.prezzo !== undefined ? { ...f, prezzo: Math.max(0, Number((f.prezzo + delta).toFixed(2))) } : f
-      )),
-    };
-    setForm({ ...form, tragitti });
-    setAggiustiPerTratta((s) => ({ ...s, [idxTragitto]: '' }));
-  }
-
-  /** Ricalcola gli orari di una tratta a ritroso dall'orario di arrivo
-   *  (ultima fermata), usando le distanze reali tra gli indirizzi via
-   *  Nominatim + OSRM (gratuiti) — stessa logica già usata per i tragitti. */
-  /** Ricalcola gli orari di una tratta a ritroso dall'ARRIVO (campo
-   *  separato della tratta, non più l'ultima fermata), usando le distanze
-   *  reali tra gli indirizzi via Nominatim + OSRM (gratuiti). Tutte le
-   *  fermate ricevono un orario calcolato — nessuna è "l'arrivo". */
-  async function ricalcolaOrariTragitto(idxTragitto: number) {
-    const tragitto = (form.tragitti ?? [])[idxTragitto];
-    if (!tragitto) return;
-    const fermateValide = tragitto.fermate.filter((f) => f.indirizzo.trim());
-    if (fermateValide.length === 0) { setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: 'Aggiungi almeno una fermata con indirizzo compilato.' })); return; }
-
-    // L'arrivo giusto dipende dal contesto: se questa tratta appartiene
-    // a un servizio, usa l'arrivo di QUEL servizio (non più uno
-    // condiviso); se è una tratta libera, quello dell'evento.
-    const servizioDellaTratta = tragitto.servizioId ? servizi.find((v) => v.key === tragitto.servizioId) : null;
-    const arrivoIndirizzoContesto = servizioDellaTratta ? servizioDellaTratta.arrivoIndirizzo : form.arrivoIndirizzo;
-    const arrivoOrarioContesto = servizioDellaTratta ? servizioDellaTratta.arrivoOrario : form.arrivoOrario;
-    const doveScriverlo = servizioDellaTratta ? `nella sezione arrivo di "${servizioDellaTratta.nome}" qui sopra` : 'qui sopra (vale per tutte le tratte)';
-
-    if (!arrivoIndirizzoContesto?.trim()) { setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: `Inserisci prima l'indirizzo di arrivo ${doveScriverlo}.` })); return; }
-    if (!arrivoOrarioContesto) { setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: `Inserisci prima l'orario di arrivo ${doveScriverlo}.` })); return; }
-
-    setRicalcolando((s) => ({ ...s, [idxTragitto]: true }));
-    setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: 'Localizzo gli indirizzi...' }));
-
-    // La sequenza da geolocalizzare è: fermate in ordine, poi l'arrivo per
-    // ultimo — il viaggio finisce sempre lì.
-    const indirizziCompleti = [...fermateValide.map((f) => `${f.indirizzo}, ${f.citta}`), arrivoIndirizzoContesto];
-    const coordinate: (Awaited<ReturnType<typeof geocodifica>>['coordinate'])[] = [];
-    let problemaRete = false;
-    for (const indirizzo of indirizziCompleti) {
-      const r = await geocodifica(indirizzo);
-      coordinate.push(r.coordinate);
-      if (r.erroreRete) problemaRete = true;
-      await attesa(1100);
-    }
-
-    if (problemaRete) {
-      setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: 'Richiesta a OpenStreetMap non riuscita (rete/firewall). Apri la Console (F12) per il dettaglio.' }));
-      setRicalcolando((s) => ({ ...s, [idxTragitto]: false }));
-      return;
-    }
-
-    const durate: (number | null)[] = [];
-    for (let i = 0; i < coordinate.length - 1; i++) {
-      const a = coordinate[i], b = coordinate[i + 1];
-      durate.push(a && b ? await durataViaggio(a, b) : null);
-      await attesa(300);
-    }
-
-    // Parto dall'orario di arrivo e risalgo tappa per tappa, dall'ultima
-    // fermata (quella più vicina all'arrivo) fino alla prima.
-    let cursore = Number(arrivoOrarioContesto.split(':')[0]) * 60 + Number(arrivoOrarioContesto.split(':')[1]);
-    const orariCalcolati = new Array<string>(fermateValide.length);
-    let errori = 0;
-    for (let i = fermateValide.length - 1; i >= 0; i--) {
-      const durata = durate[i]; // durata[i] = tratta dalla fermata i al punto successivo (fermata i+1, o l'arrivo se i è l'ultima)
-      if (durata === null) { errori++; orariCalcolati[i] = ''; continue; }
-      cursore -= durata + 5;
-      const h = Math.floor(((cursore % 1440) + 1440) % 1440 / 60);
-      const m = ((cursore % 1440) + 1440) % 1440 % 60;
-      orariCalcolati[i] = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    }
-
-    let idxValida = 0;
-    const tragitti = [...(form.tragitti ?? [])];
-    tragitti[idxTragitto] = {
-      ...tragitti[idxTragitto],
-      fermate: tragitti[idxTragitto].fermate.map((f) => {
-        if (!f.indirizzo.trim()) return f;
-        const orario = orariCalcolati[idxValida]; idxValida++;
-        return orario ? { ...f, orario } : f;
-      }),
-    };
-    setForm({ ...form, tragitti });
-
-    setStatoRicalcolo((s) => ({ ...s, [idxTragitto]: errori ? `Fatto, ma ${errori} indirizzo/i non localizzato/i: controlla a mano.` : 'Orari ricalcolati e applicati.' }));
-    setRicalcolando((s) => ({ ...s, [idxTragitto]: false }));
-  }
 
   function infoCompleta() {
     return Boolean(form.artista && form.genere && form.luogo && form.citta && form.data);
@@ -900,43 +792,18 @@ export function SchedaEventoModale({
                     </div>
                   )}
 
-                  {/* L'arrivo (indirizzo + orario) è tutto suo, non
-                      condiviso con gli altri servizi — ognuno può
-                      arrivare in un posto e a un orario diversi. */}
-                  <div style={{ background: 'var(--night)', border: '1px solid var(--pink-dim)', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
-                    <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>
-                      Arrivo di "{servizioCorrente.nome}"
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr', gap: 8 }}>
-                      <input
-                        placeholder="Indirizzo di arrivo"
-                        value={servizioCorrente.arrivoIndirizzo ?? ''}
-                        onChange={(e) => aggiornaArrivoServizio(servizioCorrente.key, 'arrivoIndirizzo', e.target.value)}
-                      />
-                      <OrarioInput
-                        value={servizioCorrente.arrivoOrario ?? ''}
-                        onChange={(v) => aggiornaArrivoServizio(servizioCorrente.key, 'arrivoOrario', v)}
-                        placeholder="Orario"
-                      />
-                    </div>
-                  </div>
+                  {/* L'arrivo (indirizzo + orario) non si imposta più
+                      da qui — si fa da Partenze, insieme a orario e
+                      prezzo delle fermate, una volta che il tragitto è
+                      confermato lì con un bus vero. */}
                 </>
               );
             })()}
         </div>
       )}
 
-      {modalitaServizi === 'singolo' && (
-        <div className="section-card" style={{ marginBottom: 16, border: '1px solid var(--pink-dim)' }}>
-          <p style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: 'var(--pink)', marginBottom: 6 }}>
-            Arrivo (destinazione) — vale per tutte le tratte di questo evento
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr .4fr', gap: 8 }}>
-            <input placeholder="Indirizzo di arrivo" value={form.arrivoIndirizzo ?? ''} onChange={(e) => setForm({ ...form, arrivoIndirizzo: e.target.value })} />
-            <OrarioInput value={form.arrivoOrario ?? ''} onChange={(v) => setForm({ ...form, arrivoOrario: v })} placeholder="Orario" />
-          </div>
-        </div>
-      )}
+      {/* Stessa cosa: l'arrivo di un evento a servizio singolo si
+          imposta da Partenze, non più da qui. */}
 
       {/* Con i nomi di default, capita raramente — ma resta una rete di
           sicurezza: se per caso un servizio finisse senza nome (es.
@@ -1037,32 +904,14 @@ export function SchedaEventoModale({
 
           {espansa && (
           <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-end' }}>
-            <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} style={{ flex: 1 }} />
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, color: 'var(--mist)', flexShrink: 0 }}>
-              Posti
-              <CampoNumero value={tragitto.postiTotali} onChange={(v) => aggiornaTragitto(idxTragitto, 'postiTotali', v ?? 0)} style={{ width: 80 }} />
-            </label>
+          <div className="campo" style={{ marginBottom: 10 }}>
+            <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} />
           </div>
+          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 10 }}>
+            Posti, prezzi, orari e punto di arrivo si impostano da <b>Partenze</b>, una volta che questo tragitto è confermato lì con un bus vero.
+          </p>
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
-            <input
-              placeholder="es. +10 o -5"
-              type="number"
-              style={{ maxWidth: 130 }}
-              value={aggiustiPerTragitto[idxTragitto] ?? ''}
-              onChange={(e) => setAggiustiPerTratta((s) => ({ ...s, [idxTragitto]: e.target.value }))}
-            />
-            <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiustaPrezziTragitto(idxTragitto)}>
-              Applica € a tutte le fermate
-            </button>
-            <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => ricalcolaOrariTragitto(idxTragitto)} disabled={ricalcolando[idxTragitto]}>
-              {ricalcolando[idxTragitto] ? 'Calcolo orari...' : '↻ Calcola orari dall\'arrivo'}
-            </button>
-          </div>
-          {statoRicalcolo[idxTragitto] && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoRicalcolo[idxTragitto]}</p>}
-
-          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla. Ognuna ha un prezzo — l'arrivo si imposta qui sopra, separatamente.</p>
+          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla.</p>
           {tragitto.fermate.map((f, idxFermata) => (
             <div key={idxFermata} style={{ marginBottom: 6 }}>
               <div
@@ -1071,7 +920,7 @@ export function SchedaEventoModale({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => onDropSu(idxTragitto, idxFermata)}
                 style={{
-                  display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr .55fr .55fr .55fr auto', gap: 6, alignItems: 'center',
+                  display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr auto', gap: 6, alignItems: 'center',
                   opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
                 }}
               >
@@ -1098,18 +947,6 @@ export function SchedaEventoModale({
                     <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)} />
                   </>
                 )}
-                <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'orario', v)} />
-                <CampoNumero
-                  valuta placeholder="Prezzo"
-                  value={f.prezzo}
-                  onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'prezzo', v !== undefined ? String(v) : '')}
-                />
-                <CampoNumero
-                  placeholder="Posti max"
-                  title="Facoltativo: limite posti solo per questa fermata. Se vuoto, condivide i posti di tutto il bus."
-                  value={f.postiMax ?? undefined}
-                  onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'postiMax', v !== undefined ? String(v) : '')}
-                />
                 <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
               </div>
               {f.fermataAnagraficaId === null && fermateAnagrafica.length > 0 && (

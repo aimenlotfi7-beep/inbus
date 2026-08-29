@@ -372,6 +372,13 @@
       "when": 1788004198887,
       "tag": "0052_tragitto_stato_conferma",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1788007145674,
+      "tag": "0053_variazioni_tragitto",
+      "breakpoints": true
     }
   ]
 }

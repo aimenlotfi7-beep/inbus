@@ -84,6 +84,11 @@ export const eventiController = {
     res.json({ ok: true });
   },
 
+  async aggiornaTragittoOperativo(req: Request, res: Response) {
+    await eventiService.aggiornaTragittoOperativo(req.params.tragittoId, req.body);
+    res.json({ ok: true });
+  },
+
   async rimuoviBus(req: Request, res: Response) {
     await eventiService.rimuoviBus(req.params.busId);
     res.status(204).send();

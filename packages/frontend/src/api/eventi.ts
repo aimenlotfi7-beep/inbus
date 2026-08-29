@@ -83,6 +83,13 @@ export const eventiApi = {
   listaBus: (id: string) => api.get<BusFisico[]>(`/api/eventi/${id}/bus`),
   creaBus: (id: string, input: BusFisicoInput) => api.post<{ id: string }>(`/api/eventi/${id}/bus`, input),
   aggiornaBus: (id: string, busId: string, input: Partial<BusFisicoInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/bus/${busId}`, input),
+  // Fase 2 — orario/prezzo/posti si modificano da Partenze, non più da
+  // Eventi. aggiornaServizio esisteva già lato backend (mai usata dal
+  // frontend finora) — qui il client mancante.
+  aggiornaServizio: (eventoId: string, servizioId: string, input: { nome?: string; arrivoIndirizzo?: string | null; arrivoOrario?: string | null }) =>
+    api.put<{ id: string; nome: string; arrivoIndirizzo: string | null; arrivoOrario: string | null }>(`/api/eventi/${eventoId}/servizi/${servizioId}`, input),
+  aggiornaTragittoOperativo: (tragittoId: string, input: { postiTotali: number; prezzoExtra?: number; fermate: FermataInput[] }) =>
+    api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/operativo`, input),
   rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
   listaPasseggeriBus: (id: string, busId: string) => api.get<PasseggeroBus[]>(`/api/eventi/${id}/bus/${busId}/passeggeri`),
   riepilogoEconomico: (id: string) => api.get<RiepilogoEconomicoTratta[]>(`/api/eventi/${id}/riepilogo-economico`),

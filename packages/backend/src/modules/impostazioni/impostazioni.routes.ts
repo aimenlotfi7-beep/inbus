@@ -30,6 +30,19 @@ export async function leggiCreditoPerPasseggero(): Promise<number> {
   return Number.isFinite(valore) && valore >= 0 ? valore : DEFAULT_CREDITO_PER_PASSEGGERO;
 }
 
+/** Un posticipo dell'orario di una fermata sotto questa soglia non fa
+ *  scattare la comunicazione ai clienti — troppi piccoli aggiustamenti
+ *  manderebbero email inutili. L'anticipo (qualunque entità) e il
+ *  cambio città/indirizzo restano SEMPRE notificati, senza soglia. */
+export const CHIAVE_SOGLIA_POSTICIPO_MINUTI = 'soglia_posticipo_variazione_minuti';
+const DEFAULT_SOGLIA_POSTICIPO_MINUTI = 20;
+
+export async function leggiSogliaPosticipoMinuti(): Promise<number> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_SOGLIA_POSTICIPO_MINUTI)).limit(1);
+  const valore = riga ? Number(riga.valore) : NaN;
+  return Number.isFinite(valore) && valore >= 0 ? valore : DEFAULT_SOGLIA_POSTICIPO_MINUTI;
+}
+
 export const impostazioniRouter = Router();
 impostazioniRouter.use(richiedeAuth);
 

@@ -266,6 +266,11 @@
     font-family:'Poppins',sans-serif; font-weight:800; font-size:clamp(26px,3.4vw,38px); text-transform:uppercase; letter-spacing:.4px; margin:0;
   }
   .section-title em{font-style:normal; color:var(--pink);}
+  .breadcrumb{display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:13px; margin:8px 0 2px; color:var(--mist);}
+  .breadcrumb a{color:var(--mist); text-decoration:none;}
+  .breadcrumb a:hover{color:var(--pink); text-decoration:underline;}
+  .breadcrumb span[aria-current]{color:var(--paper); font-weight:600;}
+  .breadcrumb-separatore{color:var(--mist); opacity:.5;}
   .section-sub{color:var(--mist); font-size:14px; max-width:40ch;}
 
   /* ---------- EVENTS GRID ---------- */

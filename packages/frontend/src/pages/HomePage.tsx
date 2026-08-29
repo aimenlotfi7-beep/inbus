@@ -193,16 +193,28 @@ export function HomePage() {
   const eventiFiltrati = useMemo(() => {
     let lista = genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => e.genere === genereAttivo);
     if (categoriaAttiva) lista = lista.filter((e) => e.categoria === categoriaAttiva);
-    const q = ricercaTesto.trim().toLowerCase();
-    if (q) {
-      lista = lista.filter((e) =>
-        e.artista.toLowerCase().includes(q) ||
-        e.citta.toLowerCase().includes(q) ||
-        e.luogo.toLowerCase().includes(q) ||
-        [...e.tragitti, ...e.servizi.flatMap((v) => v.tragitti)].some((l) => l.fermate.some((f) => f.citta.toLowerCase().includes(q)))
-      );
+    // Normalizza per il confronto: minuscolo + senza accenti (così
+    // "citta" trova anche "città") — usata sia sul testo cercato sia
+    // sui campi dell'evento.
+    const normalizza = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const parole = normalizza(ricercaTesto.trim()).split(/\s+/).filter(Boolean);
+    if (parole.length) {
+      lista = lista.filter((e) => {
+        // Tutto il testo cercabile di un evento, unito in un solo
+        // blocco — ogni parola cercata deve trovarsi DA QUALCHE PARTE
+        // qui dentro, non necessariamente tutte nello stesso campo:
+        // "Milano concerto" deve trovare un evento anche se "Milano"
+        // è solo nella fermata e "concerto" solo nel nome artista.
+        const testo = normalizza([
+          e.artista, e.citta, e.luogo,
+          ...[...e.tragitti, ...e.servizi.flatMap((v) => v.tragitti)].flatMap((l) => l.fermate.map((f) => f.citta)),
+        ].join(' '));
+        return parole.every((p) => testo.includes(p));
+      });
     }
-    return lista;
+    // Ordine cronologico sempre garantito qui, esplicitamente — non ci
+    // si affida al solo ordine con cui arrivano dal server.
+    return [...lista].sort((a, b) => a.data.localeCompare(b.data));
   }, [eventi, genereAttivo, categoriaAttiva, ricercaTesto]);
 
   // Numeri veri, calcolati dai dati reali — non inventati: quante
@@ -297,6 +309,32 @@ export function HomePage() {
         <div className="section-head">
           <div>
             <h2 className="section-title">Tutti gli <em>eventi</em></h2>
+            {/* Riflette la cascata di filtri già esistente
+                (categoria→genere) — ogni passaggio tranne l'ultimo è
+                cliccabile per tornare indietro di un livello. */}
+            <nav aria-label="Percorso" className="breadcrumb">
+              <a href="#eventi" onClick={(e) => { e.preventDefault(); setSearchParams((p) => { p.delete('categoria'); p.delete('genere'); return p; }); }}>
+                Tutti gli eventi
+              </a>
+              {categoriaAttiva && (
+                <>
+                  <span className="breadcrumb-separatore">›</span>
+                  {genereAttivo !== 'Tutti' ? (
+                    <a href="#eventi" onClick={(e) => { e.preventDefault(); setSearchParams((p) => { p.delete('genere'); return p; }); }}>
+                      {categoriaAttiva}
+                    </a>
+                  ) : (
+                    <span aria-current="page">{categoriaAttiva}</span>
+                  )}
+                </>
+              )}
+              {categoriaAttiva && genereAttivo !== 'Tutti' && (
+                <>
+                  <span className="breadcrumb-separatore">›</span>
+                  <span aria-current="page">{genereAttivo}</span>
+                </>
+              )}
+            </nav>
             <p className="section-sub">Scegli il concerto, scegli la tua fermata, il resto lo pensiamo noi.</p>
           </div>
         </div>

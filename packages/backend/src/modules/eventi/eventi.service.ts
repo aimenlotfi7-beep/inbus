@@ -18,7 +18,8 @@ import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
-import { tragittoSchema } from './eventi.dto.js';
+import { tragittoSchema, aggiornaTragittoOperativoSchema } from './eventi.dto.js';
+import { rilevaVariazioni, generaComunicazioniVariazione } from '../variazioni/variazioni.service.js';
 import type { z } from 'zod';
 
 // Include standard riusato da list/getById: evento con tutte le sue
@@ -247,7 +248,7 @@ export const eventiService = {
     const [nuovo] = await db.insert(servizi).values({ eventoId, nome, arrivoOrario }).returning();
     return nuovo;
   },
-  async aggiornaServizio(id: string, dati: { nome?: string; arrivoOrario?: string | null }) {
+  async aggiornaServizio(id: string, dati: { nome?: string; arrivoIndirizzo?: string | null; arrivoOrario?: string | null }) {
     const [aggiornato] = await db.update(servizi).set(dati).where(eq(servizi.id, id)).returning();
     if (!aggiornato) throw new NonTrovato('Servizio');
     return aggiornato;
@@ -703,6 +704,60 @@ export const eventiService = {
         tourLeaderNome: tl ? `${tl.nome} ${tl.cognome}` : null,
       };
     });
+  },
+
+  /** Fase 2 — orario/prezzo/posti per fermata e per tragitto si
+   *  modificano da qui (Partenze), non più da Eventi. A differenza del
+   *  salvataggio completo dell'evento, questa aggiorna UN tragitto
+   *  solo, senza dover rimandare tutto il payload — comodo per un
+   *  editing rapido dalla scheda del tragitto in Partenze. Le fermate
+   *  vengono sostituite per intero (elimina+ricrea, come già fa il
+   *  salvataggio completo — non hanno prenotazioni collegate
+   *  direttamente, le prenotazioni salvano città/indirizzo come
+   *  testo, non un riferimento), quindi aggiungere/togliere una
+   *  fermata solo per questa specifica partenza funziona già così
+   *  com'è: basta mandare l'elenco nuovo. */
+  async aggiornaTragittoOperativo(tragittoId: string, input: z.infer<typeof aggiornaTragittoOperativoSchema>) {
+    const [esiste] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!esiste) throw new NonTrovato('Tragitto');
+
+    // Rilevo le variazioni PRIMA di toccare il database — servono le
+    // fermate vecchie vere per il confronto (vedi rilevaVariazioni).
+    const fermateVecchie = await db.select().from(fermate).where(eq(fermate.tragittoId, tragittoId)).orderBy(fermate.ordine);
+    const variazioniRilevate = await rilevaVariazioni(
+      fermateVecchie.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario })),
+      input.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario }))
+    );
+
+    await db.transaction(async (tx) => {
+      // Stessa logica già in sincronizzaTuttiITragitti: i posti già
+      // occupati (venduti) restano tali, i disponibili si aggiustano
+      // della stessa quantità invece di essere resettati.
+      const postiOccupati = esiste.postiTotali - esiste.postiDisponibili;
+      const nuoviPostiDisponibili = Math.max(0, input.postiTotali - postiOccupati);
+      await tx.update(tragitti).set({
+        postiTotali: input.postiTotali,
+        postiDisponibili: nuoviPostiDisponibili,
+        prezzoExtra: input.prezzoExtra.toFixed(2),
+      }).where(eq(tragitti.id, tragittoId));
+
+      await tx.delete(fermate).where(eq(fermate.tragittoId, tragittoId));
+      if (input.fermate.length) {
+        await tx.insert(fermate).values(
+          input.fermate.map((f, ordine) => ({
+            tragittoId, ordine,
+            fermataAnagraficaId: f.fermataAnagraficaId,
+            citta: f.citta, indirizzo: f.indirizzo,
+            orario: f.orario, orarioRitorno: f.orarioRitorno, indirizzoRitorno: f.indirizzoRitorno,
+            postiMax: f.postiMax, prezzo: f.prezzo?.toFixed(2),
+          }))
+        );
+      }
+    });
+
+    // Le comunicazioni partono SOLO dopo che il salvataggio è andato a
+    // buon fine — non devono partire per un salvataggio poi fallito.
+    await generaComunicazioniVariazione(tragittoId, variazioniRilevate);
   },
 
   async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus?: number; note?: string; tragittiIds: string[] }) {

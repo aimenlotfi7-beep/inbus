@@ -7,7 +7,7 @@ import { chatApi } from '../../api/chat';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'partenze'
-  | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi'
+  | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi' | 'variazioni'
   | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
   | 'fornitori' | 'fermate' | 'tragitti'
   | 'chat' | 'contenuti' | 'comunicazioni'
@@ -39,6 +39,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   { titolo: 'Customer Care', voci: [
     { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
     { id: 'rimborsi', label: 'Rimborsi', permesso: 'prenotazioni.pagamenti' },
+    { id: 'variazioni', label: 'Variazioni', permesso: 'prenotazioni.pagamenti' },
     { id: 'utenti', label: 'Utenti', permesso: 'utenti.visualizza' },
     { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
     { id: 'chat', label: 'Chat', permesso: 'chat.visualizza' },

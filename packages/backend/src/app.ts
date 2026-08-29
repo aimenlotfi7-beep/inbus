@@ -29,6 +29,7 @@ import { tourLeaderAuthRouter } from './modules/tour-leader-auth/tour-leader-aut
 import { controlloAccessiRouter } from './modules/controllo-accessi/controllo-accessi.routes.js';
 import { creditoRouter } from './modules/credito/credito.routes.js';
 import { richiesteRimborsoRouter } from './modules/richieste-rimborso/richieste-rimborso.routes.js';
+import { variazioniRouter, variazioniRispostePubblicheRouter } from './modules/variazioni/variazioni.routes.js';
 import { clienteAuthRouter } from './modules/cliente-auth/cliente-auth.routes.js';
 import { ticketRouter } from './modules/ticket/ticket.routes.js';
 import { categorieRouter } from './modules/categorie/categorie.routes.js';
@@ -85,6 +86,8 @@ export function creaApp() {
   app.use('/api/controllo-accessi', controlloAccessiRouter);
   app.use('/api/credito', creditoRouter);
   app.use('/api/richieste-rimborso', richiesteRimborsoRouter);
+  app.use('/api/variazioni', variazioniRouter);
+  app.use('/api/variazioni-risposte', variazioniRispostePubblicheRouter);
   app.use('/api/cliente-auth', clienteAuthRouter);
   app.use('/api/biglietti', ticketRouter);
   app.use('/api/categorie', categorieRouter);

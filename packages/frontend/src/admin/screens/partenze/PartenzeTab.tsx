@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { eventiApi, type CalcoloBusTragitto, type BusFisico, type BusFisicoInput, type RiepilogoEconomicoTratta } from '../../../api/eventi';
+import { eventiApi, type CalcoloBusTragitto, type BusFisico, type BusFisicoInput, type RiepilogoEconomicoTratta, type FermataInput } from '../../../api/eventi';
+import type { Evento } from '../../../api/types';
 import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
+import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { tourLeaderApi, type TourLeader } from '../../../api/tourleader';
 import { ErroreApi } from '../../../api/client';
 import { Modale } from '../../shared/Modale';
 import { CampoNumero } from '../../shared/CampoNumero';
+import { OrarioInput } from '../../shared/OrarioInput';
 import { useSessione } from '../../shared/SessioneContext';
 import { haPermesso } from '../../../api/auth';
 
@@ -54,9 +57,14 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
   const sessione = useSessione();
   const vedeEconomia = haPermesso(sessione, 'eventi.economia');
   const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
+  const [eventoCompleto, setEventoCompleto] = useState<Evento | null>(null);
+  const [tragittoInModifica, setTragittoInModifica] = useState<string | null>(null);
+  const [formOperativo, setFormOperativo] = useState<{ postiTotali: number; prezzoExtra: number; fermate: FermataInput[] } | null>(null);
+  const [salvandoOperativo, setSalvandoOperativo] = useState(false);
   const [busLista, setBusLista] = useState<BusFisico[]>([]);
   const [economia, setEconomia] = useState<RiepilogoEconomicoTratta[]>([]);
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
+  const [fermateAnagrafica, setFermateAnagrafica] = useState<FermataAnagrafica[]>([]);
   const [tourLeaders, setTourLeaders] = useState<TourLeader[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState('');
@@ -78,11 +86,18 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
       eventiApi.calcolaBus(eventoId),
       eventiApi.listaBus(eventoId),
       vedeEconomia ? eventiApi.riepilogoEconomico(eventoId) : Promise.resolve([]),
+      eventiApi.getById(eventoId),
     ])
-      .then(([c, b, e]) => {
+      .then(([c, b, e, ev]) => {
         setCalcolo(c);
         setBusLista(b);
         setEconomia(e);
+        // Fase 2 — orario/prezzo/posti si modificano da qui, non più da
+        // Eventi: servono i dati VERI di ogni fermata (il calcolo bus
+        // sopra ne ha solo una versione minima, per il conteggio
+        // passeggeri) — l'evento completo li ha tutti, cercati al
+        // bisogno quando si apre il pannello di modifica di un tragitto.
+        setEventoCompleto(ev);
         // Se c'è una sola tratta, tanto vale aprirla subito — altrimenti
         // partono tutte chiuse, per non dover scorrere un elenco lungo.
         setAperte((prev) => prev.size === 0 && c.length === 1 ? new Set([c[0].tragittoId]) : prev);
@@ -109,6 +124,7 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
   useEffect(() => {
     ricarica();
     fornitoriApi.list().then(setFornitori).catch(() => setFornitori([]));
+    fermateAnagraficaApi.list().then(setFermateAnagrafica).catch(() => setFermateAnagrafica([]));
     tourLeaderApi.list().then(setTourLeaders).catch(() => setTourLeaders([]));
   }, [eventoId]);
 
@@ -117,6 +133,51 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
       const nuovo = new Set(prev);
       if (nuovo.has(tragittoId)) nuovo.delete(tragittoId); else nuovo.add(tragittoId);
       return nuovo;
+    });
+  }
+
+  // Fase 2 — orario/prezzo/posti si modificano da qui, non più da
+  // Eventi. I dati veri della fermata (non la versione minima del
+  // calcolo bus) arrivano dall'evento completo, già caricato in ricarica().
+  function apriModificaOperativa(tragitto: CalcoloBusTragitto) {
+    const tragittoVero = eventoCompleto
+      ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragitto.tragittoId)
+      : undefined;
+    if (!tragittoVero) return;
+    setFormOperativo({
+      postiTotali: tragittoVero.postiTotali,
+      prezzoExtra: Number(tragittoVero.prezzoExtra),
+      fermate: tragittoVero.fermate.map((f) => ({
+        fermataAnagraficaId: f.fermataAnagraficaId,
+        citta: f.citta, indirizzo: f.indirizzo,
+        orario: f.orario ?? undefined, orarioRitorno: f.orarioRitorno ?? undefined, indirizzoRitorno: f.indirizzoRitorno ?? undefined,
+        prezzo: f.prezzo ? Number(f.prezzo) : undefined,
+        postiMax: f.postiMax ?? undefined,
+      })),
+    });
+    setTragittoInModifica(tragitto.tragittoId);
+  }
+
+  async function salvaOperativo() {
+    if (!tragittoInModifica || !formOperativo) return;
+    setSalvandoOperativo(true);
+    try {
+      await eventiApi.aggiornaTragittoOperativo(tragittoInModifica, formOperativo);
+      setTragittoInModifica(null);
+      setFormOperativo(null);
+      ricarica();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+    } finally {
+      setSalvandoOperativo(false);
+    }
+  }
+  function aggiornaFermataOperativa(idx: number, campo: keyof FermataInput, valore: string | number | undefined) {
+    setFormOperativo((f) => {
+      if (!f) return f;
+      const fermate = [...f.fermate];
+      fermate[idx] = { ...fermate[idx], [campo]: valore };
+      return { ...f, fermate };
     });
   }
 
@@ -235,6 +296,40 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
         <p className="testo-intro">Questa scheda non ha ancora nessun tragitto configurato — vai nella tab "Dettagli" per aggiungerne uno.</p>
       )}
 
+      {eventoCompleto && (() => {
+        // Fase 2 — l'arrivo si modifica da qui, non più da Eventi.
+        // Contesto giusto: quello dell'evento intero se sei sulla tab
+        // "Tragitti liberi" (o l'evento non ha servizi), quello del
+        // servizio attivo altrimenti.
+        const contestoServizio = servizioAttivo !== 'liberi' ? eventoCompleto.servizi.find((s) => s.id === servizioAttivo) : null;
+        const indirizzo = contestoServizio ? contestoServizio.arrivoIndirizzo : eventoCompleto.arrivoIndirizzo;
+        const orario = contestoServizio ? contestoServizio.arrivoOrario : eventoCompleto.arrivoOrario;
+        async function salvaArrivo(campo: 'arrivoIndirizzo' | 'arrivoOrario', valore: string) {
+          try {
+            if (contestoServizio) await eventiApi.aggiornaServizio(eventoId, contestoServizio.id, { [campo]: valore || null });
+            else await eventiApi.update(eventoId, { [campo]: valore || null });
+            ricarica();
+          } catch (e) {
+            alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+          }
+        }
+        return (
+          <div className="section-card" style={{ marginBottom: 16 }}>
+            <p className="section-label" style={{ marginBottom: 10 }}>
+              Arrivo{contestoServizio ? ` — ${contestoServizio.nome}` : ''}
+            </p>
+            <div className="form-grid">
+              <label>Indirizzo di arrivo
+                <input defaultValue={indirizzo ?? ''} onBlur={(e) => { if (e.target.value !== (indirizzo ?? '')) salvaArrivo('arrivoIndirizzo', e.target.value); }} placeholder="es. Piazzale Clodio, Roma" />
+              </label>
+              <label>Orario di arrivo
+                <OrarioInput value={orario ?? ''} onChange={(v) => { if (v !== (orario ?? '')) salvaArrivo('arrivoOrario', v); }} />
+              </label>
+            </div>
+          </div>
+        );
+      })()}
+
       {calcoloVisibile.length > 0 && (
         <div className="section-card" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 16 }}>
           <span className="chip">{calcoloVisibile.length} tragitt{calcoloVisibile.length === 1 ? 'o' : 'i'}</span>
@@ -275,7 +370,15 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
                 })()}
               </p>
             </div>
-            <span className={`badge ${stato.classe}`} style={{ flexShrink: 0 }}>{stato.etichetta}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+              <span className={`badge ${stato.classe}`}>{stato.etichetta}</span>
+              <button
+                type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }}
+                onClick={(e) => { e.stopPropagation(); apriModificaOperativa(tragitto); }}
+              >
+                Modifica orario/prezzo/posti
+              </button>
+            </div>
           </div>
 
           {espansa && (
@@ -356,6 +459,77 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
         </div>
         );
       })}
+
+      {tragittoInModifica && formOperativo && (
+        <Modale titolo="Orario, prezzo e posti" onClose={() => setTragittoInModifica(null)} larga>
+          <p className="testo-intro" style={{ marginBottom: 16 }}>
+            Solo per questa partenza — il nome e la sequenza di fermate restano quelli definiti in Eventi.
+          </p>
+          <div className="form-grid" style={{ marginBottom: 16 }}>
+            <label>Posti bus
+              <CampoNumero value={formOperativo.postiTotali} onChange={(v) => setFormOperativo((f) => f && { ...f, postiTotali: v ?? f.postiTotali })} />
+            </label>
+            <label>Prezzo extra del tragitto (€)
+              <CampoNumero valuta value={formOperativo.prezzoExtra} onChange={(v) => setFormOperativo((f) => f && { ...f, prezzoExtra: v ?? 0 })} />
+            </label>
+          </div>
+          <p className="section-label" style={{ marginBottom: 10 }}>Fermate</p>
+          {formOperativo.fermate.map((f, idx) => (
+            <div key={idx} className="section-card" style={{ marginBottom: 10, padding: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <p style={{ fontWeight: 600, fontSize: 13.5 }}>{f.citta} <span style={{ color: 'var(--mist)', fontWeight: 400 }}>— {f.indirizzo}</span></p>
+                <button
+                  type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
+                  onClick={() => setFormOperativo((form) => form && { ...form, fermate: form.fermate.filter((_, i) => i !== idx) })}
+                >
+                  Rimuovi
+                </button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <div className="campo" style={{ marginBottom: 0 }}>
+                  <label>Orario</label>
+                  <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermataOperativa(idx, 'orario', v)} />
+                </div>
+                <div className="campo" style={{ marginBottom: 0 }}>
+                  <label>Prezzo (€)</label>
+                  <CampoNumero valuta placeholder="es. 30" value={f.prezzo} onChange={(v) => aggiornaFermataOperativa(idx, 'prezzo', v)} />
+                </div>
+                <div className="campo" style={{ marginBottom: 0 }}>
+                  <label>Posti max</label>
+                  <CampoNumero placeholder="facolt." value={f.postiMax} onChange={(v) => aggiornaFermataOperativa(idx, 'postiMax', v)} />
+                </div>
+              </div>
+            </div>
+          ))}
+          {/* Aggiungere/togliere una fermata da qui vale SOLO per
+              questa partenza specifica — non tocca il modello
+              universale in Eventi, né altri eventi che usano lo stesso
+              tragitto/percorso salvato (esattamente la "particolarità
+              per quella partenza" discussa). */}
+          {fermateAnagrafica.length > 0 && (
+            <select
+              value=""
+              style={{ marginBottom: 16 }}
+              onChange={(e) => {
+                const scelta = fermateAnagrafica.find((fa) => fa.id === e.target.value);
+                if (!scelta) return;
+                setFormOperativo((form) => form && {
+                  ...form,
+                  fermate: [...form.fermate, { fermataAnagraficaId: scelta.id, citta: scelta.citta, indirizzo: scelta.indirizzo }],
+                });
+              }}
+            >
+              <option value="" disabled>+ Aggiungi una fermata a questa partenza...</option>
+              {fermateAnagrafica.map((fa) => (
+                <option key={fa.id} value={fa.id}>{fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}</option>
+              ))}
+            </select>
+          )}
+          <button type="button" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={salvandoOperativo} onClick={salvaOperativo}>
+            {salvandoOperativo ? 'Salvo...' : 'Salva'}
+          </button>
+        </Modale>
+      )}
 
       {modaleAperta && (
         <Modale titolo={inModifica ? 'Modifica bus' : 'Censisci nuovo bus'} onClose={() => setModaleAperta(false)}>

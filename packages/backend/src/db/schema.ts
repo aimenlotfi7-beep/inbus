@@ -891,11 +891,52 @@ export const movimentiCredito = pgTable('movimenti_credito', {
 // dall'amministratore: approvandola, la prenotazione viene cancellata
 // per davvero e l'eventuale credito già maturato viene tolto.
 export const statoRichiestaRimborsoEnum = pgEnum('stato_richiesta_rimborso', ['IN_ATTESA', 'APPROVATA', 'RIFIUTATA']);
+// Chi ha causato la richiesta di rimborso — non solo il cliente che
+// cambia idea, ma anche una variazione decisa da noi (fermata spostata
+// dopo che qualcuno aveva già prenotato). Non cambia l'approvazione
+// (resta sempre manuale, come deciso), solo la segnalazione — un
+// rimborso "colpa nostra" ha priorità diversa da uno normale.
+export const origineRichiestaRimborsoEnum = pgEnum('origine_richiesta_rimborso', ['CLIENTE', 'VARIAZIONE']);
+export const statoVariazioneEnum = pgEnum('stato_variazione', ['IN_CORSO', 'GESTITA']);
+
+// Una variazione a una fermata già venduta (città/indirizzo cambiati,
+// o orario anticipato/posticipato oltre soglia — vedi
+// leggiSogliaPosticipoMinuti). "descrizione" è un testo già pronto per
+// il cliente (es. "L'orario di Milano è cambiato da 14:00 a 15:30"),
+// scritto al momento della variazione — così anche se la fermata
+// cambia di nuovo dopo, questa riga racconta esattamente cosa è
+// successo IN QUEL momento, senza dover ricostruirlo a ritroso.
+export const variazioni = pgTable('variazioni', {
+  id: id(),
+  tragittoId: text('tragitto_id').notNull().references(() => tragitti.id, { onDelete: 'cascade' }),
+  fermataDescrizione: text('fermata_descrizione').notNull(), // es. "Milano" — a chi si riferisce
+  descrizione: text('descrizione').notNull(), // testo pronto per il cliente
+  stato: statoVariazioneEnum('stato').notNull().default('IN_CORSO'),
+  creataIl: timestamp('creata_il').notNull().defaultNow(),
+});
+
+// Una riga per ogni prenotazione toccata da una variazione — il token
+// è il link univoco nella mail ("va bene così" / "voglio il
+// rimborso"). risposta resta null finché il cliente non clicca (o la
+// scadenza passa, nel qual caso resta null per sempre = accettata di
+// default, come deciso — nessuna scrittura esplicita necessaria per
+// quel caso).
+export const variazioniRisposte = pgTable('variazioni_risposte', {
+  id: id(),
+  variazioneId: text('variazione_id').notNull().references(() => variazioni.id, { onDelete: 'cascade' }),
+  prenotazioneId: text('prenotazione_id').notNull().references(() => prenotazioni.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  risposta: text('risposta'), // null | 'ACCETTATA' | 'RIMBORSO_RICHIESTO'
+  rispostoIl: timestamp('risposto_il'),
+});
+
 export const richiesteRimborso = pgTable('richieste_rimborso', {
   id: id(),
   prenotazioneId: text('prenotazione_id').notNull().references(() => prenotazioni.id, { onDelete: 'cascade' }),
   motivo: text('motivo'),
   stato: statoRichiestaRimborsoEnum('stato').notNull().default('IN_ATTESA'),
+  origine: origineRichiestaRimborsoEnum('origine').notNull().default('CLIENTE'),
+  variazioneId: text('variazione_id').references(() => variazioni.id),
   noteAdmin: text('note_admin'),
   richiestaIl: timestamp('richiesta_il').notNull().defaultNow(),
   gestitaIl: timestamp('gestita_il'),

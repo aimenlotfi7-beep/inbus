@@ -118,3 +118,15 @@ export const creaBusSchema = z.object({
 export const aggiornaBusSchema = creaBusSchema.partial().extend({
   tourLeaderId: z.string().nullable().optional(),
 });
+
+// Fase 2 della revisione architetturale: orario/prezzo/posti per
+// fermata e per tragitto si modificano ora da Partenze, non più da
+// Eventi (che tiene solo la struttura universale: nome + sequenza
+// fermate). Schema volutamente più snello di tragittoSchema — niente
+// nome (fisso, si cambia solo in Eventi) né servizioId (non si sposta
+// un tragitto da un servizio all'altro da qui).
+export const aggiornaTragittoOperativoSchema = z.object({
+  postiTotali: z.number().int().positive(),
+  prezzoExtra: z.number().default(0),
+  fermate: z.array(fermataSchema).default([]),
+});
