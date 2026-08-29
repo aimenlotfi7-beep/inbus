@@ -60,18 +60,35 @@ export function TestiTooltipScreen() {
 }
 
 function RigaTooltip({ etichetta, valoreIniziale, salvando, onSalva }: {
-  chiave: string; etichetta: string; valoreIniziale: string; salvando: boolean; onSalva: (testo: string) => void;
+  chiave: string; etichetta: string; valoreIniziale: string; salvando: boolean; onSalva: (testo: string) => Promise<void>;
 }) {
   const [testo, setTesto] = useState(valoreIniziale);
+  const [appenaSalvato, setAppenaSalvato] = useState(false);
   const modificato = testo !== valoreIniziale;
+
+  async function handleSalva() {
+    await onSalva(testo);
+    // Conferma visiva chiara — prima si vedeva solo il pulsante
+    // tornare disabilitato, facile da non notare.
+    setAppenaSalvato(true);
+    setTimeout(() => setAppenaSalvato(false), 2500);
+  }
 
   return (
     <div className="section-card">
       <p className="section-label" style={{ marginBottom: 8 }}>{etichetta}</p>
-      <textarea value={testo} onChange={(e) => setTesto(e.target.value)} rows={2} style={{ marginBottom: 8 }} />
-      <button className="btn btn-ghost" disabled={!modificato || salvando} onClick={() => onSalva(testo)}>
-        {salvando ? 'Salvo...' : 'Salva'}
-      </button>
+      <textarea
+        value={testo}
+        onChange={(e) => setTesto(e.target.value)}
+        rows={4}
+        style={{ marginBottom: 8, width: '100%', minHeight: 90, resize: 'vertical', lineHeight: 1.5, fontSize: 13.5 }}
+      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button className="btn btn-ghost" disabled={!modificato || salvando} onClick={handleSalva}>
+          {salvando ? 'Salvo...' : 'Salva'}
+        </button>
+        {appenaSalvato && <span style={{ color: 'var(--green, #4ade80)', fontSize: 12.5 }}>✓ Salvato</span>}
+      </div>
     </div>
   );
 }
