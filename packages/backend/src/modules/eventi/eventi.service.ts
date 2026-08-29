@@ -101,8 +101,8 @@ function calcolaStatoAutomatico(tragitti: { postiTotali: number; postiDisponibil
  *  come se fosse una scelta manuale sua. */
 function conStatoCalcolato<T extends {
   statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
-  tragitti: { postiTotali: number; postiDisponibili: number; attivo: boolean }[];
-  servizi: { tragitti: { postiTotali: number; postiDisponibili: number; attivo: boolean }[] }[];
+  tragitti: { postiTotali: number; postiDisponibili: number; attivo: boolean; stato: 'DA_CONFERMARE' | 'CONFERMATO' }[];
+  servizi: { tragitti: { postiTotali: number; postiDisponibili: number; attivo: boolean; stato: 'DA_CONFERMARE' | 'CONFERMATO' }[] }[];
 }>(evento: T): T {
   if (evento.statoDisponibilita) return evento; // scelta manuale, ha sempre la precedenza
   // Il calcolo considera SIA i tragitti liberi SIA quelli di ogni
@@ -111,10 +111,10 @@ function conStatoCalcolato<T extends {
   // il calcolo automatico) — ma il campo "tragitti" restituito al sito
   // resta quello originale, invariato: il frontend li combina già da
   // solo dove serve, sommarli anche qui li farebbe contare due volte.
-  // Un tragitto disattivato non contribuisce: i suoi posti non sono
-  // davvero acquistabili, includerli darebbe un falso senso di
-  // disponibilità ancora ampia.
-  const tuttiPerIlCalcolo = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].filter((t) => t.attivo);
+  // Un tragitto disattivato o ancora "da confermare" (nessun bus vero)
+  // non contribuisce: i suoi posti non sono davvero acquistabili,
+  // includerli darebbe un falso senso di disponibilità ancora ampia.
+  const tuttiPerIlCalcolo = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].filter((t) => t.attivo && t.stato === 'CONFERMATO');
   return { ...evento, statoDisponibilita: calcolaStatoAutomatico(tuttiPerIlCalcolo) };
 }
 
@@ -542,7 +542,7 @@ export const eventiService = {
     const tragittiDaMostrare = (servizioId
       ? evento.servizi.find((p) => p.id === servizioId)?.tragitti ?? []
       : evento.tragitti.filter((l) => !l.servizioId)
-    ).filter((l) => l.attivo); // un tragitto disattivato non è più prenotabile, resta configurato ma sospeso
+    ).filter((l) => l.attivo && l.stato === 'CONFERMATO'); // disattivato o "da confermare" (nessun bus vero ancora): non prenotabile
     const opzioni: Array<{
       tragittoId: string;
       postiDisponibili: number;
@@ -668,6 +668,7 @@ export const eventiService = {
         tragittoId: tragitto.id,
         servizioId: tragitto.servizioId,
         nome: tragitto.nome,
+        stato: tragitto.stato,
         postiTotali: tragitto.postiTotali,
         capienzaPerBus: capienza,
         fermate: fermateConPasseggeri,
@@ -722,6 +723,12 @@ export const eventiService = {
         note: input.note,
       }).returning();
       await tx.insert(busTratte).values(tragittiIdsFiltrate.map((tragittoId) => ({ busId: nuovo.id, tragittoId })));
+      // Appena un tragitto ha almeno un bus vero registrato, passa da
+      // "Da confermare" a "Confermato" — solo da lì può andare in
+      // vendita (vedi opzioniPartenza, che filtra su questo stato).
+      // Non tocca chi è già CONFERMATO (nessun downgrade, questo è un
+      // solo passaggio in avanti).
+      await tx.update(tragitti).set({ stato: 'CONFERMATO' }).where(and(inArray(tragitti.id, tragittiIdsFiltrate), eq(tragitti.stato, 'DA_CONFERMARE')));
       return nuovo.id;
     });
   },
@@ -750,6 +757,10 @@ export const eventiService = {
         await tx.delete(busTratte).where(eq(busTratte.busId, busId));
         if (tragittiIdsFiltrate.length > 0) {
           await tx.insert(busTratte).values(tragittiIdsFiltrate.map((tragittoId) => ({ busId, tragittoId })));
+          // Stessa auto-conferma di creaBus — assegnare un bus già
+          // esistente a un tragitto ancora "da confermare" lo conferma
+          // altrettanto, non serve passare per forza da un bus nuovo.
+          await tx.update(tragitti).set({ stato: 'CONFERMATO' }).where(and(inArray(tragitti.id, tragittiIdsFiltrate), eq(tragitti.stato, 'DA_CONFERMARE')));
         }
       }
     });

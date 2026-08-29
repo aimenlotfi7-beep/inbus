@@ -199,6 +199,12 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 
 @media (max-width:860px){
   .app-shell{flex-direction:column;}
+  /* Il divisorio tra gruppi (bordo/margine sopra ogni gruppo tranne il
+     primo) è pensato per la sidebar verticale di desktop — su mobile,
+     dove i gruppi sono affiancati in orizzontale, faceva sì che
+     "Eventi" (il primo, senza quel margine extra) restasse più in alto
+     di tutti gli altri: disallineato rispetto al resto della riga. */
+  .side-group + .side-group{border-top:none; margin-top:0; padding-top:0;}
   .sidebar{
     width:100%; height:auto; position:relative;
     display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; gap:10px;
@@ -330,8 +336,8 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
   overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch; scrollbar-width:none;
 }
 .mini-tabs::-webkit-scrollbar{display:none;}
-.mini-tab{flex-shrink:0;}
 .mini-tab{
+  flex-shrink:0;
   font-family:'Poppins',sans-serif; font-size:13.5px; font-weight:600; padding:9px 16px; border-radius:8px;
   border:1px solid var(--line); color:var(--mist); background:var(--dusk); cursor:pointer;
 }

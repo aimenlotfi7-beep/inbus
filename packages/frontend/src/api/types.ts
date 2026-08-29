@@ -19,6 +19,7 @@ export interface Tragitto {
   postiDisponibili: number;
   prezzoExtra: string;
   attivo: boolean;
+  stato: 'DA_CONFERMARE' | 'CONFERMATO';
   referenteNome: string | null;
   referenteTelefono: string | null;
   fermate: Fermata[];

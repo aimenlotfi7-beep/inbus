@@ -6,19 +6,35 @@ qualsiasi programmatore** senza dover ricostruire la struttura da capo.
 
 ## Stato del progetto
 
-- **Backend**: 13 moduli, tutti con API vere e funzionanti (vedi elenco sotto)
-- **Sito pubblico**: grafica e struttura **identiche alla Versione 18**,
-  con tutte le pagine collegate all'API vera:
-  - **Home** (`/`) — eventi, vetrina, checkout
-  - **My INBUS** (`/account`) — login per email, i miei viaggi, chat
-  - **FAQ** (`/faq`) e pagine legali (`/pagina/privacy`, `/pagina/cookie`,
-    `/pagina/termini`, `/pagina/chisiamo`, `/pagina/contatti`)
-  - **Area Promoter** (`/promoter`) — login, statistiche, generatore di link
-  - **Candidatura Tour Leader** (`/tour-leader`) — form pubblico, supporta
-    `?evento=ID` per candidature legate a un evento specifico
-- **Gestionale**: grafica e struttura **identiche alla Versione 18**
-  (stesso menu laterale a gruppi collassabili, stessa Home con ricerca
-  centrale, stesse card/tabelle/modali), con 15 sezioni collegate all'API vera
+Il progetto è cresciuto molto oltre la prima versione di questo documento —
+i numeri sotto sono verificati contro il codice vero, non a memoria.
+
+- **Backend**: 35 moduli, tutti con API vere e funzionanti — 45 tabelle nello
+  schema. Copre eventi (con servizi/tragitti/fermate/anagrafica fermate,
+  percorsi salvati riutilizzabili, layout biglietto personalizzabile),
+  prenotazioni (acconto/saldo, blocco posti atomico, biglietto digitale con
+  QR), lista d'attesa, rimborsi, coupon, campagne, offerte, White Label
+  (widget incorporabile per organizzatori terzi), Promoter e Organizzatori
+  (portali dedicati con commissioni), Tour Leader (candidatura pubblica,
+  scansione biglietti da bus), chat cliente↔admin, contenuti CMS del sito,
+  ruoli e permessi granulari, cestino con ripristino.
+- **Sito pubblico**: grafica derivata dalla Versione 18, ma cresciuta molto
+  oltre — pagine principali:
+  - **Home** (`/`), **carrello** (`/carrello`), **pagina evento** (`/eventi/:slug`)
+  - **Account cliente** (`/account`, `/accedi`, `/registrati`, reset password,
+    verifica email) — area riservata con i miei viaggi, chat, credito fedeltà
+  - **FAQ** e pagine legali (`/pagina/:chiave`)
+  - **Area Promoter** (`/promoter`) e **Area Organizzatori** (`/organizzatore`)
+    — login, statistiche, generatore di link, reset password dedicato
+  - **Candidatura Tour Leader** (`/tour-leader`) e **area scansione biglietti**
+    (`/scansione/*`) — login dedicato, elenco bus, scansione QR passeggeri
+  - **Widget White Label** (`/w/:publicWidgetId`) — checkout incorporabile su
+    siti di organizzatori terzi
+  - Link diretti per completare un saldo (`/completa-saldo/:pnr`) o finalizzare
+    una promozione da lista d'attesa (`/finalizza/:token`)
+- **Gestionale**: circa 30 sezioni collegate all'API vera, organizzate in
+  gruppi (Eventi, Partenze, Vendite, Marketing, Customer Care, Persone,
+  Logistica, Sistema) — sidebar responsive con menu a tendina su mobile.
 
 Tutto è stato **verificato per davvero** in questo ambiente: compilazione
 TypeScript pulita, build di produzione Vite riuscita, avvio a runtime
@@ -178,36 +194,51 @@ inbus-v2/
 ├── packages/
 │   ├── backend/
 │   │   ├── src/
-│   │   │   ├── db/schema.ts          # tutte le tabelle (22)
-│   │   │   ├── modules/              # 13 moduli, uno per dominio
+│   │   │   ├── db/schema.ts          # tutte le tabelle (45)
+│   │   │   ├── modules/              # 35 moduli, uno per dominio
 │   │   │   ├── shared/                # errori, validazione condivisi
 │   │   │   └── config/env.ts          # variabili d'ambiente validate
 │   │   └── drizzle/                   # migration SQL generate
 │   └── frontend/
 │       └── src/
 │           ├── api/                   # client HTTP tipizzato per modulo
-│           ├── features/              # sito pubblico (eventi, checkout)
+│           ├── pages/                 # pagine di primo livello del sito pubblico
+│           ├── features/              # logica riusabile (carrello, checkout...)
 │           ├── admin/                 # gestionale
 │           │   ├── shared/            # layout, modale, tabella riusabili
 │           │   └── screens/           # una schermata per sezione
-│           └── styles/theme.css       # stesso tema colori del prototipo
+│           └── styles/                # gestionale.css, sito.css, + fogli dedicati
+│               #   (account, promoter, tourleader, faq, pagina)
 └── docs/MODULI-DA-COMPLETARE.md       # cosa manca e come completarlo
 ```
 
-## Moduli backend implementati (13)
+## Moduli backend implementati (35)
 
-Auth · Eventi · Prenotazioni (con blocco posti atomico anti-doppia-prenotazione)
-· Utenti · Pagine CMS + Contenuti sito · Coupon · Fornitori · Tragitti ·
-Promoter · Tour Leader · Chat · Amministratori · Statistiche
+Auth (cliente + admin, separati) · Eventi (con servizi/tragitti/fermate,
+anagrafica fermate riutilizzabile, percorsi salvati, stato Da confermare/
+Confermato) · Categorie evento · Categorie (generi) · Prenotazioni (blocco
+posti atomico anti-doppia-prenotazione, acconto/saldo) · Lista d'attesa ·
+Richieste di rimborso · Coupon · Campagne · Offerte · Ticket (biglietto
+digitale, QR) · Layout biglietto (editor visuale personalizzabile) ·
+Template email · Fornitori · Percorsi salvati · Fermate anagrafica ·
+Utenti · Credito fedeltà · Commissioni · White Label (widget incorporabile)
+· Promoter · Organizzatori · Tour Leader + autenticazione dedicata ·
+Controllo accessi (scansione biglietti) · Chat · Pagine CMS + Contenuti
+sito · Comunicazioni · Amministratori · Ruoli e permessi · Impostazioni ·
+Statistiche · Sitemap · Upload
 
-## Sezioni gestionale collegate (15)
+## Sezioni gestionale collegate (~30)
 
-Home (ricerca) · Statistiche · Eventi · Vetrina · Calendario · Cestino ·
-Transazioni · Pagamenti · Utenti · Fornitori · Tragitti · Promoter ·
-Tour Leader · Coupon · Chat · Contenuti sito · Amministratori
+Organizzate in gruppi — **Eventi**: Eventi, Calendario, Cestino ·
+**Partenze**: Partenze · **Vendite**: Prenotazioni, Lista d'attesa ·
+**Marketing**: Campagne, Offerte, Vetrina, Contenuti sito, Testo email,
+Layout biglietto · **Customer Care**: Pagamenti, Rimborsi, Utenti, Coupon,
+Chat, Comunicazioni · **Persone**: Promoter, Organizzatori, White Label,
+Tour Leader · **Logistica**: Fornitori, Fermate, Percorsi salvati,
+Impostazioni · **Sistema**: Amministratori, Ruoli, Statistiche, Testi
+tooltip
 
-Per il dettaglio di cosa manca ancora (area cliente sul sito, pagamenti
-veri, ecc.) vedi `docs/MODULI-DA-COMPLETARE.md`.
+Per il dettaglio di cosa manca ancora vedi `docs/MODULI-DA-COMPLETARE.md`.
 
 Per pubblicare il progetto online (non solo sul tuo PC), vedi
 `docs/DEPLOY-PRODUZIONE.md` — guida passo-passo con Railway + Vercel.

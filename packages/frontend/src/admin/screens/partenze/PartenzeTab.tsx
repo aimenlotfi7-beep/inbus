@@ -35,6 +35,11 @@ function scaricaListaCsv(riferimentoBus: string, righe: { pnr: string; nome: str
  *  qualcosa non andasse (prima mostrava "Non ancora coperta" anche
  *  qui, sembrava un avviso pur non essendoci davvero nulla da fare). */
 function statoTragitto(tragitto: CalcoloBusTragitto) {
+  // "Da confermare" ha sempre la precedenza su tutto il resto — finché
+  // non c'è un bus vero registrato, il tragitto non è nemmeno in
+  // vendita (non può avere prenotazioni), quindi gli altri controlli
+  // (posti superati, copertura) non hanno ancora senso di essere.
+  if (tragitto.stato === 'DA_CONFERMARE') return { classe: 'attenzione', etichetta: '◔ Da confermare — nessun bus registrato ancora, non in vendita' };
   const postiSuperati = tragitto.totalePasseggeri > tragitto.postiTotali;
   if (postiSuperati) return { classe: 'non-coperta', etichetta: `⚠ Posti superati di ${tragitto.totalePasseggeri - tragitto.postiTotali}` };
   if (tragitto.totalePasseggeri === 0) return { classe: 'neutro', etichetta: 'Nessuna prenotazione ancora' };

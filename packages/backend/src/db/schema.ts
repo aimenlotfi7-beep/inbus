@@ -29,6 +29,13 @@ const id = () => text('id').primaryKey().$defaultFn(() => createId());
 // ENUM
 // ---------------------------------------------------------------------
 export const statoPrenotazioneEnum = pgEnum('stato_prenotazione', ['CONFERMATA', 'CANCELLATA']);
+// Un tragitto nasce sempre "da confermare" — non visibile né prenotabile
+// sul sito finché non c'è almeno un bus vero registrato su di lui (vedi
+// creaBus/aggiornaBus più sotto, che lo fanno scattare in automatico).
+// I bus non sono di proprietà: vendere prima di avere la certezza del
+// fornitore significherebbe promettere qualcosa che potrebbe non
+// esserci davvero.
+export const statoTragittoEnum = pgEnum('stato_tragitto', ['DA_CONFERMARE', 'CONFERMATO']);
 export const statoTicketEnum = pgEnum('stato_ticket', ['EMESSO', 'UTILIZZATO', 'ANNULLATO']);
 export const tipoPagamentoEnum = pgEnum('tipo_pagamento', ['COMPLETO', 'ACCONTO']);
 export const metodoPagamentoEnum = pgEnum('metodo_pagamento', ['CARTA', 'PAYPAL', 'SATISPAY', 'DA_CONCORDARE']);
@@ -229,6 +236,8 @@ export const tragitti = pgTable('tragitti', {
   // per sospendere temporaneamente una tratta senza perdere la
   // configurazione (utile se un bus salta per un giro ma tornerà).
   attivo: boolean('attivo').notNull().default(true),
+  // Vedi statoTragittoEnum sopra — nasce sempre DA_CONFERMARE.
+  stato: statoTragittoEnum('stato').notNull().default('DA_CONFERMARE'),
   referenteNome: text('referente_nome'),
   referenteTelefono: text('referente_telefono'),
   fornitoreId: text('fornitore_id').references(() => fornitori.id),

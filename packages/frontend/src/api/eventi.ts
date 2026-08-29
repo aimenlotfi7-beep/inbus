@@ -38,6 +38,7 @@ export interface CalcoloBusTragitto {
   tragittoId: string;
   servizioId: string | null;
   nome: string;
+  stato: 'DA_CONFERMARE' | 'CONFERMATO';
   postiTotali: number;
   capienzaPerBus: number;
   fermate: FermataConPasseggeri[];
