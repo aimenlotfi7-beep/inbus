@@ -1,0 +1,48 @@
+
+  :root{
+    --night:#100e1c; --dusk:#221a38; --pink:#ff3d7a; --paper:#f6f1e7; --mist:#a99fc2; --line:rgba(246,241,231,.12); --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--night); color:var(--paper); font-family:'Space Grotesk',sans-serif;}
+  a{color:inherit;}
+  .hidden{display:none !important;}
+  header{display:flex; align-items:center; justify-content:space-between; padding:18px clamp(20px,5vw,64px); border-bottom:1px solid var(--line);}
+  .logo{font-family:'Anton',sans-serif; font-size:22px;}
+  .logo span{color:var(--pink);}
+  .back-link{color:var(--mist); font-size:13.5px; text-decoration:none;}
+  .back-link:hover{color:var(--paper);}
+
+  main{max-width:640px; margin:0 auto; padding:clamp(30px,6vw,56px) 20px 80px;}
+  h1{font-family:'Anton',sans-serif; text-transform:uppercase; font-size:clamp(26px,4vw,34px); margin:0 0 10px;}
+  .sub{color:var(--mist); font-size:14px; margin:0 0 26px; line-height:1.6;}
+  .evento-context{
+    background:var(--dusk); border:1px solid var(--pink-dim,#ff3d7a55); border-radius:12px; padding:14px 18px;
+    font-size:13.5px; margin-bottom:26px; color:var(--paper);
+  }
+
+  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:8px;}
+  .form-grid label{
+    display:flex; flex-direction:column; gap:6px; font-size:11px; color:var(--mist);
+    text-transform:uppercase; letter-spacing:.5px; grid-column:span 1;
+  }
+  .form-grid label.full{grid-column:1 / -1;}
+  .form-grid input, .form-grid textarea{
+    font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--paper);
+    background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+  }
+  .form-grid textarea{min-height:70px; resize:vertical;}
+  @media (max-width:600px){ .form-grid{grid-template-columns:1fr;} }
+
+  .btn-primary{
+    background:var(--pink); color:var(--night); font-family:'Space Grotesk',sans-serif; font-weight:700;
+    font-size:14.5px; padding:14px 22px; border-radius:999px; border:none; cursor:pointer; margin-top:16px; width:100%;
+  }
+  .btn-primary:hover{filter:brightness(1.05);}
+  .errore{color:var(--pink); font-size:12.5px; min-height:18px; margin-top:8px;}
+
+  .success-box{
+    background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
+    padding:40px; text-align:center;
+  }
+  .success-box h2{font-family:'Anton',sans-serif; text-transform:uppercase; margin:0 0 12px;}
+  .success-box p{color:var(--mist); font-size:14px;}

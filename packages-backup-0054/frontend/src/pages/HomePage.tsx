@@ -1,0 +1,138 @@
+import { useEffect, useMemo, useState } from 'react';
+import { eventiApi } from '../api/eventi';
+import { ErroreApi } from '../api/client';
+import type { Evento } from '../api/types';
+import { EventoCard } from '../features/eventi/EventoCard';
+import { CheckoutModal } from '../features/checkout/CheckoutModal';
+
+export function HomePage() {
+  const [eventi, setEventi] = useState<Evento[]>([]);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState<string | null>(null);
+  const [eventoInCheckout, setEventoInCheckout] = useState<Evento | null>(null);
+  const [genereAttivo, setGenereAttivo] = useState('Tutti');
+
+  useEffect(() => {
+    eventiApi.list({ soloFuturi: true, soloVisibili: true })
+      .then((lista) => {
+        setEventi(lista);
+        // Se arrivo da un link con ?evento=ID (es. condiviso da un promoter
+        // o dall'area cliente), apro subito il checkout di quell'evento.
+        const idDaAprire = new URLSearchParams(window.location.search).get('evento');
+        if (idDaAprire) {
+          const trovato = lista.find((e) => e.id === idDaAprire);
+          if (trovato) setEventoInCheckout(trovato);
+        }
+      })
+      .catch((e) => setErrore(e instanceof ErroreApi ? e.message : 'Impossibile contattare il server'))
+      .finally(() => setCaricamento(false));
+  }, []);
+
+  const consigliati = useMemo(() => eventi.filter((e) => e.inEvidenza), [eventi]);
+  const generi = useMemo(() => ['Tutti', ...new Set(eventi.map((e) => e.genere))], [eventi]);
+  const eventiFiltrati = useMemo(
+    () => genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => e.genere === genereAttivo),
+    [eventi, genereAttivo]
+  );
+
+  return (
+    <>
+      <section className="hero">
+        <div className="hero-grid">
+          <div>
+            <div className="eyebrow">Bus per concerti in tutta Italia</div>
+            <h1 className="hero-title"><span>Sali sul bus.</span><span className="line2">Vivi il concerto.</span></h1>
+            <p className="hero-sub">Andata e ritorno in giornata, direttamente dalla tua città al palco del tuo artista preferito. Un solo biglietto, zero pensieri.</p>
+            <div className="hero-stats">
+              <div className="stat"><b>180+</b><span>Partenze attive</span></div>
+              <div className="stat"><b>92</b><span>Città di partenza</span></div>
+              <div className="stat"><b>4.8/5</b><span>Su 14.200 viaggi</span></div>
+            </div>
+          </div>
+          <div className="ticket">
+            <div className="ticket-head"><b>Boarding Pass</b><span>Trova il tuo bus</span></div>
+            <div className="field-row">
+              <div className="field">
+                <label>Artista / Evento</label>
+                <input type="text" placeholder="Cerca o scegli..." list="artistiList" />
+                <datalist id="artistiList">{eventi.map((e) => <option key={e.id} value={e.artista} />)}</datalist>
+              </div>
+              <div className="field">
+                <label>Genere</label>
+                <select value={genereAttivo} onChange={(e) => setGenereAttivo(e.target.value)}>
+                  {generi.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+            </div>
+            <button className="search-cta" onClick={() => document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' })}>
+              <svg viewBox="0 0 24 24"><path d="M21 11l-18-8 4 8-4 8z" /></svg>
+              Cerca il bus
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {!!consigliati.length && (
+        <section className="events-section" id="consigliati">
+          <div className="section-head">
+            <div>
+              <h2 className="section-title">Eventi <em>consigliati</em></h2>
+              <p className="section-sub">La nostra selezione dei viaggi più caldi del momento.</p>
+            </div>
+          </div>
+          <div className="carosello-wrap">
+            <div className="carosello">
+              {consigliati.map((ev) => <EventoCard key={ev.id} evento={ev} />)}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="events-section" id="eventi">
+        <div className="section-head">
+          <div>
+            <h2 className="section-title">Tutti gli <em>eventi</em></h2>
+            <p className="section-sub">Scegli il concerto, scegli la tua fermata, il resto lo pensiamo noi.</p>
+          </div>
+        </div>
+        <div className="filter-bar">
+          {generi.map((g) => (
+            <button key={g} className={`chip${g === genereAttivo ? ' active' : ''}`} onClick={() => setGenereAttivo(g)}>{g}</button>
+          ))}
+        </div>
+
+        {caricamento && <p style={{ color: 'var(--mist)', padding: 40, textAlign: 'center' }}>Carico gli eventi...</p>}
+        {errore && <p className="errore" style={{ padding: 40, textAlign: 'center' }}>{errore}</p>}
+        {!caricamento && !errore && !eventiFiltrati.length && (
+          <p style={{ color: 'var(--mist)', padding: 40, textAlign: 'center' }}>Nessun evento per questo filtro.</p>
+        )}
+        <div className="grid">
+          {eventiFiltrati.map((ev) => <EventoCard key={ev.id} evento={ev} />)}
+        </div>
+      </section>
+
+      <section className="how" id="come-funziona">
+        <div className="section-head">
+          <div>
+            <h2 className="section-title">Come <em>funziona</em></h2>
+            <p className="section-sub">Tre passaggi, un solo biglietto.</p>
+          </div>
+        </div>
+        <div className="how-grid">
+          <div className="how-step"><span className="how-num">01</span><h4>Scegli il concerto</h4><p>Cerca il tuo artista o la data dell'evento e trova tutte le partenze disponibili dalla tua zona.</p></div>
+          <div className="how-step"><span className="how-num">02</span><h4>Prenota la fermata</h4><p>Seleziona la fermata più comoda per te e blocca il posto: paghi online, ricevi il biglietto via email.</p></div>
+          <div className="how-step"><span className="how-num">03</span><h4>Sali e parti</h4><p>Ti aspettiamo al punto di ritrovo. Andata, concerto, ritorno: tutto già organizzato.</p></div>
+        </div>
+      </section>
+
+      <div className="strip">
+        <div className="strip-item"><b>15 anni</b><span>Di esperienza</span></div>
+        <div className="strip-item"><b>100%</b><span>Assicurati</span></div>
+        <div className="strip-item"><b>0€</b><span>Costi di parcheggio</span></div>
+        <div className="strip-item"><b>24/7</b><span>Assistenza WhatsApp</span></div>
+      </div>
+
+      {eventoInCheckout && <CheckoutModal evento={eventoInCheckout} onClose={() => setEventoInCheckout(null)} />}
+    </>
+  );
+}

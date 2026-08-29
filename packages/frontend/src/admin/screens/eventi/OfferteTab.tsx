@@ -41,7 +41,9 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
     if (!slugModificatoAMano) setSlug(slugSuggerito(nomeEvento, v));
   }
 
+  const [salvando, setSalvando] = useState(false);
   async function salva() {
+    if (salvando) return;
     if (!nome.trim() || !slug.trim() || !scontoPercentuale) {
       alert('Compila almeno nome, link (slug) e percentuale di sconto.');
       return;
@@ -53,12 +55,15 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
       limiteUtilizzi: limiteUtilizzi ? Number(limiteUtilizzi) : undefined,
       attiva: true,
     };
+    setSalvando(true);
     try {
       await offerteApi.create(payload);
       setFormAperto(false);
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -119,7 +124,7 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
             </label>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button className="btn btn-primary" onClick={salva}>Salva e genera link</button>
+            <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva e genera link'}</button>
             <button className="btn btn-ghost" onClick={() => setFormAperto(false)}>Annulla</button>
           </div>
         </div>

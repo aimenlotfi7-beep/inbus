@@ -1,0 +1,1 @@
+ALTER TABLE "bus_fisici" ADD COLUMN IF NOT EXISTS "costo" numeric(10, 2);

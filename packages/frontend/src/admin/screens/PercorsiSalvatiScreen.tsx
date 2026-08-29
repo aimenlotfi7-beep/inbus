@@ -69,7 +69,9 @@ export function PercorsiSalvatiScreen() {
     setFermate(fermate.filter((_, i) => i !== idx));
   }
 
+  const [salvando, setSalvando] = useState(false);
   async function salva() {
+    if (salvando) return;
     if (!nome.trim()) { alert('Dai un nome al percorso prima di salvarlo.'); return; }
     const fermateValide = fermate.filter((f) => f.citta.trim() && f.indirizzo.trim());
     if (fermateValide.length === 0) { alert('Aggiungi almeno una fermata.'); return; }
@@ -80,6 +82,7 @@ export function PercorsiSalvatiScreen() {
       }
     }
     const payload = { nome, fermate: fermateValide };
+    setSalvando(true);
     try {
       if (inModifica) await percorsiSalvatiApi.update(inModifica.id, payload);
       else await percorsiSalvatiApi.create(payload);
@@ -87,6 +90,8 @@ export function PercorsiSalvatiScreen() {
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+    } finally {
+      setSalvando(false);
     }
   }
   async function elimina(t: PercorsoSalvato) {
@@ -152,7 +157,7 @@ export function PercorsiSalvatiScreen() {
         ))}
         <button className="btn btn-ghost" style={{ marginBottom: 18 }} onClick={aggiungiFermata}>+ Aggiungi fermata</button>
 
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva percorso</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva percorso'}</button>
       </PaginaSezione>
     );
   }

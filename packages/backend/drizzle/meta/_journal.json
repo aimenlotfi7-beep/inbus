@@ -386,6 +386,13 @@
       "when": 1788011653338,
       "tag": "0054_percorso_salvato_anagrafica",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1788017061561,
+      "tag": "0055_fix_ondelete_set_null",
+      "breakpoints": true
     }
   ]
 }

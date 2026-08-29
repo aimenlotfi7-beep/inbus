@@ -26,6 +26,7 @@ export function AmministratoriScreen() {
   const [ruoloOwnerTarget, setRuoloOwnerTarget] = useState(false);
   const [statoPermessi, setStatoPermessi] = useState<Record<string, StatoPermesso>>({});
   const [ricerca, setRicerca] = useState('');
+  const [salvando, setSalvando] = useState(false);
 
   function ricarica() {
     amministratoriApi.list().then(setAdmin);
@@ -50,7 +51,9 @@ export function AmministratoriScreen() {
   function apriModifica(a: Amministratore) { setInModifica(a); setForm({ nome: a.nome, email: a.email, ruoloId: a.ruoloId, attivo: a.attivo }); setModaleAperta(true); }
 
   async function salva() {
+    if (salvando) return;
     if (!form.nome || !form.email || !form.ruoloId) return;
+    setSalvando(true);
     try {
       if (inModifica) await amministratoriApi.update(inModifica.id, form);
       else await amministratoriApi.create(form);
@@ -58,6 +61,8 @@ export function AmministratoriScreen() {
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+    } finally {
+      setSalvando(false);
     }
   }
   async function elimina(a: Amministratore) {
@@ -150,7 +155,7 @@ export function AmministratoriScreen() {
             </p>
           )}
         </div>
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva amministratore</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva amministratore'}</button>
       </PaginaSezione>
     );
   }

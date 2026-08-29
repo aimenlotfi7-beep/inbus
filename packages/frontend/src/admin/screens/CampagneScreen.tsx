@@ -26,8 +26,11 @@ export function CampagneScreen() {
     setAperta(true);
   }
 
+  const [salvando, setSalvando] = useState(false);
   async function salva() {
+    if (salvando) return;
     if (!form.nome.trim()) { alert('Dai un nome alla campagna.'); return; }
+    setSalvando(true);
     try {
       if (inModifica) await campagneApi.update(inModifica.id, form);
       else await campagneApi.create(form);
@@ -35,6 +38,8 @@ export function CampagneScreen() {
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+    } finally {
+      setSalvando(false);
     }
   }
   async function elimina(c: Campagna) {
@@ -61,7 +66,7 @@ export function CampagneScreen() {
         <div className="campo" style={{ marginTop: 12 }}>
           <label><input type="checkbox" checked={form.attiva ?? true} onChange={(e) => setForm({ ...form, attiva: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Attiva</label>
         </div>
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva campagna</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva campagna'}</button>
       </PaginaSezione>
     );
   }

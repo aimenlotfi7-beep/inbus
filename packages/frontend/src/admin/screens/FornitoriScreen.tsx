@@ -25,8 +25,11 @@ export function FornitoriScreen() {
   function apriNuovo() { setInModifica(null); setForm(VUOTO); setModaleAperta(true); }
   function apriModifica(f: Fornitore) { setInModifica(f); setForm(f); setModaleAperta(true); }
 
+  const [salvando, setSalvando] = useState(false);
   async function salva() {
+    if (salvando) return;
     if (!form.nome) return;
+    setSalvando(true);
     try {
       if (inModifica) await fornitoriApi.update(inModifica.id, form);
       else await fornitoriApi.create(form);
@@ -34,6 +37,8 @@ export function FornitoriScreen() {
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+    } finally {
+      setSalvando(false);
     }
   }
   async function elimina(f: Fornitore) {
@@ -52,7 +57,7 @@ export function FornitoriScreen() {
         <div className="campo"><label>Email</label><input value={form.email ?? ''} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
         <div className="campo"><label>Indirizzo</label><input value={form.indirizzo ?? ''} onChange={(e) => setForm({ ...form, indirizzo: e.target.value })} /></div>
         <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva fornitore</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva fornitore'}</button>
       </PaginaSezione>
     );
   }

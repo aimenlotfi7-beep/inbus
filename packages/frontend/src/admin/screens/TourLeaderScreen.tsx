@@ -63,17 +63,22 @@ export function TourLeaderScreen() {
 
   function apriNuovo() { setForm(VUOTO); setFormAperto(true); }
 
+  const [salvando, setSalvando] = useState(false);
   async function salva() {
+    if (salvando) return;
     if (!form.nome.trim() || !form.cognome.trim() || !form.email.trim()) {
       alert('Compila almeno nome, cognome ed email.');
       return;
     }
+    setSalvando(true);
     try {
       await tourLeaderApi.create(form);
       setFormAperto(false);
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -101,7 +106,7 @@ export function TourLeaderScreen() {
           </select>
         </div>
         <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva tour leader</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva tour leader'}</button>
       </PaginaSezione>
     );
   }

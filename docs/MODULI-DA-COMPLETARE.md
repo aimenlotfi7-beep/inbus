@@ -1,51 +1,38 @@
 # Cosa manca ancora
 
-Backend (13 moduli) e gestionale (11 sezioni) sono completi e collegati
-ai dati veri. Quello che resta riguarda soprattutto il **sito pubblico**
-lato cliente e alcune rifiniture.
+Aggiornato dopo una revisione completa del codice — la versione
+precedente di questo documento era gravemente indietro: descriveva come
+"da fare" cose già costruite e in produzione da tempo (Cestino,
+Calendario, Vetrina, account cliente, portale Promoter, form Tour
+Leader, upload file reale). Quello che segue è stato verificato contro
+il codice vero, non a memoria.
 
-## Sito pubblico — area cliente mancante
+## Gap reali rimasti
 
-- **Login/account cliente** ("My INBUS", I miei viaggi, Chat) — oggi il
-  sito ha solo lista eventi + checkout, senza area riservata dopo l'acquisto
-- **Pagine FAQ/Privacy/Cookie** — l'API `/api/pagine` esiste ed è
-  collegata al gestionale (sezione "Contenuti sito"), manca solo la
-  pagina pubblica che le mostra al cliente
-- **Portale Promoter** — l'API di login esiste (`POST /api/promoter/login`),
-  manca la pagina pubblica
-- **Form pubblico Tour Leader** — l'API esiste (`POST /api/tour-leader/candidatura`),
-  manca il form pubblico (oggi le candidature vanno inserite/gestite
-  solo dal gestionale)
-
-## Gestionale — rifiniture possibili
-
-- **Vetrina**: oggi il toggle "in evidenza" si imposta dentro il form
-  evento; se vuoi una schermata dedicata con drag&drop per l'ordine,
-  va costruita usando lo stesso `PUT /api/eventi/:id`, nessuna nuova API
-- **Calendario**: vista mensile — richiede solo raggruppamento lato
-  frontend dei dati già restituiti da `GET /api/eventi`, nessuna nuova API
-- **Cestino**: oggi la cancellazione evento è definitiva
-  (`DELETE /api/eventi/:id`); per un vero cestino, aggiungere un campo
-  `eliminatoIl` allo schema invece di cancellare la riga
-- **Transazioni/Pagamenti come tabella dedicata**: oggi le prenotazioni
-  si vedono solo tramite `by-email`/`by-pnr`; serve aggiungere un
-  endpoint `GET /api/prenotazioni` con filtri e paginazione per una
-  vista tabellare completa nel gestionale
-- **Wizard a step per la creazione evento**: oggi il form Eventi è un
-  unico modale; se vuoi lo stesso wizard multi-step del prototipo
-  originale, è una questione di UI (React `useState` per lo step
-  corrente), l'API sotto è già pronta così com'è
-
-## Cose infrastrutturali prima della produzione vera
-
-- **Test automatici** (nessuno scritto — solo verifica di compilazione)
-- **CI/CD** per pubblicare automaticamente ad ogni modifica
-- **Autenticazione cliente reale** (oggi il sito non verifica l'identità
-  di chi prenota via email, serve un vero magic-link o OTP)
 - **Pagamenti veri**: il checkout salva la prenotazione ma non addebita
-  nessuna carta — serve integrare Stripe o un altro gateway
-- **Storage file vero** per immagini/allegati (oggi il campo `url` si
-  aspetta un link già esistente, non gestisce l'upload di file)
-- **Deploy**: il progetto gira solo in locale finora; per metterlo online
-  servono un hosting per backend+Postgres (es. Railway, Render, Fly.io)
-  e uno per il frontend statico (es. Vercel, Netlify)
+  nessuna carta — serve integrare Stripe (o un altro gateway). Ricerca
+  nel codice: nessun riferimento a Stripe/gateway di pagamento trovato
+  in `packages/backend/src`.
+- **Test automatici**: nessuno scritto (nessun file `.test.ts`/`.spec.ts`
+  nel progetto) — solo verifica di compilazione TypeScript prima di ogni
+  consegna, niente test end-to-end o unitari veri.
+- **CI/CD**: nessuna pipeline automatica (niente `.github/workflows`) —
+  ogni pubblicazione richiede ancora il flusso manuale descritto in
+  `DEPLOY-PRODUZIONE.md` (copia file, commit, migrazione via tunnel,
+  push, promozione manuale su Vercel).
+
+## Cose già costruite (per chiarezza, visto che il documento precedente diceva il contrario)
+
+Autenticazione cliente reale (email+password, verifica via link),
+upload file reale su Cloudflare R2 (non solo un campo URL), Cestino con
+recupero (eliminazione soft, mai definitiva), Calendario, Vetrina,
+portale Promoter e Organizzatori con login proprio, form pubblico
+candidatura Tour Leader, area scansione biglietti da bus, White Label
+(widget incorporabile su siti terzi), sistema completo di rilevamento
+variazioni post-vendita con comunicazione automatica ai clienti.
+
+## Suggerimento
+
+Prima di aggiungere qualunque voce a questo documento in futuro,
+verificarla contro il codice (grep, non memoria) — è esattamente il
+motivo per cui la versione precedente era diventata fuorviante.

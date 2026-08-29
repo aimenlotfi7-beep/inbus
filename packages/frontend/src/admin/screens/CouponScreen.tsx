@@ -30,8 +30,11 @@ export function CouponScreen() {
   function apriNuovo() { setInModifica(null); setForm(VUOTO); setModaleAperta(true); }
   function apriModifica(c: Coupon) { setInModifica(c); setForm({ codice: c.codice, tipo: c.tipo, valore: Number(c.valore), usiMax: c.usiMax ?? undefined, attivo: c.attivo, eventoId: c.eventoId ?? null }); setModaleAperta(true); }
 
+  const [salvando, setSalvando] = useState(false);
   async function salva() {
+    if (salvando) return;
     if (!form.codice) return;
+    setSalvando(true);
     try {
       if (inModifica) await couponApi.update(inModifica.id, form);
       else await couponApi.create(form);
@@ -39,6 +42,8 @@ export function CouponScreen() {
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+    } finally {
+      setSalvando(false);
     }
   }
   async function elimina(c: Coupon) {
@@ -70,7 +75,7 @@ export function CouponScreen() {
         <div className="campo">
           <label><input type="checkbox" checked={form.attivo ?? true} onChange={(e) => setForm({ ...form, attivo: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Attivo</label>
         </div>
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva coupon</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva coupon'}</button>
       </PaginaSezione>
     );
   }

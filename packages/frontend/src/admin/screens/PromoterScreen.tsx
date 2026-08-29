@@ -33,8 +33,11 @@ export function PromoterScreen() {
     promoterApi.statistiche(p.id).then(setStatistiche);
   }
 
+  const [salvando, setSalvando] = useState(false);
   async function salva() {
+    if (salvando) return;
     if (!form.nome || !form.email) return;
+    setSalvando(true);
     try {
       if (inModifica) await promoterApi.update(inModifica.id, form);
       else await promoterApi.create(form);
@@ -42,6 +45,8 @@ export function PromoterScreen() {
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+    } finally {
+      setSalvando(false);
     }
   }
   async function elimina(p: Promoter) {
@@ -63,7 +68,7 @@ export function PromoterScreen() {
             {statistiche.numeroPrenotazioni} prenotazioni portate · €{statistiche.fatturato.toFixed(2)} di fatturato generato
           </p>
         )}
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva promoter</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva promoter'}</button>
       </PaginaSezione>
     );
   }

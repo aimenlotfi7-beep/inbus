@@ -59,6 +59,9 @@ Ho preparato tre file per evitare di scrivere comandi nel terminale ogni volta:
    database, backend e sito. Aspetta qualche secondo, poi apri il browser su
    `http://localhost:5173`.
 3. **`STOP.bat`** — per spegnere tutto in ordine quando hai finito.
+4. **`STUDIO.bat`** — apre Drizzle Studio nel browser, uno strumento
+   visuale per guardare/modificare i dati del database direttamente
+   (comodo per controlli rapidi, senza scrivere query SQL a mano).
 
 Serve comunque avere installato una volta Node.js e Docker Desktop (vedi sotto),
 e Docker Desktop deve essere **aperto e pronto** prima di lanciare `AVVIA.bat`

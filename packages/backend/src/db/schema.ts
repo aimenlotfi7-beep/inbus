@@ -240,7 +240,9 @@ export const tragitti = pgTable('tragitti', {
   stato: statoTragittoEnum('stato').notNull().default('DA_CONFERMARE'),
   referenteNome: text('referente_nome'),
   referenteTelefono: text('referente_telefono'),
-  fornitoreId: text('fornitore_id').references(() => fornitori.id),
+  // set null: un fornitore eliminato non deve bloccare tragitti/bus
+  // già collegati — restano intatti, solo senza più quel riferimento.
+  fornitoreId: text('fornitore_id').references(() => fornitori.id, { onDelete: 'set null' }),
   // Sezione "Partenze": indica se questa tratta è coperta (bus prenotato
   // con l'agenzia/fornitore), a prescindere dal calcolo automatico dei
   // bus necessari, che resta solo un suggerimento.
@@ -305,7 +307,7 @@ export const fermate = pgTable('fermate', {
 // ---------------------------------------------------------------------
 export const busFisici = pgTable('bus_fisici', {
   id: id(),
-  fornitoreId: text('fornitore_id').references(() => fornitori.id),
+  fornitoreId: text('fornitore_id').references(() => fornitori.id, { onDelete: 'set null' }),
   riferimento: text('riferimento').notNull(), // es. targa, o riferimento dato dall'agenzia
   autistaNome: text('autista_nome'),
   autistaTelefono: text('autista_telefono'),
@@ -825,7 +827,12 @@ export const amministratorePermessi = pgTable('amministratore_permessi', {
 
 export const logAttivita = pgTable('log_attivita', {
   id: id(),
-  amministratoreId: text('amministratore_id').references(() => amministratori.id),
+  // set null (non il default RESTRICT): un amministratore che ha fatto
+  // anche una sola azione registrata non deve restare bloccato per
+  // sempre, impossibile da eliminare — il log resta comunque, solo
+  // senza più sapere di chi fosse (comportamento coerente con lo
+  // stesso pattern già usato altrove nello schema, es. tourLeaderId).
+  amministratoreId: text('amministratore_id').references(() => amministratori.id, { onDelete: 'set null' }),
   azione: text('azione').notNull(),
   dettaglio: text('dettaglio'),
   data: timestamp('data').notNull().defaultNow(),

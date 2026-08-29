@@ -161,9 +161,65 @@ git add .
 git commit -m "Descrizione della modifica"
 git push
 ```
-Railway e Vercel si accorgono da soli del nuovo codice su GitHub e
-ripubblicano automaticamente in 1-2 minuti — non devi rifare i passaggi
-sopra, solo la prima configurazione va fatta una volta.
+Railway ripubblica il backend da solo appena vede il nuovo codice su
+GitHub (1-2 minuti). **Vercel invece no** — crea una nuova build pronta,
+ma resta ferma finché non la promuovi tu a mano: Deployments → tre
+puntini sulla riga più recente → "Promote to Production". Se ti scordi
+questo passaggio, il sito pubblico continua a mostrare la versione
+precedente anche se GitHub ha già il codice nuovo.
+
+---
+
+## Flusso di lavoro incrementale (dopo il primo setup)
+
+Una volta che il progetto è online, il lavoro di tutti i giorni non
+riparte mai da zero — si applicano piccole modifiche, una alla volta.
+Il flusso concreto usato per questo progetto:
+
+1. **Ricevi un pacchetto zip** con solo i file davvero cambiati (mai
+   tutto il progetto) — estrailo e copia il contenuto nella cartella
+   giusta sovrascrivendo i file esistenti
+2. **Verifica** con `git status --short` che i file segnati come
+   modificati/nuovi siano esattamente quelli attesi, nel posto giusto
+   (occhio a percorsi tipo `packages/backend/packages/...`: capita se
+   il comando di copia viene lanciato dalla cartella sbagliata — vedi
+   sotto)
+3. **Se la modifica tocca lo schema del database** (nuove tabelle o
+   colonne — riconoscibile da un file `.sql` dentro
+   `packages/backend/drizzle/`), serve applicare la migrazione **prima**
+   di pubblicare:
+   ```powershell
+   railway connect Postgres --tunnel-only
+   ```
+   (in una finestra a parte, tienila aperta) — poi, nell'altra finestra,
+   dentro `packages/backend`:
+   ```powershell
+   "DATABASE_URL=postgresql://postgres:PASSWORD@127.0.0.1:PORTA/railway" | Out-File -Encoding utf8 .env
+   Add-Content .env "JWT_SECRET=chiave-temporanea-solo-per-migrazioni"
+   npm run db:migrate
+   ```
+   (`PORTA` è quella che il tunnel stampa a schermo) — poi **ripristina**
+   `.env` con i valori di sviluppo locale, e chiudi il tunnel
+4. **Commit e push**:
+   ```powershell
+   git add packages/
+   git commit -m "Descrizione della modifica"
+   git push
+   ```
+   (usa `git add packages/` invece di `git add .`/`git add -A` se nel
+   progetto convivono cartelle di backup locali non tracciate — evita
+   di caricarle per sbaglio)
+5. **Promuovi su Vercel** (vedi sopra — non è automatico)
+
+### Errore comune: percorso sbagliato durante la copia
+
+Se il comando di copia dei file viene eseguito mentre ci si trova
+dentro `packages\backend` invece che nella cartella principale del
+progetto, i file finiscono annidati in un percorso sbagliato tipo
+`packages/backend/packages/frontend/...` invece che
+`packages/frontend/...` — `git status --short` lo rivela subito (righe
+con percorsi ripetuti/strani). Prima di copiare, verifica sempre con
+`Get-Location` di essere nella cartella principale del progetto.
 
 ---
 

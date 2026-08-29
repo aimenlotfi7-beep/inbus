@@ -32,8 +32,11 @@ export function OrganizzatoriScreen() {
     setModaleAperta(true);
   }
 
+  const [salvando, setSalvando] = useState(false);
   async function salva() {
+    if (salvando) return;
     if (!form.nome || !form.email) return;
+    setSalvando(true);
     try {
       if (inModifica) await organizzatoriApi.update(inModifica.id, form);
       else await organizzatoriApi.create(form);
@@ -41,6 +44,8 @@ export function OrganizzatoriScreen() {
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+    } finally {
+      setSalvando(false);
     }
   }
   async function elimina(o: Organizzatore) {
@@ -61,7 +66,7 @@ export function OrganizzatoriScreen() {
           <label>Eventi associati</label>
           <SelettoreEventi selezionati={form.eventiAbilitati ?? []} onChange={(ids) => setForm({ ...form, eventiAbilitati: ids })} />
         </div>
-        <button className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} onClick={salva}>Salva organizzatore</button>
+        <button className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva organizzatore'}</button>
         {inModifica && <PannelloCommissione organizzatoreId={inModifica.id} />}
       </PaginaSezione>
     );

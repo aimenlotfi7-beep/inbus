@@ -50,8 +50,11 @@ export function RuoliScreen() {
     }));
   }
 
+  const [salvando, setSalvando] = useState(false);
   async function salva() {
+    if (salvando) return;
     if (!form.nome) return;
+    setSalvando(true);
     try {
       if (inModifica) await ruoliApi.update(inModifica.id, form);
       else await ruoliApi.create(form);
@@ -59,6 +62,8 @@ export function RuoliScreen() {
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -95,7 +100,7 @@ export function RuoliScreen() {
           </div>
         ))}
 
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva}>Salva ruolo</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva ruolo'}</button>
       </PaginaSezione>
     );
   }
