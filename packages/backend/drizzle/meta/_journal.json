@@ -379,6 +379,13 @@
       "when": 1788007145674,
       "tag": "0053_variazioni_tragitto",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1788011653338,
+      "tag": "0054_percorso_salvato_anagrafica",
+      "breakpoints": true
     }
   ]
 }

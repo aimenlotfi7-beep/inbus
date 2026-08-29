@@ -2,6 +2,7 @@ import { api } from './client';
 
 export interface FermataPercorsoSalvato {
   id?: string;
+  fermataAnagraficaId?: string | null;
   citta: string;
   indirizzo: string;
   prezzo?: number;

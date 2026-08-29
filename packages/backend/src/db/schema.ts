@@ -350,6 +350,10 @@ export const fermatePercorsoSalvato = pgTable('fermate_percorso_salvato', {
   id: id(),
   percorsoSalvatoId: text('percorso_salvato_id').notNull().references(() => percorsiSalvati.id, { onDelete: 'cascade' }),
   ordine: integer('ordine').notNull().default(0),
+  // Da quale voce dell'anagrafica arriva — facoltativo, come già per
+  // le fermate dei tragitti veri: resta possibile scrivere una
+  // fermata al volo senza passare dall'anagrafica.
+  fermataAnagraficaId: text('fermata_anagrafica_id').references(() => fermateAnagrafica.id),
   citta: text('citta').notNull(),
   indirizzo: text('indirizzo').notNull(),
   orario: text('orario'),

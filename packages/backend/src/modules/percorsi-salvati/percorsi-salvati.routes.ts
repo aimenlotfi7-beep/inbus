@@ -9,6 +9,7 @@ import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 
 const fermataPercorsoSchema = z.object({
+  fermataAnagraficaId: z.string().nullable().optional(),
   citta: z.string().min(1),
   indirizzo: z.string().min(1),
   prezzo: z.number().positive().nullable().optional().transform((v) => v ?? undefined),
@@ -47,7 +48,7 @@ export const percorsiSalvatiService = {
       if (input.fermate.length) {
         await tx.insert(fermatePercorsoSalvato).values(
           input.fermate.map((f, ordine) => ({
-            percorsoSalvatoId: nuovo.id, ordine, citta: f.citta, indirizzo: f.indirizzo,
+            percorsoSalvatoId: nuovo.id, ordine, fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo,
             prezzo: f.prezzo?.toFixed(2),
           }))
         );
@@ -67,7 +68,7 @@ export const percorsiSalvatiService = {
         if (input.fermate.length) {
           await tx.insert(fermatePercorsoSalvato).values(
             input.fermate.map((f, ordine) => ({
-              percorsoSalvatoId: id, ordine, citta: f.citta, indirizzo: f.indirizzo,
+              percorsoSalvatoId: id, ordine, fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo,
               prezzo: f.prezzo?.toFixed(2),
             }))
           );

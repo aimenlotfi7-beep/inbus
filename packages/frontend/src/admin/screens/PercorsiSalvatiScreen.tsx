@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { percorsiSalvatiApi, type PercorsoSalvato, type FermataPercorsoSalvato } from '../../api/percorsiSalvati';
+import { fermateAnagraficaApi, type FermataAnagrafica } from '../../api/fermateAnagrafica';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { CampoNumero } from '../shared/CampoNumero';
@@ -22,9 +23,11 @@ export function PercorsiSalvatiScreen() {
   const [modaleAperta, setModaleAperta] = useState(false);
   const [snapshotIniziale, setSnapshotIniziale] = useState('');
   const [ricerca, setRicerca] = useState('');
+  const [fermateAnagrafica, setFermateAnagrafica] = useState<FermataAnagrafica[]>([]);
 
   function ricarica() { percorsiSalvatiApi.list().then(setTragitti); }
   useEffect(ricarica, []);
+  useEffect(() => { fermateAnagraficaApi.list().then(setFermateAnagrafica).catch(() => setFermateAnagrafica([])); }, []);
 
   function apriNuovo() {
     setInModifica(null); setNome('');
@@ -35,7 +38,7 @@ export function PercorsiSalvatiScreen() {
   }
   function apriModifica(t: PercorsoSalvato) {
     setInModifica(t); setNome(t.nome);
-    const fermateNormalizzate = t.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined }));
+    const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined }));
     const fermateIniziali: FermataPercorsoSalvato[] = fermateNormalizzate.length ? fermateNormalizzate : [{ citta: '', indirizzo: '' }];
     setFermate(fermateIniziali);
     setSnapshotIniziale(JSON.stringify({ nome: t.nome, fermate: fermateIniziali }));
@@ -44,6 +47,15 @@ export function PercorsiSalvatiScreen() {
 
   function aggiornaFermata(idx: number, campo: keyof FermataPercorsoSalvato, valore: string) {
     setFermate(fermate.map((f, i) => i === idx ? { ...f, [campo]: campo === 'prezzo' ? Number(valore) || undefined : valore } : f));
+  }
+  function selezionaFermataAnagrafica(idx: number, anagraficaId: string) {
+    if (anagraficaId === '__manuale__') {
+      setFermate(fermate.map((f, i) => i === idx ? { ...f, fermataAnagraficaId: null } : f));
+      return;
+    }
+    const trovata = fermateAnagrafica.find((f) => f.id === anagraficaId);
+    if (!trovata) return;
+    setFermate(fermate.map((f, i) => i === idx ? { ...f, fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo } : f));
   }
   function aggiungiFermata() {
     setFermate([...fermate, { citta: '', indirizzo: '' }]);
@@ -99,11 +111,38 @@ export function PercorsiSalvatiScreen() {
               </span>
               <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 11, color: 'var(--pink)' }} onClick={() => rimuoviFermata(idx)}>✕</button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr .6fr', gap: 8 }}>
-              <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idx, 'citta', e.target.value)} />
-              <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
+            <div style={{ display: 'grid', gridTemplateColumns: f.fermataAnagraficaId !== null ? '1fr .6fr' : '1fr 1.4fr .6fr', gap: 8 }}>
+              {f.fermataAnagraficaId !== null ? (
+                // Di default (e finché non si sceglie "scrivi
+                // manualmente") si parte da qui — stesso identico
+                // sistema già usato per le fermate dei tragitti veri.
+                <select
+                  style={{ gridColumn: 'span 1' }}
+                  value={f.fermataAnagraficaId ?? ''}
+                  onChange={(e) => selezionaFermataAnagrafica(idx, e.target.value)}
+                >
+                  <option value="" disabled>— Scegli una fermata dall'anagrafica —</option>
+                  {fermateAnagrafica.map((fa) => (
+                    <option key={fa.id} value={fa.id}>{fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}</option>
+                  ))}
+                  <option value="__manuale__">✎ Scrivi manualmente, senza anagrafica...</option>
+                </select>
+              ) : (
+                <>
+                  <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idx, 'citta', e.target.value)} />
+                  <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
+                </>
+              )}
               <CampoNumero valuta placeholder="Prezzo" value={f.prezzo} onChange={(v) => aggiornaFermata(idx, 'prezzo', v !== undefined ? String(v) : '')} />
             </div>
+            {f.fermataAnagraficaId === null && fermateAnagrafica.length > 0 && (
+              <button
+                type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px', marginTop: 6 }}
+                onClick={() => setFermate(fermate.map((ff, i) => i === idx ? { ...ff, fermataAnagraficaId: undefined, citta: '', indirizzo: '' } : ff))}
+              >
+                ← Torna a scegliere dall'anagrafica
+              </button>
+            )}
           </div>
         ))}
         <button className="btn btn-ghost" style={{ marginBottom: 18 }} onClick={aggiungiFermata}>+ Aggiungi fermata</button>
