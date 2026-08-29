@@ -66,6 +66,7 @@ export function SchedaEventoModale({
   // volta) — una volta creata, i salvataggi successivi la aggiornano
   // invece di crearne una nuova ogni volta.
   const bozzaIdRef = useRef<string | null>(null);
+  const autoSalvandoRef = useRef(false);
   // Tratte comprimibili come in Partenze — le nuove restano aperte per
   // poterle compilare subito, le altre si possono chiudere per non
   // dover scorrere tutto quando ce ne sono tante.
@@ -92,6 +93,13 @@ export function SchedaEventoModale({
   );
   const [servizioTabAttivo, setServizioTabAttivo] = useState<string | null>(servizi[0]?.key ?? null);
   const [rinominaServizioAperto, setRinominaServizioAperto] = useState(false);
+  // Protezione contro il doppio click/invio multiplo — senza questa,
+  // cliccare "Salva" più volte di seguito (es. perché sembra non
+  // rispondere, magari per un errore precedente) lancia più richieste
+  // di creazione in parallelo: un evento ancora "nuovo" (non salvato)
+  // le vede tutte come "crea", finendo per generare più eventi
+  // duplicati invece di uno solo aggiornato.
+  const [salvando, setSalvando] = useState(false);
 
   function nuovoServizio() {
     const chiave = `nuovo-${Date.now()}`;
@@ -432,6 +440,12 @@ export function SchedaEventoModale({
     if (evento) return; // in modifica di un evento vero, non serve: è già salvato
     if (!infoCompleta()) return;
     const timeout = setTimeout(async () => {
+      // Stessa protezione di salva(): se la rete è lenta, un
+      // auto-salvataggio ancora in corso non deve sovrapporsi a uno
+      // nuovo — entrambi vedrebbero bozzaIdRef.current ancora vuoto e
+      // creerebbero due bozze separate invece di una sola aggiornata.
+      if (autoSalvandoRef.current) return;
+      autoSalvandoRef.current = true;
       try {
         const payload = { ...form, bozza: true };
         if (bozzaIdRef.current) {
@@ -445,6 +459,8 @@ export function SchedaEventoModale({
         // Silenzioso apposta: un fallimento dell'auto-salvataggio non
         // deve interrompere chi sta scrivendo — riproverà al prossimo
         // cambiamento.
+      } finally {
+        autoSalvandoRef.current = false;
       }
     }, 1500);
     return () => clearTimeout(timeout);
@@ -486,6 +502,7 @@ export function SchedaEventoModale({
   }
 
   async function salva() {
+    if (salvando) return; // già in corso, ignora click ripetuti
     if (!infoCompleta()) {
       alert('Compila almeno artista, genere, luogo, città e data.');
       return;
@@ -563,6 +580,7 @@ export function SchedaEventoModale({
         tragitti: tratteValide.filter((l) => l.servizioId === v.key).map((l) => ({ ...l, servizioId: undefined })),
       })),
     };
+    setSalvando(true);
     try {
       if (evento) {
         // Se si tratta di una bozza ripresa e completata da qui, la
@@ -595,6 +613,8 @@ export function SchedaEventoModale({
           caricaDaEvento(fresco);
         } catch { /* se anche il ricaricamento fallisce, il modulo resta com'è — meglio di niente */ }
       }
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -1157,7 +1177,7 @@ export function SchedaEventoModale({
 
             {/* Salva e esci subito, disponibile su qualunque sezione ci
                 si trovi — non serve passare dalle altre per salvare. */}
-            <button className="btn btn-primary" style={{ width: '100%', marginTop: 18 }} onClick={salva}>Salva modifica</button>
+            <button className="btn btn-primary" style={{ width: '100%', marginTop: 18 }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva modifica'}</button>
           </>
         )}
       </PaginaSezione>
@@ -1220,7 +1240,7 @@ export function SchedaEventoModale({
             Avanti →
           </button>
         ) : (
-          <button className="btn btn-primary" onClick={salva}>Crea evento</button>
+          <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Creo...' : 'Crea evento'}</button>
         )}
       </div>
     </PaginaSezione>
