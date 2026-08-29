@@ -33,6 +33,16 @@ export function PartenzeScreen() {
     eventiApi.statistichePerEvento().then(setStatistiche).catch(() => {});
   }
   useEffect(ricarica, []);
+  // Se elimini/modifichi un evento da un'altra scheda o finestra del
+  // browser, questa lista non se ne accorgerebbe da sola finché non la
+  // ricarichi a mano — aggiorno automaticamente quando la finestra
+  // riprende il focus (tipico quando si torna a guardarla dopo aver
+  // lavorato altrove), senza bisogno di un aggiornamento continuo in
+  // background.
+  useEffect(() => {
+    window.addEventListener('focus', ricarica);
+    return () => window.removeEventListener('focus', ricarica);
+  }, []);
 
   const adesso = Date.now();
   // Un evento compare qui se ha DAVVERO qualcosa da lavorare: o ha già
