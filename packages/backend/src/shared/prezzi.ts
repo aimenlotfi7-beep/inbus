@@ -1,7 +1,12 @@
 /**
- * Prezzo "normale" (senza sconti) di una fermata: quello impostato sulla
- * fermata stessa, oppure — se non impostato — il prezzo base dell'evento
- * più l'extra della tratta.
+ * Prezzo "normale" (senza sconti) di una fermata: il prezzo impostato
+ * sulla fermata stessa (o il prezzo base dell'evento, se la fermata non
+ * ne ha uno proprio), più l'extra della tratta — che si somma SEMPRE,
+ * non solo quando la fermata non ha un prezzo proprio (prima "extra"
+ * restava inerte per qualunque tragitto creato da un percorso salvato,
+ * dato che li' ogni fermata ha sempre un prezzo/margine proprio
+ * obbligatorio — il nome del campo, "extra", vuol dire "in aggiunta",
+ * non "ripiego").
  *
  * Scritta qui apposta, una sola volta: prima questa stessa formula era
  * ripetuta in tre punti diversi del codice (opzioni di partenza, nuova
@@ -15,8 +20,8 @@ export function prezzoNormaleFermata(
   evento: { prezzo: string | null } | undefined,
   tragitto: { prezzoExtra: string } | undefined,
 ): number {
-  if (fermata?.prezzo) return Number(fermata.prezzo);
-  return (evento?.prezzo ? Number(evento.prezzo) : 0) + Number(tragitto?.prezzoExtra ?? 0);
+  const base = fermata?.prezzo ? Number(fermata.prezzo) : (evento?.prezzo ? Number(evento.prezzo) : 0);
+  return base + Number(tragitto?.prezzoExtra ?? 0);
 }
 
 /**

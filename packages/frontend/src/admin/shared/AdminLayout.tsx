@@ -114,6 +114,19 @@ export function AdminLayout({
     chatApi.contaNonLette().then((r) => setChatNonLette(r.conteggio)).catch(() => {});
   }, [sessione]);
 
+  // Funzione condivisa: quante notifiche ha una singola voce — usata
+  // sia per il badge sulla voce stessa sia per calcolare il totale da
+  // mostrare sull'intestazione del gruppo (che deve restare visibile
+  // anche quando il gruppo è chiuso a tendina su mobile — altrimenti
+  // una notifica dentro un gruppo chiuso passerebbe inosservata).
+  function notificaVoce(id: string): number {
+    if (id === 'partenze') return allertePartenze + eventiDaConfermare;
+    if (id === 'lista-attesa') return inAttesa;
+    if (id === 'rimborsi') return rimborsiInAttesa;
+    if (id === 'chat') return chatNonLette;
+    return 0;
+  }
+
   // Il menu a tendina (solo mobile) deve comparire come un vero popup,
   // sovrapposto al contenuto sotto — non intrappolato nello scorrimento
   // orizzontale della nav (che lo taglierebbe via, essendo overflow-x
@@ -167,7 +180,14 @@ export function AdminLayout({
                   return { ...g, [gruppo.titolo]: nuovoStato };
                 })}
               >
-                {gruppo.titolo} <span className="group-caret">▾</span>
+                {gruppo.titolo}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {(() => {
+                    const totaleGruppo = gruppo.voci.reduce((tot, v) => tot + notificaVoce(v.id), 0);
+                    return totaleGruppo > 0 ? <span className="side-badge side-badge-gruppo">{totaleGruppo}</span> : null;
+                  })()}
+                  <span className="group-caret">▾</span>
+                </span>
               </button>
               <div className="side-group-items">
                 {gruppo.voci.map((voce) => (
@@ -182,25 +202,23 @@ export function AdminLayout({
                     }}
                   >
                     {voce.label}
-                    {voce.id === 'partenze' && (allertePartenze + eventiDaConfermare) > 0 && (
+                    {notificaVoce(voce.id) > 0 && (
                       <span
                         className="side-badge"
-                        title={[
-                          allertePartenze > 0 ? `${allertePartenze} tratta/e con posti superati` : null,
-                          eventiDaConfermare > 0 ? `${eventiDaConfermare} evento/i con almeno un tragitto da confermare` : null,
-                        ].filter(Boolean).join(' · ')}
+                        title={
+                          voce.id === 'partenze'
+                            ? [
+                                allertePartenze > 0 ? `${allertePartenze} tratta/e con posti superati` : null,
+                                eventiDaConfermare > 0 ? `${eventiDaConfermare} evento/i con almeno un tragitto da confermare` : null,
+                              ].filter(Boolean).join(' · ')
+                            : voce.id === 'lista-attesa' ? `${inAttesa} iscrizione/i in attesa di promozione`
+                            : voce.id === 'rimborsi' ? `${rimborsiInAttesa} richiesta/e di rimborso da gestire`
+                            : voce.id === 'chat' ? `${chatNonLette} conversazione/i con messaggi non letti`
+                            : undefined
+                        }
                       >
-                        {allertePartenze + eventiDaConfermare}
+                        {notificaVoce(voce.id)}
                       </span>
-                    )}
-                    {voce.id === 'lista-attesa' && inAttesa > 0 && (
-                      <span className="side-badge" title={`${inAttesa} iscrizione/i in attesa di promozione`}>{inAttesa}</span>
-                    )}
-                    {voce.id === 'rimborsi' && rimborsiInAttesa > 0 && (
-                      <span className="side-badge" title={`${rimborsiInAttesa} richiesta/e di rimborso da gestire`}>{rimborsiInAttesa}</span>
-                    )}
-                    {voce.id === 'chat' && chatNonLette > 0 && (
-                      <span className="side-badge" title={`${chatNonLette} conversazione/i con messaggi non letti`}>{chatNonLette}</span>
                     )}
                   </button>
                 ))}

@@ -1,16 +1,18 @@
 import type { Evento } from './types';
 
 /** Prezzo minimo tra tutte le fermate prenotabili di un evento (quello
- *  che il cliente vedrebbe pagare di meno). Sostituisce il vecchio
- *  "prezzo base" dell'evento, ora che i prezzi arrivano dalle fermate
- *  delle tratte. Torna null se non c'è nessun prezzo impostato da
+ *  che il cliente vedrebbe pagare di meno) — include il "prezzo extra"
+ *  di ogni tragitto, che si somma SEMPRE al prezzo della fermata
+ *  (coerente con la stessa formula usata dal backend in
+ *  shared/prezzi.ts). Torna null se non c'è nessun prezzo impostato da
  *  nessuna parte (evento senza tratte, o tratte senza prezzi salvati). */
 export function prezzoMinimoEvento(evento: Evento): number | null {
   const prezzi: number[] = [];
   const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((v) => v.tragitti)];
   for (const tragitto of tuttiITragitti) {
+    const extra = Number(tragitto.prezzoExtra ?? 0);
     for (const f of tragitto.fermate) {
-      if (f.prezzo) prezzi.push(Number(f.prezzo));
+      if (f.prezzo) prezzi.push(Number(f.prezzo) + extra);
     }
   }
   if (prezzi.length > 0) return Math.min(...prezzi);

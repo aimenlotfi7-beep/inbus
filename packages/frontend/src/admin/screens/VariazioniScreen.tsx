@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { variazioniAdminApi, type Variazione } from '../../api/variazioni';
+import { pagineApi } from '../../api/pagine';
 import { PanelHead } from '../shared/PanelHead';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
 
 /** Elenco delle variazioni (cambio città/indirizzo/orario di una
  *  fermata già venduta) e come i clienti toccati hanno risposto — non
@@ -12,16 +14,29 @@ import { PanelHead } from '../shared/PanelHead';
 export function VariazioniScreen() {
   const [lista, setLista] = useState<Variazione[] | null>(null);
   const [soloInCorso, setSoloInCorso] = useState(true);
+  // Stesso sistema già usato ovunque nel gestionale (es. scheda evento)
+  // per i tooltip modificabili da Sistema → Testi tooltip — prima
+  // questo testo era passato come stringa fissa a PanelHead, senza
+  // nessun collegamento al sistema modificabile, motivo per cui non
+  // compariva lì per essere cambiato. PanelHead avvolge già "info" nel
+  // suo InfoTooltip interno — basta passargli il testo risolto (non
+  // serve un componente a parte).
+  const [mappaTooltip, setMappaTooltip] = useState<Record<string, string>>({});
 
   useEffect(() => {
     variazioniAdminApi.list().then(setLista);
+    pagineApi.listContenuti().then((lista) => {
+      const mappa: Record<string, string> = {};
+      for (const c of lista) if (c.chiave.startsWith('tooltip_')) mappa[c.chiave.slice(8)] = c.valore;
+      setMappaTooltip(mappa);
+    });
   }, []);
 
   const filtrata = (lista ?? []).filter((v) => !soloInCorso || v.stato === 'IN_CORSO');
 
   return (
     <div>
-      <PanelHead titolo="Variazioni" info="Cambi di città/indirizzo/orario su fermate già vendute, e come i clienti toccati hanno risposto." />
+      <PanelHead titolo="Variazioni" info={mappaTooltip.variazioni_intro ?? TOOLTIP_DEFAULT.variazioni_intro} />
 
       <div className="mini-tabs" style={{ marginBottom: 18 }}>
         <button type="button" className={`mini-tab${soloInCorso ? ' active' : ''}`} onClick={() => setSoloInCorso(true)}>In corso</button>

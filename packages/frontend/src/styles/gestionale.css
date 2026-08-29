@@ -152,6 +152,7 @@ select{
   margin-left:auto; background:var(--pink); color:#fff; font-size:10px; font-weight:700;
   border-radius:999px; padding:1px 7px;
 }
+.side-badge-gruppo{margin-left:0;} /* già dentro un contenitore dedicato insieme al caret, non serve spingerlo con auto */
 .side-utente-riga{
   margin-top:12px; padding-top:12px; border-top:1px solid var(--line);
   display:flex; align-items:center; justify-content:space-between; gap:8px;
