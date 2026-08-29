@@ -24,13 +24,11 @@ export function PartenzeScreen() {
   const [selezionato, setSelezionato] = useState<Evento | null>(null);
   const [ricerca, setRicerca] = useState('');
   const [allertePerEvento, setAllertePerEvento] = useState<Record<string, number>>({});
-  const [statistiche, setStatistiche] = useState<Record<string, { partecipanti: number; busCensiti: number }>>({});
   const [tab, setTab] = useState<Tab>('da-lavorare');
 
   function ricarica() {
     eventiApi.list().then(setEventi);
     eventiApi.allertePartenzePerEvento().then(setAllertePerEvento).catch(() => {});
-    eventiApi.statistichePerEvento().then(setStatistiche).catch(() => {});
   }
   useEffect(ricarica, []);
   // Se elimini/modifichi un evento da un'altra scheda o finestra del
@@ -45,17 +43,19 @@ export function PartenzeScreen() {
   }, []);
 
   const adesso = Date.now();
-  // Un evento compare qui se ha DAVVERO qualcosa da lavorare: o ha già
-  // prenotazioni confermate (come prima), OPPURE ha almeno un tragitto
-  // ancora "da confermare" — un evento appena creato, senza nessun bus
-  // registrato, non può avere prenotazioni per costruzione (la vendita
-  // resta bloccata finché non lo si conferma proprio qui): se
-  // restasse fuori finché non ha prenotazioni, non ci sarebbe MAI modo
-  // di confermare il primo bus.
+  // Rilevante per Partenze se ha almeno un tragitto configurato — non
+  // serve avere già prenotazioni, né essere ancora "da confermare": un
+  // evento appena confermato (bus registrato, ancora zero prenotazioni)
+  // deve restare visibile qui, altrimenti sparisce nel vuoto tra le due
+  // condizioni precedenti (non più "da confermare", non ancora "con
+  // prenotazioni") — esattamente il bug segnalato.
+  function haAlmenoUnTragitto(ev: Evento) {
+    return [...ev.tragitti, ...ev.servizi.flatMap((s) => s.tragitti)].length > 0;
+  }
   function haTragittoDaConfermare(ev: Evento) {
     return [...ev.tragitti, ...ev.servizi.flatMap((s) => s.tragitti)].some((t) => t.attivo && t.stato === 'DA_CONFERMARE');
   }
-  const eventiConPrenotazioni = eventi.filter((ev) => (statistiche[ev.id]?.partecipanti ?? 0) > 0 || haTragittoDaConfermare(ev));
+  const eventiConPrenotazioni = eventi.filter((ev) => haAlmenoUnTragitto(ev));
   const eventiPerTab = eventiConPrenotazioni.filter((ev) => {
     const passato = new Date(ev.data).getTime() < adesso;
     if (tab === 'passate') return passato;
@@ -97,7 +97,7 @@ export function PartenzeScreen() {
         ))}
         {!eventiFiltrati.length && (
           <p style={{ color: 'var(--mist)' }}>
-            {ricerca ? 'Nessun evento trovato.' : eventiConPrenotazioni.length === 0 ? 'Nessun evento da confermare o con prenotazioni ancora.' : tab === 'da-lavorare' ? 'Nessuna partenza da lavorare al momento.' : tab === 'lavorate' ? 'Nessuna partenza già lavorata.' : 'Nessun evento passato ancora.'}
+            {ricerca ? 'Nessun evento trovato.' : eventiConPrenotazioni.length === 0 ? 'Nessun evento con tragitti configurati ancora.' : tab === 'da-lavorare' ? 'Nessuna partenza da lavorare al momento.' : tab === 'lavorate' ? 'Nessuna partenza già lavorata.' : 'Nessun evento passato ancora.'}
           </p>
         )}
       </div>

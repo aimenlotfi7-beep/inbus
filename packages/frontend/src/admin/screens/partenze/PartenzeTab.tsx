@@ -331,11 +331,11 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
       {servizi && servizi.length > 0 && (
         <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
           {servizi
-            // Un servizio senza nessuna prenotazione confermata su
-            // nessuna delle sue tratte non ha ancora nulla da gestire
-            // qui — stesso principio già applicato all'evento intero
-            // nell'elenco di prima.
-            .filter((v) => calcolo.some((l) => l.servizioId === v.key && l.totalePasseggeri > 0))
+            // Un servizio con almeno un tragitto configurato ha
+            // qualcosa da gestire qui — non serve aspettare che abbia
+            // già prenotazioni (un evento appena confermato, ancora
+            // senza prenotazioni, deve comunque mostrare le sue tab).
+            .filter((v) => calcolo.some((l) => l.servizioId === v.key))
             .map((v) => {
             const nonCopertiQui = calcolo.filter((l) => l.servizioId === v.key && l.totalePasseggeri > 0 && !l.coperta).length;
             return (
@@ -349,7 +349,7 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
               </button>
             );
           })}
-          {calcolo.some((l) => !l.servizioId && l.totalePasseggeri > 0) && (() => {
+          {calcolo.some((l) => !l.servizioId) && (() => {
             const nonCopertiLiberi = calcolo.filter((l) => !l.servizioId && l.totalePasseggeri > 0 && !l.coperta).length;
             return (
               <button type="button" className={`mini-tab${servizioAttivo === 'liberi' ? ' active' : ''}`} onClick={() => setServizioAttivo('liberi')}>
