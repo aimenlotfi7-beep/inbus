@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { db } from '../../db/client.js';
 import { eventi, tragitti } from '../../db/schema.js';
-import { eq, and, gte, sql } from 'drizzle-orm';
+import { eq, and, gte, inArray } from 'drizzle-orm';
 import { urlSito } from '../../shared/email.service.js';
 
 export const sitemapRouter = Router();
@@ -12,7 +12,14 @@ export const sitemapRouter = Router();
  *  sito: va bene lo stesso, i motori di ricerca seguono i link dentro,
  *  non guardano da dove è servito il file. */
 sitemapRouter.get('/sitemap.xml', async (_req: Request, res: Response) => {
-  const eventiVisibili = await db
+  // Due passaggi invece di una sotto-query scritta a mano — stessa
+  // logica già applicata alla lista pubblica degli eventi, più facile
+  // da verificare che faccia davvero quello che deve.
+  const righeConfermate = await db.selectDistinct({ eventoId: tragitti.eventoId }).from(tragitti)
+    .where(and(eq(tragitti.stato, 'CONFERMATO'), eq(tragitti.attivo, true)));
+  const idEventiConfermati = righeConfermate.map((r) => r.eventoId);
+
+  const eventiVisibili = idEventiConfermati.length === 0 ? [] : await db
     .select({ slug: eventi.slug, aggiornatoIl: eventi.aggiornatoIl })
     .from(eventi)
     .where(and(
@@ -22,7 +29,7 @@ sitemapRouter.get('/sitemap.xml', async (_req: Request, res: Response) => {
       // nemmeno un tragitto confermato, l'evento non esiste ancora per
       // il sito — non ha senso indicizzarlo se poi il link restituisce
       // "non trovato".
-      sql`EXISTS (SELECT 1 FROM ${tragitti} WHERE ${tragitti.eventoId} = ${eventi.id} AND ${tragitti.stato} = 'CONFERMATO' AND ${tragitti.attivo} = true)`
+      inArray(eventi.id, idEventiConfermati)
     ));
 
   const paginaFissa = (percorso: string, priorita: string) =>

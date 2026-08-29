@@ -281,8 +281,14 @@ export const eventiService = {
       // registrato) non compare affatto — come se non esistesse ancora,
       // non solo "senza niente da prenotare". Basta UN tragitto
       // confermato in un servizio qualsiasi (o libero) perché l'evento
-      // torni visibile.
-      condizioni.push(sql`EXISTS (SELECT 1 FROM ${tragitti} WHERE ${tragitti.eventoId} = ${eventi.id} AND ${tragitti.stato} = 'CONFERMATO' AND ${tragitti.attivo} = true)`);
+      // torni visibile. Due passaggi invece di una sotto-query SQL
+      // scritta a mano dentro il where — più facile da verificare che
+      // faccia davvero quello che deve.
+      const righeConfermate = await db.selectDistinct({ eventoId: tragitti.eventoId }).from(tragitti)
+        .where(and(eq(tragitti.stato, 'CONFERMATO'), eq(tragitti.attivo, true)));
+      const idEventiConfermati = righeConfermate.map((r) => r.eventoId);
+      if (idEventiConfermati.length === 0) return []; // nessun evento ha nemmeno un tragitto confermato: lista vuota, senza nemmeno interrogare il resto
+      condizioni.push(inArray(eventi.id, idEventiConfermati));
     }
 
     const risultati = await db.query.eventi.findMany({
