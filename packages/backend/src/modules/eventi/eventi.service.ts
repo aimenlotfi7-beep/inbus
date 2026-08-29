@@ -160,18 +160,28 @@ async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction
  *  cancellati e ricreati — perderebbe le prenotazioni collegate),
  *  quelli senza sono nuovi, quelli rimasti fuori dal form vengono
  *  "eliminati" (cestino, recuperabili). */
-async function sincronizzaTragitti(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], eventoId: string, servizioId: string | null, tratte: z.infer<typeof tragittoSchema>[]) {
-  const condizioneServizio = servizioId === null ? isNull(tragitti.servizioId) : eq(tragitti.servizioId, servizioId);
-  const esistenti = await tx.select().from(tragitti).where(and(eq(tragitti.eventoId, eventoId), condizioneServizio, isNull(tragitti.eliminatoIl)));
-  const idsInviati = new Set(tratte.filter((l) => l.id).map((l) => l.id));
+/** Sincronizza TUTTI i tragitti di un evento in un solo passaggio —
+ *  liberi e di ogni servizio insieme, non un contesto alla volta.
+ *  Fondamentale: se lo facessi un servizio alla volta, un tragitto che
+ *  CAMBIA servizio (o passa da libero a un servizio, come quando si
+ *  converte un evento a servizio singolo in "più servizi") sparirebbe
+ *  dal contesto vecchio e ricomparirebbe in quello nuovo — visto un
+ *  contesto alla volta, sembra un'eliminazione vera (e se ha
+ *  prenotazioni confermate, il salvataggio si blocca per errore anche
+ *  se il tragitto non stava affatto sparendo, solo cambiando servizio).
+ *  Qui invece si guarda una volta sola dove finisce OGNI id in tutto
+ *  il nuovo payload — solo chi non compare più DA NESSUNA PARTE viene
+ *  trattato come eliminazione vera. */
+async function sincronizzaTuttiITragitti(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  eventoId: string,
+  bersagli: { servizioId: string | null; tragitto: z.infer<typeof tragittoSchema> }[]
+) {
+  const esistenti = await tx.select().from(tragitti).where(and(eq(tragitti.eventoId, eventoId), isNull(tragitti.eliminatoIl)));
+  const idsInPayload = new Set(bersagli.filter((b) => b.tragitto.id).map((b) => b.tragitto.id));
 
   for (const esistente of esistenti) {
-    if (idsInviati.has(esistente.id)) continue;
-    // Un tragitto con prenotazioni confermate non si può rimuovere —
-    // stesso identico controllo che c'era prima solo a livello di
-    // intero servizio, spostato qui alla singola tratta: è la
-    // granularità giusta, un servizio si "svuota" rimuovendo i suoi
-    // tragitti uno a uno, non tutti insieme con un pulsante a parte.
+    if (idsInPayload.has(esistente.id)) continue; // presente da qualche parte nel nuovo payload — non è un'eliminazione, se ne occupa il giro sotto
     const [conPrenotazioni] = await tx.select({ id: prenotazioni.id }).from(prenotazioni)
       .where(and(eq(prenotazioni.tragittoId, esistente.id), eq(prenotazioni.stato, 'CONFERMATA'))).limit(1);
     if (conPrenotazioni) {
@@ -180,7 +190,7 @@ async function sincronizzaTragitti(tx: Parameters<Parameters<typeof db.transacti
     await tx.update(tragitti).set({ eliminatoIl: new Date() }).where(eq(tragitti.id, esistente.id));
   }
 
-  for (const tragitto of tratte) {
+  for (const { servizioId, tragitto } of bersagli) {
     const giaEsistente = tragitto.id ? esistenti.find((l) => l.id === tragitto.id) : undefined;
 
     if (giaEsistente) {
@@ -404,40 +414,55 @@ export const eventiService = {
         }
       }
 
-      // I tragitti liberi (non dentro nessun servizio) — quelli dentro un
-      // servizio si sincronizzano più sotto, insieme al servizio stesso.
+      // Costruisco l'elenco di TUTTI i tragitti-bersaglio di questo
+      // salvataggio (liberi + di ogni servizio), con l'id VERO del
+      // servizio già risolto — poi sincronizzo tutto insieme in un
+      // solo passaggio (vedi sincronizzaTuttiITragitti sopra: guardare
+      // un contesto alla volta faceva scambiare per eliminazioni vere
+      // i tragitti che semplicemente cambiavano servizio).
+      const bersagli: { servizioId: string | null; tragitto: z.infer<typeof tragittoSchema> }[] = [];
+
       if (input.tragitti) {
-        await sincronizzaTragitti(tx, id, null, input.tragitti.filter((l) => !l.servizioId));
+        for (const tragitto of input.tragitti.filter((l) => !l.servizioId)) bersagli.push({ servizioId: null, tragitto });
       }
 
-      // I servizi — id esistente = aggiorna, assente = nuovo, rimasto
-      // fuori dal form = eliminato INSIEME ai suoi tragitti, passando
-      // da sincronizzaTragitti con un elenco vuoto: stessa identica
-      // funzione (e stesso controllo prenotazioni) già usata per
-      // rimuovere le singole tratte qui sotto — un servizio non si
-      // elimina più "tutto insieme", si svuota rimuovendo i suoi
-      // tragitti uno a uno (anche tutti insieme, ma sempre passando
-      // da lì): se anche uno solo ha prenotazioni confermate, blocca
-      // e basta quella riga, non serve più un controllo a parte qui.
       if (input.servizi) {
         const serviziEsistenti = await tx.select().from(servizi).where(eq(servizi.eventoId, id));
         const idsInviati = new Set(input.servizi.filter((p) => p.id).map((p) => p.id));
 
+        // Un servizio rimasto fuori dal form viene eliminato — le sue
+        // tratte, semplicemente non comparendo più tra i bersagli qui
+        // sotto, verranno trattate come eliminazione vera dal
+        // passaggio unico più avanti (stesso controllo prenotazioni).
         for (const esistente of serviziEsistenti) {
           if (idsInviati.has(esistente.id)) continue;
-          await sincronizzaTragitti(tx, id, esistente.id, []);
           await tx.delete(servizi).where(eq(servizi.id, esistente.id));
         }
 
         for (const servizio of input.servizi) {
           if (servizio.id) {
             await tx.update(servizi).set({ nome: servizio.nome, arrivoIndirizzo: servizio.arrivoIndirizzo, arrivoOrario: servizio.arrivoOrario }).where(eq(servizi.id, servizio.id));
-            await sincronizzaTragitti(tx, id, servizio.id, servizio.tragitti);
+            for (const tragitto of servizio.tragitti) bersagli.push({ servizioId: servizio.id, tragitto });
           } else {
             const [nuovoServizio] = await tx.insert(servizi).values({ eventoId: id, nome: servizio.nome, arrivoIndirizzo: servizio.arrivoIndirizzo, arrivoOrario: servizio.arrivoOrario }).returning();
-            for (const tragitto of servizio.tragitti) await inserisciTragitto(tx, id, nuovoServizio.id, tragitto);
+            for (const tragitto of servizio.tragitti) bersagli.push({ servizioId: nuovoServizio.id, tragitto });
           }
         }
+      }
+
+      // Nota per chi tocca questo codice in futuro: la sincronizzazione
+      // qui sotto presuppone che, quando il form invia i tragitti,
+      // invii SEMPRE sia "tragitti" (i liberi) sia "servizi" insieme
+      // (anche vuoti) — mai uno dei due senza l'altro. Oggi è così per
+      // l'unico chiamante che li tocca (SchedaEventoModale); altri
+      // aggiornamenti parziali (es. VetrinaScreen, che manda solo
+      // inEvidenza) non includono né l'uno né l'altro, e per quelli la
+      // condizione qui sotto salta tutto correttamente, senza toccare
+      // nulla. Se in futuro un chiamante mandasse SOLO uno dei due,
+      // l'altra categoria (mai menzionata) verrebbe vista come "sparita
+      // da ogni bersaglio" e trattata per errore come eliminazione.
+      if (input.tragitti || input.servizi) {
+        await sincronizzaTuttiITragitti(tx, id, bersagli);
       }
 
       return id;
