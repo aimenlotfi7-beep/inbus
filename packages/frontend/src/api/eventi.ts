@@ -88,7 +88,7 @@ export const eventiApi = {
   // frontend finora) — qui il client mancante.
   aggiornaServizio: (eventoId: string, servizioId: string, input: { nome?: string; arrivoIndirizzo?: string | null; arrivoOrario?: string | null }) =>
     api.put<{ id: string; nome: string; arrivoIndirizzo: string | null; arrivoOrario: string | null }>(`/api/eventi/${eventoId}/servizi/${servizioId}`, input),
-  aggiornaTragittoOperativo: (tragittoId: string, input: { postiTotali: number; prezzoExtra?: number; fermate: FermataInput[] }) =>
+  aggiornaTragittoOperativo: (tragittoId: string, input: { prezzoExtra?: number; fermate: FermataInput[] }) =>
     api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/operativo`, input),
   rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
   listaPasseggeriBus: (id: string, busId: string) => api.get<PasseggeroBus[]>(`/api/eventi/${id}/bus/${busId}/passeggeri`),

@@ -111,7 +111,7 @@ export const creaBusSchema = z.object({
   autistaTelefono: z.string().optional(),
   tourLeaderId: z.string().optional(),
   costo: z.number().nonnegative().optional(),
-  postiBus: z.number().int().positive().optional(),
+  postiBus: z.number().int().positive(),
   note: z.string().optional(),
   tragittiIds: z.array(z.string()).min(1),
 });
@@ -124,9 +124,10 @@ export const aggiornaBusSchema = creaBusSchema.partial().extend({
 // Eventi (che tiene solo la struttura universale: nome + sequenza
 // fermate). Schema volutamente più snello di tragittoSchema — niente
 // nome (fisso, si cambia solo in Eventi) né servizioId (non si sposta
-// un tragitto da un servizio all'altro da qui).
+// un tragitto da un servizio all'altro da qui). Niente più nemmeno
+// postiTotali: non si scrive più a mano, si ricalcola da solo dalla
+// somma dei bus veri registrati (vedi ricalcolaPostiTragitto).
 export const aggiornaTragittoOperativoSchema = z.object({
-  postiTotali: z.number().int().positive(),
   prezzoExtra: z.number().default(0),
   fermate: z.array(fermataSchema).default([]),
 });

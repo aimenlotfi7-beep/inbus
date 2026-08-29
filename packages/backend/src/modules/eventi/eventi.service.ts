@@ -43,6 +43,28 @@ export const includeCompleto = {
   allegati: true,
 } as const;
 
+/** Ricalcola i posti totali di un tragitto dalla somma dei bus VERI
+ *  registrati su di lui — non più un numero scritto a mano: la fonte
+ *  di verità sono i bus censiti. I posti già occupati (venduti)
+ *  restano tali, solo i disponibili si aggiustano di conseguenza —
+ *  stessa logica già usata per gli altri aggiustamenti manuali. Va
+ *  richiamata ogni volta che l'elenco bus di un tragitto cambia
+ *  (registrato un bus nuovo, cambiati i posti di uno esistente,
+ *  spostato o rimosso un bus da questo tragitto). */
+async function ricalcolaPostiTragitto(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], tragittoId: string) {
+  const [esiste] = await tx.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+  if (!esiste) return; // può capitare se il tragitto è stato eliminato nel frattempo — niente da ricalcolare
+  const righe = await tx.select({ postiBus: busFisici.postiBus }).from(busTratte)
+    .innerJoin(busFisici, eq(busFisici.id, busTratte.busId))
+    .where(eq(busTratte.tragittoId, tragittoId));
+  const nuovoTotale = righe.reduce((somma, r) => somma + (r.postiBus ?? 0), 0);
+  const postiOccupati = esiste.postiTotali - esiste.postiDisponibili;
+  await tx.update(tragitti).set({
+    postiTotali: nuovoTotale,
+    postiDisponibili: Math.max(0, nuovoTotale - postiOccupati),
+  }).where(eq(tragitti.id, tragittoId));
+}
+
 async function getById(id: string) {
   const evento = await db.query.eventi.findFirst({
     where: eq(eventi.id, id),
@@ -747,14 +769,10 @@ export const eventiService = {
     );
 
     await db.transaction(async (tx) => {
-      // Stessa logica già in sincronizzaTuttiITragitti: i posti già
-      // occupati (venduti) restano tali, i disponibili si aggiustano
-      // della stessa quantità invece di essere resettati.
-      const postiOccupati = esiste.postiTotali - esiste.postiDisponibili;
-      const nuoviPostiDisponibili = Math.max(0, input.postiTotali - postiOccupati);
+      // I posti non si toccano più qui — restano quelli calcolati dai
+      // bus registrati (vedi ricalcolaPostiTragitto, chiamata dai
+      // punti che toccano davvero i bus: creaBus/aggiornaBus/rimuoviBus).
       await tx.update(tragitti).set({
-        postiTotali: input.postiTotali,
-        postiDisponibili: nuoviPostiDisponibili,
         prezzoExtra: input.prezzoExtra.toFixed(2),
       }).where(eq(tragitti.id, tragittoId));
 
@@ -801,6 +819,9 @@ export const eventiService = {
       // Non tocca chi è già CONFERMATO (nessun downgrade, questo è un
       // solo passaggio in avanti).
       await tx.update(tragitti).set({ stato: 'CONFERMATO' }).where(and(inArray(tragitti.id, tragittiIdsFiltrate), eq(tragitti.stato, 'DA_CONFERMARE')));
+      // I posti totali del tragitto non si scrivono più a mano — si
+      // ricalcolano ora dalla somma dei bus veri appena collegati.
+      for (const tragittoId of tragittiIdsFiltrate) await ricalcolaPostiTragitto(tx, tragittoId);
       return nuovo.id;
     });
   },
@@ -808,6 +829,10 @@ export const eventiService = {
   async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; tragittiIds?: string[] }) {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
+    // Prima di toccare nulla: quali tragitti ha questo bus ORA — serve
+    // per ricalcolarli anche loro se l'elenco cambia (un tragitto che
+    // PERDE questo bus deve comunque perdere i suoi posti).
+    const tragittiCollegatiPrima = (await db.select({ tragittoId: busTratte.tragittoId }).from(busTratte).where(eq(busTratte.busId, busId))).map((r) => r.tragittoId);
 
     return db.transaction(async (tx) => {
       if (input.riferimento !== undefined || input.fornitoreId !== undefined || input.autistaNome !== undefined || input.autistaTelefono !== undefined || input.tourLeaderId !== undefined || input.costo !== undefined || input.postiBus !== undefined || input.note !== undefined) {
@@ -822,6 +847,7 @@ export const eventiService = {
           ...(input.note !== undefined && { note: input.note }),
         }).where(eq(busFisici.id, busId));
       }
+      let tragittiCollegatiDopo = tragittiCollegatiPrima;
       if (input.tragittiIds !== undefined) {
         const evento = await getById(eventoId);
         const lineeValide = new Set([...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((l) => l.id));
@@ -834,14 +860,26 @@ export const eventiService = {
           // altrettanto, non serve passare per forza da un bus nuovo.
           await tx.update(tragitti).set({ stato: 'CONFERMATO' }).where(and(inArray(tragitti.id, tragittiIdsFiltrate), eq(tragitti.stato, 'DA_CONFERMARE')));
         }
+        tragittiCollegatiDopo = tragittiIdsFiltrate;
       }
+      // Ricalcolo sia i tragitti di prima (potrebbero aver perso questo
+      // bus, o aver cambiato posti) sia quelli di dopo (potrebbero
+      // averlo appena guadagnato) — l'unione dei due, senza doppioni.
+      const daRicalcolare = new Set([...tragittiCollegatiPrima, ...tragittiCollegatiDopo]);
+      for (const tragittoId of daRicalcolare) await ricalcolaPostiTragitto(tx, tragittoId);
     });
   },
 
   async rimuoviBus(busId: string) {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
-    await db.delete(busFisici).where(eq(busFisici.id, busId)); // cascade su bus_tratte
+    // Quali tragitti perdono questo bus — servono per ricalcolarli
+    // DOPO l'eliminazione (che se lo porta via a cascata da bus_tratte).
+    const tragittiCollegati = (await db.select({ tragittoId: busTratte.tragittoId }).from(busTratte).where(eq(busTratte.busId, busId))).map((r) => r.tragittoId);
+    await db.transaction(async (tx) => {
+      await tx.delete(busFisici).where(eq(busFisici.id, busId)); // cascade su bus_tratte
+      for (const tragittoId of tragittiCollegati) await ricalcolaPostiTragitto(tx, tragittoId);
+    });
   },
 
   /** Elenco passeggeri (per la "lista tipo Excel" da dare al tour leader)

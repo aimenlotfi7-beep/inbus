@@ -60,7 +60,7 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
   const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
   const [eventoCompleto, setEventoCompleto] = useState<Evento | null>(null);
   const [tragittoInModifica, setTragittoInModifica] = useState<string | null>(null);
-  const [formOperativo, setFormOperativo] = useState<{ postiTotali: number; prezzoExtra: number; fermate: FermataInput[] } | null>(null);
+  const [formOperativo, setFormOperativo] = useState<{ prezzoExtra: number; fermate: FermataInput[] } | null>(null);
   const [salvandoOperativo, setSalvandoOperativo] = useState(false);
   const [calcolandoOrari, setCalcolandoOrari] = useState(false);
   const [statoCalcoloOrari, setStatoCalcoloOrari] = useState('');
@@ -148,7 +148,6 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
       : undefined;
     if (!tragittoVero) return;
     setFormOperativo({
-      postiTotali: tragittoVero.postiTotali,
       prezzoExtra: Number(tragittoVero.prezzoExtra),
       fermate: tragittoVero.fermate.map((f) => ({
         fermataAnagraficaId: f.fermataAnagraficaId,
@@ -268,6 +267,10 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
   async function salvaBus() {
     if (!form.riferimento || form.tragittiIds.length === 0) {
       alert('Indica un riferimento per il bus e seleziona almeno un tragitto che copre.');
+      return;
+    }
+    if (!inModifica && !form.postiBus) {
+      alert('Indica quanti posti ha il bus — è il dato che serve a calcolare da solo quanti posti sono disponibili sul tragitto.');
       return;
     }
     if (form.tourLeaderId) {
@@ -539,9 +542,13 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
             Solo per questa partenza — il nome e la sequenza di fermate restano quelli definiti in Eventi.
           </p>
           <div className="form-grid" style={{ marginBottom: 16 }}>
-            <label>Posti bus
-              <CampoNumero value={formOperativo.postiTotali} onChange={(v) => setFormOperativo((f) => f && { ...f, postiTotali: v ?? f.postiTotali })} />
-            </label>
+            <div>
+              <p className="section-label" style={{ marginBottom: 4 }}>Posti totali</p>
+              <p style={{ fontSize: 15, fontWeight: 600 }}>
+                {calcolo.find((l) => l.tragittoId === tragittoInModifica)?.postiTotali ?? 0}
+                <span style={{ fontSize: 11.5, color: 'var(--mist)', fontWeight: 400 }}> — dalla somma dei bus censiti qui sotto, non si scrive più a mano</span>
+              </p>
+            </div>
             <label>Prezzo extra del tragitto (€)
               <CampoNumero valuta value={formOperativo.prezzoExtra} onChange={(v) => setFormOperativo((f) => f && { ...f, prezzoExtra: v ?? 0 })} />
             </label>
@@ -632,7 +639,7 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
               <p className="testo-intro" style={{ fontSize: 12, marginTop: 4 }}>Nessun tour leader censito — vai nella sezione "Tour Leader" per aggiungerne uno.</p>
             )}
           </div>
-          <div className="campo"><label>Posti del bus (usato per calcolare da solo se la tratta è coperta)</label><CampoNumero min={0} value={form.postiBus} onChange={(v) => setForm({ ...form, postiBus: v })} /></div>
+          <div className="campo"><label>Posti del bus — è questo il dato che determina i posti disponibili sul tragitto</label><CampoNumero min={0} value={form.postiBus} onChange={(v) => setForm({ ...form, postiBus: v })} /></div>
           <div className="campo"><label>Costo del bus (facoltativo — usato per calcolare il guadagno della tratta)</label><CampoNumero valuta min={0} value={form.costo} onChange={(v) => setForm({ ...form, costo: v })} /></div>
           <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
 

@@ -183,6 +183,11 @@ export function AdminLayout({
                 {gruppo.titolo}
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {(() => {
+                    // Solo quando il gruppo è chiuso — se è aperto, le
+                    // notifiche compaiono già sulle singole voci qui
+                    // sotto, mostrare anche il totale qui sarebbe
+                    // ridondante.
+                    if (!gruppiCollassati[gruppo.titolo]) return null;
                     const totaleGruppo = gruppo.voci.reduce((tot, v) => tot + notificaVoce(v.id), 0);
                     return totaleGruppo > 0 ? <span className="side-badge side-badge-gruppo">{totaleGruppo}</span> : null;
                   })()}
