@@ -74,7 +74,14 @@ export function AdminLayout({
   onLogout: () => void;
   children: ReactNode;
 }) {
-  const [gruppiCollassati, setGruppiCollassati] = useState<Record<string, boolean>>({});
+  // Su schermi stretti i gruppi partono già chiusi (solo l'intestazione
+  // compatta nello scorrimento orizzontale) — si aprono a tendina al
+  // click, invece di mostrare sempre tutte le sottovoci in linea. Su
+  // desktop restano aperti come sempre (sidebar verticale normale).
+  const [gruppiCollassati, setGruppiCollassati] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined' || window.innerWidth > 860) return {};
+    return Object.fromEntries(GRUPPI.map((g) => [g.titolo, true]));
+  });
   const [allertePartenze, setAllertePartenze] = useState(0);
   const [inAttesa, setInAttesa] = useState(0);
   const [rimborsiInAttesa, setRimborsiInAttesa] = useState(0);
@@ -120,7 +127,19 @@ export function AdminLayout({
               <button
                 className="side-group-header"
                 type="button"
-                onClick={() => setGruppiCollassati((g) => ({ ...g, [gruppo.titolo]: !g[gruppo.titolo] }))}
+                onClick={() => setGruppiCollassati((g) => {
+                  const nuovoStato = !g[gruppo.titolo];
+                  // Solo su schermi stretti: aprendo un gruppo, chiudo
+                  // gli altri già aperti — evita più tendine
+                  // sovrapposte insieme sullo stesso schermo piccolo.
+                  // Su desktop restano indipendenti come sempre (più
+                  // sezioni aperte contemporaneamente è il comportamento
+                  // normale di una sidebar verticale).
+                  if (typeof window !== 'undefined' && window.innerWidth <= 860 && nuovoStato === false) {
+                    return Object.fromEntries(GRUPPI.map((gg) => [gg.titolo, gg.titolo !== gruppo.titolo]));
+                  }
+                  return { ...g, [gruppo.titolo]: nuovoStato };
+                })}
               >
                 {gruppo.titolo} <span className="group-caret">▾</span>
               </button>
@@ -129,7 +148,12 @@ export function AdminLayout({
                   <button
                     key={voce.id}
                     className={`side-btn${sezioneAttiva === voce.id ? ' active' : ''}`}
-                    onClick={() => onCambiaSezione(voce.id)}
+                    onClick={() => {
+                      onCambiaSezione(voce.id);
+                      if (typeof window !== 'undefined' && window.innerWidth <= 860) {
+                        setGruppiCollassati((g) => ({ ...g, [gruppo.titolo]: true }));
+                      }
+                    }}
                   >
                     {voce.label}
                     {voce.id === 'partenze' && allertePartenze > 0 && (

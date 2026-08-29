@@ -222,8 +222,21 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
     order:3; flex-basis:100%; display:flex; flex-direction:row; flex-wrap:nowrap;
     overflow-x:auto; gap:6px; padding-bottom:6px; -webkit-overflow-scrolling:touch;
   }
-  .side-group{flex-shrink:0;}
-  .side-group-items{display:flex; flex-direction:row; gap:4px;}
+  .side-group{flex-shrink:0; position:relative;}
+  /* Le voci di un gruppo APERTO (non collassato) diventano un pannello
+     a tendina sotto l'intestazione — non più in linea nello
+     scorrimento orizzontale, che resterebbe altrimenti troppo lungo e
+     scomodo con tutte le sottovoci di tutti i gruppi sempre visibili
+     insieme. Chiuso è lo stato di default su schermi stretti (vedi
+     l'inizializzazione in AdminLayout.tsx) — un gruppo mostra solo la
+     sua intestazione compatta finché non ci si clicca sopra. */
+  .side-group:not(.collassato) .side-group-items{
+    position:absolute; top:100%; left:0; z-index:20; margin-top:4px;
+    display:flex; flex-direction:column; gap:2px; min-width:180px;
+    background:var(--sidebar-bg); border:1px solid var(--sidebar-line); border-radius:10px;
+    padding:8px; box-shadow:0 12px 28px -8px rgba(0,0,0,.5);
+  }
+  .side-group.collassato .side-group-items{display:none;}
 }
 
 .btn{
