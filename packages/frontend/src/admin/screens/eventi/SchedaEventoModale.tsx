@@ -541,17 +541,6 @@ export function SchedaEventoModale({
       setServizioTabAttivo(servizioVuoto.key);
       return;
     }
-    for (let i = 0; i < (form.tragitti ?? []).length; i++) {
-      const tragitto = (form.tragitti ?? [])[i];
-      if (!tragitto.nome.trim()) continue; // tratte vuote (mai compilate) vengono comunque scartate al salvataggio
-      const fermataSenzaOrario = tragitto.fermate.find((f) => f.citta.trim() && !f.orario?.trim());
-      if (fermataSenzaOrario) {
-        alert(`Manca l'orario per la fermata "${fermataSenzaOrario.citta}" nel tragitto "${tragitto.nome}" — è un campo obbligatorio, come tutti gli altri.`);
-        setStep(2);
-        setTragittiAperti((prev) => new Set(prev).add(i));
-        return;
-      }
-    }
     if (numeroImmagini === 0) {
       alert('Carica almeno un\'immagine prima di salvare.');
       setStep(3);
