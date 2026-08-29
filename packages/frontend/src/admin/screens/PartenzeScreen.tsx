@@ -35,14 +35,25 @@ export function PartenzeScreen() {
   useEffect(ricarica, []);
 
   const adesso = Date.now();
-  // Come già in Prenotazioni: un evento senza nessuna prenotazione
-  // confermata non ha ancora nulla da gestire qui, non compare.
-  const eventiConPrenotazioni = eventi.filter((ev) => (statistiche[ev.id]?.partecipanti ?? 0) > 0);
+  // Un evento compare qui se ha DAVVERO qualcosa da lavorare: o ha già
+  // prenotazioni confermate (come prima), OPPURE ha almeno un tragitto
+  // ancora "da confermare" — un evento appena creato, senza nessun bus
+  // registrato, non può avere prenotazioni per costruzione (la vendita
+  // resta bloccata finché non lo si conferma proprio qui): se
+  // restasse fuori finché non ha prenotazioni, non ci sarebbe MAI modo
+  // di confermare il primo bus.
+  function haTragittoDaConfermare(ev: Evento) {
+    return [...ev.tragitti, ...ev.servizi.flatMap((s) => s.tragitti)].some((t) => t.attivo && t.stato === 'DA_CONFERMARE');
+  }
+  const eventiConPrenotazioni = eventi.filter((ev) => (statistiche[ev.id]?.partecipanti ?? 0) > 0 || haTragittoDaConfermare(ev));
   const eventiPerTab = eventiConPrenotazioni.filter((ev) => {
     const passato = new Date(ev.data).getTime() < adesso;
     if (tab === 'passate') return passato;
     if (passato) return false; // un evento passato vive solo nella tab "Passate", mai nelle altre due
-    return tab === 'da-lavorare' ? (allertePerEvento[ev.id] ?? 0) > 0 : !(allertePerEvento[ev.id] > 0);
+    // "Da lavorare" include anche chi ha almeno un tragitto da
+    // confermare — è la forma più urgente di "serve intervento", visto
+    // che senza quello l'evento non può nemmeno andare in vendita.
+    return tab === 'da-lavorare' ? (allertePerEvento[ev.id] ?? 0) > 0 || haTragittoDaConfermare(ev) : !(allertePerEvento[ev.id] > 0) && !haTragittoDaConfermare(ev);
   });
   const eventiFiltrati = ricerca.trim()
     ? eventiPerTab.filter((ev) => `${ev.artista} ${ev.citta} ${ev.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
@@ -71,12 +82,12 @@ export function PartenzeScreen() {
             evento={{ ...ev, immagineUrl: ev.immagini[0]?.url ?? null }}
             onClick={() => setSelezionato(ev)}
             richiedeIntervento={tab === 'da-lavorare'}
-            badge={allertePerEvento[ev.id] > 0 ? <>⚠ {allertePerEvento[ev.id]}</> : undefined}
+            badge={allertePerEvento[ev.id] > 0 ? <>⚠ {allertePerEvento[ev.id]}</> : haTragittoDaConfermare(ev) ? <>◔ Da confermare</> : undefined}
           />
         ))}
         {!eventiFiltrati.length && (
           <p style={{ color: 'var(--mist)' }}>
-            {ricerca ? 'Nessun evento trovato.' : eventiConPrenotazioni.length === 0 ? 'Nessun evento con prenotazioni ancora.' : tab === 'da-lavorare' ? 'Nessuna partenza da lavorare al momento.' : tab === 'lavorate' ? 'Nessuna partenza già lavorata.' : 'Nessun evento passato ancora.'}
+            {ricerca ? 'Nessun evento trovato.' : eventiConPrenotazioni.length === 0 ? 'Nessun evento da confermare o con prenotazioni ancora.' : tab === 'da-lavorare' ? 'Nessuna partenza da lavorare al momento.' : tab === 'lavorate' ? 'Nessuna partenza già lavorata.' : 'Nessun evento passato ancora.'}
           </p>
         )}
       </div>
