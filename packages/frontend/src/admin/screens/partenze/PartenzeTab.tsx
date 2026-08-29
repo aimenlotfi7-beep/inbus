@@ -9,6 +9,7 @@ import { Modale } from '../../shared/Modale';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useSessione } from '../../shared/SessioneContext';
+import { geocodifica, durataViaggio, attesa } from '../../shared/geo';
 import { haPermesso } from '../../../api/auth';
 
 const BUS_VUOTO: BusFisicoInput = { riferimento: '', tragittiIds: [] };
@@ -61,6 +62,8 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
   const [tragittoInModifica, setTragittoInModifica] = useState<string | null>(null);
   const [formOperativo, setFormOperativo] = useState<{ postiTotali: number; prezzoExtra: number; fermate: FermataInput[] } | null>(null);
   const [salvandoOperativo, setSalvandoOperativo] = useState(false);
+  const [calcolandoOrari, setCalcolandoOrari] = useState(false);
+  const [statoCalcoloOrari, setStatoCalcoloOrari] = useState('');
   const [busLista, setBusLista] = useState<BusFisico[]>([]);
   const [economia, setEconomia] = useState<RiepilogoEconomicoTratta[]>([]);
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
@@ -156,6 +159,7 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
       })),
     });
     setTragittoInModifica(tragitto.tragittoId);
+    setStatoCalcoloOrari('');
   }
 
   async function salvaOperativo() {
@@ -179,6 +183,75 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
       fermate[idx] = { ...fermate[idx], [campo]: valore };
       return { ...f, fermate };
     });
+  }
+
+  /** Ricalcola gli orari di tutte le fermate a ritroso dall'orario di
+   *  arrivo, usando le distanze reali tra gli indirizzi via Nominatim +
+   *  OSRM (gratuiti) — stessa identica logica che prima viveva in
+   *  Eventi, spostata qui insieme al resto della parte operativa. */
+  async function calcolaOrariDaArrivo() {
+    if (!tragittoInModifica || !formOperativo || !eventoCompleto) return;
+    const tragittoVero = [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragittoInModifica);
+    const servizioDelTragitto = tragittoVero?.servizioId ? eventoCompleto.servizi.find((s) => s.id === tragittoVero.servizioId) : null;
+    const arrivoIndirizzoContesto = servizioDelTragitto ? servizioDelTragitto.arrivoIndirizzo : eventoCompleto.arrivoIndirizzo;
+    const arrivoOrarioContesto = servizioDelTragitto ? servizioDelTragitto.arrivoOrario : eventoCompleto.arrivoOrario;
+
+    const fermateValide = formOperativo.fermate.filter((f) => f.indirizzo.trim());
+    if (fermateValide.length === 0) { setStatoCalcoloOrari('Aggiungi almeno una fermata con indirizzo compilato.'); return; }
+    if (!arrivoIndirizzoContesto?.trim()) { setStatoCalcoloOrari('Inserisci prima l\'indirizzo di arrivo qui sopra.'); return; }
+    if (!arrivoOrarioContesto) { setStatoCalcoloOrari('Inserisci prima l\'orario di arrivo qui sopra.'); return; }
+
+    setCalcolandoOrari(true);
+    setStatoCalcoloOrari('Localizzo gli indirizzi...');
+
+    const indirizziCompleti = [...fermateValide.map((f) => `${f.indirizzo}, ${f.citta}`), arrivoIndirizzoContesto];
+    const coordinate: (Awaited<ReturnType<typeof geocodifica>>['coordinate'])[] = [];
+    let problemaRete = false;
+    for (const indirizzo of indirizziCompleti) {
+      const r = await geocodifica(indirizzo);
+      coordinate.push(r.coordinate);
+      if (r.erroreRete) problemaRete = true;
+      await attesa(1100);
+    }
+    if (problemaRete) {
+      setStatoCalcoloOrari('Richiesta a OpenStreetMap non riuscita (rete/firewall). Apri la Console (F12) per il dettaglio.');
+      setCalcolandoOrari(false);
+      return;
+    }
+
+    const durate: (number | null)[] = [];
+    for (let i = 0; i < coordinate.length - 1; i++) {
+      const a = coordinate[i], b = coordinate[i + 1];
+      durate.push(a && b ? await durataViaggio(a, b) : null);
+      await attesa(300);
+    }
+
+    let cursore = Number(arrivoOrarioContesto.split(':')[0]) * 60 + Number(arrivoOrarioContesto.split(':')[1]);
+    const orariCalcolati = new Array<string>(fermateValide.length);
+    let errori = 0;
+    for (let i = fermateValide.length - 1; i >= 0; i--) {
+      const durata = durate[i];
+      if (durata === null) { errori++; orariCalcolati[i] = ''; continue; }
+      cursore -= durata + 5;
+      const h = Math.floor(((cursore % 1440) + 1440) % 1440 / 60);
+      const m = ((cursore % 1440) + 1440) % 1440 % 60;
+      orariCalcolati[i] = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    let idxValido = 0;
+    setFormOperativo((f) => {
+      if (!f) return f;
+      return {
+        ...f,
+        fermate: f.fermate.map((fer) => {
+          if (!fer.indirizzo.trim()) return fer;
+          const orario = orariCalcolati[idxValido]; idxValido++;
+          return orario ? { ...fer, orario } : fer;
+        }),
+      };
+    });
+    setStatoCalcoloOrari(errori ? `Fatto, ma ${errori} indirizzo/i non localizzato/i: controlla a mano.` : 'Orari ricalcolati e applicati.');
+    setCalcolandoOrari(false);
   }
 
   function apriNuovoBus(tragittoIdPreselezionato?: string) {
@@ -473,7 +546,13 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
               <CampoNumero valuta value={formOperativo.prezzoExtra} onChange={(v) => setFormOperativo((f) => f && { ...f, prezzoExtra: v ?? 0 })} />
             </label>
           </div>
-          <p className="section-label" style={{ marginBottom: 10 }}>Fermate</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <p className="section-label">Fermate</p>
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={calcolaOrariDaArrivo} disabled={calcolandoOrari}>
+              {calcolandoOrari ? 'Calcolo orari...' : '↻ Calcola orari dall\'arrivo'}
+            </button>
+          </div>
+          {statoCalcoloOrari && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoCalcoloOrari}</p>}
           {formOperativo.fermate.map((f, idx) => (
             <div key={idx} className="section-card" style={{ marginBottom: 10, padding: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>

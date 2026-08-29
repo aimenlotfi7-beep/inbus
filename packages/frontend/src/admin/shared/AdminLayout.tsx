@@ -22,6 +22,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   ]},
   { titolo: 'Partenze', voci: [
     { id: 'partenze', label: 'Partenze', permesso: 'eventi.partenze' },
+    { id: 'variazioni', label: 'Variazioni', permesso: 'prenotazioni.pagamenti' },
   ]},
   { titolo: 'Vendite', voci: [
     { id: 'transazioni', label: 'Prenotazioni', permesso: 'prenotazioni.transazioni' },
@@ -38,7 +39,6 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   { titolo: 'Customer Care', voci: [
     { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
     { id: 'rimborsi', label: 'Rimborsi', permesso: 'prenotazioni.pagamenti' },
-    { id: 'variazioni', label: 'Variazioni', permesso: 'prenotazioni.pagamenti' },
     { id: 'utenti', label: 'Utenti', permesso: 'utenti.visualizza' },
     { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
     { id: 'chat', label: 'Chat', permesso: 'chat.visualizza' },
