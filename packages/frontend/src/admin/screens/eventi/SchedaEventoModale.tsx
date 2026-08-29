@@ -74,7 +74,7 @@ export function SchedaEventoModale({
   // (anche alla primissima creazione dell'evento): quelli già esistenti
   // hanno l'id vero del server, quelli appena aggiunti hanno una
   // chiave temporanea che il backend riconosce come "nuovo" (nessun id).
-  const [servizi, setServizi] = useState<{ key: string; id?: string; nome: string; arrivoIndirizzo?: string; arrivoOrario?: string }[]>(
+  const [servizi, setServizi] = useState<{ key: string; id?: string; nome: string; arrivoIndirizzo?: string; arrivoOrario?: string; daRinominare?: boolean }[]>(
     (evento?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoIndirizzo: p.arrivoIndirizzo ?? undefined, arrivoOrario: p.arrivoOrario ?? undefined }))
   );
   // Due modalità nettamente separate: con un solo servizio (o nessuno) è
@@ -96,7 +96,7 @@ export function SchedaEventoModale({
   function nuovoServizio() {
     const chiave = `nuovo-${Date.now()}`;
     const numero = servizi.length + 1;
-    setServizi((prev) => [...prev, { key: chiave, nome: `Servizio ${numero}`, arrivoOrario: undefined }]);
+    setServizi((prev) => [...prev, { key: chiave, nome: `Servizio ${numero}`, arrivoOrario: undefined, daRinominare: true }]);
     setModalitaServizi('multiplo');
     setServizioTabAttivo(chiave);
     // Nome già pronto (default) — subito utilizzabile con un click, non
@@ -130,13 +130,19 @@ export function SchedaEventoModale({
     }));
     setServizi((prev) => [
       ...prev,
-      { key: chiavePrimo, nome: 'Servizio 1', arrivoIndirizzo: form.arrivoIndirizzo, arrivoOrario: form.arrivoOrario },
-      { key: chiaveSecondo, nome: 'Servizio 2', arrivoOrario: undefined },
+      { key: chiavePrimo, nome: 'Servizio 1', arrivoIndirizzo: form.arrivoIndirizzo, arrivoOrario: form.arrivoOrario, daRinominare: true },
+      { key: chiaveSecondo, nome: 'Servizio 2', arrivoOrario: undefined, daRinominare: true },
     ]);
     setServizioTabAttivo(chiaveSecondo); // porta dritto a compilare quello nuovo
   }
   function rinominaServizio(key: string, nome: string) {
-    setServizi((prev) => prev.map((v) => v.key === key ? { ...v, nome } : v));
+    // Il contrassegno si toglie solo se il nome è DAVVERO diverso dal
+    // pattern automatico ("Servizio 1", "Servizio 2"...) — altrimenti
+    // aprire il campo e richiuderlo senza scrivere nulla di nuovo
+    // basterebbe a "far finta" di aver rinominato, restando comunque
+    // col nome generico.
+    const eNomeAutomatico = /^Servizio \d+$/.test(nome.trim());
+    setServizi((prev) => prev.map((v) => v.key === key ? { ...v, nome, daRinominare: eNomeAutomatico } : v));
   }
   function toggleTragittoAperto(idx: number) {
     setTragittiAperti((prev) => {
@@ -504,6 +510,22 @@ export function SchedaEventoModale({
       setStep(2);
       setModalitaServizi('multiplo');
       setServizioTabAttivo(servizioSenzaNome.key);
+      setRinominaServizioAperto(true);
+      return;
+    }
+    // Ogni servizio creato in QUESTA sessione di modifica (sia
+    // convertendo un evento a "più servizi" — che ne crea due insieme
+    // — sia aggiungendone un altro su un evento già a più servizi) va
+    // rinominato davvero prima di poter salvare, non basta il nome
+    // automatico "Servizio N". I servizi già esistenti da prima
+    // (caricati dal server, mai toccati da questa sessione) non
+    // rientrano in questo controllo.
+    const servizioDaRinominare = servizi.find((v) => v.daRinominare);
+    if (servizioDaRinominare) {
+      alert(`Rinomina "${servizioDaRinominare.nome}" prima di salvare — un nome vero aiuta a distinguerlo dagli altri, sia per te sia per i clienti in fase di scelta.`);
+      setStep(2);
+      setModalitaServizi('multiplo');
+      setServizioTabAttivo(servizioDaRinominare.key);
       setRinominaServizioAperto(true);
       return;
     }
