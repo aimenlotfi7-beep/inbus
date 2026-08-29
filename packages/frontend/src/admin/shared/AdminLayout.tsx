@@ -19,7 +19,6 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   { titolo: 'Eventi', voci: [
     { id: 'eventi', label: 'Eventi', permesso: 'eventi.visualizza' },
     { id: 'calendario', label: 'Calendario', permesso: 'eventi.calendario' },
-    { id: 'cestino', label: 'Cestino', permesso: 'eventi.cestino' },
   ]},
   { titolo: 'Partenze', voci: [
     { id: 'partenze', label: 'Partenze', permesso: 'eventi.partenze' },
@@ -60,6 +59,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   { titolo: 'Sistema', voci: [
     { id: 'amministratori', label: 'Amministratori', permesso: 'utenze.gestisci' },
     { id: 'ruoli', label: 'Ruoli', permesso: 'permessi.gestisci' },
+    { id: 'cestino', label: 'Cestino', permesso: 'eventi.cestino' },
     { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
     { id: 'testi-tooltip', label: 'Testi tooltip', permesso: 'impostazioni.gestisci' },
   ]},
