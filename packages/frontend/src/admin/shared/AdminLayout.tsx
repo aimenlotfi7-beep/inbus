@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { haPermesso, type SessioneAdmin } from '../../api/auth';
 import { eventiApi } from '../../api/eventi';
 import { listaAttesaApi } from '../../api/listaAttesa';
@@ -109,6 +109,21 @@ export function AdminLayout({
     chatApi.contaNonLette().then((r) => setChatNonLette(r.conteggio)).catch(() => {});
   }, [sessione]);
 
+  // Il menu a tendina (solo mobile) deve comparire come un vero popup,
+  // sovrapposto al contenuto sotto — non intrappolato nello scorrimento
+  // orizzontale della nav (che lo taglierebbe via, essendo overflow-x
+  // impostato). Misuro l'altezza VERA della sidebar (non una stima
+  // fissa, che si romperebbe con font diversi o testi più lunghi) e la
+  // uso per posizionare il popup con position:fixed, fuori da
+  // qualunque contenitore con lo scroll.
+  const sidebarRef = useRef<HTMLElement>(null);
+  const qualcheGruppoAperto = Object.values(gruppiCollassati).some((v) => v === false);
+  useEffect(() => {
+    if (!qualcheGruppoAperto || !sidebarRef.current) return;
+    const altezza = sidebarRef.current.getBoundingClientRect().bottom;
+    document.documentElement.style.setProperty('--menu-popup-top', `${altezza}px`);
+  }, [qualcheGruppoAperto]);
+
   // Filtro sia i gruppi che le voci in base a ciò che l'utente loggato
   // può vedere: un gruppo compare solo se ha almeno una voce visibile.
   const gruppiVisibili = GRUPPI
@@ -117,7 +132,13 @@ export function AdminLayout({
 
   return (
     <div id="app" className="app-shell">
-      <aside className="sidebar">
+      {/* Sfondo semitrasparente dietro il menu a tendina aperto (solo
+          mobile, il CSS lo nasconde su desktop) — tocco fuori per
+          chiudere, rinforza l'effetto popup sopra il contenuto sotto. */}
+      {qualcheGruppoAperto && (
+        <div className="side-popup-sfondo" onClick={() => setGruppiCollassati((g) => Object.fromEntries(Object.keys(g).map((k) => [k, true])))} />
+      )}
+      <aside className="sidebar" ref={sidebarRef}>
         <div className="logo sidebar-logo" title="Torna alla Home" onClick={onVaiHome}>
           IN<span>BUS</span> <small>gestionale</small>
         </div>
