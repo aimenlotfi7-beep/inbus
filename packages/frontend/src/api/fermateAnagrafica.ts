@@ -24,6 +24,7 @@ export interface FermataAnagraficaInput {
 export const fermateAnagraficaApi = {
   list: () => api.get<FermataAnagrafica[]>('/api/fermate-anagrafica'),
   create: (input: FermataAnagraficaInput) => api.post<FermataAnagrafica>('/api/fermate-anagrafica', input),
+  trovaOCrea: (input: FermataAnagraficaInput) => api.post<FermataAnagrafica>('/api/fermate-anagrafica/trova-o-crea', input),
   update: (id: string, input: FermataAnagraficaInput) => api.put<FermataAnagrafica>(`/api/fermate-anagrafica/${id}`, input),
   remove: (id: string) => api.delete<void>(`/api/fermate-anagrafica/${id}`),
 };

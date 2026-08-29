@@ -84,15 +84,19 @@ export function AdminLayout({
     return Object.fromEntries(GRUPPI.map((g) => [g.titolo, true]));
   });
   const [allertePartenze, setAllertePartenze] = useState(0);
+  const [eventiDaConfermare, setEventiDaConfermare] = useState(0);
   const [inAttesa, setInAttesa] = useState(0);
   const [rimborsiInAttesa, setRimborsiInAttesa] = useState(0);
 
   // Notifica sulla voce "Partenze": quante tratte, in tutti gli eventi,
-  // hanno più passeggeri confermati dei posti previsti. Solo per chi ha
-  // il permesso di vedere quella sezione.
+  // hanno più passeggeri confermati dei posti previsti, più quanti
+  // eventi hanno ancora almeno un tragitto "da confermare" (nessun bus
+  // vero registrato — non possono nemmeno andare in vendita finché non
+  // lo si fa). Solo per chi ha il permesso di vedere quella sezione.
   useEffect(() => {
     if (!haPermesso(sessione, 'eventi.partenze')) return;
     eventiApi.allertePartenze().then((r) => setAllertePartenze(r.conteggio)).catch(() => {});
+    eventiApi.eventiDaConfermare().then((r) => setEventiDaConfermare(r.conteggio)).catch(() => {});
     listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
   }, [sessione]);
 
@@ -178,8 +182,16 @@ export function AdminLayout({
                     }}
                   >
                     {voce.label}
-                    {voce.id === 'partenze' && allertePartenze > 0 && (
-                      <span className="side-badge" title={`${allertePartenze} tratta/e con posti superati`}>{allertePartenze}</span>
+                    {voce.id === 'partenze' && (allertePartenze + eventiDaConfermare) > 0 && (
+                      <span
+                        className="side-badge"
+                        title={[
+                          allertePartenze > 0 ? `${allertePartenze} tratta/e con posti superati` : null,
+                          eventiDaConfermare > 0 ? `${eventiDaConfermare} evento/i con almeno un tragitto da confermare` : null,
+                        ].filter(Boolean).join(' · ')}
+                      >
+                        {allertePartenze + eventiDaConfermare}
+                      </span>
                     )}
                     {voce.id === 'lista-attesa' && inAttesa > 0 && (
                       <span className="side-badge" title={`${inAttesa} iscrizione/i in attesa di promozione`}>{inAttesa}</span>

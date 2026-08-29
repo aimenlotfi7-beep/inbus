@@ -94,6 +94,7 @@ export const eventiApi = {
   listaPasseggeriBus: (id: string, busId: string) => api.get<PasseggeroBus[]>(`/api/eventi/${id}/bus/${busId}/passeggeri`),
   riepilogoEconomico: (id: string) => api.get<RiepilogoEconomicoTratta[]>(`/api/eventi/${id}/riepilogo-economico`),
   allertePartenze: () => api.get<{ conteggio: number }>('/api/eventi/allerte-partenze'),
+  eventiDaConfermare: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-confermare'),
   allertePartenzePerEvento: () => api.get<Record<string, number>>('/api/eventi/allerte-partenze-per-evento'),
   statistichePerEvento: () => api.get<Record<string, { partecipanti: number; busCensiti: number }>>('/api/eventi/statistiche-per-evento'),
   tragittoHaPrenotazioniConfermate: (tragittoId: string) => api.get<{ haPrenotazioni: boolean; quante: number }>(`/api/eventi/tragitti/${tragittoId}/prenotazioni-confermate`),

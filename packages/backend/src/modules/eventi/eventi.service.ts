@@ -989,6 +989,19 @@ export const eventiService = {
     return risultato;
   },
 
+  /** Quanti eventi (non passati) hanno almeno un tragitto ancora "da
+   *  confermare" — nessun bus vero registrato, quindi non ancora in
+   *  vendita. Badge dedicato nel menu di Partenze, per non doverli
+   *  scoprire aprendo ogni evento uno per uno. */
+  async contaEventiDaConfermare() {
+    const righe = await db
+      .select({ eventoId: tragitti.eventoId })
+      .from(tragitti)
+      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(and(eq(tragitti.stato, 'DA_CONFERMARE'), eq(tragitti.attivo, true), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
+    return new Set(righe.map((r) => r.eventoId)).size;
+  },
+
   async contaAllertePartenze() {
     const righeTragitti = await db.select({ tragittoId: tragitti.id }).from(tragitti);
     if (righeTragitti.length === 0) return 0;

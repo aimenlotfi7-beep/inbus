@@ -377,23 +377,20 @@ export function SchedaEventoModale({
 
   async function aggiungiTragittoDaPercorso(percorso: PercorsoSalvato) {
     // Ogni fermata del percorso deve diventare una scelta vera
-    // dall'anagrafica — mai più testo libero, come richiesto: se
-    // esiste già una voce con la stessa città+indirizzo (senza badare
-    // a maiuscole/spazi in eccesso) la riuso, altrimenti la creo al
-    // volo (nome = città, stesso criterio già usato per popolare
-    // l'anagrafica automaticamente dai tragitti esistenti).
+    // dall'anagrafica — mai più testo libero, come richiesto. Il
+    // controllo "esiste già?" avviene lato server (trovaOCrea),
+    // affidabile anche applicando più percorsi/tragitti in rapida
+    // sequenza — un controllo lato frontend contro lo stato locale
+    // (fermateAnagrafica) causava doppioni, perché ogni chiamata non
+    // vedeva ancora quello appena creato da un'altra chiamata
+    // parallela.
     const fermateConAnagrafica: FermataInput[] = await Promise.all(percorso.fermate.map(async (f) => {
-      const match = fermateAnagrafica.find((fa) =>
-        fa.citta.trim().toLowerCase() === f.citta.trim().toLowerCase()
-        && fa.indirizzo.trim().toLowerCase() === f.indirizzo.trim().toLowerCase()
-      );
-      if (match) return { fermataAnagraficaId: match.id, citta: match.citta, indirizzo: match.indirizzo, prezzo: f.prezzo ?? undefined };
       try {
-        const nuova = await fermateAnagraficaApi.create({ nome: f.citta, citta: f.citta, indirizzo: f.indirizzo });
-        setFermateAnagrafica((prev) => [...prev, nuova]);
-        return { fermataAnagraficaId: nuova.id, citta: nuova.citta, indirizzo: nuova.indirizzo, prezzo: f.prezzo ?? undefined };
+        const trovata = await fermateAnagraficaApi.trovaOCrea({ nome: f.citta, citta: f.citta, indirizzo: f.indirizzo });
+        setFermateAnagrafica((prev) => prev.some((fa) => fa.id === trovata.id) ? prev : [...prev, trovata]);
+        return { fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo, prezzo: f.prezzo ?? undefined };
       } catch {
-        // Se la creazione fallisce (es. problema di rete), meglio non
+        // Se la richiesta fallisce (es. problema di rete), meglio non
         // bloccare tutto il tragitto — questa singola fermata resta
         // testuale, modificabile e sistemabile a mano dall'admin,
         // invece di far fallire l'intera applicazione del percorso.

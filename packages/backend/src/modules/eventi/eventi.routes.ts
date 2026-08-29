@@ -12,6 +12,7 @@ eventiRouter.get('/', valida(listaEventiQuerySchema, 'query'), asyncHandler(even
 // IMPORTANTE: va registrata PRIMA di GET '/:id', altrimenti Express la
 // interpreterebbe come una richiesta per un evento con id "allerte-partenze".
 eventiRouter.get('/allerte-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenze));
+eventiRouter.get('/eventi-da-confermare', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiDaConfermare));
 eventiRouter.get('/allerte-partenze-per-evento', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenzePerEvento));
 eventiRouter.get('/statistiche-per-evento', richiedeAuth, richiedePermesso('eventi.visualizza'), asyncHandler(eventiController.statistichePerEvento));
 eventiRouter.get('/tragitti/:tragittoId/prenotazioni-confermate', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.tragittoHaPrenotazioniConfermate));

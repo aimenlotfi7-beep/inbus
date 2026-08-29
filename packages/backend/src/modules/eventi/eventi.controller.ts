@@ -105,6 +105,9 @@ export const eventiController = {
   async allertePartenze(_req: Request, res: Response) {
     res.json({ conteggio: await eventiService.contaAllertePartenze() });
   },
+  async eventiDaConfermare(_req: Request, res: Response) {
+    res.json({ conteggio: await eventiService.contaEventiDaConfermare() });
+  },
   async allertePartenzePerEvento(_req: Request, res: Response) {
     res.json(await eventiService.allertePartenzePerEvento());
   },

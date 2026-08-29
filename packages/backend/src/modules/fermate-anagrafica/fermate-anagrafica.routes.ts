@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { eq } from 'drizzle-orm';
+import { eq, and, ilike } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { fermateAnagrafica, fermate } from '../../db/schema.js';
@@ -35,6 +35,29 @@ fermateAnagraficaRouter.post(
   richiedePermesso('tragitti.gestisci'),
   valida(fermataAnagraficaSchema),
   asyncHandler(async (req: Request, res: Response) => {
+    const [nuova] = await db.insert(fermateAnagrafica).values(req.body).returning();
+    res.status(201).json(nuova);
+  })
+);
+
+// "Trova o crea" — usata quando si applica un percorso salvato a un
+// evento: prima il controllo "esiste già una voce con questa
+// città+indirizzo?" avveniva lato frontend confrontando con lo stato
+// locale, che può non essere aggiornato se si applicano più
+// percorsi/tragitti in rapida sequenza (ogni chiamata non vede ancora
+// quello appena creato dall'altra) — risultato: doppioni in
+// anagrafica. Qui il controllo avviene sul database vero, sempre
+// aggiornato, quindi affidabile anche con più richieste ravvicinate.
+fermateAnagraficaRouter.post(
+  '/trova-o-crea',
+  richiedeAuth,
+  richiedePermesso('tragitti.gestisci'),
+  valida(fermataAnagraficaSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const [esistente] = await db.select().from(fermateAnagrafica)
+      .where(and(ilike(fermateAnagrafica.citta, req.body.citta.trim()), ilike(fermateAnagrafica.indirizzo, req.body.indirizzo.trim())))
+      .limit(1);
+    if (esistente) { res.json(esistente); return; }
     const [nuova] = await db.insert(fermateAnagrafica).values(req.body).returning();
     res.status(201).json(nuova);
   })
