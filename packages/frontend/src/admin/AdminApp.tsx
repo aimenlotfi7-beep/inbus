@@ -154,6 +154,11 @@ export function AdminApp() {
   function cambiaSezione(s: SezioneGestionale) {
     if (sessione && !haPermesso(sessione, PERMESSO_SEZIONE[s])) return; // difesa extra, oltre al menu già filtrato
     setSezione(s);
+    // Cambiando sezione si riparte sempre dall'inizio — altrimenti, se
+    // si era scorsa in basso la sezione precedente, ci si ritrova nel
+    // mezzo di quella nuova senza nessun punto di riferimento (capita
+    // spesso da mobile, dove lo spazio è poco e si scorre di più).
+    window.scrollTo(0, 0);
   }
 
   if (caricamentoIniziale) return null; // evita un lampo di schermata di login mentre verifichiamo il token

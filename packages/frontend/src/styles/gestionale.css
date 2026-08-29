@@ -156,8 +156,8 @@ select{
   display:flex; align-items:center; justify-content:space-between; gap:8px;
 }
 .side-utente-nome{font-size:12.5px; color:var(--mist); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-.side-logout{border-color:var(--pink); color:var(--pink); flex-shrink:0;}
-.side-logout:hover{background:rgba(255,61,122,.1);}
+.side-logout{background:var(--pink); border-color:var(--pink); color:#fff; flex-shrink:0; font-size:12px; padding:7px 14px;}
+.side-logout:hover{background:#e0295f; border-color:#e0295f;}
 .main-wrap{flex:1; min-width:0;}
 main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .tab-panel{width:100%;}
@@ -198,9 +198,32 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 
 @media (max-width:860px){
   .app-shell{flex-direction:column;}
-  .sidebar{width:100%; height:auto; position:relative; flex-direction:row; align-items:center; flex-wrap:wrap; gap:8px;}
-  .side-nav{flex-direction:row; flex-wrap:wrap;}
-  .sidebar .logo{margin-bottom:0; margin-right:auto;}
+  .sidebar{
+    width:100%; height:auto; position:relative;
+    display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; gap:10px;
+    padding:14px 16px 10px;
+  }
+  /* Logo ed "Esci" condividono la prima riga (il logo prende lo spazio
+     disponibile, "Esci" resta compatto a destra) — prima il logo
+     finiva mescolato in mezzo a tutto il resto (nav compresa) per via
+     del flex-wrap sulla sidebar intera, risultando fuori posto e poco
+     comprensibile. */
+  .sidebar .logo{margin:0; order:1; flex:1; min-width:0;}
+  .side-utente-riga{
+    order:2; flex-shrink:0; margin:0; padding:0; border:none;
+    display:flex; align-items:center; gap:8px;
+  }
+  .side-utente-nome{display:none;} /* poco spazio in mobile — il nome resta visibile solo su desktop, "Esci" da solo basta e avanza */
+  /* La nav prende tutta la riga successiva (flex-basis:100% dentro una
+     riga con flex-wrap forza automaticamente il capo a capo) — a
+     scorrimento orizzontale, non più tutta accatastata verticalmente
+     stretta come sarebbe altrimenti su schermi piccoli. */
+  .side-nav{
+    order:3; flex-basis:100%; display:flex; flex-direction:row; flex-wrap:nowrap;
+    overflow-x:auto; gap:6px; padding-bottom:6px; -webkit-overflow-scrolling:touch;
+  }
+  .side-group{flex-shrink:0;}
+  .side-group-items{display:flex; flex-direction:row; gap:4px;}
 }
 
 .btn{
