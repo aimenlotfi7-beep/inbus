@@ -10,6 +10,9 @@ export interface TragittoInput {
   id?: string; // presente = tratta già esistente, assente = nuova
   servizioId?: string | null; // vuoto = tratta "libera", non appartiene a nessun servizio
   nome: string; postiTotali: number; prezzoExtra?: number; attivo?: boolean; referenteNome?: string; referenteTelefono?: string; fornitoreId?: string;
+  // Deciso qui in Eventi — non più da Partenze.
+  arrivoIndirizzo?: string;
+  arrivoOrario?: string;
   fermate: FermataInput[];
 }
 export interface EventoInput {

@@ -37,6 +37,9 @@ export const tragittoSchema = z.object({
   referenteNome: z.string().optional(),
   referenteTelefono: z.string().optional(),
   fornitoreId: z.string().optional(),
+  // Deciso qui, in Eventi — non più da Partenze.
+  arrivoIndirizzo: z.string().optional(),
+  arrivoOrario: z.string().optional(),
   fermate: z.array(fermataSchema).default([]),
 });
 

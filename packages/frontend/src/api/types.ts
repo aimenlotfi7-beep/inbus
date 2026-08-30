@@ -28,6 +28,10 @@ export interface Tragitto {
   // sparisce una volta registrato: serve poterlo rivedere/modificare
   // in ogni momento, non solo la prima volta.
   preventivoCosto: string | null;
+  // Deciso in Eventi, durante la creazione del tragitto — non più da
+  // Partenze.
+  arrivoIndirizzo: string | null;
+  arrivoOrario: string | null;
   preventivoPostiBus: number | null;
   referenteNome: string | null;
   referenteTelefono: string | null;

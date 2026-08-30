@@ -48,7 +48,22 @@ export function EventiScreen() {
     setInModifica(null);
     setModaleAperta(true);
   }
-  function apriModifica(ev: Evento) { setInModifica(ev); setModaleAperta(true); }
+  // Sempre un fetch fresco dal server, non l'oggetto già in memoria
+  // dalla lista — quella lista potrebbe non riflettere l'ultimo stato
+  // vero (es. tragitti aggiunti in un salvataggio precedente non
+  // ancora ricaricato in questa schermata), mostrando dati vecchi
+  // nell'editor pur essendo tutto corretto sul server.
+  async function apriModifica(ev: Evento) {
+    setModaleAperta(true);
+    setInModifica(ev); // subito, per non far vedere un editor vuoto mentre carica
+    try {
+      const fresco = await eventiApi.getById(ev.id);
+      setInModifica(fresco);
+    } catch {
+      // Se il fetch fallisce (rete, evento cancellato nel frattempo),
+      // resta comunque la versione già in memoria — meglio di niente.
+    }
+  }
 
   async function elimina(ev: Evento) {
     if (!confirm(`Eliminare l'evento "${ev.artista}"?`)) return;

@@ -243,6 +243,14 @@ export const tragitti = pgTable('tragitti', {
   postiTotali: integer('posti_totali').notNull(),
   postiDisponibili: integer('posti_disponibili').notNull(),
   prezzoExtra: numeric('prezzo_extra', { precision: 10, scale: 2 }).notNull().default('0'),
+  // L'arrivo (destinazione + orario) — deciso ORA in Eventi, durante la
+  // creazione del tragitto, non più da Partenze. Prima viveva su
+  // evento/servizio (unico per tutte le loro tratte); spostato qui
+  // perché ogni tragitto può avere una destinazione diversa, anche
+  // dentro lo stesso evento (es. due percorsi che confluiscono in due
+  // punti diversi della stessa città).
+  arrivoIndirizzo: text('arrivo_indirizzo'),
+  arrivoOrario: text('arrivo_orario'),
   // Il tragitto resta visibile e modificabile nel gestionale, ma se
   // disattivato non compare più tra le fermate prenotabili sul sito —
   // diverso dall'eliminazione (quella lo toglie del tutto): qui serve

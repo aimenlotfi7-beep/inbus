@@ -188,6 +188,8 @@ async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction
       referenteNome: tragitto.referenteNome,
       referenteTelefono: tragitto.referenteTelefono,
       fornitoreId: tragitto.fornitoreId,
+      arrivoIndirizzo: tragitto.arrivoIndirizzo,
+      arrivoOrario: tragitto.arrivoOrario,
     })
     .returning();
 
@@ -268,6 +270,8 @@ async function sincronizzaTuttiITragitti(
         referenteNome: tragitto.referenteNome,
         referenteTelefono: tragitto.referenteTelefono,
         fornitoreId: tragitto.fornitoreId,
+        arrivoIndirizzo: tragitto.arrivoIndirizzo,
+        arrivoOrario: tragitto.arrivoOrario,
       }).where(eq(tragitti.id, giaEsistente.id));
 
       // Le fermate non hanno prenotazioni collegate direttamente (le
@@ -379,6 +383,22 @@ export const eventiService = {
   },
 
   async create(input: CreaEventoInput) {
+    // Blocca la creazione di un evento "gemello" — stesso artista,
+    // stessa data — che quasi sempre è un doppione creato per errore
+    // (doppio click, tentativo ripetuto dopo un errore di rete che in
+    // realtà era andato a buon fine) più che un evento voluto davvero
+    // due volte nello stesso giorno. Confronto sul solo GIORNO (non
+    // l'orario preciso), case-insensitive sul nome artista.
+    const giornoInizio = new Date(input.data); giornoInizio.setHours(0, 0, 0, 0);
+    const giornoFine = new Date(giornoInizio); giornoFine.setDate(giornoFine.getDate() + 1);
+    const [doppione] = await db.select({ id: eventi.id }).from(eventi)
+      .where(and(
+        isNull(eventi.eliminatoIl),
+        ilike(eventi.artista, input.artista.trim()),
+        sql`${eventi.data} >= ${giornoInizio} AND ${eventi.data} < ${giornoFine}`,
+      )).limit(1);
+    if (doppione) throw new ConflittoDati(`Esiste già un evento "${input.artista}" in questa stessa data — se non è un errore, cambia leggermente il nome o la data per distinguerli.`);
+
     const slug = await generaSlugUnivoco(input.slug?.trim() || `${input.artista}-${input.citta}`);
     return db.transaction(async (tx) => {
       const [nuovoEvento] = await tx

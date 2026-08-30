@@ -449,6 +449,20 @@
       "when": 1788093541270,
       "tag": "0063_migra_bus_esistenti_in_linee",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1788099882261,
+      "tag": "0064_arrivo_su_tragitto",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1788099889838,
+      "tag": "0065_svuota_vecchio_arrivo",
+      "breakpoints": true
     }
   ]
 }

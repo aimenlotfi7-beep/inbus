@@ -13,6 +13,7 @@ import { PaginaSezione } from '../../shared/PaginaSezione';
 import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
 import { CaricaFile } from '../../shared/CaricaFile';
 import { CampoNumero } from '../../shared/CampoNumero';
+import { OrarioInput } from '../../shared/OrarioInput';
 import { PartenzeTab } from '../partenze/PartenzeTab';
 import { ListaAttesaTab } from './ListaAttesaTab';
 import { ComunicazioniTab } from './ComunicazioniTab';
@@ -221,6 +222,7 @@ export function SchedaEventoModale({
           id: l.id,
           servizioId: l.servizioId,
           nome: l.nome, postiTotali: l.postiTotali, prezzoExtra: Number(l.prezzoExtra), attivo: l.attivo,
+          arrivoIndirizzo: l.arrivoIndirizzo ?? undefined, arrivoOrario: l.arrivoOrario ?? undefined,
           // Normalizzo qui il prezzo che arriva dal server: se una fermata
           // non ne aveva uno salvato, arriva `null`, non `undefined` — va
           // convertito subito, altrimenti finirebbe di nuovo a rimbalzare
@@ -938,8 +940,21 @@ export function SchedaEventoModale({
           <div className="campo" style={{ marginBottom: 10 }}>
             <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} />
           </div>
+          <p className="section-label" style={{ marginBottom: 6 }}>Arrivo</p>
+          <div className="form-grid" style={{ marginBottom: 10 }}>
+            <label>Indirizzo di arrivo
+              <input
+                value={tragitto.arrivoIndirizzo ?? ''}
+                onChange={(e) => aggiornaTragitto(idxTragitto, 'arrivoIndirizzo', e.target.value)}
+                placeholder="es. Piazzale Clodio, Roma"
+              />
+            </label>
+            <label>Orario di arrivo
+              <OrarioInput value={tragitto.arrivoOrario ?? ''} onChange={(v) => aggiornaTragitto(idxTragitto, 'arrivoOrario', v)} />
+            </label>
+          </div>
           <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 10 }}>
-            Posti, prezzi, orari e punto di arrivo si impostano da <b>Partenze</b>, una volta che questo tragitto è confermato lì con un bus vero.
+            Posti, prezzi e orari delle fermate si impostano da <b>Partenze</b>, una volta che questo tragitto è confermato lì con un bus vero — usano l'arrivo indicato qui sopra come riferimento per calcolarli.
           </p>
 
           <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla.</p>

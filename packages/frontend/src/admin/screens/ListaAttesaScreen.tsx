@@ -48,6 +48,18 @@ export function ListaAttesaScreen() {
     ? eventiPerTab.filter((ev) => `${ev.artista} ${ev.citta} ${ev.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : eventiPerTab;
 
+  // Sempre un fetch fresco dal server, non l'oggetto già in memoria —
+  // quella lista potrebbe non riflettere l'ultimo stato vero.
+  async function apriEvento(ev: Evento) {
+    setSelezionato(ev); // subito, per non far vedere un editor vuoto mentre carica
+    try {
+      const fresco = await eventiApi.getById(ev.id);
+      setSelezionato(fresco);
+    } catch {
+      // Se il fetch fallisce, resta la versione già in memoria.
+    }
+  }
+
   if (selezionato) {
     return <SchedaEventoModale evento={selezionato} tabIniziale="lista-attesa" soloQuestaTab onClose={() => setSelezionato(null)} onSalvato={ricarica} />;
   }
@@ -68,7 +80,7 @@ export function ListaAttesaScreen() {
           <EventoCardCompatta
             key={ev.id}
             evento={{ ...ev, immagineUrl: ev.immagini[0]?.url ?? null }}
-            onClick={() => setSelezionato(ev)}
+            onClick={() => apriEvento(ev)}
             richiedeIntervento={tab === 'da-lavorare'}
             badge={tab === 'da-lavorare' ? <>{conteggi[ev.id].inAttesa} in attesa</> : tab === 'promosse' ? <>{conteggi[ev.id].promosse} promosse</> : undefined}
           />

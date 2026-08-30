@@ -86,11 +86,18 @@ export function PartenzeScreen() {
     ? partenzePerTab.filter((p) => `${p.evento.artista} ${p.evento.citta} ${p.evento.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : partenzePerTab;
 
-  function apriPartenza(p: Partenza) {
-    const eventoVero = eventi.find((ev) => ev.id === p.evento.id);
-    if (!eventoVero) return;
+  // Sempre un fetch fresco dal server, non l'oggetto già in memoria —
+  // quella lista potrebbe non riflettere l'ultimo stato vero.
+  async function apriPartenza(p: Partenza) {
     const azione: 'preventivo' | 'espandi' = (tab === 'prezzato' || tab === 'da-confermare') ? 'preventivo' : 'espandi';
-    setSelezionato({ evento: eventoVero, tragittoId: p.tragittoId, azione });
+    const eventoInMemoria = eventi.find((ev) => ev.id === p.evento.id);
+    if (eventoInMemoria) setSelezionato({ evento: eventoInMemoria, tragittoId: p.tragittoId, azione }); // subito, non far vedere niente mentre carica
+    try {
+      const fresco = await eventiApi.getById(p.evento.id);
+      setSelezionato({ evento: fresco, tragittoId: p.tragittoId, azione });
+    } catch {
+      // Se il fetch fallisce, resta la versione già in memoria (se c'era).
+    }
   }
 
   if (selezionato) {

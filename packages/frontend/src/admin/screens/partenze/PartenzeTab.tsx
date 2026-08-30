@@ -239,11 +239,12 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
     }
     const tragittoVero = [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === preventivoAperto);
     if (!tragittoVero) return;
-    const servizioDelTragitto = tragittoVero.servizioId ? eventoCompleto.servizi.find((s) => s.id === tragittoVero.servizioId) : null;
-    const arrivoIndirizzo = servizioDelTragitto ? servizioDelTragitto.arrivoIndirizzo : eventoCompleto.arrivoIndirizzo;
+    // L'arrivo è del tragitto stesso ora, deciso in Eventi — non più
+    // di evento/servizio.
+    const arrivoIndirizzo = tragittoVero.arrivoIndirizzo;
     const fermateValide = tragittoVero.fermate.filter((f) => f.attivo && f.indirizzo.trim());
     if (fermateValide.length === 0) { setStatoCalcoloPreventivo('Nessuna fermata attiva su questo tragitto.'); return; }
-    if (!arrivoIndirizzo?.trim()) { setStatoCalcoloPreventivo('Manca l\'indirizzo di arrivo — impostalo qui sopra prima di calcolare.'); return; }
+    if (!arrivoIndirizzo?.trim()) { setStatoCalcoloPreventivo('Manca l\'indirizzo di arrivo — impostalo in Eventi, nella scheda di questo tragitto.'); return; }
 
     setCalcolandoPreventivo(true);
     setStatoCalcoloPreventivo('Localizzo gli indirizzi...');
@@ -312,14 +313,15 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
   async function calcolaOrariDaArrivo() {
     if (!tragittoInModifica || !formOperativo || !eventoCompleto) return;
     const tragittoVero = [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragittoInModifica);
-    const servizioDelTragitto = tragittoVero?.servizioId ? eventoCompleto.servizi.find((s) => s.id === tragittoVero.servizioId) : null;
-    const arrivoIndirizzoContesto = servizioDelTragitto ? servizioDelTragitto.arrivoIndirizzo : eventoCompleto.arrivoIndirizzo;
-    const arrivoOrarioContesto = servizioDelTragitto ? servizioDelTragitto.arrivoOrario : eventoCompleto.arrivoOrario;
+    // L'arrivo è del tragitto stesso ora, deciso in Eventi — non più
+    // di evento/servizio.
+    const arrivoIndirizzoContesto = tragittoVero?.arrivoIndirizzo;
+    const arrivoOrarioContesto = tragittoVero?.arrivoOrario;
 
     const fermateValide = formOperativo.fermate.filter((f) => f.indirizzo.trim());
     if (fermateValide.length === 0) { setStatoCalcoloOrari('Aggiungi almeno una fermata con indirizzo compilato.'); return; }
-    if (!arrivoIndirizzoContesto?.trim()) { setStatoCalcoloOrari('Inserisci prima l\'indirizzo di arrivo qui sopra.'); return; }
-    if (!arrivoOrarioContesto) { setStatoCalcoloOrari('Inserisci prima l\'orario di arrivo qui sopra.'); return; }
+    if (!arrivoIndirizzoContesto?.trim()) { setStatoCalcoloOrari('Manca l\'indirizzo di arrivo — impostalo in Eventi, nella scheda di questo tragitto.'); return; }
+    if (!arrivoOrarioContesto) { setStatoCalcoloOrari('Manca l\'orario di arrivo — impostalo in Eventi, nella scheda di questo tragitto.'); return; }
 
     setCalcolandoOrari(true);
     setStatoCalcoloOrari('Localizzo gli indirizzi...');
@@ -438,40 +440,6 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
       {calcoloVisibile.length === 0 && (
         <p className="testo-intro">Questa scheda non ha ancora nessun tragitto configurato — vai nella tab "Dettagli" per aggiungerne uno.</p>
       )}
-
-      {eventoCompleto && (() => {
-        // Fase 2 — l'arrivo si modifica da qui, non più da Eventi.
-        // Contesto giusto: quello dell'evento intero se sei sulla tab
-        // "Tragitti liberi" (o l'evento non ha servizi), quello del
-        // servizio attivo altrimenti.
-        const contestoServizio = servizioAttivo !== 'liberi' ? eventoCompleto.servizi.find((s) => s.id === servizioAttivo) : null;
-        const indirizzo = contestoServizio ? contestoServizio.arrivoIndirizzo : eventoCompleto.arrivoIndirizzo;
-        const orario = contestoServizio ? contestoServizio.arrivoOrario : eventoCompleto.arrivoOrario;
-        async function salvaArrivo(campo: 'arrivoIndirizzo' | 'arrivoOrario', valore: string) {
-          try {
-            if (contestoServizio) await eventiApi.aggiornaServizio(eventoId, contestoServizio.id, { [campo]: valore || null });
-            else await eventiApi.update(eventoId, { [campo]: valore || null });
-            ricarica();
-          } catch (e) {
-            alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
-          }
-        }
-        return (
-          <div className="section-card" style={{ marginBottom: 16 }}>
-            <p className="section-label" style={{ marginBottom: 10 }}>
-              Arrivo{contestoServizio ? ` — ${contestoServizio.nome}` : ''}
-            </p>
-            <div className="form-grid">
-              <label>Indirizzo di arrivo
-                <input defaultValue={indirizzo ?? ''} onBlur={(e) => { if (e.target.value !== (indirizzo ?? '')) salvaArrivo('arrivoIndirizzo', e.target.value); }} placeholder="es. Piazzale Clodio, Roma" />
-              </label>
-              <label>Orario di arrivo
-                <OrarioInput value={orario ?? ''} onChange={(v) => { if (v !== (orario ?? '')) salvaArrivo('arrivoOrario', v); }} />
-              </label>
-            </div>
-          </div>
-        );
-      })()}
 
       {calcoloVisibile.length > 0 && (
         <div className="section-card" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 16 }}>

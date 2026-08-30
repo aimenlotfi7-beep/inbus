@@ -24,6 +24,18 @@ export function OfferteScreen() {
     ? eventi.filter((ev) => `${ev.artista} ${ev.citta} ${ev.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : eventi;
 
+  // Sempre un fetch fresco dal server, non l'oggetto già in memoria —
+  // quella lista potrebbe non riflettere l'ultimo stato vero.
+  async function apriEvento(ev: Evento) {
+    setSelezionato(ev); // subito, per non far vedere un editor vuoto mentre carica
+    try {
+      const fresco = await eventiApi.getById(ev.id);
+      setSelezionato(fresco);
+    } catch {
+      // Se il fetch fallisce, resta la versione già in memoria.
+    }
+  }
+
   if (selezionato) {
     return <SchedaEventoModale evento={selezionato} tabIniziale="offerte" soloQuestaTab onClose={() => setSelezionato(null)} onSalvato={ricarica} />;
   }
@@ -35,7 +47,7 @@ export function OfferteScreen() {
 
       <div className="cards-list">
         {eventiFiltrati.map((ev) => (
-          <div key={ev.id} className="evento-card" onClick={() => setSelezionato(ev)}>
+          <div key={ev.id} className="evento-card" onClick={() => apriEvento(ev)}>
             <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
             <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
             <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{ev.luogo}, {ev.citta}</p>
