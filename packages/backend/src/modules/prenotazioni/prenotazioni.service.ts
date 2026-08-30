@@ -1,4 +1,4 @@
-import { and, eq, sql, desc, inArray, isNull } from 'drizzle-orm';
+import { and, eq, sql, desc, inArray, isNull, gte } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
 import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, lineaFermate, busFisici } from '../../db/schema.js';
@@ -628,7 +628,7 @@ export const prenotazioniService = {
       eventoData: eventi.data,
     }).from(prenotazioni)
       .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
-      .where(and(eq(prenotazioni.stato, 'CONFERMATA'), isNull(prenotazioni.busId), sql`${eventi.data} >= ${oraAdesso}`));
+      .where(and(eq(prenotazioni.stato, 'CONFERMATA'), isNull(prenotazioni.busId), gte(eventi.data, oraAdesso)));
 
     // Raggruppo per (tragittoId, fermataCitta) — ogni gruppo si
     // riordina indipendentemente dagli altri.

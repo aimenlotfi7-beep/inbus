@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, ilike, inArray, isNull, sql, gte, lt } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
   eventi,
@@ -395,7 +395,8 @@ export const eventiService = {
       .where(and(
         isNull(eventi.eliminatoIl),
         ilike(eventi.artista, input.artista.trim()),
-        sql`${eventi.data} >= ${giornoInizio} AND ${eventi.data} < ${giornoFine}`,
+        gte(eventi.data, giornoInizio),
+        lt(eventi.data, giornoFine),
       )).limit(1);
     if (doppione) throw new ConflittoDati(`Esiste già un evento "${input.artista}" in questa stessa data — se non è un errore, cambia leggermente il nome o la data per distinguerli.`);
 

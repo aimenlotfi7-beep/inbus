@@ -1,4 +1,4 @@
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, lt } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
 import { listaAttesa, eventi, prenotazioni, fermate, tragitti } from '../../db/schema.js';
@@ -143,7 +143,7 @@ export const listaAttesaService = {
     for (const riga of mie) {
       const [evento] = await db.select({ artista: eventi.artista, data: eventi.data, luogo: eventi.luogo, citta: eventi.citta }).from(eventi).where(eq(eventi.id, riga.eventoId)).limit(1);
       const primaDiLei = await db.select({ id: listaAttesa.id }).from(listaAttesa)
-        .where(and(eq(listaAttesa.eventoId, riga.eventoId), eq(listaAttesa.stato, 'IN_ATTESA'), sql`${listaAttesa.dataCreazione} < ${riga.dataCreazione}`));
+        .where(and(eq(listaAttesa.eventoId, riga.eventoId), eq(listaAttesa.stato, 'IN_ATTESA'), lt(listaAttesa.dataCreazione, riga.dataCreazione)));
       risultato.push({ ...riga, evento, posizione: primaDiLei.length + 1 });
     }
     return risultato;
