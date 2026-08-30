@@ -488,8 +488,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
     ? calcolo.filter((l) => (servizioAttivo === 'liberi' ? !l.servizioId : l.servizioId === servizioAttivo))
     : calcolo
   ).filter((l) => !contestoPartenze || contestoPartenze.tragittiIds.includes(l.tragittoId));
-  const trattoCoperteVisibili = calcoloVisibile.filter((l) => l.coperta).length;
-  const trattoConProblemiVisibili = calcoloVisibile.filter((l) => l.totalePasseggeri > l.postiTotali).length;
 
   return (
     <div>
@@ -537,17 +535,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
 
       {calcoloVisibile.length === 0 && (
         <p className="testo-intro">Questa scheda non ha ancora nessun tragitto configurato — vai nella tab "Dettagli" per aggiungerne uno.</p>
-      )}
-
-      {calcoloVisibile.length > 0 && (
-        <div className="section-card" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 16 }}>
-          <span className="chip">{calcoloVisibile.length} tragitt{calcoloVisibile.length === 1 ? 'o' : 'i'}</span>
-          <span className="chip">{trattoCoperteVisibili}/{calcoloVisibile.length} coperte</span>
-          <span className="chip">{busLista.length} bus censit{busLista.length === 1 ? 'o' : 'i'}</span>
-          {trattoConProblemiVisibili > 0 && (
-            <span className="badge non-coperta">⚠ {trattoConProblemiVisibili} tragitt{trattoConProblemiVisibili === 1 ? 'o' : 'i'} con posti superati</span>
-          )}
-        </div>
       )}
 
       {contestoPartenze && (() => {
