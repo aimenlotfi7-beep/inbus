@@ -394,6 +394,13 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                     + (o.postiDisponibili === 0 ? ' — ESAURITO, lista d\'attesa' : '');
                 }}
               />
+              {opzioneScelta?.tipoPartenza && opzioneScelta.sogliaMinima != null && (
+                <p className="checkout-nota" style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: -8, marginBottom: 12 }}>
+                  Questa fermata richiede almeno {opzioneScelta.sogliaMinima} partecipanti confermati per essere garantita
+                  {opzioneScelta.partecipantiAttuali != null && <> — al momento ce ne sono {opzioneScelta.partecipantiAttuali}</>}.
+                  Se non si raggiunge la soglia, ti avviseremo e potrai scegliere se accettare un'alternativa o essere rimborsato.
+                </p>
+              )}
 
               <label className="field-label">Passeggeri</label>
               <div className="qty-control">

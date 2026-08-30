@@ -77,6 +77,9 @@ export interface OpzionePartenza {
   orarioRitorno: string | null;
   indirizzoRitorno: string | null;
   prezzoEffettivo: number;
+  tipoPartenza: boolean;
+  sogliaMinima: number | null;
+  partecipantiAttuali: number | null;
 }
 
 export interface Prenotazione {

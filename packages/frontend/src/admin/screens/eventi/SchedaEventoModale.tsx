@@ -262,7 +262,7 @@ export function SchedaEventoModale({
   function aggiornaFermata(idxTragitto: number, idxFermata: number, campo: keyof FermataInput, valore: string) {
     const tragitti = [...(form.tragitti ?? [])];
     const fermate = [...tragitti[idxTragitto].fermate];
-    fermate[idxFermata] = { ...fermate[idxFermata], [campo]: (campo === 'prezzo' || campo === 'postiMax') ? (Number(valore) || undefined) : valore };
+    fermate[idxFermata] = { ...fermate[idxFermata], [campo]: (campo === 'prezzo' || campo === 'postiMax' || campo === 'sogliaMinima') ? (Number(valore) || undefined) : valore };
     tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate };
     setForm({ ...form, tragitti });
   }
@@ -992,6 +992,28 @@ export function SchedaEventoModale({
                 >
                   ← Torna a scegliere dall'anagrafica
                 </button>
+              )}
+              {/* Partenza/Passaggio: proprietà strutturale del tragitto
+                  universale, resta qui (non in Partenze) — decide se ha
+                  senso una soglia minima di partecipanti prima di
+                  convenire una Linea dedicata (es. la fermata più
+                  lontana in un percorso lungo). */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 22, marginTop: 4, fontSize: 12, color: 'var(--mist)' }}>
+                <input
+                  type="checkbox"
+                  checked={f.tipo === 'PARTENZA'}
+                  onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'tipo', e.target.checked ? 'PARTENZA' : 'PASSAGGIO')}
+                />
+                È una fermata di Partenza (richiede un minimo di partecipanti per convenire)
+              </label>
+              {f.tipo === 'PARTENZA' && (
+                <div style={{ marginLeft: 22, marginTop: 4, maxWidth: 220 }}>
+                  <CampoNumero
+                    placeholder="Soglia minima (default generale se vuoto)"
+                    value={f.sogliaMinima ?? undefined}
+                    onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'sogliaMinima', v !== undefined ? String(v) : '')}
+                  />
+                </div>
               )}
             </div>
           ))}

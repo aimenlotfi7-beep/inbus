@@ -16,7 +16,7 @@ import {
 } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
-import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
+import { leggiPostiPerBus, leggiSogliaMinimaPartenza } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoSchema } from './eventi.dto.js';
 import { rilevaVariazioni, generaComunicazioniVariazione } from '../variazioni/variazioni.service.js';
@@ -600,6 +600,14 @@ export const eventiService = {
       orarioRitorno: string | null;
       indirizzoRitorno: string | null;
       prezzoEffettivo: number;
+      // Solo per una fermata "Partenza" — visibile al cliente, così
+      // sa che quella fermata specifica ha bisogno di un minimo di
+      // conferme prima di essere garantita (vedi le Linee, ancora da
+      // costruire — questo è il dato che il cliente deve poter vedere
+      // già da ora, indipendentemente da quando arriva quella parte).
+      tipoPartenza: boolean;
+      sogliaMinima: number | null;
+      partecipantiAttuali: number | null;
     }> = [];
 
     for (const tragitto of tragittiDaMostrare) {
@@ -619,6 +627,12 @@ export const eventiService = {
         const postiDisponibiliFermata = f.postiMax != null
           ? Math.min(tragitto.postiDisponibili, Math.max(0, f.postiMax - f.postiPrenotati))
           : tragitto.postiDisponibili;
+        let partecipantiAttuali: number | null = null;
+        if (f.tipo === 'PARTENZA') {
+          const [riga] = await db.select({ tot: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)` }).from(prenotazioni)
+            .where(and(eq(prenotazioni.tragittoId, tragitto.id), eq(prenotazioni.fermataCitta, f.citta), eq(prenotazioni.stato, 'CONFERMATA')));
+          partecipantiAttuali = Number(riga?.tot ?? 0);
+        }
         opzioni.push({
           tragittoId: tragitto.id,
           postiDisponibili: postiDisponibiliFermata,
@@ -629,6 +643,9 @@ export const eventiService = {
           orarioRitorno: f.orarioRitorno,
           indirizzoRitorno: f.indirizzoRitorno,
           prezzoEffettivo,
+          tipoPartenza: f.tipo === 'PARTENZA',
+          sogliaMinima: f.tipo === 'PARTENZA' ? (f.sogliaMinima ?? await leggiSogliaMinimaPartenza()) : null,
+          partecipantiAttuali,
         });
       }
     }
