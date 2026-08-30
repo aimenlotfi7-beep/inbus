@@ -138,6 +138,14 @@ select{
 .side-group.collassato .group-caret{transform:rotate(-90deg);}
 .side-group-items{display:flex; flex-direction:column; gap:4px; overflow:hidden;}
 .side-group.collassato .side-group-items{display:none;}
+/* Nascosta di default — esiste solo per il menu a schermo intero su
+   mobile (vedi dentro la media query più sotto, che la riaccende con
+   display:flex). Senza questa riga, essendo renderizzata sempre nel
+   JSX a prescindere dalla larghezza schermo, comparirebbe anche su
+   desktop, senza nessuno stile applicato (il riquadro bianco con la X
+   segnalato: era proprio questo pulsante "chiudi", visibile ma senza
+   il suo aspetto voluto). */
+.side-group-items-intestazione{display:none;}
 
 .side-btn{
   display:flex; align-items:center; gap:10px; text-align:left;
