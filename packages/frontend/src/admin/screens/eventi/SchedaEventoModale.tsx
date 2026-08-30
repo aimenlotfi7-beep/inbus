@@ -1039,10 +1039,6 @@ export function SchedaEventoModale({
             </div>
           ))}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>
-          <p className="testo-intro" style={{ fontSize: 11.5, marginTop: 6 }}>
-            "Posti max" è facoltativo: mettilo solo se vuoi limitare quante persone possono salire da quella
-            città specifica, indipendentemente dai posti liberi sul resto del bus.
-          </p>
           </>
           )}
         </div>
