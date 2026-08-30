@@ -9,6 +9,9 @@ export interface Fermata {
   prezzo: string | null;
   postiMax: number | null;
   postiPrenotati: number;
+  tipo: 'PARTENZA' | 'PASSAGGIO';
+  sogliaMinima: number | null;
+  attivo: boolean;
 }
 
 export interface Tragitto {
@@ -19,7 +22,7 @@ export interface Tragitto {
   postiDisponibili: number;
   prezzoExtra: string;
   attivo: boolean;
-  stato: 'DA_CONFERMARE' | 'CONFERMATO';
+  stato: 'DA_CONFERMARE' | 'PREZZATO' | 'CONFERMATO';
   referenteNome: string | null;
   referenteTelefono: string | null;
   fermate: Fermata[];

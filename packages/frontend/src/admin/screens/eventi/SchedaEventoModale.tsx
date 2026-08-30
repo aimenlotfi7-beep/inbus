@@ -222,7 +222,7 @@ export function SchedaEventoModale({
           // non ne aveva uno salvato, arriva `null`, non `undefined` — va
           // convertito subito, altrimenti finirebbe di nuovo a rimbalzare
           // in giro come null fino a far fallire la validazione al salvataggio.
-          fermate: l.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ? Number(f.prezzo) : undefined, postiMax: f.postiMax ?? undefined })),
+          fermate: l.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ? Number(f.prezzo) : undefined, postiMax: f.postiMax ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima, attivo: f.attivo })),
         })),
       };
     } else {

@@ -66,6 +66,28 @@ export async function durataViaggio(a: Coordinate, b: Coordinate): Promise<numbe
   }
 }
 
+/** Distanza reale strada per strada in km (non in linea d'aria) — stesso
+ *  servizio OSRM già usato per la durata: la risposta contiene già
+ *  entrambi i dati nella stessa chiamata, questa funzione legge solo il
+ *  campo diverso. Usata per il calcolo prezzi per fermata (più lontano
+ *  dall'arrivo = più caro). */
+export async function distanzaViaggio(a: Coordinate, b: Coordinate): Promise<number | null> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error('OSRM ha risposto con errore:', res.status, res.statusText);
+      return null;
+    }
+    const dati = await res.json();
+    if (dati?.routes?.[0]) return Math.round(dati.routes[0].distance / 1000);
+    return null;
+  } catch (e) {
+    console.error('Calcolo distanza viaggio fallito:', e);
+    return null;
+  }
+}
+
 export function attesa(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

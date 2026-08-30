@@ -88,6 +88,10 @@ export const eventiController = {
     await eventiService.aggiornaTragittoOperativo(req.params.tragittoId, req.body);
     res.json({ ok: true });
   },
+  async registraPreventivo(req: Request, res: Response) {
+    await eventiService.registraPreventivo(req.params.tragittoId, req.body);
+    res.json({ ok: true });
+  },
 
   async rimuoviBus(req: Request, res: Response) {
     await eventiService.rimuoviBus(req.params.busId);

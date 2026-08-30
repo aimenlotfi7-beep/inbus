@@ -9,7 +9,7 @@ import { Modale } from '../../shared/Modale';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useSessione } from '../../shared/SessioneContext';
-import { geocodifica, durataViaggio, attesa } from '../../shared/geo';
+import { geocodifica, durataViaggio, distanzaViaggio, attesa } from '../../shared/geo';
 import { haPermesso } from '../../../api/auth';
 
 const BUS_VUOTO: BusFisicoInput = { riferimento: '', tragittiIds: [] };
@@ -64,6 +64,15 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
   const [salvandoOperativo, setSalvandoOperativo] = useState(false);
   const [calcolandoOrari, setCalcolandoOrari] = useState(false);
   const [statoCalcoloOrari, setStatoCalcoloOrari] = useState('');
+  // Pannello "Registra preventivo" — per i tragitti ancora "Da
+  // confermare": una stima (non un bus vero opzionato) che sblocca la
+  // vendita e calcola i prezzi per fermata dal modello di pareggio.
+  const [preventivoAperto, setPreventivoAperto] = useState<string | null>(null);
+  const [formPreventivo, setFormPreventivo] = useState<{ costo?: number; postiBus?: number }>({});
+  const [prezziCalcolati, setPrezziCalcolati] = useState<{ fermataId: string; citta: string; distanza: number; prezzo: number }[] | null>(null);
+  const [calcolandoPreventivo, setCalcolandoPreventivo] = useState(false);
+  const [statoCalcoloPreventivo, setStatoCalcoloPreventivo] = useState('');
+  const [salvandoPreventivo, setSalvandoPreventivo] = useState(false);
   const [busLista, setBusLista] = useState<BusFisico[]>([]);
   const [economia, setEconomia] = useState<RiepilogoEconomicoTratta[]>([]);
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
@@ -155,6 +164,7 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
         orario: f.orario ?? undefined, orarioRitorno: f.orarioRitorno ?? undefined, indirizzoRitorno: f.indirizzoRitorno ?? undefined,
         prezzo: f.prezzo ? Number(f.prezzo) : undefined,
         postiMax: f.postiMax ?? undefined,
+        tipo: f.tipo, sogliaMinima: f.sogliaMinima, attivo: f.attivo,
       })),
     });
     setTragittoInModifica(tragitto.tragittoId);
@@ -182,6 +192,95 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
       fermate[idx] = { ...fermate[idx], [campo]: valore };
       return { ...f, fermate };
     });
+  }
+
+  /** Apre il pannello preventivo per un tragitto ancora "Da
+   *  confermare" — parte sempre vuoto, non c'è nessun preventivo
+   *  precedente da ricaricare (è la prima volta che si registra). */
+  function apriPreventivo(tragittoId: string) {
+    setPreventivoAperto(tragittoId);
+    setFormPreventivo({});
+    setPrezziCalcolati(null);
+    setStatoCalcoloPreventivo('');
+  }
+
+  /** Calcola il prezzo di ogni fermata dal preventivo (modello di
+   *  pareggio al 50%: prezzo medio minimo = costo ÷ metà dei posti) +
+   *  distanza reale dall'arrivo (quota fissa + per km, calibrate così
+   *  che la fermata alla distanza MEDIA paghi esattamente il prezzo
+   *  medio minimo — le più lontane pagano di più, le più vicine di
+   *  meno, mai sotto la metà del prezzo medio). */
+  async function calcolaPrezziPreventivo() {
+    if (!preventivoAperto || !eventoCompleto || !formPreventivo.costo || !formPreventivo.postiBus) {
+      setStatoCalcoloPreventivo('Inserisci prima costo e posti presunti del bus.');
+      return;
+    }
+    const tragittoVero = [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === preventivoAperto);
+    if (!tragittoVero) return;
+    const servizioDelTragitto = tragittoVero.servizioId ? eventoCompleto.servizi.find((s) => s.id === tragittoVero.servizioId) : null;
+    const arrivoIndirizzo = servizioDelTragitto ? servizioDelTragitto.arrivoIndirizzo : eventoCompleto.arrivoIndirizzo;
+    const fermateValide = tragittoVero.fermate.filter((f) => f.attivo && f.indirizzo.trim());
+    if (fermateValide.length === 0) { setStatoCalcoloPreventivo('Nessuna fermata attiva su questo tragitto.'); return; }
+    if (!arrivoIndirizzo?.trim()) { setStatoCalcoloPreventivo('Manca l\'indirizzo di arrivo — impostalo qui sopra prima di calcolare.'); return; }
+
+    setCalcolandoPreventivo(true);
+    setStatoCalcoloPreventivo('Localizzo gli indirizzi...');
+
+    const rArrivo = await geocodifica(arrivoIndirizzo);
+    await attesa(1100);
+    if (!rArrivo.coordinate) {
+      setStatoCalcoloPreventivo(rArrivo.erroreRete ? 'Richiesta a OpenStreetMap non riuscita (rete/firewall).' : 'Indirizzo di arrivo non localizzato — controllalo.');
+      setCalcolandoPreventivo(false);
+      return;
+    }
+
+    const distanze: { fermataId: string; citta: string; distanza: number | null }[] = [];
+    for (const f of fermateValide) {
+      const r = await geocodifica(`${f.indirizzo}, ${f.citta}`);
+      await attesa(1100);
+      if (!r.coordinate) { distanze.push({ fermataId: f.id, citta: f.citta, distanza: null }); continue; }
+      const km = await distanzaViaggio(r.coordinate, rArrivo.coordinate);
+      await attesa(300);
+      distanze.push({ fermataId: f.id, citta: f.citta, distanza: km });
+    }
+
+    const valide = distanze.filter((d): d is { fermataId: string; citta: string; distanza: number } => d.distanza !== null);
+    if (valide.length === 0) {
+      setStatoCalcoloPreventivo('Nessun indirizzo localizzato — controlla le fermate.');
+      setCalcolandoPreventivo(false);
+      return;
+    }
+
+    const prezzoMedioMinimo = formPreventivo.costo / (formPreventivo.postiBus * 0.5);
+    const distanzaMedia = valide.reduce((tot, d) => tot + d.distanza, 0) / valide.length;
+    const quotaFissa = 0.5 * prezzoMedioMinimo;
+    const tariffaPerKm = distanzaMedia > 0 ? quotaFissa / distanzaMedia : 0;
+
+    setPrezziCalcolati(valide.map((d) => ({
+      fermataId: d.fermataId, citta: d.citta, distanza: d.distanza,
+      prezzo: Math.round(quotaFissa + tariffaPerKm * d.distanza),
+    })));
+    const nonLocalizzate = distanze.length - valide.length;
+    setStatoCalcoloPreventivo(nonLocalizzate > 0 ? `Fatto, ma ${nonLocalizzate} fermata/e non localizzata/e: resta senza prezzo, va impostato a mano dopo.` : 'Prezzi calcolati — controllali prima di confermare.');
+    setCalcolandoPreventivo(false);
+  }
+
+  async function salvaPreventivo() {
+    if (!preventivoAperto || !formPreventivo.costo || !formPreventivo.postiBus || !prezziCalcolati) return;
+    setSalvandoPreventivo(true);
+    try {
+      await eventiApi.registraPreventivo(preventivoAperto, {
+        preventivoCosto: formPreventivo.costo,
+        preventivoPostiBus: formPreventivo.postiBus,
+        prezziPerFermata: prezziCalcolati.map((p) => ({ fermataId: p.fermataId, prezzo: p.prezzo })),
+      });
+      setPreventivoAperto(null);
+      ricarica();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+    } finally {
+      setSalvandoPreventivo(false);
+    }
   }
 
   /** Ricalcola gli orari di tutte le fermate a ritroso dall'orario di
@@ -448,12 +547,23 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
               <span className={`badge ${stato.classe}`}>{stato.etichetta}</span>
+              {tragitto.stato === 'PREZZATO' && (
+                <span style={{ fontSize: 10.5, color: 'var(--mist)' }}>Prezzato, bus vero ancora da opzionare</span>
+              )}
               <button
                 type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }}
                 onClick={(e) => { e.stopPropagation(); apriModificaOperativa(tragitto); }}
               >
                 Modifica orario/prezzo/posti
               </button>
+              {tragitto.stato === 'DA_CONFERMARE' && (
+                <button
+                  type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px', borderColor: 'var(--pink-dim)', color: 'var(--pink)' }}
+                  onClick={(e) => { e.stopPropagation(); apriPreventivo(tragitto.tragittoId); }}
+                >
+                  Registra preventivo
+                </button>
+              )}
             </div>
           </div>
 
@@ -613,6 +723,44 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
           )}
           <button type="button" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={salvandoOperativo} onClick={salvaOperativo}>
             {salvandoOperativo ? 'Salvo...' : 'Salva'}
+          </button>
+        </Modale>
+      )}
+
+      {preventivoAperto && (
+        <Modale titolo="Registra preventivo" onClose={() => setPreventivoAperto(null)} larga>
+          <p className="testo-intro" style={{ marginBottom: 16 }}>
+            Una stima dal fornitore (non un bus vero ancora opzionato) sullo scenario più caro — sblocca la vendita, coi prezzi calcolati per fermata. Se poi costruisci una Linea più economica, il margine extra resta un guadagno in più.
+          </p>
+          <div className="form-grid" style={{ marginBottom: 16 }}>
+            <label>Costo del preventivo (€)
+              <CampoNumero valuta value={formPreventivo.costo} onChange={(v) => setFormPreventivo((f) => ({ ...f, costo: v }))} />
+            </label>
+            <label>Posti presunti del bus
+              <CampoNumero value={formPreventivo.postiBus} onChange={(v) => setFormPreventivo((f) => ({ ...f, postiBus: v }))} />
+            </label>
+          </div>
+          <button type="button" className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={calcolaPrezziPreventivo} disabled={calcolandoPreventivo}>
+            {calcolandoPreventivo ? 'Calcolo prezzi...' : '↻ Calcola prezzi per fermata'}
+          </button>
+          {statoCalcoloPreventivo && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 12 }}>{statoCalcoloPreventivo}</p>}
+          {prezziCalcolati && prezziCalcolati.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <p className="section-label" style={{ marginBottom: 8 }}>Prezzi calcolati — controllali prima di confermare</p>
+              {prezziCalcolati.map((p) => (
+                <div key={p.fermataId} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
+                  <span>{p.citta} <span style={{ color: 'var(--mist)', fontSize: 12 }}>({p.distanza} km dall'arrivo)</span></span>
+                  <strong>€{p.prezzo}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            type="button" className="btn btn-primary" style={{ width: '100%' }}
+            disabled={!prezziCalcolati || prezziCalcolati.length === 0 || salvandoPreventivo}
+            onClick={salvaPreventivo}
+          >
+            {salvandoPreventivo ? 'Salvo...' : 'Conferma e vai in vendita'}
           </button>
         </Modale>
       )}

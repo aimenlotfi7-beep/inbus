@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { eventiController } from './eventi.controller.js';
-import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, creaBusSchema, aggiornaBusSchema, aggiornaTragittoOperativoSchema } from './eventi.dto.js';
+import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, creaBusSchema, aggiornaBusSchema, aggiornaTragittoOperativoSchema, registraPreventivoSchema } from './eventi.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
@@ -59,6 +59,7 @@ eventiRouter.put('/:id/servizi/:servizioId', richiedeAuth, richiedePermesso('eve
 eventiRouter.delete('/:id/servizi/:servizioId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.eliminaServizio));
 eventiRouter.put('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaBusSchema), asyncHandler(eventiController.aggiornaBus));
 eventiRouter.put('/tragitti/:tragittoId/operativo', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaTragittoOperativoSchema), asyncHandler(eventiController.aggiornaTragittoOperativo));
+eventiRouter.put('/tragitti/:tragittoId/preventivo', richiedeAuth, richiedePermesso('eventi.crea'), valida(registraPreventivoSchema), asyncHandler(eventiController.registraPreventivo));
 eventiRouter.delete('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.rimuoviBus));
 eventiRouter.get('/:id/bus/:busId/passeggeri', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaPasseggeriBus));
 eventiRouter.get('/:id/riepilogo-economico', richiedeAuth, richiedePermesso('eventi.economia'), asyncHandler(eventiController.riepilogoEconomico));

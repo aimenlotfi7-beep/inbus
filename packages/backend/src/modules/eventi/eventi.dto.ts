@@ -138,3 +138,18 @@ export const aggiornaTragittoOperativoSchema = z.object({
   prezzoExtra: z.number().default(0),
   fermate: z.array(fermataSchema).default([]),
 });
+
+// Fase "Prezzato": il preventivo (dal fornitore, sullo scenario più
+// caro — dalla fermata più lontana) sblocca la vendita SENZA ancora un
+// bus vero opzionato. I prezzi per fermata arrivano già calcolati dal
+// frontend (modello pareggio al 50% + distanza dall'arrivo, richiede
+// geocodifica — più naturale farla lì, stesso posto che già calcola
+// gli orari dall'arrivo) — qui si limita a salvarli.
+export const registraPreventivoSchema = z.object({
+  preventivoCosto: z.number().positive(),
+  preventivoPostiBus: z.number().int().positive(),
+  prezziPerFermata: z.array(z.object({
+    fermataId: z.string(),
+    prezzo: z.number().nonnegative(),
+  })),
+});

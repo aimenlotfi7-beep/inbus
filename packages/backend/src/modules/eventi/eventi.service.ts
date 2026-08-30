@@ -18,7 +18,7 @@ import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
-import { tragittoSchema, aggiornaTragittoOperativoSchema } from './eventi.dto.js';
+import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoSchema } from './eventi.dto.js';
 import { rilevaVariazioni, generaComunicazioniVariazione } from '../variazioni/variazioni.service.js';
 import type { z } from 'zod';
 
@@ -801,6 +801,31 @@ export const eventiService = {
     // Le comunicazioni partono SOLO dopo che il salvataggio è andato a
     // buon fine — non devono partire per un salvataggio poi fallito.
     await generaComunicazioniVariazione(tragittoId, variazioniRilevate);
+  },
+
+  /** Registra il preventivo (stima dal fornitore, sullo scenario più
+   *  caro) e salva i prezzi già calcolati per ogni fermata — sblocca la
+   *  vendita (stato "Prezzato") senza bisogno di un bus vero opzionato,
+   *  che arriva solo dopo, quando le prenotazioni chiariscono da dove
+   *  costruire la prima Linea vera. */
+  async registraPreventivo(tragittoId: string, input: z.infer<typeof registraPreventivoSchema>) {
+    const [esiste] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!esiste) throw new NonTrovato('Tragitto');
+
+    await db.transaction(async (tx) => {
+      await tx.update(tragitti).set({
+        preventivoCosto: input.preventivoCosto.toFixed(2),
+        preventivoPostiBus: input.preventivoPostiBus,
+        // Solo un passaggio in avanti — non tocca un tragitto già
+        // "Confermato" (avrebbe un bus vero, non ha senso retrocederlo).
+        ...(esiste.stato === 'DA_CONFERMARE' && { stato: 'PREZZATO' as const }),
+      }).where(eq(tragitti.id, tragittoId));
+
+      for (const { fermataId, prezzo } of input.prezziPerFermata) {
+        await tx.update(fermate).set({ prezzo: prezzo.toFixed(2) })
+          .where(and(eq(fermate.id, fermataId), eq(fermate.tragittoId, tragittoId))); // il secondo controllo è una sicurezza in più, non fidarsi di un id passato dal client senza verificarlo
+      }
+    });
   },
 
   async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus?: number; note?: string; tragittiIds: string[] }) {

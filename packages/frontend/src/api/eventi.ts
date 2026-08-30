@@ -4,6 +4,7 @@ import type { Evento, OpzionePartenza } from './types';
 export interface FermataInput {
   fermataAnagraficaId?: string | null;
   citta: string; indirizzo: string; orario?: string; orarioRitorno?: string; indirizzoRitorno?: string; prezzo?: number; postiMax?: number;
+  tipo?: 'PARTENZA' | 'PASSAGGIO'; sogliaMinima?: number | null; attivo?: boolean;
 }
 export interface TragittoInput {
   id?: string; // presente = tratta già esistente, assente = nuova
@@ -38,7 +39,7 @@ export interface CalcoloBusTragitto {
   tragittoId: string;
   servizioId: string | null;
   nome: string;
-  stato: 'DA_CONFERMARE' | 'CONFERMATO';
+  stato: 'DA_CONFERMARE' | 'PREZZATO' | 'CONFERMATO';
   postiTotali: number;
   capienzaPerBus: number;
   fermate: FermataConPasseggeri[];
@@ -90,6 +91,8 @@ export const eventiApi = {
     api.put<{ id: string; nome: string; arrivoIndirizzo: string | null; arrivoOrario: string | null }>(`/api/eventi/${eventoId}/servizi/${servizioId}`, input),
   aggiornaTragittoOperativo: (tragittoId: string, input: { prezzoExtra?: number; fermate: FermataInput[] }) =>
     api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/operativo`, input),
+  registraPreventivo: (tragittoId: string, input: { preventivoCosto: number; preventivoPostiBus: number; prezziPerFermata: { fermataId: string; prezzo: number }[] }) =>
+    api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/preventivo`, input),
   rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
   listaPasseggeriBus: (id: string, busId: string) => api.get<PasseggeroBus[]>(`/api/eventi/${id}/bus/${busId}/passeggeri`),
   riepilogoEconomico: (id: string) => api.get<RiepilogoEconomicoTratta[]>(`/api/eventi/${id}/riepilogo-economico`),
