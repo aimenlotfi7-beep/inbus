@@ -4,6 +4,7 @@ import { AdminLayout, type SezioneGestionale } from './shared/AdminLayout';
 import { AdminHome } from './screens/AdminHome';
 import { AdminDashboard } from './AdminDashboard';
 import { SessioneContext } from './shared/SessioneContext';
+import { NavigazioneContext } from './shared/NavigazioneContext';
 import { EventiScreen } from './screens/EventiScreen';
 import { VetrinaScreen } from './screens/VetrinaScreen';
 import { CalendarioScreen } from './screens/CalendarioScreen';
@@ -130,11 +131,17 @@ export function AdminApp() {
   const [caricamentoIniziale, setCaricamentoIniziale] = useState(true);
   const [sezione, setSezioneState] = useState<SezioneGestionale | 'home'>(leggiSezioneDaUrl);
 
-  function setSezione(s: SezioneGestionale | 'home') {
+  function setSezione(s: SezioneGestionale | 'home', parametriExtra?: Record<string, string | null>) {
     setSezioneState(s);
     const url = new URL(window.location.href);
     if (s === 'home') url.searchParams.delete('sezione');
     else url.searchParams.set('sezione', s);
+    if (parametriExtra) {
+      for (const [chiave, valore] of Object.entries(parametriExtra)) {
+        if (valore === null) url.searchParams.delete(chiave);
+        else url.searchParams.set(chiave, valore);
+      }
+    }
     window.history.replaceState(null, '', url);
   }
 
@@ -157,9 +164,9 @@ export function AdminApp() {
     setSezione('home');
   }
 
-  function cambiaSezione(s: SezioneGestionale) {
+  function cambiaSezione(s: SezioneGestionale, parametriExtra?: Record<string, string | null>) {
     if (sessione && !haPermesso(sessione, PERMESSO_SEZIONE[s])) return; // difesa extra, oltre al menu già filtrato
-    setSezione(s);
+    setSezione(s, parametriExtra);
     // Cambiando sezione si riparte sempre dall'inizio — altrimenti, se
     // si era scorsa in basso la sezione precedente, ci si ritrova nel
     // mezzo di quella nuova senza nessun punto di riferimento (capita
@@ -172,9 +179,11 @@ export function AdminApp() {
 
   return (
     <SessioneContext.Provider value={sessione}>
-      <AdminLayout sessione={sessione} sezioneAttiva={sezione} onCambiaSezione={cambiaSezione} onVaiHome={() => setSezione('home')} onLogout={logout}>
-        {sezione === 'home' ? <AdminHome onVaiA={cambiaSezione} /> : (() => { const Schermata = SCHERMATE[sezione]; return <Schermata />; })()}
-      </AdminLayout>
+      <NavigazioneContext.Provider value={cambiaSezione}>
+        <AdminLayout sessione={sessione} sezioneAttiva={sezione} onCambiaSezione={cambiaSezione} onVaiHome={() => setSezione('home')} onLogout={logout}>
+          {sezione === 'home' ? <AdminHome onVaiA={cambiaSezione} /> : (() => { const Schermata = SCHERMATE[sezione]; return <Schermata />; })()}
+        </AdminLayout>
+      </NavigazioneContext.Provider>
     </SessioneContext.Provider>
   );
 }

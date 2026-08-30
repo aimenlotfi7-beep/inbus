@@ -6,6 +6,7 @@ import { tourLeaderApi, type TourLeader } from '../../api/tourleader';
 import { ErroreApi } from '../../api/client';
 import { CampoNumero } from '../shared/CampoNumero';
 import { PanelHead } from '../shared/PanelHead';
+import { useNavigazione } from '../shared/NavigazioneContext';
 
 const BUS_VUOTO: BusDiLineaInput = { riferimento: '' };
 
@@ -19,6 +20,7 @@ const BUS_VUOTO: BusDiLineaInput = { riferimento: '' };
  *  fermate, se ne aggiunge un secondo alla STESSA Linea invece di
  *  crearne una nuova. */
 export function LineeTragittoScreen() {
+  const navigaSezione = useNavigazione();
   const parametri = new URLSearchParams(window.location.search);
   const eventoId = parametri.get('evento');
   const tragittoId = parametri.get('tragitto');
@@ -66,13 +68,12 @@ export function LineeTragittoScreen() {
   }, [eventoId, tragittoId]);
 
   function tornaAPartenze(tabDestinazione?: 'fermate' | 'da-prezzare' | 'da-confermare') {
-    const url = new URL(window.location.href);
-    url.searchParams.set('sezione', 'partenze');
-    url.searchParams.delete('evento');
-    url.searchParams.delete('tragitto');
-    if (tabDestinazione) url.searchParams.set('partenzeTab', tabDestinazione);
-    else url.searchParams.delete('partenzeTab');
-    window.location.href = url.toString();
+    // Cambio di sezione interno — non più una navigazione vera del
+    // browser. "evento"/"tragitto" vanno tolti esplicitamente
+    // dall'indirizzo (prima un ricaricamento completo li avrebbe
+    // "ripuliti" da solo insieme a tutto il resto — qui no, restano se
+    // non li tolgo apposta).
+    navigaSezione('partenze', { evento: null, tragitto: null, partenzeTab: tabDestinazione ?? null });
   }
 
   if (!eventoId || !tragittoId) {

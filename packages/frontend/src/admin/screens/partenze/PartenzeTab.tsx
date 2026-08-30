@@ -7,6 +7,7 @@ import { ErroreApi } from '../../../api/client';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useSessione } from '../../shared/SessioneContext';
+import { useNavigazione } from '../../shared/NavigazioneContext';
 import { geocodifica, durataViaggio, distanzaViaggio, attesa } from '../../shared/geo';
 import { haPermesso } from '../../../api/auth';
 
@@ -56,6 +57,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
   onSalvato?: () => void;
 }) {
   const sessione = useSessione();
+  const navigaSezione = useNavigazione();
   const vedeEconomia = haPermesso(sessione, 'eventi.economia');
   const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
   const [eventoCompleto, setEventoCompleto] = useState<Evento | null>(null);
@@ -470,11 +472,11 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
    *  indirizzo (?sezione=linee&evento=...&tragitto=...), non più un
    *  modale qui dentro. */
   function apriPaginaLinee(tragittoIdContesto: string) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('sezione', 'linee');
-    url.searchParams.set('evento', eventoId);
-    url.searchParams.set('tragitto', tragittoIdContesto);
-    window.location.href = url.toString();
+    // Cambio di sezione interno (stato React + indirizzo aggiornato
+    // senza ricaricare) — non più una navigazione vera del browser,
+    // molto più lenta (ricaricava tutto il bundle da zero solo per
+    // saltare a una pagina che fa già parte della stessa app).
+    navigaSezione('linee', { evento: eventoId, tragitto: tragittoIdContesto });
   }
 
   if (caricamento) return <p className="testo-intro">Caricamento...</p>;
