@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { eq, and, ilike } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
-import { fermateAnagrafica, fermate } from '../../db/schema.js';
+import { fermateAnagrafica, fermate, fermatePercorsoSalvato } from '../../db/schema.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
@@ -90,6 +90,14 @@ fermateAnagraficaRouter.delete(
     if (!esiste) throw new NonTrovato('Fermata');
     const [inUso] = await db.select({ id: fermate.id }).from(fermate).where(eq(fermate.fermataAnagraficaId, req.params.id)).limit(1);
     if (inUso) throw new ConflittoDati('Questa fermata è usata in almeno un tragitto — non puoi eliminarla (i tragitti che la usano restano comunque intatti anche se la lasci).');
+    // Stesso controllo anche sui Percorsi Salvati — una fermata usata
+    // SOLO in un percorso salvato (mai ancora applicata a un evento
+    // vero) non risulterebbe "in uso" dal controllo sopra, ma
+    // l'eliminazione vera fallirebbe comunque con un errore grezzo del
+    // database (stesso vincolo, tabella diversa) — controllato qui
+    // prima, con un messaggio comprensibile.
+    const [inUsoPercorso] = await db.select({ id: fermatePercorsoSalvato.id }).from(fermatePercorsoSalvato).where(eq(fermatePercorsoSalvato.fermataAnagraficaId, req.params.id)).limit(1);
+    if (inUsoPercorso) throw new ConflittoDati('Questa fermata è usata in almeno un percorso salvato — non puoi eliminarla (toglila prima da lì, o lascia il percorso salvato com\'è).');
     await db.delete(fermateAnagrafica).where(eq(fermateAnagrafica.id, req.params.id));
     res.status(204).send();
   })

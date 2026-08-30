@@ -1,7 +1,8 @@
 import { eq, and } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { whiteLabel, organizzatoreEventi, organizzatori, eventi } from '../../db/schema.js';
+import { whiteLabel, organizzatoreEventi, organizzatori, eventi, prenotazioni } from '../../db/schema.js';
+import { ConflittoDati } from '../../shared/errors.js';
 import { normalizzaTema, DEFAULT_WHITE_LABEL_THEME, type WhiteLabelTheme } from './white-label.theme.js';
 import { WhiteLabelNonTrovata, OrganizzatoreNonAutorizzato, AssociazioneGiaEsistente } from './white-label.errors.js';
 import type { z } from 'zod';
@@ -99,6 +100,13 @@ export const whiteLabelService = {
 
   async remove(id: string) {
     await getRigaCompleta(id);
+    // Una prenotazione fatta tramite questo widget lo referenzia
+    // direttamente (prenotazioni.white_label_id) — senza questo
+    // controllo, eliminare un white-label già usato da un cliente vero
+    // fallirebbe con un errore grezzo del database invece di un
+    // messaggio comprensibile.
+    const [inUso] = await db.select({ id: prenotazioni.id }).from(prenotazioni).where(eq(prenotazioni.whiteLabelId, id)).limit(1);
+    if (inUso) throw new ConflittoDati('Questo white-label ha già almeno una prenotazione collegata — non può essere eliminato (disattivalo invece, con l\'interruttore).');
     await db.delete(whiteLabel).where(eq(whiteLabel.id, id));
   },
 

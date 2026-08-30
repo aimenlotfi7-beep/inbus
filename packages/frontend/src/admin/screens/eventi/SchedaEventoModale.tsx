@@ -314,24 +314,28 @@ export function SchedaEventoModale({
   // "Annulla" su uno ancora vuoto, e rimuoviTragitto quando arriva a
   // zero tragitti — stessa identica regola in entrambi i casi (incluso
   // il ritorno automatico "a un servizio" se ne resta uno solo).
-  function rimuoviServizio(key: string, tragittiCorrenti: TragittoInput[]) {
+  // Chiamata SOLO da rimuoviTragitto qui sotto, quando l'ultimo
+  // tragitto di un servizio viene tolto — "tragittiAttuali" arriva già
+  // fresco da lì (mai una copia catturata prima di un'attesa), non
+  // serve un aggiornamento funzionale qui: chi chiama se n'è già
+  // occupato.
+  function rimuoviServizio(key: string, tragittiAttuali: TragittoInput[]) {
     const serviziRimasti = servizi.filter((v) => v.key !== key);
     if (serviziRimasti.length === 1) {
       const ultimoKey = serviziRimasti[0].key;
-      setForm({ ...form, tragitti: tragittiCorrenti.map((t) => (t.servizioId === ultimoKey ? { ...t, servizioId: null } : t)) });
+      setForm((f) => ({ ...f, tragitti: tragittiAttuali.map((t) => (t.servizioId === ultimoKey ? { ...t, servizioId: null } : t)) }));
       setServizi([]);
       setModalitaServizi('singolo');
       setServizioTabAttivo(null);
     } else {
-      setForm({ ...form, tragitti: tragittiCorrenti });
+      setForm((f) => ({ ...f, tragitti: tragittiAttuali }));
       setServizi(serviziRimasti);
       setServizioTabAttivo(serviziRimasti[0]?.key ?? null);
     }
   }
 
   async function rimuoviTragitto(idxTragitto: number) {
-    const tuttiTragitti = form.tragitti ?? [];
-    const tragittoRimosso = tuttiTragitti[idxTragitto];
+    const tragittoRimosso = (form.tragitti ?? [])[idxTragitto];
 
     // Un tragitto già salvato (ha un id vero) potrebbe avere
     // prenotazioni confermate — controllo subito, al click, invece di
@@ -352,18 +356,30 @@ export function SchedaEventoModale({
       }
     }
 
-    const nuoviTragitti = tuttiTragitti.filter((_, i) => i !== idxTragitto);
-
-    // Un servizio non si elimina più con un pulsante a parte — si
-    // "svuota" rimuovendo i suoi tragitti uno a uno (anche tutti
-    // insieme, ma sempre da qui): appena non gliene resta più
-    // nessuno, il servizio stesso sparisce da solo.
-    const servizioIdRimosso = tragittoRimosso?.servizioId;
-    if (servizioIdRimosso && !nuoviTragitti.some((t) => t.servizioId === servizioIdRimosso)) {
-      rimuoviServizio(servizioIdRimosso, nuoviTragitti);
-      return;
-    }
-    setForm({ ...form, tragitti: nuoviTragitti });
+    // Individuato per RIFERIMENTO (non per indice, che potrebbe non
+    // essere più valido se nel frattempo — durante l'attesa qui sopra —
+    // è cambiato qualcos'altro nell'elenco, es. un'altra rimozione in
+    // parallelo) sullo stato più recente davvero, non una copia
+    // catturata prima dell'attesa. Bug della stessa famiglia già
+    // trovato e corretto altrove in questo file (race condition sui
+    // due servizi) — stessa causa, stesso rimedio.
+    const risultato: { servizioDaRimuovere: { key: string; tragittiRestanti: TragittoInput[] } | null } = { servizioDaRimuovere: null };
+    setForm((f) => {
+      const tragittiAttuali = f.tragitti ?? [];
+      const idxAttuale = tragittoRimosso ? tragittiAttuali.indexOf(tragittoRimosso) : -1;
+      if (idxAttuale === -1) return f; // già rimosso da un'altra chiamata nel frattempo
+      const nuoviTragitti = tragittiAttuali.filter((_, i) => i !== idxAttuale);
+      // Un servizio non si elimina più con un pulsante a parte — si
+      // "svuota" rimuovendo i suoi tragitti uno a uno: appena non
+      // gliene resta più nessuno, il servizio stesso sparisce da solo.
+      const servizioIdRimosso = tragittoRimosso?.servizioId;
+      if (servizioIdRimosso && !nuoviTragitti.some((t) => t.servizioId === servizioIdRimosso)) {
+        risultato.servizioDaRimuovere = { key: servizioIdRimosso, tragittiRestanti: nuoviTragitti };
+        return f; // lo fa rimuoviServizio subito dopo, con lo stato giusto
+      }
+      return { ...f, tragitti: nuoviTragitti };
+    });
+    if (risultato.servizioDaRimuovere) rimuoviServizio(risultato.servizioDaRimuovere.key, risultato.servizioDaRimuovere.tragittiRestanti);
   }
 
   // ---- Riordino fermate trascinandole (drag & drop nativo, senza librerie) ----

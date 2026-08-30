@@ -162,6 +162,25 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
 
   // Atterraggio diretto da una card di Partenze — una volta sola,
   // appena i dati sono pronti (non ad ogni ricarica successiva,
+  // "Da confermare" naviga SEMPRE via alla pagina Linee — non mostra
+  // mai nulla qui dentro. Il tragitto di destinazione è già noto subito
+  // dal contesto (contestoPartenze.tragittiIds[0]), senza bisogno di
+  // aspettare calcolaBus/listaBus/riepilogoEconomico/getById (le 4
+  // chiamate di "ricarica" qui sotto, compreso un getById RIPETUTO —
+  // chi ha aperto questa scheda l'aveva già fatto): aspettarle tutte
+  // solo per poi reindirizzare comunque è il "lag" percepito aprendo
+  // questa sezione. Un effetto a parte, separato da quello sotto (che
+  // resta per gli altri contesti, dove servono davvero i dati) — parte
+  // subito al montaggio, prima ancora che "ricarica" finisca.
+  const reindirizzoLineeFattoRef = useRef(false);
+  useEffect(() => {
+    if (reindirizzoLineeFattoRef.current || contestoPartenze?.azione !== 'linee') return;
+    const primoTragittoId = contestoPartenze.tragittiIds[0];
+    if (!primoTragittoId) return;
+    reindirizzoLineeFattoRef.current = true;
+    apriPaginaLinee(primoTragittoId);
+  }, [contestoPartenze]);
+
   // altrimenti riaprirebbe il pannello anche dopo un salvataggio).
   // Espande TUTTI i tragitti del contesto (potrebbero essere più di
   // uno, se l'evento ha più servizi/percorsi nello stesso stato) e
@@ -182,7 +201,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
     const primoTragitto = tuttiITragitti.find((t) => t.id === primoTragittoId);
     if (primoTragitto) setServizioAttivo(primoTragitto.servizioId ?? 'liberi');
     if (contestoPartenze.azione === 'preventivo') apriPreventivo(primoTragittoId);
-    if (contestoPartenze.azione === 'linee') apriPaginaLinee(primoTragittoId);
     if (contestoPartenze.azione === 'fermate') {
       const primoCalcolo = calcolo.find((c) => c.tragittoId === primoTragittoId);
       if (primoCalcolo) apriModificaOperativa(primoCalcolo);

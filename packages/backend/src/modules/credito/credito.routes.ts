@@ -17,10 +17,3 @@ creditoRouter.get(
   }),
 );
 
-creditoRouter.get(
-  '/movimenti',
-  valida(z.object({ email: z.string().email() }), 'query'),
-  asyncHandler(async (req: Request, res: Response) => {
-    res.json(await creditoService.storicoMovimenti(req.query.email as string));
-  }),
-);

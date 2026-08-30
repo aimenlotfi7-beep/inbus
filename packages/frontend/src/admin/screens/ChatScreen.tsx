@@ -56,14 +56,16 @@ export function ChatScreen() {
   async function chiudi() {
     if (!selezionata) return;
     if (!confirm(`Chiudere la conversazione con ${selezionata.clienteNome}? Se scrive di nuovo, se ne aprirà una nuova (questa resta comunque consultabile nello storico).`)) return;
-    await chatApi.chiudi(selezionata.id);
-    setSelezionata({ ...selezionata, stato: 'CHIUSA' });
+    const id = selezionata.id;
+    await chatApi.chiudi(id);
+    setSelezionata((s) => s && s.id === id ? { ...s, stato: 'CHIUSA' } : s);
     ricaricaLista();
   }
   async function riapri() {
     if (!selezionata) return;
-    await chatApi.riapri(selezionata.id);
-    setSelezionata({ ...selezionata, stato: 'IN_CORSO' });
+    const id = selezionata.id;
+    await chatApi.riapri(id);
+    setSelezionata((s) => s && s.id === id ? { ...s, stato: 'IN_CORSO' } : s);
     ricaricaLista();
   }
 
