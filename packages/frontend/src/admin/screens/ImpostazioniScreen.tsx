@@ -12,6 +12,8 @@ const IMPOSTAZIONI: { chiave: string; etichetta: string; default: string; suffis
   { chiave: 'credito_per_passeggero', etichetta: 'Credito fedeltà per passeggero (€)', default: '0.5' },
   { chiave: 'soglia_posticipo_variazione_minuti', etichetta: 'Soglia posticipo per notifica variazione (minuti — l\'anticipo e il cambio città/indirizzo notificano sempre, senza soglia)', default: '20' },
   { chiave: 'soglia_minima_fermata_partenza', etichetta: 'Soglia minima partecipanti per una fermata "Partenza" (sotto questo numero non conviene includerla in una Linea)', default: '10' },
+  { chiave: 'soglia_occupazione_pareggio', etichetta: 'Riempimento minimo assunto per il calcolo prezzi (0,5 = pareggio a metà bus pieno; più basso = prezzi più alti, più prudente)', default: '0.5' },
+  { chiave: 'quota_fissa_percentuale', etichetta: 'Quota fissa sul prezzo medio (0,5 = metà fissa per tutti, metà cresce con la distanza; più alto = meno differenza tra fermate vicine e lontane)', default: '0.5' },
 ];
 
 export function ImpostazioniScreen() {
@@ -36,6 +38,14 @@ export function ImpostazioniScreen() {
     const numero = Number(valori[chiave]);
     if (!Number.isFinite(numero) || numero < 0) {
       alert('Inserisci un numero valido.');
+      return;
+    }
+    // Le due voci della formula prezzi sono percentuali — 0 romperebbe
+    // il calcolo (divisione per zero), oltre 1 non avrebbe senso
+    // (più del 100% di riempimento, o una quota fissa che da sola
+    // supera l'intero prezzo medio).
+    if ((chiave === 'soglia_occupazione_pareggio' || chiave === 'quota_fissa_percentuale') && (numero <= 0 || numero > 1)) {
+      alert('Questo valore deve essere maggiore di 0 e non superiore a 1 (es. 0.5 per il 50%).');
       return;
     }
     setSalvataggio(chiave);

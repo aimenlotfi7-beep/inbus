@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput } from '../../../api/eventi';
 import type { Evento } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
+import { impostazioniApi } from '../../../api/impostazioni';
 import { ErroreApi } from '../../../api/client';
 import { Modale } from '../../shared/Modale';
 import { CampoNumero } from '../../shared/CampoNumero';
@@ -57,6 +58,11 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
   // vendita e calcola i prezzi per fermata dal modello di pareggio.
   const [preventivoAperto, setPreventivoAperto] = useState<string | null>(null);
   const [formPreventivo, setFormPreventivo] = useState<{ costo?: number; postiBus?: number }>({});
+  // I due numeri della formula prezzi, configurabili da Impostazioni —
+  // caricati una volta sola all'apertura, con gli stessi default già
+  // usati finora se non sono ancora stati impostati esplicitamente
+  // (così non cambia nulla per chi non li ha mai toccati).
+  const [parametriFormula, setParametriFormula] = useState({ sogliaOccupazione: 0.5, quotaFissaPercentuale: 0.5 });
   const [prezziCalcolati, setPrezziCalcolati] = useState<{ fermataId: string; citta: string; distanza: number; prezzo: number }[] | null>(null);
   const [calcolandoPreventivo, setCalcolandoPreventivo] = useState(false);
   const [statoCalcoloPreventivo, setStatoCalcoloPreventivo] = useState('');
@@ -117,6 +123,17 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
   useEffect(() => {
     ricarica();
     fermateAnagraficaApi.list().then(setFermateAnagrafica).catch(() => setFermateAnagrafica([]));
+    impostazioniApi.list().then((righe) => {
+      const trova = (chiave: string, fallback: number) => {
+        const riga = righe.find((r) => r.chiave === chiave);
+        const numero = riga ? Number(riga.valore) : NaN;
+        return Number.isFinite(numero) && numero > 0 ? numero : fallback;
+      };
+      setParametriFormula({
+        sogliaOccupazione: trova('soglia_occupazione_pareggio', 0.5),
+        quotaFissaPercentuale: trova('quota_fissa_percentuale', 0.5),
+      });
+    }).catch(() => {}); // se non risponde, restano i default — meglio che bloccare il calcolo
   }, [eventoId]);
 
   // Atterraggio diretto da una card di Partenze — una volta sola,
@@ -256,9 +273,9 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
       return;
     }
 
-    const prezzoMedioMinimo = formPreventivo.costo / (formPreventivo.postiBus * 0.5);
+    const prezzoMedioMinimo = formPreventivo.costo / (formPreventivo.postiBus * parametriFormula.sogliaOccupazione);
     const distanzaMedia = valide.reduce((tot, d) => tot + d.distanza, 0) / valide.length;
-    const quotaFissa = 0.5 * prezzoMedioMinimo;
+    const quotaFissa = parametriFormula.quotaFissaPercentuale * prezzoMedioMinimo;
     const tariffaPerKm = distanzaMedia > 0 ? quotaFissa / distanzaMedia : 0;
 
     setPrezziCalcolati(valide.map((d) => ({

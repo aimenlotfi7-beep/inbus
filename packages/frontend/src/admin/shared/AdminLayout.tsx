@@ -59,7 +59,6 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'fornitori', label: 'Fornitori', permesso: 'fornitori.visualizza' },
     { id: 'fermate', label: 'Fermate', permesso: 'tragitti.visualizza' },
     { id: 'tragitti', label: 'Percorsi salvati', permesso: 'tragitti.visualizza' },
-    { id: 'impostazioni', label: 'Impostazioni', permesso: 'impostazioni.gestisci' },
   ]},
   { titolo: 'Sistema', voci: [
     { id: 'amministratori', label: 'Amministratori', permesso: 'utenze.gestisci' },
@@ -67,6 +66,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'cestino', label: 'Cestino', permesso: 'eventi.cestino' },
     { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
     { id: 'testi-tooltip', label: 'Testi tooltip', permesso: 'impostazioni.gestisci' },
+    { id: 'impostazioni', label: 'Impostazioni', permesso: 'impostazioni.gestisci' },
   ]},
 ];
 

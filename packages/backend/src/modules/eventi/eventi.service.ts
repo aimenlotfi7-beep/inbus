@@ -830,7 +830,7 @@ export const eventiService = {
       const tl = tourLeaders.find((t) => t.id === b.tourLeaderId);
       const fermateIdsDaFermate = assegnazioniFermate.filter((a) => a.busId === b.id).map((a) => a.fermataId);
       const fermateIdsDaLinea = b.lineaId ? fermateDelleLinee.filter((f) => f.lineaId === b.lineaId).map((f) => f.fermataId) : [];
-      const fermateIds = [...fermateIdsDaFermate, ...fermateIdsDaLinea];
+      const fermateIds = [...new Set([...fermateIdsDaFermate, ...fermateIdsDaLinea])];
       const tragittiIdsDaTratte = assegnazioniTratte.filter((a) => a.busId === b.id).map((a) => a.tragittoId);
       const tragittiIdsDaFermate = fermateIdsDaFermate.map((fId) => mappaFermataTragitto.get(fId)).filter((id): id is string => !!id);
       const tragittoIdDaLinea = b.lineaId ? mappaLineaTragitto.get(b.lineaId) : undefined;
