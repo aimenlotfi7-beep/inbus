@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
 import { pagineApi } from '../../../api/pagine';
 import { eventiApi, type EventoInput, type TragittoInput, type FermataInput } from '../../../api/eventi';
@@ -65,12 +65,6 @@ export function SchedaEventoModale({
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [subTabInfo, setSubTabInfo] = useState<'info' | 'descrizione'>('info');
   const [subTabImmagini, setSubTabImmagini] = useState<'immagini' | 'biglietto'>('immagini');
-  // Id della bozza salvata in automatico durante QUESTA sessione di
-  // creazione (null finché non c'è abbastanza per salvarla la prima
-  // volta) — una volta creata, i salvataggi successivi la aggiornano
-  // invece di crearne una nuova ogni volta.
-  const bozzaIdRef = useRef<string | null>(null);
-  const autoSalvandoRef = useRef(false);
   // Tratte comprimibili come in Partenze — le nuove restano aperte per
   // poterle compilare subito, le altre si possono chiudere per non
   // dover scorrere tutto quando ce ne sono tante.
@@ -249,6 +243,29 @@ export function SchedaEventoModale({
     ricaricaCategorie();
     ricaricaCategorieEvento();
     caricaDaEvento(evento ?? null);
+    // Per un evento NUOVO (non in modifica di uno esistente) — se c'era
+    // un form in corso di compilazione salvato nel browser (rimasto lì
+    // da un ricaricamento accidentale della pagina), lo ripristino in
+    // silenzio, senza chiedere nulla: è quello che si aspetta di
+    // trovare chi ha appena ricaricato per sbaglio. Cliccando invece
+    // "+ Nuovo evento" di proposito, EventiScreen non riapre affatto
+    // questa scheda se non c'era una creazione già in corso (vedi lì)
+    // — quindi questo ramo scatta solo nel caso giusto.
+    if (!evento) {
+      const salvata = localStorage.getItem('inbus_bozza_form_evento');
+      if (salvata) {
+        try {
+          const { form: formSalvato, servizi: serviziSalvati, modalitaServizi: modalitaSalvata } = JSON.parse(salvata);
+          setForm(formSalvato);
+          setServizi(serviziSalvati);
+          setModalitaServizi(modalitaSalvata);
+          setServizioTabAttivo(serviziSalvati[0]?.key ?? null);
+        } catch {
+          // Contenuto non leggibile (versione vecchia, corrotto) —
+          // ignoro e resta il form vuoto già impostato sopra.
+        }
+      }
+    }
     setTabAttiva(tabIniziale);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evento?.id]);
@@ -432,42 +449,22 @@ export function SchedaEventoModale({
   const bigliettoPersonalizzato = Boolean(form.ticketColoreAccento || form.ticketImmagineSfondoUrl || form.layoutBigliettoId);
   const descrizioneCompilata = Boolean((form.descrizione ?? '').trim() || (form.descrizioneSeo ?? '').trim());
 
-  // Auto-salvataggio in bozza — solo per un evento NUOVO (non in modifica
-  // di uno esistente): appena ci sono almeno i campi minimi, salva da
-  // sola una bozza sul server (non solo nel browser) e la tiene
-  // aggiornata mentre si continua a compilare, così un'uscita
-  // accidentale o un ricaricamento della pagina non fa perdere nulla —
-  // riaprendo "Nuovo evento" viene proposto di riprenderla.
+  // Auto-salvataggio nel BROWSER (non più sul server) — solo per un
+  // evento NUOVO (non in modifica di uno esistente): tiene il form
+  // scritto in localStorage mentre si compila, così un ricaricamento
+  // accidentale della pagina non fa perdere nulla. A differenza di
+  // prima, questo non tocca mai il server prima del salvataggio vero
+  // — niente più righe "fantasma" nel database per bozze mai
+  // completate, e niente più rischio di duplicare tragitti/servizi ad
+  // ogni giro (il bug che aveva fatto scoprire il problema: ogni
+  // auto-salvataggio sul server, senza un modo affidabile di sapere
+  // cosa fosse già stato salvato, rischiava di ricreare le stesse
+  // righe più volte).
   useEffect(() => {
     if (evento) return; // in modifica di un evento vero, non serve: è già salvato
-    if (!infoCompleta()) return;
-    const timeout = setTimeout(async () => {
-      // Stessa protezione di salva(): se la rete è lenta, un
-      // auto-salvataggio ancora in corso non deve sovrapporsi a uno
-      // nuovo — entrambi vedrebbero bozzaIdRef.current ancora vuoto e
-      // creerebbero due bozze separate invece di una sola aggiornata.
-      if (autoSalvandoRef.current) return;
-      autoSalvandoRef.current = true;
-      try {
-        const payload = { ...form, bozza: true };
-        if (bozzaIdRef.current) {
-          await eventiApi.update(bozzaIdRef.current, payload);
-        } else {
-          const creata = await eventiApi.create(payload);
-          bozzaIdRef.current = creata.id;
-          localStorage.setItem('inbus_bozza_evento_id', creata.id);
-        }
-      } catch {
-        // Silenzioso apposta: un fallimento dell'auto-salvataggio non
-        // deve interrompere chi sta scrivendo — riproverà al prossimo
-        // cambiamento.
-      } finally {
-        autoSalvandoRef.current = false;
-      }
-    }, 1500);
-    return () => clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form]);
+    localStorage.setItem('inbus_bozza_form_evento', JSON.stringify({ form, servizi, modalitaServizi }));
+    localStorage.setItem('inbus_creazione_evento_in_corso', '1');
+  }, [form, servizi, modalitaServizi, evento]);
 
   async function nuovoGenere() {
     const nome = window.prompt('Nome del nuovo genere:');
@@ -585,18 +582,12 @@ export function SchedaEventoModale({
     setSalvando(true);
     try {
       if (evento) {
-        // Se si tratta di una bozza ripresa e completata da qui, la
-        // "confermo" col salvataggio normale — altrimenti resterebbe
-        // segnata come bozza per sempre, anche dopo averla finita.
-        await eventiApi.update(evento.id, { ...payload, bozza: false });
-      } else if (bozzaIdRef.current) {
-        // C'era già una bozza salvata in automatico: la aggiorno e la
-        // "confermo" (bozza:false), invece di crearne una seconda.
-        await eventiApi.update(bozzaIdRef.current, { ...payload, bozza: false });
+        await eventiApi.update(evento.id, payload);
       } else {
-        await eventiApi.create({ ...payload, bozza: false });
+        await eventiApi.create(payload);
       }
-      localStorage.removeItem('inbus_bozza_evento_id');
+      localStorage.removeItem('inbus_bozza_form_evento');
+      localStorage.removeItem('inbus_creazione_evento_in_corso');
       onSalvato();
       onClose();
     } catch (e) {
@@ -1211,8 +1202,19 @@ export function SchedaEventoModale({
 
   // ---- Vista CREAZIONE (nuovo evento): wizard a step ----
 
+  // Chiusura VOLONTARIA senza salvare — a differenza di un ricaricamento
+  // accidentale della pagina, qui l'admin sta scegliendo di abbandonare
+  // quello che stava scrivendo: la bozza nel browser va tolta, altrimenti
+  // resterebbe lì e riapparirebbe da sola alla prossima ricarica pagina
+  // (anche in un momento completamente scollegato da questa creazione).
+  function chiudiSenzaSalvare() {
+    localStorage.removeItem('inbus_bozza_form_evento');
+    localStorage.removeItem('inbus_creazione_evento_in_corso');
+    onClose();
+  }
+
   return (
-    <PaginaSezione titolo="Nuovo evento" onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)}>
+    <PaginaSezione titolo="Nuovo evento" onIndietro={chiudiSenzaSalvare} richiediConferma={() => chiediConferma(chiudiSenzaSalvare)}>
       <div className="mini-tabs">
         {STEP_WIZARD.map((s) => (
           <button

@@ -26,25 +26,20 @@ export function EventiScreen() {
     ? eventiTab.filter((ev) => `${ev.artista} ${ev.genere} ${ev.citta} ${ev.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : eventiTab;
 
-  async function apriNuovo() {
-    const bozzaId = localStorage.getItem('inbus_bozza_evento_id');
-    if (bozzaId) {
-      const riprendi = confirm('Hai una bozza di un evento non ancora completato — vuoi riprenderla da dove l\'avevi lasciata?');
-      if (riprendi) {
-        try {
-          const bozza = await eventiApi.getById(bozzaId);
-          setInModifica(bozza);
-          setModaleAperta(true);
-          return;
-        } catch {
-          // La bozza non esiste più (es. cancellata da un altro admin) —
-          // proseguo con un evento vuoto invece di bloccare tutto qui.
-          localStorage.removeItem('inbus_bozza_evento_id');
-        }
-      } else {
-        localStorage.removeItem('inbus_bozza_evento_id');
-      }
+  // Se la scheda di creazione era aperta quando la pagina è stata
+  // ricaricata per sbaglio (F5, chiusura accidentale della scheda del
+  // browser), la riapro da sola — il contenuto del form lo ripristina
+  // SchedaEventoModale stessa dal suo salvataggio nel browser (vedi
+  // lì). Cliccando "+ Nuovo evento" di proposito, invece, si parte
+  // sempre vuoti — vedi apriNuovo più sotto, nessun controllo qui.
+  useEffect(() => {
+    if (localStorage.getItem('inbus_creazione_evento_in_corso')) {
+      setInModifica(null);
+      setModaleAperta(true);
     }
+  }, []);
+
+  function apriNuovo() {
     setInModifica(null);
     setModaleAperta(true);
   }
