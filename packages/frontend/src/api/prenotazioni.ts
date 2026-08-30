@@ -49,7 +49,6 @@ export const prenotazioniApi = {
     apiConToken('inbus_cliente_token').post<{ ordine: { id: string; totale: string }; prenotazioni: Prenotazione[] }>('/api/prenotazioni/ordine', { articoli }),
   getSaldo: (pnr: string) => api.get<DifferenzaSaldo>(`/api/prenotazioni/${pnr}/saldo`),
   saldaResto: (pnr: string, couponCodice?: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`, couponCodice ? { couponCodice } : undefined),
-  getByPnr: (pnr: string) => api.get<Prenotazione>(`/api/prenotazioni/${pnr}`),
   listByEmail: (email: string) => api.get<Prenotazione[]>(`/api/prenotazioni/by-email?email=${encodeURIComponent(email)}`),
   dettaglioPerCliente: (pnr: string, email: string) =>
     api.get<DettaglioPrenotazione>(`/api/prenotazioni/${pnr}/dettaglio-cliente?email=${encodeURIComponent(email)}`),

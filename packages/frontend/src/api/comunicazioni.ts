@@ -17,12 +17,6 @@ export interface FiltroDestinatari {
   tragittoId?: string;
   fermataId?: string;
 }
-export interface FermataTragitto {
-  id: string;
-  citta: string;
-  indirizzo: string;
-}
-
 export const comunicazioniApi = {
   list: (eventoId: string) => api.get<Comunicazione[]>(`/api/comunicazioni/evento/${eventoId}`),
   anteprima: (eventoId: string, filtro: FiltroDestinatari) => {
@@ -34,5 +28,4 @@ export const comunicazioniApi = {
   },
   invia: (eventoId: string, input: FiltroDestinatari & { oggetto: string; corpo: string; canali: ('EMAIL' | 'CHAT')[] }) =>
     api.post<Comunicazione>(`/api/comunicazioni/evento/${eventoId}`, input),
-  fermateTragitto: (tragittoId: string) => api.get<FermataTragitto[]>(`/api/comunicazioni/tragitto/${tragittoId}/fermate`),
 };

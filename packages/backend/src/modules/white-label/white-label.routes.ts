@@ -15,9 +15,6 @@ whiteLabelRouter.use(richiedeAuth);
 whiteLabelRouter.get('/', richiedePermesso('white-label.visualizza'), asyncHandler(async (_req: Request, res: Response) => {
   res.json(await whiteLabelService.list());
 }));
-whiteLabelRouter.get('/evento/:eventoId', richiedePermesso('white-label.visualizza'), asyncHandler(async (req: Request, res: Response) => {
-  res.json(await whiteLabelService.perEvento(req.params.eventoId));
-}));
 whiteLabelRouter.get('/:id', richiedePermesso('white-label.visualizza'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await whiteLabelService.getById(req.params.id));
 }));

@@ -33,9 +33,6 @@ export const prenotazioniController = {
     const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente.sub);
     res.status(201).json(risultato);
   },
-  async getByPnr(req: Request, res: Response) {
-    res.json(await prenotazioniService.getByPnr(req.params.pnr));
-  },
   async dettaglioPerCliente(req: Request, res: Response) {
     res.json(await prenotazioniService.dettaglioPerCliente(req.params.pnr, String(req.query.email)));
   },
@@ -81,7 +78,6 @@ prenotazioniRouter.post('/', richiedeAuthCliente, valida(creaPrenotazioneSchema)
 prenotazioniRouter.post('/ordine', richiedeAuthCliente, valida(creaOrdineSchema), asyncHandler(prenotazioniController.creaOrdine));
 prenotazioniRouter.get('/by-email', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.listByEmail));
 prenotazioniRouter.get('/:pnr/dettaglio-cliente', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.dettaglioPerCliente));
-prenotazioniRouter.get('/:pnr', limitePnr, asyncHandler(prenotazioniController.getByPnr));
 prenotazioniRouter.get('/:pnr/saldo', limitePnr, asyncHandler(prenotazioniController.differenzaSaldo));
 prenotazioniRouter.post('/:pnr/salda', limitePnr, asyncHandler(prenotazioniController.saldaResto));
 

@@ -317,13 +317,6 @@ export const prenotazioniService = {
     return { ordine, prenotazioni: righe.map((r) => ({ ...r, ordineId: ordine.id })) };
   },
 
-
-  async getByPnr(pnr: string) {
-    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
-    if (!p) throw new NonTrovato('Prenotazione');
-    return p;
-  },
-
   /** Tutto quello che serve per la "travel card" del cliente in un
    *  colpo solo — prenotazione, evento e partecipanti (dati già nel
    *  database, solo non ancora uniti in una risposta sola). Verifica

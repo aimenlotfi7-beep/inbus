@@ -48,15 +48,6 @@ export const whiteLabelService = {
 
   getById: getRigaCompleta,
 
-  async perEvento(eventoId: string) {
-    const righe = await db
-      .select({ whiteLabel, organizzatoreNome: organizzatori.nome })
-      .from(whiteLabel)
-      .innerJoin(organizzatori, eq(whiteLabel.organizzatoreId, organizzatori.id))
-      .where(eq(whiteLabel.eventoId, eventoId));
-    return righe.map((r) => ({ ...r.whiteLabel, tema: normalizzaTema(r.whiteLabel.tema), organizzatoreNome: r.organizzatoreNome }));
-  },
-
   async create(input: z.infer<typeof creaWhiteLabelSchema>) {
     const [associazione] = await db
       .select()

@@ -140,6 +140,15 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   }
 
   const opzioneScelta = opzioni.find((o) => o.fermataId === fermataId);
+  // L'arrivo (destinazione + orario) vive sul TRAGITTO, non più
+  // sull'evento/servizio — diversi tragitti dello stesso evento
+  // possono avere destinazioni diverse. Prima di sapere quale fermata
+  // sceglie il cliente non c'è un tragitto certo da mostrare, quindi
+  // niente arrivo finché non sceglie — mostrarne uno a caso sarebbe
+  // fuorviante se l'evento ne avesse più di uno diverso.
+  const tragittoScelto = opzioneScelta
+    ? [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === opzioneScelta.tragittoId)
+    : undefined;
   // Con i limiti per fermata, una singola fermata può esaurirsi da sola
   // anche se il resto del bus ha ancora posti — vanno distinti i due casi
   // per mostrare il messaggio giusto e proporre la lista d'attesa solo
@@ -306,9 +315,9 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
           <div className="checkout-riepilogo-persistente">
             <div>
               <b>{evento.artista}</b>
-              {(servizioScelto?.arrivoOrario ?? evento.arrivoOrario) && (
+              {tragittoScelto?.arrivoOrario && (
                 <span style={{ fontWeight: 400, fontSize: 12, marginLeft: 8, color: 'var(--mist)' }}>
-                  Arrivo {servizioScelto?.arrivoOrario ?? evento.arrivoOrario}
+                  Arrivo {tragittoScelto.arrivoOrario}
                 </span>
               )}
               <span className="checkout-riepilogo-riga">
@@ -346,17 +355,21 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
           {multiServizio && !servizioScelto && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <p style={{ fontSize: 13.5, opacity: .75, marginTop: -6 }}>Questo evento ha più opzioni di servizio — scegli quella che preferisci.</p>
-              {evento.servizi.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  className="checkout-servizio-card"
-                  onClick={() => setServizioScelto(v)}
-                >
-                  <b>{v.nome}</b>
-                  {v.arrivoOrario && <span>Arrivo previsto alle {v.arrivoOrario}</span>}
-                </button>
-              ))}
+              {evento.servizi.map((v) => {
+                const orariDistinti = [...new Set(v.tragitti.map((t) => t.arrivoOrario).filter((o): o is string => !!o))];
+                const arrivoComune = orariDistinti.length === 1 ? orariDistinti[0] : null;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    className="checkout-servizio-card"
+                    onClick={() => setServizioScelto(v)}
+                  >
+                    <b>{v.nome}</b>
+                    {arrivoComune && <span>Arrivo previsto alle {arrivoComune}</span>}
+                  </button>
+                );
+              })}
             </div>
           )}
 

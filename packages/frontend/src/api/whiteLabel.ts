@@ -93,7 +93,6 @@ export const whiteLabelApi = {
   prenota: (publicWidgetId: string, input: Record<string, unknown>) =>
     apiClienteConToken.post<PrenotazioneCreata>(`/api/public/widget/${publicWidgetId}/prenota`, input),
   list: () => api.get<WhiteLabel[]>('/api/admin/white-label'),
-  perEvento: (eventoId: string) => api.get<WhiteLabel[]>(`/api/admin/white-label/evento/${eventoId}`),
   getById: (id: string) => api.get<WhiteLabel>(`/api/admin/white-label/${id}`),
   create: (input: WhiteLabelInput) => api.post<WhiteLabel>('/api/admin/white-label', input),
   update: (id: string, input: Partial<WhiteLabelInput>) => api.put<WhiteLabel>(`/api/admin/white-label/${id}`, input),

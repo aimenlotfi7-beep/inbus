@@ -1,7 +1,7 @@
 import { eq, and, desc, lt } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { listaAttesa, eventi, prenotazioni, fermate, tragitti } from '../../db/schema.js';
+import { listaAttesa, eventi, fermate, tragitti } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
@@ -57,13 +57,6 @@ export const listaAttesaService = {
   /** Conta i passeggeri totali confermati per un evento (somma su tutte
    *  le prenotazioni CONFERMATA) — usato per mostrare "N partecipanti"
    *  nella scheda evento. */
-  async contaPartecipanti(eventoId: string) {
-    const righe = await db
-      .select({ passeggeri: prenotazioni.passeggeri })
-      .from(prenotazioni)
-      .where(and(eq(prenotazioni.eventoId, eventoId), eq(prenotazioni.stato, 'CONFERMATA')));
-    return righe.reduce((somma, r) => somma + r.passeggeri, 0);
-  },
 
   /** Quante iscrizioni sono ancora "in attesa" (non promosse) su tutti
    *  gli eventi — usato per il pallino di notifica sulla voce "Lista

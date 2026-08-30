@@ -46,6 +46,14 @@ export function PercorsoBus({ evento, soloTragittoId, fermataEvidenziataId }: { 
   }
   const tappe = [...mappaTappe.values()].sort((a, b) => (a.orario ?? '99:99').localeCompare(b.orario ?? '99:99'));
 
+  // L'arrivo vive sul tragitto, non più sull'evento — con un solo
+  // tragitto mostrato (il caso "soloTragittoId") è sempre quello
+  // giusto; con più tragitti mischiati (vista generica, nessun
+  // filtro) lo mostro solo se tutti condividono lo stesso orario,
+  // altrimenti sarebbe fuorviante mostrarne uno a caso.
+  const orariArrivoDistinti = [...new Set(tragittiDaMostrare.map((t) => t.arrivoOrario).filter((o): o is string => !!o))];
+  const arrivoDaMostrare = orariArrivoDistinti.length === 1 ? orariArrivoDistinti[0] : null;
+
   return (
     <div className="percorso-bus-blocco">
       <div className="percorso-tappe">
@@ -63,7 +71,7 @@ export function PercorsoBus({ evento, soloTragittoId, fermataEvidenziataId }: { 
           <div className="percorso-tappa-puntino arrivo" />
           <div className="percorso-tappa-corpo">
             <b>{evento.citta} — {evento.luogo}</b>
-            {evento.arrivoOrario && <span className="percorso-orario">{evento.arrivoOrario}</span>}
+            {arrivoDaMostrare && <span className="percorso-orario">{arrivoDaMostrare}</span>}
           </div>
         </div>
       </div>

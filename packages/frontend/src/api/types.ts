@@ -42,8 +42,6 @@ export interface Servizio {
   id: string;
   eventoId: string;
   nome: string;
-  arrivoIndirizzo: string | null;
-  arrivoOrario: string | null;
   ordine: number;
   tragitti: Tragitto[];
 }
@@ -61,8 +59,6 @@ export interface Evento {
   ordineEvidenza: number;
   accontoEur: string | null;
   statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
-  arrivoIndirizzo: string | null;
-  arrivoOrario: string | null;
   visibileSito: boolean;
   bozza: boolean;
   descrizione: string | null;

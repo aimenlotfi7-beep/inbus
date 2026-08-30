@@ -128,6 +128,3 @@ comunicazioniRouter.post(
   }),
 );
 
-comunicazioniRouter.get('/tragitto/:tragittoId/fermate', richiedePermesso('eventi.crea'), asyncHandler(async (req: Request, res: Response) => {
-  res.json(await db.select().from(fermate).where(eq(fermate.tragittoId, req.params.tragittoId)));
-}));

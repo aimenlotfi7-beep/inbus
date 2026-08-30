@@ -56,7 +56,6 @@ export const listaAttesaApi = {
     api.post<{ pnr: string }>(`/api/lista-attesa/finalizza/${token}`, input),
   // Amministrazione
   listByEvento: (eventoId: string) => api.get<IscrizioneListaAttesa[]>(`/api/lista-attesa/eventi/${eventoId}`),
-  contaPartecipanti: (eventoId: string) => api.get<{ partecipanti: number }>(`/api/lista-attesa/eventi/${eventoId}/conta-partecipanti`),
   contaInAttesa: () => api.get<{ conteggio: number }>('/api/lista-attesa/allerte'),
   mieIscrizioni: (email: string) => api.get<MiaIscrizione[]>(`/api/lista-attesa/mie?email=${encodeURIComponent(email)}`),
   contaInAttesaPerEvento: () => api.get<Record<string, number>>('/api/lista-attesa/allerte-per-evento'),
