@@ -1140,7 +1140,7 @@ export function SchedaEventoModale({
           </div>
         )}
 
-        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} servizi={servizi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} contestoPartenze={contestoPartenze} onNavigaTab={onNavigaTab} />}
+        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} servizi={servizi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} contestoPartenze={contestoPartenze} onNavigaTab={onNavigaTab} onSalvato={onSalvato} />}
         {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} servizi={(evento.servizi ?? []).map((s) => ({ key: s.id, nome: s.nome }))} />}
         {tabAttiva === 'comunicazioni' && evento && <ComunicazioniTab evento={evento} />}
         {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}

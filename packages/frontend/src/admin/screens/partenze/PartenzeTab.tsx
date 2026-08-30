@@ -34,7 +34,7 @@ function statoTragitto(tragitto: CalcoloBusTragitto) {
 /** Sezione "Partenze" di un singolo evento: riepilogo generale, calcolo
  *  bus necessari, copertura tratte, censimento bus fisici. Va dentro la
  *  scheda dell'evento (tab). */
-export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab }: {
+export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, onSalvato }: {
   eventoId: string;
   servizi?: { key: string; nome: string }[];
   // Arrivando da una card di Partenze (raggruppata per evento, che può
@@ -48,6 +48,12 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab }
   // corrispondente già selezionata — non un editor in linea qui, per
   // scelta esplicita.
   onNavigaTab?: (tab: 'fermate' | 'da-prezzare' | 'da-confermare') => void;
+  // Avvisa il componente che ha aperto questa scheda (risale fino a
+  // PartenzeScreen) dopo OGNI salvataggio fatto qui dentro — altrimenti
+  // la lista/cache lì fuori resta con dati vecchi: tornando indietro e
+  // rientrando si rivedrebbero i dati di PRIMA del salvataggio (bug
+  // segnalato: "si applicano i dati ma cliccando indietro si perdono").
+  onSalvato?: () => void;
 }) {
   const sessione = useSessione();
   const vedeEconomia = haPermesso(sessione, 'eventi.economia');
@@ -241,6 +247,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab }
       await eventiApi.aggiornaTragittoOperativo(tragittoId, form);
       chiudiModificaOperativa(tragittoId);
       ricarica();
+      onSalvato?.();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
@@ -361,6 +368,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab }
       });
       chiudiPreventivo(tragittoId);
       ricarica();
+      onSalvato?.();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
     } finally {
@@ -526,13 +534,44 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab }
         const ETICHETTE_CONTESTO: Record<string, string> = {
           fermate: 'Fermate', 'da-prezzare': 'Da prezzare', 'da-confermare': 'Da confermare', confermato: 'Confermato', passate: 'Passate',
         };
+        const tragittiVeri = contestoPartenze.tragittiIds
+          .map((id) => eventoCompleto ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === id) : undefined)
+          .filter((t): t is NonNullable<typeof t> => !!t);
+        // Sblocco progressivo — si può passare al passo successivo solo
+        // se quello precedente è compilato per TUTTI i tragitti di
+        // questo contesto (un evento a più servizi deve averli pronti
+        // entrambi, non solo uno).
+        const fermateCompilate = tragittiVeri.length > 0 && tragittiVeri.every((t) => t.fermate.some((f) => f.orario));
+        const preventivoCompilato = tragittiVeri.length > 0 && tragittiVeri.every((t) => !!t.preventivoCosto);
+        const lineeCompilate = tragittiVeri.length > 0 && tragittiVeri.every((t) => busLista.some((b) => b.tragittiIds.includes(t.id)));
+        const SBLOCCO: Record<string, boolean> = {
+          fermate: true,
+          'da-prezzare': fermateCompilate,
+          'da-confermare': fermateCompilate && preventivoCompilato,
+          confermato: fermateCompilate && preventivoCompilato && lineeCompilate,
+          passate: true,
+        };
         return (
           <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-            {(['fermate', 'da-prezzare', 'da-confermare', 'confermato', 'passate']).map((t) => (
-              <span key={t} className={`mini-tab${t === contestoPartenze.tabOrigine ? ' active' : ''}`} style={{ cursor: 'default' }}>
-                {ETICHETTE_CONTESTO[t]}
-              </span>
-            ))}
+            {(['fermate', 'da-prezzare', 'da-confermare', 'confermato', 'passate'] as const).map((t) => {
+              // Solo questi tre hanno un posto dove atterrare da qui (un
+              // editor in linea per quel tragitto) — "Confermato" e
+              // "Passate" restano solo indicazione visiva, mai cliccabili.
+              const navigabile = t === 'fermate' || t === 'da-prezzare' || t === 'da-confermare';
+              const cliccabile = navigabile && SBLOCCO[t] && t !== contestoPartenze.tabOrigine;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  className={`mini-tab${t === contestoPartenze.tabOrigine ? ' active' : ''}`}
+                  style={{ cursor: cliccabile ? 'pointer' : 'default', opacity: navigabile && !SBLOCCO[t] ? 0.5 : 1 }}
+                  disabled={!cliccabile}
+                  onClick={cliccabile ? () => onNavigaTab?.(t as 'fermate' | 'da-prezzare' | 'da-confermare') : undefined}
+                >
+                  {ETICHETTE_CONTESTO[t]}
+                </button>
+              );
+            })}
           </div>
         );
       })()}
@@ -719,7 +758,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab }
               </div>
             );
 
-            if (!espansa) return null;
+            // Il riepilogo a righe (Fermate/Preventivo/Linee/Costo) ha
+            // senso solo per "Confermato"/"Passate" — in "Fermate", "Da
+            // prezzare" o "Da confermare" non deve comparire MAI, nemmeno
+            // se l'editor di quella sezione viene chiuso (es. Annulla)
+            // lasciando la card ancora espansa: mostrerebbe di nuovo
+            // Preventivo/Costo in un contesto dove non servono.
+            const contestoAmmetteRiepilogo = !contestoPartenze || contestoPartenze.tabOrigine === 'confermato' || contestoPartenze.tabOrigine === 'passate';
+            if (!espansa || !contestoAmmetteRiepilogo) return null;
 
             // Riepilogo a righe (tab "Confermato"/"Passate") — ogni riga
             // rimanda alla tab in alto corrispondente per modificare quel
