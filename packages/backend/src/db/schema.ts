@@ -375,6 +375,19 @@ export const busTratte = pgTable('bus_tratte', {
   pk: primaryKey({ columns: [t.busId, t.tragittoId] }),
 }));
 
+// Le "Linee" (sezione dedicata in Partenze, sostituisce Censisci Bus):
+// un bus copre FERMATE specifiche, non più l'intero tragitto come
+// bus_tratte sopra — es. un bus può coprire solo "Modena+Bologna" di un
+// tragitto Milano-Modena-Bologna-Firenze, senza dover per forza
+// includere Milano. bus_tratte resta per compatibilità con dati
+// esistenti, ma il calcolo posti/copertura ora guarda qui.
+export const busFermate = pgTable('bus_fermate', {
+  busId: text('bus_id').notNull().references(() => busFisici.id, { onDelete: 'cascade' }),
+  fermataId: text('fermata_id').notNull().references(() => fermate.id, { onDelete: 'cascade' }),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.busId, t.fermataId] }),
+}));
+
 // ---------------------------------------------------------------------
 // TRAGITTI (template riutilizzabili di fermate)
 // ---------------------------------------------------------------------

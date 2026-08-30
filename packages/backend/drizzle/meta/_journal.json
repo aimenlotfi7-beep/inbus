@@ -414,6 +414,13 @@
       "when": 1788050337636,
       "tag": "0058_stato_prezzato_e_tipo_fermata",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1788052181463,
+      "tag": "0059_bus_fermate",
+      "breakpoints": true
     }
   ]
 }

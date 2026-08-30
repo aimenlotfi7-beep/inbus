@@ -10,6 +10,7 @@ import {
   prenotazioni,
   busFisici,
   busTratte,
+  busFermate,
   tourLeader,
   utenti,
   partecipantiPrenotazione,
@@ -54,10 +55,23 @@ export const includeCompleto = {
 async function ricalcolaPostiTragitto(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], tragittoId: string) {
   const [esiste] = await tx.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
   if (!esiste) return; // può capitare se il tragitto è stato eliminato nel frattempo — niente da ricalcolare
-  const righe = await tx.select({ postiBus: busFisici.postiBus }).from(busTratte)
-    .innerJoin(busFisici, eq(busFisici.id, busTratte.busId))
-    .where(eq(busTratte.tragittoId, tragittoId));
-  const nuovoTotale = righe.reduce((somma, r) => somma + (r.postiBus ?? 0), 0);
+  // Unione di due modi di essere "collegato" a questo tragitto: il
+  // vecchio (bus_tratte, l'intero tragitto — bus registrati prima delle
+  // Linee) e il nuovo (bus_fermate, fermate specifiche — come coprono
+  // ora le Linee). Un bus collegato tramite PIÙ fermate dello stesso
+  // tragitto va contato UNA volta sola, non una per fermata — da qui
+  // il Set sugli id, prima di sommare i posti.
+  const daBusTratte = await tx.select({ busId: busTratte.busId }).from(busTratte).where(eq(busTratte.tragittoId, tragittoId));
+  const daBusFermate = await tx.select({ busId: busFermate.busId }).from(busFermate)
+    .innerJoin(fermate, eq(fermate.id, busFermate.fermataId))
+    .where(eq(fermate.tragittoId, tragittoId));
+  const idBusUnici = new Set([...daBusTratte, ...daBusFermate].map((r) => r.busId));
+  if (idBusUnici.size === 0) {
+    await tx.update(tragitti).set({ postiTotali: 0, postiDisponibili: 0 }).where(eq(tragitti.id, tragittoId));
+    return;
+  }
+  const bus = await tx.select({ postiBus: busFisici.postiBus }).from(busFisici).where(inArray(busFisici.id, [...idBusUnici]));
+  const nuovoTotale = bus.reduce((somma, r) => somma + (r.postiBus ?? 0), 0);
   const postiOccupati = esiste.postiTotali - esiste.postiDisponibili;
   await tx.update(tragitti).set({
     postiTotali: nuovoTotale,
@@ -923,11 +937,17 @@ export const eventiService = {
   async rimuoviBus(busId: string) {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
-    // Quali tragitti perdono questo bus — servono per ricalcolarli
-    // DOPO l'eliminazione (che se lo porta via a cascata da bus_tratte).
-    const tragittiCollegati = (await db.select({ tragittoId: busTratte.tragittoId }).from(busTratte).where(eq(busTratte.busId, busId))).map((r) => r.tragittoId);
+    // Quali tragitti perdono questo bus — servono per ricalcolarli DOPO
+    // l'eliminazione (che se lo porta via a cascata sia da bus_tratte
+    // che da bus_fermate). Unione di entrambi i modi di collegamento,
+    // stesso principio già in ricalcolaPostiTragitto.
+    const daBusTratte = (await db.select({ tragittoId: busTratte.tragittoId }).from(busTratte).where(eq(busTratte.busId, busId))).map((r) => r.tragittoId);
+    const daBusFermate = (await db.select({ tragittoId: fermate.tragittoId }).from(busFermate)
+      .innerJoin(fermate, eq(fermate.id, busFermate.fermataId))
+      .where(eq(busFermate.busId, busId))).map((r) => r.tragittoId);
+    const tragittiCollegati = [...new Set([...daBusTratte, ...daBusFermate])];
     await db.transaction(async (tx) => {
-      await tx.delete(busFisici).where(eq(busFisici.id, busId)); // cascade su bus_tratte
+      await tx.delete(busFisici).where(eq(busFisici.id, busId)); // cascade su bus_tratte e bus_fermate
       for (const tragittoId of tragittiCollegati) await ricalcolaPostiTragitto(tx, tragittoId);
     });
   },
