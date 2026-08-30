@@ -16,7 +16,7 @@ sitemapRouter.get('/sitemap.xml', async (_req: Request, res: Response) => {
   // logica già applicata alla lista pubblica degli eventi, più facile
   // da verificare che faccia davvero quello che deve.
   const righeConfermate = await db.selectDistinct({ eventoId: tragitti.eventoId }).from(tragitti)
-    .where(and(eq(tragitti.stato, 'CONFERMATO'), eq(tragitti.attivo, true)));
+    .where(and(inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true)));
   const idEventiConfermati = righeConfermate.map((r) => r.eventoId);
 
   const eventiVisibili = idEventiConfermati.length === 0 ? [] : await db

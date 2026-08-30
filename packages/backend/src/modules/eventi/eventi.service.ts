@@ -124,8 +124,8 @@ function calcolaStatoAutomatico(tragitti: { postiTotali: number; postiDisponibil
  *  come se fosse una scelta manuale sua. */
 function conStatoCalcolato<T extends {
   statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
-  tragitti: { postiTotali: number; postiDisponibili: number; attivo: boolean; stato: 'DA_CONFERMARE' | 'CONFERMATO' }[];
-  servizi: { tragitti: { postiTotali: number; postiDisponibili: number; attivo: boolean; stato: 'DA_CONFERMARE' | 'CONFERMATO' }[] }[];
+  tragitti: { postiTotali: number; postiDisponibili: number; attivo: boolean; stato: 'DA_CONFERMARE' | 'PREZZATO' | 'CONFERMATO' }[];
+  servizi: { tragitti: { postiTotali: number; postiDisponibili: number; attivo: boolean; stato: 'DA_CONFERMARE' | 'PREZZATO' | 'CONFERMATO' }[] }[];
 }>(evento: T): T {
   if (evento.statoDisponibilita) return evento; // scelta manuale, ha sempre la precedenza
   // Il calcolo considera SIA i tragitti liberi SIA quelli di ogni
@@ -134,10 +134,11 @@ function conStatoCalcolato<T extends {
   // il calcolo automatico) — ma il campo "tragitti" restituito al sito
   // resta quello originale, invariato: il frontend li combina già da
   // solo dove serve, sommarli anche qui li farebbe contare due volte.
-  // Un tragitto disattivato o ancora "da confermare" (nessun bus vero)
-  // non contribuisce: i suoi posti non sono davvero acquistabili,
-  // includerli darebbe un falso senso di disponibilità ancora ampia.
-  const tuttiPerIlCalcolo = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].filter((t) => t.attivo && t.stato === 'CONFERMATO');
+  // Un tragitto disattivato o ancora "da confermare" (nessun preventivo,
+  // non in vendita) non contribuisce — ma "Prezzato" sì, è già in
+  // vendita esattamente come "Confermato", solo senza ancora un bus
+  // vero opzionato con un fornitore.
+  const tuttiPerIlCalcolo = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].filter((t) => t.attivo && t.stato !== 'DA_CONFERMARE');
   return { ...evento, statoDisponibilita: calcolaStatoAutomatico(tuttiPerIlCalcolo) };
 }
 
@@ -173,6 +174,9 @@ async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction
         indirizzoRitorno: f.indirizzoRitorno,
         postiMax: f.postiMax,
         prezzo: f.prezzo?.toFixed(2),
+        tipo: f.tipo,
+        sogliaMinima: f.sogliaMinima,
+        attivo: f.attivo,
       }))
     );
   }
@@ -253,6 +257,9 @@ async function sincronizzaTuttiITragitti(
             indirizzoRitorno: f.indirizzoRitorno,
             postiMax: f.postiMax,
             prezzo: f.prezzo?.toFixed(2),
+            tipo: f.tipo,
+            sogliaMinima: f.sogliaMinima,
+            attivo: f.attivo,
           }))
         );
       }
@@ -307,7 +314,7 @@ export const eventiService = {
       // scritta a mano dentro il where — più facile da verificare che
       // faccia davvero quello che deve.
       const righeConfermate = await db.selectDistinct({ eventoId: tragitti.eventoId }).from(tragitti)
-        .where(and(eq(tragitti.stato, 'CONFERMATO'), eq(tragitti.attivo, true)));
+        .where(and(inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true)));
       const idEventiConfermati = righeConfermate.map((r) => r.eventoId);
       if (idEventiConfermati.length === 0) return []; // nessun evento ha nemmeno un tragitto confermato: lista vuota, senza nemmeno interrogare il resto
       condizioni.push(inArray(eventi.id, idEventiConfermati));
@@ -337,7 +344,7 @@ export const eventiService = {
     // l'evento non esiste ancora per il sito — nemmeno con un link
     // diretto allo slug.
     const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
-    if (!tuttiITragitti.some((t) => t.attivo && t.stato === 'CONFERMATO')) throw new NonTrovato('Evento');
+    if (!tuttiITragitti.some((t) => t.attivo && t.stato !== 'DA_CONFERMARE')) throw new NonTrovato('Evento');
     return conStatoCalcolato(evento);
   },
 
@@ -582,7 +589,7 @@ export const eventiService = {
     const tragittiDaMostrare = (servizioId
       ? evento.servizi.find((p) => p.id === servizioId)?.tragitti ?? []
       : evento.tragitti.filter((l) => !l.servizioId)
-    ).filter((l) => l.attivo && l.stato === 'CONFERMATO'); // disattivato o "da confermare" (nessun bus vero ancora): non prenotabile
+    ).filter((l) => l.attivo && l.stato !== 'DA_CONFERMARE'); // disattivato o "da confermare" (nessun preventivo ancora): non prenotabile
     const opzioni: Array<{
       tragittoId: string;
       postiDisponibili: number;
@@ -785,6 +792,7 @@ export const eventiService = {
             citta: f.citta, indirizzo: f.indirizzo,
             orario: f.orario, orarioRitorno: f.orarioRitorno, indirizzoRitorno: f.indirizzoRitorno,
             postiMax: f.postiMax, prezzo: f.prezzo?.toFixed(2),
+            tipo: f.tipo, sogliaMinima: f.sogliaMinima, attivo: f.attivo,
           }))
         );
       }

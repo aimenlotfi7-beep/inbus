@@ -32,10 +32,14 @@ export const statoPrenotazioneEnum = pgEnum('stato_prenotazione', ['CONFERMATA',
 // Un tragitto nasce sempre "da confermare" — non visibile né prenotabile
 // sul sito finché non c'è almeno un bus vero registrato su di lui (vedi
 // creaBus/aggiornaBus più sotto, che lo fanno scattare in automatico).
-// I bus non sono di proprietà: vendere prima di avere la certezza del
-// fornitore significherebbe promettere qualcosa che potrebbe non
-// esserci davvero.
-export const statoTragittoEnum = pgEnum('stato_tragitto', ['DA_CONFERMARE', 'CONFERMATO']);
+// Un tragitto nasce sempre "da confermare" — non visibile né prenotabile
+// sul sito finché non ha almeno un preventivo (vedi tragitti.preventivoCosto
+// più sotto): a quel punto diventa "Prezzato" — in vendita, con prezzi
+// calcolati sullo scenario più caro (dalla fermata più lontana), ma
+// ancora senza nessun bus vero opzionato con un fornitore — quello
+// arriva solo dopo, quando le prenotazioni chiariscono da dove costruire
+// la prima Linea vera, a quel punto diventa "Confermato".
+export const statoTragittoEnum = pgEnum('stato_tragitto', ['DA_CONFERMARE', 'PREZZATO', 'CONFERMATO']);
 export const statoTicketEnum = pgEnum('stato_ticket', ['EMESSO', 'UTILIZZATO', 'ANNULLATO']);
 export const tipoPagamentoEnum = pgEnum('tipo_pagamento', ['COMPLETO', 'ACCONTO']);
 export const metodoPagamentoEnum = pgEnum('metodo_pagamento', ['CARTA', 'PAYPAL', 'SATISPAY', 'DA_CONCORDARE']);
@@ -44,6 +48,14 @@ export const canaleVenditaEnum = pgEnum('canale_vendita', ['INBUS', 'WHITE_LABEL
 export const tipoCouponEnum = pgEnum('tipo_coupon', ['PERCENTUALE', 'FISSO']);
 export const autoreMessaggioEnum = pgEnum('autore_messaggio', ['CLIENTE', 'ADMIN']);
 export const statoListaAttesaEnum = pgEnum('stato_lista_attesa', ['IN_ATTESA', 'PROMOSSA']);
+// Una fermata di "Partenza" (tipicamente la più lontana, dove il bus
+// deve fare una deviazione dedicata) ha senso solo se raggiunge un
+// minimo di partecipanti — sotto soglia non conviene costruirci una
+// Linea. Una di "Passaggio" (nel mezzo del tragitto) non ha questo
+// problema, il bus ci passa comunque. Un percorso può avere più
+// fermate di Partenza "candidate" — non è detto sia sempre e solo la
+// più lontana in assoluto.
+export const tipoFermataEnum = pgEnum('tipo_fermata', ['PARTENZA', 'PASSAGGIO']);
 // Etichetta di scarsità/abbondanza mostrata ai clienti al posto del
 // numero esatto di posti — impostata a mano dal gestionale, indipendente
 // dai posti reali (serve per creare percezione di scarsità o urgenza).
@@ -238,6 +250,16 @@ export const tragitti = pgTable('tragitti', {
   attivo: boolean('attivo').notNull().default(true),
   // Vedi statoTragittoEnum sopra — nasce sempre DA_CONFERMARE.
   stato: statoTragittoEnum('stato').notNull().default('DA_CONFERMARE'),
+  // Il preventivo (dal fornitore, sullo scenario più caro — dalla
+  // fermata più lontana) è quello che sblocca lo stato "Prezzato": una
+  // stima, non un bus vero opzionato. Serve per calcolare i prezzi per
+  // fermata (modello pareggio al 50%) SENZA dover già sapere da dove
+  // partirà davvero il primo bus vero — quello si scopre solo dopo,
+  // dalle prenotazioni. Il prezzo calcolato sul preventivo resta quello
+  // di vendita anche se poi la Linea vera costruita è più economica: il
+  // margine extra resta un guadagno, non si gira al cliente.
+  preventivoCosto: numeric('preventivo_costo', { precision: 10, scale: 2 }),
+  preventivoPostiBus: integer('preventivo_posti_bus'),
   referenteNome: text('referente_nome'),
   referenteTelefono: text('referente_telefono'),
   // set null: un fornitore eliminato non deve bloccare tragitti/bus
@@ -299,6 +321,19 @@ export const fermate = pgTable('fermate', {
   postiPrenotati: integer('posti_prenotati').notNull().default(0),
   lat: doublePrecision('lat'),
   lng: doublePrecision('lng'),
+  // Vedi tipoFermataEnum sopra — di default "Passaggio" (la maggior
+  // parte delle fermate lo sono). Solo se "Partenza" ha senso guardare
+  // sogliaMinima.
+  tipo: tipoFermataEnum('tipo').notNull().default('PASSAGGIO'),
+  // Sotto quanti partecipanti una fermata di Partenza non conviene
+  // includerla in una Linea — null = usa il default generale impostato
+  // in Impostazioni. Visibile al cliente in fase di prenotazione, se
+  // sta scegliendo proprio questa fermata.
+  sogliaMinima: integer('soglia_minima'),
+  // Una fermata disattivata singolarmente non è più prenotabile, pur
+  // restando configurata (stesso principio già usato per tragitti.attivo
+  // — non si elimina, si sospende).
+  attivo: boolean('attivo').notNull().default(true),
 });
 
 // ---------------------------------------------------------------------

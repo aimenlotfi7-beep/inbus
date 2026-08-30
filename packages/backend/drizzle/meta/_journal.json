@@ -407,6 +407,13 @@
       "when": 1788045370044,
       "tag": "0057_posti_da_bus_registrati",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1788050337636,
+      "tag": "0058_stato_prezzato_e_tipo_fermata",
+      "breakpoints": true
     }
   ]
 }
