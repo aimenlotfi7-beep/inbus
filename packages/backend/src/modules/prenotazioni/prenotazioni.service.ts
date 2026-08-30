@@ -1,7 +1,7 @@
 import { and, eq, sql, desc, inArray, isNull } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, busFermate, busFisici } from '../../db/schema.js';
+import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, lineaFermate, busFisici } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { couponService } from '../coupon/coupon.service.js';
@@ -649,15 +649,16 @@ export const prenotazioniService = {
     for (const [chiave, righe] of gruppi) {
       const [tragittoId, fermataCitta] = chiave.split('::');
 
-      // I bus che coprono davvero questa fermata specifica — via
-      // bus_fermate (Linee). Se nessuno la copre ancora, non c'è
-      // niente da fare per questo gruppo, si riprova al prossimo giro.
+      // I bus che coprono davvero questa fermata specifica — tramite
+      // il modello Linee (una Linea copre certe fermate, uno o più bus
+      // dentro). Se nessuno la copre ancora, non c'è niente da fare
+      // per questo gruppo, si riprova al prossimo giro.
       const fermataRiga = await db.select({ id: fermate.id }).from(fermate)
         .where(and(eq(fermate.tragittoId, tragittoId), eq(fermate.citta, fermataCitta))).limit(1);
       if (fermataRiga.length === 0) continue;
-      const busCopertura = await db.select({ busId: busFermate.busId, postiBus: busFisici.postiBus }).from(busFermate)
-        .innerJoin(busFisici, eq(busFisici.id, busFermate.busId))
-        .where(eq(busFermate.fermataId, fermataRiga[0].id));
+      const busCopertura = await db.select({ busId: busFisici.id, postiBus: busFisici.postiBus }).from(lineaFermate)
+        .innerJoin(busFisici, eq(busFisici.lineaId, lineaFermate.lineaId))
+        .where(eq(lineaFermate.fermataId, fermataRiga[0].id));
       if (busCopertura.length === 0) continue;
 
       // Età dal titolare dell'account — chi non ha una data di nascita

@@ -9,8 +9,6 @@ import {
   allegatiEvento,
   prenotazioni,
   busFisici,
-  busTratte,
-  busFermate,
   linee,
   lineaFermate,
   tourLeader,
@@ -66,21 +64,15 @@ async function ricalcolaPostiTragitto(tx: Parameters<Parameters<typeof db.transa
   const [esiste] = await tx.select().from(tragitti).where(eq(tragitti.id, tragittoId)).for('update').limit(1);
   if (!esiste) return; // può capitare se il tragitto è stato eliminato nel frattempo — niente da ricalcolare
   const postiOccupati = esiste.postiTotali - esiste.postiDisponibili;
-  // Unione di TRE modi di essere "collegato" a questo tragitto: il più
-  // vecchio (bus_tratte, l'intero tragitto), quello di mezzo
-  // (bus_fermate, un bus da solo su fermate specifiche) e il più
-  // recente (linee → linea_fermate, il contenitore che può avere più
-  // bus dentro). Un bus collegato tramite PIÙ fermate/linee dello
-  // stesso tragitto va contato UNA volta sola — da qui il Set sugli
-  // id, prima di sommare i posti.
-  const daBusTratte = await tx.select({ busId: busTratte.busId }).from(busTratte).where(eq(busTratte.tragittoId, tragittoId));
-  const daBusFermate = await tx.select({ busId: busFermate.busId }).from(busFermate)
-    .innerJoin(fermate, eq(fermate.id, busFermate.fermataId))
-    .where(eq(fermate.tragittoId, tragittoId));
+  // Solo il modello Linee — bus_tratte e bus_fermate (i due sistemi
+  // precedenti) non ricevono più nessuna scrittura da nessuna parte
+  // del codice: creaBus e la vecchia versione di creaLinea, le uniche
+  // funzioni che ci scrivevano, non esistono più. Verificato vuoto sul
+  // database vero prima di semplificare qui.
   const daLinee = await tx.select({ busId: busFisici.id }).from(busFisici)
     .innerJoin(linee, eq(linee.id, busFisici.lineaId))
     .where(eq(linee.tragittoId, tragittoId));
-  const idBusUnici = new Set([...daBusTratte, ...daBusFermate, ...daLinee].map((r) => r.busId));
+  const idBusUnici = new Set(daLinee.map((r) => r.busId));
   if (idBusUnici.size === 0) {
     // Nessun bus più collegato — se non c'era ancora nessuna
     // prenotazione confermata va benissimo (torna semplicemente senza
@@ -721,20 +713,11 @@ export const eventiService = {
     // che esclude correttamente i tragitti già assegnati a un servizio,
     // per non farli comparire duplicati) non li conteneva più tutti.
     const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
-    const tragittiIds = tuttiITragitti.map((l) => l.id);
 
     const prenotazioniConfermate = await db
       .select({ tragittoId: prenotazioni.tragittoId, fermataCitta: prenotazioni.fermataCitta, passeggeri: prenotazioni.passeggeri })
       .from(prenotazioni)
       .where(and(eq(prenotazioni.eventoId, eventoId), eq(prenotazioni.stato, 'CONFERMATA')));
-
-    // Per calcolare la copertura reale servono i bus davvero censiti su
-    // ogni tratta, con i loro posti (facoltativi: un bus senza posti
-    // indicati non contribuisce alla somma, invece di essere ignorato
-    // del tutto o contare come 0 posti per errore).
-    const assegnazioni = tragittiIds.length ? await db.select().from(busTratte).where(inArray(busTratte.tragittoId, tragittiIds)) : [];
-    const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
-    const busCensiti = busIds.length ? await db.select().from(busFisici).where(inArray(busFisici.id, busIds)) : [];
 
     return tuttiITragitti.map((tragitto) => {
       const fermateOrdinate = [...tragitto.fermate].sort((a, b) => a.ordine - b.ordine);
@@ -767,15 +750,15 @@ export const eventiService = {
 
       const totalePasseggeri = fermateConPasseggeri.reduce((s, f) => s + f.passeggeri, 0);
 
-      // Coperta = automatico, non più un interruttore da cliccare: somma
-      // i posti dei bus censiti su questa tratta e la confronta con i
-      // passeggeri REALMENTE confermati (non con i posti pianificati —
-      // quella è un'altra domanda, "sto vendendo più di quanto
-      // previsto?", già visibile separatamente come "posti superati").
-      const postiBusCensiti = busCensiti
-        .filter((b) => assegnazioni.some((a) => a.busId === b.id && a.tragittoId === tragitto.id))
-        .reduce((s, b) => s + (b.postiBus ?? 0), 0);
-      const coperta = totalePasseggeri > 0 && postiBusCensiti >= totalePasseggeri;
+      // Coperta = automatico, non più un interruttore da cliccare: usa
+      // direttamente postiTotali del tragitto (già mantenuto corretto
+      // da ricalcolaPostiTragitto, che considera già ogni bus/Linea
+      // registrata) — prima questa funzione lo ricalcolava DA SOLA con
+      // una propria query, guardando solo bus_tratte: un bus registrato
+      // tramite una Linea (bus_fermate o il contenitore) non veniva
+      // considerato, un'incoerenza mai notata finché non è rimasta
+      // l'unica strada davvero in uso.
+      const coperta = totalePasseggeri > 0 && tragitto.postiTotali >= totalePasseggeri;
 
       return {
         tragittoId: tragitto.id,
@@ -788,7 +771,7 @@ export const eventiService = {
         totalePasseggeri,
         busSuggeriti,
         coperta,
-        postiBusCensiti,
+        postiBusCensiti: tragitto.postiTotali,
       };
     });
   },
@@ -801,42 +784,23 @@ export const eventiService = {
     const tragittiIds = tuttiITragitti.map((l) => l.id);
     if (tragittiIds.length === 0) return [];
 
-    const assegnazioniTratte = await db.select().from(busTratte).where(inArray(busTratte.tragittoId, tragittiIds));
-    // Bus collegati per fermata (vecchie Linee, un bus da solo) —
-    // traduco ogni fermataId nel suo tragittoId, per poter mostrare
-    // comunque "quali tragitti copre" anche a chi guarda ancora in
-    // termini di tragitto intero.
-    const mappaFermataTragitto = new Map(tuttiITragitti.flatMap((t) => t.fermate.map((f) => [f.id, t.id] as const)));
-    const fermateIdsValide = new Set(mappaFermataTragitto.keys());
-    const assegnazioniFermate = fermateIdsValide.size > 0
-      ? await db.select().from(busFermate).where(inArray(busFermate.fermataId, [...fermateIdsValide]))
-      : [];
-    // Bus collegati tramite una Linea (il contenitore nuovo) — le
-    // fermate coperte sono quelle della Linea, non scritte sul bus.
     const lineeDiQuestiTragitti = await db.select().from(linee).where(inArray(linee.tragittoId, tragittiIds));
     const lineaIds = lineeDiQuestiTragitti.map((l) => l.id);
-    const busDaLinee = lineaIds.length ? await db.select().from(busFisici).where(inArray(busFisici.lineaId, lineaIds)) : [];
-    const fermateDelleLinee = lineaIds.length ? await db.select().from(lineaFermate).where(inArray(lineaFermate.lineaId, lineaIds)) : [];
+    if (lineaIds.length === 0) return [];
+    const busDaLinee = await db.select().from(busFisici).where(inArray(busFisici.lineaId, lineaIds));
+    const fermateDelleLinee = await db.select().from(lineaFermate).where(inArray(lineaFermate.lineaId, lineaIds));
     const mappaLineaTragitto = new Map(lineeDiQuestiTragitti.map((l) => [l.id, l.tragittoId]));
 
-    const busIds = Array.from(new Set([...assegnazioniTratte.map((a) => a.busId), ...assegnazioniFermate.map((a) => a.busId), ...busDaLinee.map((b) => b.id)]));
-    if (busIds.length === 0) return [];
-
-    const bus = await db.select().from(busFisici).where(inArray(busFisici.id, busIds));
-    const tourLeaderIds = bus.map((b) => b.tourLeaderId).filter((id): id is string => id !== null);
+    const tourLeaderIds = busDaLinee.map((b) => b.tourLeaderId).filter((id): id is string => id !== null);
     const tourLeaders = tourLeaderIds.length ? await db.select().from(tourLeader).where(inArray(tourLeader.id, tourLeaderIds)) : [];
 
-    return bus.map((b) => {
+    return busDaLinee.map((b) => {
       const tl = tourLeaders.find((t) => t.id === b.tourLeaderId);
-      const fermateIdsDaFermate = assegnazioniFermate.filter((a) => a.busId === b.id).map((a) => a.fermataId);
-      const fermateIdsDaLinea = b.lineaId ? fermateDelleLinee.filter((f) => f.lineaId === b.lineaId).map((f) => f.fermataId) : [];
-      const fermateIds = [...new Set([...fermateIdsDaFermate, ...fermateIdsDaLinea])];
-      const tragittiIdsDaTratte = assegnazioniTratte.filter((a) => a.busId === b.id).map((a) => a.tragittoId);
-      const tragittiIdsDaFermate = fermateIdsDaFermate.map((fId) => mappaFermataTragitto.get(fId)).filter((id): id is string => !!id);
+      const fermateIds = b.lineaId ? fermateDelleLinee.filter((f) => f.lineaId === b.lineaId).map((f) => f.fermataId) : [];
       const tragittoIdDaLinea = b.lineaId ? mappaLineaTragitto.get(b.lineaId) : undefined;
       return {
         ...b,
-        tragittiIds: [...new Set([...tragittiIdsDaTratte, ...tragittiIdsDaFermate, ...(tragittoIdDaLinea ? [tragittoIdDaLinea] : [])])],
+        tragittiIds: tragittoIdDaLinea ? [tragittoIdDaLinea] : [],
         fermateIds,
         tourLeaderNome: tl ? `${tl.nome} ${tl.cognome}` : null,
       };
@@ -919,45 +883,6 @@ export const eventiService = {
     });
   },
 
-  async creaBus(eventoId: string, input: { fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus?: number; note?: string; tragittiIds: string[] }) {
-    const evento = await getById(eventoId);
-    const lineeValide = new Set([...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((l) => l.id));
-    const tragittiIdsFiltrate = input.tragittiIds.filter((id) => lineeValide.has(id));
-    if (tragittiIdsFiltrate.length === 0) throw new ConflittoDati('Seleziona almeno una tratta di questo evento per il bus.');
-
-    return db.transaction(async (tx) => {
-      const [nuovo] = await tx.insert(busFisici).values({
-        fornitoreId: input.fornitoreId,
-        riferimento: input.riferimento,
-        autistaNome: input.autistaNome,
-        autistaTelefono: input.autistaTelefono,
-        tourLeaderId: input.tourLeaderId,
-        costo: input.costo?.toFixed(2),
-        postiBus: input.postiBus,
-        note: input.note,
-      }).returning();
-      await tx.insert(busTratte).values(tragittiIdsFiltrate.map((tragittoId) => ({ busId: nuovo.id, tragittoId })));
-      // Appena un tragitto ha almeno un bus vero registrato, passa da
-      // "Da confermare" a "Confermato" — solo da lì può andare in
-      // vendita (vedi opzioniPartenza, che filtra su questo stato).
-      // Non tocca chi è già CONFERMATO (nessun downgrade, questo è un
-      // solo passaggio in avanti).
-      await tx.update(tragitti).set({ stato: 'CONFERMATO' }).where(and(inArray(tragitti.id, tragittiIdsFiltrate), inArray(tragitti.stato, ['DA_CONFERMARE', 'PREZZATO'])));
-      // I posti totali del tragitto non si scrivono più a mano — si
-      // ricalcolano ora dalla somma dei bus veri appena collegati.
-      for (const tragittoId of tragittiIdsFiltrate) await ricalcolaPostiTragitto(tx, tragittoId);
-      return nuovo.id;
-    });
-  },
-
-  /** Le "Linee" — sezione dedicata in Partenze, sostituisce Censisci
-   *  Bus: un bus copre FERMATE specifiche scelte una per una (non
-   *  l'intero tragitto come creaBus sopra) — esattamente lo scenario
-   *  discusso: un bus che copre solo "Modena+Bologna" di un tragitto
-   *  più lungo, senza dover per forza includere Milano. */
-  /** Crea una nuova Linea (il contenitore) con il suo PRIMO bus dentro
-   *  — le fermate scelte si ordinano da sole per orario (non per
-   *  ordine di selezione: l'admin le clicca in qualsiasi sequenza). */
   async creaLinea(eventoId: string, input: { riferimento: string; fornitoreId?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus: number; note?: string; fermateIds: string[] }) {
     const evento = await getById(eventoId);
     const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
@@ -1128,64 +1053,16 @@ export const eventiService = {
     }));
   },
 
-  async aggiornaBus(eventoId: string, busId: string, input: { fornitoreId?: string; riferimento?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; tragittiIds?: string[] }) {
-    const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
-    if (!bus) throw new NonTrovato('Bus');
-    // Prima di toccare nulla: quali tragitti ha questo bus ORA — serve
-    // per ricalcolarli anche loro se l'elenco cambia (un tragitto che
-    // PERDE questo bus deve comunque perdere i suoi posti).
-    const tragittiCollegatiPrima = (await db.select({ tragittoId: busTratte.tragittoId }).from(busTratte).where(eq(busTratte.busId, busId))).map((r) => r.tragittoId);
-
-    return db.transaction(async (tx) => {
-      if (input.riferimento !== undefined || input.fornitoreId !== undefined || input.autistaNome !== undefined || input.autistaTelefono !== undefined || input.tourLeaderId !== undefined || input.costo !== undefined || input.postiBus !== undefined || input.note !== undefined) {
-        await tx.update(busFisici).set({
-          ...(input.riferimento !== undefined && { riferimento: input.riferimento }),
-          ...(input.fornitoreId !== undefined && { fornitoreId: input.fornitoreId }),
-          ...(input.autistaNome !== undefined && { autistaNome: input.autistaNome }),
-          ...(input.autistaTelefono !== undefined && { autistaTelefono: input.autistaTelefono }),
-          ...(input.tourLeaderId !== undefined && { tourLeaderId: input.tourLeaderId }),
-          ...(input.costo !== undefined && { costo: input.costo.toFixed(2) }),
-          ...(input.postiBus !== undefined && { postiBus: input.postiBus }),
-          ...(input.note !== undefined && { note: input.note }),
-        }).where(eq(busFisici.id, busId));
-      }
-      let tragittiCollegatiDopo = tragittiCollegatiPrima;
-      if (input.tragittiIds !== undefined) {
-        const evento = await getById(eventoId);
-        const lineeValide = new Set([...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((l) => l.id));
-        const tragittiIdsFiltrate = input.tragittiIds.filter((id) => lineeValide.has(id));
-        await tx.delete(busTratte).where(eq(busTratte.busId, busId));
-        if (tragittiIdsFiltrate.length > 0) {
-          await tx.insert(busTratte).values(tragittiIdsFiltrate.map((tragittoId) => ({ busId, tragittoId })));
-          // Stessa auto-conferma di creaBus — assegnare un bus già
-          // esistente a un tragitto ancora "da confermare" lo conferma
-          // altrettanto, non serve passare per forza da un bus nuovo.
-          await tx.update(tragitti).set({ stato: 'CONFERMATO' }).where(and(inArray(tragitti.id, tragittiIdsFiltrate), inArray(tragitti.stato, ['DA_CONFERMARE', 'PREZZATO'])));
-        }
-        tragittiCollegatiDopo = tragittiIdsFiltrate;
-      }
-      // Ricalcolo sia i tragitti di prima (potrebbero aver perso questo
-      // bus, o aver cambiato posti) sia quelli di dopo (potrebbero
-      // averlo appena guadagnato) — l'unione dei due, senza doppioni.
-      const daRicalcolare = new Set([...tragittiCollegatiPrima, ...tragittiCollegatiDopo]);
-      for (const tragittoId of daRicalcolare) await ricalcolaPostiTragitto(tx, tragittoId);
-    });
-  },
-
   async rimuoviBus(busId: string) {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
-    // Quali tragitti perdono questo bus — servono per ricalcolarli DOPO
-    // l'eliminazione. Unione di tutti e tre i modi di collegamento,
-    // stesso principio già in ricalcolaPostiTragitto.
-    const daBusTratte = (await db.select({ tragittoId: busTratte.tragittoId }).from(busTratte).where(eq(busTratte.busId, busId))).map((r) => r.tragittoId);
-    const daBusFermate = (await db.select({ tragittoId: fermate.tragittoId }).from(busFermate)
-      .innerJoin(fermate, eq(fermate.id, busFermate.fermataId))
-      .where(eq(busFermate.busId, busId))).map((r) => r.tragittoId);
-    const daLinea = bus.lineaId ? (await db.select({ tragittoId: linee.tragittoId }).from(linee).where(eq(linee.id, bus.lineaId))).map((r) => r.tragittoId) : [];
-    const tragittiCollegati = [...new Set([...daBusTratte, ...daBusFermate, ...daLinea])];
+    // Quale tragitto perde questo bus — serve per ricalcolarlo DOPO
+    // l'eliminazione.
+    const tragittiCollegati = bus.lineaId
+      ? (await db.select({ tragittoId: linee.tragittoId }).from(linee).where(eq(linee.id, bus.lineaId))).map((r) => r.tragittoId)
+      : [];
     await db.transaction(async (tx) => {
-      await tx.delete(busFisici).where(eq(busFisici.id, busId)); // cascade su bus_tratte e bus_fermate
+      await tx.delete(busFisici).where(eq(busFisici.id, busId));
       for (const tragittoId of tragittiCollegati) await ricalcolaPostiTragitto(tx, tragittoId);
     });
   },
@@ -1196,10 +1073,20 @@ export const eventiService = {
   async listaPasseggeriBus(busId: string) {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
+    if (!bus.lineaId) return []; // bus non ancora collegato a nessuna Linea
 
-    const assegnazioni = await db.select().from(busTratte).where(eq(busTratte.busId, busId));
-    const tragittiIds = assegnazioni.map((a) => a.tragittoId);
-    if (tragittiIds.length === 0) return [];
+    const [lineaVera] = await db.select().from(linee).where(eq(linee.id, bus.lineaId)).limit(1);
+    if (!lineaVera) return [];
+    // Le fermate coperte da QUESTA Linea — un bus non copre per forza
+    // tutto il tragitto, solo le fermate specifiche della sua Linea
+    // (prima questa funzione guardava l'intero tragitto tramite
+    // bus_tratte, un sistema ormai senza più nessuna scrittura: per un
+    // bus registrato tramite una Linea sarebbe sempre tornata vuota).
+    const righeFermate = await db.select({ citta: fermate.citta }).from(lineaFermate)
+      .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
+      .where(eq(lineaFermate.lineaId, bus.lineaId));
+    const cittaCoperte = righeFermate.map((f) => f.citta);
+    if (cittaCoperte.length === 0) return [];
 
     const righe = await db
       .select({
@@ -1209,7 +1096,7 @@ export const eventiService = {
         telefonoReferente: prenotazioni.referenteTelefono,
       })
       .from(prenotazioni)
-      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')));
+      .where(and(eq(prenotazioni.tragittoId, lineaVera.tragittoId), inArray(prenotazioni.fermataCitta, cittaCoperte), eq(prenotazioni.stato, 'CONFERMATA')));
 
     if (righe.length === 0) return [];
 
@@ -1261,7 +1148,9 @@ export const eventiService = {
       .from(prenotazioni)
       .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')));
 
-    const assegnazioni = tragittiIds.length ? await db.select().from(busTratte).where(inArray(busTratte.tragittoId, tragittiIds)) : [];
+    const assegnazioni = tragittiIds.length ? await db.select({ busId: busFisici.id, tragittoId: linee.tragittoId }).from(busFisici)
+      .innerJoin(linee, eq(linee.id, busFisici.lineaId))
+      .where(inArray(linee.tragittoId, tragittiIds)) : [];
     const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
     const bus = busIds.length ? await db.select().from(busFisici).where(inArray(busFisici.id, busIds)) : [];
 
@@ -1325,13 +1214,16 @@ export const eventiService = {
       risultato[eventoId].partecipanti += Number(s.totale);
     }
 
-    const assegnazioni = await db.select().from(busTratte);
+    const lineeConTragitto = await db.select({ lineaId: linee.id, eventoId: tragitti.eventoId }).from(linee)
+      .innerJoin(tragitti, eq(tragitti.id, linee.tragittoId));
+    const mappaEventoDiLinea = new Map(lineeConTragitto.map((l) => [l.lineaId, l.eventoId]));
+    const tuttiIBus = lineeConTragitto.length ? await db.select({ id: busFisici.id, lineaId: busFisici.lineaId }).from(busFisici).where(inArray(busFisici.lineaId, lineeConTragitto.map((l) => l.lineaId))) : [];
     const busPerEvento = new Map<string, Set<string>>();
-    for (const a of assegnazioni) {
-      const eventoId = mappaEventoDiTragitto.get(a.tragittoId);
+    for (const b of tuttiIBus) {
+      const eventoId = b.lineaId ? mappaEventoDiLinea.get(b.lineaId) : undefined;
       if (!eventoId) continue;
       if (!busPerEvento.has(eventoId)) busPerEvento.set(eventoId, new Set());
-      busPerEvento.get(eventoId)!.add(a.busId);
+      busPerEvento.get(eventoId)!.add(b.id);
     }
     for (const [eventoId, bus] of busPerEvento) {
       risultato[eventoId] ??= { partecipanti: 0, busCensiti: 0 };
@@ -1355,9 +1247,8 @@ export const eventiService = {
   },
 
   async contaAllertePartenze() {
-    const righeTragitti = await db.select({ tragittoId: tragitti.id }).from(tragitti);
+    const righeTragitti = await db.select({ tragittoId: tragitti.id, postiTotali: tragitti.postiTotali }).from(tragitti);
     if (righeTragitti.length === 0) return 0;
-    const tuttiTragittiIds = righeTragitti.map((r) => r.tragittoId);
 
     const somme = await db
       .select({ tragittoId: prenotazioni.tragittoId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
@@ -1366,19 +1257,11 @@ export const eventiService = {
       .groupBy(prenotazioni.tragittoId);
     const mappaPasseggeri = new Map(somme.map((s) => [s.tragittoId, Number(s.totale)]));
 
-    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.tragittoId, tuttiTragittiIds));
-    const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
-    const bus = busIds.length ? await db.select({ id: busFisici.id, postiBus: busFisici.postiBus }).from(busFisici).where(inArray(busFisici.id, busIds)) : [];
-    const mappaBus = new Map(bus.map((b) => [b.id, b.postiBus ?? 0]));
-
     let conteggio = 0;
-    for (const tragittoId of tuttiTragittiIds) {
-      const passeggeri = mappaPasseggeri.get(tragittoId) ?? 0;
+    for (const r of righeTragitti) {
+      const passeggeri = mappaPasseggeri.get(r.tragittoId) ?? 0;
       if (passeggeri === 0) continue; // niente da coprire, non è un allarme
-      const postiBusCensiti = assegnazioni
-        .filter((a) => a.tragittoId === tragittoId)
-        .reduce((s, a) => s + (mappaBus.get(a.busId) ?? 0), 0);
-      if (postiBusCensiti < passeggeri) conteggio++;
+      if (r.postiTotali < passeggeri) conteggio++;
     }
     return conteggio;
   },
@@ -1388,10 +1271,10 @@ export const eventiService = {
    *  mostrare il pallino di avviso sulla card dell'evento specifico
    *  nella sezione Partenze, non solo nel menu laterale. */
   async allertePartenzePerEvento(): Promise<Record<string, number>> {
-    const righeTragitti = await db.select({ tragittoId: tragitti.id, eventoId: tragitti.eventoId }).from(tragitti);
+    const righeTragitti = await db.select({ tragittoId: tragitti.id, eventoId: tragitti.eventoId, postiTotali: tragitti.postiTotali }).from(tragitti);
     if (righeTragitti.length === 0) return {};
-    const tuttiTragittiIds = righeTragitti.map((r) => r.tragittoId);
     const mappaEventoDiTragitto = new Map(righeTragitti.map((r) => [r.tragittoId, r.eventoId]));
+    const mappaPostiTotali = new Map(righeTragitti.map((r) => [r.tragittoId, r.postiTotali]));
 
     const somme = await db
       .select({ tragittoId: prenotazioni.tragittoId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
@@ -1400,20 +1283,13 @@ export const eventiService = {
       .groupBy(prenotazioni.tragittoId);
     const mappaPasseggeri = new Map(somme.map((s) => [s.tragittoId, Number(s.totale)]));
 
-    const assegnazioni = await db.select().from(busTratte).where(inArray(busTratte.tragittoId, tuttiTragittiIds));
-    const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
-    const bus = busIds.length ? await db.select({ id: busFisici.id, postiBus: busFisici.postiBus }).from(busFisici).where(inArray(busFisici.id, busIds)) : [];
-    const mappaBus = new Map(bus.map((b) => [b.id, b.postiBus ?? 0]));
-
     const risultato: Record<string, number> = {};
-    for (const tragittoId of tuttiTragittiIds) {
-      const passeggeri = mappaPasseggeri.get(tragittoId) ?? 0;
+    for (const r of righeTragitti) {
+      const passeggeri = mappaPasseggeri.get(r.tragittoId) ?? 0;
       if (passeggeri === 0) continue;
-      const postiBusCensiti = assegnazioni
-        .filter((a) => a.tragittoId === tragittoId)
-        .reduce((s, a) => s + (mappaBus.get(a.busId) ?? 0), 0);
-      if (postiBusCensiti < passeggeri) {
-        const eventoId = mappaEventoDiTragitto.get(tragittoId)!;
+      const postiTotali = mappaPostiTotali.get(r.tragittoId) ?? 0;
+      if (postiTotali < passeggeri) {
+        const eventoId = mappaEventoDiTragitto.get(r.tragittoId)!;
         risultato[eventoId] = (risultato[eventoId] ?? 0) + 1;
       }
     }

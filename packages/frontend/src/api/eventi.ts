@@ -62,9 +62,6 @@ export interface BusFisico {
   tragittiIds: string[];
   fermateIds: string[];
 }
-export interface BusFisicoInput {
-  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; tragittiIds: string[];
-}
 export interface LineaInput {
   fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; fermateIds: string[];
 }
@@ -95,8 +92,7 @@ export const eventiApi = {
 
   calcolaBus: (id: string) => api.get<CalcoloBusTragitto[]>(`/api/eventi/${id}/calcola-bus`),
   listaBus: (id: string) => api.get<BusFisico[]>(`/api/eventi/${id}/bus`),
-  creaBus: (id: string, input: BusFisicoInput) => api.post<{ id: string }>(`/api/eventi/${id}/bus`, input),
-  aggiornaBus: (id: string, busId: string, input: Partial<BusFisicoInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/bus/${busId}`, input),
+
   creaLinea: (id: string, input: LineaInput) => api.post<{ lineaId: string; busId: string }>(`/api/eventi/${id}/linee`, input),
   aggiungiBusALinea: (lineaId: string, input: BusDiLineaInput) => api.post<{ id: string }>(`/api/eventi/linee/${lineaId}/bus`, input),
   aggiornaPercorsoLinea: (eventoId: string, lineaId: string, fermateIds: string[]) => api.put<{ ok: true }>(`/api/eventi/${eventoId}/linee/${lineaId}/percorso`, { fermateIds }),

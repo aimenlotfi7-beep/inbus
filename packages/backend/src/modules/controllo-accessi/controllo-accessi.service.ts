@@ -1,6 +1,6 @@
 import { eq, inArray, and, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { busFisici, busTratte, tragitti, eventi, prenotazioni, partecipantiPrenotazione } from '../../db/schema.js';
+import { busFisici, linee, lineaFermate, fermate, tragitti, eventi, prenotazioni, partecipantiPrenotazione } from '../../db/schema.js';
 import { NonTrovato, VietatoDaiPermessi } from '../../shared/errors.js';
 
 /** Verifica che il bus appartenga davvero a questo tour leader — ogni
@@ -14,11 +14,35 @@ async function verificaProprietaBus(busId: string, tourLeaderId: string) {
   return bus;
 }
 
-/** Id dei tragitti assegnati a questo bus — i passeggeri di
- *  QUESTE tratte sono quelli che il tour leader deve controllare. */
-async function tratteDelBus(busId: string): Promise<string[]> {
-  const righe = await db.select({ tragittoId: busTratte.tragittoId }).from(busTratte).where(eq(busTratte.busId, busId));
-  return righe.map((r) => r.tragittoId);
+/** Cosa copre davvero questo bus — il tragitto E le fermate specifiche
+ *  (via la sua Linea), non più l'intero tragitto come col vecchio
+ *  sistema. Un bus può condividere il tragitto con un ALTRO bus (Linee
+ *  diverse dello stesso tragitto, es. una per le fermate del nord e
+ *  una per quelle del sud) — controllare solo il tragitto avrebbe
+ *  lasciato salire un passeggero sul bus sbagliato. */
+async function coperturaDelBus(busId: string): Promise<{ tragittoId: string; fermateCitta: string[] } | null> {
+  const [bus] = await db.select({ lineaId: busFisici.lineaId }).from(busFisici).where(eq(busFisici.id, busId)).limit(1);
+  if (!bus?.lineaId) return null;
+  const [lineaVera] = await db.select().from(linee).where(eq(linee.id, bus.lineaId)).limit(1);
+  if (!lineaVera) return null;
+  const righeFermate = await db.select({ citta: fermate.citta }).from(lineaFermate)
+    .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
+    .where(eq(lineaFermate.lineaId, bus.lineaId));
+  return { tragittoId: lineaVera.tragittoId, fermateCitta: righeFermate.map((f) => f.citta) };
+}
+
+/** Stessa cosa di coperturaDelBus, ma per TUTTI i bus di un tour
+ *  leader insieme — usata dove serve cercare/validare senza sapere a
+ *  priori su quale bus specifico (ricerca manuale, check-in manuale). */
+async function coperturaCompleta(tourLeaderId: string): Promise<Set<string>> {
+  const busIds = (await db.select({ id: busFisici.id }).from(busFisici).where(eq(busFisici.tourLeaderId, tourLeaderId))).map((b) => b.id);
+  const chiavi = new Set<string>();
+  for (const busId of busIds) {
+    const copertura = await coperturaDelBus(busId);
+    if (!copertura) continue;
+    for (const citta of copertura.fermateCitta) chiavi.add(`${copertura.tragittoId}::${citta}`);
+  }
+  return chiavi;
 }
 
 export const controlloAccessiService = {
@@ -35,29 +59,29 @@ export const controlloAccessiService = {
         eventoData: eventi.data,
       })
       .from(busFisici)
-      .innerJoin(busTratte, eq(busTratte.busId, busFisici.id))
-      .innerJoin(tragitti, eq(tragitti.id, busTratte.tragittoId))
+      .innerJoin(linee, eq(linee.id, busFisici.lineaId))
+      .innerJoin(tragitti, eq(tragitti.id, linee.tragittoId))
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
       .where(eq(busFisici.tourLeaderId, tourLeaderId));
 
-    // Un bus può avere più tratte (quindi più righe qui) — le riduco a
-    // una voce sola per bus.
-    const perBus = new Map<string, typeof righe[number]>();
-    for (const r of righe) perBus.set(r.busId, r);
-    return Array.from(perBus.values()).sort((a, b) => +new Date(a.eventoData) - +new Date(b.eventoData));
+    return righe.sort((a, b) => +new Date(a.eventoData) - +new Date(b.eventoData));
   },
 
   /** Contatore in tempo reale: quanti passeggeri attesi su questo bus,
    *  quanti sono già saliti (scansionati almeno una volta). */
   async statoBus(busId: string, tourLeaderId: string) {
     const bus = await verificaProprietaBus(busId, tourLeaderId);
-    const tragittiIds = await tratteDelBus(busId);
-    if (tragittiIds.length === 0) return { riferimento: bus.riferimento, totale: 0, saliti: 0 };
+    const copertura = await coperturaDelBus(busId);
+    if (!copertura || copertura.fermateCitta.length === 0) return { riferimento: bus.riferimento, totale: 0, saliti: 0 };
 
     const prenotazioniBus = await db
       .select({ id: prenotazioni.id })
       .from(prenotazioni)
-      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')));
+      .where(and(
+        eq(prenotazioni.tragittoId, copertura.tragittoId),
+        inArray(prenotazioni.fermataCitta, copertura.fermateCitta),
+        eq(prenotazioni.stato, 'CONFERMATA'),
+      ));
     const prenotazioniIds = prenotazioniBus.map((p) => p.id);
     if (prenotazioniIds.length === 0) return { riferimento: bus.riferimento, totale: 0, saliti: 0 };
 
@@ -86,7 +110,7 @@ export const controlloAccessiService = {
     | { esito: 'non_valido' }
   > {
     await verificaProprietaBus(busId, tourLeaderId);
-    const tragittiIds = await tratteDelBus(busId);
+    const copertura = await coperturaDelBus(busId);
 
     const [partecipante] = await db
       .select()
@@ -97,7 +121,12 @@ export const controlloAccessiService = {
 
     const [pren] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, partecipante.prenotazioneId)).limit(1);
     if (!pren || pren.stato !== 'CONFERMATA') return { esito: 'non_valido' };
-    if (!tragittiIds.includes(pren.tragittoId)) return { esito: 'bus_sbagliato' };
+    // Deve combaciare sia il tragitto SIA la fermata specifica — un
+    // passeggero di una fermata coperta da un'ALTRA Linea dello stesso
+    // tragitto non sale su questo bus.
+    if (!copertura || pren.tragittoId !== copertura.tragittoId || !copertura.fermateCitta.includes(pren.fermataCitta)) {
+      return { esito: 'bus_sbagliato' };
+    }
 
     const nome = `${partecipante.nome} ${partecipante.cognome}`;
     if (partecipante.ticketUtilizzatoIl) return { esito: 'gia_a_bordo', nome };
@@ -106,28 +135,20 @@ export const controlloAccessiService = {
     return { esito: 'valido', nome };
   },
 
-  /** Tutti i bus (di tutti gli eventi) assegnati a questo tour leader,
-   *  come coppie evento-bus — usata dalla schermata "Eventi" e dalla
-   *  ricerca, per limitare sempre e solo ai bus davvero suoi. */
-  async lineeAssegnate(tourLeaderId: string): Promise<string[]> {
-    const busIds = (await db.select({ id: busFisici.id }).from(busFisici).where(eq(busFisici.tourLeaderId, tourLeaderId))).map((b) => b.id);
-    if (!busIds.length) return [];
-    const righe = await db.select({ tragittoId: busTratte.tragittoId }).from(busTratte).where(inArray(busTratte.busId, busIds));
-    return Array.from(new Set(righe.map((r) => r.tragittoId)));
-  },
-
   /** Cerca un passeggero per nome, cognome, PNR o email — su tutte le
    *  tratte assegnate a questo tour leader, non solo un bus alla volta.
    *  Serve per il check-in manuale quando il QR non si legge o il
    *  cliente non ce l'ha a portata di mano. */
   async cerca(tourLeaderId: string, query: string) {
-    const tragittiIds = await this.lineeAssegnate(tourLeaderId);
-    if (!tragittiIds.length || query.trim().length < 2) return [];
+    const chiaviCoperte = await coperturaCompleta(tourLeaderId);
+    if (chiaviCoperte.size === 0 || query.trim().length < 2) return [];
+    const tragittiIds = [...new Set([...chiaviCoperte].map((c) => c.split('::')[0]))];
 
-    const prenotazioniAssegnate = await db
+    const prenotazioniAssegnate = (await db
       .select()
       .from(prenotazioni)
-      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')));
+      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA'))))
+      .filter((p) => chiaviCoperte.has(`${p.tragittoId}::${p.fermataCitta}`));
     if (!prenotazioniAssegnate.length) return [];
 
     const prenotazioniPerId = new Map(prenotazioniAssegnate.map((p) => [p.id, p]));
@@ -164,8 +185,10 @@ export const controlloAccessiService = {
     const [pren] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, partecipante.prenotazioneId)).limit(1);
     if (!pren) throw new NonTrovato('Prenotazione');
 
-    const tragittiIds = await this.lineeAssegnate(tourLeaderId);
-    if (!tragittiIds.includes(pren.tragittoId)) throw new VietatoDaiPermessi('Questo passeggero non è su una tua tratta.');
+    const chiaviCoperte = await coperturaCompleta(tourLeaderId);
+    if (!chiaviCoperte.has(`${pren.tragittoId}::${pren.fermataCitta}`)) {
+      throw new VietatoDaiPermessi('Questo passeggero non è su una tua tratta.');
+    }
 
     if (!partecipante.ticketUtilizzatoIl) {
       await db.update(partecipantiPrenotazione).set({ ticketUtilizzatoIl: new Date() }).where(eq(partecipantiPrenotazione.id, partecipanteId));

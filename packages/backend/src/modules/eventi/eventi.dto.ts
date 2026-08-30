@@ -111,23 +111,8 @@ export const listaEventiQuerySchema = z.object({
 });
 export type ListaEventiQuery = z.infer<typeof listaEventiQuerySchema>;
 
-export const creaBusSchema = z.object({
-  fornitoreId: z.string().optional(),
-  riferimento: z.string().min(1),
-  autistaNome: z.string().optional(),
-  autistaTelefono: z.string().optional(),
-  tourLeaderId: z.string().optional(),
-  costo: z.number().nonnegative().optional(),
-  postiBus: z.number().int().positive(),
-  note: z.string().optional(),
-  tragittiIds: z.array(z.string()).min(1),
-});
-export const aggiornaBusSchema = creaBusSchema.partial().extend({
-  tourLeaderId: z.string().nullable().optional(),
-});
-
-// Le "Linee" — stesso identico bus, ma collegato a fermate specifiche
-// invece che all'intero tragitto (vedi creaLinea/aggiornaLinea).
+// Le Linee — un contenitore (percorso: quali fermate copre, in che
+// ordine) che può avere uno o più bus dentro.
 export const creaLineaSchema = z.object({
   fornitoreId: z.string().optional(),
   riferimento: z.string().min(1),
