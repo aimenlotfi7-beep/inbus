@@ -165,6 +165,10 @@ async function scaricaImmagine(url: string): Promise<Buffer | null> {
 export async function disegnaBigliettoPdf(config: ConfigurazioneLayout, dati: {
   artista: string; dataEvento: Date; fermataCitta: string; fermataOrario: string | null;
   passeggeriNomi: string[]; pnr: string; qrDataUrl: string; immagineIntestazioneUrl: string | null;
+  // Nome del bus/Linea assegnata (es. "Bus 1") — vuoto finché non è
+  // ancora stata costruita nessuna Linea che copre questa fermata, o
+  // finché non è passato il riordino per fasce d'età (24 ore prima).
+  nomeBus?: string | null;
 }): Promise<Buffer> {
   const [immagineIntestazioneBuffer, sfondoBuffer, buffersImmaginiExtra] = await Promise.all([
     dati.immagineIntestazioneUrl ? scaricaImmagine(dati.immagineIntestazioneUrl) : Promise.resolve(null),
@@ -253,6 +257,9 @@ export async function disegnaBigliettoPdf(config: ConfigurazioneLayout, dati: {
       } else if (sezione === 'partenza') {
         doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('PARTENZA', pos.x, pos.y, { width: pos.larghezza });
         doc.fillColor('#000').font('Helvetica').fontSize(13).text(`${dati.fermataCitta}${dati.fermataOrario ? ` — ore ${dati.fermataOrario}` : ''}`, pos.x, doc.y, { width: pos.larghezza });
+        if (dati.nomeBus) {
+          doc.fillColor('#666').font('Helvetica').fontSize(10).text(dati.nomeBus, pos.x, doc.y, { width: pos.larghezza });
+        }
       } else if (sezione === 'passeggero') {
         doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('PASSEGGER' + (dati.passeggeriNomi.length > 1 ? 'I' : 'O'), pos.x, pos.y, { width: pos.larghezza });
         doc.fillColor('#000').font('Helvetica').fontSize(12).text(dati.passeggeriNomi.join('\n'), pos.x, doc.y, { width: pos.larghezza });

@@ -8,6 +8,7 @@ import { db } from '../../db/client.js';
 import { promoter, promoterEventi, prenotazioni, eventi } from '../../db/schema.js';
 import { NonTrovato, NonAutorizzato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
+import { limiteAutenticazione } from '../../shared/rateLimit.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { env } from '../../config/env.js';
@@ -153,12 +154,12 @@ export const promoterService = {
 
 export const promoterRouter = Router();
 
-promoterRouter.post('/login', valida(loginPromoterSchema), asyncHandler(async (req: Request, res: Response) => res.json(await promoterService.login(req.body))));
-promoterRouter.post('/richiedi-reset', valida(z.object({ email: z.string().email() })), asyncHandler(async (req: Request, res: Response) => {
+promoterRouter.post('/login', limiteAutenticazione, valida(loginPromoterSchema), asyncHandler(async (req: Request, res: Response) => res.json(await promoterService.login(req.body))));
+promoterRouter.post('/richiedi-reset', limiteAutenticazione, valida(z.object({ email: z.string().email() })), asyncHandler(async (req: Request, res: Response) => {
   await promoterService.richiediResetPassword(req.body.email);
   res.json({ ok: true });
 }));
-promoterRouter.post('/reset-password', valida(z.object({ token: z.string(), password: z.string().min(8, 'La password deve avere almeno 8 caratteri.') })), asyncHandler(async (req: Request, res: Response) => {
+promoterRouter.post('/reset-password', limiteAutenticazione, valida(z.object({ token: z.string(), password: z.string().min(8, 'La password deve avere almeno 8 caratteri.') })), asyncHandler(async (req: Request, res: Response) => {
   await promoterService.confermaResetPassword(req.body.token, req.body.password);
   res.json({ ok: true });
 }));

@@ -10,6 +10,7 @@ export function RegistratiPage() {
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [citta, setCitta] = useState('');
+  const [dataNascita, setDataNascita] = useState('');
   const [password, setPassword] = useState('');
   const [confermaPassword, setConfermaPassword] = useState('');
   const [errore, setErrore] = useState('');
@@ -22,10 +23,11 @@ export function RegistratiPage() {
     setErrore('');
     if (password !== confermaPassword) { setErrore('Le due password non coincidono.'); return; }
     if (password.length < 8) { setErrore('La password deve avere almeno 8 caratteri.'); return; }
+    if (!dataNascita) { setErrore('Inserisci la tua data di nascita.'); return; }
 
     setCaricamento(true);
     try {
-      await clienteAuthApi.registrati({ nome, cognome, email, telefono: telefono || undefined, citta: citta || undefined, password });
+      await clienteAuthApi.registrati({ nome, cognome, email, telefono: telefono || undefined, citta: citta || undefined, password, dataNascita });
       setInviata(true);
     } catch (err) {
       setErrore(err instanceof ErroreClienteAuth ? err.message : 'Registrazione non riuscita.');
@@ -76,6 +78,10 @@ export function RegistratiPage() {
 
         <label>Città (facoltativo)</label>
         <input type="text" autoComplete="address-level2" value={citta} onChange={(e) => setCitta(e.target.value)} />
+
+        <label>Data di nascita</label>
+        <input type="date" autoComplete="bday" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} required />
+        <p className="sottotitolo-auth" style={{ fontSize: 12.5, marginTop: -6 }}>Serve per organizzare al meglio i gruppi sui bus quando prenoti in più persone.</p>
 
         <label>Password (almeno 8 caratteri)</label>
         <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required />

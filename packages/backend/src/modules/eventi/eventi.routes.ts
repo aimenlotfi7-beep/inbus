@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { eventiController } from './eventi.controller.js';
-import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, creaBusSchema, aggiornaBusSchema, aggiornaTragittoOperativoSchema, registraPreventivoSchema } from './eventi.dto.js';
+import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, creaBusSchema, aggiornaBusSchema, aggiornaTragittoOperativoSchema, registraPreventivoSchema, creaLineaSchema, aggiornaLineaSchema } from './eventi.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
@@ -58,6 +58,8 @@ eventiRouter.post('/:id/servizi', richiedeAuth, richiedePermesso('eventi.crea'),
 eventiRouter.put('/:id/servizi/:servizioId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.aggiornaServizio));
 eventiRouter.delete('/:id/servizi/:servizioId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.eliminaServizio));
 eventiRouter.put('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaBusSchema), asyncHandler(eventiController.aggiornaBus));
+eventiRouter.post('/:id/linee', richiedeAuth, richiedePermesso('eventi.crea'), valida(creaLineaSchema), asyncHandler(eventiController.creaLinea));
+eventiRouter.put('/:id/linee/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaLineaSchema), asyncHandler(eventiController.aggiornaLinea));
 eventiRouter.put('/tragitti/:tragittoId/operativo', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaTragittoOperativoSchema), asyncHandler(eventiController.aggiornaTragittoOperativo));
 eventiRouter.put('/tragitti/:tragittoId/preventivo', richiedeAuth, richiedePermesso('eventi.crea'), valida(registraPreventivoSchema), asyncHandler(eventiController.registraPreventivo));
 eventiRouter.delete('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.rimuoviBus));

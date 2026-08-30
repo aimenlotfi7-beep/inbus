@@ -485,6 +485,13 @@ export const prenotazioni = pgTable('prenotazioni', {
   eventoId: text('evento_id').notNull().references(() => eventi.id),
   tragittoId: text('tragitto_id').notNull().references(() => tragitti.id),
   fermataCitta: text('fermata_citta').notNull(),
+  // Su quale bus/Linea è stata assegnata questa prenotazione — vuoto
+  // finché non è stato costruito nessun bus che copre la sua fermata,
+  // oppure (anche dopo) finché non è passato il riordino automatico
+  // per fasce d'età (24 ore prima della partenza — vedi scheduler).
+  // Prima di quel riordino il biglietto vero non si può scaricare
+  // (l'assegnazione bus non è ancora definitiva).
+  busId: text('bus_id').references(() => busFisici.id, { onDelete: 'set null' }),
   fermataIndirizzo: text('fermata_indirizzo'),
   fermataOrario: text('fermata_orario'),
   orarioRitorno: text('orario_ritorno'),

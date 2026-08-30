@@ -19,6 +19,13 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
 }) {
   const [dettaglio, setDettaglio] = useState<DettaglioPrenotazione | null>(null);
   const [biglietti, setBiglietti] = useState<Biglietto[]>([]);
+  // Aggiornato ogni minuto — serve per far scorrere il conto alla
+  // rovescia senza dover ricaricare la pagina.
+  const [adesso, setAdesso] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setAdesso(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     prenotazioniApi.dettaglioPerCliente(pnr, email).then(setDettaglio).catch(() => setDettaglio(null));
@@ -52,6 +59,21 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
   }
 
   const ev = dettaglio.evento;
+
+  // Stessa soglia già applicata sul server (rigeneraPdfPerToken) — qui
+  // serve solo per decidere COSA MOSTRARE (timer o pulsanti), il vero
+  // blocco resta comunque lato server, questo è solo per non far
+  // vedere un pulsante "Scarica" che poi fallirebbe con un errore.
+  let oreAllaPartenza: number | null = null;
+  if (ev?.data && dettaglio.fermataOrario) {
+    const [ore, minuti] = dettaglio.fermataOrario.split(':').map(Number);
+    if (!Number.isNaN(ore) && !Number.isNaN(minuti)) {
+      const partenzaVera = new Date(ev.data);
+      partenzaVera.setHours(ore, minuti, 0, 0);
+      oreAllaPartenza = (partenzaVera.getTime() - adesso) / 3600000;
+    }
+  }
+  const bigliettoBloccato = oreAllaPartenza !== null && oreAllaPartenza > 24;
   const oggi = new Date().toISOString().slice(0, 10);
   const giorniAlViaggio = ev ? Math.ceil((new Date(ev.data).getTime() - Date.now()) / (24 * 3600 * 1000)) : null;
   const pagamentoCompleto = dettaglio.tipoPagamento === 'COMPLETO' || dettaglio.saldoPagato;
@@ -93,7 +115,19 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
         {dettaglio.stato === 'CONFERMATA' && (
           <>
             <p className="section-label" style={{ marginTop: 18 }}>I miei biglietti</p>
-            {biglietti.length > 0 ? (
+            {bigliettoBloccato && oreAllaPartenza !== null ? (
+              <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '14px 16px' }}>
+                <p style={{ margin: 0, fontSize: 13.5 }}>
+                  🕒 Il biglietto sarà scaricabile a partire da 24 ore prima della partenza.
+                </p>
+                <p style={{ margin: '6px 0 0', fontSize: 18, fontWeight: 700 }}>
+                  {formattaConteggio(oreAllaPartenza - 24)}
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--mist)' }}>
+                  Torna qui più vicino alla data — l'autobus assegnato compare in automatico appena disponibile.
+                </p>
+              </div>
+            ) : biglietti.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {biglietti.map((b) => (
                   <div key={b.token} className="travel-biglietto-riga">
@@ -152,4 +186,16 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
       </div>
     </div>
   );
+}
+
+/** Formatta le ore rimanenti in un testo leggibile — giorni+ore se
+ *  manca più di un giorno, solo ore+minuti altrimenti (più preciso man
+ *  mano che ci si avvicina, quando conta di più). */
+function formattaConteggio(oreRimanenti: number): string {
+  if (oreRimanenti <= 0) return 'Disponibile a breve';
+  const giorni = Math.floor(oreRimanenti / 24);
+  const oreResto = Math.floor(oreRimanenti % 24);
+  if (giorni > 0) return `${giorni} giorno${giorni === 1 ? '' : 'i'} e ${oreResto} or${oreResto === 1 ? 'a' : 'e'}`;
+  const minutiResto = Math.round((oreRimanenti - oreResto) * 60);
+  return `${oreResto} or${oreResto === 1 ? 'a' : 'e'} e ${minutiResto} minuti`;
 }

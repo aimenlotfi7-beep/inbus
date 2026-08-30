@@ -6,6 +6,7 @@ import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { richiedeAuthCliente } from '../cliente-auth/cliente-auth.middleware.js';
 import { NonAutorizzato } from '../../shared/errors.js';
+import { limitePnr } from '../../shared/rateLimit.js';
 import { z } from 'zod';
 
 export const prenotazioniController = {
@@ -78,11 +79,11 @@ prenotazioniRouter.get('/eventi', richiedeAuth, richiedePermesso('prenotazioni.v
 // Pubbliche: il checkout del sito e l'area cliente non richiedono login admin
 prenotazioniRouter.post('/', richiedeAuthCliente, valida(creaPrenotazioneSchema), asyncHandler(prenotazioniController.crea));
 prenotazioniRouter.post('/ordine', richiedeAuthCliente, valida(creaOrdineSchema), asyncHandler(prenotazioniController.creaOrdine));
-prenotazioniRouter.get('/by-email', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.listByEmail));
-prenotazioniRouter.get('/:pnr/dettaglio-cliente', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.dettaglioPerCliente));
-prenotazioniRouter.get('/:pnr', asyncHandler(prenotazioniController.getByPnr));
-prenotazioniRouter.get('/:pnr/saldo', asyncHandler(prenotazioniController.differenzaSaldo));
-prenotazioniRouter.post('/:pnr/salda', asyncHandler(prenotazioniController.saldaResto));
+prenotazioniRouter.get('/by-email', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.listByEmail));
+prenotazioniRouter.get('/:pnr/dettaglio-cliente', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.dettaglioPerCliente));
+prenotazioniRouter.get('/:pnr', limitePnr, asyncHandler(prenotazioniController.getByPnr));
+prenotazioniRouter.get('/:pnr/saldo', limitePnr, asyncHandler(prenotazioniController.differenzaSaldo));
+prenotazioniRouter.post('/:pnr/salda', limitePnr, asyncHandler(prenotazioniController.saldaResto));
 
 // Amministrazione: cancellazione vera di una prenotazione — protetta
 // (era rimasta pubblica per errore: il cliente non può più cancellare

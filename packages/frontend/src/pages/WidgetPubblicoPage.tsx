@@ -188,15 +188,17 @@ function FormRegistrati({ tema, onFatto }: { tema: WhiteLabelPubblica['tema']; o
   const [cognome, setCognome] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [dataNascita, setDataNascita] = useState('');
   const [password, setPassword] = useState('');
   const [errore, setErrore] = useState('');
   const [caricamento, setCaricamento] = useState(false);
 
   async function invia() {
+    if (!dataNascita) { setErrore('Inserisci la data di nascita.'); return; }
     setCaricamento(true);
     setErrore('');
     try {
-      await clienteAuthApi.registrati({ nome, cognome, email, telefono, password });
+      await clienteAuthApi.registrati({ nome, cognome, email, telefono, password, dataNascita });
       onFatto();
     } catch (e) {
       setErrore(e instanceof ErroreApi ? e.message : 'Registrazione non riuscita.');
@@ -212,6 +214,7 @@ function FormRegistrati({ tema, onFatto }: { tema: WhiteLabelPubblica['tema']; o
       <Campo tema={tema} placeholder="Cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} />
       <Campo tema={tema} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <Campo tema={tema} placeholder="Telefono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+      <Campo tema={tema} type="date" placeholder="Data di nascita" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} />
       <Campo tema={tema} type="password" placeholder="Password (almeno 8 caratteri)" value={password} onChange={(e) => setPassword(e.target.value)} />
       <TestoErrore>{errore}</TestoErrore>
       <PulsantePrincipale tema={tema} onClick={invia} disabled={caricamento}>{caricamento ? 'Creazione...' : 'Crea account'}</PulsantePrincipale>

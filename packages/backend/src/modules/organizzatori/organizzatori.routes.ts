@@ -8,6 +8,7 @@ import { db } from '../../db/client.js';
 import { organizzatori, organizzatoreEventi, eventi, prenotazioni, whiteLabel } from '../../db/schema.js';
 import { NonTrovato, NonAutorizzato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
+import { limiteAutenticazione } from '../../shared/rateLimit.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { env } from '../../config/env.js';
@@ -187,12 +188,12 @@ export const organizzatoriService = {
 
 export const organizzatoriRouter = Router();
 
-organizzatoriRouter.post('/login', valida(loginOrganizzatoreSchema), asyncHandler(async (req: Request, res: Response) => res.json(await organizzatoriService.login(req.body))));
-organizzatoriRouter.post('/richiedi-reset', valida(z.object({ email: z.string().email() })), asyncHandler(async (req: Request, res: Response) => {
+organizzatoriRouter.post('/login', limiteAutenticazione, valida(loginOrganizzatoreSchema), asyncHandler(async (req: Request, res: Response) => res.json(await organizzatoriService.login(req.body))));
+organizzatoriRouter.post('/richiedi-reset', limiteAutenticazione, valida(z.object({ email: z.string().email() })), asyncHandler(async (req: Request, res: Response) => {
   await organizzatoriService.richiediResetPassword(req.body.email);
   res.json({ ok: true });
 }));
-organizzatoriRouter.post('/reset-password', valida(z.object({ token: z.string(), password: z.string().min(8, 'La password deve avere almeno 8 caratteri.') })), asyncHandler(async (req: Request, res: Response) => {
+organizzatoriRouter.post('/reset-password', limiteAutenticazione, valida(z.object({ token: z.string(), password: z.string().min(8, 'La password deve avere almeno 8 caratteri.') })), asyncHandler(async (req: Request, res: Response) => {
   await organizzatoriService.confermaResetPassword(req.body.token, req.body.password);
   res.json({ ok: true });
 }));

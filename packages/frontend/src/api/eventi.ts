@@ -60,9 +60,13 @@ export interface BusFisico {
   postiBus: number | null;
   note: string | null;
   tragittiIds: string[];
+  fermateIds: string[];
 }
 export interface BusFisicoInput {
   fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; tragittiIds: string[];
+}
+export interface LineaInput {
+  fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; fermateIds: string[];
 }
 export interface PasseggeroBus { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string; }
 export interface RiepilogoEconomicoTratta { tragittoId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; }
@@ -84,6 +88,8 @@ export const eventiApi = {
   listaBus: (id: string) => api.get<BusFisico[]>(`/api/eventi/${id}/bus`),
   creaBus: (id: string, input: BusFisicoInput) => api.post<{ id: string }>(`/api/eventi/${id}/bus`, input),
   aggiornaBus: (id: string, busId: string, input: Partial<BusFisicoInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/bus/${busId}`, input),
+  creaLinea: (id: string, input: LineaInput) => api.post<{ id: string }>(`/api/eventi/${id}/linee`, input),
+  aggiornaLinea: (id: string, busId: string, input: Partial<LineaInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/linee/${busId}`, input),
   // Fase 2 — orario/prezzo/posti si modificano da Partenze, non più da
   // Eventi. aggiornaServizio esisteva già lato backend (mai usata dal
   // frontend finora) — qui il client mancante.

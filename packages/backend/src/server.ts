@@ -4,7 +4,7 @@ import { env } from './config/env.js';
 import { sincronizzaPermessi } from './shared/permessi-sync.js';
 import { sincronizzaTemplateEmail } from './modules/template-email/template-email.service.js';
 import { sincronizzaLayoutBiglietto } from './modules/layout-biglietto/layout-biglietto.service.js';
-import { avviaSchedulerPromemoriaSaldo } from './shared/scheduler.js';
+import { avviaSchedulerPromemoriaSaldo, avviaSchedulerRiordinoEta } from './shared/scheduler.js';
 
 // Railway (l'hosting del backend) non ha una rete IPv6 in uscita
 // funzionante — le connessioni verso host che rispondono anche in IPv6
@@ -24,6 +24,7 @@ sincronizzaPermessi()
     app.listen(env.PORT, () => {
       console.log(`INBUS API in ascolto su http://localhost:${env.PORT} (${env.NODE_ENV})`);
       avviaSchedulerPromemoriaSaldo();
+      avviaSchedulerRiordinoEta();
     });
   })
   .catch((err) => {

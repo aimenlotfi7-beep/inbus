@@ -84,6 +84,15 @@ export const eventiController = {
     res.json({ ok: true });
   },
 
+  async creaLinea(req: Request, res: Response) {
+    const busId = await eventiService.creaLinea(req.params.id, req.body);
+    res.status(201).json({ id: busId });
+  },
+  async aggiornaLinea(req: Request, res: Response) {
+    await eventiService.aggiornaLinea(req.params.id, req.params.busId, req.body);
+    res.json({ ok: true });
+  },
+
   async aggiornaTragittoOperativo(req: Request, res: Response) {
     await eventiService.aggiornaTragittoOperativo(req.params.tragittoId, req.body);
     res.json({ ok: true });

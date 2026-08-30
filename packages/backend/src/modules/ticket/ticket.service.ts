@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import QRCode from 'qrcode';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { prenotazioni, eventi, utenti, partecipantiPrenotazione, whiteLabel } from '../../db/schema.js';
+import { prenotazioni, eventi, utenti, partecipantiPrenotazione, whiteLabel, busFisici } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { inviaEmail } from '../../shared/email.service.js';
 import { layoutBigliettoService, disegnaBigliettoPdf } from '../layout-biglietto/layout-biglietto.service.js';
@@ -159,6 +159,30 @@ export const ticketService = {
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
     if (!evento) throw new NonTrovato('Evento');
 
+    // Il biglietto vero diventa scaricabile solo nelle ultime 24 ore
+    // prima della partenza — prima di allora l'assegnazione del bus
+    // (dal riordino per fasce d'età) non è ancora definitiva. Se
+    // manca l'orario della fermata non posso calcolare la soglia con
+    // precisione: in quel caso lascio passare (meglio permettere il
+    // download che bloccarlo per un dato mancante).
+    if (p.fermataOrario) {
+      const [ore, minuti] = p.fermataOrario.split(':').map(Number);
+      if (!Number.isNaN(ore) && !Number.isNaN(minuti)) {
+        const partenzaVera = new Date(evento.data);
+        partenzaVera.setHours(ore, minuti, 0, 0);
+        const oreAllaPartenza = (partenzaVera.getTime() - Date.now()) / 3600000;
+        if (oreAllaPartenza > 24) {
+          throw new ConflittoDati(`Il biglietto sarà scaricabile a partire dalle 24 ore prima della partenza (${partenzaVera.toLocaleString('it-IT', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}).`);
+        }
+      }
+    }
+
+    let nomeBus: string | null = null;
+    if (p.busId) {
+      const [bus] = await db.select({ riferimento: busFisici.riferimento }).from(busFisici).where(eq(busFisici.id, p.busId)).limit(1);
+      nomeBus = bus?.riferimento ?? null;
+    }
+
     const layoutIdEffettivo = await risolviLayoutBigliettoId(p.whiteLabelId, evento.layoutBigliettoId);
     const config = await layoutBigliettoService.getPerEvento(layoutIdEffettivo);
     const configEffettiva = evento.ticketColoreAccento ? { ...config, coloreAccento: evento.ticketColoreAccento } : config;
@@ -172,6 +196,7 @@ export const ticketService = {
       pnr: p.pnr,
       qrDataUrl,
       immagineIntestazioneUrl: evento.ticketImmagineSfondoUrl,
+      nomeBus,
     });
     const nomeFile = `biglietto-${p.pnr}-${pt.nome}-${pt.cognome}`.replace(/[^a-zA-Z0-9-]+/g, '-') + '.pdf';
     return { pdfBuffer, nomeFile };

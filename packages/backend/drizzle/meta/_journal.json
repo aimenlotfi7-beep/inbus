@@ -421,6 +421,13 @@
       "when": 1788052181463,
       "tag": "0059_bus_fermate",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1788084257245,
+      "tag": "0060_eta_riordino_bus_biglietto",
+      "breakpoints": true
     }
   ]
 }

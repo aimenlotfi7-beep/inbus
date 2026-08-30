@@ -1,6 +1,7 @@
-import { and, eq, sql, desc, inArray } from 'drizzle-orm';
+import { and, eq, sql, desc, inArray, isNull } from 'drizzle-orm';
+import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini } from '../../db/schema.js';
+import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, busFermate, busFisici } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { couponService } from '../coupon/coupon.service.js';
@@ -12,8 +13,23 @@ import type { CreaPrenotazioneInput } from './prenotazioni.dto.js';
 // cambiasse la configurazione di drizzle non andrebbe mai fuori sync.
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+// Prima: 'IB' + Math.random().toString(36).slice(2, 8) — solo 6
+// caratteri (circa 2 miliardi di combinazioni) generati con un
+// generatore NON crittografico. Il PNR è l'unica "chiave" che protegge
+// l'accesso a GET /:pnr (e alle route vicine, saldo/pagamento) — che
+// non richiedono nessun login, si affidano solo al fatto che il PNR
+// sia difficile da indovinare. Con 6 caratteri e nessun limite di
+// richieste, uno script poteva provarli in sequenza e trovarne di
+// validi in tempi ragionevoli, vedendo dati di clienti altrui (nome,
+// email, telefono — l'intera riga, nessun filtro). Ora: generatore
+// crittografico vero (crypto.randomBytes, non Math.random) e 12
+// caratteri invece di 6 — le combinazioni possibili passano da ~2
+// miliardi a decine di migliaia di miliardi, il tempo per un
+// tentativo casuale di successo diventa impraticabile anche senza
+// contare il limite di richieste aggiunto separatamente sulle route
+// che lo usano.
 function generaPnr() {
-  return 'IB' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  return 'IB' + crypto.randomBytes(6).toString('hex').toUpperCase();
 }
 
 /** Il coupon vale solo per l'acquisto pieno, non per il solo acconto —
@@ -575,6 +591,103 @@ export const prenotazioniService = {
     });
     const { inviata } = await inviaEmail({ a: utente.email, oggetto, html });
     return { inviata };
+  },
+
+  /** Assegna ogni prenotazione confermata al bus/Linea giusto,
+   *  raggruppando per età (il titolare dell'account, non i singoli
+   *  partecipanti — una prenotazione non si spezza mai tra bus diversi,
+   *  anche se copre persone di età diverse, es. un genitore con figli).
+   *  Scatta da sola, una volta sola per fermata, appena la partenza
+   *  entra nelle prossime 24 ore — prima di allora il biglietto vero
+   *  non è ancora scaricabile (prenotazioni.busId resta vuoto).
+   *
+   *  Algoritmo: ordina tutte le prenotazioni di quella fermata per età
+   *  (dalla più anziana alla più giovane), poi le versa nei bus nello
+   *  stesso ordine, riempiendo il primo fino alla sua capienza prima di
+   *  passare al secondo — chi ha età vicina finisce quasi sempre nello
+   *  stesso bus, senza però poter garantire una combinazione perfetta
+   *  se i posti non lo permettono (un caso accettato fin dall'inizio:
+   *  un sessantenne può finire in un bus di ventenni se non c'è altro
+   *  posto). Se una fermata non ha nessun bus che la copre ancora,
+   *  resta semplicemente da fare — non è un errore, è solo presto. */
+  async riordinaPerFasceEta() {
+    const oraAdesso = new Date();
+    const tra24Ore = new Date(oraAdesso.getTime() + 24 * 3600 * 1000);
+
+    // Tutte le prenotazioni confermate ancora senza bus assegnato, di
+    // eventi non ancora passati — filtro l'orario preciso di ciascuna
+    // fermata (data evento + orario fermata) più sotto, in JS: troppo
+    // specifico da esprimere comodamente in una singola query SQL.
+    const candidate = await db.select({
+      prenotazioneId: prenotazioni.id,
+      tragittoId: prenotazioni.tragittoId,
+      fermataCitta: prenotazioni.fermataCitta,
+      fermataOrario: prenotazioni.fermataOrario,
+      utenteId: prenotazioni.utenteId,
+      passeggeri: prenotazioni.passeggeri,
+      eventoData: eventi.data,
+    }).from(prenotazioni)
+      .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
+      .where(and(eq(prenotazioni.stato, 'CONFERMATA'), isNull(prenotazioni.busId), sql`${eventi.data} >= ${oraAdesso}`));
+
+    // Raggruppo per (tragittoId, fermataCitta) — ogni gruppo si
+    // riordina indipendentemente dagli altri.
+    const gruppi = new Map<string, typeof candidate>();
+    for (const c of candidate) {
+      if (!c.fermataOrario) continue; // senza orario non posso calcolare quando parte davvero
+      const [ore, minuti] = c.fermataOrario.split(':').map(Number);
+      if (Number.isNaN(ore) || Number.isNaN(minuti)) continue;
+      const partenzaVera = new Date(c.eventoData);
+      partenzaVera.setHours(ore, minuti, 0, 0);
+      if (partenzaVera > tra24Ore) continue; // non ancora nelle prossime 24 ore — troppo presto
+      const chiave = `${c.tragittoId}::${c.fermataCitta}`;
+      if (!gruppi.has(chiave)) gruppi.set(chiave, []);
+      gruppi.get(chiave)!.push(c);
+    }
+
+    let riordinate = 0;
+    for (const [chiave, righe] of gruppi) {
+      const [tragittoId, fermataCitta] = chiave.split('::');
+
+      // I bus che coprono davvero questa fermata specifica — via
+      // bus_fermate (Linee). Se nessuno la copre ancora, non c'è
+      // niente da fare per questo gruppo, si riprova al prossimo giro.
+      const fermataRiga = await db.select({ id: fermate.id }).from(fermate)
+        .where(and(eq(fermate.tragittoId, tragittoId), eq(fermate.citta, fermataCitta))).limit(1);
+      if (fermataRiga.length === 0) continue;
+      const busCopertura = await db.select({ busId: busFermate.busId, postiBus: busFisici.postiBus }).from(busFermate)
+        .innerJoin(busFisici, eq(busFisici.id, busFermate.busId))
+        .where(eq(busFermate.fermataId, fermataRiga[0].id));
+      if (busCopertura.length === 0) continue;
+
+      // Età dal titolare dell'account — chi non ha una data di nascita
+      // impostata (account creati prima che il campo fosse
+      // obbligatorio) finisce in fondo all'ordinamento, non bloccante.
+      const utentiIds = [...new Set(righe.map((r) => r.utenteId))];
+      const utentiDati = await db.select({ id: utenti.id, dataNascita: utenti.dataNascita }).from(utenti).where(inArray(utenti.id, utentiIds));
+      const mappaEta = new Map(utentiDati.map((u) => [u.id, u.dataNascita ? oraAdesso.getTime() - u.dataNascita.getTime() : -1]));
+
+      const ordinate = [...righe].sort((a, b) => (mappaEta.get(b.utenteId) ?? -1) - (mappaEta.get(a.utenteId) ?? -1));
+
+      let busCorrente = 0;
+      let postiRimastiBusCorrente = busCopertura[0]?.postiBus ?? 0;
+      for (const r of ordinate) {
+        // Passa al bus successivo se quello corrente non ha più posto
+        // per NESSUNO — non spezza una prenotazione tra due bus, ma
+        // nemmeno lascia posti vuoti se la prossima prenotazione
+        // ci starebbe comunque (qui semplificato: un posto per
+        // prenotazione, il conteggio vero dei passeggeri l'ha già
+        // gestito la vendita — qui serve solo la distribuzione).
+        while (busCorrente < busCopertura.length - 1 && postiRimastiBusCorrente <= 0) {
+          busCorrente++;
+          postiRimastiBusCorrente = busCopertura[busCorrente]?.postiBus ?? 0;
+        }
+        await db.update(prenotazioni).set({ busId: busCopertura[busCorrente].busId }).where(eq(prenotazioni.id, r.prenotazioneId));
+        postiRimastiBusCorrente -= r.passeggeri;
+        riordinate++;
+      }
+    }
+    return { riordinate };
   },
 
   async inviaPromemoriaSaldo() {

@@ -126,6 +126,23 @@ export const aggiornaBusSchema = creaBusSchema.partial().extend({
   tourLeaderId: z.string().nullable().optional(),
 });
 
+// Le "Linee" — stesso identico bus, ma collegato a fermate specifiche
+// invece che all'intero tragitto (vedi creaLinea/aggiornaLinea).
+export const creaLineaSchema = z.object({
+  fornitoreId: z.string().optional(),
+  riferimento: z.string().min(1),
+  autistaNome: z.string().optional(),
+  autistaTelefono: z.string().optional(),
+  tourLeaderId: z.string().optional(),
+  costo: z.number().nonnegative().optional(),
+  postiBus: z.number().int().positive(),
+  note: z.string().optional(),
+  fermateIds: z.array(z.string()).min(1),
+});
+export const aggiornaLineaSchema = creaLineaSchema.partial().extend({
+  tourLeaderId: z.string().nullable().optional(),
+});
+
 // Fase 2 della revisione architetturale: orario/prezzo/posti per
 // fermata e per tragitto si modificano ora da Partenze, non più da
 // Eventi (che tiene solo la struttura universale: nome + sequenza

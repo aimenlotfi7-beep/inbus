@@ -28,7 +28,7 @@ export interface DatiCliente {
 }
 
 export const clienteAuthApi = {
-  registrati: (input: { email: string; password: string; nome: string; cognome: string; telefono?: string; citta?: string }) =>
+  registrati: (input: { email: string; password: string; nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: string }) =>
     chiamata<{ ok: true }>('/api/cliente-auth/registrati', { method: 'POST', body: JSON.stringify(input) }),
 
   login: (email: string, password: string) =>

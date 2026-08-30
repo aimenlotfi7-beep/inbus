@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { variazioni, variazioniRisposte, prenotazioni, richiesteRimborso, eventi, tragitti, utenti } from '../../db/schema.js';
+import { variazioni, variazioniRisposte, prenotazioni, richiesteRimborso, eventi, tragitti, utenti, fermate } from '../../db/schema.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
-import { leggiSogliaPosticipoMinuti } from '../impostazioni/impostazioni.routes.js';
+import { leggiSogliaPosticipoMinuti, leggiSogliaMinimaPartenza } from '../impostazioni/impostazioni.routes.js';
 import { NonTrovato } from '../../shared/errors.js';
 
 type FermataConfronto = { citta: string; indirizzo: string; orario?: string | null };
@@ -190,4 +190,54 @@ export async function rispondiVariazione(token: string, risposta: 'ACCETTATA' | 
   if (!restanoInAttesa) {
     await db.update(variazioni).set({ stato: 'GESTITA' }).where(eq(variazioni.id, riga.variazioneId));
   }
+}
+
+/** Disattiva le fermate "Partenza" che non hanno raggiunto la loro
+ *  soglia minima di partecipanti, nelle ultime 24 ore prima della
+ *  partenza (stesso momento del riordino per fasce d'età e dello
+ *  sblocco del biglietto — è il punto naturale in cui la decisione
+ *  diventa definitiva). Riusa lo stesso meccanismo di comunicazione
+ *  già costruito per le Variazioni vere e proprie (email + scelta
+ *  accetta/rimborso) — dal punto di vista del cliente è esattamente lo
+ *  stesso tipo di avviso, solo con una causa diversa. */
+export async function disattivaFermatePartenzaSottoSoglia() {
+  const oraAdesso = new Date();
+  const tra24Ore = new Date(oraAdesso.getTime() + 24 * 3600 * 1000);
+
+  const fermatePartenza = await db.select({
+    fermataId: fermate.id,
+    tragittoId: fermate.tragittoId,
+    citta: fermate.citta,
+    indirizzo: fermate.indirizzo,
+    orario: fermate.orario,
+    sogliaMinima: fermate.sogliaMinima,
+    eventoData: eventi.data,
+  }).from(fermate)
+    .innerJoin(tragitti, eq(tragitti.id, fermate.tragittoId))
+    .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+    .where(and(eq(fermate.tipo, 'PARTENZA'), eq(fermate.attivo, true)));
+
+  let disattivate = 0;
+  for (const f of fermatePartenza) {
+    if (!f.orario) continue; // senza orario non posso calcolare quando parte davvero
+    const [ore, minuti] = f.orario.split(':').map(Number);
+    if (Number.isNaN(ore) || Number.isNaN(minuti)) continue;
+    const partenzaVera = new Date(f.eventoData);
+    partenzaVera.setHours(ore, minuti, 0, 0);
+    if (partenzaVera > tra24Ore) continue; // non ancora nelle prossime 24 ore, troppo presto per decidere
+
+    const soglia = f.sogliaMinima ?? await leggiSogliaMinimaPartenza();
+    const [conteggio] = await db.select({ tot: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)` }).from(prenotazioni)
+      .where(and(eq(prenotazioni.tragittoId, f.tragittoId), eq(prenotazioni.fermataCitta, f.citta), eq(prenotazioni.stato, 'CONFERMATA')));
+    const partecipantiAttuali = Number(conteggio?.tot ?? 0);
+    if (partecipantiAttuali >= soglia) continue; // soglia raggiunta, tutto bene, nessuna azione
+
+    await db.update(fermate).set({ attivo: false }).where(eq(fermate.id, f.fermataId));
+    await generaComunicazioniVariazione(f.tragittoId, [{
+      fermataVecchia: { citta: f.citta, indirizzo: f.indirizzo, orario: f.orario },
+      descrizione: `La fermata di "${f.citta}" non ha raggiunto il numero minimo di partecipanti necessario (${partecipantiAttuali} su ${soglia} richiesti) — non è più prevista per questa partenza.`,
+    }]);
+    disattivate++;
+  }
+  return { disattivate };
 }
