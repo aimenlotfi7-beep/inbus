@@ -110,17 +110,29 @@ select{
   width:230px; flex-shrink:0; background:var(--sidebar-bg); border-right:1px solid var(--sidebar-line);
   display:flex; flex-direction:column; padding:22px 16px; position:sticky; top:0; height:100vh;
 }
-.sidebar .logo{margin-bottom:22px; padding-left:6px; color:var(--sidebar-text);}
+/* .sidebar-riga-alto raggruppa logo + hamburger (solo mobile) + Esci
+   nello stesso contenitore, per poterli disporre in riga su mobile —
+   ma su desktop deve comportarsi come se non esistesse (i tre elementi
+   dentro devono restare esattamente dove stavano prima: logo in alto,
+   poi lo spazio del menu, "Esci" in fondo). display:contents fa
+   sparire il contenitore dal layout senza toccare i figli, poi order
+   rimette ciascun figlio al suo posto originale, come diretti figli
+   della sidebar (che è già flex-direction:column). */
+.sidebar-riga-alto{display:contents;}
+.sidebar .logo{margin-bottom:22px; padding-left:6px; color:var(--sidebar-text); order:1;}
 .sidebar .logo span{color:var(--sidebar-accent);}
 .sidebar-logo{cursor:pointer;}
+.side-hamburger{display:none;} /* visibile solo su mobile — vedi dentro la media query più sotto */
+.side-utente-riga{order:3;}
 .side-nav{
-  display:flex; flex-direction:column; gap:14px; flex:1; overflow-y:auto;
+  display:flex; flex-direction:column; gap:14px; flex:1; overflow-y:auto; order:2;
   scrollbar-width:thin; scrollbar-color:var(--sidebar-line) transparent;
 }
 .side-nav::-webkit-scrollbar{width:6px;}
 .side-nav::-webkit-scrollbar-track{background:transparent;}
 .side-nav::-webkit-scrollbar-thumb{background-color:var(--sidebar-line); border-radius:999px;}
 .side-nav::-webkit-scrollbar-thumb:hover{background-color:var(--sidebar-accent);}
+.side-nav-intestazione-mobile{display:none;} /* solo mobile, dentro il pannello a schermo intero */
 
 .side-group + .side-group{
   border-top:1px solid var(--sidebar-line); margin-top:6px; padding-top:14px;
@@ -138,14 +150,6 @@ select{
 .side-group.collassato .group-caret{transform:rotate(-90deg);}
 .side-group-items{display:flex; flex-direction:column; gap:4px; overflow:hidden;}
 .side-group.collassato .side-group-items{display:none;}
-/* Nascosta di default — esiste solo per il menu a schermo intero su
-   mobile (vedi dentro la media query più sotto, che la riaccende con
-   display:flex). Senza questa riga, essendo renderizzata sempre nel
-   JSX a prescindere dalla larghezza schermo, comparirebbe anche su
-   desktop, senza nessuno stile applicato (il riquadro bianco con la X
-   segnalato: era proprio questo pulsante "chiudi", visibile ma senza
-   il suo aspetto voluto). */
-.side-group-items-intestazione{display:none;}
 
 .side-btn{
   display:flex; align-items:center; gap:10px; text-align:left;
@@ -207,79 +211,60 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 
 @media (max-width:860px){
   .app-shell{flex-direction:column;}
-  /* Il divisorio tra gruppi (bordo/margine sopra ogni gruppo tranne il
-     primo) è pensato per la sidebar verticale di desktop — su mobile,
-     dove i gruppi sono affiancati in orizzontale, faceva sì che
-     "Eventi" (il primo, senza quel margine extra) restasse più in alto
-     di tutti gli altri: disallineato rispetto al resto della riga. */
-  .side-group + .side-group{border-top:none; margin-top:0; padding-top:0;}
   .sidebar{
     width:100%; height:auto; position:relative;
-    display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; gap:10px;
-    padding:14px 16px 10px;
+    display:block; padding:14px 16px;
   }
-  /* Logo ed "Esci" condividono la prima riga (il logo prende lo spazio
-     disponibile, "Esci" resta compatto a destra) — prima il logo
-     finiva mescolato in mezzo a tutto il resto (nav compresa) per via
-     del flex-wrap sulla sidebar intera, risultando fuori posto e poco
-     comprensibile. */
-  .sidebar .logo{margin:0; order:1; flex:1; min-width:0;}
+  /* La riga in alto (logo, hamburger, Esci) è un contenitore SEMPLICE
+     in riga orizzontale — niente scorrimento, niente calcoli di
+     larghezza automatici, solo flexbox normale con pochi elementi. */
+  .sidebar-riga-alto{
+    display:flex; align-items:center; gap:10px;
+  }
+  .sidebar .logo{margin:0; flex:1; min-width:0; order:0;}
+  .side-hamburger{
+    display:block; order:0; flex-shrink:0;
+    background:none; border:1px solid var(--sidebar-line); border-radius:8px;
+    color:var(--sidebar-text); font-size:18px; padding:6px 12px; cursor:pointer;
+  }
   .side-utente-riga{
-    order:2; flex-shrink:0; margin:0; padding:0; border:none;
+    order:0; flex-shrink:0; margin:0; padding:0; border:none;
     display:flex; align-items:center; gap:8px;
   }
   .side-utente-nome{display:none;} /* poco spazio in mobile — il nome resta visibile solo su desktop, "Esci" da solo basta e avanza */
-  /* La nav prende tutta la riga successiva (flex-basis:100% dentro una
-     riga con flex-wrap forza automaticamente il capo a capo) — a
-     scorrimento orizzontale, non più tutta accatastata verticalmente
-     stretta come sarebbe altrimenti su schermi piccoli. */
-  .side-nav{
-    order:3; flex-basis:100%; display:flex; flex-direction:row; flex-wrap:nowrap;
-    overflow-x:auto; gap:6px; padding-bottom:6px; -webkit-overflow-scrolling:touch;
-  }
-  .side-group{flex-shrink:0;}
-  /* .side-group-header ha width:100% per la sidebar verticale di
-     desktop (dove ha senso, riempie tutta la colonna) — ma qui, dove
-     ogni .side-group scorre in orizzontale e la sua larghezza dipende
-     dal proprio contenuto (flex-shrink:0, nessuna larghezza fissa),
-     quel 100% diventa un riferimento circolare: "sii come il tuo
-     genitore, che è largo quanto te" — su alcuni browser mobili questo
-     risulta in una larghezza pressoché nulla (la fila dei pulsanti
-     appare come una striscia sottile vuota, invece dei nomi dei
-     gruppi). width:auto qui rompe il ciclo: il pulsante torna a
-     dimensionarsi sul proprio testo, come dovrebbe. */
-  .side-group-header{width:auto; white-space:nowrap; gap:8px;}
-  /* Le voci di un gruppo APERTO diventano un menu a SCHERMO INTERO —
-     position:fixed, inset:0, nessun calcolo di nessun tipo (né altezza
-     misurata via JS, né vh/dvh) — il modo più robusto per evitare
-     rotture su dispositivi/browser particolari: prima si provava a
-     posizionarlo con precisione appena sotto l'intestazione, ma su
-     alcuni iPhone/Safari il calcolo (mai riprodotto qui per verificarlo
-     di persona) risultava in un pannello invisibile pur esistendo nel
-     DOM. Schermo intero non lascia nessun valore che possa risultare
-     sbagliato. */
-  .side-group:not(.collassato) .side-group-items{
-    position:fixed; inset:0; z-index:20;
-    display:flex; flex-direction:column; gap:4px;
+
+  /* Il pannello di navigazione è NASCOSTO di default su mobile — non
+     più una fila orizzontale sempre visibile (quella è la fonte di
+     tutti i bug avuti finora: larghezze automatiche che collassavano,
+     pannelli che finivano sotto il contenuto). Si apre SOLO quando
+     serve, a schermo intero, con un elenco VERTICALE semplice —
+     esattamente lo stesso layout che già funziona bene su desktop,
+     solo dentro un overlay invece che in una colonna fissa a lato. */
+  .side-nav{display:none;}
+  .side-nav.side-nav-mobile-aperto{
+    display:flex; flex-direction:column; gap:14px;
+    position:fixed; inset:0; z-index:30;
     background:var(--sidebar-bg);
     padding:max(20px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
     overflow-y:auto;
   }
-  .side-group.collassato .side-group-items{display:none;}
-  .side-group-items .side-btn{padding:12px 14px; font-size:14.5px;} /* tocco più comodo, essendo ora un vero menu a piena larghezza */
-  /* Intestazione dentro il pannello a schermo intero — il pulsante del
-     gruppo che l'ha aperto resta coperto sotto (il pannello copre
-     tutto), serve un modo esplicito e sempre visibile per richiuderlo. */
-  .side-group-items-intestazione{
+  .side-nav-intestazione-mobile{
     display:flex; align-items:center; justify-content:space-between;
-    padding-bottom:12px; margin-bottom:8px; border-bottom:1px solid var(--sidebar-line);
+    padding-bottom:12px; margin-bottom:4px; border-bottom:1px solid var(--sidebar-line);
     font-weight:700; color:var(--sidebar-text); font-size:15px;
   }
   .side-group-chiudi{
-    background:none; border:none; color:var(--sidebar-text); font-size:20px;
+    background:none; border:none; color:var(--sidebar-text); font-size:22px;
     line-height:1; padding:6px; cursor:pointer; opacity:.7;
   }
   .side-group-chiudi:hover{opacity:1;}
+  /* Ogni gruppo, dentro il pannello verticale, si comporta come un
+     accordion normale — stessa identica struttura già usata su
+     desktop (side-group-header + side-group-items), nessuna variante
+     speciale per mobile: se funziona su desktop, funziona anche qui,
+     perché è lo stesso identico markup e la stessa identica logica di
+     apertura/chiusura, solo dentro un contenitore diverso. */
+  .side-group-items .side-btn{padding:12px 14px; font-size:14.5px;} /* tocco più comodo */
 }
 
 .btn{

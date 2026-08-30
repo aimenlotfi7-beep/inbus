@@ -88,6 +88,15 @@ export function AdminLayout({
     if (typeof window === 'undefined' || window.innerWidth > 860) return {};
     return Object.fromEntries(GRUPPI.map((g) => [g.titolo, true]));
   });
+  // Un solo pulsante "☰ Menu" (solo mobile) invece della fila di
+  // gruppi affiancati in orizzontale — dopo diversi tentativi falliti
+  // di far funzionare in modo affidabile lo scorrimento orizzontale su
+  // iPhone/Safari (larghezze che collassavano, pannelli che finivano
+  // sotto al contenuto), un elenco verticale semplice — nessuno
+  // scorrimento laterale, nessun calcolo di larghezza — è molto più
+  // robusto: o funziona la disposizione verticale normale, o non
+  // funziona nulla del layout mobile in generale.
+  const [menuMobileAperto, setMenuMobileAperto] = useState(false);
   const [allertePartenze, setAllertePartenze] = useState(0);
   const [eventiDaConfermare, setEventiDaConfermare] = useState(0);
   const [inAttesa, setInAttesa] = useState(0);
@@ -152,28 +161,39 @@ export function AdminLayout({
   return (
     <div id="app" className="app-shell">
       <aside className="sidebar">
-        <div className="logo sidebar-logo" title="Torna alla Home" onClick={onVaiHome}>
-          IN<span>BUS</span> <small>gestionale</small>
+        <div className="sidebar-riga-alto">
+          <div className="logo sidebar-logo" title="Torna alla Home" onClick={onVaiHome}>
+            IN<span>BUS</span> <small>gestionale</small>
+          </div>
+          {/* Solo mobile (il CSS lo nasconde su desktop) — apre il
+              pannello a schermo intero con tutti i gruppi in elenco
+              verticale. */}
+          <button
+            type="button" className="side-hamburger" aria-label="Apri il menu"
+            onClick={() => setMenuMobileAperto(true)}
+          >
+            ☰
+          </button>
+          <div className="side-utente-riga">
+            <span className="side-utente-nome" title={sessione.email}>{sessione.nome}</span>
+            <button className="btn btn-ghost side-logout" onClick={onLogout}>Esci</button>
+          </div>
         </div>
-        <nav className="side-nav">
+        <nav className={`side-nav${menuMobileAperto ? ' side-nav-mobile-aperto' : ''}`}>
+          {/* Intestazione visibile SOLO dentro il pannello a schermo
+              intero su mobile (il CSS la nasconde altrove) — serve un
+              modo esplicito per richiudere, non c'è più "tocca fuori"
+              dato che il pannello copre tutto. */}
+          <div className="side-nav-intestazione-mobile">
+            <span>Menu</span>
+            <button type="button" className="side-group-chiudi" aria-label="Chiudi il menu" onClick={() => setMenuMobileAperto(false)}>✕</button>
+          </div>
           {gruppiVisibili.map((gruppo) => (
             <div className={`side-group${gruppiCollassati[gruppo.titolo] ? ' collassato' : ''}`} key={gruppo.titolo}>
               <button
                 className="side-group-header"
                 type="button"
-                onClick={() => setGruppiCollassati((g) => {
-                  const nuovoStato = !g[gruppo.titolo];
-                  // Solo su schermi stretti: aprendo un gruppo, chiudo
-                  // gli altri già aperti — evita più tendine
-                  // sovrapposte insieme sullo stesso schermo piccolo.
-                  // Su desktop restano indipendenti come sempre (più
-                  // sezioni aperte contemporaneamente è il comportamento
-                  // normale di una sidebar verticale).
-                  if (typeof window !== 'undefined' && window.innerWidth <= 860 && nuovoStato === false) {
-                    return Object.fromEntries(GRUPPI.map((gg) => [gg.titolo, gg.titolo !== gruppo.titolo]));
-                  }
-                  return { ...g, [gruppo.titolo]: nuovoStato };
-                })}
+                onClick={() => setGruppiCollassati((g) => ({ ...g, [gruppo.titolo]: !g[gruppo.titolo] }))}
               >
                 {gruppo.titolo}
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -190,31 +210,13 @@ export function AdminLayout({
                 </span>
               </button>
               <div className="side-group-items">
-                {/* Visibile solo su mobile (il CSS la nasconde su
-                    desktop) — ora che il pannello copre tutto lo
-                    schermo, il pulsante del gruppo che l'ha aperto
-                    resta coperto sotto: serve un modo esplicito per
-                    richiuderlo, non basta più "tocca fuori". */}
-                <div className="side-group-items-intestazione">
-                  <span>{gruppo.titolo}</span>
-                  <button
-                    type="button"
-                    className="side-group-chiudi"
-                    aria-label="Chiudi il menu"
-                    onClick={() => setGruppiCollassati((g) => Object.fromEntries(Object.keys(g).map((k) => [k, true])))}
-                  >
-                    ✕
-                  </button>
-                </div>
                 {gruppo.voci.map((voce) => (
                   <button
                     key={voce.id}
                     className={`side-btn${sezioneAttiva === voce.id ? ' active' : ''}`}
                     onClick={() => {
                       onCambiaSezione(voce.id);
-                      if (typeof window !== 'undefined' && window.innerWidth <= 860) {
-                        setGruppiCollassati((g) => ({ ...g, [gruppo.titolo]: true }));
-                      }
+                      setMenuMobileAperto(false);
                     }}
                   >
                     {voce.label}
@@ -242,10 +244,6 @@ export function AdminLayout({
             </div>
           ))}
         </nav>
-        <div className="side-utente-riga">
-          <span className="side-utente-nome" title={sessione.email}>{sessione.nome}</span>
-          <button className="btn btn-ghost side-logout" onClick={onLogout}>Esci</button>
-        </div>
       </aside>
 
       <div className="main-wrap">
