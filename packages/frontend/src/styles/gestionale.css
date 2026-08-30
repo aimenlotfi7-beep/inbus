@@ -106,7 +106,6 @@ select{
 
 /* ---------- LAYOUT A SIDEBAR ---------- */
 .app-shell{display:flex; min-height:100vh;}
-.side-popup-sfondo{display:none;} /* visibile solo su mobile — vedi dentro la media query più sotto */
 .sidebar{
   width:230px; flex-shrink:0; background:var(--sidebar-bg); border-right:1px solid var(--sidebar-line);
   display:flex; flex-direction:column; padding:22px 16px; position:sticky; top:0; height:100vh;
@@ -231,30 +230,37 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
     overflow-x:auto; gap:6px; padding-bottom:6px; -webkit-overflow-scrolling:touch;
   }
   .side-group{flex-shrink:0;}
-  /* Le voci di un gruppo APERTO diventano un vero popup a piena
-     larghezza — position:fixed (non absolute: quello si sarebbe
-     comunque ancorato al singolo .side-group, il suo genitore diretto
-     con position:relative, restando stretto e tagliato dallo
-     scorrimento orizzontale della nav) e --menu-popup-top, misurata
-     per davvero via JS (l'altezza vera della sidebar, non una stima
-     fissa che si romperebbe con font o testi diversi) — vedi l'effetto
-     dedicato in AdminLayout.tsx. */
+  /* Le voci di un gruppo APERTO diventano un menu a SCHERMO INTERO —
+     position:fixed, inset:0, nessun calcolo di nessun tipo (né altezza
+     misurata via JS, né vh/dvh) — il modo più robusto per evitare
+     rotture su dispositivi/browser particolari: prima si provava a
+     posizionarlo con precisione appena sotto l'intestazione, ma su
+     alcuni iPhone/Safari il calcolo (mai riprodotto qui per verificarlo
+     di persona) risultava in un pannello invisibile pur esistendo nel
+     DOM. Schermo intero non lascia nessun valore che possa risultare
+     sbagliato. */
   .side-group:not(.collassato) .side-group-items{
-    position:fixed; top:var(--menu-popup-top, 90px); left:0; right:0; z-index:20;
+    position:fixed; inset:0; z-index:20;
     display:flex; flex-direction:column; gap:4px;
-    background:var(--sidebar-bg); border-top:1px solid var(--sidebar-line);
-    padding:14px 16px; box-shadow:0 16px 32px -8px rgba(0,0,0,.6);
-    max-height:calc(100dvh - var(--menu-popup-top, 90px)); overflow-y:auto;
+    background:var(--sidebar-bg);
+    padding:max(20px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    overflow-y:auto;
   }
   .side-group.collassato .side-group-items{display:none;}
   .side-group-items .side-btn{padding:12px 14px; font-size:14.5px;} /* tocco più comodo, essendo ora un vero menu a piena larghezza */
-  /* Sfondo semitrasparente dietro il popup — tocca fuori per chiudere
-     (vedi onClick in AdminLayout.tsx), e rinforza visivamente che si
-     sta sovrapponendo al contenuto della sezione sotto, non è "in
-     linea" con la pagina. */
-  .side-popup-sfondo{
-    display:block; position:fixed; inset:0; z-index:19; background:rgba(0,0,0,.5);
+  /* Intestazione dentro il pannello a schermo intero — il pulsante del
+     gruppo che l'ha aperto resta coperto sotto (il pannello copre
+     tutto), serve un modo esplicito e sempre visibile per richiuderlo. */
+  .side-group-items-intestazione{
+    display:flex; align-items:center; justify-content:space-between;
+    padding-bottom:12px; margin-bottom:8px; border-bottom:1px solid var(--sidebar-line);
+    font-weight:700; color:var(--sidebar-text); font-size:15px;
   }
+  .side-group-chiudi{
+    background:none; border:none; color:var(--sidebar-text); font-size:20px;
+    line-height:1; padding:6px; cursor:pointer; opacity:.7;
+  }
+  .side-group-chiudi:hover{opacity:1;}
 }
 
 .btn{

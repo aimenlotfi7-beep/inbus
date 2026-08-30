@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { eventiApi, type CalcoloBusTragitto, type BusFisico, type LineaInput, type RiepilogoEconomicoTratta, type FermataInput } from '../../../api/eventi';
+import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput } from '../../../api/eventi';
 import type { Evento } from '../../../api/types';
-import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
-import { tourLeaderApi, type TourLeader } from '../../../api/tourleader';
 import { ErroreApi } from '../../../api/client';
 import { Modale } from '../../shared/Modale';
 import { CampoNumero } from '../../shared/CampoNumero';
@@ -11,24 +9,6 @@ import { OrarioInput } from '../../shared/OrarioInput';
 import { useSessione } from '../../shared/SessioneContext';
 import { geocodifica, durataViaggio, distanzaViaggio, attesa } from '../../shared/geo';
 import { haPermesso } from '../../../api/auth';
-
-const LINEA_VUOTA: LineaInput = { riferimento: '', fermateIds: [] };
-
-/** Genera e scarica un file CSV (si apre in Excel) con l'elenco
- *  passeggeri di un bus — la "lista tipo Excel" da dare al tour leader. */
-function scaricaListaCsv(riferimentoBus: string, righe: { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string }[]) {
-  const intestazione = ['PNR', 'Nome', 'Cognome', 'Fermata', 'Telefono', 'Email'];
-  const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const righeCsv = righe.map((r) => [r.pnr, r.nome, r.cognome, r.fermata, r.telefono, r.email].map(escapeCsv).join(';'));
-  const csv = '\uFEFF' + [intestazione.join(';'), ...righeCsv].join('\n'); // BOM per accenti corretti in Excel
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `passeggeri-${riferimentoBus.replace(/[^a-z0-9]+/gi, '-')}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 /** Un solo indicatore di stato per tratta (invece di due badge separati
  *  che si accavallavano): rosso se ha posti superati (il problema più
@@ -75,21 +55,14 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
   const [salvandoPreventivo, setSalvandoPreventivo] = useState(false);
   const [busLista, setBusLista] = useState<BusFisico[]>([]);
   const [economia, setEconomia] = useState<RiepilogoEconomicoTratta[]>([]);
-  const [fornitori, setFornitori] = useState<Fornitore[]>([]);
   const [fermateAnagrafica, setFermateAnagrafica] = useState<FermataAnagrafica[]>([]);
-  const [tourLeaders, setTourLeaders] = useState<TourLeader[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState('');
-  const [generandoLista, setGenerandoLista] = useState<string | null>(null);
   const [aperte, setAperte] = useState<Set<string>>(new Set());
   // Se l'evento ha più servizi, questa sezione si comporta come se
   // ognuno fosse un evento a parte: una tab per servizio (più una per i
   // tragitti liberi, se ce ne sono).
   const [servizioAttivo, setServizioAttivo] = useState<string | 'liberi'>(servizi?.[0]?.key ?? 'liberi');
-
-  const [inModifica, setInModifica] = useState<BusFisico | null>(null);
-  const [form, setForm] = useState<LineaInput>(LINEA_VUOTA);
-  const [modaleAperta, setModaleAperta] = useState(false);
 
   function ricarica() {
     setCaricamento(true);
@@ -135,9 +108,7 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
   }
   useEffect(() => {
     ricarica();
-    fornitoriApi.list().then(setFornitori).catch(() => setFornitori([]));
     fermateAnagraficaApi.list().then(setFermateAnagrafica).catch(() => setFermateAnagrafica([]));
-    tourLeaderApi.list().then(setTourLeaders).catch(() => setTourLeaders([]));
   }, [eventoId]);
 
   function toggleApertura(tragittoId: string) {
@@ -352,87 +323,15 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
     setCalcolandoOrari(false);
   }
 
-  function apriNuovoBus(tragittoIdContesto?: string) {
-    setInModifica(null);
-    // Preseleziona tutte le fermate ATTIVE di quel tragitto — comodo
-    // punto di partenza (copre tutto, come il vecchio comportamento),
-    // l'admin toglie quelle che non gli servono per questa Linea.
-    const tragittoVero = tragittoIdContesto && eventoCompleto
-      ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragittoIdContesto)
-      : undefined;
-    setForm(tragittoVero ? { ...LINEA_VUOTA, fermateIds: tragittoVero.fermate.filter((f) => f.attivo).map((f) => f.id) } : LINEA_VUOTA);
-    setModaleAperta(true);
-  }
-  function apriModificaBus(b: BusFisico) {
-    setInModifica(b);
-    // Un bus registrato col vecchio sistema (bus_tratte, l'intero
-    // tragitto) non ha ancora nessuna riga in bus_fermate — se lo
-    // modifichi da qui senza convertirlo, il modale lo mostrerebbe con
-    // zero fermate selezionate, e salvando perderesti la sua copertura
-    // reale (bus_tratte non verrebbe toccata, ma l'admin crederebbe
-    // di aver "aggiornato" tutto). Lo traduco qui: se non ha ancora
-    // fermate proprie ma copre un tragitto, parto da TUTTE le sue
-    // fermate attive selezionate — equivalente a "copre tutto il
-    // tragitto", il comportamento di prima.
-    const fermateIniziali = b.fermateIds.length > 0
-      ? b.fermateIds
-      : b.tragittiIds.flatMap((tId) => calcolo.find((t) => t.tragittoId === tId)?.fermate.map((f) => f.fermataId) ?? []);
-    setForm({ fornitoreId: b.fornitoreId ?? undefined, riferimento: b.riferimento, autistaNome: b.autistaNome ?? undefined, autistaTelefono: b.autistaTelefono ?? undefined, tourLeaderId: b.tourLeaderId, costo: b.costo ? Number(b.costo) : undefined, postiBus: b.postiBus ?? undefined, note: b.note ?? undefined, fermateIds: fermateIniziali });
-    setModaleAperta(true);
-  }
-
-  async function salvaBus() {
-    if (!form.riferimento || form.fermateIds.length === 0) {
-      alert('Indica un riferimento per la Linea e seleziona almeno una fermata che copre.');
-      return;
-    }
-    if (!inModifica && !form.postiBus) {
-      alert('Indica quanti posti ha il bus — è il dato che serve a calcolare da solo quanti posti sono disponibili sul tragitto.');
-      return;
-    }
-    if (form.tourLeaderId) {
-      const giaAssegnato = busLista.some((b) => b.tourLeaderId === form.tourLeaderId && b.id !== inModifica?.id);
-      if (giaAssegnato) {
-        alert('Questo tour leader è già assegnato a un altro bus di questo evento — un tour leader non può seguire due bus insieme.');
-        return;
-      }
-    }
-    try {
-      if (inModifica) await eventiApi.aggiornaLinea(eventoId, inModifica.id, form);
-      else await eventiApi.creaLinea(eventoId, { ...form, postiBus: form.postiBus as number });
-      setModaleAperta(false);
-      ricarica();
-    } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
-    }
-  }
-  async function rimuoviBus(b: BusFisico) {
-    if (!confirm(`Rimuovere il bus "${b.riferimento}" dal censimento?`)) return;
-    try {
-      await eventiApi.rimuoviBus(eventoId, b.id);
-      ricarica();
-    } catch (e) {
-      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
-    }
-  }
-
-  async function generaLista(b: BusFisico) {
-    setGenerandoLista(b.id);
-    try {
-      const righe = await eventiApi.listaPasseggeriBus(eventoId, b.id);
-      if (righe.length === 0) {
-        alert('Nessun passeggero confermato ancora su questo bus.');
-        return;
-      }
-      scaricaListaCsv(b.riferimento, righe);
-      // L'invio diretto all'account del tour leader arriverà appena
-      // definiamo insieme come funzionerà l'account — per ora la lista
-      // si scarica qui e la giri tu.
-    } catch (e) {
-      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
-    } finally {
-      setGenerandoLista(null);
-    }
+  /** Va alla pagina dedicata delle Linee di questo tragitto — un vero
+   *  indirizzo (?sezione=linee&evento=...&tragitto=...), non più un
+   *  modale qui dentro. */
+  function apriPaginaLinee(tragittoIdContesto: string) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('sezione', 'linee');
+    url.searchParams.set('evento', eventoId);
+    url.searchParams.set('tragitto', tragittoIdContesto);
+    window.location.href = url.toString();
   }
 
   if (caricamento) return <p className="testo-intro">Caricamento...</p>;
@@ -574,6 +473,12 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
               >
                 Modifica orario/prezzo/posti
               </button>
+              <button
+                type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }}
+                onClick={(e) => { e.stopPropagation(); apriPaginaLinee(tragitto.tragittoId); }}
+              >
+                Gestisci Linee{busTragitto.length > 0 ? ` (${busTragitto.length})` : ''}
+              </button>
               {tragitto.stato === 'DA_CONFERMARE' && (
                 <button
                   type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px', borderColor: 'var(--pink-dim)', color: 'var(--pink)' }}
@@ -631,41 +536,6 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
                   </div>
                 );
               })()}
-
-              <div className="section-divider">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                  <p className="section-label" style={{ marginBottom: 0 }}>Bus registrati su questo tragitto</p>
-                  <button type="button" className="btn btn-primary" style={{ fontSize: 12.5, padding: '6px 14px' }} onClick={(e) => { e.stopPropagation(); apriNuovoBus(tragitto.tragittoId); }}>
-                    + Crea una Linea per questo tragitto
-                  </button>
-                </div>
-                {busTragitto.map((b) => {
-                  const nomiFermateCoperte = tragitto.fermate
-                    .filter((f) => b.fermateIds.includes(f.fermataId))
-                    .map((f) => f.citta);
-                  return (
-                  <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
-                    <span className="riga-titolo">
-                      {b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}
-                      {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>Tour leader: {b.tourLeaderNome}</span></>}
-                      {nomiFermateCoperte.length > 0 && (
-                        <><br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>Copre: {nomiFermateCoperte.join(', ')}</span></>
-                      )}
-                    </span>
-                    <span className="riga-meta">
-                      <button className="btn btn-primary" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => generaLista(b)} disabled={generandoLista === b.id}>
-                        {generandoLista === b.id ? 'Genero...' : '⤓ Genera lista'}
-                      </button>
-                      <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => apriModificaBus(b)}>Modifica</button>
-                      <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px', color: 'var(--pink)' }} onClick={() => rimuoviBus(b)}>Rimuovi</button>
-                    </span>
-                  </div>
-                  );
-                })}
-                {busTragitto.length === 0 && (
-                  <p className="testo-intro" style={{ marginBottom: 0, fontSize: 13 }}>Nessun bus ancora censito per questa tratta.</p>
-                )}
-              </div>
             </div>
           )}
         </div>
@@ -791,73 +661,6 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
         </Modale>
       )}
 
-      {modaleAperta && (
-        <Modale titolo={inModifica ? 'Modifica Linea' : 'Nuova Linea'} onClose={() => setModaleAperta(false)}>
-          <div className="campo"><label>Riferimento (es. targa, o codice dell'agenzia)</label><input value={form.riferimento} onChange={(e) => setForm({ ...form, riferimento: e.target.value })} /></div>
-          <div className="campo">
-            <label>Fornitore</label>
-            <select value={form.fornitoreId ?? ''} onChange={(e) => setForm({ ...form, fornitoreId: e.target.value || undefined })}>
-              <option value="">— Nessuno —</option>
-              {fornitori.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-            </select>
-          </div>
-          <div className="campo"><label>Autista (facoltativo)</label><input value={form.autistaNome ?? ''} onChange={(e) => setForm({ ...form, autistaNome: e.target.value })} /></div>
-          <div className="campo"><label>Telefono autista (facoltativo)</label><input value={form.autistaTelefono ?? ''} onChange={(e) => setForm({ ...form, autistaTelefono: e.target.value })} /></div>
-          <div className="campo">
-            <label>Tour leader assegnato</label>
-            <select value={form.tourLeaderId ?? ''} onChange={(e) => setForm({ ...form, tourLeaderId: e.target.value || null })}>
-              <option value="">— Nessuno —</option>
-              {tourLeaders.map((t) => <option key={t.id} value={t.id}>{t.nome} {t.cognome} ({t.stato === 'ATTIVO' ? 'attivo' : t.stato === 'CANDIDATO' ? 'candidato' : 'archiviato'})</option>)}
-            </select>
-            {tourLeaders.length === 0 && (
-              <p className="testo-intro" style={{ fontSize: 12, marginTop: 4 }}>Nessun tour leader censito — vai nella sezione "Tour Leader" per aggiungerne uno.</p>
-            )}
-          </div>
-          <div className="campo"><label>Posti del bus — è questo il dato che determina i posti disponibili sul tragitto</label><CampoNumero min={0} value={form.postiBus} onChange={(v) => setForm({ ...form, postiBus: v })} /></div>
-          <div className="campo"><label>Costo del bus (facoltativo — usato per calcolare il guadagno della tratta)</label><CampoNumero valuta min={0} value={form.costo} onChange={(v) => setForm({ ...form, costo: v })} /></div>
-          <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
-
-          <p className="section-label" style={{ marginTop: 16 }}>Fermate coperte da questa Linea</p>
-          <p className="testo-intro" style={{ marginTop: -6, marginBottom: 8 }}>
-            Nell'ordine del tragitto — non puoi selezionarne una saltando quelle prima di lei nel percorso.
-          </p>
-          {calcolo.map((t) => (
-            <div key={t.tragittoId} style={{ marginBottom: 10 }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--mist)', marginBottom: 4 }}>{t.nome}</p>
-              {t.fermate.map((f, idx) => {
-                const selezionata = form.fermateIds.includes(f.fermataId);
-                const precedentiTutteSelezionate = t.fermate.slice(0, idx).every((prec) => form.fermateIds.includes(prec.fermataId));
-                return (
-                  <label key={f.fermataId} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13.5, opacity: !selezionata && !precedentiTutteSelezionate ? 0.45 : 1 }}>
-                    <input
-                      type="checkbox"
-                      checked={selezionata}
-                      onChange={(e) => {
-                        if (e.target.checked && !precedentiTutteSelezionate) {
-                          alert(`Prima di "${f.citta}" devi selezionare tutte le fermate che la precedono in questo tragitto — l'ordine del percorso non si può saltare.`);
-                          return;
-                        }
-                        setForm((v) => ({
-                          ...v,
-                          fermateIds: e.target.checked
-                            ? [...v.fermateIds, f.fermataId]
-                            // Togliendone una, tolgo anche tutte quelle DOPO di lei nello
-                            // stesso tragitto — restare con un "buco" in mezzo violerebbe
-                            // lo stesso principio dell'ordine.
-                            : v.fermateIds.filter((id) => !t.fermate.slice(idx).map((ff) => ff.fermataId).includes(id)),
-                        }));
-                      }}
-                    />
-                    {f.citta} {f.passeggeri > 0 && <span style={{ color: 'var(--mist)' }}>({f.passeggeri} prenotazioni)</span>}
-                  </label>
-                );
-              })}
-            </div>
-          ))}
-
-          <button className="btn btn-primary" style={{ width: '100%', marginTop: 14 }} onClick={salvaBus}>Salva Linea</button>
-        </Modale>
-      )}
     </div>
   );
 }

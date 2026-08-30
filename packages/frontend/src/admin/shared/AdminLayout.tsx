@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { haPermesso, type SessioneAdmin } from '../../api/auth';
 import { eventiApi } from '../../api/eventi';
 import { listaAttesaApi } from '../../api/listaAttesa';
@@ -11,7 +11,12 @@ export type SezioneGestionale =
   | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
   | 'fornitori' | 'fermate' | 'tragitti'
   | 'chat' | 'contenuti' | 'comunicazioni'
-  | 'amministratori' | 'ruoli' | 'impostazioni' | 'template-email' | 'layout-biglietto' | 'testi-tooltip';
+  | 'amministratori' | 'ruoli' | 'impostazioni' | 'template-email' | 'layout-biglietto' | 'testi-tooltip'
+  // "linee" non compare in nessun GRUPPI qui sotto: non è una voce di
+  // menu, si raggiunge solo dal pulsante "Gestisci Linee" dentro un
+  // tragitto in Partenze — una vera pagina a sé (indirizzo proprio:
+  // ?sezione=linee&evento=...&tragitto=...), non più un modale.
+  | 'linee';
 
 // Ogni voce dichiara il permesso che serve per vederla. Chi ha ruolo
 // "owner" vede sempre tutto (haPermesso lo gestisce automaticamente).
@@ -127,24 +132,16 @@ export function AdminLayout({
     return 0;
   }
 
-  // Il menu a tendina (solo mobile) deve comparire come un vero popup,
-  // sovrapposto al contenuto sotto — non intrappolato nello scorrimento
-  // orizzontale della nav (che lo taglierebbe via, essendo overflow-x
-  // impostato). Misuro l'altezza VERA della sidebar (non una stima
-  // fissa, che si romperebbe con font diversi o testi più lunghi) e la
-  // uso per posizionare il popup con position:fixed, fuori da
-  // qualunque contenitore con lo scroll.
-  const sidebarRef = useRef<HTMLElement>(null);
-  const qualcheGruppoAperto = Object.values(gruppiCollassati).some((v) => v === false);
-  // useLayoutEffect, non useEffect: gira PRIMA che il browser disegni
-  // il pannello a schermo, non dopo — evita che per un fotogramma il
-  // popup compaia con la posizione di prima (o quella di default) e
-  // "salti" in quella giusta un istante dopo.
-  useLayoutEffect(() => {
-    if (!qualcheGruppoAperto || !sidebarRef.current) return;
-    const altezza = sidebarRef.current.getBoundingClientRect().bottom;
-    document.documentElement.style.setProperty('--menu-popup-top', `${altezza}px`);
-  }, [qualcheGruppoAperto]);
+  // Il menu a tendina (solo mobile) è un pannello a SCHERMO INTERO
+  // (position:fixed, inset:0 — niente calcoli, niente misure via JS di
+  // nessun tipo). In precedenza si provava a posizionarlo con
+  // precisione appena sotto l'intestazione, misurandone l'altezza reale
+  // via JavaScript — ma su alcuni iPhone/Safari quel calcolo risultava
+  // in un pannello invisibile pur esistendo nel DOM (probabile
+  // interazione tra viewport dinamico di Safari iOS e la misura JS,
+  // mai riprodotta qui per verificarlo di persona). Schermo intero
+  // elimina il problema alla radice: non c'è più nessun valore da
+  // calcolare che possa risultare sbagliato.
 
   // Filtro sia i gruppi che le voci in base a ciò che l'utente loggato
   // può vedere: un gruppo compare solo se ha almeno una voce visibile.
@@ -154,13 +151,7 @@ export function AdminLayout({
 
   return (
     <div id="app" className="app-shell">
-      {/* Sfondo semitrasparente dietro il menu a tendina aperto (solo
-          mobile, il CSS lo nasconde su desktop) — tocco fuori per
-          chiudere, rinforza l'effetto popup sopra il contenuto sotto. */}
-      {qualcheGruppoAperto && (
-        <div className="side-popup-sfondo" onClick={() => setGruppiCollassati((g) => Object.fromEntries(Object.keys(g).map((k) => [k, true])))} />
-      )}
-      <aside className="sidebar" ref={sidebarRef}>
+      <aside className="sidebar">
         <div className="logo sidebar-logo" title="Torna alla Home" onClick={onVaiHome}>
           IN<span>BUS</span> <small>gestionale</small>
         </div>
@@ -199,6 +190,22 @@ export function AdminLayout({
                 </span>
               </button>
               <div className="side-group-items">
+                {/* Visibile solo su mobile (il CSS la nasconde su
+                    desktop) — ora che il pannello copre tutto lo
+                    schermo, il pulsante del gruppo che l'ha aperto
+                    resta coperto sotto: serve un modo esplicito per
+                    richiuderlo, non basta più "tocca fuori". */}
+                <div className="side-group-items-intestazione">
+                  <span>{gruppo.titolo}</span>
+                  <button
+                    type="button"
+                    className="side-group-chiudi"
+                    aria-label="Chiudi il menu"
+                    onClick={() => setGruppiCollassati((g) => Object.fromEntries(Object.keys(g).map((k) => [k, true])))}
+                  >
+                    ✕
+                  </button>
+                </div>
                 {gruppo.voci.map((voce) => (
                   <button
                     key={voce.id}
