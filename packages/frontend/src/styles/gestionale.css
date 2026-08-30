@@ -238,6 +238,17 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
     overflow-x:auto; gap:6px; padding-bottom:6px; -webkit-overflow-scrolling:touch;
   }
   .side-group{flex-shrink:0;}
+  /* .side-group-header ha width:100% per la sidebar verticale di
+     desktop (dove ha senso, riempie tutta la colonna) — ma qui, dove
+     ogni .side-group scorre in orizzontale e la sua larghezza dipende
+     dal proprio contenuto (flex-shrink:0, nessuna larghezza fissa),
+     quel 100% diventa un riferimento circolare: "sii come il tuo
+     genitore, che è largo quanto te" — su alcuni browser mobili questo
+     risulta in una larghezza pressoché nulla (la fila dei pulsanti
+     appare come una striscia sottile vuota, invece dei nomi dei
+     gruppi). width:auto qui rompe il ciclo: il pulsante torna a
+     dimensionarsi sul proprio testo, come dovrebbe. */
+  .side-group-header{width:auto; white-space:nowrap; gap:8px;}
   /* Le voci di un gruppo APERTO diventano un menu a SCHERMO INTERO —
      position:fixed, inset:0, nessun calcolo di nessun tipo (né altezza
      misurata via JS, né vh/dvh) — il modo più robusto per evitare
