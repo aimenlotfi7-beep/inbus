@@ -85,12 +85,23 @@ export const eventiController = {
   },
 
   async creaLinea(req: Request, res: Response) {
-    const busId = await eventiService.creaLinea(req.params.id, req.body);
+    const risultato = await eventiService.creaLinea(req.params.id, req.body);
+    res.status(201).json(risultato);
+  },
+  async aggiungiBusALinea(req: Request, res: Response) {
+    const busId = await eventiService.aggiungiBusALinea(req.params.lineaId, req.body);
     res.status(201).json({ id: busId });
   },
-  async aggiornaLinea(req: Request, res: Response) {
-    await eventiService.aggiornaLinea(req.params.id, req.params.busId, req.body);
+  async aggiornaPercorsoLinea(req: Request, res: Response) {
+    await eventiService.aggiornaPercorsoLinea(req.params.id, req.params.lineaId, req.body.fermateIds);
     res.json({ ok: true });
+  },
+  async aggiornaBusDiLinea(req: Request, res: Response) {
+    await eventiService.aggiornaBusDiLinea(req.params.busId, req.body);
+    res.json({ ok: true });
+  },
+  async listaLinee(req: Request, res: Response) {
+    res.json(await eventiService.listaLinee(req.params.tragittoId));
   },
 
   async aggiornaTragittoOperativo(req: Request, res: Response) {
@@ -123,6 +134,9 @@ export const eventiController = {
   },
   async allertePartenzePerEvento(_req: Request, res: Response) {
     res.json(await eventiService.allertePartenzePerEvento());
+  },
+  async elencoPartenze(_req: Request, res: Response) {
+    res.json(await eventiService.elencoPartenze());
   },
   async statistichePerEvento(_req: Request, res: Response) {
     res.json(await eventiService.statistichePerEvento());

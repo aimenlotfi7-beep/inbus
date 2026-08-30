@@ -40,7 +40,7 @@ const STEP_WIZARD = [
  * averlo, perché nessuno parte da lì.
  */
 export function SchedaEventoModale({
-  evento, tabIniziale = 'dettagli', soloQuestaTab = false, onClose, onSalvato,
+  evento, tabIniziale = 'dettagli', soloQuestaTab = false, tragittoFocus, onClose, onSalvato,
 }: {
   evento: Evento | null; // null = nuovo evento
   tabIniziale?: 'dettagli' | 'partenze' | 'lista-attesa' | 'offerte' | 'comunicazioni';
@@ -49,6 +49,9 @@ export function SchedaEventoModale({
   // occuparsi solo della propria competenza, senza poter navigare per
   // sbaglio nelle altre.
   soloQuestaTab?: boolean;
+  // Arrivando da una card di Partenze — quale tragitto aprire subito,
+  // e con quale azione (vedi PartenzeTab).
+  tragittoFocus?: { tragittoId: string; azione: 'preventivo' | 'espandi' } | null;
   onClose: () => void;
   onSalvato: () => void;
 }) {
@@ -388,13 +391,13 @@ export function SchedaEventoModale({
       try {
         const trovata = await fermateAnagraficaApi.trovaOCrea({ nome: f.citta, citta: f.citta, indirizzo: f.indirizzo });
         setFermateAnagrafica((prev) => prev.some((fa) => fa.id === trovata.id) ? prev : [...prev, trovata]);
-        return { fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo, prezzo: f.prezzo ?? undefined };
+        return { fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo, prezzo: f.prezzo ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
       } catch {
         // Se la richiesta fallisce (es. problema di rete), meglio non
         // bloccare tutto il tragitto — questa singola fermata resta
         // testuale, modificabile e sistemabile a mano dall'admin,
         // invece di far fallire l'intera applicazione del percorso.
-        return { fermataAnagraficaId: null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined };
+        return { fermataAnagraficaId: null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
       }
     }));
 
@@ -993,27 +996,15 @@ export function SchedaEventoModale({
                   ← Torna a scegliere dall'anagrafica
                 </button>
               )}
-              {/* Partenza/Passaggio: proprietà strutturale del tragitto
-                  universale, resta qui (non in Partenze) — decide se ha
-                  senso una soglia minima di partecipanti prima di
-                  convenire una Linea dedicata (es. la fermata più
-                  lontana in un percorso lungo). */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 22, marginTop: 4, fontSize: 12, color: 'var(--mist)' }}>
-                <input
-                  type="checkbox"
-                  checked={f.tipo === 'PARTENZA'}
-                  onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'tipo', e.target.checked ? 'PARTENZA' : 'PASSAGGIO')}
-                />
-                È una fermata di Partenza (richiede un minimo di partecipanti per convenire)
-              </label>
+              {/* Partenza/Passaggio + soglia minima si decidono ORA sui
+                  Percorsi salvati, non più qui — arrivano già impostati
+                  quando applichi un percorso. Qui resta solo
+                  un'indicazione, per sapere a colpo d'occhio quali
+                  fermate sono "Partenza" mentre costruisci l'evento. */}
               {f.tipo === 'PARTENZA' && (
-                <div style={{ marginLeft: 22, marginTop: 4, maxWidth: 220 }}>
-                  <CampoNumero
-                    placeholder="Soglia minima (default generale se vuoto)"
-                    value={f.sogliaMinima ?? undefined}
-                    onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'sogliaMinima', v !== undefined ? String(v) : '')}
-                  />
-                </div>
+                <p style={{ marginLeft: 22, marginTop: 4, fontSize: 11.5, color: 'var(--mist)' }}>
+                  ◔ Fermata di Partenza{f.sogliaMinima ? ` — soglia minima ${f.sogliaMinima} partecipanti` : ' (soglia di default)'} — impostata dal percorso salvato, si cambia solo lì
+                </p>
               )}
             </div>
           ))}
@@ -1146,7 +1137,7 @@ export function SchedaEventoModale({
           </div>
         )}
 
-        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} servizi={servizi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} />}
+        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} servizi={servizi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} tragittoFocus={tragittoFocus} />}
         {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} servizi={(evento.servizi ?? []).map((s) => ({ key: s.id, nome: s.nome }))} />}
         {tabAttiva === 'comunicazioni' && evento && <ComunicazioniTab evento={evento} />}
         {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}

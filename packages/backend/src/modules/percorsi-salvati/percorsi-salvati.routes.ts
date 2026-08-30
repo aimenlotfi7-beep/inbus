@@ -13,6 +13,11 @@ const fermataPercorsoSchema = z.object({
   citta: z.string().min(1),
   indirizzo: z.string().min(1),
   prezzo: z.number().positive().nullable().optional().transform((v) => v ?? undefined),
+  // Decisi qui (sul percorso, il modello riutilizzabile) e non più in
+  // Eventi — se lo stesso percorso si applica a più eventi, ha senso
+  // stabilire una volta sola quale fermata è "Partenza".
+  tipo: z.enum(['PARTENZA', 'PASSAGGIO']).default('PASSAGGIO'),
+  sogliaMinima: z.number().int().positive().nullable().optional(),
 });
 const percorsoSalvatoSchema = z.object({
   nome: z.string().min(1),
@@ -49,7 +54,7 @@ export const percorsiSalvatiService = {
         await tx.insert(fermatePercorsoSalvato).values(
           input.fermate.map((f, ordine) => ({
             percorsoSalvatoId: nuovo.id, ordine, fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo,
-            prezzo: f.prezzo?.toFixed(2),
+            prezzo: f.prezzo?.toFixed(2), tipo: f.tipo, sogliaMinima: f.sogliaMinima,
           }))
         );
       }
@@ -69,7 +74,7 @@ export const percorsiSalvatiService = {
           await tx.insert(fermatePercorsoSalvato).values(
             input.fermate.map((f, ordine) => ({
               percorsoSalvatoId: id, ordine, fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo,
-              prezzo: f.prezzo?.toFixed(2),
+              prezzo: f.prezzo?.toFixed(2), tipo: f.tipo, sogliaMinima: f.sogliaMinima,
             }))
           );
         }

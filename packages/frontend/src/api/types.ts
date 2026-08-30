@@ -23,6 +23,12 @@ export interface Tragitto {
   prezzoExtra: string;
   attivo: boolean;
   stato: 'DA_CONFERMARE' | 'PREZZATO' | 'CONFERMATO';
+  // Il preventivo (dal fornitore, sullo scenario più caro) che ha
+  // sbloccato lo stato "Prezzato" — resta sempre leggibile qui, non
+  // sparisce una volta registrato: serve poterlo rivedere/modificare
+  // in ogni momento, non solo la prima volta.
+  preventivoCosto: string | null;
+  preventivoPostiBus: number | null;
   referenteNome: string | null;
   referenteTelefono: string | null;
   fermate: Fermata[];

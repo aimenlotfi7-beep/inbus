@@ -139,8 +139,17 @@ export const creaLineaSchema = z.object({
   note: z.string().optional(),
   fermateIds: z.array(z.string()).min(1),
 });
-export const aggiornaLineaSchema = creaLineaSchema.partial().extend({
+// Aggiungere un bus a una Linea esistente — stesse fermate della
+// Linea, non si ridefiniscono qui.
+export const aggiungiBusALineaSchema = creaLineaSchema.omit({ fermateIds: true });
+// Modificare i dati di un singolo bus dentro una Linea — mai le
+// fermate (quelle sono della Linea intera, si cambiano con l'altro
+// endpoint sotto).
+export const aggiornaBusDiLineaSchema = creaLineaSchema.omit({ fermateIds: true }).partial().extend({
   tourLeaderId: z.string().nullable().optional(),
+});
+export const aggiornaPercorsoLineaSchema = z.object({
+  fermateIds: z.array(z.string()).min(1),
 });
 
 // Fase 2 della revisione architetturale: orario/prezzo/posti per

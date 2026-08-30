@@ -428,6 +428,27 @@
       "when": 1788084257245,
       "tag": "0060_eta_riordino_bus_biglietto",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1788090337047,
+      "tag": "0061_partenza_su_percorsi_salvati",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1788093529983,
+      "tag": "0062_linee_contenitore",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1788093541270,
+      "tag": "0063_migra_bus_esistenti_in_linee",
+      "breakpoints": true
     }
   ]
 }

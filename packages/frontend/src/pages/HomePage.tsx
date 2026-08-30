@@ -12,6 +12,13 @@ import { pagineApi } from '../api/pagine';
 // circolare — abbastanza da coprire anche uno schermo largo (mai più
 // di quante card ci sono davvero, per eventi con pochi risultati).
 const NUM_CLONI_CAROSELLO = 5;
+// Con troppi pochi eventi, il "giro infinito" (cloni all'inizio e alla
+// fine, per l'illusione di uno scorrimento senza fine) non ha senso —
+// anzi confonde: con un solo evento, l'utente vedrebbe la STESSA card
+// ripetuta 3 volte (un clone, la vera, un altro clone), sembrando un
+// errore di duplicazione invece che l'effetto voluto. Sotto questa
+// soglia, niente cloni: si vedono solo le card vere, ferme.
+const SOGLIA_MINIMA_GIRO_INFINITO = 3;
 // Larghezza di una card più lo spazio dopo di lei (dal CSS,
 // .hero-carosello-card + gap) — usata per tutti i calcoli di
 // posizione dello scroll qui sotto.
@@ -67,7 +74,7 @@ export function HomePage() {
   // vede solo un giro che non finisce mai, mai uno scatto indietro.
   function salvaguardiaGiroInfinito() {
     const el = caroselloHeroRef.current;
-    if (!el || eventi.length < 2) return;
+    if (!el || eventi.length < SOGLIA_MINIMA_GIRO_INFINITO) return;
     const numCloni = Math.min(NUM_CLONI_CAROSELLO, eventi.length);
     const inizioZonaVera = numCloni * LARGHEZZA_CARD_CAROSELLO;
     const fineZonaVera = inizioZonaVera + eventi.length * LARGHEZZA_CARD_CAROSELLO;
@@ -96,7 +103,7 @@ export function HomePage() {
     contenitore.addEventListener('scrollend', alloScrollFermo, { passive: true });
     // Parte già dalla prima card vera (salta i cloni iniziali) — mai
     // dallo zero assoluto, che mostrerebbe prima i cloni.
-    const numCloni = Math.min(NUM_CLONI_CAROSELLO, eventi.length);
+    const numCloni = eventi.length < SOGLIA_MINIMA_GIRO_INFINITO ? 0 : Math.min(NUM_CLONI_CAROSELLO, eventi.length);
     contenitore.scrollLeft = numCloni * LARGHEZZA_CARD_CAROSELLO;
     aggiornaCardCentrale();
     return () => {
@@ -270,8 +277,8 @@ export function HomePage() {
                 // al punto corrispondente tra le card vere, dando
                 // l'effetto di un giro infinito senza soluzione di
                 // continuità, invece di uno scatto indietro a fine giro.
-                const numCloni = Math.min(NUM_CLONI_CAROSELLO, eventi.length);
-                const cloniInizio = eventi.slice(-numCloni).map((ev, i) => ({ ev, chiave: `clone-inizio-${i}-${ev.id}` }));
+                const numCloni = eventi.length < SOGLIA_MINIMA_GIRO_INFINITO ? 0 : Math.min(NUM_CLONI_CAROSELLO, eventi.length);
+                const cloniInizio = (numCloni === 0 ? [] : eventi.slice(-numCloni)).map((ev, i) => ({ ev, chiave: `clone-inizio-${i}-${ev.id}` }));
                 const veri = eventi.map((ev) => ({ ev, chiave: ev.id }));
                 const cloniFine = eventi.slice(0, numCloni).map((ev, i) => ({ ev, chiave: `clone-fine-${i}-${ev.id}` }));
                 return [...cloniInizio, ...veri, ...cloniFine].map(({ ev, chiave }) => (

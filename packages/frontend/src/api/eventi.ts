@@ -68,6 +68,15 @@ export interface BusFisicoInput {
 export interface LineaInput {
   fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; fermateIds: string[];
 }
+// Aggiungere un bus a una Linea esistente, o modificare un bus già
+// dentro — mai le fermate, quelle sono della Linea intera.
+export type BusDiLineaInput = Omit<LineaInput, 'fermateIds'>;
+export interface FermataLinea { fermataId: string; citta: string; orario: string | null; partecipanti: number; }
+export interface BusDiLinea {
+  id: string; fornitoreId: string | null; riferimento: string; autistaNome: string | null; autistaTelefono: string | null;
+  tourLeaderId: string | null; tourLeaderNome: string | null; costo: string | null; postiBus: number | null; note: string | null;
+}
+export interface Linea { id: string; nome: string; fermate: FermataLinea[]; bus: BusDiLinea[]; }
 export interface PasseggeroBus { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string; }
 export interface RiepilogoEconomicoTratta { tragittoId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; }
 
@@ -88,8 +97,11 @@ export const eventiApi = {
   listaBus: (id: string) => api.get<BusFisico[]>(`/api/eventi/${id}/bus`),
   creaBus: (id: string, input: BusFisicoInput) => api.post<{ id: string }>(`/api/eventi/${id}/bus`, input),
   aggiornaBus: (id: string, busId: string, input: Partial<BusFisicoInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/bus/${busId}`, input),
-  creaLinea: (id: string, input: LineaInput) => api.post<{ id: string }>(`/api/eventi/${id}/linee`, input),
-  aggiornaLinea: (id: string, busId: string, input: Partial<LineaInput>) => api.put<{ ok: true }>(`/api/eventi/${id}/linee/${busId}`, input),
+  creaLinea: (id: string, input: LineaInput) => api.post<{ lineaId: string; busId: string }>(`/api/eventi/${id}/linee`, input),
+  aggiungiBusALinea: (lineaId: string, input: BusDiLineaInput) => api.post<{ id: string }>(`/api/eventi/linee/${lineaId}/bus`, input),
+  aggiornaPercorsoLinea: (eventoId: string, lineaId: string, fermateIds: string[]) => api.put<{ ok: true }>(`/api/eventi/${eventoId}/linee/${lineaId}/percorso`, { fermateIds }),
+  aggiornaBusDiLinea: (busId: string, input: Partial<BusDiLineaInput>) => api.put<{ ok: true }>(`/api/eventi/linee/bus/${busId}`, input),
+  listaLinee: (tragittoId: string) => api.get<Linea[]>(`/api/eventi/tragitti/${tragittoId}/linee`),
   // Fase 2 — orario/prezzo/posti si modificano da Partenze, non più da
   // Eventi. aggiornaServizio esisteva già lato backend (mai usata dal
   // frontend finora) — qui il client mancante.
@@ -105,6 +117,13 @@ export const eventiApi = {
   allertePartenze: () => api.get<{ conteggio: number }>('/api/eventi/allerte-partenze'),
   eventiDaConfermare: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-confermare'),
   allertePartenzePerEvento: () => api.get<Record<string, number>>('/api/eventi/allerte-partenze-per-evento'),
+  elencoPartenze: () => api.get<Array<{
+    tragittoId: string; tragittoNome: string;
+    stato: 'DA_CONFERMARE' | 'PREZZATO' | 'CONFERMATO';
+    postiTotali: number; totalePasseggeri: number;
+    preventivoCosto: string | null; servizioNome: string | null;
+    evento: { id: string; artista: string; genere: string; data: string; citta: string; luogo: string; slug: string; immagineUrl: string | null };
+  }>>('/api/eventi/elenco-partenze'),
   statistichePerEvento: () => api.get<Record<string, { partecipanti: number; busCensiti: number }>>('/api/eventi/statistiche-per-evento'),
   tragittoHaPrenotazioniConfermate: (tragittoId: string) => api.get<{ haPrenotazioni: boolean; quante: number }>(`/api/eventi/tragitti/${tragittoId}/prenotazioni-confermate`),
   cestino: {

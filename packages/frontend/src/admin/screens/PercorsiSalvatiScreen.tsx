@@ -43,7 +43,7 @@ export function PercorsiSalvatiScreen() {
   }
   function apriModifica(t: PercorsoSalvato) {
     setInModifica(t); setNome(t.nome);
-    const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined }));
+    const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima }));
     const fermateIniziali: FermataPercorsoSalvato[] = fermateNormalizzate.length ? fermateNormalizzate : [{ citta: '', indirizzo: '' }];
     setFermate(fermateIniziali);
     setSnapshotIniziale(JSON.stringify({ nome: t.nome, fermate: fermateIniziali }));
@@ -51,7 +51,7 @@ export function PercorsiSalvatiScreen() {
   }
 
   function aggiornaFermata(idx: number, campo: keyof FermataPercorsoSalvato, valore: string) {
-    setFermate(fermate.map((f, i) => i === idx ? { ...f, [campo]: campo === 'prezzo' ? Number(valore) || undefined : valore } : f));
+    setFermate(fermate.map((f, i) => i === idx ? { ...f, [campo]: (campo === 'prezzo' || campo === 'sogliaMinima') ? (Number(valore) || undefined) : valore } : f));
   }
   function selezionaFermataAnagrafica(idx: number, anagraficaId: string) {
     if (anagraficaId === '__manuale__') {
@@ -152,6 +152,28 @@ export function PercorsiSalvatiScreen() {
               >
                 ← Torna a scegliere dall'anagrafica
               </button>
+            )}
+            {/* "Fermata di Partenza" (col significato di soglia minima —
+                diverso dall'etichetta sopra, che è solo la posizione
+                nell'ordine) si decide qui sul percorso, non più in
+                Eventi: se lo stesso percorso si applica a più eventi,
+                ha senso stabilirlo una volta sola. */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11.5, color: 'var(--mist)' }}>
+              <input
+                type="checkbox"
+                checked={f.tipo === 'PARTENZA'}
+                onChange={(e) => aggiornaFermata(idx, 'tipo', e.target.checked ? 'PARTENZA' : 'PASSAGGIO')}
+              />
+              Richiede un minimo di partecipanti per convenire (es. la fermata più lontana)
+            </label>
+            {f.tipo === 'PARTENZA' && (
+              <div style={{ marginTop: 4, maxWidth: 220 }}>
+                <CampoNumero
+                  placeholder="Soglia minima (default generale se vuoto)"
+                  value={f.sogliaMinima ?? undefined}
+                  onChange={(v) => aggiornaFermata(idx, 'sogliaMinima', v !== undefined ? String(v) : '')}
+                />
+              </div>
             )}
           </div>
         ))}

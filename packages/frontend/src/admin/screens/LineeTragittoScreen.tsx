@@ -1,64 +1,60 @@
 import { useEffect, useState } from 'react';
-import { eventiApi, type BusFisico, type LineaInput } from '../../api/eventi';
-import type { Evento } from '../../api/types';
+import { eventiApi, type Linea, type BusDiLineaInput, type CalcoloBusTragitto } from '../../api/eventi';
+import type { Evento, Fermata } from '../../api/types';
 import { fornitoriApi, type Fornitore } from '../../api/fornitori';
 import { tourLeaderApi, type TourLeader } from '../../api/tourleader';
 import { ErroreApi } from '../../api/client';
 import { CampoNumero } from '../shared/CampoNumero';
 import { PanelHead } from '../shared/PanelHead';
 
-const LINEA_VUOTA: LineaInput = { riferimento: '', fermateIds: [] };
+const BUS_VUOTO: BusDiLineaInput = { riferimento: '' };
 
-/** Genera e scarica un file CSV (si apre in Excel) con l'elenco
- *  passeggeri di un bus — la "lista tipo Excel" da dare al tour leader.
- *  Stessa funzione già usata in Partenze, duplicata qui apposta: questa
- *  pagina è pensata per stare da sola, senza dipendere da niente di
- *  interno a PartenzeTab. */
-function scaricaListaCsv(riferimentoBus: string, righe: { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string }[]) {
-  const intestazione = ['PNR', 'Nome', 'Cognome', 'Fermata', 'Telefono', 'Email'];
-  const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const righeCsv = righe.map((r) => [r.pnr, r.nome, r.cognome, r.fermata, r.telefono, r.email].map(escapeCsv).join(';'));
-  const csv = '\uFEFF' + [intestazione.join(';'), ...righeCsv].join('\n'); // BOM per accenti corretti in Excel
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `passeggeri-${riferimentoBus.replace(/[^a-z0-9]+/gi, '-')}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-/** Pagina dedicata alla gestione delle Linee di UN tragitto specifico —
- *  prima era un modale dentro Partenze, ora un vero indirizzo a sé
+/** Pagina dedicata a UN tragitto — un vero indirizzo a sé
  *  (?sezione=linee&evento=...&tragitto=...), raggiunto dal pulsante
- *  "Gestisci Linee" accanto a "Modifica orario/prezzo/posti". Legge il
- *  contesto (quale evento, quale tragitto) direttamente dall'indirizzo
- *  — stesso principio già usato in tutto il resto del gestionale
- *  (niente react-router qui dentro, solo le API del browser). */
+ *  "Gestisci Linee" in Partenze.
+ *
+ *  Una "Linea" è un CONTENITORE: un percorso (quali fermate copre, in
+ *  che ordine — cronologico, non di inserimento) che può avere UNO O
+ *  PIÙ bus dentro — quando un primo bus non basta più per le stesse
+ *  fermate, se ne aggiunge un secondo alla STESSA Linea invece di
+ *  crearne una nuova. */
 export function LineeTragittoScreen() {
   const parametri = new URLSearchParams(window.location.search);
   const eventoId = parametri.get('evento');
   const tragittoId = parametri.get('tragitto');
 
   const [evento, setEvento] = useState<Evento | null>(null);
-  const [busLista, setBusLista] = useState<BusFisico[]>([]);
+  const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
+  const [linee, setLinee] = useState<Linea[]>([]);
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
   const [tourLeaders, setTourLeaders] = useState<TourLeader[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState('');
-  const [generandoLista, setGenerandoLista] = useState<string | null>(null);
+  const [lineaAttivaId, setLineaAttivaId] = useState<string | null>(null);
 
-  const [inModifica, setInModifica] = useState<BusFisico | null>(null);
-  const [form, setForm] = useState<LineaInput>(LINEA_VUOTA);
-  const [formAperto, setFormAperto] = useState(false);
+  // Popup "+ Aggiungi linea" — 2 step: anagrafica bus, poi percorso.
+  const [popupAperto, setPopupAperto] = useState(false);
+  const [stepPopup, setStepPopup] = useState<1 | 2>(1);
+  const [formBus, setFormBus] = useState<BusDiLineaInput & { postiBus?: number }>(BUS_VUOTO);
+  const [fermateSelezionate, setFermateSelezionate] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
 
+  // Modifica di una Linea già esistente.
+  const [modificaBusId, setModificaBusId] = useState<string | null>(null);
+  const [modificaPercorsoAperta, setModificaPercorsoAperta] = useState(false);
+  const [percorsoModificato, setPercorsoModificato] = useState<string[]>([]);
+  const [aggiungiBusAperto, setAggiungiBusAperto] = useState(false);
+  const [formNuovoBus, setFormNuovoBus] = useState<BusDiLineaInput & { postiBus?: number }>(BUS_VUOTO);
+
   function ricarica() {
-    if (!eventoId) return;
+    if (!eventoId || !tragittoId) return;
     setCaricamento(true);
     setErrore('');
-    Promise.all([eventiApi.getById(eventoId), eventiApi.listaBus(eventoId)])
-      .then(([ev, b]) => { setEvento(ev); setBusLista(b); })
+    Promise.all([eventiApi.getById(eventoId), eventiApi.calcolaBus(eventoId), eventiApi.listaLinee(tragittoId)])
+      .then(([ev, c, l]) => {
+        setEvento(ev); setCalcolo(c); setLinee(l);
+        setLineaAttivaId((prec) => prec && l.some((x) => x.id === prec) ? prec : (l[0]?.id ?? null));
+      })
       .catch((e) => setErrore(e instanceof ErroreApi ? e.message : 'Impossibile caricare la pagina.'))
       .finally(() => setCaricamento(false));
   }
@@ -67,7 +63,7 @@ export function LineeTragittoScreen() {
     fornitoriApi.list().then(setFornitori).catch(() => setFornitori([]));
     tourLeaderApi.list().then(setTourLeaders).catch(() => setTourLeaders([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventoId]);
+  }, [eventoId, tragittoId]);
 
   function tornaAPartenze() {
     const url = new URL(window.location.href);
@@ -81,9 +77,7 @@ export function LineeTragittoScreen() {
     return (
       <div>
         <PanelHead titolo="Linee" />
-        <p className="testo-intro" style={{ color: 'var(--pink)' }}>
-          Manca il riferimento all'evento o al tragitto — torna a Partenze e riprova dal pulsante "Gestisci Linee".
-        </p>
+        <p className="testo-intro" style={{ color: 'var(--pink)' }}>Manca il riferimento all'evento o al tragitto — torna a Partenze e riprova.</p>
         <button className="btn btn-ghost" onClick={tornaAPartenze}>← Torna a Partenze</button>
       </div>
     );
@@ -92,10 +86,9 @@ export function LineeTragittoScreen() {
   if (errore) return <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>;
   if (!evento) return null;
 
-  // Da qui in poi sono sicuramente valorizzati (il controllo sopra
-  // l'ha già garantito) — TypeScript non lo deduce da solo dentro le
-  // funzioni più sotto (chiusure catturano il tipo originale, non
-  // ristretto), quindi lo fisso qui una volta per tutte.
+  // Da qui in poi sono sicuramente valorizzati — TypeScript non lo
+  // deduce da solo dentro le funzioni più sotto (chiusure catturano il
+  // tipo originale, non ristretto).
   const idEvento = eventoId;
   const idTragitto = tragittoId;
 
@@ -109,49 +102,41 @@ export function LineeTragittoScreen() {
       </div>
     );
   }
+  const fermateAttive = tragittoVero.fermate.filter((f: Fermata) => f.attivo);
+  const calcoloTragitto = calcolo.find((c) => c.tragittoId === tragittoId);
+  const partecipantiPerFermata = new Map(calcoloTragitto?.fermate.map((f) => [f.fermataId, f.passeggeri]) ?? []);
 
-  const busTragitto = busLista.filter((b) => b.tragittiIds.includes(idTragitto));
-
-  function apriNuovaLinea() {
-    setInModifica(null);
-    // Preseleziona tutte le fermate ATTIVE del tragitto — comodo punto
-    // di partenza (copre tutto), si tolgono quelle che non servono.
-    setForm({ ...LINEA_VUOTA, fermateIds: tragittoVero!.fermate.filter((f) => f.attivo).map((f) => f.id) });
-    setFormAperto(true);
+  // Ordina per orario — usata sia per il riepilogo in alto sia per
+  // ordinare le fermate scelte nel popup (l'admin le clicca in
+  // qualsiasi ordine, l'ordine finale lo decide sempre l'orario).
+  function perOrario(a: Fermata, b: Fermata) {
+    if (!a.orario && !b.orario) return 0;
+    if (!a.orario) return 1;
+    if (!b.orario) return -1;
+    return a.orario.localeCompare(b.orario);
   }
-  function apriModificaLinea(b: BusFisico) {
-    setInModifica(b);
-    // Un bus registrato col vecchio sistema (bus_tratte, l'intero
-    // tragitto) non ha ancora nessuna riga in bus_fermate — lo traduco
-    // qui: se non ha ancora fermate proprie, parto da tutte le fermate
-    // attive del tragitto (equivalente a "copre tutto", il
-    // comportamento di prima).
-    const fermateIniziali = b.fermateIds.length > 0 ? b.fermateIds : tragittoVero!.fermate.filter((f) => f.attivo).map((f) => f.id);
-    setForm({ fornitoreId: b.fornitoreId ?? undefined, riferimento: b.riferimento, autistaNome: b.autistaNome ?? undefined, autistaTelefono: b.autistaTelefono ?? undefined, tourLeaderId: b.tourLeaderId, costo: b.costo ? Number(b.costo) : undefined, postiBus: b.postiBus ?? undefined, note: b.note ?? undefined, fermateIds: fermateIniziali });
-    setFormAperto(true);
+  const fermateInOrdine = [...fermateAttive].sort(perOrario);
+
+  function apriPopupNuovaLinea() {
+    setFormBus(BUS_VUOTO);
+    setFermateSelezionate([]);
+    setStepPopup(1);
+    setPopupAperto(true);
   }
 
-  async function salvaLinea() {
-    if (!form.riferimento || form.fermateIds.length === 0) {
-      alert('Indica un riferimento per la Linea e seleziona almeno una fermata che copre.');
+  async function salvaNuovaLinea() {
+    if (!formBus.riferimento || !formBus.postiBus) {
+      alert('Indica un riferimento per il bus e quanti posti ha.');
       return;
     }
-    if (!inModifica && !form.postiBus) {
-      alert('Indica quanti posti ha il bus — è il dato che serve a calcolare da solo quanti posti sono disponibili sul tragitto.');
+    if (fermateSelezionate.length === 0) {
+      alert('Seleziona almeno una fermata per la Linea.');
       return;
-    }
-    if (form.tourLeaderId) {
-      const giaAssegnato = busLista.some((b) => b.tourLeaderId === form.tourLeaderId && b.id !== inModifica?.id);
-      if (giaAssegnato) {
-        alert('Questo tour leader è già assegnato a un altro bus di questo evento — un tour leader non può seguire due bus insieme.');
-        return;
-      }
     }
     setSalvando(true);
     try {
-      if (inModifica) await eventiApi.aggiornaLinea(idEvento, inModifica.id, form);
-      else await eventiApi.creaLinea(idEvento, { ...form, postiBus: form.postiBus as number });
-      setFormAperto(false);
+      await eventiApi.creaLinea(idEvento, { ...formBus, postiBus: formBus.postiBus, fermateIds: fermateSelezionate });
+      setPopupAperto(false);
       ricarica();
     } catch (e) {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
@@ -159,118 +144,292 @@ export function LineeTragittoScreen() {
       setSalvando(false);
     }
   }
-  async function rimuoviLinea(b: BusFisico) {
-    if (!confirm(`Rimuovere il bus "${b.riferimento}" dal censimento?`)) return;
+
+  const lineaAttiva = linee.find((l) => l.id === lineaAttivaId);
+
+  function apriModificaBus(busId: string) {
+    const bus = lineaAttiva?.bus.find((b) => b.id === busId);
+    if (!bus) return;
+    setFormNuovoBus({
+      riferimento: bus.riferimento, fornitoreId: bus.fornitoreId ?? undefined, autistaNome: bus.autistaNome ?? undefined,
+      autistaTelefono: bus.autistaTelefono ?? undefined, tourLeaderId: bus.tourLeaderId, costo: bus.costo ? Number(bus.costo) : undefined,
+      postiBus: bus.postiBus ?? undefined, note: bus.note ?? undefined,
+    });
+    setModificaBusId(busId);
+  }
+
+  async function salvaModificaBus() {
+    if (!modificaBusId) return;
+    setSalvando(true);
     try {
-      await eventiApi.rimuoviBus(idEvento, b.id);
+      await eventiApi.aggiornaBusDiLinea(modificaBusId, formNuovoBus);
+      setModificaBusId(null);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+    } finally {
+      setSalvando(false);
     }
   }
-  async function generaLista(b: BusFisico) {
-    setGenerandoLista(b.id);
+
+  function apriAggiungiBus() {
+    setFormNuovoBus(BUS_VUOTO);
+    setAggiungiBusAperto(true);
+  }
+  async function salvaBusAggiunto() {
+    if (!lineaAttivaId || !formNuovoBus.riferimento || !formNuovoBus.postiBus) {
+      alert('Indica un riferimento e quanti posti ha il bus.');
+      return;
+    }
+    setSalvando(true);
     try {
-      const righe = await eventiApi.listaPasseggeriBus(idEvento, b.id);
-      if (righe.length === 0) { alert('Nessun passeggero confermato ancora su questo bus.'); return; }
-      scaricaListaCsv(b.riferimento, righe);
+      await eventiApi.aggiungiBusALinea(lineaAttivaId, { ...formNuovoBus, postiBus: formNuovoBus.postiBus });
+      setAggiungiBusAperto(false);
+      ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
-      setGenerandoLista(null);
+      setSalvando(false);
+    }
+  }
+
+  function apriModificaPercorso() {
+    if (!lineaAttiva) return;
+    setPercorsoModificato(lineaAttiva.fermate.map((f) => f.fermataId));
+    setModificaPercorsoAperta(true);
+  }
+  async function salvaModificaPercorso() {
+    if (!lineaAttivaId || percorsoModificato.length === 0) {
+      alert('Seleziona almeno una fermata.');
+      return;
+    }
+    setSalvando(true);
+    try {
+      await eventiApi.aggiornaPercorsoLinea(idEvento, lineaAttivaId, percorsoModificato);
+      setModificaPercorsoAperta(false);
+      ricarica();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+    } finally {
+      setSalvando(false);
     }
   }
 
   return (
     <div>
       <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={tornaAPartenze}>← Torna a Partenze</button>
-      <PanelHead titolo={`Linee — ${tragittoVero.nome}`} info={`${evento.artista} · ogni Linea è un bus vero, con le fermate specifiche che copre — non deve per forza coprirle tutte.`} />
 
-      <button className="btn btn-primary" style={{ marginBottom: 16 }} onClick={apriNuovaLinea}>+ Nuova Linea</button>
+      {/* 1. RIEPILOGO PARTENZA */}
+      <PanelHead titolo={tragittoVero.nome} info={evento.artista} />
+      <p style={{ fontSize: 14, color: 'var(--paper)', marginTop: -8, marginBottom: 24 }}>
+        {fermateInOrdine.map((f, i) => (
+          <span key={f.id}>
+            {i > 0 && <span style={{ color: 'var(--mist)' }}> → </span>}
+            {f.citta} <span style={{ color: 'var(--mist)' }}>{partecipantiPerFermata.get(f.id) ?? 0}</span>
+          </span>
+        ))}
+        {fermateInOrdine.length === 0 && <span style={{ color: 'var(--mist)' }}>Nessuna fermata attiva su questo tragitto.</span>}
+      </p>
 
-      {busTragitto.length === 0 ? (
+      {/* 2. LINEE / BUS */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <p className="section-label" style={{ marginBottom: 0 }}>Linee</p>
+        <button className="btn btn-primary" style={{ fontSize: 12.5, padding: '6px 14px' }} onClick={apriPopupNuovaLinea}>+ Aggiungi linea</button>
+      </div>
+
+      {linee.length === 0 ? (
         <p className="testo-intro">Nessuna Linea ancora per questo tragitto.</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {busTragitto.map((b) => {
-            const nomiFermateCoperte = tragittoVero.fermate.filter((f) => b.fermateIds.includes(f.id)).map((f) => f.citta);
-            return (
-              <div key={b.id} className="riga-cliccabile section-card" style={{ cursor: 'default', flexWrap: 'wrap' }}>
-                <span className="riga-titolo">
-                  {b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}
-                  {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>Tour leader: {b.tourLeaderNome}</span></>}
-                  {nomiFermateCoperte.length > 0 && <><br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>Copre: {nomiFermateCoperte.join(', ')}</span></>}
-                </span>
-                <span className="riga-meta">
-                  <button className="btn btn-primary" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => generaLista(b)} disabled={generandoLista === b.id}>
-                    {generandoLista === b.id ? 'Genero...' : '⤓ Genera lista'}
-                  </button>
-                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => apriModificaLinea(b)}>Modifica</button>
-                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px', color: 'var(--pink)' }} onClick={() => rimuoviLinea(b)}>Rimuovi</button>
-                </span>
+        <>
+          {/* Tab orizzontali, una per Linea */}
+          <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+            {linee.map((l) => (
+              <button key={l.id} type="button" className={`mini-tab${lineaAttivaId === l.id ? ' active' : ''}`} onClick={() => setLineaAttivaId(l.id)}>
+                {l.nome}
+              </button>
+            ))}
+          </div>
+
+          {lineaAttiva && (
+            <div className="section-card">
+              {/* Riepilogo immediato della Linea selezionata */}
+              <p style={{ fontSize: 13.5, marginBottom: 4 }}>
+                {lineaAttiva.fermate.map((f, i) => (
+                  <span key={f.fermataId}>
+                    {i > 0 && <span style={{ color: 'var(--mist)' }}> → </span>}
+                    {f.citta} {f.orario && <span style={{ color: 'var(--mist)', fontSize: 12 }}>({f.orario})</span>} <span style={{ color: 'var(--mist)' }}>{f.partecipanti}</span>
+                  </span>
+                ))}
+              </p>
+              <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 16 }}>
+                {lineaAttiva.bus.length} bus associat{lineaAttiva.bus.length === 1 ? 'o' : 'i'} a questa Linea
+              </p>
+
+              <button className="btn btn-ghost" style={{ fontSize: 12, marginBottom: 12 }} onClick={apriModificaPercorso}>Modifica percorso</button>
+
+              {lineaAttiva.bus.map((b) => (
+                <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
+                  <span className="riga-titolo">
+                    {b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}
+                    {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>Tour leader: {b.tourLeaderNome}</span></>}
+                    <br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{b.postiBus ?? '—'} posti</span>
+                  </span>
+                  <span className="riga-meta">
+                    <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => apriModificaBus(b.id)}>Modifica</button>
+                  </span>
+                </div>
+              ))}
+
+              <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 12 }} onClick={apriAggiungiBus}>+ Aggiungi un altro bus a questa Linea</button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Popup nuova Linea, a 2 step */}
+      {popupAperto && (
+        <div className="section-card" style={{ marginTop: 20 }}>
+          <p className="section-label" style={{ marginBottom: 12 }}>Nuova Linea — passo {stepPopup} di 2</p>
+
+          {stepPopup === 1 && (
+            <>
+              <p className="testo-intro" style={{ marginTop: -4 }}>Anagrafica bus</p>
+              <div className="campo"><label>Riferimento (es. targa, o codice dell'agenzia)</label><input value={formBus.riferimento} onChange={(e) => setFormBus({ ...formBus, riferimento: e.target.value })} /></div>
+              <div className="campo">
+                <label>Fornitore</label>
+                <select value={formBus.fornitoreId ?? ''} onChange={(e) => setFormBus({ ...formBus, fornitoreId: e.target.value || undefined })}>
+                  <option value="">— Nessuno —</option>
+                  {fornitori.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                </select>
               </div>
-            );
-          })}
+              <div className="campo"><label>Autista (facoltativo)</label><input value={formBus.autistaNome ?? ''} onChange={(e) => setFormBus({ ...formBus, autistaNome: e.target.value })} /></div>
+              <div className="campo"><label>Telefono autista (facoltativo)</label><input value={formBus.autistaTelefono ?? ''} onChange={(e) => setFormBus({ ...formBus, autistaTelefono: e.target.value })} /></div>
+              <div className="campo">
+                <label>Tour leader assegnato</label>
+                <select value={formBus.tourLeaderId ?? ''} onChange={(e) => setFormBus({ ...formBus, tourLeaderId: e.target.value || null })}>
+                  <option value="">— Nessuno —</option>
+                  {tourLeaders.map((t) => <option key={t.id} value={t.id}>{t.nome} {t.cognome}</option>)}
+                </select>
+              </div>
+              <div className="campo"><label>Posti del bus</label><CampoNumero min={0} value={formBus.postiBus} onChange={(v) => setFormBus({ ...formBus, postiBus: v })} /></div>
+              <div className="campo"><label>Costo del bus (facoltativo)</label><CampoNumero valuta min={0} value={formBus.costo} onChange={(v) => setFormBus({ ...formBus, costo: v })} /></div>
+              <div className="campo"><label>Note</label><input value={formBus.note ?? ''} onChange={(e) => setFormBus({ ...formBus, note: e.target.value })} /></div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <button
+                  className="btn btn-primary" style={{ flex: 1 }}
+                  onClick={() => {
+                    if (!formBus.riferimento || !formBus.postiBus) { alert('Indica un riferimento e i posti del bus.'); return; }
+                    setStepPopup(2);
+                  }}
+                >
+                  Avanti — scegli le fermate
+                </button>
+                <button className="btn btn-ghost" onClick={() => setPopupAperto(false)}>Annulla</button>
+              </div>
+            </>
+          )}
+
+          {stepPopup === 2 && (
+            <>
+              <p className="testo-intro" style={{ marginTop: -4 }}>
+                Scegli le fermate — in QUALSIASI ordine (l'ordine finale lo decide da solo l'orario di ciascuna).
+              </p>
+              {fermateAttive.map((f) => (
+                <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 13.5 }}>
+                  <input
+                    type="checkbox"
+                    checked={fermateSelezionate.includes(f.id)}
+                    onChange={(e) => setFermateSelezionate((prev) => e.target.checked ? [...prev, f.id] : prev.filter((id) => id !== f.id))}
+                  />
+                  {f.citta} {f.orario && <span style={{ color: 'var(--mist)', fontSize: 12 }}>({f.orario})</span>}
+                </label>
+              ))}
+              {fermateSelezionate.length > 0 && (
+                <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 10 }}>
+                  Ordine finale: {[...fermateAttive].filter((f) => fermateSelezionate.includes(f.id)).sort(perOrario).map((f) => f.citta).join(' → ')}
+                </p>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <button className="btn btn-ghost" onClick={() => setStepPopup(1)}>← Indietro</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={salvaNuovaLinea} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva Linea'}</button>
+                <button className="btn btn-ghost" onClick={() => setPopupAperto(false)}>Annulla</button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {formAperto && (
+      {/* Modifica di un bus già dentro la Linea */}
+      {modificaBusId && (
         <div className="section-card" style={{ marginTop: 20 }}>
-          <p className="section-label" style={{ marginBottom: 12 }}>{inModifica ? 'Modifica Linea' : 'Nuova Linea'}</p>
-          <div className="campo"><label>Riferimento (es. targa, o codice dell'agenzia)</label><input value={form.riferimento} onChange={(e) => setForm({ ...form, riferimento: e.target.value })} /></div>
+          <p className="section-label" style={{ marginBottom: 12 }}>Modifica bus</p>
+          <div className="campo"><label>Riferimento</label><input value={formNuovoBus.riferimento} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, riferimento: e.target.value })} /></div>
           <div className="campo">
             <label>Fornitore</label>
-            <select value={form.fornitoreId ?? ''} onChange={(e) => setForm({ ...form, fornitoreId: e.target.value || undefined })}>
+            <select value={formNuovoBus.fornitoreId ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, fornitoreId: e.target.value || undefined })}>
               <option value="">— Nessuno —</option>
               {fornitori.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
             </select>
           </div>
-          <div className="campo"><label>Autista (facoltativo)</label><input value={form.autistaNome ?? ''} onChange={(e) => setForm({ ...form, autistaNome: e.target.value })} /></div>
-          <div className="campo"><label>Telefono autista (facoltativo)</label><input value={form.autistaTelefono ?? ''} onChange={(e) => setForm({ ...form, autistaTelefono: e.target.value })} /></div>
+          <div className="campo"><label>Autista</label><input value={formNuovoBus.autistaNome ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, autistaNome: e.target.value })} /></div>
+          <div className="campo"><label>Telefono autista</label><input value={formNuovoBus.autistaTelefono ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, autistaTelefono: e.target.value })} /></div>
           <div className="campo">
-            <label>Tour leader assegnato</label>
-            <select value={form.tourLeaderId ?? ''} onChange={(e) => setForm({ ...form, tourLeaderId: e.target.value || null })}>
+            <label>Tour leader</label>
+            <select value={formNuovoBus.tourLeaderId ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, tourLeaderId: e.target.value || null })}>
               <option value="">— Nessuno —</option>
-              {tourLeaders.map((t) => <option key={t.id} value={t.id}>{t.nome} {t.cognome} ({t.stato === 'ATTIVO' ? 'attivo' : t.stato === 'CANDIDATO' ? 'candidato' : 'archiviato'})</option>)}
+              {tourLeaders.map((t) => <option key={t.id} value={t.id}>{t.nome} {t.cognome}</option>)}
             </select>
           </div>
-          <div className="campo"><label>Posti del bus — è questo il dato che determina i posti disponibili sul tragitto</label><CampoNumero min={0} value={form.postiBus} onChange={(v) => setForm({ ...form, postiBus: v })} /></div>
-          <div className="campo"><label>Costo del bus (facoltativo — usato per calcolare il guadagno della tratta)</label><CampoNumero valuta min={0} value={form.costo} onChange={(v) => setForm({ ...form, costo: v })} /></div>
-          <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
-
-          <p className="section-label" style={{ marginTop: 16 }}>Fermate coperte da questa Linea</p>
-          <p className="testo-intro" style={{ marginTop: -6, marginBottom: 8 }}>
-            Nell'ordine del tragitto — non puoi selezionarne una saltando quelle prima di lei nel percorso.
-          </p>
-          {tragittoVero.fermate.map((f, idx) => {
-            const selezionata = form.fermateIds.includes(f.id);
-            const precedentiTutteSelezionate = tragittoVero.fermate.slice(0, idx).every((prec) => form.fermateIds.includes(prec.id));
-            return (
-              <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13.5, opacity: !selezionata && !precedentiTutteSelezionate ? 0.45 : 1 }}>
-                <input
-                  type="checkbox"
-                  checked={selezionata}
-                  onChange={(e) => {
-                    if (e.target.checked && !precedentiTutteSelezionate) {
-                      alert(`Prima di "${f.citta}" devi selezionare tutte le fermate che la precedono in questo tragitto — l'ordine del percorso non si può saltare.`);
-                      return;
-                    }
-                    setForm((v) => ({
-                      ...v,
-                      fermateIds: e.target.checked
-                        ? [...v.fermateIds, f.id]
-                        : v.fermateIds.filter((id) => !tragittoVero.fermate.slice(idx).map((ff) => ff.id).includes(id)),
-                    }));
-                  }}
-                />
-                {f.citta}
-              </label>
-            );
-          })}
-
+          <div className="campo"><label>Posti del bus</label><CampoNumero min={0} value={formNuovoBus.postiBus} onChange={(v) => setFormNuovoBus({ ...formNuovoBus, postiBus: v })} /></div>
+          <div className="campo"><label>Costo del bus</label><CampoNumero valuta min={0} value={formNuovoBus.costo} onChange={(v) => setFormNuovoBus({ ...formNuovoBus, costo: v })} /></div>
+          <div className="campo"><label>Note</label><input value={formNuovoBus.note ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, note: e.target.value })} /></div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={salvaLinea} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva Linea'}</button>
-            <button className="btn btn-ghost" onClick={() => setFormAperto(false)}>Annulla</button>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={salvaModificaBus} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva'}</button>
+            <button className="btn btn-ghost" onClick={() => setModificaBusId(null)}>Annulla</button>
+          </div>
+        </div>
+      )}
+
+      {/* Aggiungi un altro bus alla Linea attiva */}
+      {aggiungiBusAperto && (
+        <div className="section-card" style={{ marginTop: 20 }}>
+          <p className="section-label" style={{ marginBottom: 12 }}>Aggiungi bus a "{lineaAttiva?.nome}"</p>
+          <p className="testo-intro" style={{ marginTop: -6 }}>Stesse fermate della Linea — non si ridefiniscono qui.</p>
+          <div className="campo"><label>Riferimento</label><input value={formNuovoBus.riferimento} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, riferimento: e.target.value })} /></div>
+          <div className="campo">
+            <label>Fornitore</label>
+            <select value={formNuovoBus.fornitoreId ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, fornitoreId: e.target.value || undefined })}>
+              <option value="">— Nessuno —</option>
+              {fornitori.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+            </select>
+          </div>
+          <div className="campo"><label>Autista</label><input value={formNuovoBus.autistaNome ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, autistaNome: e.target.value })} /></div>
+          <div className="campo"><label>Posti del bus</label><CampoNumero min={0} value={formNuovoBus.postiBus} onChange={(v) => setFormNuovoBus({ ...formNuovoBus, postiBus: v })} /></div>
+          <div className="campo"><label>Costo del bus</label><CampoNumero valuta min={0} value={formNuovoBus.costo} onChange={(v) => setFormNuovoBus({ ...formNuovoBus, costo: v })} /></div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={salvaBusAggiunto} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva'}</button>
+            <button className="btn btn-ghost" onClick={() => setAggiungiBusAperto(false)}>Annulla</button>
+          </div>
+        </div>
+      )}
+
+      {/* Modifica del percorso della Linea attiva */}
+      {modificaPercorsoAperta && (
+        <div className="section-card" style={{ marginTop: 20 }}>
+          <p className="section-label" style={{ marginBottom: 12 }}>Modifica percorso — cambia per tutti i bus di questa Linea</p>
+          {fermateAttive.map((f) => (
+            <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 13.5 }}>
+              <input
+                type="checkbox"
+                checked={percorsoModificato.includes(f.id)}
+                onChange={(e) => setPercorsoModificato((prev) => e.target.checked ? [...prev, f.id] : prev.filter((id) => id !== f.id))}
+              />
+              {f.citta} {f.orario && <span style={{ color: 'var(--mist)', fontSize: 12 }}>({f.orario})</span>}
+            </label>
+          ))}
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={salvaModificaPercorso} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva'}</button>
+            <button className="btn btn-ghost" onClick={() => setModificaPercorsoAperta(false)}>Annulla</button>
           </div>
         </div>
       )}

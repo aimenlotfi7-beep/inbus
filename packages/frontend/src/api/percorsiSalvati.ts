@@ -6,6 +6,8 @@ export interface FermataPercorsoSalvato {
   citta: string;
   indirizzo: string;
   prezzo?: number;
+  tipo?: 'PARTENZA' | 'PASSAGGIO';
+  sogliaMinima?: number | null;
 }
 export interface PercorsoSalvato {
   id: string;

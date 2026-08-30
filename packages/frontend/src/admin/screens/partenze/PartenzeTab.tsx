@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput } from '../../../api/eventi';
 import type { Evento } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
@@ -34,7 +34,15 @@ function statoTragitto(tragitto: CalcoloBusTragitto) {
 /** Sezione "Partenze" di un singolo evento: riepilogo generale, calcolo
  *  bus necessari, copertura tratte, censimento bus fisici. Va dentro la
  *  scheda dell'evento (tab). */
-export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?: { key: string; nome: string }[] }) {
+export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
+  eventoId: string;
+  servizi?: { key: string; nome: string }[];
+  // Arrivando da una card specifica in Partenze (una per "Prezzato",
+  // "Da confermare", ecc.) si vuole atterrare DIRETTAMENTE sul
+  // pannello giusto per quel tragitto, non su un elenco generico da
+  // dover riesplorare — vedi useEffect più sotto.
+  tragittoFocus?: { tragittoId: string; azione: 'preventivo' | 'espandi' } | null;
+}) {
   const sessione = useSessione();
   const vedeEconomia = haPermesso(sessione, 'eventi.economia');
   const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
@@ -111,6 +119,17 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
     fermateAnagraficaApi.list().then(setFermateAnagrafica).catch(() => setFermateAnagrafica([]));
   }, [eventoId]);
 
+  // Atterraggio diretto da una card di Partenze — una volta sola,
+  // appena i dati sono pronti (non ad ogni ricarica successiva,
+  // altrimenti riaprirebbe il pannello anche dopo un salvataggio).
+  const focusGestitoRef = useRef(false);
+  useEffect(() => {
+    if (focusGestitoRef.current || !tragittoFocus || !eventoCompleto) return;
+    focusGestitoRef.current = true;
+    setAperte((prev) => new Set(prev).add(tragittoFocus.tragittoId));
+    if (tragittoFocus.azione === 'preventivo') apriPreventivo(tragittoFocus.tragittoId);
+  }, [tragittoFocus, eventoCompleto]);
+
   function toggleApertura(tragittoId: string) {
     setAperte((prev) => {
       const nuovo = new Set(prev);
@@ -165,14 +184,29 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
     });
   }
 
-  /** Apre il pannello preventivo per un tragitto ancora "Da
-   *  confermare" — parte sempre vuoto, non c'è nessun preventivo
-   *  precedente da ricaricare (è la prima volta che si registra). */
+  /** Apre il pannello preventivo — se il tragitto ne ha già uno
+   *  registrato (stato "Prezzato" o oltre), lo precompila con i dati
+   *  veri già salvati (costo, posti presunti, prezzi attuali per
+   *  fermata) invece di partire vuoto: prima, una volta registrato il
+   *  preventivo, non c'era più modo di rivederlo — bug corretto qui. */
   function apriPreventivo(tragittoId: string) {
     setPreventivoAperto(tragittoId);
-    setFormPreventivo({});
-    setPrezziCalcolati(null);
-    setStatoCalcoloPreventivo('');
+    const tragittoVero = eventoCompleto
+      ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragittoId)
+      : undefined;
+    if (tragittoVero?.preventivoCosto) {
+      setFormPreventivo({ costo: Number(tragittoVero.preventivoCosto), postiBus: tragittoVero.preventivoPostiBus ?? undefined });
+      // Mostro subito i prezzi già salvati per ogni fermata (senza
+      // dover ricalcolare/richiamare OpenStreetMap solo per vederli) —
+      // la distanza qui non è nota (andrebbe ricalcolata), la mostro
+      // come "—" finché l'admin non preme di nuovo "Calcola prezzi".
+      setPrezziCalcolati(tragittoVero.fermate.filter((f) => f.attivo && f.prezzo).map((f) => ({ fermataId: f.id, citta: f.citta, distanza: -1, prezzo: Number(f.prezzo) })));
+      setStatoCalcoloPreventivo('Preventivo già registrato — questi sono i prezzi attuali. Premi "Calcola prezzi" per ricalcolarli da zero se il costo o i posti sono cambiati.');
+    } else {
+      setFormPreventivo({});
+      setPrezziCalcolati(null);
+      setStatoCalcoloPreventivo('');
+    }
   }
 
   /** Calcola il prezzo di ogni fermata dal preventivo (modello di
@@ -479,14 +513,12 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
               >
                 Gestisci Linee{busTragitto.length > 0 ? ` (${busTragitto.length})` : ''}
               </button>
-              {tragitto.stato === 'DA_CONFERMARE' && (
-                <button
-                  type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px', borderColor: 'var(--pink-dim)', color: 'var(--pink)' }}
-                  onClick={(e) => { e.stopPropagation(); apriPreventivo(tragitto.tragittoId); }}
-                >
-                  Registra preventivo
-                </button>
-              )}
+              <button
+                type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px', borderColor: 'var(--pink-dim)', color: 'var(--pink)' }}
+                onClick={(e) => { e.stopPropagation(); apriPreventivo(tragitto.tragittoId); }}
+              >
+                {tragitto.stato === 'DA_CONFERMARE' ? 'Registra preventivo' : 'Vedi/modifica preventivo'}
+              </button>
             </div>
           </div>
 
@@ -645,7 +677,7 @@ export function PartenzeTab({ eventoId, servizi }: { eventoId: string; servizi?:
               <p className="section-label" style={{ marginBottom: 8 }}>Prezzi calcolati — controllali prima di confermare</p>
               {prezziCalcolati.map((p) => (
                 <div key={p.fermataId} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
-                  <span>{p.citta} <span style={{ color: 'var(--mist)', fontSize: 12 }}>({p.distanza} km dall'arrivo)</span></span>
+                  <span>{p.citta} <span style={{ color: 'var(--mist)', fontSize: 12 }}>({p.distanza >= 0 ? `${p.distanza} km dall'arrivo` : 'distanza da ricalcolare'})</span></span>
                   <strong>€{p.prezzo}</strong>
                 </div>
               ))}

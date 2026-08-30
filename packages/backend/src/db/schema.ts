@@ -19,6 +19,7 @@ import {
   unique,
   jsonb,
   doublePrecision,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { createId } from '@paralleldrive/cuid2';
@@ -362,6 +363,12 @@ export const busFisici = pgTable('bus_fisici', {
   // non lo compili, questo bus non contribuisce al calcolo automatico
   // (meglio "non contribuisce" che assumere un numero a caso).
   postiBus: integer('posti_bus'),
+  // A quale Linea (contenitore, vedi sotto) appartiene questo bus —
+  // nullo per i bus registrati col vecchio sistema (bus_fermate/
+  // bus_tratte direttamente, prima che esistesse questo contenitore).
+  // Se impostato, le fermate coperte sono quelle della Linea, non più
+  // quelle scritte direttamente su questo bus.
+  lineaId: text('linea_id').references((): AnyPgColumn => linee.id, { onDelete: 'cascade' }),
   note: text('note'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
 });
@@ -388,6 +395,32 @@ export const busFermate = pgTable('bus_fermate', {
   pk: primaryKey({ columns: [t.busId, t.fermataId] }),
 }));
 
+// Una "Linea" è il CONTENITORE: un percorso specifico (quali fermate
+// copre, in che ordine) che può avere UNO O PIÙ bus dentro — quando un
+// primo bus non basta più (troppe prenotazioni per le stesse fermate),
+// se ne aggiunge un secondo alla STESSA Linea invece di crearne una
+// nuova. bus_fermate sopra resta per compatibilità con le Linee create
+// prima di questo cambiamento (un bus autonomo, senza passare da un
+// contenitore) — non si tocca mai per le Linee nuove.
+export const linee = pgTable('linee', {
+  id: id(),
+  tragittoId: text('tragitto_id').notNull().references(() => tragitti.id, { onDelete: 'cascade' }),
+  nome: text('nome').notNull(), // es. "Linea 1" — assegnato in automatico, modificabile
+  ordine: integer('ordine').notNull().default(0),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+});
+
+// Le fermate coperte dalla Linea (nell'ordine CRONOLOGICO reale, non
+// quello di inserimento — vedi il servizio che le riordina da solo in
+// base all'orario di ogni fermata prima di salvare).
+export const lineaFermate = pgTable('linea_fermate', {
+  lineaId: text('linea_id').notNull().references(() => linee.id, { onDelete: 'cascade' }),
+  fermataId: text('fermata_id').notNull().references(() => fermate.id, { onDelete: 'cascade' }),
+  ordine: integer('ordine').notNull().default(0),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.lineaId, t.fermataId] }),
+}));
+
 // ---------------------------------------------------------------------
 // TRAGITTI (template riutilizzabili di fermate)
 // ---------------------------------------------------------------------
@@ -408,6 +441,12 @@ export const fermatePercorsoSalvato = pgTable('fermate_percorso_salvato', {
   indirizzo: text('indirizzo').notNull(),
   orario: text('orario'),
   prezzo: numeric('prezzo', { precision: 10, scale: 2 }),
+  // Vedi tipoFermataEnum — deciso qui, sul percorso (il modello
+  // riutilizzabile), non più evento per evento: se uno stesso percorso
+  // si applica a più eventi, ha senso stabilire una volta sola quale
+  // fermata è "Partenza" invece di rifarlo ogni volta in Eventi.
+  tipo: tipoFermataEnum('tipo').notNull().default('PASSAGGIO'),
+  sogliaMinima: integer('soglia_minima'),
 });
 
 // ---------------------------------------------------------------------
