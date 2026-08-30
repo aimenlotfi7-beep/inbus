@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { haPermesso, type SessioneAdmin } from '../../api/auth';
 import { eventiApi } from '../../api/eventi';
 import { listaAttesaApi } from '../../api/listaAttesa';
@@ -136,7 +136,11 @@ export function AdminLayout({
   // qualunque contenitore con lo scroll.
   const sidebarRef = useRef<HTMLElement>(null);
   const qualcheGruppoAperto = Object.values(gruppiCollassati).some((v) => v === false);
-  useEffect(() => {
+  // useLayoutEffect, non useEffect: gira PRIMA che il browser disegni
+  // il pannello a schermo, non dopo — evita che per un fotogramma il
+  // popup compaia con la posizione di prima (o quella di default) e
+  // "salti" in quella giusta un istante dopo.
+  useLayoutEffect(() => {
     if (!qualcheGruppoAperto || !sidebarRef.current) return;
     const altezza = sidebarRef.current.getBoundingClientRect().bottom;
     document.documentElement.style.setProperty('--menu-popup-top', `${altezza}px`);

@@ -244,7 +244,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
     display:flex; flex-direction:column; gap:4px;
     background:var(--sidebar-bg); border-top:1px solid var(--sidebar-line);
     padding:14px 16px; box-shadow:0 16px 32px -8px rgba(0,0,0,.6);
-    max-height:calc(100vh - var(--menu-popup-top, 90px)); overflow-y:auto;
+    max-height:calc(100dvh - var(--menu-popup-top, 90px)); overflow-y:auto;
   }
   .side-group.collassato .side-group-items{display:none;}
   .side-group-items .side-btn{padding:12px 14px; font-size:14.5px;} /* tocco più comodo, essendo ora un vero menu a piena larghezza */
