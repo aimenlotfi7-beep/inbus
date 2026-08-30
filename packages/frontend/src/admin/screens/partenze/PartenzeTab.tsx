@@ -4,7 +4,6 @@ import type { Evento } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { impostazioniApi } from '../../../api/impostazioni';
 import { ErroreApi } from '../../../api/client';
-import { Modale } from '../../shared/Modale';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useSessione } from '../../shared/SessioneContext';
@@ -43,7 +42,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze }: {
   // diversi) — quali tragitti sono rilevanti per QUESTO contesto
   // specifico (filtra i servizi mostrati a solo quelli coinvolti) e
   // quale azione eseguire subito sul primo di loro.
-  contestoPartenze?: { tragittiIds: string[]; azione: 'preventivo' | 'linee' | 'espandi' } | null;
+  contestoPartenze?: { tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi' } | null;
 }) {
   const sessione = useSessione();
   const vedeEconomia = haPermesso(sessione, 'eventi.economia');
@@ -146,7 +145,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze }: {
   // Linee) parte solo per quel primo.
   const focusGestitoRef = useRef(false);
   useEffect(() => {
-    if (focusGestitoRef.current || !contestoPartenze || !eventoCompleto) return;
+    if (focusGestitoRef.current || !contestoPartenze || !eventoCompleto || calcolo.length === 0) return;
     focusGestitoRef.current = true;
     setAperte((prev) => {
       const nuovo = new Set(prev);
@@ -160,7 +159,11 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze }: {
     if (primoTragitto) setServizioAttivo(primoTragitto.servizioId ?? 'liberi');
     if (contestoPartenze.azione === 'preventivo') apriPreventivo(primoTragittoId);
     if (contestoPartenze.azione === 'linee') apriPaginaLinee(primoTragittoId);
-  }, [contestoPartenze, eventoCompleto]);
+    if (contestoPartenze.azione === 'fermate') {
+      const primoCalcolo = calcolo.find((c) => c.tragittoId === primoTragittoId);
+      if (primoCalcolo) apriModificaOperativa(primoCalcolo);
+    }
+  }, [contestoPartenze, eventoCompleto, calcolo]);
 
   function toggleApertura(tragittoId: string) {
     setAperte((prev) => {
@@ -173,6 +176,23 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze }: {
   // Fase 2 — orario/prezzo/posti si modificano da qui, non più da
   // Eventi. I dati veri della fermata (non la versione minima del
   // calcolo bus) arrivano dall'evento completo, già caricato in ricarica().
+  /** Esporta le fermate di un tragitto in CSV (si apre in Excel) — da
+   *  mandare al fornitore per farsi fare il preventivo: città,
+   *  indirizzo e orario di ognuna. */
+  function esportaFermateCsv(nomeTragitto: string, fermate: FermataInput[]) {
+    const intestazione = ['Città', 'Indirizzo', 'Orario'];
+    const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const righeCsv = fermate.map((f) => [f.citta, f.indirizzo, f.orario ?? ''].map(escapeCsv).join(';'));
+    const csv = '\uFEFF' + [intestazione.join(';'), ...righeCsv].join('\n'); // BOM per accenti corretti in Excel
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fermate-${nomeTragitto.replace(/[^a-z0-9]+/gi, '-')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function apriModificaOperativa(tragitto: CalcoloBusTragitto) {
     const tragittoVero = eventoCompleto
       ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragitto.tragittoId)
@@ -508,28 +528,89 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze }: {
               {tragitto.stato === 'PREZZATO' && (
                 <span style={{ fontSize: 10.5, color: 'var(--mist)' }}>Prezzato, bus vero ancora da opzionare</span>
               )}
-              <button
-                type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }}
-                onClick={(e) => { e.stopPropagation(); apriModificaOperativa(tragitto); }}
-              >
-                Modifica orario/prezzo/posti
-              </button>
-              <button
-                type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }}
-                onClick={(e) => { e.stopPropagation(); apriPaginaLinee(tragitto.tragittoId); }}
-              >
-                Gestisci Linee{busTragitto.length > 0 ? ` (${busTragitto.length})` : ''}
-              </button>
-              <button
-                type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px', borderColor: 'var(--pink-dim)', color: 'var(--pink)' }}
-                onClick={(e) => { e.stopPropagation(); apriPreventivo(tragitto.tragittoId); }}
-              >
-                {tragitto.stato === 'DA_CONFERMARE' ? 'Registra preventivo' : 'Vedi/modifica preventivo'}
-              </button>
+              {!contestoPartenze && (
+                <>
+                  <button
+                    type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }}
+                    onClick={(e) => { e.stopPropagation(); apriModificaOperativa(tragitto); }}
+                  >
+                    Modifica orario/prezzo/posti
+                  </button>
+                  <button
+                    type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }}
+                    onClick={(e) => { e.stopPropagation(); apriPaginaLinee(tragitto.tragittoId); }}
+                  >
+                    Gestisci Linee{busTragitto.length > 0 ? ` (${busTragitto.length})` : ''}
+                  </button>
+                  <button
+                    type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px', borderColor: 'var(--pink-dim)', color: 'var(--pink)' }}
+                    onClick={(e) => { e.stopPropagation(); apriPreventivo(tragitto.tragittoId); }}
+                  >
+                    {tragitto.stato === 'DA_CONFERMARE' ? 'Registra preventivo' : 'Vedi/modifica preventivo'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
-          {preventivoAperto === tragitto.tragittoId ? (
+          {tragittoInModifica === tragitto.tragittoId && formOperativo ? (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                <p className="section-label" style={{ marginBottom: 0 }}>Fermate</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={calcolaOrariDaArrivo} disabled={calcolandoOrari}>
+                    {calcolandoOrari ? 'Calcolo orari...' : '↻ Calcola orari dall\'arrivo'}
+                  </button>
+                  <button
+                    type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }}
+                    onClick={() => esportaFermateCsv(tragitto.nome, formOperativo.fermate)}
+                  >
+                    ⤓ Esporta CSV per il fornitore
+                  </button>
+                </div>
+              </div>
+              {statoCalcoloOrari && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoCalcoloOrari}</p>}
+              {formOperativo.fermate.map((f, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
+                  <span style={{ flex: 1, fontSize: 13.5 }}>{f.citta} <span style={{ color: 'var(--mist)' }}>— {f.indirizzo}</span></span>
+                  <div style={{ width: 110 }}>
+                    <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermataOperativa(idx, 'orario', v)} />
+                  </div>
+                  <button
+                    type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
+                    onClick={() => setFormOperativo((form) => form && { ...form, fermate: form.fermate.filter((_, i) => i !== idx) })}
+                  >
+                    Rimuovi
+                  </button>
+                </div>
+              ))}
+              {fermateAnagrafica.length > 0 && (
+                <select
+                  style={{ marginTop: 10 }}
+                  value=""
+                  onChange={(e) => {
+                    const scelta = fermateAnagrafica.find((fa) => fa.id === e.target.value);
+                    if (!scelta) return;
+                    setFormOperativo((form) => form && {
+                      ...form,
+                      fermate: [...form.fermate, { fermataAnagraficaId: scelta.id, citta: scelta.citta, indirizzo: scelta.indirizzo }],
+                    });
+                  }}
+                >
+                  <option value="" disabled>+ Aggiungi una fermata a questa partenza...</option>
+                  {fermateAnagrafica.map((fa) => (
+                    <option key={fa.id} value={fa.id}>{fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}</option>
+                  ))}
+                </select>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <button type="button" className="btn btn-primary" style={{ flex: 1 }} disabled={salvandoOperativo} onClick={salvaOperativo}>
+                  {salvandoOperativo ? 'Salvo...' : 'Salva'}
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => { setTragittoInModifica(null); setFormOperativo(null); }}>Annulla</button>
+              </div>
+            </div>
+          ) : preventivoAperto === tragitto.tragittoId ? (
             <div style={{ marginTop: 14 }}>
               <p className="testo-intro" style={{ marginBottom: 16 }}>
                 Una stima dal fornitore (non un bus vero ancora opzionato) sullo scenario più caro — sblocca la vendita, coi prezzi calcolati per fermata. Se poi costruisci una Linea più economica, il margine extra resta un guadagno in più.
@@ -620,86 +701,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze }: {
         );
       })}
 
-      {tragittoInModifica && formOperativo && (
-        <Modale titolo="Orario, prezzo e posti" onClose={() => setTragittoInModifica(null)} larga>
-          <p className="testo-intro" style={{ marginBottom: 16 }}>
-            Solo per questa partenza — il nome e la sequenza di fermate restano quelli definiti in Eventi.
-          </p>
-          <div className="form-grid" style={{ marginBottom: 16 }}>
-            <div>
-              <p className="section-label" style={{ marginBottom: 4 }}>Posti totali</p>
-              <p style={{ fontSize: 15, fontWeight: 600 }}>
-                {calcolo.find((l) => l.tragittoId === tragittoInModifica)?.postiTotali ?? 0}
-                <span style={{ fontSize: 11.5, color: 'var(--mist)', fontWeight: 400 }}> — dalla somma dei bus censiti qui sotto, non si scrive più a mano</span>
-              </p>
-            </div>
-            <label>Prezzo extra del tragitto (€)
-              <CampoNumero valuta value={formOperativo.prezzoExtra} onChange={(v) => setFormOperativo((f) => f && { ...f, prezzoExtra: v ?? 0 })} />
-            </label>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <p className="section-label">Fermate</p>
-            <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={calcolaOrariDaArrivo} disabled={calcolandoOrari}>
-              {calcolandoOrari ? 'Calcolo orari...' : '↻ Calcola orari dall\'arrivo'}
-            </button>
-          </div>
-          {statoCalcoloOrari && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoCalcoloOrari}</p>}
-          {formOperativo.fermate.map((f, idx) => (
-            <div key={idx} className="section-card" style={{ marginBottom: 10, padding: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <p style={{ fontWeight: 600, fontSize: 13.5 }}>{f.citta} <span style={{ color: 'var(--mist)', fontWeight: 400 }}>— {f.indirizzo}</span></p>
-                <button
-                  type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
-                  onClick={() => setFormOperativo((form) => form && { ...form, fermate: form.fermate.filter((_, i) => i !== idx) })}
-                >
-                  Rimuovi
-                </button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                <div className="campo" style={{ marginBottom: 0 }}>
-                  <label>Orario</label>
-                  <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermataOperativa(idx, 'orario', v)} />
-                </div>
-                <div className="campo" style={{ marginBottom: 0 }}>
-                  <label>Prezzo (€)</label>
-                  <CampoNumero valuta placeholder="es. 30" value={f.prezzo} onChange={(v) => aggiornaFermataOperativa(idx, 'prezzo', v)} />
-                </div>
-                <div className="campo" style={{ marginBottom: 0 }}>
-                  <label>Posti max</label>
-                  <CampoNumero placeholder="facolt." value={f.postiMax} onChange={(v) => aggiornaFermataOperativa(idx, 'postiMax', v)} />
-                </div>
-              </div>
-            </div>
-          ))}
-          {/* Aggiungere/togliere una fermata da qui vale SOLO per
-              questa partenza specifica — non tocca il modello
-              universale in Eventi, né altri eventi che usano lo stesso
-              tragitto/percorso salvato (esattamente la "particolarità
-              per quella partenza" discussa). */}
-          {fermateAnagrafica.length > 0 && (
-            <select
-              value=""
-              style={{ marginBottom: 16 }}
-              onChange={(e) => {
-                const scelta = fermateAnagrafica.find((fa) => fa.id === e.target.value);
-                if (!scelta) return;
-                setFormOperativo((form) => form && {
-                  ...form,
-                  fermate: [...form.fermate, { fermataAnagraficaId: scelta.id, citta: scelta.citta, indirizzo: scelta.indirizzo }],
-                });
-              }}
-            >
-              <option value="" disabled>+ Aggiungi una fermata a questa partenza...</option>
-              {fermateAnagrafica.map((fa) => (
-                <option key={fa.id} value={fa.id}>{fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}</option>
-              ))}
-            </select>
-          )}
-          <button type="button" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={salvandoOperativo} onClick={salvaOperativo}>
-            {salvandoOperativo ? 'Salvo...' : 'Salva'}
-          </button>
-        </Modale>
-      )}
 
     </div>
   );

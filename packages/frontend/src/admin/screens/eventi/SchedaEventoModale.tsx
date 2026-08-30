@@ -52,7 +52,7 @@ export function SchedaEventoModale({
   soloQuestaTab?: boolean;
   // Arrivando da una card di Partenze — quale tragitto aprire subito,
   // e con quale azione (vedi PartenzeTab).
-  contestoPartenze?: { tragittiIds: string[]; azione: 'preventivo' | 'linee' | 'espandi' } | null;
+  contestoPartenze?: { tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi' } | null;
   onClose: () => void;
   onSalvato: () => void;
 }) {
