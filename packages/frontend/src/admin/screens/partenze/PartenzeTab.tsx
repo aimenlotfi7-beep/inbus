@@ -758,14 +758,42 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
               </div>
             );
 
-            // Il riepilogo a righe (Fermate/Preventivo/Linee/Costo) ha
-            // senso solo per "Confermato"/"Passate" — in "Fermate", "Da
-            // prezzare" o "Da confermare" non deve comparire MAI, nemmeno
-            // se l'editor di quella sezione viene chiuso (es. Annulla)
-            // lasciando la card ancora espansa: mostrerebbe di nuovo
-            // Preventivo/Costo in un contesto dove non servono.
-            const contestoAmmetteRiepilogo = !contestoPartenze || contestoPartenze.tabOrigine === 'confermato' || contestoPartenze.tabOrigine === 'passate';
-            if (!espansa || !contestoAmmetteRiepilogo) return null;
+            if (!espansa) return null;
+
+            const tragittoVero = eventoCompleto ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragitto.tragittoId) : undefined;
+
+            // In "Fermate" e "Da prezzare", una volta chiuso l'editor
+            // (calcolato/salvato, o Annulla) deve restare possibile
+            // RIVEDERE quello che c'è già, non sparire del tutto —
+            // altrimenti la freccia sembra non "espandere" più nulla.
+            // Vista di sola lettura, niente pulsanti di modifica (per
+            // quelli si riapre l'editor dal contesto giusto).
+            if (contestoPartenze?.tabOrigine === 'fermate') return (
+              <div style={{ marginTop: 14 }}>
+                <p className="section-label" style={{ marginBottom: 8 }}>Fermate</p>
+                {!tragittoVero || tragittoVero.fermate.length === 0
+                  ? <p className="testo-intro">Nessuna fermata su questo tragitto.</p>
+                  : tragittoVero.fermate.map((f) => (
+                    <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
+                      <span>{f.citta}</span>
+                      <span style={{ color: 'var(--mist)' }}>{f.orario ?? '— orario non impostato'}</span>
+                    </div>
+                  ))}
+              </div>
+            );
+            if (contestoPartenze?.tabOrigine === 'da-prezzare') return (
+              <div style={{ marginTop: 14 }}>
+                <p className="section-label" style={{ marginBottom: 8 }}>Preventivo</p>
+                {tragittoVero?.preventivoCosto
+                  ? <p style={{ fontSize: 13.5 }}>€{Number(tragittoVero.preventivoCosto).toFixed(0)} · {tragittoVero.preventivoPostiBus ?? '—'} posti presunti</p>
+                  : <p className="testo-intro">Nessun preventivo ancora registrato.</p>}
+              </div>
+            );
+            if (contestoPartenze?.tabOrigine === 'da-confermare') return null;
+
+            // Il riepilogo a righe (Fermate/Preventivo/Linee/Costo) resta
+            // solo per "Confermato"/"Passate" (o senza contesto, caso di
+            // riserva) — è lì che ha senso vedere tutto insieme.
 
             // Riepilogo a righe (tab "Confermato"/"Passate") — ogni riga
             // rimanda alla tab in alto corrispondente per modificare quel
@@ -776,7 +804,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
             const busNelleLinee = linee.flatMap((l) => l.bus);
             const postiNelleLinee = busNelleLinee.reduce((tot, b) => tot + (b.postiBus ?? 0), 0);
             const dati = economia.find((e) => e.tragittoId === tragitto.tragittoId);
-            const tragittoVero = eventoCompleto ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragitto.tragittoId) : undefined;
             const rigaStile: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--line)' };
             return (
               <div style={{ marginTop: 14 }}>

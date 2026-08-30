@@ -427,12 +427,23 @@ export function SchedaEventoModale({
       servizioId: servizioIdContestoAttuale(),
       fermate: fermateConAnagrafica,
     };
+    // Aggiornamento FUNZIONALE (legge lo stato più recente al momento
+    // vero dell'esecuzione, non quello catturato quando la funzione è
+    // stata chiamata) — essenziale qui perché la funzione è asincrona
+    // (aspetta le chiamate all'anagrafica fermate): aggiungendo un
+    // tragitto a un servizio e subito dopo un altro a un secondo
+    // servizio, le due chiamate si sovrappongono nel tempo — con un
+    // aggiornamento non funzionale, la seconda `setForm` avrebbe
+    // sovrascritto il risultato usando ancora l'istantanea DI PRIMA
+    // (senza il primo tragitto appena aggiunto), perdendolo. Bug
+    // trovato proprio così: "creo un evento a due servizi, non si
+    // salva correttamente".
+    setForm((f) => ({ ...f, tragitti: [...(f.tragitti ?? []), nuovoTragitto] }));
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
-    setForm({ ...form, tragitti: [...(form.tragitti ?? []), nuovoTragitto] });
   }
   function aggiungiTragittoManuale() {
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
-    setForm({ ...form, tragitti: [...(form.tragitti ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, attivo: true, servizioId: servizioIdContestoAttuale(), fermate: [{ citta: '', indirizzo: '' }] }] });
+    setForm((f) => ({ ...f, tragitti: [...(f.tragitti ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, attivo: true, servizioId: servizioIdContestoAttuale(), fermate: [{ citta: '', indirizzo: '' }] }] }));
   }
 
 
