@@ -52,8 +52,6 @@ export const tragittoSchema = z.object({
 const servizioSchema = z.object({
   id: z.string().optional(),
   nome: z.string().min(1),
-  arrivoIndirizzo: z.string().optional(),
-  arrivoOrario: z.string().optional(),
   tragitti: z.array(tragittoSchema).default([]),
 });
 
@@ -76,11 +74,6 @@ export const creaEventoSchema = z.object({
   vetrinaAl: z.coerce.date().optional(),
   accontoEur: z.number().positive().optional(),
   statoDisponibilita: z.enum(['POCHI_POSTI', 'NUOVI_POSTI', 'ESAURITO']).nullable().optional(),
-  // L'arrivo (destinazione + orario) è unico per l'evento e si applica a
-  // tutte le sue tratte: è l'ancora da cui si calcolano a ritroso gli
-  // orari delle fermate. I tragitti restano solo fermate+prezzo, riusabili.
-  arrivoIndirizzo: z.string().optional(),
-  arrivoOrario: z.string().optional(),
   visibileSito: z.boolean().default(true),
   bozza: z.boolean().optional(),
   descrizione: z.string().optional(),

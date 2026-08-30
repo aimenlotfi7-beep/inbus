@@ -62,18 +62,6 @@ export const eventiController = {
     res.json(await eventiService.listaBus(req.params.id));
   },
 
-  async creaServizio(req: Request, res: Response) {
-    const nuovo = await eventiService.creaServizio(req.params.id, req.body.nome, req.body.arrivoOrario);
-    res.status(201).json(nuovo);
-  },
-  async aggiornaServizio(req: Request, res: Response) {
-    res.json(await eventiService.aggiornaServizio(req.params.servizioId, req.body));
-  },
-  async eliminaServizio(req: Request, res: Response) {
-    await eventiService.eliminaServizio(req.params.servizioId);
-    res.status(204).send();
-  },
-
   async creaLinea(req: Request, res: Response) {
     const risultato = await eventiService.creaLinea(req.params.id, req.body);
     res.status(201).json(risultato);

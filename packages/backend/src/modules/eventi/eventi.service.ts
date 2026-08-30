@@ -307,22 +307,6 @@ export const eventiService = {
   /** Crea un servizio (pacchetto bus distinto) per un evento — da qui
    *  in poi le tratte di quell'evento possono essere assegnate a
    *  questo servizio invece che restare "libere". */
-  async creaServizio(eventoId: string, nome: string, arrivoOrario?: string) {
-    const [nuovo] = await db.insert(servizi).values({ eventoId, nome, arrivoOrario }).returning();
-    return nuovo;
-  },
-  async aggiornaServizio(id: string, dati: { nome?: string; arrivoIndirizzo?: string | null; arrivoOrario?: string | null }) {
-    const [aggiornato] = await db.update(servizi).set(dati).where(eq(servizi.id, id)).returning();
-    if (!aggiornato) throw new NonTrovato('Servizio');
-    return aggiornato;
-  },
-  /** Eliminare un servizio libera le sue tratte (tornano "senza
-   *  servizio"), non le cancella — evita di perdere lavoro fatto per
-   *  errore nel censimento. */
-  async eliminaServizio(id: string) {
-    await db.update(tragitti).set({ servizioId: null }).where(eq(tragitti.servizioId, id));
-    await db.delete(servizi).where(eq(servizi.id, id));
-  },
 
   async list(query: ListaEventiQuery) {
     // Nascosti sempre, sia per il gestionale sia per il sito pubblico —
@@ -419,8 +403,6 @@ export const eventiService = {
           vetrinaAl: input.vetrinaAl,
           accontoEur: input.accontoEur?.toFixed(2),
           statoDisponibilita: input.statoDisponibilita,
-          arrivoIndirizzo: input.arrivoIndirizzo,
-          arrivoOrario: input.arrivoOrario,
           visibileSito: input.visibileSito,
           bozza: input.bozza ?? false,
           descrizione: input.descrizione,
@@ -446,7 +428,7 @@ export const eventiService = {
       }
       for (const servizio of input.servizi) {
         const [nuovoServizio] = await tx.insert(servizi).values({
-          eventoId: nuovoEvento.id, nome: servizio.nome, arrivoIndirizzo: servizio.arrivoIndirizzo, arrivoOrario: servizio.arrivoOrario,
+          eventoId: nuovoEvento.id, nome: servizio.nome,
         }).returning();
         for (const tragitto of servizio.tragitti) {
           await inserisciTragitto(tx, nuovoEvento.id, nuovoServizio.id, tragitto);
@@ -479,8 +461,6 @@ export const eventiService = {
           ...(input.accontoEur !== undefined && { accontoEur: input.accontoEur.toFixed(2) }),
           ...(input.statoDisponibilita !== undefined && { statoDisponibilita: input.statoDisponibilita }),
           ...(nuovoSlug !== undefined && { slug: nuovoSlug }),
-          ...(input.arrivoIndirizzo !== undefined && { arrivoIndirizzo: input.arrivoIndirizzo }),
-          ...(input.arrivoOrario !== undefined && { arrivoOrario: input.arrivoOrario }),
           ...(input.visibileSito !== undefined && { visibileSito: input.visibileSito }),
           ...(input.bozza !== undefined && { bozza: input.bozza }),
           ...(input.descrizione !== undefined && { descrizione: input.descrizione }),
@@ -539,10 +519,10 @@ export const eventiService = {
 
         for (const servizio of input.servizi) {
           if (servizio.id) {
-            await tx.update(servizi).set({ nome: servizio.nome, arrivoIndirizzo: servizio.arrivoIndirizzo, arrivoOrario: servizio.arrivoOrario }).where(eq(servizi.id, servizio.id));
+            await tx.update(servizi).set({ nome: servizio.nome }).where(eq(servizi.id, servizio.id));
             for (const tragitto of servizio.tragitti) bersagli.push({ servizioId: servizio.id, tragitto });
           } else {
-            const [nuovoServizio] = await tx.insert(servizi).values({ eventoId: id, nome: servizio.nome, arrivoIndirizzo: servizio.arrivoIndirizzo, arrivoOrario: servizio.arrivoOrario }).returning();
+            const [nuovoServizio] = await tx.insert(servizi).values({ eventoId: id, nome: servizio.nome }).returning();
             for (const tragitto of servizio.tragitti) bersagli.push({ servizioId: nuovoServizio.id, tragitto });
           }
         }

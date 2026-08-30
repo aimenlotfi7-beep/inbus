@@ -54,10 +54,6 @@ eventiRouter.delete(
 eventiRouter.get('/:id/calcola-bus', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.calcolaBus));
 eventiRouter.get('/:id/bus', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaBus));
 
-eventiRouter.post('/:id/servizi', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.creaServizio));
-eventiRouter.put('/:id/servizi/:servizioId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.aggiornaServizio));
-eventiRouter.delete('/:id/servizi/:servizioId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.eliminaServizio));
-
 eventiRouter.post('/:id/linee', richiedeAuth, richiedePermesso('eventi.crea'), valida(creaLineaSchema), asyncHandler(eventiController.creaLinea));
 eventiRouter.post('/linee/:lineaId/bus', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiungiBusALineaSchema), asyncHandler(eventiController.aggiungiBusALinea));
 eventiRouter.put('/:id/linee/:lineaId/percorso', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaPercorsoLineaSchema), asyncHandler(eventiController.aggiornaPercorsoLinea));

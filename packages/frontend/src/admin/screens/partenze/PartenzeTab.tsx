@@ -210,6 +210,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze }: {
       })),
     });
     setTragittoInModifica(tragitto.tragittoId);
+    setPreventivoAperto(null); // due pannelli in linea non possono restare aperti insieme sullo stesso tragitto
     setStatoCalcoloOrari('');
   }
 
@@ -243,6 +244,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze }: {
    *  preventivo, non c'era più modo di rivederlo — bug corretto qui. */
   function apriPreventivo(tragittoId: string) {
     setPreventivoAperto(tragittoId);
+    setTragittoInModifica(null); // due pannelli in linea non possono restare aperti insieme sullo stesso tragitto
     setAperte((prev) => new Set(prev).add(tragittoId));
     const tragittoVero = eventoCompleto
       ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragittoId)
