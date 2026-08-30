@@ -73,8 +73,8 @@ export function SchedaEventoModale({
   // (anche alla primissima creazione dell'evento): quelli già esistenti
   // hanno l'id vero del server, quelli appena aggiunti hanno una
   // chiave temporanea che il backend riconosce come "nuovo" (nessun id).
-  const [servizi, setServizi] = useState<{ key: string; id?: string; nome: string; arrivoIndirizzo?: string; arrivoOrario?: string; daRinominare?: boolean }[]>(
-    (evento?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoIndirizzo: p.arrivoIndirizzo ?? undefined, arrivoOrario: p.arrivoOrario ?? undefined }))
+  const [servizi, setServizi] = useState<{ key: string; id?: string; nome: string; daRinominare?: boolean }[]>(
+    (evento?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome }))
   );
   // Due modalità nettamente separate: con un solo servizio (o nessuno) è
   // la stessa identica interfaccia di prima, senza nessun concetto di
@@ -102,7 +102,7 @@ export function SchedaEventoModale({
   function nuovoServizio() {
     const chiave = `nuovo-${Date.now()}`;
     const numero = servizi.length + 1;
-    setServizi((prev) => [...prev, { key: chiave, nome: `Servizio ${numero}`, arrivoOrario: undefined, daRinominare: true }]);
+    setServizi((prev) => [...prev, { key: chiave, nome: `Servizio ${numero}`, daRinominare: true }]);
     setModalitaServizi('multiplo');
     setServizioTabAttivo(chiave);
     // Nome già pronto (default) — subito utilizzabile con un click, non
@@ -136,8 +136,8 @@ export function SchedaEventoModale({
     }));
     setServizi((prev) => [
       ...prev,
-      { key: chiavePrimo, nome: 'Servizio 1', arrivoIndirizzo: form.arrivoIndirizzo, arrivoOrario: form.arrivoOrario, daRinominare: true },
-      { key: chiaveSecondo, nome: 'Servizio 2', arrivoOrario: undefined, daRinominare: true },
+      { key: chiavePrimo, nome: 'Servizio 1', daRinominare: true },
+      { key: chiaveSecondo, nome: 'Servizio 2', daRinominare: true },
     ]);
     setServizioTabAttivo(chiaveSecondo); // porta dritto a compilare quello nuovo
   }
@@ -194,8 +194,6 @@ export function SchedaEventoModale({
         slug: sorgente.slug,
         accontoEur: sorgente.accontoEur ? Number(sorgente.accontoEur) : 10,
         statoDisponibilita: sorgente.statoDisponibilita,
-        arrivoIndirizzo: sorgente.arrivoIndirizzo ?? undefined,
-        arrivoOrario: sorgente.arrivoOrario ?? undefined,
         visibileSito: sorgente.visibileSito,
         descrizione: sorgente.descrizione ?? undefined,
         descrizioneSeo: sorgente.descrizioneSeo ?? undefined,
@@ -229,7 +227,7 @@ export function SchedaEventoModale({
       setStep(1);
     }
     setForm(nuovoForm);
-    const serviziCaricati = (sorgente?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome, arrivoIndirizzo: p.arrivoIndirizzo ?? undefined, arrivoOrario: p.arrivoOrario ?? undefined }));
+    const serviziCaricati = (sorgente?.servizi ?? []).map((p) => ({ key: p.id, id: p.id, nome: p.nome }));
     setServizi(serviziCaricati);
     setModalitaServizi(serviziCaricati.length >= 1 ? 'multiplo' : 'singolo');
     setServizioTabAttivo(serviziCaricati[0]?.key ?? null);
@@ -574,8 +572,6 @@ export function SchedaEventoModale({
       servizi: servizi.map((v) => ({
         id: v.id, // assente = servizio nuovo, non ancora salvato
         nome: v.nome,
-        arrivoIndirizzo: v.arrivoIndirizzo,
-        arrivoOrario: v.arrivoOrario,
         tragitti: tratteValide.filter((l) => l.servizioId === v.key).map((l) => ({ ...l, servizioId: undefined })),
       })),
     };

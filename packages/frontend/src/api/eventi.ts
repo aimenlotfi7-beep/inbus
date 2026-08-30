@@ -20,9 +20,6 @@ export interface EventoInput {
   slug?: string;
   inEvidenza?: boolean; ordineEvidenza?: number; accontoEur?: number;
   statoDisponibilita?: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
-  // L'arrivo (destinazione + orario) è unico per l'evento e si applica a
-  // tutte le sue tratte come ancora per il calcolo orari.
-  arrivoIndirizzo?: string; arrivoOrario?: string;
   visibileSito?: boolean;
   bozza?: boolean;
   descrizione?: string;
@@ -34,7 +31,7 @@ export interface EventoInput {
   // I servizi (pacchetti bus distinti dentro lo stesso evento) — ognuno
   // con i propri tragitti annidati. Facoltativo: la maggior parte degli
   // eventi non ne ha bisogno.
-  servizi?: { id?: string; nome: string; arrivoIndirizzo?: string; arrivoOrario?: string; tragitti: TragittoInput[] }[];
+  servizi?: { id?: string; nome: string; tragitti: TragittoInput[] }[];
 }
 
 export interface FermataConPasseggeri { fermataId: string; citta: string; passeggeri: number; }
@@ -104,8 +101,7 @@ export const eventiApi = {
   // Fase 2 — orario/prezzo/posti si modificano da Partenze, non più da
   // Eventi. aggiornaServizio esisteva già lato backend (mai usata dal
   // frontend finora) — qui il client mancante.
-  aggiornaServizio: (eventoId: string, servizioId: string, input: { nome?: string; arrivoIndirizzo?: string | null; arrivoOrario?: string | null }) =>
-    api.put<{ id: string; nome: string; arrivoIndirizzo: string | null; arrivoOrario: string | null }>(`/api/eventi/${eventoId}/servizi/${servizioId}`, input),
+
   aggiornaTragittoOperativo: (tragittoId: string, input: { prezzoExtra?: number; fermate: FermataInput[] }) =>
     api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/operativo`, input),
   registraPreventivo: (tragittoId: string, input: { preventivoCosto: number; preventivoPostiBus: number; prezziPerFermata: { fermataId: string; prezzo: number }[] }) =>
