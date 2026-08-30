@@ -42,7 +42,9 @@ export function PartenzeScreen() {
   const [partenze, setPartenze] = useState<Partenza[]>([]);
   const [selezionato, setSelezionato] = useState<{ evento: Evento; tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi'; tabOrigine: Tab } | null>(null);
   const [ricerca, setRicerca] = useState('');
-  const [tab, setTab] = useState<Tab>('fermate');
+  const TAB_VALIDE: Tab[] = ['fermate', 'da-prezzare', 'da-confermare', 'confermato', 'passate'];
+  const tabDaUrl = new URLSearchParams(window.location.search).get('partenzeTab') as Tab | null;
+  const [tab, setTab] = useState<Tab>(tabDaUrl && TAB_VALIDE.includes(tabDaUrl) ? tabDaUrl : 'fermate');
   const [caricamento, setCaricamento] = useState(true);
 
   function ricarica() {

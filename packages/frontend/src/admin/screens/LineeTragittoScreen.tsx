@@ -65,11 +65,13 @@ export function LineeTragittoScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventoId, tragittoId]);
 
-  function tornaAPartenze() {
+  function tornaAPartenze(tabDestinazione?: 'fermate' | 'da-prezzare' | 'da-confermare') {
     const url = new URL(window.location.href);
     url.searchParams.set('sezione', 'partenze');
     url.searchParams.delete('evento');
     url.searchParams.delete('tragitto');
+    if (tabDestinazione) url.searchParams.set('partenzeTab', tabDestinazione);
+    else url.searchParams.delete('partenzeTab');
     window.location.href = url.toString();
   }
 
@@ -78,7 +80,7 @@ export function LineeTragittoScreen() {
       <div>
         <PanelHead titolo="Linee" />
         <p className="testo-intro" style={{ color: 'var(--pink)' }}>Manca il riferimento all'evento o al tragitto — torna a Partenze e riprova.</p>
-        <button className="btn btn-ghost" onClick={tornaAPartenze}>← Torna a Partenze</button>
+        <button className="btn btn-ghost" onClick={() => tornaAPartenze()}>← Torna a Partenze</button>
       </div>
     );
   }
@@ -98,7 +100,7 @@ export function LineeTragittoScreen() {
       <div>
         <PanelHead titolo="Linee" />
         <p className="testo-intro" style={{ color: 'var(--pink)' }}>Questo tragitto non esiste più, o è stato eliminato.</p>
-        <button className="btn btn-ghost" onClick={tornaAPartenze}>← Torna a Partenze</button>
+        <button className="btn btn-ghost" onClick={() => tornaAPartenze()}>← Torna a Partenze</button>
       </div>
     );
   }
@@ -217,7 +219,47 @@ export function LineeTragittoScreen() {
 
   return (
     <div>
-      <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={tornaAPartenze}>← Torna a Partenze</button>
+      <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => tornaAPartenze()}>← Torna a Partenze</button>
+
+      {/* Stesso indicatore di Partenze, con lo stesso sblocco
+          progressivo — qui si arriva sempre dal contesto "Da
+          confermare" (unico che porta a questa pagina), quindi è
+          sempre quella evidenziata. "Confermato"/"Passate" restano
+          solo visive (nessun editor dove atterrare da lì). */}
+      {(() => {
+        const ETICHETTE_CONTESTO: Record<string, string> = {
+          fermate: 'Fermate', 'da-prezzare': 'Da prezzare', 'da-confermare': 'Da confermare', confermato: 'Confermato', passate: 'Passate',
+        };
+        const fermateCompilate = tragittoVero.fermate.some((f) => f.orario);
+        const preventivoCompilato = !!tragittoVero.preventivoCosto;
+        const SBLOCCO: Record<string, boolean> = {
+          fermate: true,
+          'da-prezzare': fermateCompilate,
+          'da-confermare': fermateCompilate && preventivoCompilato,
+          confermato: true, // già ci sei: questa pagina Linee esiste solo perché la Linea è in corso di costruzione qui
+          passate: true,
+        };
+        return (
+          <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+            {(['fermate', 'da-prezzare', 'da-confermare', 'confermato', 'passate'] as const).map((t) => {
+              const navigabile = t === 'fermate' || t === 'da-prezzare' || t === 'da-confermare';
+              const cliccabile = navigabile && SBLOCCO[t] && t !== 'da-confermare';
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  className={`mini-tab${t === 'da-confermare' ? ' active' : ''}`}
+                  style={{ cursor: cliccabile ? 'pointer' : 'default', opacity: navigabile && !SBLOCCO[t] ? 0.5 : 1 }}
+                  disabled={!cliccabile}
+                  onClick={cliccabile ? () => tornaAPartenze(t as 'fermate' | 'da-prezzare' | 'da-confermare') : undefined}
+                >
+                  {ETICHETTE_CONTESTO[t]}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* 1. RIEPILOGO PARTENZA */}
       <PanelHead titolo={tragittoVero.nome} info={evento.artista} />
