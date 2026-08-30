@@ -1340,6 +1340,7 @@ export const eventiService = {
       eventoLuogo: eventi.luogo,
       eventoSlug: eventi.slug,
       servizioNome: servizi.nome,
+      servizioId: tragitti.servizioId,
     }).from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
       .leftJoin(servizi, eq(servizi.id, tragitti.servizioId))
@@ -1372,6 +1373,7 @@ export const eventiService = {
       totalePasseggeri: mappaPasseggeri.get(r.tragittoId) ?? 0,
       preventivoCosto: r.preventivoCosto,
       servizioNome: r.servizioNome,
+      servizioId: r.servizioId,
       evento: {
         id: r.eventoId,
         artista: r.eventoArtista,

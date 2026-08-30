@@ -120,7 +120,7 @@ export const eventiApi = {
     tragittoId: string; tragittoNome: string;
     stato: 'DA_CONFERMARE' | 'PREZZATO' | 'CONFERMATO';
     postiTotali: number; totalePasseggeri: number;
-    preventivoCosto: string | null; servizioNome: string | null;
+    preventivoCosto: string | null; servizioNome: string | null; servizioId: string | null;
     evento: { id: string; artista: string; genere: string; data: string; citta: string; luogo: string; slug: string; immagineUrl: string | null };
   }>>('/api/eventi/elenco-partenze'),
   statistichePerEvento: () => api.get<Record<string, { partecipanti: number; busCensiti: number }>>('/api/eventi/statistiche-per-evento'),

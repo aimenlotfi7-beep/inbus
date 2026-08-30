@@ -35,14 +35,15 @@ function statoTragitto(tragitto: CalcoloBusTragitto) {
 /** Sezione "Partenze" di un singolo evento: riepilogo generale, calcolo
  *  bus necessari, copertura tratte, censimento bus fisici. Va dentro la
  *  scheda dell'evento (tab). */
-export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
+export function PartenzeTab({ eventoId, servizi, contestoPartenze }: {
   eventoId: string;
   servizi?: { key: string; nome: string }[];
-  // Arrivando da una card specifica in Partenze (una per "Prezzato",
-  // "Da confermare", ecc.) si vuole atterrare DIRETTAMENTE sul
-  // pannello giusto per quel tragitto, non su un elenco generico da
-  // dover riesplorare — vedi useEffect più sotto.
-  tragittoFocus?: { tragittoId: string; azione: 'preventivo' | 'linee' | 'espandi' } | null;
+  // Arrivando da una card di Partenze (raggruppata per evento, che può
+  // comparire in più tab insieme se le sue parti sono in stati
+  // diversi) — quali tragitti sono rilevanti per QUESTO contesto
+  // specifico (filtra i servizi mostrati a solo quelli coinvolti) e
+  // quale azione eseguire subito sul primo di loro.
+  contestoPartenze?: { tragittiIds: string[]; azione: 'preventivo' | 'linee' | 'espandi' } | null;
 }) {
   const sessione = useSessione();
   const vedeEconomia = haPermesso(sessione, 'eventi.economia');
@@ -139,14 +140,27 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
   // Atterraggio diretto da una card di Partenze — una volta sola,
   // appena i dati sono pronti (non ad ogni ricarica successiva,
   // altrimenti riaprirebbe il pannello anche dopo un salvataggio).
+  // Espande TUTTI i tragitti del contesto (potrebbero essere più di
+  // uno, se l'evento ha più servizi/percorsi nello stesso stato) e
+  // sposta la tab servizio sul primo di loro; l'azione (preventivo,
+  // Linee) parte solo per quel primo.
   const focusGestitoRef = useRef(false);
   useEffect(() => {
-    if (focusGestitoRef.current || !tragittoFocus || !eventoCompleto) return;
+    if (focusGestitoRef.current || !contestoPartenze || !eventoCompleto) return;
     focusGestitoRef.current = true;
-    setAperte((prev) => new Set(prev).add(tragittoFocus.tragittoId));
-    if (tragittoFocus.azione === 'preventivo') apriPreventivo(tragittoFocus.tragittoId);
-    if (tragittoFocus.azione === 'linee') apriPaginaLinee(tragittoFocus.tragittoId);
-  }, [tragittoFocus, eventoCompleto]);
+    setAperte((prev) => {
+      const nuovo = new Set(prev);
+      for (const id of contestoPartenze.tragittiIds) nuovo.add(id);
+      return nuovo;
+    });
+    const primoTragittoId = contestoPartenze.tragittiIds[0];
+    if (!primoTragittoId) return;
+    const tuttiITragitti = [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)];
+    const primoTragitto = tuttiITragitti.find((t) => t.id === primoTragittoId);
+    if (primoTragitto) setServizioAttivo(primoTragitto.servizioId ?? 'liberi');
+    if (contestoPartenze.azione === 'preventivo') apriPreventivo(primoTragittoId);
+    if (contestoPartenze.azione === 'linee') apriPaginaLinee(primoTragittoId);
+  }, [contestoPartenze, eventoCompleto]);
 
   function toggleApertura(tragittoId: string) {
     setAperte((prev) => {
@@ -209,6 +223,7 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
    *  preventivo, non c'era più modo di rivederlo — bug corretto qui. */
   function apriPreventivo(tragittoId: string) {
     setPreventivoAperto(tragittoId);
+    setAperte((prev) => new Set(prev).add(tragittoId));
     const tragittoVero = eventoCompleto
       ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragittoId)
       : undefined;
@@ -393,9 +408,10 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
 
   // Se ci sono servizi, questa sezione si comporta come se ognuno fosse
   // un evento a parte: filtro i tragitti mostrati secondo la tab scelta.
-  const calcoloVisibile = (servizi && servizi.length > 0)
+  const calcoloVisibile = ((servizi && servizi.length > 0)
     ? calcolo.filter((l) => (servizioAttivo === 'liberi' ? !l.servizioId : l.servizioId === servizioAttivo))
-    : calcolo;
+    : calcolo
+  ).filter((l) => !contestoPartenze || contestoPartenze.tragittiIds.includes(l.tragittoId));
   const trattoCoperteVisibili = calcoloVisibile.filter((l) => l.coperta).length;
   const trattoConProblemiVisibili = calcoloVisibile.filter((l) => l.totalePasseggeri > l.postiTotali).length;
 
@@ -408,7 +424,12 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
             // qualcosa da gestire qui — non serve aspettare che abbia
             // già prenotazioni (un evento appena confermato, ancora
             // senza prenotazioni, deve comunque mostrare le sue tab).
+            // Se si arriva da una card di Partenze con un contesto
+            // specifico (es. "Da prezzare"), si vedono SOLO i servizi
+            // coinvolti in quello stato — non tutti quelli dell'evento,
+            // per restare sulla porzione rilevante a quella card.
             .filter((v) => calcolo.some((l) => l.servizioId === v.key))
+            .filter((v) => !contestoPartenze || calcolo.some((l) => l.servizioId === v.key && contestoPartenze.tragittiIds.includes(l.tragittoId)))
             .map((v) => {
             const nonCopertiQui = calcolo.filter((l) => l.servizioId === v.key && l.totalePasseggeri > 0 && !l.coperta).length;
             return (
@@ -422,7 +443,7 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
               </button>
             );
           })}
-          {calcolo.some((l) => !l.servizioId) && (() => {
+          {calcolo.some((l) => !l.servizioId) && (!contestoPartenze || calcolo.some((l) => !l.servizioId && contestoPartenze.tragittiIds.includes(l.tragittoId))) && (() => {
             const nonCopertiLiberi = calcolo.filter((l) => !l.servizioId && l.totalePasseggeri > 0 && !l.coperta).length;
             return (
               <button type="button" className={`mini-tab${servizioAttivo === 'liberi' ? ' active' : ''}`} onClick={() => setServizioAttivo('liberi')}>
@@ -508,7 +529,46 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
             </div>
           </div>
 
-          {espansa && (
+          {preventivoAperto === tragitto.tragittoId ? (
+            <div style={{ marginTop: 14 }}>
+              <p className="testo-intro" style={{ marginBottom: 16 }}>
+                Una stima dal fornitore (non un bus vero ancora opzionato) sullo scenario più caro — sblocca la vendita, coi prezzi calcolati per fermata. Se poi costruisci una Linea più economica, il margine extra resta un guadagno in più.
+              </p>
+              <div className="form-grid" style={{ marginBottom: 16 }}>
+                <label>Costo del preventivo (€)
+                  <CampoNumero valuta value={formPreventivo.costo} onChange={(v) => setFormPreventivo((f) => ({ ...f, costo: v }))} />
+                </label>
+                <label>Posti presunti del bus
+                  <CampoNumero value={formPreventivo.postiBus} onChange={(v) => setFormPreventivo((f) => ({ ...f, postiBus: v }))} />
+                </label>
+              </div>
+              <button type="button" className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={calcolaPrezziPreventivo} disabled={calcolandoPreventivo}>
+                {calcolandoPreventivo ? 'Calcolo prezzi...' : '↻ Calcola prezzi per fermata'}
+              </button>
+              {statoCalcoloPreventivo && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 12 }}>{statoCalcoloPreventivo}</p>}
+              {prezziCalcolati && prezziCalcolati.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <p className="section-label" style={{ marginBottom: 8 }}>Prezzi calcolati — controllali prima di confermare</p>
+                  {prezziCalcolati.map((p) => (
+                    <div key={p.fermataId} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
+                      <span>{p.citta} <span style={{ color: 'var(--mist)', fontSize: 12 }}>({p.distanza >= 0 ? `${p.distanza} km dall'arrivo` : 'distanza da ricalcolare'})</span></span>
+                      <strong>€{p.prezzo}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button" className="btn btn-primary" style={{ flex: 1 }}
+                  disabled={!prezziCalcolati || prezziCalcolati.length === 0 || salvandoPreventivo}
+                  onClick={salvaPreventivo}
+                >
+                  {salvandoPreventivo ? 'Salvo...' : 'Conferma e vai in vendita'}
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => setPreventivoAperto(null)}>Annulla</button>
+              </div>
+            </div>
+          ) : espansa && (
             <div style={{ marginTop: 14 }}>
               <p style={{ fontSize: 14, marginBottom: 10 }}>
                 <strong>Bus suggeriti: {tragitto.busSuggeriti}</strong>
@@ -637,44 +697,6 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
           )}
           <button type="button" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} disabled={salvandoOperativo} onClick={salvaOperativo}>
             {salvandoOperativo ? 'Salvo...' : 'Salva'}
-          </button>
-        </Modale>
-      )}
-
-      {preventivoAperto && (
-        <Modale titolo="Registra preventivo" onClose={() => setPreventivoAperto(null)} larga>
-          <p className="testo-intro" style={{ marginBottom: 16 }}>
-            Una stima dal fornitore (non un bus vero ancora opzionato) sullo scenario più caro — sblocca la vendita, coi prezzi calcolati per fermata. Se poi costruisci una Linea più economica, il margine extra resta un guadagno in più.
-          </p>
-          <div className="form-grid" style={{ marginBottom: 16 }}>
-            <label>Costo del preventivo (€)
-              <CampoNumero valuta value={formPreventivo.costo} onChange={(v) => setFormPreventivo((f) => ({ ...f, costo: v }))} />
-            </label>
-            <label>Posti presunti del bus
-              <CampoNumero value={formPreventivo.postiBus} onChange={(v) => setFormPreventivo((f) => ({ ...f, postiBus: v }))} />
-            </label>
-          </div>
-          <button type="button" className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={calcolaPrezziPreventivo} disabled={calcolandoPreventivo}>
-            {calcolandoPreventivo ? 'Calcolo prezzi...' : '↻ Calcola prezzi per fermata'}
-          </button>
-          {statoCalcoloPreventivo && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 12 }}>{statoCalcoloPreventivo}</p>}
-          {prezziCalcolati && prezziCalcolati.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <p className="section-label" style={{ marginBottom: 8 }}>Prezzi calcolati — controllali prima di confermare</p>
-              {prezziCalcolati.map((p) => (
-                <div key={p.fermataId} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
-                  <span>{p.citta} <span style={{ color: 'var(--mist)', fontSize: 12 }}>({p.distanza >= 0 ? `${p.distanza} km dall'arrivo` : 'distanza da ricalcolare'})</span></span>
-                  <strong>€{p.prezzo}</strong>
-                </div>
-              ))}
-            </div>
-          )}
-          <button
-            type="button" className="btn btn-primary" style={{ width: '100%' }}
-            disabled={!prezziCalcolati || prezziCalcolati.length === 0 || salvandoPreventivo}
-            onClick={salvaPreventivo}
-          >
-            {salvandoPreventivo ? 'Salvo...' : 'Conferma e vai in vendita'}
           </button>
         </Modale>
       )}
