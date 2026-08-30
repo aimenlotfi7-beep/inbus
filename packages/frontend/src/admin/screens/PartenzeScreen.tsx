@@ -40,7 +40,7 @@ type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
 export function PartenzeScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [partenze, setPartenze] = useState<Partenza[]>([]);
-  const [selezionato, setSelezionato] = useState<{ evento: Evento; tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi' } | null>(null);
+  const [selezionato, setSelezionato] = useState<{ evento: Evento; tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi'; tabOrigine: Tab } | null>(null);
   const [ricerca, setRicerca] = useState('');
   const [tab, setTab] = useState<Tab>('fermate');
   const [caricamento, setCaricamento] = useState(true);
@@ -115,10 +115,10 @@ export function PartenzeScreen() {
     const tragittiIds = gruppo.map((p) => p.tragittoId);
     const eventoId = gruppo[0].evento.id;
     const eventoInMemoria = eventi.find((ev) => ev.id === eventoId);
-    if (eventoInMemoria) setSelezionato({ evento: eventoInMemoria, tragittiIds, azione }); // subito, non far vedere niente mentre carica
+    if (eventoInMemoria) setSelezionato({ evento: eventoInMemoria, tragittiIds, azione, tabOrigine: tab }); // subito, non far vedere niente mentre carica
     try {
       const fresco = await eventiApi.getById(eventoId);
-      setSelezionato({ evento: fresco, tragittiIds, azione });
+      setSelezionato({ evento: fresco, tragittiIds, azione, tabOrigine: tab });
     } catch {
       // Se il fetch fallisce, resta la versione già in memoria (se c'era).
     }
@@ -130,7 +130,8 @@ export function PartenzeScreen() {
         evento={selezionato.evento}
         tabIniziale="partenze"
         soloQuestaTab
-        contestoPartenze={{ tragittiIds: selezionato.tragittiIds, azione: selezionato.azione }}
+        contestoPartenze={{ tragittiIds: selezionato.tragittiIds, azione: selezionato.azione, tabOrigine: selezionato.tabOrigine }}
+        onNavigaTab={(t) => { setSelezionato(null); setTab(t); }}
         onClose={() => setSelezionato(null)}
         onSalvato={ricarica}
       />

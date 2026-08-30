@@ -41,7 +41,7 @@ const STEP_WIZARD = [
  * averlo, perché nessuno parte da lì.
  */
 export function SchedaEventoModale({
-  evento, tabIniziale = 'dettagli', soloQuestaTab = false, contestoPartenze, onClose, onSalvato,
+  evento, tabIniziale = 'dettagli', soloQuestaTab = false, contestoPartenze, onNavigaTab, onClose, onSalvato,
 }: {
   evento: Evento | null; // null = nuovo evento
   tabIniziale?: 'dettagli' | 'partenze' | 'lista-attesa' | 'offerte' | 'comunicazioni';
@@ -52,7 +52,8 @@ export function SchedaEventoModale({
   soloQuestaTab?: boolean;
   // Arrivando da una card di Partenze — quale tragitto aprire subito,
   // e con quale azione (vedi PartenzeTab).
-  contestoPartenze?: { tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi' } | null;
+  contestoPartenze?: { tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi'; tabOrigine: 'fermate' | 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate' } | null;
+  onNavigaTab?: (tab: 'fermate' | 'da-prezzare' | 'da-confermare') => void;
   onClose: () => void;
   onSalvato: () => void;
 }) {
@@ -1139,7 +1140,7 @@ export function SchedaEventoModale({
           </div>
         )}
 
-        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} servizi={servizi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} contestoPartenze={contestoPartenze} />}
+        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} servizi={servizi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} contestoPartenze={contestoPartenze} onNavigaTab={onNavigaTab} />}
         {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} servizi={(evento.servizi ?? []).map((s) => ({ key: s.id, nome: s.nome }))} />}
         {tabAttiva === 'comunicazioni' && evento && <ComunicazioniTab evento={evento} />}
         {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}
