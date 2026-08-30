@@ -6,7 +6,7 @@ import { RicercaSezione } from '../shared/RicercaSezione';
 import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 
-type Tab = 'prezzato' | 'da-confermare' | 'confermato' | 'passate';
+type Tab = 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate';
 type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
 
 /**
@@ -16,29 +16,34 @@ type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
  * posti tutti indipendenti). Le card si raggruppano da sole nei 4 stati
  * — nessuno stato da segnare a mano, gira tutto sui dati veri:
  *
- * - "Prezzato": preventivo registrato, già in vendita, bus vero ancora
- *   da opzionare
- * - "Da confermare": nessun preventivo ancora, non in vendita
- * - "Confermato": bus vero registrato (almeno una Linea)
+ * - "Da prezzare": nessun preventivo ancora, non in vendita — qui si
+ *   applica il preventivo di partenza
+ * - "Da confermare": preventivo fatto, già in vendita, ma senza ancora
+ *   una Linea (bus vero) — qui si aggiungono le Linee. Ci finisce
+ *   ANCHE un tragitto già "Confermato" che è tornato scoperto perché
+ *   sono arrivate più prenotazioni di quante ne coprano i bus già
+ *   registrati: la capienza mancante si copre da qui, aggiungendo un
+ *   altro bus alla Linea esistente o una Linea nuova.
+ * - "Confermato": almeno una Linea registrata E capienza sufficiente
  * - "Passate": la data dell'evento è già passata, qualunque fosse lo
  *   stato — qui si trova sempre tutta la storia, anche se non era mai
  *   arrivata a "Confermato"
  *
  * Un evento passato vive SEMPRE e SOLO in "Passate", mai nelle altre
- * tre, anche se il suo stato tecnico sarebbe ancora "Da confermare" —
- * un evento già svolto non ha più senso lavorarlo.
+ * tre, anche se il suo stato tecnico sarebbe ancora "Da prezzare" — un
+ * evento già svolto non ha più senso lavorarlo.
  *
  * Cliccando una card si apre la scheda dell'evento già sulla tab
- * Partenze, con quel tragitto specifico già aperto e (per Prezzato/Da
- * confermare) il pannello preventivo già pronto — non serve
- * ritrovarlo in mezzo agli altri.
+ * Partenze, con quel tragitto specifico già aperto e l'azione giusta
+ * già pronta (preventivo, o direttamente la pagina Linee) — non serve
+ * ritrovarla in mezzo alle altre.
  */
 export function PartenzeScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [partenze, setPartenze] = useState<Partenza[]>([]);
-  const [selezionato, setSelezionato] = useState<{ evento: Evento; tragittoId: string; azione: 'preventivo' | 'espandi' } | null>(null);
+  const [selezionato, setSelezionato] = useState<{ evento: Evento; tragittoId: string; azione: 'preventivo' | 'linee' | 'espandi' } | null>(null);
   const [ricerca, setRicerca] = useState('');
-  const [tab, setTab] = useState<Tab>('da-confermare');
+  const [tab, setTab] = useState<Tab>('da-prezzare');
   const [caricamento, setCaricamento] = useState(true);
 
   function ricarica() {
@@ -61,24 +66,30 @@ export function PartenzeScreen() {
   function passata(p: Partenza) {
     return new Date(p.evento.data).getTime() < adesso;
   }
+  function scoperta(p: Partenza) {
+    return p.totalePasseggeri > p.postiTotali;
+  }
   function tabDi(p: Partenza): Tab {
     if (passata(p)) return 'passate';
-    if (p.stato === 'DA_CONFERMARE') return 'da-confermare';
-    if (p.stato === 'PREZZATO') return 'prezzato';
-    return 'confermato';
+    if (p.stato === 'DA_CONFERMARE') return 'da-prezzare';
+    if (p.stato === 'PREZZATO') return 'da-confermare';
+    // CONFERMATO: resta lì solo se la capienza basta — altrimenti
+    // torna in "Da confermare", dove si aggiunge capienza.
+    return scoperta(p) ? 'da-confermare' : 'confermato';
   }
-  // Notifica solo dove ha senso agire: posti superati (Prezzato o
-  // Confermato — a Prezzato può capitare, essendo già in vendita anche
-  // senza un bus vero ancora). "Da confermare" non ha bisogno di un
-  // conteggio: ESSERE in quella tab è già di per sé la notifica (non
-  // c'è ancora nessun preventivo). "Passate" è solo storico, nessuna
-  // azione richiesta lì.
-  function notifica(p: Partenza): number {
+  // Notifica ovunque ci sia qualcosa da fare — non solo un contatore
+  // sulla tab, un indicatore chiaro su ogni singola card. "Confermato"
+  // e "Passate" non hanno mai notifiche: la prima è a posto per
+  // definizione (altrimenti sarebbe già tornata in "Da confermare"),
+  // la seconda è solo storico.
+  function notifica(p: Partenza): { conta: boolean; etichetta: string } {
     const tabAttuale = tabDi(p);
-    if (tabAttuale === 'prezzato' || tabAttuale === 'confermato') {
-      return p.totalePasseggeri > p.postiTotali ? p.totalePasseggeri - p.postiTotali : 0;
+    if (tabAttuale === 'da-prezzare') return { conta: true, etichetta: '◔ Da prezzare' };
+    if (tabAttuale === 'da-confermare') {
+      if (scoperta(p)) return { conta: true, etichetta: `⚠ ${p.totalePasseggeri - p.postiTotali} posti mancanti` };
+      return { conta: true, etichetta: '◔ Serve una Linea' };
     }
-    return 0;
+    return { conta: false, etichetta: '' };
   }
 
   const partenzePerTab = partenze.filter((p) => tabDi(p) === tab);
@@ -89,7 +100,8 @@ export function PartenzeScreen() {
   // Sempre un fetch fresco dal server, non l'oggetto già in memoria —
   // quella lista potrebbe non riflettere l'ultimo stato vero.
   async function apriPartenza(p: Partenza) {
-    const azione: 'preventivo' | 'espandi' = (tab === 'prezzato' || tab === 'da-confermare') ? 'preventivo' : 'espandi';
+    const azione: 'preventivo' | 'linee' | 'espandi' =
+      tab === 'da-prezzare' ? 'preventivo' : tab === 'da-confermare' ? 'linee' : 'espandi';
     const eventoInMemoria = eventi.find((ev) => ev.id === p.evento.id);
     if (eventoInMemoria) setSelezionato({ evento: eventoInMemoria, tragittoId: p.tragittoId, azione }); // subito, non far vedere niente mentre carica
     try {
@@ -114,7 +126,7 @@ export function PartenzeScreen() {
   }
 
   const ETICHETTE: Record<Tab, string> = {
-    prezzato: 'Prezzato',
+    'da-prezzare': 'Da prezzare',
     'da-confermare': 'Da confermare',
     confermato: 'Confermato',
     passate: 'Passate',
@@ -127,7 +139,7 @@ export function PartenzeScreen() {
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
 
       <div className="mini-tabs" style={{ justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
-        {(['prezzato', 'da-confermare', 'confermato', 'passate'] as Tab[]).map((t) => {
+        {(['da-prezzare', 'da-confermare', 'confermato', 'passate'] as Tab[]).map((t) => {
           const conteggio = partenze.filter((p) => tabDi(p) === t).length;
           return (
             <button key={t} type="button" className={`mini-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
@@ -142,19 +154,19 @@ export function PartenzeScreen() {
       ) : (
         <div className="cards-list">
           {partenzeFiltrate.map((p) => {
-            const conta = notifica(p);
+            const n = notifica(p);
             return (
               <EventoCardCompatta
                 key={p.tragittoId}
                 evento={p.evento}
                 onClick={() => apriPartenza(p)}
-                richiedeIntervento={conta > 0}
-                badge={conta > 0 ? <>⚠ {conta}</> : undefined}
+                richiedeIntervento={n.conta}
+                badge={n.conta ? <>{n.etichetta}</> : undefined}
                 extra={
                   <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 2 }}>
                     {p.tragittoNome}{p.servizioNome ? ` · ${p.servizioNome}` : ''}
-                    {tab !== 'da-confermare' && ` · ${p.totalePasseggeri}/${p.postiTotali} posti`}
-                    {tab === 'prezzato' && p.preventivoCosto && ` · preventivo €${Number(p.preventivoCosto).toFixed(0)}`}
+                    {tab !== 'da-prezzare' && ` · ${p.totalePasseggeri}/${p.postiTotali} posti`}
+                    {tab === 'da-confermare' && p.preventivoCosto && ` · preventivo €${Number(p.preventivoCosto).toFixed(0)}`}
                   </p>
                 }
               />
@@ -163,7 +175,7 @@ export function PartenzeScreen() {
           {!partenzeFiltrate.length && (
             <p style={{ color: 'var(--mist)' }}>
               {ricerca ? 'Nessuna partenza trovata.'
-                : tab === 'prezzato' ? 'Nessuna partenza prezzata al momento.'
+                : tab === 'da-prezzare' ? 'Nessuna partenza da prezzare al momento.'
                 : tab === 'da-confermare' ? 'Nessuna partenza da confermare al momento.'
                 : tab === 'confermato' ? 'Nessuna partenza confermata al momento.'
                 : 'Nessun evento passato ancora.'}

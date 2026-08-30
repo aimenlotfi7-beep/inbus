@@ -42,7 +42,7 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
   // "Da confermare", ecc.) si vuole atterrare DIRETTAMENTE sul
   // pannello giusto per quel tragitto, non su un elenco generico da
   // dover riesplorare — vedi useEffect più sotto.
-  tragittoFocus?: { tragittoId: string; azione: 'preventivo' | 'espandi' } | null;
+  tragittoFocus?: { tragittoId: string; azione: 'preventivo' | 'linee' | 'espandi' } | null;
 }) {
   const sessione = useSessione();
   const vedeEconomia = haPermesso(sessione, 'eventi.economia');
@@ -145,6 +145,7 @@ export function PartenzeTab({ eventoId, servizi, tragittoFocus }: {
     focusGestitoRef.current = true;
     setAperte((prev) => new Set(prev).add(tragittoFocus.tragittoId));
     if (tragittoFocus.azione === 'preventivo') apriPreventivo(tragittoFocus.tragittoId);
+    if (tragittoFocus.azione === 'linee') apriPaginaLinee(tragittoFocus.tragittoId);
   }, [tragittoFocus, eventoCompleto]);
 
   function toggleApertura(tragittoId: string) {
