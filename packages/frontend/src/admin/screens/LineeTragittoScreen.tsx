@@ -260,7 +260,7 @@ export function LineeTragittoScreen() {
           solo visive (nessun editor dove atterrare da lì). */}
       {(() => {
         const ETICHETTE_CONTESTO: Record<string, string> = {
-          fermate: 'Fermate', 'da-prezzare': 'Da prezzare', 'da-confermare': 'Da confermare', confermato: 'Confermato', passate: 'Passate',
+          fermate: 'Orari', 'da-prezzare': 'Prezzo', 'da-confermare': 'Linee Bus', confermato: 'Confermato', passate: 'Passate',
         };
         const fermateCompilate = tragittoVero.fermate.some((f) => f.orario);
         const preventivoCompilato = !!tragittoVero.preventivoCosto;

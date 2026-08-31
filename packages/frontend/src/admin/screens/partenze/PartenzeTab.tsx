@@ -539,7 +539,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
 
       {contestoPartenze && (() => {
         const ETICHETTE_CONTESTO: Record<string, string> = {
-          fermate: 'Fermate', 'da-prezzare': 'Da prezzare', 'da-confermare': 'Da confermare', confermato: 'Confermato', passate: 'Passate',
+          fermate: 'Orari', 'da-prezzare': 'Prezzo', 'da-confermare': 'Linee Bus', confermato: 'Confermato', passate: 'Passate',
         };
         const tragittiVeri = contestoPartenze.tragittiIds
           .map((id) => eventoCompleto ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === id) : undefined)

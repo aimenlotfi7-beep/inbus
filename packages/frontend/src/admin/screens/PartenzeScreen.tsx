@@ -13,20 +13,23 @@ type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
  * Sezione Partenze — una card per EVENTO (non più per tragitto): un
  * evento con più servizi/tragitti conta come UNA card, che può però
  * comparire in PIÙ tab insieme se le sue parti sono in stati diversi
- * (es. "Andata" già Confermata, "Ritorno" ancora Da prezzare — la
- * card compare sia in "Da prezzare" che in "Confermato", ma ogni
- * "copia" apre una vista filtrata solo sulla parte rilevante per
- * quella tab, non tutto l'evento insieme).
+ * (es. "Andata" già Confermata, "Ritorno" ancora da lavorare — la
+ * card compare sia in "Prezzo" che in "Confermato", ma ogni "copia"
+ * apre una vista filtrata solo sulla parte rilevante per quella tab,
+ * non tutto l'evento insieme).
  *
- * - "Fermate": nessun preventivo ancora — qui si calcolano gli orari
- *   di ogni fermata e si esporta l'elenco (CSV/PDF) da mandare al
- *   fornitore per farsi fare il preventivo. Un tragitto qui vive
- *   SEMPRE anche in "Da prezzare" insieme — sono due scopi diversi
- *   sullo stesso tragitto, non due stati diversi: prima si esporta,
- *   poi (quando il preventivo torna dal fornitore) si registra.
- * - "Da prezzare": nessun preventivo ancora — qui si applica il
- *   preventivo che è tornato dal fornitore
- * - "Da confermare": preventivo fatto, già in vendita, ma senza ancora
+ * - "Orari": qui si calcolano gli orari di ogni fermata e si esporta
+ *   l'elenco (CSV/PDF) da mandare al fornitore per farsi fare il
+ *   preventivo.
+ * - "Prezzo": qui si applica il preventivo che è tornato dal
+ *   fornitore. Un tragitto senza preventivo ancora vive SEMPRE anche
+ *   in "Orari" insieme — sono due compiti diversi sullo STESSO
+ *   tragitto, non due stati diversi: entrambi restano visibili finché
+ *   il tragitto non passa oltre (preventivo registrato), ognuno con
+ *   la propria etichetta indipendente (fatto/da fare) — un compito
+ *   fatto non fa sparire il tragitto dall'altra tab, resta lì per
+ *   poterlo sempre rivedere.
+ * - "Linee Bus": preventivo fatto, già in vendita, ma senza ancora
  *   una Linea (bus vero) — qui si aggiungono le Linee direttamente.
  *   Ci finisce ANCHE un tragitto già "Confermato" che è tornato
  *   scoperto perché sono arrivate più prenotazioni di quante ne
@@ -70,10 +73,13 @@ export function PartenzeScreen() {
   function scoperta(p: Partenza) {
     return p.totalePasseggeri > p.postiTotali;
   }
-  // Un tragitto può appartenere a PIÙ tab insieme (non solo per il
-  // caso "evento con parti in stati diversi", ma anche perché "Fermate"
-  // e "Da prezzare" sono due scopi diversi sullo STESSO tragitto — vedi
-  // sopra), quindi restituisce un elenco, non una tab sola.
+  // Un tragitto può appartenere a PIÙ tab insieme — "Orari" e
+  // "Prezzo" sono due compiti diversi sullo STESSO tragitto (non due
+  // stati diversi), quindi finché non è arrivato il preventivo vive
+  // in entrambe insieme, SEMPRE — non sparisce da una quando l'altra
+  // è fatta, resta visibile con un'etichetta che dice se quel compito
+  // specifico è già stato fatto o no (così si può sempre tornare a
+  // rivedere/correggere quello già fatto).
   function tabsDi(p: Partenza): Tab[] {
     if (passata(p)) return ['passate'];
     if (p.stato === 'DA_CONFERMARE') return ['fermate', 'da-prezzare'];
@@ -82,17 +88,27 @@ export function PartenzeScreen() {
     // torna in "Da confermare", dove si aggiunge capienza.
     return [scoperta(p) ? 'da-confermare' : 'confermato'];
   }
-  // Notifica ovunque ci sia qualcosa da fare. "Confermato" e "Passate"
-  // non hanno mai notifiche: la prima è a posto per definizione, la
-  // seconda è solo storico.
-  function notifica(p: Partenza, tabAttuale: Tab): { conta: boolean; etichetta: string } {
-    if (tabAttuale === 'fermate') return { conta: true, etichetta: '◔ Da calcolare/esportare' };
-    if (tabAttuale === 'da-prezzare') return { conta: true, etichetta: '◔ Da prezzare' };
+  // Se il compito di QUESTA tab specifica è già stato fatto per questo
+  // tragitto — solo "Orari" e "Prezzo" hanno questo concetto (restano
+  // sempre visibili lì, fatto o no); le altre tab non ce l'hanno,
+  // perché lì un tragitto sparisce da solo quando il compito è fatto
+  // (passa di stato), quindi "essere ancora presente" è già di per sé
+  // "da fare".
+  function fattoInTab(p: Partenza, tabAttuale: Tab): boolean {
+    if (tabAttuale === 'fermate') return p.fermateCompilate;
+    if (tabAttuale === 'da-prezzare') return !!p.preventivoCosto;
+    return false;
+  }
+  // Etichetta SEMPRE presente per ogni card, verde se il compito di
+  // questa tab è fatto, rossa/arancio se manca ancora.
+  function etichettaStato(p: Partenza, tabAttuale: Tab): { fatto: boolean; testo: string } {
+    if (tabAttuale === 'fermate') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: '✓ Fatto' } : { fatto: false, testo: '◔ Da calcolare/esportare' };
+    if (tabAttuale === 'da-prezzare') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: '✓ Fatto' } : { fatto: false, testo: '◔ Da prezzare' };
     if (tabAttuale === 'da-confermare') {
-      if (scoperta(p)) return { conta: true, etichetta: `⚠ ${p.totalePasseggeri - p.postiTotali} posti mancanti` };
-      return { conta: true, etichetta: '◔ Serve una Linea' };
+      if (scoperta(p)) return { fatto: false, testo: `⚠ ${p.totalePasseggeri - p.postiTotali} posti mancanti` };
+      return { fatto: false, testo: '◔ Serve una Linea' };
     }
-    return { conta: false, etichetta: '' };
+    return { fatto: true, testo: '' }; // Confermato/Passate: nessuna etichetta di stato
   }
 
   const partenzePerTab = partenze.filter((p) => tabsDi(p).includes(tab));
@@ -141,9 +157,9 @@ export function PartenzeScreen() {
   }
 
   const ETICHETTE: Record<Tab, string> = {
-    fermate: 'Fermate',
-    'da-prezzare': 'Da prezzare',
-    'da-confermare': 'Da confermare',
+    fermate: 'Orari',
+    'da-prezzare': 'Prezzo',
+    'da-confermare': 'Linee Bus',
     confermato: 'Confermato',
     passate: 'Passate',
   };
@@ -156,10 +172,14 @@ export function PartenzeScreen() {
 
       <div className="mini-tabs" style={{ justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
         {(['fermate', 'da-prezzare', 'da-confermare', 'confermato', 'passate'] as Tab[]).map((t) => {
-          const eventiInTab = new Set(partenze.filter((p) => tabsDi(p).includes(t)).map((p) => p.evento.id));
+          // Solo quanti sono ANCORA da fare in questa tab — resta un
+          // indicatore di quanto lavoro manca, non un totale grezzo
+          // (per "Orari"/"Prezzo", un evento già fatto resta comunque
+          // visibile nella lista, ma non conta più nel numero qui).
+          const daFareInTab = new Set(partenze.filter((p) => tabsDi(p).includes(t) && !fattoInTab(p, t)).map((p) => p.evento.id));
           return (
             <button key={t} type="button" className={`mini-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-              {ETICHETTE[t]}{eventiInTab.size > 0 ? ` (${eventiInTab.size})` : ''}
+              {ETICHETTE[t]}{daFareInTab.size > 0 ? ` (${daFareInTab.size})` : ''}
             </button>
           );
         })}
@@ -170,21 +190,27 @@ export function PartenzeScreen() {
       ) : (
         <div className="cards-list">
           {cardsFiltrate.map((gruppo) => {
-            // Se ci sono più voci nel gruppo con la stessa notifica,
-            // la mostro una volta sola; se sono diverse (es. un
+            const stati = gruppo.map((p) => etichettaStato(p, tab));
+            const tuttoFatto = stati.every((s) => s.fatto);
+            const nienteDaMostrare = stati.every((s) => !s.testo); // Confermato/Passate: nessuna etichetta di stato qui
+            // Se alcuni sono fatti e altri no (evento a più servizi), o
+            // se sono tutti da fare ma con etichette diverse (es. un
             // servizio "Serve una Linea" e un altro "posti mancanti"),
             // mostro solo un conteggio generico invece di scegliere a
             // caso quale delle due mostrare.
-            const notifiche = gruppo.map((p) => notifica(p, tab)).filter((n) => n.conta);
-            const etichetteUniche = [...new Set(notifiche.map((n) => n.etichetta))];
-            const etichettaBadge = etichetteUniche.length === 1 ? etichetteUniche[0] : notifiche.length > 0 ? `${notifiche.length} da lavorare` : undefined;
+            const daFare = stati.filter((s) => !s.fatto);
+            const etichetteDaFareUniche = [...new Set(daFare.map((s) => s.testo))];
+            const testoBadge = nienteDaMostrare ? undefined
+              : tuttoFatto ? '✓ Fatto'
+              : etichetteDaFareUniche.length === 1 ? etichetteDaFareUniche[0]
+              : `${daFare.length} da lavorare`;
             return (
               <EventoCardCompatta
                 key={gruppo[0].evento.id}
                 evento={gruppo[0].evento}
                 onClick={() => apriGruppo(gruppo)}
-                richiedeIntervento={notifiche.length > 0}
-                badge={etichettaBadge}
+                richiedeIntervento={!nienteDaMostrare && !tuttoFatto}
+                badge={testoBadge && <span style={{ color: tuttoFatto ? 'var(--green)' : undefined }}>{testoBadge}</span>}
                 extra={
                   <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 2 }}>
                     {gruppo.map((p) => p.servizioNome ?? p.tragittoNome).join(', ')}
@@ -197,9 +223,9 @@ export function PartenzeScreen() {
           {!cardsFiltrate.length && (
             <p style={{ color: 'var(--mist)' }}>
               {ricerca ? 'Nessuna partenza trovata.'
-                : tab === 'fermate' ? 'Nessuna partenza da lavorare qui al momento.'
+                : tab === 'fermate' ? 'Nessuna partenza da lavorare per gli orari, al momento.'
                 : tab === 'da-prezzare' ? 'Nessuna partenza da prezzare al momento.'
-                : tab === 'da-confermare' ? 'Nessuna partenza da confermare al momento.'
+                : tab === 'da-confermare' ? 'Nessuna Linea Bus da costruire al momento.'
                 : tab === 'confermato' ? 'Nessuna partenza confermata al momento.'
                 : 'Nessun evento passato ancora.'}
             </p>

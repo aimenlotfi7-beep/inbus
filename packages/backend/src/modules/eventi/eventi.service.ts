@@ -1423,6 +1423,17 @@ export const eventiService = {
     const mappaImmagine = new Map<string, string>();
     for (const img of immaginiRighe) if (!mappaImmagine.has(img.eventoId)) mappaImmagine.set(img.eventoId, img.url);
 
+    // Almeno una fermata con orario impostato — serve per distinguere
+    // "Fermate" (tragitti ancora senza nessun orario, da configurare)
+    // da "Da prezzare" (tragitti dove le fermate sono già pronte, resta
+    // solo da inserire il preventivo che torna dal fornitore).
+    const fermateRighe = await db.select({ tragittoId: fermate.tragittoId, orario: fermate.orario })
+      .from(fermate).where(inArray(fermate.tragittoId, tragittiIds));
+    const mappaFermateCompilate = new Map<string, boolean>();
+    for (const f of fermateRighe) {
+      if (f.orario) mappaFermateCompilate.set(f.tragittoId, true);
+    }
+
     return righe.map((r) => ({
       tragittoId: r.tragittoId,
       tragittoNome: r.tragittoNome,
@@ -1430,6 +1441,7 @@ export const eventiService = {
       postiTotali: r.postiTotali,
       totalePasseggeri: mappaPasseggeri.get(r.tragittoId) ?? 0,
       preventivoCosto: r.preventivoCosto,
+      fermateCompilate: mappaFermateCompilate.get(r.tragittoId) ?? false,
       servizioNome: r.servizioNome,
       servizioId: r.servizioId,
       evento: {
