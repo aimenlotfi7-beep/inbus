@@ -59,6 +59,7 @@ eventiRouter.post('/linee/:lineaId/bus', richiedeAuth, richiedePermesso('eventi.
 eventiRouter.put('/:id/linee/:lineaId/percorso', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaPercorsoLineaSchema), asyncHandler(eventiController.aggiornaPercorsoLinea));
 eventiRouter.put('/linee/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaBusDiLineaSchema), asyncHandler(eventiController.aggiornaBusDiLinea));
 eventiRouter.get('/tragitti/:tragittoId/linee', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaLinee));
+eventiRouter.post('/linee/:lineaId/versa', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.versaLinea));
 eventiRouter.put('/tragitti/:tragittoId/operativo', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaTragittoOperativoSchema), asyncHandler(eventiController.aggiornaTragittoOperativo));
 eventiRouter.put('/tragitti/:tragittoId/preventivo', richiedeAuth, richiedePermesso('eventi.crea'), valida(registraPreventivoSchema), asyncHandler(eventiController.registraPreventivo));
 eventiRouter.delete('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.rimuoviBus));

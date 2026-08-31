@@ -1029,20 +1029,35 @@ export const eventiService = {
     const tourLeaderIds = tuttiIBus.map((b) => b.tourLeaderId).filter((id): id is string => id !== null);
     const tourLeaders = tourLeaderIds.length ? await db.select().from(tourLeader).where(inArray(tourLeader.id, tourLeaderIds)) : [];
 
-    // Partecipanti confermati per fermata (sulla città, come fa già
-    // tutto il resto dell'app — le prenotazioni salvano la città come
-    // testo, non un riferimento).
-    const somme = await db.select({ fermataCitta: prenotazioni.fermataCitta, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
+    // Prima "in attesa" (senza bus, valgono per l'intero tragitto,
+    // uguali qualunque Linea le mostri) e "versate" (con un bus di
+    // QUESTA Linea specifica — un'altra Linea diversa avrebbe le sue).
+    const tutte = await db.select({ fermataCitta: prenotazioni.fermataCitta, busId: prenotazioni.busId, passeggeri: prenotazioni.passeggeri })
       .from(prenotazioni)
-      .where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA')))
-      .groupBy(prenotazioni.fermataCitta);
-    const mappaPartecipanti = new Map(somme.map((s) => [s.fermataCitta, Number(s.totale)]));
+      .where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA')));
+    const mappaInAttesa = new Map<string, number>();
+    // Chiave "lineaId::citta" — un bus appartiene sempre a una sola
+    // Linea, quindi risalgo da busId a lineaId tramite tuttiIBus.
+    const mappaVersati = new Map<string, number>();
+    const lineaDiBus = new Map(tuttiIBus.map((b) => [b.id, b.lineaId]));
+    for (const p of tutte) {
+      if (!p.busId) {
+        mappaInAttesa.set(p.fermataCitta, (mappaInAttesa.get(p.fermataCitta) ?? 0) + p.passeggeri);
+        continue;
+      }
+      const lineaDiQuestoBus = lineaDiBus.get(p.busId);
+      if (!lineaDiQuestoBus) continue; // bus di un altro tragitto/evento, non dovrebbe capitare
+      const chiave = `${lineaDiQuestoBus}::${p.fermataCitta}`;
+      mappaVersati.set(chiave, (mappaVersati.get(chiave) ?? 0) + p.passeggeri);
+    }
 
     return righeLinee.map((l) => ({
       id: l.id,
       nome: l.nome,
       fermate: righeFermate.filter((f) => f.lineaId === l.id).map((f) => ({
-        fermataId: f.fermataId, citta: f.citta, orario: f.orario, partecipanti: mappaPartecipanti.get(f.citta) ?? 0,
+        fermataId: f.fermataId, citta: f.citta, orario: f.orario,
+        inAttesa: mappaInAttesa.get(f.citta) ?? 0,
+        versati: mappaVersati.get(`${l.id}::${f.citta}`) ?? 0,
       })),
       bus: tuttiIBus.filter((b) => b.lineaId === l.id).map((b) => ({
         ...b,
@@ -1052,6 +1067,69 @@ export const eventiService = {
         })(),
       })),
     }));
+  },
+
+  /** "Versa" tutte le prenotazioni ancora in attesa (confermate, senza
+   *  bus) sui bus di questa Linea — una volta sola, per tutte le
+   *  fermate coperte insieme. Sceglie da sola quali prenotazioni
+   *  specifiche versare per prima (le più vecchie), riempiendo un bus
+   *  prima di passare al successivo — stessa logica già usata dallo
+   *  scheduler automatico per età (24h prima della partenza), solo
+   *  con un criterio diverso (anzianità della prenotazione, non età
+   *  del passeggero) e attivata a mano invece che in automatico.
+   *
+   *  Il limite "posti max" di una fermata specifica non serve
+   *  ricontrollarlo qui: è già garantito al momento della
+   *  prenotazione (il checkout blocca chi supererebbe quel limite),
+   *  quindi le prenotazioni "in attesa" non possono mai essere più di
+   *  quante quel limite ne permetta. */
+  async versaLinea(lineaId: string) {
+    const [lineaRiga] = await db.select().from(linee).where(eq(linee.id, lineaId)).limit(1);
+    if (!lineaRiga) throw new NonTrovato('Linea');
+
+    const bus = await db.select({ id: busFisici.id, postiBus: busFisici.postiBus }).from(busFisici)
+      .where(eq(busFisici.lineaId, lineaId)).orderBy(busFisici.id);
+    if (bus.length === 0) throw new ConflittoDati('Questa Linea non ha ancora nessun bus — aggiungine uno prima di versare.');
+
+    const fermateCoperte = await db.select({ citta: fermate.citta }).from(lineaFermate)
+      .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
+      .where(eq(lineaFermate.lineaId, lineaId));
+    if (fermateCoperte.length === 0) return { versate: 0, restanoInAttesa: 0 };
+
+    // Posti già occupati su ogni bus — prenotazioni versate in un giro
+    // precedente (di questa stessa funzione, o dello scheduler età).
+    const busIds = bus.map((b) => b.id);
+    const giaAssegnati = await db.select({ busId: prenotazioni.busId, passeggeri: prenotazioni.passeggeri }).from(prenotazioni)
+      .where(and(inArray(prenotazioni.busId, busIds), eq(prenotazioni.stato, 'CONFERMATA')));
+    const postiOccupati = new Map<string, number>();
+    for (const r of giaAssegnati) {
+      if (!r.busId) continue;
+      postiOccupati.set(r.busId, (postiOccupati.get(r.busId) ?? 0) + r.passeggeri);
+    }
+
+    // Tutte le prenotazioni in attesa (senza bus) su TUTTE le fermate
+    // coperte da questa Linea insieme, le più vecchie prima — non una
+    // fermata alla volta: la capienza dei bus è condivisa tra tutte le
+    // fermate che coprono, quindi va gestita insieme.
+    const cittaCoperte = fermateCoperte.map((f) => f.citta);
+    const inAttesa = await db.select().from(prenotazioni)
+      .where(and(eq(prenotazioni.tragittoId, lineaRiga.tragittoId), inArray(prenotazioni.fermataCitta, cittaCoperte), eq(prenotazioni.stato, 'CONFERMATA'), isNull(prenotazioni.busId)))
+      .orderBy(prenotazioni.creataIl);
+
+    let busCorrente = 0;
+    let postiRimasti = (bus[0]?.postiBus ?? 0) - (postiOccupati.get(bus[0]?.id) ?? 0);
+    let versate = 0;
+    for (const p of inAttesa) {
+      while (busCorrente < bus.length - 1 && postiRimasti <= 0) {
+        busCorrente++;
+        postiRimasti = (bus[busCorrente]?.postiBus ?? 0) - (postiOccupati.get(bus[busCorrente]?.id) ?? 0);
+      }
+      if (postiRimasti <= 0) break; // tutti i bus della Linea sono pieni — il resto resta in attesa
+      await db.update(prenotazioni).set({ busId: bus[busCorrente].id }).where(eq(prenotazioni.id, p.id));
+      postiRimasti -= p.passeggeri;
+      versate++;
+    }
+    return { versate, restanoInAttesa: inAttesa.length - versate };
   },
 
   async rimuoviBus(busId: string) {

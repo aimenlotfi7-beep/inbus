@@ -46,6 +46,7 @@ export function LineeTragittoScreen() {
   const [modificaPercorsoAperta, setModificaPercorsoAperta] = useState(false);
   const [percorsoModificato, setPercorsoModificato] = useState<string[]>([]);
   const [aggiungiBusAperto, setAggiungiBusAperto] = useState(false);
+  const [versando, setVersando] = useState(false);
   const [formNuovoBus, setFormNuovoBus] = useState<BusDiLineaInput & { postiBus?: number }>(BUS_VUOTO);
 
   function ricarica() {
@@ -119,6 +120,21 @@ export function LineeTragittoScreen() {
     return a.orario.localeCompare(b.orario);
   }
   const fermateInOrdine = [...fermateAttive].sort(perOrario);
+
+  // Riepilogo in cima — "in attesa" è lo stesso ovunque (è quante
+  // prenotazioni non hanno ancora nessun bus, non dipende da QUALE
+  // Linea guardi), "versate" invece è la SOMMA su tutte le Linee che
+  // coprono quella città (ognuna versa sui propri bus). Se nessuna
+  // Linea copre ancora quella città, tutto è "in attesa" — il totale
+  // grezzo di prima, che è comunque quello giusto in quel caso.
+  function contatoriCitta(f: Fermata) {
+    const versati = linee.reduce((tot, l) => tot + (l.fermate.find((lf) => lf.citta === f.citta)?.versati ?? 0), 0);
+    const primaLineaConQuestaCitta = linee.find((l) => l.fermate.some((lf) => lf.citta === f.citta));
+    const inAttesa = primaLineaConQuestaCitta
+      ? primaLineaConQuestaCitta.fermate.find((lf) => lf.citta === f.citta)!.inAttesa
+      : partecipantiPerFermata.get(f.id) ?? 0;
+    return { inAttesa, versati };
+  }
 
   function apriPopupNuovaLinea() {
     setFormBus(BUS_VUOTO);
@@ -196,6 +212,21 @@ export function LineeTragittoScreen() {
     }
   }
 
+  async function versa() {
+    if (!lineaAttivaId) return;
+    setVersando(true);
+    try {
+      const { versate, restanoInAttesa } = await eventiApi.versaLinea(lineaAttivaId);
+      ricarica();
+      if (versate === 0 && restanoInAttesa > 0) alert('Nessun posto libero sui bus di questa Linea — aggiungine un altro, o aumenta i posti di quello che c\'è.');
+      else if (restanoInAttesa > 0) alert(`Versate ${versate} prenotazion${versate === 1 ? 'e' : 'i'} — ${restanoInAttesa} restano in attesa, non c'è più posto sui bus di questa Linea.`);
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Versamento non riuscito: ${e.message}` : 'Versamento non riuscito: errore di rete.');
+    } finally {
+      setVersando(false);
+    }
+  }
+
   function apriModificaPercorso() {
     if (!lineaAttiva) return;
     setPercorsoModificato(lineaAttiva.fermate.map((f) => f.fermataId));
@@ -265,12 +296,15 @@ export function LineeTragittoScreen() {
       {/* 1. RIEPILOGO PARTENZA */}
       <PanelHead titolo={tragittoVero.nome} info={evento.artista} />
       <p style={{ fontSize: 14, color: 'var(--paper)', marginTop: -8, marginBottom: 24 }}>
-        {fermateInOrdine.map((f, i) => (
-          <span key={f.id}>
-            {i > 0 && <span style={{ color: 'var(--mist)' }}> → </span>}
-            {f.citta} <span style={{ color: 'var(--mist)' }}>{partecipantiPerFermata.get(f.id) ?? 0}</span>
-          </span>
-        ))}
+        {fermateInOrdine.map((f, i) => {
+          const { inAttesa, versati } = contatoriCitta(f);
+          return (
+            <span key={f.id}>
+              {i > 0 && <span style={{ color: 'var(--mist)' }}> → </span>}
+              {f.citta} <span style={{ color: inAttesa > 0 ? 'var(--pink)' : 'var(--mist)' }}>{inAttesa}/{versati}</span>
+            </span>
+          );
+        })}
         {fermateInOrdine.length === 0 && <span style={{ color: 'var(--mist)' }}>Nessuna fermata attiva su questo tragitto.</span>}
       </p>
 
@@ -300,7 +334,7 @@ export function LineeTragittoScreen() {
                 {lineaAttiva.fermate.map((f, i) => (
                   <span key={f.fermataId}>
                     {i > 0 && <span style={{ color: 'var(--mist)' }}> → </span>}
-                    {f.citta} {f.orario && <span style={{ color: 'var(--mist)', fontSize: 12 }}>({f.orario})</span>} <span style={{ color: 'var(--mist)' }}>{f.partecipanti}</span>
+                    {f.citta} {f.orario && <span style={{ color: 'var(--mist)', fontSize: 12 }}>({f.orario})</span>} <span style={{ color: 'var(--mist)' }}>{f.versati} versat{f.versati === 1 ? 'o' : 'i'}</span>
                   </span>
                 ))}
               </p>
@@ -308,7 +342,10 @@ export function LineeTragittoScreen() {
                 {lineaAttiva.bus.length} bus associat{lineaAttiva.bus.length === 1 ? 'o' : 'i'} a questa Linea
               </p>
 
-              <button className="btn btn-ghost" style={{ fontSize: 12, marginBottom: 12 }} onClick={apriModificaPercorso}>Modifica percorso</button>
+              <button className="btn btn-primary" style={{ fontSize: 12.5, marginBottom: 12 }} onClick={versa} disabled={versando}>
+                {versando ? 'Verso...' : '↓ Versa le prenotazioni in attesa su questa Linea'}
+              </button>
+              <button className="btn btn-ghost" style={{ fontSize: 12, marginBottom: 12, marginLeft: 8 }} onClick={apriModificaPercorso}>Modifica percorso</button>
 
               {lineaAttiva.bus.map((b) => (
                 <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>

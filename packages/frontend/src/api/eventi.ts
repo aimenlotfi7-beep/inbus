@@ -68,7 +68,7 @@ export interface LineaInput {
 // Aggiungere un bus a una Linea esistente, o modificare un bus già
 // dentro — mai le fermate, quelle sono della Linea intera.
 export type BusDiLineaInput = Omit<LineaInput, 'fermateIds'>;
-export interface FermataLinea { fermataId: string; citta: string; orario: string | null; partecipanti: number; }
+export interface FermataLinea { fermataId: string; citta: string; orario: string | null; inAttesa: number; versati: number; }
 export interface BusDiLinea {
   id: string; fornitoreId: string | null; riferimento: string; autistaNome: string | null; autistaTelefono: string | null;
   tourLeaderId: string | null; tourLeaderNome: string | null; costo: string | null; postiBus: number | null; note: string | null;
@@ -98,6 +98,7 @@ export const eventiApi = {
   aggiornaPercorsoLinea: (eventoId: string, lineaId: string, fermateIds: string[]) => api.put<{ ok: true }>(`/api/eventi/${eventoId}/linee/${lineaId}/percorso`, { fermateIds }),
   aggiornaBusDiLinea: (busId: string, input: Partial<BusDiLineaInput>) => api.put<{ ok: true }>(`/api/eventi/linee/bus/${busId}`, input),
   listaLinee: (tragittoId: string) => api.get<Linea[]>(`/api/eventi/tragitti/${tragittoId}/linee`),
+  versaLinea: (lineaId: string) => api.post<{ versate: number; restanoInAttesa: number }>(`/api/eventi/linee/${lineaId}/versa`, {}),
   // Fase 2 — orario/prezzo/posti si modificano da Partenze, non più da
   // Eventi. aggiornaServizio esisteva già lato backend (mai usata dal
   // frontend finora) — qui il client mancante.

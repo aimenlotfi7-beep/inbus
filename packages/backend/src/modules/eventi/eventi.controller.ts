@@ -81,6 +81,9 @@ export const eventiController = {
   async listaLinee(req: Request, res: Response) {
     res.json(await eventiService.listaLinee(req.params.tragittoId));
   },
+  async versaLinea(req: Request, res: Response) {
+    res.json(await eventiService.versaLinea(req.params.lineaId));
+  },
 
   async aggiornaTragittoOperativo(req: Request, res: Response) {
     await eventiService.aggiornaTragittoOperativo(req.params.tragittoId, req.body);

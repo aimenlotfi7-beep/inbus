@@ -654,6 +654,22 @@ export const prenotazioniService = {
         .where(eq(lineaFermate.fermataId, fermataRiga[0].id));
       if (busCopertura.length === 0) continue;
 
+      // Quanti passeggeri ha già ogni bus — versati a mano da un admin
+      // (vedi versaLinea) o da un giro precedente di questo stesso
+      // scheduler. Senza questo conteggio, si ripartirebbe ogni volta
+      // dalla capienza PIENA del bus, rischiando di assegnarne più di
+      // quanti posti liberi restano davvero.
+      const busIds = busCopertura.map((b) => b.busId);
+      const giaAssegnati = busIds.length
+        ? await db.select({ busId: prenotazioni.busId, passeggeri: prenotazioni.passeggeri }).from(prenotazioni)
+          .where(and(inArray(prenotazioni.busId, busIds), eq(prenotazioni.stato, 'CONFERMATA')))
+        : [];
+      const postiGiaOccupati = new Map<string, number>();
+      for (const r of giaAssegnati) {
+        if (!r.busId) continue;
+        postiGiaOccupati.set(r.busId, (postiGiaOccupati.get(r.busId) ?? 0) + r.passeggeri);
+      }
+
       // Età dal titolare dell'account — chi non ha una data di nascita
       // impostata (account creati prima che il campo fosse
       // obbligatorio) finisce in fondo all'ordinamento, non bloccante.
@@ -664,7 +680,7 @@ export const prenotazioniService = {
       const ordinate = [...righe].sort((a, b) => (mappaEta.get(b.utenteId) ?? -1) - (mappaEta.get(a.utenteId) ?? -1));
 
       let busCorrente = 0;
-      let postiRimastiBusCorrente = busCopertura[0]?.postiBus ?? 0;
+      let postiRimastiBusCorrente = (busCopertura[0]?.postiBus ?? 0) - (postiGiaOccupati.get(busCopertura[0]?.busId) ?? 0);
       for (const r of ordinate) {
         // Passa al bus successivo se quello corrente non ha più posto
         // per NESSUNO — non spezza una prenotazione tra due bus, ma
@@ -674,7 +690,7 @@ export const prenotazioniService = {
         // gestito la vendita — qui serve solo la distribuzione).
         while (busCorrente < busCopertura.length - 1 && postiRimastiBusCorrente <= 0) {
           busCorrente++;
-          postiRimastiBusCorrente = busCopertura[busCorrente]?.postiBus ?? 0;
+          postiRimastiBusCorrente = (busCopertura[busCorrente]?.postiBus ?? 0) - (postiGiaOccupati.get(busCopertura[busCorrente]?.busId) ?? 0);
         }
         await db.update(prenotazioni).set({ busId: busCopertura[busCorrente].busId }).where(eq(prenotazioni.id, r.prenotazioneId));
         postiRimastiBusCorrente -= r.passeggeri;
