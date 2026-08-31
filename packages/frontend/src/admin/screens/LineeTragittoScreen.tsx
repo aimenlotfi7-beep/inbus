@@ -295,18 +295,20 @@ export function LineeTragittoScreen() {
 
       {/* 1. RIEPILOGO PARTENZA */}
       <PanelHead titolo={tragittoVero.nome} info={evento.artista} />
-      <p style={{ fontSize: 14, color: 'var(--paper)', marginTop: -8, marginBottom: 24 }}>
-        {fermateInOrdine.map((f, i) => {
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+        {fermateInOrdine.map((f) => {
           const { inAttesa, versati } = contatoriCitta(f);
           return (
-            <span key={f.id}>
-              {i > 0 && <span style={{ color: 'var(--mist)' }}> → </span>}
-              {f.citta} <span style={{ color: inAttesa > 0 ? 'var(--pink)' : 'var(--mist)' }}>{inAttesa}/{versati}</span>
+            <span key={f.id} className="chip">
+              {f.citta}
+              <span style={{ color: 'var(--pink)', fontFamily: "'Space Mono',monospace" }}>{inAttesa}</span>
+              <span style={{ color: 'var(--mist)' }}>/</span>
+              <span style={{ color: 'var(--green)', fontFamily: "'Space Mono',monospace" }}>{versati}</span>
             </span>
           );
         })}
         {fermateInOrdine.length === 0 && <span style={{ color: 'var(--mist)' }}>Nessuna fermata attiva su questo tragitto.</span>}
-      </p>
+      </div>
 
       {/* 2. LINEE / BUS */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -330,14 +332,16 @@ export function LineeTragittoScreen() {
           {lineaAttiva && (
             <div className="section-card">
               {/* Riepilogo immediato della Linea selezionata */}
-              <p style={{ fontSize: 13.5, marginBottom: 4 }}>
-                {lineaAttiva.fermate.map((f, i) => (
-                  <span key={f.fermataId}>
-                    {i > 0 && <span style={{ color: 'var(--mist)' }}> → </span>}
-                    {f.citta} {f.orario && <span style={{ color: 'var(--mist)', fontSize: 12 }}>({f.orario})</span>} <span style={{ color: 'var(--mist)' }}>{f.versati} versat{f.versati === 1 ? 'o' : 'i'}</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                {lineaAttiva.fermate.map((f) => (
+                  <span key={f.fermataId} className="chip">
+                    {f.citta}{f.orario && <span style={{ color: 'var(--mist)', fontSize: 11.5 }}>({f.orario})</span>}
+                    <span style={{ color: 'var(--pink)', fontFamily: "'Space Mono',monospace" }}>{f.inAttesa}</span>
+                    <span style={{ color: 'var(--mist)' }}>/</span>
+                    <span style={{ color: 'var(--green)', fontFamily: "'Space Mono',monospace" }}>{f.versati}</span>
                   </span>
                 ))}
-              </p>
+              </div>
               <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 16 }}>
                 {lineaAttiva.bus.length} bus associat{lineaAttiva.bus.length === 1 ? 'o' : 'i'} a questa Linea
               </p>
