@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
 import { pagineApi } from '../../../api/pagine';
 import { eventiApi, type EventoInput, type TragittoInput, type FermataInput } from '../../../api/eventi';
-import { percorsiSalvatiApi, type PercorsoSalvato } from '../../../api/percorsiSalvati';
+import { percorsiSalvatiApi, type PercorsoSalvato, type FermataPercorsoSalvato } from '../../../api/percorsiSalvati';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../../api/layoutBiglietto';
 import { categorieApi, type Categoria } from '../../../api/categorie';
@@ -70,6 +70,7 @@ export function SchedaEventoModale({
   // poterle compilare subito, le altre si possono chiudere per non
   // dover scorrere tutto quando ce ne sono tante.
   const [tragittiAperti, setTragittiAperti] = useState<Set<number>>(new Set());
+  const [invertiPercorso, setInvertiPercorso] = useState(false);
   // I servizi — completamente locali finché non si salva tutto insieme
   // (anche alla primissima creazione dell'evento): quelli già esistenti
   // hanno l'id vero del server, quelli appena aggiunti hanno una
@@ -412,7 +413,24 @@ export function SchedaEventoModale({
     return servizioTabAttivo;
   }
 
-  async function aggiungiTragittoDaPercorso(percorso: PercorsoSalvato) {
+  async function aggiungiTragittoDaPercorso(percorso: PercorsoSalvato, inverti: boolean) {
+    // Nell'ordine normale: [0] = Partenza (può non avere indirizzo,
+    // si scrive in Eventi), [1..] = fermate intermedie in ordine,
+    // arrivo = percorso.arrivoCitta (mai una fermata vera, come per
+    // arrivoIndirizzo sui tragitti). Invertendo: quella che ERA
+    // l'arrivoCitta diventa la nuova Partenza (senza indirizzo, non
+    // ne aveva uno nemmeno lei), le fermate intermedie girano
+    // d'ordine, e quella che ERA la Partenza diventa la nuova
+    // arrivoCitta.
+    let fermateOrdinate = percorso.fermate;
+    let arrivoCittaFinale = percorso.arrivoCitta ?? '';
+    if (inverti) {
+      const [vecchiaPartenza, ...intermedie] = fermateOrdinate;
+      const nuovaPartenza: FermataPercorsoSalvato = { citta: arrivoCittaFinale, indirizzo: null, fermataAnagraficaId: null, tipo: 'PASSAGGIO', prezzo: undefined, sogliaMinima: null };
+      fermateOrdinate = [nuovaPartenza, ...[...intermedie].reverse()];
+      arrivoCittaFinale = vecchiaPartenza?.citta ?? '';
+    }
+
     // Ogni fermata del percorso deve diventare una scelta vera
     // dall'anagrafica — mai più testo libero, come richiesto. Il
     // controllo "esiste già?" avviene lato server (trovaOCrea),
@@ -420,10 +438,15 @@ export function SchedaEventoModale({
     // sequenza — un controllo lato frontend contro lo stato locale
     // (fermateAnagrafica) causava doppioni, perché ogni chiamata non
     // vedeva ancora quello appena creato da un'altra chiamata
-    // parallela.
-    const fermateConAnagrafica: FermataInput[] = await Promise.all(percorso.fermate.map(async (f) => {
+    // parallela. La Partenza senza indirizzo (ancora da scrivere in
+    // Eventi) fa eccezione — niente da cercare/creare in anagrafica
+    // finché non ha un indirizzo vero, resta testuale per ora.
+    const fermateConAnagrafica: FermataInput[] = await Promise.all(fermateOrdinate.map(async (f, idx) => {
+      if (idx === 0 && !f.indirizzo?.trim()) {
+        return { fermataAnagraficaId: null, citta: f.citta, indirizzo: '', prezzo: f.prezzo ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
+      }
       try {
-        const trovata = await fermateAnagraficaApi.trovaOCrea({ nome: f.citta, citta: f.citta, indirizzo: f.indirizzo });
+        const trovata = await fermateAnagraficaApi.trovaOCrea({ nome: f.citta, citta: f.citta, indirizzo: f.indirizzo ?? '' });
         setFermateAnagrafica((prev) => prev.some((fa) => fa.id === trovata.id) ? prev : [...prev, trovata]);
         return { fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo, prezzo: f.prezzo ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
       } catch {
@@ -442,6 +465,7 @@ export function SchedaEventoModale({
       attivo: true,
       servizioId: servizioIdContestoAttuale(),
       fermate: fermateConAnagrafica,
+      arrivoCitta: arrivoCittaFinale || undefined,
     };
     // Aggiornamento FUNZIONALE (legge lo stato più recente al momento
     // vero dell'esecuzione, non quello catturato quando la funzione è
@@ -591,7 +615,7 @@ export function SchedaEventoModale({
     }
     const tratteValide = (form.tragitti ?? [])
       .filter((l) => l.nome.trim())
-      .map((l) => ({ ...l, fermate: l.fermate.filter((f) => f.citta.trim() && f.indirizzo.trim()) }));
+      .map((l) => ({ ...l, fermate: l.fermate.filter((f, idx) => f.citta.trim() && (idx === 0 || f.indirizzo?.trim())) }));
     const payload = {
       ...form,
       // Solo i tragitti liberi restano qui — quelli dentro un servizio
@@ -867,6 +891,10 @@ export function SchedaEventoModale({
       {percorsiSalvati.length > 0 && (
         <div className="section-card" style={{ marginBottom: 16 }}>
           <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi un tragitto da un percorso salvato</p>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12.5, color: 'var(--mist)' }}>
+            <input type="checkbox" checked={invertiPercorso} onChange={(e) => setInvertiPercorso(e.target.checked)} />
+            Inverti (scambia partenza e arrivo, gira anche l'ordine delle fermate intermedie)
+          </label>
           <select
             value=""
             onChange={(e) => {
@@ -877,7 +905,7 @@ export function SchedaEventoModale({
               // STESSO servizio.
               const contesto = servizioIdContestoAttuale();
               const giaUsatoQui = (form.tragitti ?? []).some((l) => l.nome === t?.nome && (l.servizioId ?? null) === contesto);
-              if (t && !giaUsatoQui) aggiungiTragittoDaPercorso(t);
+              if (t && !giaUsatoQui) aggiungiTragittoDaPercorso(t, invertiPercorso);
             }}
           >
             <option value="">Scegli un tragitto...</option>
@@ -955,7 +983,9 @@ export function SchedaEventoModale({
           <div className="campo" style={{ marginBottom: 10 }}>
             <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} />
           </div>
-          <p className="section-label" style={{ marginBottom: 6 }}>Arrivo</p>
+          <p className="section-label" style={{ marginBottom: 6 }}>
+            Arrivo{tragitto.arrivoCitta ? <span style={{ color: 'var(--blue)', fontWeight: 400 }}> — {tragitto.arrivoCitta}</span> : ''}
+          </p>
           <div className="form-grid" style={{ marginBottom: 10 }}>
             <label>Indirizzo di arrivo
               <input
@@ -1005,7 +1035,7 @@ export function SchedaEventoModale({
                 ) : (
                   <>
                     <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
-                    <input placeholder="Indirizzo" value={f.indirizzo} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)} />
+                    <input placeholder="Indirizzo" value={f.indirizzo ?? ''} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)} />
                   </>
                 )}
                 <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>

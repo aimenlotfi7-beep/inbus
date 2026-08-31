@@ -225,7 +225,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
    *  indirizzo e orario di ognuna. */
   function esportaFermateCsv(nomeTragitto: string, fermate: FermataInput[]) {
     const intestazione = ['Città', 'Indirizzo', 'Orario'];
-    const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const escapeCsv = (v: string | null | undefined) => `"${(v ?? '').replace(/"/g, '""')}"`;
     const righeCsv = fermate.map((f) => [f.citta, f.indirizzo, f.orario ?? ''].map(escapeCsv).join(';'));
     const csv = '\uFEFF' + [intestazione.join(';'), ...righeCsv].join('\n'); // BOM per accenti corretti in Excel
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -329,7 +329,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
     // L'arrivo è del tragitto stesso ora, deciso in Eventi — non più
     // di evento/servizio.
     const arrivoIndirizzo = tragittoVero.arrivoIndirizzo;
-    const fermateValide = tragittoVero.fermate.filter((f) => f.attivo && f.indirizzo.trim());
+    const fermateValide = tragittoVero.fermate.filter((f) => f.attivo && f.indirizzo?.trim());
     if (fermateValide.length === 0) { setStatoCalcoloPreventivoMap((prev) => new Map(prev).set(tragittoId, 'Nessuna fermata attiva su questo tragitto.')); return; }
     if (!arrivoIndirizzo?.trim()) { setStatoCalcoloPreventivoMap((prev) => new Map(prev).set(tragittoId, 'Manca l\'indirizzo di arrivo — impostalo in Eventi, nella scheda di questo tragitto.')); return; }
 
@@ -409,7 +409,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
     const arrivoIndirizzoContesto = tragittoVero?.arrivoIndirizzo;
     const arrivoOrarioContesto = tragittoVero?.arrivoOrario;
 
-    const fermateValide = formOperativo.fermate.filter((f) => f.indirizzo.trim());
+    const fermateValide = formOperativo.fermate.filter((f) => f.indirizzo?.trim());
     if (fermateValide.length === 0) { setStatoCalcoloOrariMap((prev) => new Map(prev).set(tragittoId, 'Aggiungi almeno una fermata con indirizzo compilato.')); return; }
     if (!arrivoIndirizzoContesto?.trim()) { setStatoCalcoloOrariMap((prev) => new Map(prev).set(tragittoId, 'Manca l\'indirizzo di arrivo — impostalo in Eventi, nella scheda di questo tragitto.')); return; }
     if (!arrivoOrarioContesto) { setStatoCalcoloOrariMap((prev) => new Map(prev).set(tragittoId, 'Manca l\'orario di arrivo — impostalo in Eventi, nella scheda di questo tragitto.')); return; }
@@ -458,7 +458,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
       return new Map(prev).set(tragittoId, {
         ...f,
         fermate: f.fermate.map((fer) => {
-          if (!fer.indirizzo.trim()) return fer;
+          if (!fer.indirizzo?.trim()) return fer;
           const orario = orariCalcolati[idxValido]; idxValido++;
           return orario ? { ...fer, orario } : fer;
         }),

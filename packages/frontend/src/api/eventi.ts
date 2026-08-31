@@ -3,7 +3,7 @@ import type { Evento, OpzionePartenza } from './types';
 
 export interface FermataInput {
   fermataAnagraficaId?: string | null;
-  citta: string; indirizzo: string; orario?: string; orarioRitorno?: string; indirizzoRitorno?: string; prezzo?: number; postiMax?: number;
+  citta: string; indirizzo?: string | null; orario?: string; orarioRitorno?: string; indirizzoRitorno?: string; prezzo?: number; postiMax?: number;
   tipo?: 'PARTENZA' | 'PASSAGGIO'; sogliaMinima?: number | null; attivo?: boolean;
 }
 export interface TragittoInput {
@@ -13,6 +13,7 @@ export interface TragittoInput {
   // Deciso qui in Eventi — non più da Partenze.
   arrivoIndirizzo?: string;
   arrivoOrario?: string;
+  arrivoCitta?: string;
   fermate: FermataInput[];
 }
 export interface EventoInput {

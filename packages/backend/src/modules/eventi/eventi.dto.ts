@@ -40,6 +40,7 @@ export const tragittoSchema = z.object({
   // Deciso qui, in Eventi — non più da Partenze.
   arrivoIndirizzo: z.string().optional(),
   arrivoOrario: z.string().optional(),
+  arrivoCitta: z.string().optional(),
   fermate: z.array(fermataSchema).default([]),
 });
 

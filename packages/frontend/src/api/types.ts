@@ -2,7 +2,10 @@ export interface Fermata {
   id: string;
   fermataAnagraficaId: string | null;
   citta: string;
-  indirizzo: string;
+  // Nullo solo per una fermata "Partenza" appena creata da un Percorso
+  // Salvato applicato e non ancora invertito — l'indirizzo vero si
+  // scrive qui in Eventi (la venue dipende dall'evento specifico).
+  indirizzo: string | null;
   orario: string | null;
   orarioRitorno: string | null;
   indirizzoRitorno: string | null;
@@ -32,6 +35,7 @@ export interface Tragitto {
   // Partenze.
   arrivoIndirizzo: string | null;
   arrivoOrario: string | null;
+  arrivoCitta: string | null;
   preventivoPostiBus: number | null;
   referenteNome: string | null;
   referenteTelefono: string | null;

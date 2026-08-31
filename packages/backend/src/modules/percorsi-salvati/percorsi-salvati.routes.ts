@@ -11,7 +11,12 @@ import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 const fermataPercorsoSchema = z.object({
   fermataAnagraficaId: z.string().nullable().optional(),
   citta: z.string().min(1),
-  indirizzo: z.string().min(1),
+  // Facoltativo SOLO per la fermata "Partenza" — quella si scrive in
+  // Eventi quando il percorso viene applicato (dipende dall'evento
+  // specifico). Le fermate intermedie (PASSAGGIO) lo richiedono
+  // comunque — controllato sotto, nel refine, dato che qui Zod non sa
+  // ancora se questa riga è la Partenza o una intermedia.
+  indirizzo: z.string().min(1).nullable().optional(),
   prezzo: z.number().positive().nullable().optional().transform((v) => v ?? undefined),
   // Decisi qui (sul percorso, il modello riutilizzabile) e non più in
   // Eventi — se lo stesso percorso si applica a più eventi, ha senso
@@ -21,17 +26,32 @@ const fermataPercorsoSchema = z.object({
 });
 const percorsoSalvatoSchema = z.object({
   nome: z.string().min(1),
+  // Solo il nome della città — l'indirizzo vero (la venue) si scrive
+  // sempre in Eventi, come già per arrivoIndirizzo sui tragitti veri:
+  // lo stesso percorso può portare a venue diverse nella stessa città.
+  arrivoCitta: z.string().min(1).nullable().optional(),
   fermate: z.array(fermataPercorsoSchema).default([]),
 }).refine(
   (t) => t.fermate.every((f) => f.prezzo !== undefined),
   { message: 'Ogni fermata deve avere un prezzo.', path: ['fermate'] }
+).refine(
+  // La PRIMA fermata dell'elenco (posizione, non il campo "tipo" — che
+  // significa tutt'altro: se quella fermata ha una soglia minima di
+  // partecipanti, vedi sopra) è il punto di partenza geografico, può
+  // restare senza indirizzo. Tutte le altre lo richiedono comunque.
+  (t) => t.fermate.every((f, idx) => idx === 0 || f.indirizzo?.trim()),
+  { message: 'Ogni fermata intermedia deve avere un indirizzo — solo la prima (la Partenza) può esserne senza.', path: ['fermate'] }
 );
 const aggiornaPercorsoSalvatoSchema = z.object({
   nome: z.string().min(1).optional(),
+  arrivoCitta: z.string().min(1).nullable().optional(),
   fermate: z.array(fermataPercorsoSchema).optional(),
 }).refine(
   (t) => !t.fermate || t.fermate.every((f) => f.prezzo !== undefined),
   { message: 'Ogni fermata deve avere un prezzo.', path: ['fermate'] }
+).refine(
+  (t) => !t.fermate || t.fermate.every((f, idx) => idx === 0 || f.indirizzo?.trim()),
+  { message: 'Ogni fermata intermedia deve avere un indirizzo — solo la prima (la Partenza) può esserne senza.', path: ['fermate'] }
 );
 
 async function getById(id: string) {
@@ -49,7 +69,7 @@ export const percorsiSalvatiService = {
 
   async create(input: z.infer<typeof percorsoSalvatoSchema>) {
     return db.transaction(async (tx) => {
-      const [nuovo] = await tx.insert(percorsiSalvati).values({ nome: input.nome }).returning();
+      const [nuovo] = await tx.insert(percorsiSalvati).values({ nome: input.nome, arrivoCitta: input.arrivoCitta }).returning();
       if (input.fermate.length) {
         await tx.insert(fermatePercorsoSalvato).values(
           input.fermate.map((f, ordine) => ({
@@ -67,6 +87,9 @@ export const percorsiSalvatiService = {
     return db.transaction(async (tx) => {
       if (input.nome !== undefined) {
         await tx.update(percorsiSalvati).set({ nome: input.nome }).where(eq(percorsiSalvati.id, id));
+      }
+      if (input.arrivoCitta !== undefined) {
+        await tx.update(percorsiSalvati).set({ arrivoCitta: input.arrivoCitta }).where(eq(percorsiSalvati.id, id));
       }
       if (input.fermate) {
         await tx.delete(fermatePercorsoSalvato).where(eq(fermatePercorsoSalvato.percorsoSalvatoId, id));

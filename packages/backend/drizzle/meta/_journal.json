@@ -463,6 +463,13 @@
       "when": 1788099889838,
       "tag": "0065_svuota_vecchio_arrivo",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1788209021261,
+      "tag": "0066_arrivo_partenza_invertibili",
+      "breakpoints": true
     }
   ]
 }

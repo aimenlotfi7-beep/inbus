@@ -52,6 +52,13 @@ export const includeCompleto = {
  *  richiamata ogni volta che l'elenco bus di un tragitto cambia
  *  (registrato un bus nuovo, cambiati i posti di uno esistente,
  *  spostato o rimosso un bus da questo tragitto). */
+// Usato quando un tragitto diventa prenotabile (preventivo registrato)
+// ma non ha ancora nessun bus vero — le vendite non devono avere un
+// tetto in quella fase (vedi registraPreventivo). Un numero enorme
+// invece di un vero infinito: resta un intero valido nel database, e
+// il sito non mostra comunque mai il numero esatto al cliente.
+const POSTI_QUASI_ILLIMITATI = 999999;
+
 async function ricalcolaPostiTragitto(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], tragittoId: string) {
   // .for('update'): blocca la riga finché questa transazione non
   // finisce — se due admin toccano bus dello stesso tragitto nello
@@ -190,6 +197,7 @@ async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction
       fornitoreId: tragitto.fornitoreId,
       arrivoIndirizzo: tragitto.arrivoIndirizzo,
       arrivoOrario: tragitto.arrivoOrario,
+      arrivoCitta: tragitto.arrivoCitta,
     })
     .returning();
 
@@ -272,6 +280,7 @@ async function sincronizzaTuttiITragitti(
         fornitoreId: tragitto.fornitoreId,
         arrivoIndirizzo: tragitto.arrivoIndirizzo,
         arrivoOrario: tragitto.arrivoOrario,
+        arrivoCitta: tragitto.arrivoCitta,
       }).where(eq(tragitti.id, giaEsistente.id));
 
       // Le fermate non hanno prenotazioni collegate direttamente (le
@@ -880,6 +889,28 @@ export const eventiService = {
       for (const { fermataId, prezzo } of input.prezziPerFermata) {
         await tx.update(fermate).set({ prezzo: prezzo.toFixed(2) })
           .where(and(eq(fermate.id, fermataId), eq(fermate.tragittoId, tragittoId))); // il secondo controllo è una sicurezza in più, non fidarsi di un id passato dal client senza verificarlo
+      }
+
+      // Da qui il tragitto è prenotabile sul sito — ma se non c'è
+      // ancora nessun bus vero registrato in una Linea, le vendite non
+      // devono essere limitate: il numero "posti presunti" scritto nel
+      // preventivo qui sopra è solo reportistica, non un tetto alle
+      // vendite (deciso esplicitamente così — si vende prima, si
+      // decidono i bus vengono dopo in base a quanto si è venduto).
+      // "Quasi illimitato" invece di un vero infinito: il sito comunque
+      // non mostra mai il numero esatto (solo "Posti disponibili"/
+      // "Pochi posti"/"Esaurito" a soglie — vedi PercorsoBus.tsx), un
+      // numero enorme si comporta a tutti gli effetti come nessun
+      // limite, restando comunque un intero valido nel database.
+      const daLinee = await tx.select({ busId: busFisici.id }).from(busFisici)
+        .innerJoin(linee, eq(linee.id, busFisici.lineaId))
+        .where(eq(linee.tragittoId, tragittoId));
+      if (daLinee.length === 0) {
+        const postiOccupati = esiste.postiTotali - esiste.postiDisponibili;
+        await tx.update(tragitti).set({
+          postiTotali: POSTI_QUASI_ILLIMITATI,
+          postiDisponibili: POSTI_QUASI_ILLIMITATI - postiOccupati,
+        }).where(eq(tragitti.id, tragittoId));
       }
     });
   },

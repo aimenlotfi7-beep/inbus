@@ -251,6 +251,13 @@ export const tragitti = pgTable('tragitti', {
   // punti diversi della stessa città).
   arrivoIndirizzo: text('arrivo_indirizzo'),
   arrivoOrario: text('arrivo_orario'),
+  // Solo il nome della città — mostrato come etichetta ("Arrivo:
+  // Milano") anche PRIMA che arrivoIndirizzo venga compilato, quando
+  // il tragitto nasce da un Percorso Salvato applicato (dove la città
+  // di arrivo è già nota, ma l'indirizzo vero si scrive solo qui in
+  // Eventi). Facoltativo — un tragitto creato a mano, senza passare da
+  // un percorso salvato, può non averlo.
+  arrivoCitta: text('arrivo_citta'),
   // Il tragitto resta visibile e modificabile nel gestionale, ma se
   // disattivato non compare più tra le fermate prenotabili sul sito —
   // diverso dall'eliminazione (quella lo toglie del tutto): qui serve
@@ -435,6 +442,12 @@ export const lineaFermate = pgTable('linea_fermate', {
 export const percorsiSalvati = pgTable('percorsi_salvati', {
   id: id(),
   nome: text('nome').notNull(),
+  // Solo il nome della città — l'indirizzo vero (la venue) si scrive
+  // sempre in Eventi, perché lo stesso percorso può essere applicato
+  // per eventi diversi con luoghi diversi nella stessa città. Vedi lo
+  // stesso identico ragionamento già fatto per arrivoIndirizzo sui
+  // tragitti veri.
+  arrivoCitta: text('arrivo_citta'),
 });
 
 export const fermatePercorsoSalvato = pgTable('fermate_percorso_salvato', {
@@ -446,7 +459,15 @@ export const fermatePercorsoSalvato = pgTable('fermate_percorso_salvato', {
   // fermata al volo senza passare dall'anagrafica.
   fermataAnagraficaId: text('fermata_anagrafica_id').references(() => fermateAnagrafica.id),
   citta: text('citta').notNull(),
-  indirizzo: text('indirizzo').notNull(),
+  // Facoltativo SOLO per la fermata "Partenza" (tipo qui sotto) — lo
+  // stesso ragionamento di arrivoCitta: la partenza vera dipende
+  // dall'evento specifico, si scrive in Eventi quando il percorso
+  // viene applicato. Le fermate intermedie (PASSAGGIO) restano invece
+  // sempre con l'indirizzo vero già pronto qui — quelle non cambiano
+  // da un evento all'altro, sono punti di ritrovo fissi e riusabili.
+  // Il controllo che PASSAGGIO lo richieda comunque è applicativo
+  // (rotte/validazione), non qui a livello di colonna.
+  indirizzo: text('indirizzo'),
   orario: text('orario'),
   prezzo: numeric('prezzo', { precision: 10, scale: 2 }),
   // Vedi tipoFermataEnum — deciso qui, sul percorso (il modello
