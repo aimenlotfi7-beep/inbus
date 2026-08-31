@@ -816,7 +816,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
               <div style={{ marginTop: 14 }}>
                 <div style={rigaStile}>
                   <div><strong style={{ fontSize: 13.5 }}>Fermate</strong> <span style={{ color: 'var(--mist)', fontSize: 13 }}>· {tragitto.fermate.length} fermate</span></div>
-                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }} onClick={() => onNavigaTab?.('fermate')}>Modifica</button>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }} onClick={() => apriModificaOperativa(tragitto)}>Modifica</button>
                 </div>
                 <div style={rigaStile}>
                   <div>
@@ -825,11 +825,11 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
                       · {tragittoVero?.preventivoCosto ? `€${Number(tragittoVero.preventivoCosto).toFixed(0)} · ${tragittoVero.preventivoPostiBus ?? '—'} posti presunti` : 'non registrato'}
                     </span>
                   </div>
-                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }} onClick={() => onNavigaTab?.('da-prezzare')}>Modifica</button>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }} onClick={() => apriPreventivo(tragitto.tragittoId)}>Modifica</button>
                 </div>
                 <div style={rigaStile}>
                   <div><strong style={{ fontSize: 13.5 }}>Linee</strong> <span style={{ color: 'var(--mist)', fontSize: 13 }}>· {linee.length} Linee · {busNelleLinee.length} bus · {postiNelleLinee} posti</span></div>
-                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }} onClick={() => onNavigaTab?.('da-confermare')}>Modifica</button>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }} onClick={() => apriPaginaLinee(tragitto.tragittoId)}>Modifica</button>
                 </div>
                 {vedeEconomia && dati && (
                   <div style={{ ...rigaStile, borderBottom: 'none' }}>
