@@ -5,6 +5,24 @@
 
 export interface Coordinate { lat: number; lng: number; }
 
+// Nominatim chiede esplicitamente di restare sotto 1 richiesta al
+// secondo — con centinaia di fermate da cercare (es. tutti i percorsi
+// insieme sulla cartina), senza questo limitatore le richieste
+// partono una via l'altra troppo veloci e Nominatim comincia a
+// rifiutarle, facendo sembrare "non trovate" anche città notissime
+// come Firenze o Napoli (che di per sé si troverebbero senza problemi).
+// Un'unica coda condivisa da tutte le chiamate di questo file: ogni
+// nuova richiesta aspetta il proprio turno, mai più veloce di una al
+// secondo, indipendentemente da quante parti del gestionale la usano
+// insieme nello stesso momento.
+let prossimoTurnoNominatim = 0;
+async function attendiTurnoNominatim() {
+  const adesso = Date.now();
+  const attesa = Math.max(0, prossimoTurnoNominatim - adesso);
+  prossimoTurnoNominatim = Math.max(adesso, prossimoTurnoNominatim) + 1100; // 1.1s di margine, non il minimo esatto
+  if (attesa > 0) await new Promise((r) => setTimeout(r, attesa));
+}
+
 /** Risultato esplicito: distingue "indirizzo non trovato" da "richiesta
  *  fallita" (rete/firewall/CORS), così l'interfaccia può mostrare un
  *  messaggio utile invece di un generico "non ci sono riuscito". */
@@ -24,6 +42,7 @@ export async function geocodifica(indirizzo: string): Promise<RisultatoGeocodifi
   const inCache = cacheGeocodifica.get(chiave);
   if (inCache) return inCache;
   try {
+    await attendiTurnoNominatim();
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(indirizzo)}`;
     const res = await fetch(url, { headers: { 'Accept-Language': 'it' } });
     if (!res.ok) {
@@ -50,6 +69,7 @@ export async function geocodifica(indirizzo: string): Promise<RisultatoGeocodifi
 export async function suggerimentiIndirizzo(query: string): Promise<{ label: string; lat: number; lng: number }[]> {
   if (query.trim().length < 3) return [];
   try {
+    await attendiTurnoNominatim();
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=it&q=${encodeURIComponent(query)}`;
     const res = await fetch(url, { headers: { 'Accept-Language': 'it' } });
     if (!res.ok) return [];

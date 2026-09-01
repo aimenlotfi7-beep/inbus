@@ -229,6 +229,7 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
       {stato === 'carico' && (
         <p style={{ color: 'var(--mist)' }}>
           Cerco le fermate sulla cartina... {percorsi.length > 1 ? `(${progresso.fatti}/${progresso.totali} percorsi)` : ''}
+          {percorsi.length > 5 && <><br />Con molte fermate mai cercate prima può richiedere qualche minuto (il servizio gratuito chiede di restare sotto 1 richiesta al secondo).</>}
         </p>
       )}
       {stato === 'carico-tracciati' && <p style={{ color: 'var(--mist)' }}>Fermate trovate — calcolo i tracciati stradali...</p>}
