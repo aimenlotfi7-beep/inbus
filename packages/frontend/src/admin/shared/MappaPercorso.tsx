@@ -22,18 +22,22 @@ const PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#0891b2
 
 // Un pin unico (grigio, sempre uguale) per TUTTE le fermate — non uno
 // per colore di percorso, così è chiaro a colpo d'occhio "qui c'è una
-// fermata" senza doverlo dedurre dal colore. Disegnato a mano come SVG
-// invece di scaricare le icone di default di Leaflet (che richiedono
-// tre file immagine esterni da un CDN solo per un pallino colorato).
+// fermata" senza doverlo dedurre dal colore. Rombo smussato invece
+// della classica goccia — disegnato a mano in SVG invece di scaricare
+// le icone di default di Leaflet (che richiedono tre file immagine
+// esterni da un CDN solo per un pallino colorato).
 const PIN_GRIGIO = L.divIcon({
   className: '',
-  html: `<svg width="26" height="34" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg">
-    <path d="M13 0C5.8 0 0 5.8 0 13c0 9.5 13 21 13 21s13-11.5 13-21C26 5.8 20.2 0 13 0z" fill="#6b7280" stroke="#374151" stroke-width="1"/>
-    <circle cx="13" cy="13" r="5" fill="#fff"/>
+  html: `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="14" cy="33" rx="5" ry="2" fill="#000" opacity="0.18"/>
+    <g transform="translate(14,14) rotate(45)">
+      <rect x="-9" y="-9" width="18" height="18" rx="5" fill="#52525b" stroke="#27272a" stroke-width="1"/>
+    </g>
+    <circle cx="14" cy="14" r="4" fill="#fff"/>
   </svg>`,
-  iconSize: [26, 34],
-  iconAnchor: [13, 34], // la punta della goccia indica il punto esatto
-  popupAnchor: [0, -30],
+  iconSize: [28, 36],
+  iconAnchor: [14, 14], // il centro del rombo indica il punto esatto — l'ombra sotto è solo un effetto visivo, non il riferimento
+  popupAnchor: [0, -12],
 });
 
 /** Sposta un tracciato (sequenza di punti) di un piccolo margine fisso,
