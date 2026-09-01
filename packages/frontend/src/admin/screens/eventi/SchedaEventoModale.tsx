@@ -280,10 +280,13 @@ export function SchedaEventoModale({
     tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate };
     setForm({ ...form, tragitti });
   }
-  function aggiornaFermata(idxTragitto: number, idxFermata: number, campo: keyof FermataInput, valore: string) {
+  function aggiornaFermata(idxTragitto: number, idxFermata: number, campo: keyof FermataInput, valore: string | boolean) {
     const tragitti = [...(form.tragitti ?? [])];
     const fermate = [...tragitti[idxTragitto].fermate];
-    fermate[idxFermata] = { ...fermate[idxFermata], [campo]: (campo === 'prezzo' || campo === 'postiMax' || campo === 'sogliaMinima') ? (Number(valore) || undefined) : valore };
+    const valoreConvertito = campo === 'attivo' ? valore
+      : (campo === 'prezzo' || campo === 'postiMax' || campo === 'sogliaMinima') ? (Number(valore) || undefined)
+      : valore;
+    fermate[idxFermata] = { ...fermate[idxFermata], [campo]: valoreConvertito };
     tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate };
     setForm({ ...form, tragitti });
   }
@@ -1072,7 +1075,7 @@ export function SchedaEventoModale({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => onDropSu(idxTragitto, idxFermata)}
                 style={{
-                  display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr auto', gap: 6, alignItems: 'center',
+                  display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr auto auto', gap: 6, alignItems: 'center',
                   opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
                 }}
               >
@@ -1109,6 +1112,13 @@ export function SchedaEventoModale({
                     <input placeholder="Indirizzo" value={f.indirizzo ?? ''} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)} />
                   </>
                 )}
+                <label
+                  title={f.attivo === false ? 'Fermata esclusa — non compare più nelle Linee né sul sito' : 'Fermata attiva — clicca per escluderla (es. per scarse adesioni), senza doverla rimuovere del tutto'}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: f.attivo === false ? 'var(--pink)' : 'var(--mist)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  <input type="checkbox" checked={f.attivo !== false} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'attivo', e.target.checked)} style={{ width: 'auto' }} />
+                  {f.attivo === false ? 'Esclusa' : 'Attiva'}
+                </label>
                 <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
               </div>
               {f.fermataAnagraficaId === null && fermateAnagrafica.length > 0 && (

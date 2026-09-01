@@ -73,8 +73,14 @@ export function LineeTragittoScreen() {
     // browser. "evento"/"tragitto" vanno tolti esplicitamente
     // dall'indirizzo (prima un ricaricamento completo li avrebbe
     // "ripuliti" da solo insieme a tutto il resto — qui no, restano se
-    // non li tolgo apposta).
-    navigaSezione('partenze', { evento: null, tragitto: null, partenzeTab: tabDestinazione ?? null });
+    // non li tolgo apposta). "Orari"/"Prezzo" vivono nella sezione
+    // "Preventivi" (separata da "Partenze") — instrado verso quella,
+    // non più sempre verso "Partenze" come prima della divisione.
+    if (tabDestinazione === 'fermate' || tabDestinazione === 'da-prezzare') {
+      navigaSezione('preventivi', { evento: null, tragitto: null, preventiviTab: tabDestinazione });
+    } else {
+      navigaSezione('partenze', { evento: null, tragitto: null, partenzeTab: tabDestinazione ?? null });
+    }
   }
 
   if (!eventoId || !tragittoId) {
@@ -119,7 +125,34 @@ export function LineeTragittoScreen() {
     if (!b.orario) return -1;
     return a.orario.localeCompare(b.orario);
   }
-  const fermateInOrdine = [...fermateAttive].sort(perOrario);
+  // Per il riepilogo in cima, a differenza di fermateAttive (che resta
+  // filtrata solo su quelle attive — le uniche selezionabili quando si
+  // costruisce una Linea, non toccare quella): qui servono TUTTE le
+  // fermate, comprese quelle già escluse, per poterle riattivare da
+  // qui se serve.
+  const tutteLeFermateOrdinate = [...tragittoVero.fermate].sort(perOrario);
+  // Aggiorna solo il flag attivo di UNA fermata, lasciando tutte le
+  // altre invariate — stessa funzione già usata da Eventi per salvare
+  // le fermate operative di un tragitto (aggiornaTragittoOperativo),
+  // qui costruita per un solo campo alla volta invece di un modulo
+  // intero.
+  async function alternaFermataAttiva(fermataId: string) {
+    const t = tragittoVero;
+    if (!t) return;
+    const fermateAggiornate = t.fermate.map((f) => ({
+      fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo ?? undefined,
+      orario: f.orario ?? undefined, orarioRitorno: f.orarioRitorno ?? undefined, indirizzoRitorno: f.indirizzoRitorno ?? undefined,
+      prezzo: f.prezzo ? Number(f.prezzo) : undefined, postiMax: f.postiMax ?? undefined,
+      tipo: f.tipo, sogliaMinima: f.sogliaMinima ?? undefined,
+      attivo: f.id === fermataId ? !f.attivo : f.attivo,
+    }));
+    try {
+      await eventiApi.aggiornaTragittoOperativo(idTragitto, { fermate: fermateAggiornate });
+      ricarica();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: errore di rete.');
+    }
+  }
 
   // Riepilogo in cima — "in attesa" è lo stesso ovunque (è quante
   // prenotazioni non hanno ancora nessun bus, non dipende da QUALE
@@ -296,7 +329,19 @@ export function LineeTragittoScreen() {
       {/* 1. RIEPILOGO PARTENZA */}
       <PanelHead titolo={tragittoVero.nome} info={evento.artista} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-        {fermateInOrdine.map((f) => {
+        {tutteLeFermateOrdinate.map((f) => {
+          // Una fermata esclusa (es. per scarse adesioni) non ha senso
+          // mostrarla coi contatori prenotazioni — non è più
+          // selezionabile per nessuna Linea, resta solo un promemoria
+          // sfumato con un modo per riattivarla se serve.
+          if (!f.attivo) {
+            return (
+              <span key={f.id} className="chip" style={{ opacity: 0.55 }}>
+                <span style={{ textDecoration: 'line-through' }}>{f.citta}</span>
+                <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Riattiva questa fermata" style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0, fontSize: 13 }}>↺</button>
+              </span>
+            );
+          }
           const { inAttesa, versati } = contatoriCitta(f);
           return (
             <span key={f.id} className="chip">
@@ -304,10 +349,11 @@ export function LineeTragittoScreen() {
               <span style={{ color: 'var(--pink)', fontFamily: "'Space Mono',monospace" }}>{inAttesa}</span>
               <span style={{ color: 'var(--mist)' }}>/</span>
               <span style={{ color: 'var(--green)', fontFamily: "'Space Mono',monospace" }}>{versati}</span>
+              <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Escludi questa fermata (es. per scarse adesioni) — resta nel tragitto, solo non più selezionabile per una Linea" style={{ background: 'none', border: 'none', color: 'var(--mist)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
             </span>
           );
         })}
-        {fermateInOrdine.length === 0 && <span style={{ color: 'var(--mist)' }}>Nessuna fermata attiva su questo tragitto.</span>}
+        {tutteLeFermateOrdinate.length === 0 && <span style={{ color: 'var(--mist)' }}>Nessuna fermata su questo tragitto.</span>}
       </div>
 
       {/* 2. LINEE / BUS */}

@@ -30,6 +30,7 @@ import { AmministratoriScreen } from './screens/AmministratoriScreen';
 import { RuoliScreen } from './screens/RuoliScreen';
 import { TestiTooltipScreen } from './screens/TestiTooltipScreen';
 import { PartenzeScreen } from './screens/PartenzeScreen';
+import { PreventiviScreen } from './screens/PreventiviScreen';
 import { LineeTragittoScreen } from './screens/LineeTragittoScreen';
 import { ListaAttesaScreen } from './screens/ListaAttesaScreen';
 import { OfferteScreen } from './screens/OfferteScreen';
@@ -71,6 +72,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   ruoli: RuoliScreen,
   'testi-tooltip': TestiTooltipScreen,
   partenze: PartenzeScreen,
+  preventivi: PreventiviScreen,
   linee: LineeTragittoScreen,
   impostazioni: ImpostazioniScreen,
   'template-email': TemplateEmailScreen,
@@ -109,6 +111,7 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   ruoli: 'permessi.gestisci',
   'testi-tooltip': 'impostazioni.gestisci',
   partenze: 'eventi.partenze',
+  preventivi: 'eventi.partenze',
   linee: 'eventi.crea',
   impostazioni: 'impostazioni.gestisci',
   'template-email': 'template-email.gestisci',
