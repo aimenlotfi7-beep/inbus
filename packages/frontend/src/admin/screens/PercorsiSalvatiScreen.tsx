@@ -224,9 +224,8 @@ export function PercorsiSalvatiScreen() {
               )}
             </div>
           ))}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ marginBottom: 16 }}>
             <button type="button" className="btn btn-ghost" onClick={() => setPercorsiCartinaIds([...percorsiCartinaIds, ''])}>+ Aggiungi un altro percorso</button>
-            <button type="button" className="btn btn-ghost" onClick={() => setPercorsiCartinaIds(percorsi.map((p) => p.id))}>Mostra tutti insieme ({percorsi.length})</button>
           </div>
           {(() => {
             const tappeDiPercorso = (p: PercorsoSalvato): TappaMappa[] => p.fermate.map((f, idx) => {

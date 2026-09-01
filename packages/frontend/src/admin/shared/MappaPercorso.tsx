@@ -107,11 +107,16 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
   const [stato, setStato] = useState<'carico' | 'carico-tracciati' | 'pronto' | 'errore'>('carico');
   const [progresso, setProgresso] = useState<{ fatti: number; totali: number }>({ fatti: 0, totali: 0 });
   const [risultatiPerPercorso, setRisultatiPerPercorso] = useState<{ id: string; nome: string; colore: string; distanzaKm: number | null; nonTrovate: string[] }[]>([]);
-  // Il percorso attualmente evidenziato — al passaggio del cursore
-  // (desktop) o al tocco del pallino colorato in legenda (mobile, dove
-  // "passare il cursore" non esiste e toccare una linea sottile sulla
-  // cartina è difficile). null = nessuno evidenziato, tutti normali.
-  const [evidenziato, setEvidenziato] = useState<string | null>(null);
+  // Due concetti separati: "selezionati" è persistente, si costruisce
+  // cliccando una linea (o il suo pallino in legenda) — resta finché
+  // non si clicca di nuovo lo stesso (lo toglie) o si clicca fuori
+  // (lo svuota tutto), permettendo di tenerne evidenziati PIÙ di uno
+  // insieme, come richiesto. "hoverId" è solo un'anteprima al
+  // passaggio del cursore (desktop), temporanea — si aggiunge alla
+  // vista finché il cursore resta sopra, sparisce non appena esce,
+  // senza toccare la selezione vera sotto.
+  const [selezionati, setSelezionati] = useState<Set<string>>(new Set());
+  const [hoverId, setHoverId] = useState<string | null>(null);
 
   useEffect(() => {
     let annullato = false;
@@ -119,7 +124,8 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
     async function costruisci() {
       setStato('carico');
       setProgresso({ fatti: 0, totali: percorsi.length });
-      setEvidenziato(null);
+      setSelezionati(new Set());
+      setHoverId(null);
       polilineePerPercorso.current.clear();
 
       if (!mappaRef.current && contenitoreRef.current) {
@@ -132,7 +138,7 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
         // toglie l'evidenziazione — le linee hanno il proprio click
         // separato più sotto, che ferma la propagazione qui: i due
         // click non si "pestano" a vicenda.
-        mappaRef.current.on('click', () => setEvidenziato(null));
+        mappaRef.current.on('click', () => setSelezionati(new Set()));
       }
       const mappa = mappaRef.current;
       if (!mappa) { setStato('errore'); return; }
@@ -199,18 +205,25 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
         const puntiScostati = scostaTracciato(puntiVeri, d.indiceOriginale, percorsi.length);
         const linea = L.polyline(puntiScostati.map((pt): [number, number] => [pt.lat, pt.lng]), { color: d.colore, weight: 4 }).addTo(mappa);
         // Passaggio del cursore (desktop) — evidenzia mentre resta
-        // sopra, torna normale appena esce. Click (anche da mobile,
-        // se si riesce a toccare la linea sottile) — resta
-        // evidenziato finché non si clicca altrove, utile per
-        // guardarlo con calma invece di doverci restare sopra col
-        // dito. "stopPropagation" evita che lo stesso click arrivi
-        // anche al gestore sullo sfondo della cartina, che altrimenti
-        // lo toglierebbe subito dopo averlo appena messo.
-        linea.on('mouseover', () => setEvidenziato(d.p.id));
-        linea.on('mouseout', () => setEvidenziato(null));
+        // Passaggio del cursore (desktop) — anteprima temporanea,
+        // sparisce appena esce, non tocca la selezione vera. Click
+        // (anche da mobile, se si riesce a toccare la linea sottile) —
+        // AGGIUNGE o TOGLIE dalla selezione persistente (si può
+        // tenerne evidenziati più di uno insieme, cliccandone diversi
+        // in sequenza), utile per guardarli con calma invece di dover
+        // restare col dito sopra. "stopPropagation" evita che lo
+        // stesso click arrivi anche al gestore sullo sfondo della
+        // cartina, che altrimenti svuoterebbe subito la selezione
+        // appena fatta.
+        linea.on('mouseover', () => setHoverId(d.p.id));
+        linea.on('mouseout', () => setHoverId(null));
         linea.on('click', (e) => {
           L.DomEvent.stopPropagation(e);
-          setEvidenziato((prec) => (prec === d.p.id ? null : d.p.id));
+          setSelezionati((prec) => {
+            const nuovo = new Set(prec);
+            if (nuovo.has(d.p.id)) nuovo.delete(d.p.id); else nuovo.add(d.p.id);
+            return nuovo;
+          });
         });
         polilineePerPercorso.current.set(d.p.id, linea);
         tuttiIPunti.push(...d.coordinate.map((c): [number, number] => [c.lat, c.lng]));
@@ -243,25 +256,26 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
     return () => { annullato = true; };
   }, [percorsi]);
 
-  // Ogni volta che cambia quale percorso è evidenziato (o torna a
-  // nessuno): quello scelto resta bene in vista e passa sopra alle
-  // altre linee (bringToFront, altrimenti una linea "sotto" a un'altra
-  // resterebbe nascosta anche se evidenziata), tutte le altre si
-  // affievoliscono. Effetto separato dalla costruzione della cartina —
-  // non serve rifare geocodifica/tracciati solo per cambiare quale
-  // riga è più in vista.
+  // Ogni volta che cambia la selezione (persistente o l'anteprima al
+  // passaggio del cursore): le linee scelte restano bene in vista e
+  // passano sopra alle altre (bringToFront, altrimenti una linea
+  // "sotto" a un'altra resterebbe nascosta anche se evidenziata),
+  // tutte le altre si affievoliscono. Effetto separato dalla
+  // costruzione della cartina — non serve rifare geocodifica/tracciati
+  // solo per cambiare quali righe sono più in vista.
   useEffect(() => {
+    const daEvidenziare = hoverId ? new Set([...selezionati, hoverId]) : selezionati;
     for (const [id, linea] of polilineePerPercorso.current) {
-      if (evidenziato === null) {
+      if (daEvidenziare.size === 0) {
         linea.setStyle({ opacity: 1, weight: 4 });
-      } else if (id === evidenziato) {
+      } else if (daEvidenziare.has(id)) {
         linea.setStyle({ opacity: 1, weight: 6 });
         linea.bringToFront();
       } else {
         linea.setStyle({ opacity: 0.15, weight: 4 });
       }
     }
-  }, [evidenziato]);
+  }, [selezionati, hoverId]);
 
   // La mappa Leaflet resta viva tra un aggiornamento e l'altro (non la
   // ricreiamo ogni volta, solo i marcatori/le linee sopra) — va
@@ -294,13 +308,17 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
             <button
               key={r.id}
               type="button"
-              onClick={() => setEvidenziato((prec) => (prec === r.id ? null : r.id))}
-              title="Evidenzia questo tragitto sulla cartina"
+              onClick={() => setSelezionati((prec) => {
+                const nuovo = new Set(prec);
+                if (nuovo.has(r.id)) nuovo.delete(r.id); else nuovo.add(r.id);
+                return nuovo;
+              })}
+              title="Evidenzia questo tragitto sulla cartina — puoi sceglierne più di uno insieme"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5,
-                color: evidenziato === r.id ? 'var(--paper)' : 'var(--mist)',
+                color: selezionati.has(r.id) ? 'var(--paper)' : 'var(--mist)',
                 background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                fontWeight: evidenziato === r.id ? 600 : 400,
+                fontWeight: selezionati.has(r.id) ? 600 : 400,
               }}
             >
               <span style={{ width: 10, height: 10, borderRadius: '50%', background: r.colore, flexShrink: 0 }} />
