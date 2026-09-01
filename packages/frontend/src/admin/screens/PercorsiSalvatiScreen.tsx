@@ -211,6 +211,7 @@ export function PercorsiSalvatiScreen() {
                 onChange={(e) => setPercorsiCartinaIds(percorsiCartinaIds.map((v, i) => (i === idx ? e.target.value : v)))}
               >
                 <option value="">— Seleziona un percorso —</option>
+                <option value="__tutti__">— Tutti i percorsi insieme —</option>
                 {percorsi.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
               {percorsiCartinaIds.length > 1 && (
@@ -250,13 +251,16 @@ export function PercorsiSalvatiScreen() {
             const idsScelti = [...new Set(percorsiCartinaIds.filter((id) => id.trim() !== ''))];
             if (idsScelti.length === 0) return <p style={{ color: 'var(--mist)' }}>Scegli almeno un percorso per vederlo sulla cartina.</p>;
 
-            const percorsiMappa: PercorsoMappa[] = idsScelti
-              .map((id) => percorsi.find((p) => p.id === id))
-              .filter((p): p is PercorsoSalvato => !!p)
+            // "Tutti insieme" scelto in una qualsiasi casella prevale
+            // sulle altre — non avrebbe senso combinarlo con singoli
+            // percorsi scelti a parte, li contiene già tutti.
+            const percorsiDaMostrare = idsScelti.includes('__tutti__') ? percorsi : idsScelti.map((id) => percorsi.find((p) => p.id === id)).filter((p): p is PercorsoSalvato => !!p);
+
+            const percorsiMappa: PercorsoMappa[] = percorsiDaMostrare
               .map((p) => ({ id: p.id, nome: p.nome, tappe: tappeDiPercorso(p) }))
               .filter((p) => p.tappe.length >= 2); // un percorso con meno di 2 fermate non ha niente da disegnare, lo salto invece di farlo fallire
             if (percorsiMappa.length === 0) return <p style={{ color: 'var(--mist)' }}>Nessuno dei percorsi scelti ha ancora abbastanza fermate da disegnare.</p>;
-            return <MappaPercorso key={idsScelti.join(',')} percorsi={percorsiMappa} />;
+            return <MappaPercorso key={idsScelti.includes('__tutti__') ? '__tutti__' : idsScelti.join(',')} percorsi={percorsiMappa} />;
           })()}
         </div>
       ) : (
