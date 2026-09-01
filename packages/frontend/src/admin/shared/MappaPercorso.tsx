@@ -19,63 +19,42 @@ export interface TappaMappa {
   citta: string;
   indirizzo?: string | null; // se assente/vuoto, si geocodifica solo la città (centro città, approssimato)
 }
+export interface PercorsoMappa {
+  id: string;
+  nome: string;
+  tappe: TappaMappa[];
+}
 
-/** Disegna un percorso su una cartina reale (OpenStreetMap, gratuita —
- *  stesso servizio già usato per gli indirizzi altrove), con la linea
- *  che segue DAVVERO le strade (non un segmento dritto tra un punto e
- *  l'altro) — usa lo stesso servizio OSRM già in uso per calcolare
- *  tempi/distanze, qui chiesto di restituire anche il tracciato
- *  completo invece di solo i numeri. */
-export function MappaPercorso({ tappe }: { tappe: TappaMappa[] }) {
+// Colori ben distinguibili tra loro, uno per percorso — se i percorsi
+// sono più dei colori disponibili, si ricomincia dal primo (comunque
+// affiancati da nome/km nella legenda, non serve un colore unico per
+// distinguerli davvero).
+const PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#0891b2', '#db2777', '#65a30d'];
+
+/** Disegna uno o più percorsi su una cartina reale (OpenStreetMap,
+ *  gratuita — stesso servizio già usato per gli indirizzi altrove), con
+ *  la linea che segue DAVVERO le strade (non un segmento dritto tra un
+ *  punto e l'altro) — usa lo stesso servizio OSRM già in uso per
+ *  calcolare tempi/distanze, qui chiesto di restituire anche il
+ *  tracciato completo invece di solo i numeri. Con più percorsi
+ *  insieme, ognuno prende un colore diverso (vedi PALETTE) — utile per
+ *  vedere a colpo d'occhio come si sovrappongono/completano a vicenda. */
+export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
   const contenitoreRef = useRef<HTMLDivElement>(null);
   const mappaRef = useRef<L.Map | null>(null);
   const [stato, setStato] = useState<'carico' | 'pronto' | 'errore'>('carico');
-  const [distanzaKm, setDistanzaKm] = useState<number | null>(null);
-  const [tappeNonTrovate, setTappeNonTrovate] = useState<string[]>([]);
+  const [progresso, setProgresso] = useState<{ fatti: number; totali: number }>({ fatti: 0, totali: 0 });
+  const [risultatiPerPercorso, setRisultatiPerPercorso] = useState<{ id: string; nome: string; colore: string; distanzaKm: number | null; nonTrovate: string[] }[]>([]);
 
   useEffect(() => {
     let annullato = false;
 
     async function costruisci() {
       setStato('carico');
-      setTappeNonTrovate([]);
+      setProgresso({ fatti: 0, totali: percorsi.length });
+      const risultati: { id: string; nome: string; colore: string; distanzaKm: number | null; nonTrovate: string[] }[] = [];
 
-      // Ogni tappa: prova prima l'indirizzo vero, se manca (le due
-      // Teste possono non averlo ancora) o se non si trova, prova solo
-      // la città — approssimato al centro, come deciso.
-      const coordinate: (Coordinate & { etichetta: string })[] = [];
-      const nonTrovate: string[] = [];
-      for (const t of tappe) {
-        const query = t.indirizzo?.trim() ? `${t.indirizzo}, ${t.citta}` : t.citta;
-        const risultato = await geocodifica(query);
-        if (risultato.coordinate) {
-          coordinate.push({ ...risultato.coordinate, etichetta: t.etichetta });
-        } else if (t.indirizzo?.trim()) {
-          // L'indirizzo preciso non è stato trovato — ultimo tentativo
-          // solo sulla città, prima di arrendersi del tutto su questa tappa.
-          const soloCitta = await geocodifica(t.citta);
-          if (soloCitta.coordinate) coordinate.push({ ...soloCitta.coordinate, etichetta: t.etichetta });
-          else nonTrovate.push(t.etichetta);
-        } else {
-          nonTrovate.push(t.etichetta);
-        }
-      }
-      if (annullato) return;
-      setTappeNonTrovate(nonTrovate);
-
-      if (coordinate.length < 2 || !contenitoreRef.current) {
-        setStato('errore');
-        return;
-      }
-
-      // Il tracciato vero su strada — se OSRM non risponde (rete,
-      // percorso non collegabile via strada, ecc.) resta comunque un
-      // segnale utile: mostriamo i marcatori con segmenti dritti tra
-      // loro invece di mostrare solo un errore secco.
-      const tracciato = await tracciatoPercorso(coordinate);
-      if (annullato) return;
-
-      if (!mappaRef.current) {
+      if (!mappaRef.current && contenitoreRef.current) {
         mappaRef.current = L.map(contenitoreRef.current);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap',
@@ -83,43 +62,110 @@ export function MappaPercorso({ tappe }: { tappe: TappaMappa[] }) {
         }).addTo(mappaRef.current);
       }
       const mappa = mappaRef.current;
+      if (!mappa) { setStato('errore'); return; }
       mappa.eachLayer((layer) => { if (!(layer instanceof L.TileLayer)) mappa.removeLayer(layer); });
 
-      for (const c of coordinate) {
-        L.marker([c.lat, c.lng]).addTo(mappa).bindPopup(c.etichetta);
-      }
-      const puntiLinea: [number, number][] = tracciato
-        ? tracciato.tratto.map((p) => [p.lat, p.lng])
-        : coordinate.map((c) => [c.lat, c.lng]); // ripiego: segmenti dritti se OSRM non risponde
-      L.polyline(puntiLinea, { color: '#2563eb', weight: 4 }).addTo(mappa);
-      mappa.fitBounds(L.latLngBounds(coordinate.map((c) => [c.lat, c.lng])), { padding: [30, 30] });
+      const tuttiIPunti: [number, number][] = [];
 
-      setDistanzaKm(tracciato?.distanzaKm ?? null);
+      for (let i = 0; i < percorsi.length; i++) {
+        const p = percorsi[i];
+        const colore = PALETTE[i % PALETTE.length];
+
+        // Ogni tappa: prova prima l'indirizzo vero, se manca (le due
+        // Teste possono non averlo ancora) o se non si trova, prova
+        // solo la città — approssimato al centro, come deciso. La
+        // cache dentro geocodifica() evita di richiedere di nuovo una
+        // fermata già cercata per un percorso precedente in questo
+        // stesso giro (es. la stessa città di partenza condivisa da
+        // più percorsi).
+        const coordinate: (Coordinate & { etichetta: string })[] = [];
+        const nonTrovate: string[] = [];
+        for (const t of p.tappe) {
+          const query = t.indirizzo?.trim() ? `${t.indirizzo}, ${t.citta}` : t.citta;
+          const risultato = await geocodifica(query);
+          if (risultato.coordinate) {
+            coordinate.push({ ...risultato.coordinate, etichetta: t.etichetta });
+          } else if (t.indirizzo?.trim()) {
+            const soloCitta = await geocodifica(t.citta);
+            if (soloCitta.coordinate) coordinate.push({ ...soloCitta.coordinate, etichetta: t.etichetta });
+            else nonTrovate.push(t.etichetta);
+          } else {
+            nonTrovate.push(t.etichetta);
+          }
+        }
+        if (annullato) return;
+
+        if (coordinate.length < 2) {
+          risultati.push({ id: p.id, nome: p.nome, colore, distanzaKm: null, nonTrovate });
+          setProgresso({ fatti: i + 1, totali: percorsi.length });
+          continue;
+        }
+
+        const tracciato = await tracciatoPercorso(coordinate);
+        if (annullato) return;
+
+        for (const c of coordinate) {
+          L.circleMarker([c.lat, c.lng], { radius: 6, color: colore, fillColor: colore, fillOpacity: 0.9, weight: 2 })
+            .addTo(mappa)
+            .bindPopup(`<b>${p.nome}</b><br>${c.etichetta}`);
+        }
+        const puntiLinea: [number, number][] = tracciato
+          ? tracciato.tratto.map((pt) => [pt.lat, pt.lng])
+          : coordinate.map((c) => [c.lat, c.lng]); // ripiego: segmenti dritti se OSRM non risponde
+        L.polyline(puntiLinea, { color: colore, weight: 4 }).addTo(mappa);
+        tuttiIPunti.push(...coordinate.map((c): [number, number] => [c.lat, c.lng]));
+
+        risultati.push({ id: p.id, nome: p.nome, colore, distanzaKm: tracciato?.distanzaKm ?? null, nonTrovate });
+        setProgresso({ fatti: i + 1, totali: percorsi.length });
+      }
+
+      if (annullato) return;
+      if (tuttiIPunti.length === 0) {
+        setStato('errore');
+        return;
+      }
+      mappa.fitBounds(L.latLngBounds(tuttiIPunti), { padding: [30, 30] });
+      setRisultatiPerPercorso(risultati);
       setStato('pronto');
     }
 
     costruisci();
     return () => { annullato = true; };
-  }, [tappe]);
+  }, [percorsi]);
 
   // La mappa Leaflet resta viva tra un aggiornamento e l'altro (non la
-  // ricreiamo ogni volta, solo i marcatori/la linea sopra) — va
+  // ricreiamo ogni volta, solo i marcatori/le linee sopra) — va
   // distrutta esplicitamente solo quando il componente sparisce del
   // tutto, altrimenti Leaflet perde il riferimento al contenitore DOM
   // e la mappa successiva non si disegna più.
   useEffect(() => () => { mappaRef.current?.remove(); mappaRef.current = null; }, []);
 
+  const tappeNonTrovateTotali = risultatiPerPercorso.flatMap((r) => r.nonTrovate.map((t) => `${r.nome}: ${t}`));
+
   return (
     <div>
-      {stato === 'carico' && <p style={{ color: 'var(--mist)' }}>Cerco le fermate sulla cartina...</p>}
+      {stato === 'carico' && (
+        <p style={{ color: 'var(--mist)' }}>
+          Cerco le fermate sulla cartina... {progresso.totali > 1 ? `(${progresso.fatti}/${progresso.totali} percorsi)` : ''}
+        </p>
+      )}
       {stato === 'errore' && <p style={{ color: 'var(--pink)' }}>Non riesco a mostrare la cartina — nessuna fermata trovata con un indirizzo o città valida.</p>}
-      {tappeNonTrovate.length > 0 && (
+      {tappeNonTrovateTotali.length > 0 && (
         <p style={{ color: 'var(--amber)', fontSize: 12.5, marginBottom: 8 }}>
-          Non trovate sulla cartina: {tappeNonTrovate.join(', ')}.
+          Non trovate sulla cartina: {tappeNonTrovateTotali.join(', ')}.
         </p>
       )}
       <div ref={contenitoreRef} style={{ height: 420, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--line)' }} />
-      {distanzaKm !== null && <p style={{ color: 'var(--mist)', fontSize: 12.5, marginTop: 8 }}>Percorso reale: circa {distanzaKm} km.</p>}
+      {risultatiPerPercorso.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 10 }}>
+          {risultatiPerPercorso.map((r) => (
+            <span key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--mist)' }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: r.colore, flexShrink: 0 }} />
+              {r.nome}{r.distanzaKm !== null ? ` — ${r.distanzaKm} km` : ''}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

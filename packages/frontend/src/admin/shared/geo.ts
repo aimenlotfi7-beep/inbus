@@ -13,7 +13,16 @@ export interface RisultatoGeocodifica {
   erroreRete: boolean;
 }
 
+// Stessa richiesta ripetuta più volte nella stessa sessione (fermate
+// condivise tra più percorsi, o la stessa cartina ricaricata) non ha
+// senso rifarla da capo — Nominatim chiede comunque di restare sotto 1
+// richiesta al secondo, una cache qui aiuta a rispettarlo davvero.
+const cacheGeocodifica = new Map<string, RisultatoGeocodifica>();
+
 export async function geocodifica(indirizzo: string): Promise<RisultatoGeocodifica> {
+  const chiave = indirizzo.trim().toLowerCase();
+  const inCache = cacheGeocodifica.get(chiave);
+  if (inCache) return inCache;
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(indirizzo)}`;
     const res = await fetch(url, { headers: { 'Accept-Language': 'it' } });
@@ -23,9 +32,13 @@ export async function geocodifica(indirizzo: string): Promise<RisultatoGeocodifi
     }
     const risultati = await res.json();
     if (risultati?.[0]) {
-      return { coordinate: { lat: Number(risultati[0].lat), lng: Number(risultati[0].lon) }, erroreRete: false };
+      const trovato: RisultatoGeocodifica = { coordinate: { lat: Number(risultati[0].lat), lng: Number(risultati[0].lon) }, erroreRete: false };
+      cacheGeocodifica.set(chiave, trovato);
+      return trovato;
     }
-    return { coordinate: null, erroreRete: false }; // richiesta riuscita, ma indirizzo non trovato
+    const nonTrovato: RisultatoGeocodifica = { coordinate: null, erroreRete: false }; // richiesta riuscita, ma indirizzo non trovato
+    cacheGeocodifica.set(chiave, nonTrovato);
+    return nonTrovato;
   } catch (e) {
     // Qui arrivano i problemi di rete/CORS/firewall: li stampo in console
     // per poterli diagnosticare (apri la Console del browser con F12).

@@ -7,7 +7,7 @@ import { CampoNumero } from '../shared/CampoNumero';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { useAvvisoModificheNonSalvate } from '../shared/useAvvisoModificheNonSalvate';
-import { MappaPercorso, type TappaMappa } from '../shared/MappaPercorso';
+import { MappaPercorso, type TappaMappa, type PercorsoMappa } from '../shared/MappaPercorso';
 
 /**
  * I percorsi sono solo template di fermate+margine, riutilizzabili su
@@ -211,22 +211,35 @@ export function PercorsiSalvatiScreen() {
       {tab === 'cartina' ? (
         <div>
           <div className="campo" style={{ maxWidth: 420, marginBottom: 16 }}>
-            <label>Scegli un percorso</label>
+            <label>Scegli cosa vedere</label>
             <select value={percorsoCartinaId} onChange={(e) => setPercorsoCartinaId(e.target.value)}>
               <option value="">— Seleziona —</option>
+              <option value="__tutti__">— Tutti i percorsi insieme —</option>
               {percorsi.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
             </select>
           </div>
           {(() => {
-            const percorsoScelto = percorsi.find((p) => p.id === percorsoCartinaId);
-            if (!percorsoScelto) return <p style={{ color: 'var(--mist)' }}>Scegli un percorso per vederlo sulla cartina.</p>;
-            const tappe: TappaMappa[] = percorsoScelto.fermate.map((f, idx) => ({
-              etichetta: `${(idx === 0 || idx === percorsoScelto.fermate.length - 1) ? 'Testa' : `Fermata ${idx + 1}`} — ${f.citta}`,
+            const tappeDiPercorso = (p: PercorsoSalvato): TappaMappa[] => p.fermate.map((f, idx) => ({
+              etichetta: `${(idx === 0 || idx === p.fermate.length - 1) ? 'Testa' : `Fermata ${idx + 1}`} — ${f.citta}`,
               citta: f.citta,
               indirizzo: f.indirizzo,
             }));
+
+            if (!percorsoCartinaId) return <p style={{ color: 'var(--mist)' }}>Scegli un percorso (o "Tutti insieme") per vederlo sulla cartina.</p>;
+
+            if (percorsoCartinaId === '__tutti__') {
+              const percorsiMappa: PercorsoMappa[] = percorsi
+                .map((p) => ({ id: p.id, nome: p.nome, tappe: tappeDiPercorso(p) }))
+                .filter((p) => p.tappe.length >= 2); // un percorso con meno di 2 fermate non ha niente da disegnare, lo salto invece di farlo fallire
+              if (percorsiMappa.length === 0) return <p style={{ color: 'var(--mist)' }}>Nessun percorso ha ancora abbastanza fermate da disegnare.</p>;
+              return <MappaPercorso key="tutti" percorsi={percorsiMappa} />;
+            }
+
+            const percorsoScelto = percorsi.find((p) => p.id === percorsoCartinaId);
+            if (!percorsoScelto) return null;
+            const tappe = tappeDiPercorso(percorsoScelto);
             if (tappe.length < 2) return <p style={{ color: 'var(--mist)' }}>Questo percorso ha meno di due fermate — niente da disegnare.</p>;
-            return <MappaPercorso key={percorsoScelto.id} tappe={tappe} />;
+            return <MappaPercorso key={percorsoScelto.id} percorsi={[{ id: percorsoScelto.id, nome: percorsoScelto.nome, tappe }]} />;
           })()}
         </div>
       ) : (
