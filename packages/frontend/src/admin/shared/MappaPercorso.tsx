@@ -3,17 +3,6 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { geocodifica, tracciatoPercorso, type Coordinate } from './geo';
 
-// Leaflet cerca le icone dei marcatori come file separati — nel nostro
-// bundle (Vite) i percorsi di default non si risolvono da soli, motivo
-// per cui senza questo la mappa mostrerebbe marcatori "rotti" (icona
-// mancante, solo l'ombra). Le puntiamo esplicitamente a un CDN pubblico.
-delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
-
 export interface TappaMappa {
   etichetta: string; // testo mostrato sul marcatore (es. "Testa — Milano")
   citta: string;
@@ -31,14 +20,65 @@ export interface PercorsoMappa {
 // distinguerli davvero).
 const PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#0891b2', '#db2777', '#65a30d'];
 
+// Un pin unico (grigio, sempre uguale) per TUTTE le fermate — non uno
+// per colore di percorso, così è chiaro a colpo d'occhio "qui c'è una
+// fermata" senza doverlo dedurre dal colore. Disegnato a mano come SVG
+// invece di scaricare le icone di default di Leaflet (che richiedono
+// tre file immagine esterni da un CDN solo per un pallino colorato).
+const PIN_GRIGIO = L.divIcon({
+  className: '',
+  html: `<svg width="26" height="34" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg">
+    <path d="M13 0C5.8 0 0 5.8 0 13c0 9.5 13 21 13 21s13-11.5 13-21C26 5.8 20.2 0 13 0z" fill="#6b7280" stroke="#374151" stroke-width="1"/>
+    <circle cx="13" cy="13" r="5" fill="#fff"/>
+  </svg>`,
+  iconSize: [26, 34],
+  iconAnchor: [13, 34], // la punta della goccia indica il punto esatto
+  popupAnchor: [0, -30],
+});
+
+/** Sposta un tracciato (sequenza di punti) di un piccolo margine fisso,
+ *  perpendicolare alla direzione locale in ogni punto — serve a
+ *  separare visivamente due percorsi che per un tratto coincidono
+ *  davvero (altrimenti si disegnerebbero esattamente uno sopra
+ *  l'altro, indistinguibili). Lo scostamento è fisso per TUTTA la
+ *  lunghezza del percorso (scelto insieme così, invece del calcolo
+ *  molto più complesso "solo dove si sovrappongono davvero") — quindi
+ *  anche un percorso senza nessuna sovrapposizione risulterà spostato
+ *  di pochi metri dalla strada esatta, impercettibile a occhio.
+ *  "indice"/"totale" servono a centrare tutti i percorsi attorno alla
+ *  posizione vera (es. con 2 percorsi: uno a -4m, l'altro a +4m). */
+function scostaTracciato(punti: Coordinate[], indice: number, totale: number, metriTraLinee = 8): Coordinate[] {
+  if (totale <= 1 || punti.length < 2) return punti;
+  const metriOffset = (indice - (totale - 1) / 2) * metriTraLinee;
+  const METRI_PER_GRADO_LAT = 111320;
+  return punti.map((punto, i) => {
+    const prima = punti[Math.max(0, i - 1)];
+    const dopo = punti[Math.min(punti.length - 1, i + 1)];
+    const dLat = dopo.lat - prima.lat;
+    const dLng = dopo.lng - prima.lng;
+    const lunghezza = Math.hypot(dLat, dLng) || 1;
+    // Perpendicolare alla direzione locale (ruotata di 90°).
+    const perpLat = -dLng / lunghezza;
+    const perpLng = dLat / lunghezza;
+    const metriPerGradoLng = METRI_PER_GRADO_LAT * Math.cos((punto.lat * Math.PI) / 180);
+    return {
+      lat: punto.lat + (perpLat * metriOffset) / METRI_PER_GRADO_LAT,
+      lng: punto.lng + (perpLng * metriOffset) / metriPerGradoLng,
+    };
+  });
+}
+
 /** Disegna uno o più percorsi su una cartina reale (OpenStreetMap,
  *  gratuita — stesso servizio già usato per gli indirizzi altrove), con
  *  la linea che segue DAVVERO le strade (non un segmento dritto tra un
  *  punto e l'altro) — usa lo stesso servizio OSRM già in uso per
  *  calcolare tempi/distanze, qui chiesto di restituire anche il
  *  tracciato completo invece di solo i numeri. Con più percorsi
- *  insieme, ognuno prende un colore diverso (vedi PALETTE) — utile per
- *  vedere a colpo d'occhio come si sovrappongono/completano a vicenda. */
+ *  insieme, ognuno prende un colore diverso (vedi PALETTE) e le linee
+ *  che coincidono per un tratto si scostano leggermente per restare
+ *  distinguibili (vedi scostaTracciato). Le fermate hanno tutte lo
+ *  stesso pin grigio — se più percorsi condividono la stessa fermata,
+ *  il popup elenca tutti quelli che ci passano. */
 export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
   const contenitoreRef = useRef<HTMLDivElement>(null);
   const mappaRef = useRef<L.Map | null>(null);
@@ -53,6 +93,12 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
       setStato('carico');
       setProgresso({ fatti: 0, totali: percorsi.length });
       const risultati: { id: string; nome: string; colore: string; distanzaKm: number | null; nonTrovate: string[] }[] = [];
+      // Una fermata nello stesso punto esatto (es. "Milano" condivisa da
+      // più percorsi — la cache di geocodifica() garantisce le stesse
+      // coordinate identiche) diventa UN solo pin, con tutti i percorsi
+      // che ci passano elencati nello stesso popup — invece di pin
+      // impilati uno sopra l'altro, indistinguibili.
+      const fermateCondivise = new Map<string, { lat: number; lng: number; voci: string[] }>();
 
       if (!mappaRef.current && contenitoreRef.current) {
         mappaRef.current = L.map(contenitoreRef.current);
@@ -77,7 +123,9 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
         // cache dentro geocodifica() evita di richiedere di nuovo una
         // fermata già cercata per un percorso precedente in questo
         // stesso giro (es. la stessa città di partenza condivisa da
-        // più percorsi).
+        // più percorsi) — e fa sì che due percorsi con la stessa
+        // fermata ottengano ESATTAMENTE le stesse coordinate, non due
+        // leggermente diverse, altrimenti non si raggrupperebbero.
         const coordinate: (Coordinate & { etichetta: string })[] = [];
         const nonTrovate: string[] = [];
         for (const t of p.tappe) {
@@ -95,6 +143,14 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
         }
         if (annullato) return;
 
+        for (const c of coordinate) {
+          const chiave = `${c.lat.toFixed(5)},${c.lng.toFixed(5)}`;
+          const esistente = fermateCondivise.get(chiave);
+          const voce = `${p.nome} — ${c.etichetta}`;
+          if (esistente) esistente.voci.push(voce);
+          else fermateCondivise.set(chiave, { lat: c.lat, lng: c.lng, voci: [voce] });
+        }
+
         if (coordinate.length < 2) {
           risultati.push({ id: p.id, nome: p.nome, colore, distanzaKm: null, nonTrovate });
           setProgresso({ fatti: i + 1, totali: percorsi.length });
@@ -104,15 +160,11 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
         const tracciato = await tracciatoPercorso(coordinate);
         if (annullato) return;
 
-        for (const c of coordinate) {
-          L.circleMarker([c.lat, c.lng], { radius: 6, color: colore, fillColor: colore, fillOpacity: 0.9, weight: 2 })
-            .addTo(mappa)
-            .bindPopup(`<b>${p.nome}</b><br>${c.etichetta}`);
-        }
-        const puntiLinea: [number, number][] = tracciato
-          ? tracciato.tratto.map((pt) => [pt.lat, pt.lng])
-          : coordinate.map((c) => [c.lat, c.lng]); // ripiego: segmenti dritti se OSRM non risponde
-        L.polyline(puntiLinea, { color: colore, weight: 4 }).addTo(mappa);
+        const puntiVeri: Coordinate[] = tracciato
+          ? tracciato.tratto
+          : coordinate.map((c) => ({ lat: c.lat, lng: c.lng })); // ripiego: segmenti dritti se OSRM non risponde
+        const puntiScostati = scostaTracciato(puntiVeri, i, percorsi.length);
+        L.polyline(puntiScostati.map((pt): [number, number] => [pt.lat, pt.lng]), { color: colore, weight: 4 }).addTo(mappa);
         tuttiIPunti.push(...coordinate.map((c): [number, number] => [c.lat, c.lng]));
 
         risultati.push({ id: p.id, nome: p.nome, colore, distanzaKm: tracciato?.distanzaKm ?? null, nonTrovate });
@@ -120,6 +172,11 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
       }
 
       if (annullato) return;
+
+      for (const f of fermateCondivise.values()) {
+        L.marker([f.lat, f.lng], { icon: PIN_GRIGIO }).addTo(mappa).bindPopup(f.voci.map((v) => `• ${v}`).join('<br>'));
+      }
+
       if (tuttiIPunti.length === 0) {
         setStato('errore');
         return;
