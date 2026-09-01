@@ -103,9 +103,15 @@ async function mappaConLimite<T, R>(items: T[], limite: number, fn: (item: T) =>
 export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
   const contenitoreRef = useRef<HTMLDivElement>(null);
   const mappaRef = useRef<L.Map | null>(null);
+  const polilineePerPercorso = useRef<Map<string, L.Polyline>>(new Map());
   const [stato, setStato] = useState<'carico' | 'carico-tracciati' | 'pronto' | 'errore'>('carico');
   const [progresso, setProgresso] = useState<{ fatti: number; totali: number }>({ fatti: 0, totali: 0 });
   const [risultatiPerPercorso, setRisultatiPerPercorso] = useState<{ id: string; nome: string; colore: string; distanzaKm: number | null; nonTrovate: string[] }[]>([]);
+  // Il percorso attualmente evidenziato — al passaggio del cursore
+  // (desktop) o al tocco del pallino colorato in legenda (mobile, dove
+  // "passare il cursore" non esiste e toccare una linea sottile sulla
+  // cartina è difficile). null = nessuno evidenziato, tutti normali.
+  const [evidenziato, setEvidenziato] = useState<string | null>(null);
 
   useEffect(() => {
     let annullato = false;
@@ -113,6 +119,8 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
     async function costruisci() {
       setStato('carico');
       setProgresso({ fatti: 0, totali: percorsi.length });
+      setEvidenziato(null);
+      polilineePerPercorso.current.clear();
 
       if (!mappaRef.current && contenitoreRef.current) {
         mappaRef.current = L.map(contenitoreRef.current);
@@ -120,6 +128,11 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
           attribution: '© OpenStreetMap',
           maxZoom: 19,
         }).addTo(mappaRef.current);
+        // Cliccare sulla cartina ma FUORI da una linea (sullo sfondo)
+        // toglie l'evidenziazione — le linee hanno il proprio click
+        // separato più sotto, che ferma la propagazione qui: i due
+        // click non si "pestano" a vicenda.
+        mappaRef.current.on('click', () => setEvidenziato(null));
       }
       const mappa = mappaRef.current;
       if (!mappa) { setStato('errore'); return; }
@@ -184,7 +197,22 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
         const tracciato = tracciati[idxFiltrato];
         const puntiVeri: Coordinate[] = tracciato ? tracciato.tratto : d.coordinate.map((c) => ({ lat: c.lat, lng: c.lng }));
         const puntiScostati = scostaTracciato(puntiVeri, d.indiceOriginale, percorsi.length);
-        L.polyline(puntiScostati.map((pt): [number, number] => [pt.lat, pt.lng]), { color: d.colore, weight: 4 }).addTo(mappa);
+        const linea = L.polyline(puntiScostati.map((pt): [number, number] => [pt.lat, pt.lng]), { color: d.colore, weight: 4 }).addTo(mappa);
+        // Passaggio del cursore (desktop) — evidenzia mentre resta
+        // sopra, torna normale appena esce. Click (anche da mobile,
+        // se si riesce a toccare la linea sottile) — resta
+        // evidenziato finché non si clicca altrove, utile per
+        // guardarlo con calma invece di doverci restare sopra col
+        // dito. "stopPropagation" evita che lo stesso click arrivi
+        // anche al gestore sullo sfondo della cartina, che altrimenti
+        // lo toglierebbe subito dopo averlo appena messo.
+        linea.on('mouseover', () => setEvidenziato(d.p.id));
+        linea.on('mouseout', () => setEvidenziato(null));
+        linea.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          setEvidenziato((prec) => (prec === d.p.id ? null : d.p.id));
+        });
+        polilineePerPercorso.current.set(d.p.id, linea);
         tuttiIPunti.push(...d.coordinate.map((c): [number, number] => [c.lat, c.lng]));
 
         for (const c of d.coordinate) {
@@ -215,6 +243,26 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
     return () => { annullato = true; };
   }, [percorsi]);
 
+  // Ogni volta che cambia quale percorso è evidenziato (o torna a
+  // nessuno): quello scelto resta bene in vista e passa sopra alle
+  // altre linee (bringToFront, altrimenti una linea "sotto" a un'altra
+  // resterebbe nascosta anche se evidenziata), tutte le altre si
+  // affievoliscono. Effetto separato dalla costruzione della cartina —
+  // non serve rifare geocodifica/tracciati solo per cambiare quale
+  // riga è più in vista.
+  useEffect(() => {
+    for (const [id, linea] of polilineePerPercorso.current) {
+      if (evidenziato === null) {
+        linea.setStyle({ opacity: 1, weight: 4 });
+      } else if (id === evidenziato) {
+        linea.setStyle({ opacity: 1, weight: 6 });
+        linea.bringToFront();
+      } else {
+        linea.setStyle({ opacity: 0.15, weight: 4 });
+      }
+    }
+  }, [evidenziato]);
+
   // La mappa Leaflet resta viva tra un aggiornamento e l'altro (non la
   // ricreiamo ogni volta, solo i marcatori/le linee sopra) — va
   // distrutta esplicitamente solo quando il componente sparisce del
@@ -243,10 +291,21 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
       {risultatiPerPercorso.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 10 }}>
           {risultatiPerPercorso.map((r) => (
-            <span key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--mist)' }}>
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setEvidenziato((prec) => (prec === r.id ? null : r.id))}
+              title="Evidenzia questo tragitto sulla cartina"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5,
+                color: evidenziato === r.id ? 'var(--paper)' : 'var(--mist)',
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                fontWeight: evidenziato === r.id ? 600 : 400,
+              }}
+            >
               <span style={{ width: 10, height: 10, borderRadius: '50%', background: r.colore, flexShrink: 0 }} />
               {r.nome}{r.distanzaKm !== null ? ` — ${r.distanzaKm} km` : ''}
-            </span>
+            </button>
           ))}
         </div>
       )}
