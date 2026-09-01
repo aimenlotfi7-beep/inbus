@@ -1,0 +1,1 @@
+ALTER TABLE "fermate_percorso_salvato" DROP COLUMN IF EXISTS "prezzo";

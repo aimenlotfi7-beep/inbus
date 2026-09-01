@@ -464,7 +464,6 @@ export const fermatePercorsoSalvato = pgTable('fermate_percorso_salvato', {
   // livello di colonna.
   indirizzo: text('indirizzo'),
   orario: text('orario'),
-  prezzo: numeric('prezzo', { precision: 10, scale: 2 }),
   // Vedi tipoFermataEnum — deciso qui, sul percorso (il modello
   // riutilizzabile), non più evento per evento: se uno stesso percorso
   // si applica a più eventi, ha senso stabilire una volta sola quale

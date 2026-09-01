@@ -477,6 +477,13 @@
       "when": 1788244793847,
       "tag": "0067_testa_doppia_percorsi",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1788282003955,
+      "tag": "0068_rimuovi_margine_percorsi_salvati",
+      "breakpoints": true
     }
   ]
 }

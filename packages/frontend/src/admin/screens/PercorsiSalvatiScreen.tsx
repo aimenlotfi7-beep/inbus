@@ -10,16 +10,15 @@ import { useAvvisoModificheNonSalvate } from '../shared/useAvvisoModificheNonSal
 import { MappaPercorso, type TappaMappa, type PercorsoMappa } from '../shared/MappaPercorso';
 
 /**
- * I percorsi sono solo template di fermate+margine, riutilizzabili su
+ * I percorsi sono solo template di fermate, riutilizzabili su
  * qualunque evento — niente orari qui: l'arrivo (destinazione + orario)
  * cambia a ogni evento anche riusando lo stesso tragitto, quindi si
  * imposta e si calcola direttamente in Partenze, non qui.
  *
- * "Margine" (campo interno ancora chiamato prezzo, solo l'etichetta è
- * cambiata) non è più il prezzo finale al cliente — è quanto vuoi
- * guadagnare come minimo su quella fermata, da sommare al costo vero
- * del bus (che si conosce solo dopo, in Partenze, quando confermi un
- * bus reale con un fornitore).
+ * Il margine per fermata (prima presente qui) è stato tolto — la
+ * logica di calcolo del prezzo verrà ridisegnata da capo, il prezzo
+ * per fermata resta da decidere in Partenze quando si registra il
+ * preventivo, come per l'arrivo.
  */
 export function PercorsiSalvatiScreen() {
   const [tab, setTab] = useState<'elenco' | 'cartina'>('elenco');
@@ -49,7 +48,7 @@ export function PercorsiSalvatiScreen() {
   }
   function apriModifica(t: PercorsoSalvato) {
     setInModifica(t); setNome(t.nome);
-    const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima }));
+    const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, tipo: f.tipo, sogliaMinima: f.sogliaMinima }));
     const fermateIniziali: FermataPercorsoSalvato[] = fermateNormalizzate.length >= 2 ? fermateNormalizzate : [{ citta: '', indirizzo: '' }, { citta: '', indirizzo: '' }];
     setFermate(fermateIniziali);
     setSnapshotIniziale(JSON.stringify({ nome: t.nome, fermate: fermateIniziali }));
@@ -57,7 +56,7 @@ export function PercorsiSalvatiScreen() {
   }
 
   function aggiornaFermata(idx: number, campo: keyof FermataPercorsoSalvato, valore: string) {
-    setFermate(fermate.map((f, i) => i === idx ? { ...f, [campo]: (campo === 'prezzo' || campo === 'sogliaMinima') ? (Number(valore) || undefined) : valore } : f));
+    setFermate(fermate.map((f, i) => i === idx ? { ...f, [campo]: campo === 'sogliaMinima' ? (Number(valore) || undefined) : valore } : f));
   }
   function selezionaFermataAnagrafica(idx: number, anagraficaId: string) {
     if (anagraficaId === '__manuale__') {
@@ -91,12 +90,6 @@ export function PercorsiSalvatiScreen() {
     // comunque.
     const fermateValide = fermate.filter((f, idx) => f.citta.trim() && (idx === 0 || idx === fermate.length - 1 || f.indirizzo?.trim()));
     if (fermateValide.length < 2) { alert('Servono almeno due fermate — le due Teste (partenza e arrivo).'); return; }
-    for (const f of fermateValide) {
-      if (f.prezzo === undefined) {
-        alert(`Manca il margine sulla fermata "${f.citta}" — è obbligatorio su tutte.`);
-        return;
-      }
-    }
     const payload = { nome, fermate: fermateValide };
     setSalvando(true);
     try {
@@ -128,7 +121,7 @@ export function PercorsiSalvatiScreen() {
       <PaginaSezione titolo={inModifica ? 'Modifica percorso' : 'Nuovo percorso'} onIndietro={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
         <div className="campo"><label>Nome percorso</label><input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
 
-        <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate (con margine — le due Teste si scrivono in Eventi)</p>
+        <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate (le due Teste si scrivono in Eventi)</p>
         {fermate.map((f, idx) => (
           <div key={idx} style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -159,7 +152,6 @@ export function PercorsiSalvatiScreen() {
                   <input placeholder={(idx === 0 || idx === fermate.length - 1) ? 'Indirizzo (facoltativo — si scrive in Eventi)' : 'Indirizzo'} value={f.indirizzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
                 </>
               )}
-              <CampoNumero valuta placeholder="Margine" value={f.prezzo} onChange={(v) => aggiornaFermata(idx, 'prezzo', v !== undefined ? String(v) : '')} />
             </div>
             {f.fermataAnagraficaId === null && fermateAnagrafica.length > 0 && (
               <button

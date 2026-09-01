@@ -18,7 +18,6 @@ const fermataPercorsoSchema = z.object({
   // controllato sotto, nel refine, dato che qui Zod non sa ancora la
   // posizione di questa riga nell'elenco.
   indirizzo: z.string().min(1).nullable().optional(),
-  prezzo: z.number().positive().nullable().optional().transform((v) => v ?? undefined),
   // Decisi qui (sul percorso, il modello riutilizzabile) e non più in
   // Eventi — se lo stesso percorso si applica a più eventi, ha senso
   // stabilire una volta sola quale fermata è "Partenza".
@@ -32,9 +31,6 @@ const percorsoSalvatoSchema = z.object({
   // entrambe per avere senso.
   fermate: z.array(fermataPercorsoSchema).min(2, 'Servono almeno due fermate — le due Teste (partenza e arrivo).'),
 }).refine(
-  (t) => t.fermate.every((f) => f.prezzo !== undefined),
-  { message: 'Ogni fermata deve avere un prezzo.', path: ['fermate'] }
-).refine(
   // Le due Teste (prima e ultima fermata dell'elenco — posizione, non
   // il campo "tipo", che significa tutt'altro: se quella fermata ha
   // una soglia minima di partecipanti, vedi sopra) possono restare
@@ -47,9 +43,6 @@ const aggiornaPercorsoSalvatoSchema = z.object({
   nome: z.string().min(1).optional(),
   fermate: z.array(fermataPercorsoSchema).min(2, 'Servono almeno due fermate — le due Teste (partenza e arrivo).').optional(),
 }).refine(
-  (t) => !t.fermate || t.fermate.every((f) => f.prezzo !== undefined),
-  { message: 'Ogni fermata deve avere un prezzo.', path: ['fermate'] }
-).refine(
   (t) => !t.fermate || t.fermate.every((f, idx) => idx === 0 || idx === t.fermate!.length - 1 || f.indirizzo?.trim()),
   { message: 'Ogni fermata intermedia deve avere un indirizzo — solo le due Teste (partenza e arrivo) possono esserne senza.', path: ['fermate'] }
 );
@@ -74,7 +67,7 @@ export const percorsiSalvatiService = {
         await tx.insert(fermatePercorsoSalvato).values(
           input.fermate.map((f, ordine) => ({
             percorsoSalvatoId: nuovo.id, ordine, fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo,
-            prezzo: f.prezzo?.toFixed(2), tipo: f.tipo, sogliaMinima: f.sogliaMinima,
+            tipo: f.tipo, sogliaMinima: f.sogliaMinima,
           }))
         );
       }
@@ -94,7 +87,7 @@ export const percorsiSalvatiService = {
           await tx.insert(fermatePercorsoSalvato).values(
             input.fermate.map((f, ordine) => ({
               percorsoSalvatoId: id, ordine, fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo,
-              prezzo: f.prezzo?.toFixed(2), tipo: f.tipo, sogliaMinima: f.sogliaMinima,
+              tipo: f.tipo, sogliaMinima: f.sogliaMinima,
             }))
           );
         }

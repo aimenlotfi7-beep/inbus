@@ -435,19 +435,19 @@ export function SchedaEventoModale({
       try {
         const trovata = await fermateAnagraficaApi.trovaOCrea({ nome: f.citta, citta: f.citta, indirizzo: f.indirizzo ?? '' });
         setFermateAnagrafica((prev) => prev.some((fa) => fa.id === trovata.id) ? prev : [...prev, trovata]);
-        return { fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo, prezzo: f.prezzo ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
+        return { fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
       } catch {
         // Se la richiesta fallisce (es. problema di rete), meglio non
         // bloccare tutto il tragitto — questa singola fermata resta
         // testuale, modificabile e sistemabile a mano dall'admin,
         // invece di far fallire l'intera applicazione del percorso.
-        return { fermataAnagraficaId: null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
+        return { fermataAnagraficaId: null, citta: f.citta, indirizzo: f.indirizzo, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
       }
     }));
     // La Testa di partenza NON passa dall'anagrafica finché non ha un
     // indirizzo vero (niente da cercare/creare senza un indirizzo) —
     // resta testuale, prima fermata del tragitto.
-    const fermataPartenza: FermataInput = { fermataAnagraficaId: null, citta: testaPartenza.citta, indirizzo: testaPartenza.indirizzo ?? '', prezzo: testaPartenza.prezzo ?? undefined, tipo: testaPartenza.tipo, sogliaMinima: testaPartenza.sogliaMinima };
+    const fermataPartenza: FermataInput = { fermataAnagraficaId: null, citta: testaPartenza.citta, indirizzo: testaPartenza.indirizzo ?? '', tipo: testaPartenza.tipo, sogliaMinima: testaPartenza.sogliaMinima };
 
     const nuovoTragitto: TragittoInput = {
       nome: percorso.nome,

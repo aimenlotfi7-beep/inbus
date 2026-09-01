@@ -8,7 +8,6 @@ export interface FermataPercorsoSalvato {
   // per posizione) — l'indirizzo vero si scrive in Eventi, quando il
   // percorso viene applicato (la venue dipende dall'evento).
   indirizzo?: string | null;
-  prezzo?: number;
   tipo?: 'PARTENZA' | 'PASSAGGIO';
   sogliaMinima?: number | null;
 }
