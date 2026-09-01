@@ -88,6 +88,42 @@ export async function distanzaViaggio(a: Coordinate, b: Coordinate): Promise<num
   }
 }
 
+/** Il tracciato VERO su strada di un intero percorso a più tappe (non
+ *  segmenti dritti tra un punto e l'altro) — stesso servizio OSRM già
+ *  usato sopra, qui con "overview=full&geometries=geojson" invece di
+ *  "overview=false": in più alla durata/distanza, la risposta include
+ *  anche la sequenza di punti che segue davvero le strade, pensata per
+ *  disegnarla su una cartina. Le tappe vanno passate nell'ordine in
+ *  cui si percorrono davvero (OSRM le collega in quell'ordine, non le
+ *  riordina lui). */
+export interface TracciatoPercorso {
+  tratto: Coordinate[]; // il percorso vero, punto per punto, per disegnarlo
+  distanzaKm: number;
+  minutiViaggio: number;
+}
+export async function tracciatoPercorso(tappe: Coordinate[]): Promise<TracciatoPercorso | null> {
+  if (tappe.length < 2) return null;
+  try {
+    const coordinateUrl = tappe.map((t) => `${t.lng},${t.lat}`).join(';');
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordinateUrl}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error('OSRM ha risposto con errore:', res.status, res.statusText);
+      return null;
+    }
+    const dati = await res.json();
+    const percorso = dati?.routes?.[0];
+    if (!percorso?.geometry?.coordinates) return null;
+    // GeoJSON usa [longitudine, latitudine] — l'ordine opposto a quello
+    // che usiamo noi ovunque nel resto del gestionale (lat, poi lng).
+    const tratto: Coordinate[] = percorso.geometry.coordinates.map(([lng, lat]: [number, number]) => ({ lat, lng }));
+    return { tratto, distanzaKm: Math.round(percorso.distance / 1000), minutiViaggio: Math.round(percorso.duration / 60) };
+  } catch (e) {
+    console.error('Calcolo tracciato percorso fallito:', e);
+    return null;
+  }
+}
+
 export function attesa(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

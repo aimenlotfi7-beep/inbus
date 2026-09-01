@@ -7,6 +7,7 @@ import { CampoNumero } from '../shared/CampoNumero';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { useAvvisoModificheNonSalvate } from '../shared/useAvvisoModificheNonSalvate';
+import { MappaPercorso, type TappaMappa } from '../shared/MappaPercorso';
 
 /**
  * I percorsi sono solo template di fermate+margine, riutilizzabili su
@@ -21,6 +22,8 @@ import { useAvvisoModificheNonSalvate } from '../shared/useAvvisoModificheNonSal
  * bus reale con un fornitore).
  */
 export function PercorsiSalvatiScreen() {
+  const [tab, setTab] = useState<'elenco' | 'cartina'>('elenco');
+  const [percorsoCartinaId, setPercorsoCartinaId] = useState<string>('');
   const [percorsi, setTragitti] = useState<PercorsoSalvato[]>([]);
   const [inModifica, setInModifica] = useState<PercorsoSalvato | null>(null);
   const [nome, setNome] = useState('');
@@ -199,7 +202,35 @@ export function PercorsiSalvatiScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Percorsi salvati" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo percorso</button>} />
+      <PanelHead titolo="Percorsi salvati" azione={tab === 'elenco' && <button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo percorso</button>} />
+      <div className="mini-tabs" style={{ marginBottom: 18 }}>
+        <button type="button" className={`mini-tab${tab === 'elenco' ? ' active' : ''}`} onClick={() => setTab('elenco')}>Elenco</button>
+        <button type="button" className={`mini-tab${tab === 'cartina' ? ' active' : ''}`} onClick={() => setTab('cartina')}>Cartina</button>
+      </div>
+
+      {tab === 'cartina' ? (
+        <div>
+          <div className="campo" style={{ maxWidth: 420, marginBottom: 16 }}>
+            <label>Scegli un percorso</label>
+            <select value={percorsoCartinaId} onChange={(e) => setPercorsoCartinaId(e.target.value)}>
+              <option value="">— Seleziona —</option>
+              {percorsi.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            </select>
+          </div>
+          {(() => {
+            const percorsoScelto = percorsi.find((p) => p.id === percorsoCartinaId);
+            if (!percorsoScelto) return <p style={{ color: 'var(--mist)' }}>Scegli un percorso per vederlo sulla cartina.</p>;
+            const tappe: TappaMappa[] = percorsoScelto.fermate.map((f, idx) => ({
+              etichetta: `${(idx === 0 || idx === percorsoScelto.fermate.length - 1) ? 'Testa' : `Fermata ${idx + 1}`} — ${f.citta}`,
+              citta: f.citta,
+              indirizzo: f.indirizzo,
+            }));
+            if (tappe.length < 2) return <p style={{ color: 'var(--mist)' }}>Questo percorso ha meno di due fermate — niente da disegnare.</p>;
+            return <MappaPercorso key={percorsoScelto.id} tappe={tappe} />;
+          })()}
+        </div>
+      ) : (
+        <>
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome percorso o città..." />
       {!tragittiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun percorso trovato.' : 'Nessun percorso ancora.'}</p>}
       <div className="cards-list">
@@ -211,6 +242,8 @@ export function PercorsiSalvatiScreen() {
           </div>
         ))}
       </div>
+        </>
+      )}
     </div>
   );
 }
