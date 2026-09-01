@@ -211,11 +211,21 @@ export function PercorsiSalvatiScreen() {
             </select>
           </div>
           {(() => {
-            const tappeDiPercorso = (p: PercorsoSalvato): TappaMappa[] => p.fermate.map((f, idx) => ({
-              etichetta: `${(idx === 0 || idx === p.fermate.length - 1) ? 'Testa' : `Fermata ${idx + 1}`} — ${f.citta}`,
-              citta: f.citta,
-              indirizzo: f.indirizzo,
-            }));
+            const tappeDiPercorso = (p: PercorsoSalvato): TappaMappa[] => p.fermate.map((f, idx) => {
+              // Se la fermata è collegata all'anagrafica, uso le sue
+              // coordinate già verificate invece di farle geocodificare
+              // di nuovo per testo — un nome come "Piacenza Sud" (un
+              // casello, non un vero comune) può far sbagliare la
+              // ricerca testuale anche di continente.
+              const anagrafica = f.fermataAnagraficaId ? fermateAnagrafica.find((fa) => fa.id === f.fermataAnagraficaId) : null;
+              return {
+                etichetta: `${(idx === 0 || idx === p.fermate.length - 1) ? 'Testa' : `Fermata ${idx + 1}`} — ${f.citta}`,
+                citta: f.citta,
+                indirizzo: f.indirizzo,
+                lat: anagrafica?.lat,
+                lng: anagrafica?.lng,
+              };
+            });
 
             if (!percorsoCartinaId) return <p style={{ color: 'var(--mist)' }}>Scegli un percorso (o "Tutti insieme") per vederlo sulla cartina.</p>;
 

@@ -8,6 +8,12 @@ export interface TappaMappa {
   etichetta: string; // testo mostrato sul marcatore (es. "Testa — Milano")
   citta: string;
   indirizzo?: string | null; // se assente/vuoto, si geocodifica solo la città (centro città, approssimato)
+  // Se già note (dall'anagrafica fermate, quando questa tappa vi è
+  // collegata) — evita di richiederle di nuovo per testo a Nominatim,
+  // che su nomi non standard (es. "Piacenza Sud", un'uscita
+  // autostradale, non un vero comune) può sbagliare paese del tutto.
+  lat?: number | null;
+  lng?: number | null;
 }
 export interface PercorsoMappa {
   id: string;
@@ -119,6 +125,10 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
         const coordinate: (Coordinate & { etichetta: string })[] = [];
         const nonTrovate: string[] = [];
         for (const t of p.tappe) {
+          if (t.lat != null && t.lng != null) {
+            coordinate.push({ lat: t.lat, lng: t.lng, etichetta: t.etichetta });
+            continue;
+          }
           const query = t.indirizzo?.trim() ? `${t.indirizzo}, ${t.citta}` : t.citta;
           const risultato = await geocodifica(query);
           if (risultato.coordinate) {
