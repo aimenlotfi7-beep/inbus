@@ -66,7 +66,12 @@ export function PercorsiSalvatiScreen() {
     setFermate(fermate.map((f, i) => i === idx ? { ...f, fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo } : f));
   }
   function aggiungiFermata() {
-    setFermate([...fermate, { citta: '', indirizzo: '' }]);
+    // Va inserita PRIMA dell'ultima posizione — quella deve restare
+    // sempre la Testa 2 (arrivo), non diventare una fermata intermedia
+    // per sbaglio solo perché se n'è aggiunta una nuova in fondo.
+    const nuove = [...fermate];
+    nuove.splice(fermate.length - 1, 0, { citta: '', indirizzo: '' });
+    setFermate(nuove);
   }
   function rimuoviFermata(idx: number) {
     if (fermate.length <= 2) { alert('Servono sempre almeno due fermate — le due Teste (partenza e arrivo).'); return; }
