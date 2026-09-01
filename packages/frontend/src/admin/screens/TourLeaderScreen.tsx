@@ -96,14 +96,13 @@ export function TourLeaderScreen() {
           <label>Telefono <input value={form.telefono ?? ''} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></label>
           <label>Città <input value={form.citta ?? ''} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>
           <label>Lingue parlate <input value={form.lingue ?? ''} onChange={(e) => setForm({ ...form, lingue: e.target.value })} placeholder="es. Italiano, Inglese" /></label>
-        </div>
-        <div className="campo"><label>Disponibilità</label><input value={form.disponibilita ?? ''} onChange={(e) => setForm({ ...form, disponibilita: e.target.value })} /></div>
-        <div className="campo"><label>Esperienza</label><input value={form.esperienza ?? ''} onChange={(e) => setForm({ ...form, esperienza: e.target.value })} /></div>
-        <div className="campo">
-          <label>Stato</label>
-          <select value={form.stato} onChange={(e) => setForm({ ...form, stato: e.target.value as TourLeader['stato'] })}>
-            {Object.entries(ETICHETTE).map(([valore, etichetta]) => <option key={valore} value={valore}>{etichetta}</option>)}
-          </select>
+          <label>Disponibilità <input value={form.disponibilita ?? ''} onChange={(e) => setForm({ ...form, disponibilita: e.target.value })} /></label>
+          <label>Esperienza <input value={form.esperienza ?? ''} onChange={(e) => setForm({ ...form, esperienza: e.target.value })} /></label>
+          <label>Stato
+            <select value={form.stato} onChange={(e) => setForm({ ...form, stato: e.target.value as TourLeader['stato'] })}>
+              {Object.entries(ETICHETTE).map(([valore, etichetta]) => <option key={valore} value={valore}>{etichetta}</option>)}
+            </select>
+          </label>
         </div>
         <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva tour leader'}</button>

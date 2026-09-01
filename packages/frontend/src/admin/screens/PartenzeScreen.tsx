@@ -29,14 +29,21 @@ type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
  *   la propria etichetta indipendente (fatto/da fare) — un compito
  *   fatto non fa sparire il tragitto dall'altra tab, resta lì per
  *   poterlo sempre rivedere.
- * - "Linee Bus": preventivo fatto, già in vendita, ma senza ancora
- *   una Linea (bus vero) — qui si aggiungono le Linee direttamente.
- *   Ci finisce ANCHE un tragitto già "Confermato" che è tornato
- *   scoperto perché sono arrivate più prenotazioni di quante ne
- *   coprano i bus già registrati.
- * - "Confermato": almeno una Linea registrata E capienza sufficiente
+ * - "Linee Bus": preventivo fatto, già in vendita — qui si aggiungono
+ *   le Linee (bus veri) direttamente. Persistente come "Orari"/
+ *   "Prezzo": un tragitto ci resta SEMPRE una volta prezzato, anche
+ *   dopo essere stato confermato del tutto (etichetta verde "✓
+ *   Confermata", contorno verde) — non sparisce più da qui, per poter
+ *   sempre tornare a vedere/aggiungere capienza.
+ * - "Confermato": un insieme A PARTE, deciso così esplicitamente — ci
+ *   entra SOLO chi ha avuto almeno una volta un bus vero registrato
+ *   (stato interno "CONFERMATO", che una volta raggiunto non torna mai
+ *   indietro da solo). Contorno verde se la capienza basta ancora,
+ *   rosso con l'avviso "posti mancanti" se sono arrivate più
+ *   prenotazioni di quante i bus già registrati ne coprano.
  * - "Passate": la data dell'evento è già passata, qualunque fosse lo
- *   stato — qui si trova sempre tutta la storia
+ *   stato — qui si trova sempre tutta la storia. Resta un semplice
+ *   archivio, mai un'etichetta di stato né un contorno colorato.
  *
  * Un evento passato vive SEMPRE e SOLO in "Passate", mai nelle altre.
  */
@@ -83,32 +90,43 @@ export function PartenzeScreen() {
   function tabsDi(p: Partenza): Tab[] {
     if (passata(p)) return ['passate'];
     if (p.stato === 'DA_CONFERMARE') return ['fermate', 'da-prezzare'];
+    // "Linee Bus" ora persistente come "Orari"/"Prezzo" — un tragitto
+    // ci resta SEMPRE una volta prezzato, anche dopo essere del tutto
+    // confermato (con l'etichetta verde), non sparisce più da qui.
+    // "Confermato" invece resta un insieme A PARTE (deciso così
+    // esplicitamente): ci entra SOLO chi ha avuto almeno una volta un
+    // bus vero registrato (stato CONFERMATO — che una volta raggiunto
+    // non torna mai indietro da solo, anche se poi la capienza non
+    // basta più), verde se la capienza basta ancora, rosso se no.
     if (p.stato === 'PREZZATO') return ['da-confermare'];
-    // CONFERMATO: resta lì solo se la capienza basta — altrimenti
-    // torna in "Da confermare", dove si aggiunge capienza.
-    return [scoperta(p) ? 'da-confermare' : 'confermato'];
+    return ['da-confermare', 'confermato'];
   }
   // Se il compito di QUESTA tab specifica è già stato fatto per questo
-  // tragitto — solo "Orari" e "Prezzo" hanno questo concetto (restano
-  // sempre visibili lì, fatto o no); le altre tab non ce l'hanno,
-  // perché lì un tragitto sparisce da solo quando il compito è fatto
-  // (passa di stato), quindi "essere ancora presente" è già di per sé
-  // "da fare".
+  // tragitto — tutte le tab tranne "Passate" ce l'hanno ora: restano
+  // sempre visibili lì, fatto o no, con l'etichetta che lo dice.
   function fattoInTab(p: Partenza, tabAttuale: Tab): boolean {
     if (tabAttuale === 'fermate') return p.fermateCompilate;
     if (tabAttuale === 'da-prezzare') return !!p.preventivoCosto;
-    return false;
+    if (tabAttuale === 'da-confermare') return p.stato === 'CONFERMATO' && !scoperta(p);
+    if (tabAttuale === 'confermato') return !scoperta(p); // qui dentro lo stato è già sempre CONFERMATO, per costruzione
+    return false; // "Passate" non ha questo concetto — è solo archivio, mai un compito da segnare
   }
   // Etichetta SEMPRE presente per ogni card, verde se il compito di
-  // questa tab è fatto, rossa/arancio se manca ancora.
+  // questa tab è fatto, rossa/arancio se manca ancora. "Passate" non
+  // ce l'ha — resta un semplice archivio, mai un contorno colorato.
   function etichettaStato(p: Partenza, tabAttuale: Tab): { fatto: boolean; testo: string } {
     if (tabAttuale === 'fermate') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: '✓ Fatto' } : { fatto: false, testo: '◔ Da calcolare/esportare' };
     if (tabAttuale === 'da-prezzare') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: '✓ Fatto' } : { fatto: false, testo: '◔ Da prezzare' };
     if (tabAttuale === 'da-confermare') {
+      if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: '✓ Confermata' };
       if (scoperta(p)) return { fatto: false, testo: `⚠ ${p.totalePasseggeri - p.postiTotali} posti mancanti` };
       return { fatto: false, testo: '◔ Serve una Linea' };
     }
-    return { fatto: true, testo: '' }; // Confermato/Passate: nessuna etichetta di stato
+    if (tabAttuale === 'confermato') {
+      if (scoperta(p)) return { fatto: false, testo: `⚠ ${p.totalePasseggeri - p.postiTotali} posti mancanti` };
+      return { fatto: true, testo: '' };
+    }
+    return { fatto: true, testo: '' }; // Passate: nessuna etichetta di stato, mai contorno
   }
 
   const partenzePerTab = partenze.filter((p) => tabsDi(p).includes(tab));
@@ -209,7 +227,8 @@ export function PartenzeScreen() {
                 key={gruppo[0].evento.id}
                 evento={gruppo[0].evento}
                 onClick={() => apriGruppo(gruppo)}
-                richiedeIntervento={!nienteDaMostrare && !tuttoFatto}
+                richiedeIntervento={tab !== 'passate' && !tuttoFatto}
+                completata={tab !== 'passate' && tuttoFatto}
                 badge={testoBadge && <span style={{ color: tuttoFatto ? 'var(--green)' : undefined }}>{testoBadge}</span>}
                 extra={
                   <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 2 }}>

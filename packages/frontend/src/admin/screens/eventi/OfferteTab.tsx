@@ -105,10 +105,9 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
 
       {formAperto && (
         <div className="section-card" style={{ marginBottom: 16 }}>
-          <div className="campo"><label>Nome offerta</label><input value={nome} onChange={(e) => cambiaNome(e.target.value)} placeholder="es. Meta Retargeting" /></div>
-          <div className="campo">
-            <label>Link (si vedrà come /offerta/...)</label>
-            <input value={slug} onChange={(e) => { setSlug(e.target.value); setSlugModificatoAMano(true); }} />
+          <div className="form-grid">
+            <label>Nome offerta <input value={nome} onChange={(e) => cambiaNome(e.target.value)} placeholder="es. Meta Retargeting" /></label>
+            <label>Link (si vedrà come /offerta/...) <input value={slug} onChange={(e) => { setSlug(e.target.value); setSlugModificatoAMano(true); }} /></label>
           </div>
           <div className="form-grid">
             <label>Sconto (%) <input type="number" min={1} max={100} value={scontoPercentuale} onChange={(e) => setScontoPercentuale(e.target.value)} placeholder="es. 20" /></label>

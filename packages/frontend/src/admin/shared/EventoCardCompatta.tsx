@@ -26,12 +26,15 @@ interface EventoMinimo {
  *  "badge" è per un'etichetta libera in alto a destra sulla copertina
  *  (es. "3 in attesa", "⚠ 2"). "richiedeIntervento" contorna la card
  *  di rosso — pensato per quando il badge da solo, con tanti eventi in
- *  elenco, rischia di passare inosservato. */
-export function EventoCardCompatta({ evento, onClick, badge, richiedeIntervento, extra, opacitaRidotta, mostraLinkPubblico, footer, selezionato }: {
+ *  elenco, rischia di passare inosservato. "completata" fa lo stesso
+ *  ma di verde — il contorno colorato si AGGIUNGE al badge testuale,
+ *  non lo sostituisce (i due possono benissimo comparire insieme). */
+export function EventoCardCompatta({ evento, onClick, badge, richiedeIntervento, completata, extra, opacitaRidotta, mostraLinkPubblico, footer, selezionato }: {
   evento: EventoMinimo;
   onClick: () => void;
   badge?: ReactNode;
   richiedeIntervento?: boolean;
+  completata?: boolean;
   extra?: ReactNode;
   opacitaRidotta?: boolean;
   mostraLinkPubblico?: boolean;
@@ -40,7 +43,7 @@ export function EventoCardCompatta({ evento, onClick, badge, richiedeIntervento,
 }) {
   return (
     <div
-      className={`evento-card-compatta${richiedeIntervento ? ' richiede-intervento' : ''}${selezionato ? ' selezionata' : ''}`}
+      className={`evento-card-compatta${richiedeIntervento ? ' richiede-intervento' : ''}${completata ? ' completata' : ''}${selezionato ? ' selezionata' : ''}`}
       onClick={onClick}
       style={opacitaRidotta ? { opacity: .65 } : undefined}
     >

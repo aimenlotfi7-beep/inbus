@@ -36,7 +36,7 @@ export function CalendarioScreen() {
     <div>
       <PanelHead titolo="Calendario" />
       {Object.entries(perMese).map(([mese, lista]) => (
-        <div key={mese} style={{ marginBottom: 22 }}>
+        <div key={mese} style={{ marginBottom: 24 }}>
           <h3 style={{ fontSize: 14, textTransform: 'capitalize', color: 'var(--mist)', marginBottom: 10 }}>{mese}</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {lista.map((ev) => {

@@ -63,7 +63,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
   const [eventoCompleto, setEventoCompleto] = useState<Evento | null>(null);
   // Mappa tragittoId -> form in modifica — non più un solo tragitto alla
   // volta: un evento con più servizi/percorsi nello stesso contesto (es.
-  // "Fermate") deve poter avere PIÙ pannelli aperti insieme, altrimenti
+  // "Orari") deve poter avere PIÙ pannelli aperti insieme, altrimenti
   // si resta bloccati sul secondo tragitto mentre si lavora sul primo
   // (bug segnalato: "non riesco a calcolare gli orari per il secondo
   // tragitto e continuare").
@@ -769,7 +769,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
 
             const tragittoVero = eventoCompleto ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragitto.tragittoId) : undefined;
 
-            // In "Fermate" e "Da prezzare", una volta chiuso l'editor
+            // In "Orari" e "Prezzo", una volta chiuso l'editor
             // (calcolato/salvato, o Annulla) deve restare possibile
             // RIVEDERE quello che c'è già, non sparire del tutto —
             // altrimenti la freccia sembra non "espandere" più nulla.

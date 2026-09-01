@@ -481,23 +481,54 @@ export function SchedaEventoModale({
    *  Ripetibile avanti e indietro quante volte serve: applicandola due
    *  volte di fila si torna esattamente al punto di partenza (uno
    *  scambio pulito, mai con perdita di dati). */
-  function invertiTragitto(idxTragitto: number) {
+  async function invertiTragitto(idxTragitto: number) {
+    const t = (form.tragitti ?? [])[idxTragitto];
+    if (!t) return;
+
+    // Stesso controllo già usato per rimuoviTragitto — invertire
+    // scambia partenza e arrivo: se la città che era "partenza" (dove
+    // i clienti si sono davvero imbarcati) diventa "arrivo", quella
+    // città sparisce dall'elenco delle fermate prenotabili — le
+    // prenotazioni vere restano nel database, ma diventano difficili
+    // da gestire nell'interfaccia. Una riga appena aggiunta (senza id,
+    // mai salvata) non può averne, si salta il controllo.
+    if (t.id) {
+      try {
+        const { haPrenotazioni, quante } = await eventiApi.tragittoHaPrenotazioniConfermate(t.id);
+        if (haPrenotazioni) {
+          alert(`Questo tragitto ha ${quante} prenotazion${quante > 1 ? 'i' : 'e'} confermat${quante > 1 ? 'e' : 'a'} — non può essere invertito. Sposta quelle prenotazioni prima di invertirlo.`);
+          return;
+        }
+      } catch {
+        alert('Impossibile verificare le prenotazioni di questo tragitto — controlla la connessione e riprova.');
+        return;
+      }
+    }
+
+    // Individuato per RIFERIMENTO (non per indice, che potrebbe non
+    // essere più valido se nel frattempo — durante l'attesa qui sopra
+    // — è cambiato qualcos'altro nell'elenco) sullo stato più recente
+    // davvero, non una copia catturata prima dell'attesa — stessa
+    // causa/rimedio della race condition già corretta altrove in
+    // questo file.
     setForm((f) => {
       const tragitti = [...(f.tragitti ?? [])];
-      const t = tragitti[idxTragitto];
-      if (!t || t.fermate.length === 0) return f;
-      const [vecchiaPartenza, ...intermedie] = t.fermate;
+      const idxAttuale = tragitti.indexOf(t);
+      if (idxAttuale === -1) return f; // rimosso da un'altra azione nel frattempo
+      const attuale = tragitti[idxAttuale];
+      if (attuale.fermate.length === 0) return f;
+      const [vecchiaPartenza, ...intermedie] = attuale.fermate;
       const nuovaPartenza: FermataInput = {
         fermataAnagraficaId: null,
-        citta: t.arrivoCitta ?? '',
-        indirizzo: t.arrivoIndirizzo ?? '',
-        orario: t.arrivoOrario,
+        citta: attuale.arrivoCitta ?? '',
+        indirizzo: attuale.arrivoIndirizzo ?? '',
+        orario: attuale.arrivoOrario,
         prezzo: vecchiaPartenza.prezzo,
         tipo: vecchiaPartenza.tipo,
         sogliaMinima: vecchiaPartenza.sogliaMinima,
       };
-      tragitti[idxTragitto] = {
-        ...t,
+      tragitti[idxAttuale] = {
+        ...attuale,
         fermate: [nuovaPartenza, ...[...intermedie].reverse()],
         arrivoCitta: vecchiaPartenza.citta || undefined,
         arrivoIndirizzo: vecchiaPartenza.indirizzo || undefined,
