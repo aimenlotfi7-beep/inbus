@@ -1088,9 +1088,19 @@ export function SchedaEventoModale({
                     onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
                   >
                     <option value="" disabled>— Scegli una fermata dall'anagrafica —</option>
-                    {fermateAnagrafica.map((fa) => (
-                      <option key={fa.id} value={fa.id}>{fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}</option>
-                    ))}
+                    {fermateAnagrafica.map((fa) => {
+                      // Non ha senso la stessa fermata due volte nello
+                      // stesso tragitto (es. "Milano" scelta sia come
+                      // fermata 1 che come fermata 3) — disabilitata se
+                      // già usata da UN'ALTRA riga qui sotto (non questa
+                      // stessa, che deve restare selezionabile/invariata).
+                      const usataAltrove = tragitto.fermate.some((altra, i) => i !== idxFermata && altra.fermataAnagraficaId === fa.id);
+                      return (
+                        <option key={fa.id} value={fa.id} disabled={usataAltrove}>
+                          {fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}{usataAltrove ? ' (già in questo tragitto)' : ''}
+                        </option>
+                      );
+                    })}
                     <option value="__manuale__">✎ Scrivi manualmente, senza anagrafica...</option>
                   </select>
                 ) : (

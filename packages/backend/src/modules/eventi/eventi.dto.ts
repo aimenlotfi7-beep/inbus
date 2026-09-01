@@ -42,7 +42,18 @@ export const tragittoSchema = z.object({
   arrivoOrario: z.string().optional(),
   arrivoCitta: z.string().optional(),
   fermate: z.array(fermataSchema).default([]),
-});
+}).refine(
+  // Non ha senso la stessa fermata dell'anagrafica due volte nello
+  // stesso tragitto — stesso controllo già applicato nel menu a
+  // tendina in Eventi (disabilita l'opzione già usata), qui ripetuto
+  // come sicurezza in più a livello di salvataggio, nel caso arrivi
+  // comunque un doppione da altrove.
+  (t) => {
+    const idUsati = t.fermate.map((f) => f.fermataAnagraficaId).filter((id): id is string => !!id);
+    return new Set(idUsati).size === idUsati.length;
+  },
+  { message: 'Questo tragitto usa la stessa fermata dell\'anagrafica più di una volta.', path: ['fermate'] }
+);
 
 // Un "servizio" raggruppa tragitti (tratte) — per gli eventi che
 // vendono più pacchetti bus distinti nello stesso evento (es. "arrivo
@@ -145,7 +156,13 @@ export const aggiornaPercorsoLineaSchema = z.object({
 export const aggiornaTragittoOperativoSchema = z.object({
   prezzoExtra: z.number().default(0),
   fermate: z.array(fermataSchema).default([]),
-});
+}).refine(
+  (t) => {
+    const idUsati = t.fermate.map((f) => f.fermataAnagraficaId).filter((id): id is string => !!id);
+    return new Set(idUsati).size === idUsati.length;
+  },
+  { message: 'Questo tragitto usa la stessa fermata dell\'anagrafica più di una volta.', path: ['fermate'] }
+);
 
 // Fase "Prezzato": il preventivo (dal fornitore, sullo scenario più
 // caro — dalla fermata più lontana) sblocca la vendita SENZA ancora un
