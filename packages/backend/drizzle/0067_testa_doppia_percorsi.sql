@@ -1,0 +1,1 @@
+ALTER TABLE "percorsi_salvati" DROP COLUMN IF EXISTS "arrivo_citta";

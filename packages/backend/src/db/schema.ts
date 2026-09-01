@@ -442,12 +442,6 @@ export const lineaFermate = pgTable('linea_fermate', {
 export const percorsiSalvati = pgTable('percorsi_salvati', {
   id: id(),
   nome: text('nome').notNull(),
-  // Solo il nome della città — l'indirizzo vero (la venue) si scrive
-  // sempre in Eventi, perché lo stesso percorso può essere applicato
-  // per eventi diversi con luoghi diversi nella stessa città. Vedi lo
-  // stesso identico ragionamento già fatto per arrivoIndirizzo sui
-  // tragitti veri.
-  arrivoCitta: text('arrivo_citta'),
 });
 
 export const fermatePercorsoSalvato = pgTable('fermate_percorso_salvato', {
@@ -459,14 +453,15 @@ export const fermatePercorsoSalvato = pgTable('fermate_percorso_salvato', {
   // fermata al volo senza passare dall'anagrafica.
   fermataAnagraficaId: text('fermata_anagrafica_id').references(() => fermateAnagrafica.id),
   citta: text('citta').notNull(),
-  // Facoltativo SOLO per la fermata "Partenza" (tipo qui sotto) — lo
-  // stesso ragionamento di arrivoCitta: la partenza vera dipende
-  // dall'evento specifico, si scrive in Eventi quando il percorso
-  // viene applicato. Le fermate intermedie (PASSAGGIO) restano invece
-  // sempre con l'indirizzo vero già pronto qui — quelle non cambiano
-  // da un evento all'altro, sono punti di ritrovo fissi e riusabili.
-  // Il controllo che PASSAGGIO lo richieda comunque è applicativo
-  // (rotte/validazione), non qui a livello di colonna.
+  // Facoltativo SOLO per le due "Teste" (prima e ultima fermata
+  // dell'elenco, vedi tipo qui sotto per un concetto diverso) — la
+  // partenza e l'arrivo veri dipendono dall'evento specifico, si
+  // scrivono in Eventi quando il percorso viene applicato. Le fermate
+  // intermedie restano invece sempre con l'indirizzo vero già pronto
+  // qui — quelle non cambiano da un evento all'altro, sono punti di
+  // ritrovo fissi e riusabili. Il controllo che le intermedie lo
+  // richiedano comunque è applicativo (rotte/validazione), non qui a
+  // livello di colonna.
   indirizzo: text('indirizzo'),
   orario: text('orario'),
   prezzo: numeric('prezzo', { precision: 10, scale: 2 }),

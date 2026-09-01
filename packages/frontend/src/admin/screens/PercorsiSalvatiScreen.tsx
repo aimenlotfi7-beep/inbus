@@ -24,7 +24,6 @@ export function PercorsiSalvatiScreen() {
   const [percorsi, setTragitti] = useState<PercorsoSalvato[]>([]);
   const [inModifica, setInModifica] = useState<PercorsoSalvato | null>(null);
   const [nome, setNome] = useState('');
-  const [arrivoCitta, setArrivoCitta] = useState('');
   const [fermate, setFermate] = useState<FermataPercorsoSalvato[]>([]);
   const [modaleAperta, setModaleAperta] = useState(false);
   const [snapshotIniziale, setSnapshotIniziale] = useState('');
@@ -36,18 +35,21 @@ export function PercorsiSalvatiScreen() {
   useEffect(() => { fermateAnagraficaApi.list().then(setFermateAnagrafica).catch(() => setFermateAnagrafica([])); }, []);
 
   function apriNuovo() {
-    setInModifica(null); setNome(''); setArrivoCitta('');
-    const fermateVuote = [{ citta: '', indirizzo: '' }];
+    setInModifica(null); setNome('');
+    // Le due Teste (partenza e arrivo) sono sempre presenti, anche
+    // senza nessuna fermata intermedia in mezzo — un percorso senza
+    // almeno queste due non ha senso.
+    const fermateVuote = [{ citta: '', indirizzo: '' }, { citta: '', indirizzo: '' }];
     setFermate(fermateVuote);
-    setSnapshotIniziale(JSON.stringify({ nome: '', arrivoCitta: '', fermate: fermateVuote }));
+    setSnapshotIniziale(JSON.stringify({ nome: '', fermate: fermateVuote }));
     setModaleAperta(true);
   }
   function apriModifica(t: PercorsoSalvato) {
-    setInModifica(t); setNome(t.nome); setArrivoCitta(t.arrivoCitta ?? '');
+    setInModifica(t); setNome(t.nome);
     const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima }));
-    const fermateIniziali: FermataPercorsoSalvato[] = fermateNormalizzate.length ? fermateNormalizzate : [{ citta: '', indirizzo: '' }];
+    const fermateIniziali: FermataPercorsoSalvato[] = fermateNormalizzate.length >= 2 ? fermateNormalizzate : [{ citta: '', indirizzo: '' }, { citta: '', indirizzo: '' }];
     setFermate(fermateIniziali);
-    setSnapshotIniziale(JSON.stringify({ nome: t.nome, arrivoCitta: t.arrivoCitta ?? '', fermate: fermateIniziali }));
+    setSnapshotIniziale(JSON.stringify({ nome: t.nome, fermate: fermateIniziali }));
     setModaleAperta(true);
   }
 
@@ -67,6 +69,7 @@ export function PercorsiSalvatiScreen() {
     setFermate([...fermate, { citta: '', indirizzo: '' }]);
   }
   function rimuoviFermata(idx: number) {
+    if (fermate.length <= 2) { alert('Servono sempre almeno due fermate — le due Teste (partenza e arrivo).'); return; }
     setFermate(fermate.filter((_, i) => i !== idx));
   }
 
@@ -74,19 +77,19 @@ export function PercorsiSalvatiScreen() {
   async function salva() {
     if (salvando) return;
     if (!nome.trim()) { alert('Dai un nome al percorso prima di salvarlo.'); return; }
-    // La PRIMA fermata (posizione, la Partenza) può restare senza
-    // indirizzo — quello vero si scrive in Eventi, quando il percorso
-    // viene applicato. Le altre lo richiedono comunque.
-    const fermateValide = fermate.filter((f, idx) => f.citta.trim() && (idx === 0 || f.indirizzo?.trim()));
-    if (fermateValide.length === 0) { alert('Aggiungi almeno una fermata.'); return; }
+    // Le due Teste (prima e ultima fermata, posizione) possono restare
+    // senza indirizzo — quello vero si scrive in Eventi, quando il
+    // percorso viene applicato. Le fermate intermedie lo richiedono
+    // comunque.
+    const fermateValide = fermate.filter((f, idx) => f.citta.trim() && (idx === 0 || idx === fermate.length - 1 || f.indirizzo?.trim()));
+    if (fermateValide.length < 2) { alert('Servono almeno due fermate — le due Teste (partenza e arrivo).'); return; }
     for (const f of fermateValide) {
       if (f.prezzo === undefined) {
         alert(`Manca il margine sulla fermata "${f.citta}" — è obbligatorio su tutte.`);
         return;
       }
     }
-    if (!arrivoCitta.trim()) { alert('Indica la città di arrivo del percorso.'); return; }
-    const payload = { nome, arrivoCitta, fermate: fermateValide };
+    const payload = { nome, fermate: fermateValide };
     setSalvando(true);
     try {
       if (inModifica) await percorsiSalvatiApi.update(inModifica.id, payload);
@@ -105,7 +108,7 @@ export function PercorsiSalvatiScreen() {
     ricarica();
   }
 
-  const modificato = snapshotIniziale !== '' && JSON.stringify({ nome, arrivoCitta, fermate }) !== snapshotIniziale;
+  const modificato = snapshotIniziale !== '' && JSON.stringify({ nome, fermate }) !== snapshotIniziale;
   const chiediConferma = useAvvisoModificheNonSalvate(modificato);
 
   const tragittiFiltrati = ricerca.trim()
@@ -116,18 +119,13 @@ export function PercorsiSalvatiScreen() {
     return (
       <PaginaSezione titolo={inModifica ? 'Modifica percorso' : 'Nuovo percorso'} onIndietro={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
         <div className="campo"><label>Nome percorso</label><input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-        <div className="campo">
-          <label>Città di arrivo</label>
-          <input value={arrivoCitta} onChange={(e) => setArrivoCitta(e.target.value)} placeholder="es. Milano" />
-          <p style={{ fontSize: 11, color: 'var(--mist)', marginTop: 4 }}>Solo il nome della città — l'indirizzo vero (la venue) si scrive in Eventi, quando applichi il percorso.</p>
-        </div>
 
-        <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate (con margine — la Partenza si scrive in Eventi come l'arrivo)</p>
+        <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate (con margine — le due Teste si scrivono in Eventi)</p>
         {fermate.map((f, idx) => (
           <div key={idx} style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: idx === 0 ? '#5be0a0' : 'var(--amber)' }}>
-                {idx === 0 ? 'PARTENZA' : `FERMATA ${idx + 1}`}
+              <span style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: (idx === 0 || idx === fermate.length - 1) ? '#5be0a0' : 'var(--amber)' }}>
+                {idx === 0 || idx === fermate.length - 1 ? 'TESTA' : `FERMATA ${idx + 1}`}
               </span>
               <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 11, color: 'var(--pink)' }} onClick={() => rimuoviFermata(idx)}>✕</button>
             </div>
@@ -150,7 +148,7 @@ export function PercorsiSalvatiScreen() {
               ) : (
                 <>
                   <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idx, 'citta', e.target.value)} />
-                  <input placeholder={idx === 0 ? 'Indirizzo (facoltativo — si scrive in Eventi)' : 'Indirizzo'} value={f.indirizzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
+                  <input placeholder={(idx === 0 || idx === fermate.length - 1) ? 'Indirizzo (facoltativo — si scrive in Eventi)' : 'Indirizzo'} value={f.indirizzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
                 </>
               )}
               <CampoNumero valuta placeholder="Margine" value={f.prezzo} onChange={(v) => aggiornaFermata(idx, 'prezzo', v !== undefined ? String(v) : '')} />
@@ -203,7 +201,7 @@ export function PercorsiSalvatiScreen() {
         {tragittiFiltrati.map((t) => (
           <div key={t.id} className="evento-card" onClick={() => apriModifica(t)}>
             <h3>{t.nome}</h3>
-            <p>{[...t.fermate.map((f) => f.citta).filter(Boolean), t.arrivoCitta].filter(Boolean).join(' → ') || 'Nessuna fermata'}</p>
+            <p>{t.fermate.map((f) => f.citta).filter(Boolean).join(' → ') || 'Nessuna fermata'}</p>
             <button className="btn btn-ghost" style={{ marginTop: 10, fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(t); }}>Elimina</button>
           </div>
         ))}

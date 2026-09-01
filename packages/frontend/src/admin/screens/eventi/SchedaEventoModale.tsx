@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
 import { pagineApi } from '../../../api/pagine';
 import { eventiApi, type EventoInput, type TragittoInput, type FermataInput } from '../../../api/eventi';
-import { percorsiSalvatiApi, type PercorsoSalvato, type FermataPercorsoSalvato } from '../../../api/percorsiSalvati';
+import { percorsiSalvatiApi, type PercorsoSalvato } from '../../../api/percorsiSalvati';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../../api/layoutBiglietto';
 import { categorieApi, type Categoria } from '../../../api/categorie';
@@ -70,7 +70,6 @@ export function SchedaEventoModale({
   // poterle compilare subito, le altre si possono chiudere per non
   // dover scorrere tutto quando ce ne sono tante.
   const [tragittiAperti, setTragittiAperti] = useState<Set<number>>(new Set());
-  const [invertiPercorso, setInvertiPercorso] = useState(false);
   // I servizi — completamente locali finché non si salva tutto insieme
   // (anche alla primissima creazione dell'evento): quelli già esistenti
   // hanno l'id vero del server, quelli appena aggiunti hanno una
@@ -413,38 +412,28 @@ export function SchedaEventoModale({
     return servizioTabAttivo;
   }
 
-  async function aggiungiTragittoDaPercorso(percorso: PercorsoSalvato, inverti: boolean) {
-    // Nell'ordine normale: [0] = Partenza (può non avere indirizzo,
-    // si scrive in Eventi), [1..] = fermate intermedie in ordine,
-    // arrivo = percorso.arrivoCitta (mai una fermata vera, come per
-    // arrivoIndirizzo sui tragitti). Invertendo: quella che ERA
-    // l'arrivoCitta diventa la nuova Partenza (senza indirizzo, non
-    // ne aveva uno nemmeno lei), le fermate intermedie girano
-    // d'ordine, e quella che ERA la Partenza diventa la nuova
-    // arrivoCitta.
-    let fermateOrdinate = percorso.fermate;
-    let arrivoCittaFinale = percorso.arrivoCitta ?? '';
-    if (inverti) {
-      const [vecchiaPartenza, ...intermedie] = fermateOrdinate;
-      const nuovaPartenza: FermataPercorsoSalvato = { citta: arrivoCittaFinale, indirizzo: null, fermataAnagraficaId: null, tipo: 'PASSAGGIO', prezzo: undefined, sogliaMinima: null };
-      fermateOrdinate = [nuovaPartenza, ...[...intermedie].reverse()];
-      arrivoCittaFinale = vecchiaPartenza?.citta ?? '';
-    }
+  async function aggiungiTragittoDaPercorso(percorso: PercorsoSalvato) {
+    // La PRIMA fermata del percorso è la Testa di partenza (può non
+    // avere indirizzo, si scrive qui in Eventi), l'ULTIMA è la Testa
+    // di arrivo (stessa cosa — non diventa una fermata vera del
+    // tragitto, va su arrivoCitta/arrivoIndirizzo, come per un tragitto
+    // creato a mano). Tutto ciò che sta in mezzo sono le fermate
+    // intermedie vere. Se serve il verso opposto, si inverte DOPO,
+    // con la freccia sulla tab del tragitto qui sotto — non più una
+    // scelta da fare PRIMA di applicare il percorso.
+    const [testaPartenza, ...resto] = percorso.fermate;
+    const testaArrivo = resto.pop(); // tolto da resto: quel che resta sono le sole intermedie
+    const fermateIntermedie = resto;
 
-    // Ogni fermata del percorso deve diventare una scelta vera
-    // dall'anagrafica — mai più testo libero, come richiesto. Il
+    // Ogni fermata intermedia del percorso deve diventare una scelta
+    // vera dall'anagrafica — mai più testo libero, come richiesto. Il
     // controllo "esiste già?" avviene lato server (trovaOCrea),
     // affidabile anche applicando più percorsi/tragitti in rapida
     // sequenza — un controllo lato frontend contro lo stato locale
     // (fermateAnagrafica) causava doppioni, perché ogni chiamata non
     // vedeva ancora quello appena creato da un'altra chiamata
-    // parallela. La Partenza senza indirizzo (ancora da scrivere in
-    // Eventi) fa eccezione — niente da cercare/creare in anagrafica
-    // finché non ha un indirizzo vero, resta testuale per ora.
-    const fermateConAnagrafica: FermataInput[] = await Promise.all(fermateOrdinate.map(async (f, idx) => {
-      if (idx === 0 && !f.indirizzo?.trim()) {
-        return { fermataAnagraficaId: null, citta: f.citta, indirizzo: '', prezzo: f.prezzo ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
-      }
+    // parallela.
+    const fermateConAnagrafica: FermataInput[] = await Promise.all(fermateIntermedie.map(async (f) => {
       try {
         const trovata = await fermateAnagraficaApi.trovaOCrea({ nome: f.citta, citta: f.citta, indirizzo: f.indirizzo ?? '' });
         setFermateAnagrafica((prev) => prev.some((fa) => fa.id === trovata.id) ? prev : [...prev, trovata]);
@@ -457,6 +446,10 @@ export function SchedaEventoModale({
         return { fermataAnagraficaId: null, citta: f.citta, indirizzo: f.indirizzo, prezzo: f.prezzo ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
       }
     }));
+    // La Testa di partenza NON passa dall'anagrafica finché non ha un
+    // indirizzo vero (niente da cercare/creare senza un indirizzo) —
+    // resta testuale, prima fermata del tragitto.
+    const fermataPartenza: FermataInput = { fermataAnagraficaId: null, citta: testaPartenza.citta, indirizzo: testaPartenza.indirizzo ?? '', prezzo: testaPartenza.prezzo ?? undefined, tipo: testaPartenza.tipo, sogliaMinima: testaPartenza.sogliaMinima };
 
     const nuovoTragitto: TragittoInput = {
       nome: percorso.nome,
@@ -464,8 +457,8 @@ export function SchedaEventoModale({
       prezzoExtra: 0,
       attivo: true,
       servizioId: servizioIdContestoAttuale(),
-      fermate: fermateConAnagrafica,
-      arrivoCitta: arrivoCittaFinale || undefined,
+      fermate: [fermataPartenza, ...fermateConAnagrafica],
+      arrivoCitta: testaArrivo?.citta || undefined,
     };
     // Aggiornamento FUNZIONALE (legge lo stato più recente al momento
     // vero dell'esecuzione, non quello catturato quando la funzione è
@@ -480,6 +473,38 @@ export function SchedaEventoModale({
     // salva correttamente".
     setForm((f) => ({ ...f, tragitti: [...(f.tragitti ?? []), nuovoTragitto] }));
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
+  }
+
+  /** Inverte un tragitto GIÀ aggiunto — scambia la Testa di partenza
+   *  (prima fermata) con la Testa di arrivo (arrivoCitta/Indirizzo/
+   *  Orario), e gira l'ordine di tutte le fermate intermedie in mezzo.
+   *  Ripetibile avanti e indietro quante volte serve: applicandola due
+   *  volte di fila si torna esattamente al punto di partenza (uno
+   *  scambio pulito, mai con perdita di dati). */
+  function invertiTragitto(idxTragitto: number) {
+    setForm((f) => {
+      const tragitti = [...(f.tragitti ?? [])];
+      const t = tragitti[idxTragitto];
+      if (!t || t.fermate.length === 0) return f;
+      const [vecchiaPartenza, ...intermedie] = t.fermate;
+      const nuovaPartenza: FermataInput = {
+        fermataAnagraficaId: null,
+        citta: t.arrivoCitta ?? '',
+        indirizzo: t.arrivoIndirizzo ?? '',
+        orario: t.arrivoOrario,
+        prezzo: vecchiaPartenza.prezzo,
+        tipo: vecchiaPartenza.tipo,
+        sogliaMinima: vecchiaPartenza.sogliaMinima,
+      };
+      tragitti[idxTragitto] = {
+        ...t,
+        fermate: [nuovaPartenza, ...[...intermedie].reverse()],
+        arrivoCitta: vecchiaPartenza.citta || undefined,
+        arrivoIndirizzo: vecchiaPartenza.indirizzo || undefined,
+        arrivoOrario: vecchiaPartenza.orario,
+      };
+      return { ...f, tragitti };
+    });
   }
   function aggiungiTragittoManuale() {
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
@@ -891,10 +916,6 @@ export function SchedaEventoModale({
       {percorsiSalvati.length > 0 && (
         <div className="section-card" style={{ marginBottom: 16 }}>
           <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi un tragitto da un percorso salvato</p>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12.5, color: 'var(--mist)' }}>
-            <input type="checkbox" checked={invertiPercorso} onChange={(e) => setInvertiPercorso(e.target.checked)} />
-            Inverti (scambia partenza e arrivo, gira anche l'ordine delle fermate intermedie)
-          </label>
           <select
             value=""
             onChange={(e) => {
@@ -905,7 +926,7 @@ export function SchedaEventoModale({
               // STESSO servizio.
               const contesto = servizioIdContestoAttuale();
               const giaUsatoQui = (form.tragitti ?? []).some((l) => l.nome === t?.nome && (l.servizioId ?? null) === contesto);
-              if (t && !giaUsatoQui) aggiungiTragittoDaPercorso(t, invertiPercorso);
+              if (t && !giaUsatoQui) aggiungiTragittoDaPercorso(t);
             }}
           >
             <option value="">Scegli un tragitto...</option>
@@ -980,8 +1001,17 @@ export function SchedaEventoModale({
 
           {espansa && (
           <>
-          <div className="campo" style={{ marginBottom: 10 }}>
-            <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} />
+          <div className="campo" style={{ marginBottom: 10, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}>
+              <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} />
+            </div>
+            <button
+              type="button" className="btn btn-ghost" style={{ fontSize: 12, whiteSpace: 'nowrap' }}
+              onClick={() => invertiTragitto(idxTragitto)}
+              title="Scambia partenza e arrivo, gira anche l'ordine delle fermate intermedie"
+            >
+              ↔ Inverti
+            </button>
           </div>
           <p className="section-label" style={{ marginBottom: 6 }}>
             Arrivo{tragitto.arrivoCitta ? <span style={{ color: 'var(--blue)', fontWeight: 400 }}> — {tragitto.arrivoCitta}</span> : ''}

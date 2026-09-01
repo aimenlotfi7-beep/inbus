@@ -470,6 +470,13 @@
       "when": 1788209021261,
       "tag": "0066_arrivo_partenza_invertibili",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1788244793847,
+      "tag": "0067_testa_doppia_percorsi",
+      "breakpoints": true
     }
   ]
 }
