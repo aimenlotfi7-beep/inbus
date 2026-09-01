@@ -20,15 +20,16 @@ type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
  *
  * - "Orari": qui si calcolano gli orari di ogni fermata e si esporta
  *   l'elenco (CSV/PDF) da mandare al fornitore per farsi fare il
- *   preventivo.
+ *   preventivo. Persistente su TUTTI gli stati (non solo finché "Da
+ *   confermare") — un tragitto ci resta SEMPRE, anche dopo il
+ *   preventivo e dopo essere confermato, con l'etichetta che dice se
+ *   gli orari sono già stati calcolati o no.
  * - "Prezzo": qui si applica il preventivo che è tornato dal
- *   fornitore. Un tragitto senza preventivo ancora vive SEMPRE anche
- *   in "Orari" insieme — sono due compiti diversi sullo STESSO
- *   tragitto, non due stati diversi: entrambi restano visibili finché
- *   il tragitto non passa oltre (preventivo registrato), ognuno con
- *   la propria etichetta indipendente (fatto/da fare) — un compito
- *   fatto non fa sparire il tragitto dall'altra tab, resta lì per
- *   poterlo sempre rivedere.
+ *   fornitore. Stessa persistenza di "Orari" — sono due compiti
+ *   diversi sullo STESSO tragitto, non due stati diversi: nessuno dei
+ *   due fa sparire il tragitto dall'altra tab (né da qualunque altra),
+ *   resta sempre lì per poterlo rivedere, ognuno con la propria
+ *   etichetta indipendente (fatto/da fare).
  * - "Linee Bus": preventivo fatto, già in vendita — qui si aggiungono
  *   le Linee (bus veri) direttamente. Persistente come "Orari"/
  *   "Prezzo": un tragitto ci resta SEMPRE una volta prezzato, anche
@@ -89,17 +90,21 @@ export function PartenzeScreen() {
   // rivedere/correggere quello già fatto).
   function tabsDi(p: Partenza): Tab[] {
     if (passata(p)) return ['passate'];
-    if (p.stato === 'DA_CONFERMARE') return ['fermate', 'da-prezzare'];
-    // "Linee Bus" ora persistente come "Orari"/"Prezzo" — un tragitto
-    // ci resta SEMPRE una volta prezzato, anche dopo essere del tutto
-    // confermato (con l'etichetta verde), non sparisce più da qui.
+    // "Orari" e "Prezzo" ora persistenti su TUTTI gli stati (non solo
+    // "Da confermare" come prima) — un tragitto ci resta SEMPRE, anche
+    // dopo il preventivo e dopo essere confermato, con l'etichetta che
+    // dice se quel compito specifico è ancora fatto o no. Stessa
+    // filosofia già applicata a "Linee Bus" — coerenza fra tutte le
+    // tab, nessuna sparisce più quando il tragitto va oltre.
+    const tabs: Tab[] = ['fermate', 'da-prezzare'];
     // "Confermato" invece resta un insieme A PARTE (deciso così
     // esplicitamente): ci entra SOLO chi ha avuto almeno una volta un
     // bus vero registrato (stato CONFERMATO — che una volta raggiunto
     // non torna mai indietro da solo, anche se poi la capienza non
     // basta più), verde se la capienza basta ancora, rosso se no.
-    if (p.stato === 'PREZZATO') return ['da-confermare'];
-    return ['da-confermare', 'confermato'];
+    if (p.stato === 'PREZZATO') tabs.push('da-confermare');
+    else if (p.stato === 'CONFERMATO') tabs.push('da-confermare', 'confermato');
+    return tabs;
   }
   // Se il compito di QUESTA tab specifica è già stato fatto per questo
   // tragitto — tutte le tab tranne "Passate" ce l'hanno ora: restano
