@@ -8,6 +8,7 @@ import { Modale } from '../shared/Modale';
 import { EtichettaTooltip } from '../shared/EtichettaTooltip';
 import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
 import { useMappaTooltip } from '../shared/useMappaTooltip';
+import { geocodifica } from '../shared/geo';
 import { MappaPuntiFermate, type CategoriaTesta } from '../shared/MappaPuntiFermate';
 
 const VUOTA: FermataAnagraficaInput = { nome: '', citta: '', indirizzo: '', lat: undefined, lng: undefined, note: '', link: '' };
@@ -61,8 +62,19 @@ export function FermateScreen() {
     }
     setSalvando(true);
     try {
-      if (inModifica) await fermateAnagraficaApi.update(inModifica.id, form);
-      else await fermateAnagraficaApi.create(form);
+      // Se non sono già state scritte a mano, le calcolo da sole prima
+      // di salvare — evita fermate senza coordinate per distrazione
+      // (il problema trovato con "Piacenza Sud": creata senza, poi
+      // sparita dal punto giusto sulla cartina). Se la ricerca non
+      // trova nulla, si salva comunque senza — meglio una fermata
+      // senza coordinate che bloccare il salvataggio.
+      let formDaSalvare = form;
+      if (form.lat == null || form.lng == null) {
+        const risultato = await geocodifica(`${form.indirizzo}, ${form.citta}`);
+        if (risultato.coordinate) formDaSalvare = { ...form, lat: risultato.coordinate.lat, lng: risultato.coordinate.lng };
+      }
+      if (inModifica) await fermateAnagraficaApi.update(inModifica.id, formDaSalvare);
+      else await fermateAnagraficaApi.create(formDaSalvare);
       setModaleAperta(false);
       ricarica();
     } catch (e) {
