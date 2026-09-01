@@ -64,6 +64,25 @@ function scostaTracciato(punti: Coordinate[], indice: number, totale: number, me
   });
 }
 
+/** Esegue "fn" su ogni elemento di "items", ma con al massimo "limite"
+ *  chiamate in corso insieme invece che una alla volta — usata per i
+ *  tracciati OSRM (a differenza di Nominatim, non ha un limite rigido
+ *  di 1 richiesta al secondo da rispettare), dove farle tutte in fila
+ *  su tanti percorsi insieme diventava lentissimo (quasi 50 percorsi =
+ *  quasi 50 attese in sequenza). */
+async function mappaConLimite<T, R>(items: T[], limite: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const risultati: R[] = new Array(items.length);
+  let indice = 0;
+  async function worker() {
+    while (indice < items.length) {
+      const i = indice++;
+      risultati[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limite, items.length) }, worker));
+  return risultati;
+}
+
 /** Disegna uno o più percorsi su una cartina reale (OpenStreetMap,
  *  gratuita — stesso servizio già usato per gli indirizzi altrove), con
  *  la linea che segue DAVVERO le strade (non un segmento dritto tra un
@@ -74,11 +93,17 @@ function scostaTracciato(punti: Coordinate[], indice: number, totale: number, me
  *  che coincidono per un tratto si scostano leggermente per restare
  *  distinguibili (vedi scostaTracciato). Le fermate hanno tutte lo
  *  stesso pin grigio — se più percorsi condividono la stessa fermata,
- *  il popup elenca tutti quelli che ci passano. */
+ *  il popup elenca tutti quelli che ci passano.
+ *
+ *  In due fasi, non una sola: prima la geocodifica di TUTTE le tappe
+ *  di TUTTI i percorsi (in fila, un vincolo vero di Nominatim — ma la
+ *  cache rende gratis le fermate già viste), poi i tracciati OSRM di
+ *  TUTTI i percorsi insieme, in parallelo limitato — molto più veloce
+ *  che uno alla volta quando i percorsi sono tanti (es. quasi 50). */
 export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
   const contenitoreRef = useRef<HTMLDivElement>(null);
   const mappaRef = useRef<L.Map | null>(null);
-  const [stato, setStato] = useState<'carico' | 'pronto' | 'errore'>('carico');
+  const [stato, setStato] = useState<'carico' | 'carico-tracciati' | 'pronto' | 'errore'>('carico');
   const [progresso, setProgresso] = useState<{ fatti: number; totali: number }>({ fatti: 0, totali: 0 });
   const [risultatiPerPercorso, setRisultatiPerPercorso] = useState<{ id: string; nome: string; colore: string; distanzaKm: number | null; nonTrovate: string[] }[]>([]);
 
@@ -88,13 +113,6 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
     async function costruisci() {
       setStato('carico');
       setProgresso({ fatti: 0, totali: percorsi.length });
-      const risultati: { id: string; nome: string; colore: string; distanzaKm: number | null; nonTrovate: string[] }[] = [];
-      // Una fermata nello stesso punto esatto (es. "Milano" condivisa da
-      // più percorsi — la cache di geocodifica() garantisce le stesse
-      // coordinate identiche) diventa UN solo pin, con tutti i percorsi
-      // che ci passano elencati nello stesso popup — invece di pin
-      // impilati uno sopra l'altro, indistinguibili.
-      const fermateCondivise = new Map<string, { lat: number; lng: number; voci: string[] }>();
 
       if (!mappaRef.current && contenitoreRef.current) {
         mappaRef.current = L.map(contenitoreRef.current);
@@ -107,21 +125,15 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
       if (!mappa) { setStato('errore'); return; }
       mappa.eachLayer((layer) => { if (!(layer instanceof L.TileLayer)) mappa.removeLayer(layer); });
 
-      const tuttiIPunti: [number, number][] = [];
-
+      // FASE 1 — geocodifica di ogni tappa di ogni percorso, un
+      // percorso alla volta (Nominatim chiede di restare sotto 1
+      // richiesta al secondo — la cache dentro geocodifica() rende
+      // istantanea una fermata già vista, che con più percorsi
+      // condivisi capita spessissimo, es. la stessa città di arrivo).
+      const datiPerPercorso: { p: PercorsoMappa; colore: string; coordinate: (Coordinate & { etichetta: string })[]; nonTrovate: string[] }[] = [];
       for (let i = 0; i < percorsi.length; i++) {
         const p = percorsi[i];
         const colore = PALETTE[i % PALETTE.length];
-
-        // Ogni tappa: prova prima l'indirizzo vero, se manca (le due
-        // Teste possono non averlo ancora) o se non si trova, prova
-        // solo la città — approssimato al centro, come deciso. La
-        // cache dentro geocodifica() evita di richiedere di nuovo una
-        // fermata già cercata per un percorso precedente in questo
-        // stesso giro (es. la stessa città di partenza condivisa da
-        // più percorsi) — e fa sì che due percorsi con la stessa
-        // fermata ottengano ESATTAMENTE le stesse coordinate, non due
-        // leggermente diverse, altrimenti non si raggrupperebbero.
         const coordinate: (Coordinate & { etichetta: string })[] = [];
         const nonTrovate: string[] = [];
         for (const t of p.tappe) {
@@ -142,36 +154,49 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
           }
         }
         if (annullato) return;
+        datiPerPercorso.push({ p, colore, coordinate, nonTrovate });
+        setProgresso({ fatti: i + 1, totali: percorsi.length });
+      }
+      if (annullato) return;
 
-        for (const c of coordinate) {
+      // FASE 2 — i tracciati stradali veri (OSRM), stavolta in
+      // parallelo (limitato a 6 insieme) invece che uno alla volta:
+      // OSRM non ha lo stesso vincolo rigido di Nominatim, farli tutti
+      // in fila su tanti percorsi era il vero collo di bottiglia.
+      setStato('carico-tracciati');
+      const conAlmenoDue = datiPerPercorso
+        .map((d, indiceOriginale) => ({ ...d, indiceOriginale }))
+        .filter((d) => d.coordinate.length >= 2);
+      const tracciati = await mappaConLimite(conAlmenoDue, 6, (d) => tracciatoPercorso(d.coordinate));
+      if (annullato) return;
+
+      // FASE 3 — disegno tutto insieme, solo ora che i dati ci sono tutti.
+      const risultati: typeof risultatiPerPercorso = [];
+      const fermateCondivise = new Map<string, { lat: number; lng: number; voci: string[] }>();
+      const tuttiIPunti: [number, number][] = [];
+
+      for (const d of datiPerPercorso) {
+        if (d.coordinate.length < 2) {
+          risultati.push({ id: d.p.id, nome: d.p.nome, colore: d.colore, distanzaKm: null, nonTrovate: d.nonTrovate });
+        }
+      }
+      conAlmenoDue.forEach((d, idxFiltrato) => {
+        const tracciato = tracciati[idxFiltrato];
+        const puntiVeri: Coordinate[] = tracciato ? tracciato.tratto : d.coordinate.map((c) => ({ lat: c.lat, lng: c.lng }));
+        const puntiScostati = scostaTracciato(puntiVeri, d.indiceOriginale, percorsi.length);
+        L.polyline(puntiScostati.map((pt): [number, number] => [pt.lat, pt.lng]), { color: d.colore, weight: 4 }).addTo(mappa);
+        tuttiIPunti.push(...d.coordinate.map((c): [number, number] => [c.lat, c.lng]));
+
+        for (const c of d.coordinate) {
           const chiave = `${c.lat.toFixed(5)},${c.lng.toFixed(5)}`;
           const esistente = fermateCondivise.get(chiave);
-          const voce = `${p.nome} — ${c.etichetta}`;
+          const voce = `${d.p.nome} — ${c.etichetta}`;
           if (esistente) esistente.voci.push(voce);
           else fermateCondivise.set(chiave, { lat: c.lat, lng: c.lng, voci: [voce] });
         }
 
-        if (coordinate.length < 2) {
-          risultati.push({ id: p.id, nome: p.nome, colore, distanzaKm: null, nonTrovate });
-          setProgresso({ fatti: i + 1, totali: percorsi.length });
-          continue;
-        }
-
-        const tracciato = await tracciatoPercorso(coordinate);
-        if (annullato) return;
-
-        const puntiVeri: Coordinate[] = tracciato
-          ? tracciato.tratto
-          : coordinate.map((c) => ({ lat: c.lat, lng: c.lng })); // ripiego: segmenti dritti se OSRM non risponde
-        const puntiScostati = scostaTracciato(puntiVeri, i, percorsi.length);
-        L.polyline(puntiScostati.map((pt): [number, number] => [pt.lat, pt.lng]), { color: colore, weight: 4 }).addTo(mappa);
-        tuttiIPunti.push(...coordinate.map((c): [number, number] => [c.lat, c.lng]));
-
-        risultati.push({ id: p.id, nome: p.nome, colore, distanzaKm: tracciato?.distanzaKm ?? null, nonTrovate });
-        setProgresso({ fatti: i + 1, totali: percorsi.length });
-      }
-
-      if (annullato) return;
+        risultati.push({ id: d.p.id, nome: d.p.nome, colore: d.colore, distanzaKm: tracciato?.distanzaKm ?? null, nonTrovate: d.nonTrovate });
+      });
 
       for (const f of fermateCondivise.values()) {
         L.marker([f.lat, f.lng], { icon: PIN_GRIGIO }).addTo(mappa).bindPopup(f.voci.map((v) => `• ${v}`).join('<br>'));
@@ -203,9 +228,10 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
     <div>
       {stato === 'carico' && (
         <p style={{ color: 'var(--mist)' }}>
-          Cerco le fermate sulla cartina... {progresso.totali > 1 ? `(${progresso.fatti}/${progresso.totali} percorsi)` : ''}
+          Cerco le fermate sulla cartina... {percorsi.length > 1 ? `(${progresso.fatti}/${progresso.totali} percorsi)` : ''}
         </p>
       )}
+      {stato === 'carico-tracciati' && <p style={{ color: 'var(--mist)' }}>Fermate trovate — calcolo i tracciati stradali...</p>}
       {stato === 'errore' && <p style={{ color: 'var(--pink)' }}>Non riesco a mostrare la cartina — nessuna fermata trovata con un indirizzo o città valida.</p>}
       {tappeNonTrovateTotali.length > 0 && (
         <p style={{ color: 'var(--amber)', fontSize: 12.5, marginBottom: 8 }}>
