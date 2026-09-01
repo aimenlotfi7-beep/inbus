@@ -11,6 +11,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:esegui-sql": "tsx src/db/esegui-sql.ts",
+    "db:controlla": "tsx src/db/controlla.ts",
     "db:migra-permessi": "tsx src/db/migra-permessi.ts",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx src/db/seed.ts",
