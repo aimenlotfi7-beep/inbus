@@ -503,16 +503,17 @@ export function SchedaEventoModale({
       }
     }
 
-    // Individuato per RIFERIMENTO (non per indice, che potrebbe non
-    // essere più valido se nel frattempo — durante l'attesa qui sopra
-    // — è cambiato qualcos'altro nell'elenco) sullo stato più recente
-    // davvero, non una copia catturata prima dell'attesa — stessa
-    // causa/rimedio della race condition già corretta altrove in
-    // questo file.
+    // Individuato per ID (stabile) quando il tragitto è già salvato —
+    // non per riferimento oggetto, che durante l'attesa di rete qui
+    // sopra può non corrispondere più anche se è "lo stesso" tragitto
+    // logicamente (basta un altro giro di render nel frattempo, React
+    // può ricreare l'oggetto). Un tragitto appena aggiunto (senza id
+    // ancora) non può cambiare riferimento nello stesso modo — lì
+    // resta valida la posizione originale.
     setForm((f) => {
       const tragitti = [...(f.tragitti ?? [])];
-      const idxAttuale = tragitti.indexOf(t);
-      if (idxAttuale === -1) return f; // rimosso da un'altra azione nel frattempo
+      const idxAttuale = t.id ? tragitti.findIndex((x) => x.id === t.id) : idxTragitto;
+      if (idxAttuale === -1 || !tragitti[idxAttuale]) return f; // rimosso da un'altra azione nel frattempo
       const attuale = tragitti[idxAttuale];
       if (attuale.fermate.length === 0) return f;
       const [vecchiaPartenza, ...intermedie] = attuale.fermate;
