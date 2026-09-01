@@ -6,6 +6,8 @@ import { RicercaSezione } from '../shared/RicercaSezione';
 import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 import { useNavigazione } from '../shared/NavigazioneContext';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 type Tab = 'da-confermare' | 'confermato' | 'passate';
 type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
@@ -41,6 +43,7 @@ type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
  * Un evento passato vive SEMPRE e SOLO in "Passate", mai nelle altre.
  */
 export function PartenzeScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [partenze, setPartenze] = useState<Partenza[]>([]);
   const [selezionato, setSelezionato] = useState<{ evento: Evento; tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi'; tabOrigine: 'fermate' | 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate' } | null>(null);
@@ -168,8 +171,7 @@ export function PartenzeScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Partenze" />
-      <p className="testo-intro">Ogni card è un evento — se ha più servizi o percorsi, si aprono dentro.</p>
+      <PanelHead titolo="Partenze" info={mappaTooltip.partenze_intro ?? TOOLTIP_DEFAULT.partenze_intro} />
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
 
       <div className="mini-tabs" style={{ justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>

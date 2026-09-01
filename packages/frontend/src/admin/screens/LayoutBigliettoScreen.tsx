@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../api/layoutBiglietto';
 import { PanelHead } from '../shared/PanelHead';
 import { CaricaFile } from '../shared/CaricaFile';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 type SezioneBiglietto = 'intestazione_immagine' | 'titolo' | 'evento' | 'partenza' | 'passeggero' | 'pnr' | 'qr' | 'nota';
 
@@ -110,6 +112,7 @@ function ManigliaAngoli({ colore, onInizia }: { colore: string; onInizia: (e: Re
 }
 
 export function LayoutBigliettoScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [lista, setLista] = useState<LayoutBiglietto[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState('');
@@ -365,10 +368,7 @@ export function LayoutBigliettoScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Layout biglietto" azione={<button type="button" className="btn btn-primary" onClick={nuovo}>+ Nuovo layout</button>} />
-      <p className="testo-intro" style={{ marginBottom: 16 }}>
-        Trascina ogni sezione dove vuoi sul biglietto; trascina l'angolo in basso a destra per ridimensionarla — mentre trascini, delle linee rosa ti avvisano quando ti allinei con un altro elemento o con centro/bordi della pagina, e ci si "aggancia" da sole per allineamenti sempre precisi. Ogni evento usa il layout <b>predefinito</b> a meno che, dalla sua scheda, tu non ne scelga uno diverso.
-      </p>
+      <PanelHead titolo="Layout biglietto" azione={<button type="button" className="btn btn-primary" onClick={nuovo}>+ Nuovo layout</button>} info={mappaTooltip.layout_biglietto_intro ?? TOOLTIP_DEFAULT.layout_biglietto_intro} />
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{ flex: '0 0 220px', display: 'flex', flexDirection: 'column', gap: 6 }}>

@@ -6,6 +6,8 @@ import type { Evento } from '../../api/types';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { PaginaSezione } from '../shared/PaginaSezione';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 import { CampoCopiabile } from '../shared/CampoCopiabile';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../api/layoutBiglietto';
 import { WhiteLabelEditor } from '../../features/white-label/WhiteLabelEditor';
@@ -15,6 +17,7 @@ import { WhiteLabelEditor } from '../../features/white-label/WhiteLabelEditor';
  *  associati, Tappa 1), si crea la White Label, e si passa
  *  all'editor grafico + codice embed. */
 export function WhiteLabelScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [whiteLabels, setWhiteLabels] = useState<WhiteLabel[]>([]);
   const [organizzatori, setOrganizzatori] = useState<Organizzatore[]>([]);
   const [eventi, setEventi] = useState<Evento[]>([]);
@@ -59,10 +62,7 @@ export function WhiteLabelScreen() {
 
   return (
     <div>
-      <PanelHead titolo="White Label" azione={<button className="btn btn-primary" onClick={() => setVista('nuova')}>+ Nuova White Label</button>} />
-      <p className="testo-intro" style={{ marginBottom: 18 }}>
-        Ogni riga collega un organizzatore a UN suo evento specifico — il widget che riceve serve solo a vendere il viaggio di quell'evento, mai altro.
-      </p>
+      <PanelHead titolo="White Label" azione={<button className="btn btn-primary" onClick={() => setVista('nuova')}>+ Nuova White Label</button>} info={mappaTooltip.white_label_intro ?? TOOLTIP_DEFAULT.white_label_intro} />
       {whiteLabels.length === 0 && <p style={{ color: 'var(--mist)' }}>Nessuna White Label creata ancora.</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {whiteLabels.map((wl) => (

@@ -4,6 +4,9 @@ import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { Modale } from '../shared/Modale';
+import { EtichettaTooltip } from '../shared/EtichettaTooltip';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 const VUOTA: FermataAnagraficaInput = { nome: '', citta: '', indirizzo: '', lat: undefined, lng: undefined, note: '', link: '' };
 
@@ -17,6 +20,7 @@ const VUOTA: FermataAnagraficaInput = { nome: '', citta: '', indirizzo: '', lat:
  * della scelta).
  */
 export function FermateScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [fermate, setFermate] = useState<FermataAnagrafica[]>([]);
   const [ricerca, setRicerca] = useState('');
   const [inModifica, setInModifica] = useState<FermataAnagrafica | null>(null);
@@ -76,7 +80,7 @@ export function FermateScreen() {
     <div>
       <PanelHead
         titolo="Fermate"
-        info="L'anagrafica dei luoghi fisici — si scelgono da qui componendo i tragitti di un evento, invece di riscrivere ogni volta città e indirizzo."
+        info={mappaTooltip.fermate_intro ?? TOOLTIP_DEFAULT.fermate_intro}
         azione={<button className="btn btn-primary" onClick={apriNuova}>+ Nuova fermata</button>}
       />
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, città o indirizzo..." />
@@ -117,7 +121,7 @@ export function FermateScreen() {
       {modaleAperta && (
         <Modale titolo={inModifica ? 'Modifica — ' + inModifica.nome : 'Nuova fermata'} onClose={() => setModaleAperta(false)}>
           <div className="campo">
-            <label>Nome<span style={{ opacity: 0.6, fontWeight: 400 }}> — es. "Milano Lambrate", non solo "Milano"</span></label>
+            <label><EtichettaTooltip testo="Nome" chiave="fermata_nome_campo" mappaTooltip={mappaTooltip} /></label>
             <input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
           </div>
           <div className="form-grid">
@@ -149,7 +153,7 @@ export function FermateScreen() {
             </label>
           </div>
           <div className="campo">
-            <label>Link (facoltativo)<span style={{ opacity: .6, fontWeight: 400 }}> — es. Google Maps, punto di ritrovo</span></label>
+            <label><EtichettaTooltip testo="Link" chiave="fermata_link_campo" mappaTooltip={mappaTooltip} /></label>
             <input type="url" placeholder="https://..." value={form.link ?? ''} onChange={(e) => setForm({ ...form, link: e.target.value })} />
           </div>
           <div className="campo">

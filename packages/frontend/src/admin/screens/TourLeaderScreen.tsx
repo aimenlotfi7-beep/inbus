@@ -6,6 +6,8 @@ import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { Modale } from '../shared/Modale';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 import { CampoCopiabile } from '../shared/CampoCopiabile';
 
 const ETICHETTE: Record<TourLeader['stato'], string> = { CANDIDATO: 'Candidato', ATTIVO: 'Attivo', ARCHIVIATO: 'Archiviato' };
@@ -15,6 +17,7 @@ const VUOTO: CandidaturaInput & { stato: TourLeader['stato'] } = {
 };
 
 export function TourLeaderScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [lista, setLista] = useState<TourLeader[]>([]);
   const [ricerca, setRicerca] = useState('');
   const [linkCopiato, setLinkCopiato] = useState(false);
@@ -84,11 +87,7 @@ export function TourLeaderScreen() {
 
   if (formAperto) {
     return (
-      <PaginaSezione titolo="Censisci tour leader" onIndietro={() => setFormAperto(false)}>
-        <p className="testo-intro">
-          Registra qui direttamente un tour leader che conosci già — non deve passare dal modulo pubblico di
-          autocandidatura. Parte come "Attivo", puoi cambiare stato in qualsiasi momento dall'elenco.
-        </p>
+      <PaginaSezione titolo="Censisci tour leader" onIndietro={() => setFormAperto(false)} info={mappaTooltip.tourleader_censisci_intro ?? TOOLTIP_DEFAULT.tourleader_censisci_intro}>
         <div className="form-grid">
           <label>Nome <input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></label>
           <label>Cognome <input value={form.cognome} onChange={(e) => setForm({ ...form, cognome: e.target.value })} /></label>

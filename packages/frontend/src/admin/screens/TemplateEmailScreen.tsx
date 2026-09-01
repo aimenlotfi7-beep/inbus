@@ -3,6 +3,8 @@ import { templateEmailApi, type TemplateEmail } from '../../api/templateEmail';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { CaricaFile } from '../shared/CaricaFile';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 /** Modifica del testo delle email automatiche (conferma prenotazione,
  *  promemoria saldo, biglietto, promozione lista d'attesa) — invece di
@@ -10,6 +12,7 @@ import { CaricaFile } from '../shared/CaricaFile';
  *  da qui. I segnaposto tipo {{nome}} vengono sostituiti automaticamente
  *  con il dato vero al momento dell'invio. */
 export function TemplateEmailScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [lista, setLista] = useState<TemplateEmail[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState('');
@@ -96,12 +99,7 @@ export function TemplateEmailScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Testo delle email automatiche" />
-      <p className="testo-intro" style={{ marginBottom: 16 }}>
-        Modifica il testo che i clienti ricevono via email. I segnaposto tra doppie graffe (es. <code>{'{{nome}}'}</code>)
-        vengono sostituiti automaticamente con il dato vero al momento dell'invio — non toglierli, altrimenti quel
-        punto resterebbe vuoto.
-      </p>
+      <PanelHead titolo="Testo delle email automatiche" info={mappaTooltip.template_email_intro ?? TOOLTIP_DEFAULT.template_email_intro} />
 
       {lista.length === 0 && (
         <p className="testo-intro">

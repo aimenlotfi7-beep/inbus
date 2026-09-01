@@ -7,12 +7,15 @@ import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { CampoCopiabile } from '../shared/CampoCopiabile';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 const VUOTO: AmministratoreInput = { nome: '', email: '', password: '', ruoloId: '' };
 
 type StatoPermesso = 'ruolo' | 'extra' | 'negato' | 'nessuno';
 
 export function AmministratoriScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [admin, setAdmin] = useState<Amministratore[]>([]);
   const [log, setLog] = useState<LogRiga[]>([]);
   const [ruoliAssegnabili, setRuoliAssegnabili] = useState<Ruolo[]>([]);
@@ -162,11 +165,9 @@ export function AmministratoriScreen() {
 
   if (permessiUtenza && !ruoloOwnerTarget) {
     return (
-      <PaginaSezione titolo={`Permessi personali di ${permessiUtenza.nome}`} onIndietro={() => setPermessiUtenza(null)}>
+      <PaginaSezione titolo={`Permessi personali di ${permessiUtenza.nome}`} onIndietro={() => setPermessiUtenza(null)} info={mappaTooltip.permessi_personali_intro ?? TOOLTIP_DEFAULT.permessi_personali_intro}>
         <p className="testo-intro">
-          Di base questa utenza ha i permessi del ruolo "{nomeRuolo(permessiUtenza.ruoloId)}". Clicca un permesso per
-          aggiungerlo o toglierlo solo per questa persona, indipendentemente dal ruolo. Puoi togliere qualsiasi
-          permesso, ma puoi concederne in più solo tra quelli che possiedi tu stesso.
+          Di base questa utenza ha i permessi del ruolo "{nomeRuolo(permessiUtenza.ruoloId)}".
         </p>
         {moduli.map((modulo) => (
           <div key={modulo} className="gruppo-modulo">

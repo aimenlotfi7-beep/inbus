@@ -5,6 +5,8 @@ import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 interface FormRuolo {
   nome: string;
@@ -14,6 +16,7 @@ interface FormRuolo {
 const VUOTO: FormRuolo = { nome: '', descrizione: '', permessi: [] };
 
 export function RuoliScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [ruoli, setRuoli] = useState<Ruolo[]>([]);
   // Permessi assegnabili: già filtrati dal server in base a ciò che
   // l'utente loggato possiede lui stesso.
@@ -107,7 +110,7 @@ export function RuoliScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Ruoli" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo ruolo</button>} info="Puoi creare ruoli con il nome che preferisci e scegliere esattamente cosa può fare chi lo ha. Puoi assegnare solo i permessi che possiedi tu stesso." />
+      <PanelHead titolo="Ruoli" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo ruolo</button>} info={mappaTooltip.ruoli_intro ?? TOOLTIP_DEFAULT.ruoli_intro} />
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome ruolo..." />
       <TabellaGenerica
         righe={ruoliFiltrati}

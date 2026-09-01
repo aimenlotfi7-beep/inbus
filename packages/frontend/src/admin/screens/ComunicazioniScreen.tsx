@@ -6,8 +6,11 @@ import { PaginaSezione } from '../shared/PaginaSezione';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { ComunicazioniTab } from './eventi/ComunicazioniTab';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 export function ComunicazioniScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [ricerca, setRicerca] = useState('');
@@ -31,10 +34,7 @@ export function ComunicazioniScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Comunicazioni" />
-      <p className="testo-intro" style={{ marginBottom: 16 }}>
-        Scegli l'evento per cui vuoi scrivere ai clienti — poi filtri per servizio, tratta o fermata specifica.
-      </p>
+      <PanelHead titolo="Comunicazioni" info={mappaTooltip.comunicazioni_intro ?? TOOLTIP_DEFAULT.comunicazioni_intro} />
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
 
       {caricamento && <p className="testo-intro">Carico...</p>}

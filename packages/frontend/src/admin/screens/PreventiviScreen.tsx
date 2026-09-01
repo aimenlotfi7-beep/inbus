@@ -6,6 +6,8 @@ import { RicercaSezione } from '../shared/RicercaSezione';
 import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 import { useNavigazione } from '../shared/NavigazioneContext';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 type Tab = 'fermate' | 'da-prezzare';
 type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
@@ -38,6 +40,7 @@ type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
  * anche qui.
  */
 export function PreventiviScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [partenze, setPartenze] = useState<Partenza[]>([]);
   const [selezionato, setSelezionato] = useState<{ evento: Evento; tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi'; tabOrigine: 'fermate' | 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate' } | null>(null);
@@ -129,8 +132,7 @@ export function PreventiviScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Preventivi" />
-      <p className="testo-intro">Calcola gli orari e registra i preventivi dei fornitori — ogni card è un evento.</p>
+      <PanelHead titolo="Preventivi" info={mappaTooltip.preventivi_intro ?? TOOLTIP_DEFAULT.preventivi_intro} />
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
 
       <div className="mini-tabs" style={{ justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>

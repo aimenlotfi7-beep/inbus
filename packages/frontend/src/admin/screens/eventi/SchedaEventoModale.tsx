@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
-import { pagineApi } from '../../../api/pagine';
+import { InfoTooltip } from '../../shared/InfoTooltip';
+import { TOOLTIP_DEFAULT } from '../../tooltipDefaults';
+import { useMappaTooltip } from '../../shared/useMappaTooltip';
 import { eventiApi, type EventoInput, type TragittoInput, type FermataInput } from '../../../api/eventi';
 import { percorsiSalvatiApi, type PercorsoSalvato } from '../../../api/percorsiSalvati';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
@@ -163,14 +165,7 @@ export function SchedaEventoModale({
   const [formIniziale, setFormIniziale] = useState('');
 
   const [categorieEvento, setCategorieEvento] = useState<CategoriaEvento[]>([]);
-  const [mappaTooltip, setMappaTooltip] = useState<Record<string, string>>({});
-  useEffect(() => {
-    pagineApi.listContenuti().then((lista) => {
-      const mappa: Record<string, string> = {};
-      for (const c of lista) if (c.chiave.startsWith('tooltip_')) mappa[c.chiave.slice(8)] = c.valore;
-      setMappaTooltip(mappa);
-    });
-  }, []);
+  const mappaTooltip = useMappaTooltip();
   function ricaricaCategorie() {
     categorieApi.list().then(setCategorie);
   }
@@ -816,10 +811,6 @@ export function SchedaEventoModale({
               rows={4}
               placeholder="Un testo descrittivo sull'evento/artista — se la lasci vuota, per Google viene generata automaticamente (artista, data, città, prezzo), ma sulla pagina non comparirà nessuna sezione."
             />
-            <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
-              Diversa dalle "Informazioni viaggio" sopra: questa è un testo più discorsivo su evento/artista (utile
-              anche per farsi trovare meglio su Google), quella sopra è pratica (ritrovo, regole del bus, ecc.).
-            </p>
           </div>
         </>
       )}
@@ -1169,7 +1160,10 @@ export function SchedaEventoModale({
 
       {subTabImmagini === 'immagini' && (
         <>
-          <p className="testo-intro">Carica un'immagine, oppure incolla il link se è già online da qualche parte — vengono mostrate nella galleria della pagina evento sul sito.</p>
+          <p className="section-label" style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}>
+            Immagini
+            <InfoTooltip>{mappaTooltip.immagini_evento_intro ?? TOOLTIP_DEFAULT.immagini_evento_intro}</InfoTooltip>
+          </p>
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
             <input placeholder="https://..." value={nuovaImmagine} onChange={(e) => setNuovaImmagine(e.target.value)} style={{ flex: 1 }} />
             <button type="button" className="btn btn-ghost" onClick={aggiungiImmagine}>+ Aggiungi link</button>
@@ -1187,8 +1181,9 @@ export function SchedaEventoModale({
 
       {subTabImmagini === 'biglietto' && (
         <>
-          <p className="testo-intro" style={{ fontSize: 12, marginBottom: 14 }}>
-            Grafica del biglietto digitale — facoltativa, se non la imposti il PDF (con QR) usa l'aspetto di base.
+          <p className="section-label" style={{ marginBottom: 14, display: 'flex', alignItems: 'center' }}>
+            Grafica del biglietto
+            <InfoTooltip>{mappaTooltip.biglietto_grafica_intro ?? TOOLTIP_DEFAULT.biglietto_grafica_intro}</InfoTooltip>
           </p>
           <div className="campo">
             <label>Colore d'accento</label>
@@ -1217,12 +1212,9 @@ export function SchedaEventoModale({
               />
               <CaricaFile onCaricato={(url) => setForm({ ...form, ticketImmagineSfondoUrl: url })} etichetta="Carica" />
             </div>
-            <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
-              Compare come fascia in cima al biglietto (larga quanto la pagina, ritagliata automaticamente).
-            </p>
           </div>
           <div className="campo">
-            <label>Layout del biglietto</label>
+            <label><EtichettaTooltip testo="Layout del biglietto" chiave="layout_biglietto_campo" mappaTooltip={mappaTooltip} /></label>
             <select
               value={form.layoutBigliettoId ?? ''}
               onChange={(e) => setForm({ ...form, layoutBigliettoId: e.target.value || null })}
@@ -1235,10 +1227,6 @@ export function SchedaEventoModale({
                 <option key={l.id} value={l.id}>{l.nome}</option>
               ))}
             </select>
-            <p className="testo-intro" style={{ fontSize: 11, marginTop: 4, marginBottom: 0 }}>
-              Composizione grafica del PDF (ordine sezioni, posizione QR) — si gestiscono da Marketing → Layout
-              biglietto.
-            </p>
           </div>
         </>
       )}

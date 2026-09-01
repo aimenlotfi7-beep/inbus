@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { offerteApi, type Offerta, type OffertaInput } from '../../../api/offerte';
 import { campagneApi, type Campagna } from '../../../api/campagne';
 import { ErroreApi } from '../../../api/client';
+import { InfoTooltip } from '../../shared/InfoTooltip';
+import { TOOLTIP_DEFAULT } from '../../tooltipDefaults';
+import { useMappaTooltip } from '../../shared/useMappaTooltip';
 
 function slugSuggerito(nomeEvento: string, nomeOfferta: string) {
   const pulisci = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -9,6 +12,7 @@ function slugSuggerito(nomeEvento: string, nomeOfferta: string) {
 }
 
 export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEvento: string }) {
+  const mappaTooltip = useMappaTooltip();
   const [offerte, setOfferte] = useState<Offerta[]>([]);
   const [campagne, setCampagne] = useState<Campagna[]>([]);
   const [caricamento, setCaricamento] = useState(true);
@@ -95,10 +99,9 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
 
   return (
     <div>
-      <p className="testo-intro">
-        Crea un link con uno sconto percentuale dedicato per una campagna pubblicitaria (es. "-20%" per chi arriva
-        da Meta) — si applica al prezzo normale di qualunque fermata scelga il cliente. Il link pubblico porta solo
-        un nome, mai lo sconto: non è modificabile dal browser.
+      <p className="section-label" style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}>
+        Offerte
+        <InfoTooltip>{mappaTooltip.offerte_intro ?? TOOLTIP_DEFAULT.offerte_intro}</InfoTooltip>
       </p>
 
       {!formAperto && <button className="btn btn-primary" style={{ marginBottom: 16 }} onClick={apriNuova}>+ Nuova offerta</button>}

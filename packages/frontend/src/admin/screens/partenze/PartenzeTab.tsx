@@ -10,6 +10,9 @@ import { useSessione } from '../../shared/SessioneContext';
 import { useNavigazione } from '../../shared/NavigazioneContext';
 import { geocodifica, durataViaggio, distanzaViaggio, attesa } from '../../shared/geo';
 import { haPermesso } from '../../../api/auth';
+import { InfoTooltip } from '../../shared/InfoTooltip';
+import { TOOLTIP_DEFAULT } from '../../tooltipDefaults';
+import { useMappaTooltip } from '../../shared/useMappaTooltip';
 
 /** Un solo indicatore di stato per tratta (invece di due badge separati
  *  che si accavallavano): rosso se ha posti superati (il problema più
@@ -57,6 +60,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
   onSalvato?: () => void;
 }) {
   const sessione = useSessione();
+  const mappaTooltip = useMappaTooltip();
   const navigaSezione = useNavigazione();
   const vedeEconomia = haPermesso(sessione, 'eventi.economia');
   const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
@@ -726,8 +730,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
 
             if (formPreventivo) return (
               <div style={{ marginTop: 14 }}>
-                <p className="testo-intro" style={{ marginBottom: 16 }}>
-                  Una stima dal fornitore (non un bus vero ancora opzionato) sullo scenario più caro — sblocca la vendita, coi prezzi calcolati per fermata. Se poi costruisci una Linea più economica, il margine extra resta un guadagno in più.
+                <p className="section-label" style={{ marginBottom: 16, display: 'flex', alignItems: 'center' }}>
+                  Preventivo
+                  <InfoTooltip>{mappaTooltip.preventivo_form_intro ?? TOOLTIP_DEFAULT.preventivo_form_intro}</InfoTooltip>
                 </p>
                 <div className="form-grid" style={{ marginBottom: 16 }}>
                   <label>Costo del preventivo (€)

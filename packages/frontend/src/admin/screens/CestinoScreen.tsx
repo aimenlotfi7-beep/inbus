@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { eventiApi } from '../../api/eventi';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
+import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 type Tab = 'eventi' | 'tratte';
 type Tratta = { id: string; nome: string; eliminatoIl: string; eventoId: string; eventoArtista: string };
@@ -13,6 +15,7 @@ type Tratta = { id: string; nome: string; eliminatoIl: string; eventoId: string;
  * eliminare, così cresce facilmente se in futuro se ne aggiungono altri.
  */
 export function CestinoScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [tab, setTab] = useState<Tab>('eventi');
   const [eventiEliminati, setEventiEliminati] = useState<(Evento & { eliminatoIl: string })[] | null>(null);
   const [tratteEliminate, setTratteEliminate] = useState<Tratta[] | null>(null);
@@ -41,7 +44,7 @@ export function CestinoScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Cestino" info="Niente viene mai cancellato per davvero — se ha prenotazioni collegate, andrebbero perse. Qui trovi tutto quello che hai eliminato, sempre recuperabile." />
+      <PanelHead titolo="Cestino" info={mappaTooltip.cestino_intro ?? TOOLTIP_DEFAULT.cestino_intro} />
 
       <div className="mini-tabs" style={{ marginBottom: 18 }}>
         <button type="button" className={`mini-tab${tab === 'eventi' ? ' active' : ''}`} onClick={() => setTab('eventi')}>
