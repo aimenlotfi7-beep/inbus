@@ -22,7 +22,7 @@ import { MappaPercorso, type TappaMappa, type PercorsoMappa } from '../shared/Ma
  */
 export function PercorsiSalvatiScreen() {
   const [tab, setTab] = useState<'elenco' | 'cartina'>('elenco');
-  const [percorsoCartinaId, setPercorsoCartinaId] = useState<string>('');
+  const [percorsiCartinaIds, setPercorsiCartinaIds] = useState<string[]>(['']);
   const [percorsi, setTragitti] = useState<PercorsoSalvato[]>([]);
   const [inModifica, setInModifica] = useState<PercorsoSalvato | null>(null);
   const [nome, setNome] = useState('');
@@ -202,13 +202,31 @@ export function PercorsiSalvatiScreen() {
 
       {tab === 'cartina' ? (
         <div>
-          <div className="campo" style={{ maxWidth: 420, marginBottom: 16 }}>
-            <label>Scegli cosa vedere</label>
-            <select value={percorsoCartinaId} onChange={(e) => setPercorsoCartinaId(e.target.value)}>
-              <option value="">— Seleziona —</option>
-              <option value="__tutti__">— Tutti i percorsi insieme —</option>
-              {percorsi.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-            </select>
+          <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 10 }}>Scegli uno o più percorsi da confrontare — con più di uno, si vedono sovrapposti sulla stessa cartina.</p>
+          {percorsiCartinaIds.map((id, idx) => (
+            <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, maxWidth: 480 }}>
+              <select
+                style={{ flex: 1 }}
+                value={id}
+                onChange={(e) => setPercorsiCartinaIds(percorsiCartinaIds.map((v, i) => (i === idx ? e.target.value : v)))}
+              >
+                <option value="">— Seleziona un percorso —</option>
+                {percorsi.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+              </select>
+              {percorsiCartinaIds.length > 1 && (
+                <button
+                  type="button" className="btn btn-ghost" style={{ padding: '4px 10px', color: 'var(--pink)', flexShrink: 0 }}
+                  onClick={() => setPercorsiCartinaIds(percorsiCartinaIds.filter((_, i) => i !== idx))}
+                  title="Togli questo percorso dal confronto"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => setPercorsiCartinaIds([...percorsiCartinaIds, ''])}>+ Aggiungi un altro percorso</button>
+            <button type="button" className="btn btn-ghost" onClick={() => setPercorsiCartinaIds(percorsi.map((p) => p.id))}>Mostra tutti insieme ({percorsi.length})</button>
           </div>
           {(() => {
             const tappeDiPercorso = (p: PercorsoSalvato): TappaMappa[] => p.fermate.map((f, idx) => {
@@ -227,21 +245,19 @@ export function PercorsiSalvatiScreen() {
               };
             });
 
-            if (!percorsoCartinaId) return <p style={{ color: 'var(--mist)' }}>Scegli un percorso (o "Tutti insieme") per vederlo sulla cartina.</p>;
+            // Stesso percorso scelto per sbaglio in due caselle diverse
+            // (capita facile con tanti percorsi) — tolto, non avrebbe
+            // senso confrontarlo con se stesso.
+            const idsScelti = [...new Set(percorsiCartinaIds.filter((id) => id.trim() !== ''))];
+            if (idsScelti.length === 0) return <p style={{ color: 'var(--mist)' }}>Scegli almeno un percorso per vederlo sulla cartina.</p>;
 
-            if (percorsoCartinaId === '__tutti__') {
-              const percorsiMappa: PercorsoMappa[] = percorsi
-                .map((p) => ({ id: p.id, nome: p.nome, tappe: tappeDiPercorso(p) }))
-                .filter((p) => p.tappe.length >= 2); // un percorso con meno di 2 fermate non ha niente da disegnare, lo salto invece di farlo fallire
-              if (percorsiMappa.length === 0) return <p style={{ color: 'var(--mist)' }}>Nessun percorso ha ancora abbastanza fermate da disegnare.</p>;
-              return <MappaPercorso key="tutti" percorsi={percorsiMappa} />;
-            }
-
-            const percorsoScelto = percorsi.find((p) => p.id === percorsoCartinaId);
-            if (!percorsoScelto) return null;
-            const tappe = tappeDiPercorso(percorsoScelto);
-            if (tappe.length < 2) return <p style={{ color: 'var(--mist)' }}>Questo percorso ha meno di due fermate — niente da disegnare.</p>;
-            return <MappaPercorso key={percorsoScelto.id} percorsi={[{ id: percorsoScelto.id, nome: percorsoScelto.nome, tappe }]} />;
+            const percorsiMappa: PercorsoMappa[] = idsScelti
+              .map((id) => percorsi.find((p) => p.id === id))
+              .filter((p): p is PercorsoSalvato => !!p)
+              .map((p) => ({ id: p.id, nome: p.nome, tappe: tappeDiPercorso(p) }))
+              .filter((p) => p.tappe.length >= 2); // un percorso con meno di 2 fermate non ha niente da disegnare, lo salto invece di farlo fallire
+            if (percorsiMappa.length === 0) return <p style={{ color: 'var(--mist)' }}>Nessuno dei percorsi scelti ha ancora abbastanza fermate da disegnare.</p>;
+            return <MappaPercorso key={idsScelti.join(',')} percorsi={percorsiMappa} />;
           })()}
         </div>
       ) : (
