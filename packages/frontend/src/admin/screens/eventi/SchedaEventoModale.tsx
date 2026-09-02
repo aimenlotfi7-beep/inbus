@@ -528,6 +528,7 @@ export function SchedaEventoModale({
       };
       tragitti[idxAttuale] = {
         ...attuale,
+        nome: invertiNomeTragitto(attuale.nome),
         fermate: [nuovaPartenza, ...[...intermedie].reverse()],
         arrivoCitta: vecchiaPartenza.citta || undefined,
         arrivoIndirizzo: vecchiaPartenza.indirizzo || undefined,
@@ -536,7 +537,17 @@ export function SchedaEventoModale({
       return { ...f, tragitti };
     });
   }
-  function aggiungiTragittoManuale() {
+  // Se il nome segue la forma "Partenza → Arrivo" (quella usata dai
+  // Percorsi Salvati, e proposta di default quando se ne applica uno),
+  // lo capovolge insieme all'inversione vera — "Varese → Roma" diventa
+  // "Roma → Varese". Un nome scritto a mano senza quella freccia
+  // (es. "Andata mattina") resta invariato — non c'è un ordine
+  // riconoscibile da capovolgere.
+  function invertiNomeTragitto(nome: string): string {
+    const parti = nome.split(' → ');
+    if (parti.length !== 2) return nome;
+    return `${parti[1]} → ${parti[0]}`;
+  }  function aggiungiTragittoManuale() {
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
     setForm((f) => ({ ...f, tragitti: [...(f.tragitti ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, attivo: true, servizioId: servizioIdContestoAttuale(), fermate: [{ citta: '', indirizzo: '' }] }] }));
   }
@@ -982,7 +993,13 @@ export function SchedaEventoModale({
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggleTragittoAperto(idxTragitto)}>
               <span style={{ color: 'var(--mist)', fontSize: 13 }}>{espansa ? '▾' : '▸'}</span>
               <div style={{ flex: 1 }}>
-                <b>{tragitto.nome || 'Tragitto senza nome'}</b>
+                <input
+                  value={tragitto.nome}
+                  onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="Tragitto senza nome"
+                  style={{ background: 'none', border: 'none', padding: 0, margin: 0, fontWeight: 700, fontSize: 'inherit', color: 'inherit', width: '100%', cursor: 'text' }}
+                />
                 {disattivato && <span className="badge attenzione" style={{ marginLeft: 8 }}>Disattivato</span>}
                 {!espansa && (
                   <p className="section-sub" style={{ margin: '2px 0 0' }}>
@@ -1027,22 +1044,26 @@ export function SchedaEventoModale({
 
           {espansa && (
           <>
-          <div className="campo" style={{ marginBottom: 10, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-            <div style={{ flex: 1 }}>
-              <input placeholder="Nome tragitto" value={tragitto.nome} onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)} />
-            </div>
+          <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'flex-end' }}>
             <button
               type="button" className="btn btn-ghost" style={{ fontSize: 12, whiteSpace: 'nowrap' }}
               onClick={() => invertiTragitto(idxTragitto)}
-              title="Scambia partenza e arrivo, gira anche l'ordine delle fermate intermedie"
+              title="Scambia partenza e arrivo, gira anche l'ordine delle fermate intermedie (e il nome, se segue la forma 'A → B')"
             >
               ↔ Inverti
             </button>
           </div>
-          <p className="section-label" style={{ marginBottom: 6 }}>
-            Arrivo{tragitto.arrivoCitta ? <span style={{ color: 'var(--blue)', fontWeight: 400 }}> — {tragitto.arrivoCitta}</span> : ''}
+          <p className="section-label" style={{ marginBottom: 6, fontSize: 15, fontWeight: 700, color: 'var(--pink)' }}>
+            Arrivo
           </p>
           <div className="form-grid" style={{ marginBottom: 10 }}>
+            <label>Città di arrivo
+              <input
+                value={tragitto.arrivoCitta ?? ''}
+                onChange={(e) => aggiornaTragitto(idxTragitto, 'arrivoCitta', e.target.value)}
+                placeholder="es. Roma"
+              />
+            </label>
             <label>Indirizzo di arrivo
               <input
                 value={tragitto.arrivoIndirizzo ?? ''}
@@ -1054,13 +1075,17 @@ export function SchedaEventoModale({
               <OrarioInput value={tragitto.arrivoOrario ?? ''} onChange={(v) => aggiornaTragitto(idxTragitto, 'arrivoOrario', v)} />
             </label>
           </div>
-          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 10 }}>
-            Posti, prezzi e orari delle fermate si impostano da <b>Partenze</b>, una volta che questo tragitto è confermato lì con un bus vero — usano l'arrivo indicato qui sopra come riferimento per calcolarli.
+          <p className="section-label" style={{ marginBottom: 6, display: 'flex', alignItems: 'center' }}>
+            Fermate
+            <InfoTooltip>{mappaTooltip.fermate_orario_intro ?? TOOLTIP_DEFAULT.fermate_orario_intro}</InfoTooltip>
           </p>
 
           <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla.</p>
           {tragitto.fermate.map((f, idxFermata) => (
             <div key={idxFermata} style={{ marginBottom: 6 }}>
+              {idxFermata === 0 && (
+                <p style={{ marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--pink)' }}>Partenza</p>
+              )}
               <div
                 draggable
                 onDragStart={() => onDragStart(idxTragitto, idxFermata)}

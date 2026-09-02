@@ -37,6 +37,7 @@ export const TOOLTIP_DEFAULT: Record<string, string> = {
   biglietto_grafica_intro: 'Grafica del biglietto digitale — facoltativa, se non la imposti il PDF (con QR) usa l\'aspetto di base.',
   fermata_nome_campo: 'es. "Milano Lambrate", non solo "Milano".',
   fermata_link_campo: 'Facoltativo — es. Google Maps, punto di ritrovo.',
+  fermate_orario_intro: 'Posti, prezzi e orari delle fermate si impostano da Partenze, una volta che questo tragitto è confermato lì con un bus vero — usano l\'arrivo indicato qui sopra come riferimento per calcolarli.',
 };
 
 /** Etichette leggibili per la schermata di modifica in Sistema — non
@@ -70,4 +71,5 @@ export const TOOLTIP_ETICHETTA: Record<string, string> = {
   biglietto_grafica_intro: 'Introduzione (tab Biglietto, scheda evento)',
   fermata_nome_campo: 'Nome (sezione Fermate)',
   fermata_link_campo: 'Link (sezione Fermate)',
+  fermate_orario_intro: 'Introduzione (elenco fermate, scheda evento)',
 };
