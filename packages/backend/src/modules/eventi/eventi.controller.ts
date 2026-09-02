@@ -107,11 +107,21 @@ export const eventiController = {
     res.json(await eventiService.riepilogoEconomico(req.params.id));
   },
 
+  async venditePerFermata(req: Request, res: Response) {
+    res.json(await eventiService.venditePerFermata(req.params.tragittoId));
+  },
+
   async allertePartenze(_req: Request, res: Response) {
     res.json({ conteggio: await eventiService.contaAllertePartenze() });
   },
-  async eventiDaConfermare(_req: Request, res: Response) {
-    res.json({ conteggio: await eventiService.contaEventiDaConfermare() });
+  async eventiDaCalcolareOrari(_req: Request, res: Response) {
+    res.json({ conteggio: await eventiService.contaEventiDaCalcolareOrari() });
+  },
+  async eventiDaPrezzare(_req: Request, res: Response) {
+    res.json({ conteggio: await eventiService.contaEventiDaPrezzare() });
+  },
+  async eventiDaCostruireLinee(_req: Request, res: Response) {
+    res.json({ conteggio: await eventiService.contaEventiDaCostruireLinee() });
   },
   async allertePartenzePerEvento(_req: Request, res: Response) {
     res.json(await eventiService.allertePartenzePerEvento());

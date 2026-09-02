@@ -1241,12 +1241,15 @@ export const eventiService = {
     return elenco;
   },
 
-  /** Incassato, costo bus e guadagno per ogni tratta dell'evento —
-   *  l'incassato conta solo le prenotazioni CONFERMATA su quella tratta
-   *  (l'acconto versato per intero, non solo la parte già incassata: è
-   *  il "totale" della prenotazione, coerente con come viene mostrato
-   *  ovunque nel gestionale). Il costo è la somma dei bus registrati su
-   *  quella tratta (un bus copre sempre una tratta sola, come deciso). */
+  /** Incassato, costo bus e guadagno per ogni tratta dell'evento (come
+   *  già faceva) — E ANCHE il dettaglio per singola Linea dentro
+   *  quella tratta (una tratta con più Linee, es. una da Milano e una
+   *  da Reggio Emilia con costi diversi, altrimenti mostrerebbe solo
+   *  un numero aggregato, impossibile capire quale delle due Linee
+   *  guadagna di più). L'incassato di ogni Linea conta solo le
+   *  prenotazioni sulle città che quella Linea copre davvero — un
+   *  bus copre sempre una tratta sola, come deciso, ma una tratta può
+   *  avere più Linee. */
   async riepilogoEconomico(eventoId: string) {
     const evento = await getById(eventoId);
     const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
@@ -1254,22 +1257,41 @@ export const eventiService = {
     if (tragittiIds.length === 0) return [];
 
     const prenotazioniConfermate = await db
-      .select({ tragittoId: prenotazioni.tragittoId, totale: prenotazioni.totale })
+      .select({ tragittoId: prenotazioni.tragittoId, fermataCitta: prenotazioni.fermataCitta, totale: prenotazioni.totale })
       .from(prenotazioni)
       .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')));
 
-    const assegnazioni = tragittiIds.length ? await db.select({ busId: busFisici.id, tragittoId: linee.tragittoId }).from(busFisici)
-      .innerJoin(linee, eq(linee.id, busFisici.lineaId))
-      .where(inArray(linee.tragittoId, tragittiIds)) : [];
-    const busIds = Array.from(new Set(assegnazioni.map((a) => a.busId)));
-    const bus = busIds.length ? await db.select().from(busFisici).where(inArray(busFisici.id, busIds)) : [];
+    const tutteLeLinee = tragittiIds.length ? await db.select().from(linee).where(inArray(linee.tragittoId, tragittiIds)) : [];
+    const lineeIds = tutteLeLinee.map((l) => l.id);
+    const tutteLeFermateDiLinea = lineeIds.length
+      ? await db.select({ lineaId: lineaFermate.lineaId, citta: fermate.citta }).from(lineaFermate)
+        .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
+        .where(inArray(lineaFermate.lineaId, lineeIds))
+      : [];
+    const bus = lineeIds.length ? await db.select().from(busFisici).where(inArray(busFisici.lineaId, lineeIds)) : [];
 
     return tuttiITragitti.map((tragitto) => {
       const incassato = prenotazioniConfermate
         .filter((p) => p.tragittoId === tragitto.id)
         .reduce((s, p) => s + Number(p.totale), 0);
 
-      const busIdsTratta = assegnazioni.filter((a) => a.tragittoId === tragitto.id).map((a) => a.busId);
+      const lineeTratta = tutteLeLinee.filter((l) => l.tragittoId === tragitto.id);
+      const perLinea = lineeTratta.map((l) => {
+        const cittaLinea = new Set(tutteLeFermateDiLinea.filter((f) => f.lineaId === l.id).map((f) => f.citta));
+        const incassatoLinea = prenotazioniConfermate
+          .filter((p) => p.tragittoId === tragitto.id && cittaLinea.has(p.fermataCitta))
+          .reduce((s, p) => s + Number(p.totale), 0);
+        const busLinea = bus.filter((b) => b.lineaId === l.id);
+        const costoCensitoLinea = busLinea.some((b) => b.costo !== null);
+        const costoLinea = busLinea.reduce((s, b) => s + (b.costo ? Number(b.costo) : 0), 0);
+        return {
+          lineaId: l.id, lineaNome: l.nome,
+          incassato: incassatoLinea, costo: costoLinea, costoCensito: costoCensitoLinea,
+          guadagno: incassatoLinea - costoLinea,
+        };
+      });
+
+      const busIdsTratta = bus.filter((b) => lineeTratta.some((l) => l.id === b.lineaId)).map((b) => b.id);
       const busTratta = bus.filter((b) => busIdsTratta.includes(b.id));
       const costoCensito = busTratta.some((b) => b.costo !== null);
       const costo = busTratta.reduce((s, b) => s + (b.costo ? Number(b.costo) : 0), 0);
@@ -1281,8 +1303,58 @@ export const eventiService = {
         costo,
         costoCensito, // false = nessun bus ha un costo compilato: il guadagno non è affidabile, va segnalato
         guadagno: incassato - costo,
+        perLinea,
       };
     });
+  },
+
+  /** Prenotazioni confermate per fermata di UN tragitto specifico — il
+   *  totale attuale (per capire dove si sono già accumulate abbastanza
+   *  persone) e l'andamento giorno per giorno (cumulativo, non il
+   *  delta del giorno — serve a vedere il RITMO con cui arrivano, non
+   *  solo il totale di adesso). Usato dal Cruscotto Vendite (dentro
+   *  "Da Confermare") per decidere se/come dividere un tragitto in
+   *  più Linee. */
+  async venditePerFermata(tragittoId: string) {
+    const [tragitto] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!tragitto) throw new NonTrovato('Tragitto');
+
+    const righe = await db.select({
+      citta: prenotazioni.fermataCitta,
+      passeggeri: prenotazioni.passeggeri,
+      creataIl: prenotazioni.creataIl,
+    }).from(prenotazioni)
+      .where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA')))
+      .orderBy(prenotazioni.creataIl);
+
+    const perFermata = new Map<string, number>();
+    for (const r of righe) perFermata.set(r.citta, (perFermata.get(r.citta) ?? 0) + r.passeggeri);
+
+    // Andamento cumulativo per giorno E per città — una riga per ogni
+    // combinazione (giorno, città) con il totale accumulato FINO A
+    // FINE di quel giorno (non una riga per ogni singola prenotazione,
+    // che con più prenotazioni lo stesso giorno darebbe righe
+    // ridondanti) — il frontend disegna una linea per città usando
+    // queste righe, senza dover ricalcolare nulla.
+    const cumulativoPerCitta = new Map<string, number>();
+    const cumulativoPerGiornoECitta = new Map<string, number>(); // chiave: "giorno::citta"
+    for (const r of righe) {
+      const giorno = r.creataIl.toISOString().slice(0, 10); // YYYY-MM-DD
+      const nuovoCumulativo = (cumulativoPerCitta.get(r.citta) ?? 0) + r.passeggeri;
+      cumulativoPerCitta.set(r.citta, nuovoCumulativo);
+      cumulativoPerGiornoECitta.set(`${giorno}::${r.citta}`, nuovoCumulativo);
+    }
+    const andamento = [...cumulativoPerGiornoECitta.entries()]
+      .map(([chiave, cumulativo]) => {
+        const [data, citta] = chiave.split('::');
+        return { data, citta, cumulativo };
+      })
+      .sort((a, b) => a.data.localeCompare(b.data));
+
+    return {
+      perFermata: [...perFermata.entries()].map(([citta, confermati]) => ({ citta, confermati })),
+      andamento,
+    };
   },
 
   /** Conta quante tratte, in tutti gli eventi, NON sono coperte — cioè
@@ -1347,13 +1419,57 @@ export const eventiService = {
    *  confermare" — nessun bus vero registrato, quindi non ancora in
    *  vendita. Badge dedicato nel menu di Partenze, per non doverli
    *  scoprire aprendo ogni evento uno per uno. */
-  async contaEventiDaConfermare() {
+  /** Eventi con almeno un tragitto senza ancora nessuna fermata con
+   *  orario impostato — stesso criterio già usato da "fermateCompilate"
+   *  qui sotto (almeno una fermata con orario = fatto). Conteggio per
+   *  la tappa di menu "Orari". */
+  async contaEventiDaCalcolareOrari() {
+    const righeTragitti = await db
+      .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id })
+      .from(tragitti)
+      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(and(eq(tragitti.attivo, true), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
+    if (righeTragitti.length === 0) return 0;
+
+    const tragittiIds = righeTragitti.map((r) => r.tragittoId);
+    const fermateConOrario = await db.select({ tragittoId: fermate.tragittoId, orario: fermate.orario })
+      .from(fermate).where(inArray(fermate.tragittoId, tragittiIds));
+    const conOrario = new Set(fermateConOrario.filter((f) => f.orario).map((f) => f.tragittoId));
+    const senzaOrario = righeTragitti.filter((r) => !conOrario.has(r.tragittoId));
+    return new Set(senzaOrario.map((r) => r.eventoId)).size;
+  },
+
+  // Nome corretto: questi tragitti hanno stato interno "DA_CONFERMARE"
+  // (prima ancora di essere prezzati) - da non confondere con la tappa
+  // di menu "Da Confermare" (quella per costruire le Linee, tragitti
+  // GIA' prezzati) - stessa parola, due concetti diversi. Questo
+  // conteggio appartiene alla tappa "Prezzi".
+  async contaEventiDaPrezzare() {
     const righe = await db
       .select({ eventoId: tragitti.eventoId })
       .from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
       .where(and(eq(tragitti.stato, 'DA_CONFERMARE'), eq(tragitti.attivo, true), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
     return new Set(righe.map((r) => r.eventoId)).size;
+  },
+
+  /** Eventi con almeno un tragitto già prezzato ma senza ancora
+   *  nessuna Linea costruita — questo, e non lo stato interno
+   *  "DA_CONFERMARE" (un nome simile ma un concetto diverso), è il
+   *  conteggio giusto per la tappa di menu "Da Confermare". */
+  async contaEventiDaCostruireLinee() {
+    const righeTragitti = await db
+      .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id })
+      .from(tragitti)
+      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(and(eq(tragitti.stato, 'PREZZATO'), eq(tragitti.attivo, true), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
+    if (righeTragitti.length === 0) return 0;
+
+    const tragittiIds = righeTragitti.map((r) => r.tragittoId);
+    const lineeEsistenti = await db.select({ tragittoId: linee.tragittoId }).from(linee).where(inArray(linee.tragittoId, tragittiIds));
+    const conLinea = new Set(lineeEsistenti.map((l) => l.tragittoId));
+    const senzaLinea = righeTragitti.filter((r) => !conLinea.has(r.tragittoId));
+    return new Set(senzaLinea.map((r) => r.eventoId)).size;
   },
 
   async contaAllertePartenze() {

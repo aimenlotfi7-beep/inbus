@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea } from '../../../api/eventi';
+import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea, type VenditePerFermata } from '../../../api/eventi';
+import { GraficoLinee, type SerieGrafico } from '../../shared/GraficoLinee';
 import type { Evento } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { impostazioniApi } from '../../../api/impostazioni';
@@ -86,6 +87,17 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   // usati finora se non sono ancora stati impostati esplicitamente
   // (così non cambia nulla per chi non li ha mai toccati).
   const [sogliaOccupazionePercento, setSogliaOccupazionePercento] = useState(50);
+  const [postiPerBusGlobale, setPostiPerBusGlobale] = useState(50);
+  // Dati Cruscotto Vendite (Fase 4) — caricati per tragitto solo
+  // quando serve davvero (apertura effettiva della tab "Da
+  // Confermare"), non per tutti i tragitti visibili in ogni istante.
+  const [venditeMap, setVenditeMap] = useState<Map<string, VenditePerFermata>>(new Map());
+  // Simulatore break-even (dentro il Cruscotto Vendite) — quali
+  // fermate ipotizzo di coprire con la Linea candidata, e quanto
+  // costerebbe: entrambi per tragitto, dato che più tragitti possono
+  // essere aperti ed espansi insieme nella stessa pagina.
+  const [simulatoreFermateMap, setSimulatoreFermateMap] = useState<Map<string, Set<string>>>(new Map());
+  const [simulatoreCostoMap, setSimulatoreCostoMap] = useState<Map<string, number | undefined>>(new Map());
   const [prezziCalcolatiMap, setPrezziCalcolatiMap] = useState<Map<string, { fermataId: string; citta: string; distanza: number; prezzo: number }[]>>(new Map());
   const [calcolandoPreventivoSet, setCalcolandoPreventivoSet] = useState<Set<string>>(new Set());
   const [statoCalcoloPreventivoMap, setStatoCalcoloPreventivoMap] = useState<Map<string, string>>(new Map());
@@ -103,6 +115,10 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   function caricaLineeSeServe(tragittoId: string) {
     if (lineePerTragitto.has(tragittoId)) return;
     eventiApi.listaLinee(tragittoId).then((l) => setLineePerTragitto((prev) => new Map(prev).set(tragittoId, l))).catch(() => {});
+  }
+  function caricaVenditeSeServe(tragittoId: string) {
+    if (venditeMap.has(tragittoId)) return;
+    eventiApi.venditePerFermata(tragittoId).then((v) => setVenditeMap((prev) => new Map(prev).set(tragittoId, v))).catch(() => {});
   }
   // Se l'evento ha più servizi, questa sezione si comporta come se
   // ognuno fosse un evento a parte: una tab per servizio (più una per i
@@ -158,30 +174,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
       const riga = righe.find((r) => r.chiave === 'soglia_occupazione_pareggio');
       const numero = riga ? Number(riga.valore) : NaN;
       if (Number.isFinite(numero) && numero > 0 && numero <= 100) setSogliaOccupazionePercento(numero);
+      const rigaPosti = righe.find((r) => r.chiave === 'posti_per_bus');
+      const numeroPosti = rigaPosti ? Number(rigaPosti.valore) : NaN;
+      if (Number.isFinite(numeroPosti) && numeroPosti > 0) setPostiPerBusGlobale(numeroPosti);
     }).catch(() => {}); // se non risponde, resta il default — meglio che bloccare il calcolo
   }, [eventoId]);
 
   // Atterraggio diretto da una card di Partenze — una volta sola,
   // appena i dati sono pronti (non ad ogni ricarica successiva,
-  // "Da confermare" naviga SEMPRE via alla pagina Linee — non mostra
-  // mai nulla qui dentro. Il tragitto di destinazione è già noto subito
-  // dal contesto (contestoPartenze.tragittiIds[0]), senza bisogno di
-  // aspettare calcolaBus/listaBus/riepilogoEconomico/getById (le 4
-  // chiamate di "ricarica" qui sotto, compreso un getById RIPETUTO —
-  // chi ha aperto questa scheda l'aveva già fatto): aspettarle tutte
-  // solo per poi reindirizzare comunque è il "lag" percepito aprendo
-  // questa sezione. Un effetto a parte, separato da quello sotto (che
-  // resta per gli altri contesti, dove servono davvero i dati) — parte
-  // subito al montaggio, prima ancora che "ricarica" finisca.
-  const reindirizzoLineeFattoRef = useRef(false);
-  useEffect(() => {
-    if (reindirizzoLineeFattoRef.current || contestoPartenze?.azione !== 'linee') return;
-    const primoTragittoId = contestoPartenze.tragittiIds[0];
-    if (!primoTragittoId) return;
-    reindirizzoLineeFattoRef.current = true;
-    apriPaginaLinee(primoTragittoId);
-  }, [contestoPartenze]);
-
   // altrimenti riaprirebbe il pannello anche dopo un salvataggio).
   // Espande TUTTI i tragitti del contesto (potrebbero essere più di
   // uno, se l'evento ha più servizi/percorsi nello stesso stato) e
@@ -201,10 +201,17 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
     const tuttiITragitti = [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)];
     const primoTragitto = tuttiITragitti.find((t) => t.id === primoTragittoId);
     if (primoTragitto) setServizioAttivo(primoTragitto.servizioId ?? 'liberi');
-    if (contestoPartenze.azione === 'preventivo') apriPreventivo(primoTragittoId);
+    // Per TUTTI i tragitti del contesto, non solo il primo — un
+    // evento a più servizi/tragitti che arrivano qui insieme di solito
+    // ne ha bisogno per ognuno, non solo per uno a caso (prima si
+    // apriva solo il primo dell'elenco, lasciando gli altri chiusi e
+    // sembrando "mancanti" a chi si aspettava di vederli tutti).
+    if (contestoPartenze.azione === 'preventivo') for (const id of contestoPartenze.tragittiIds) apriPreventivo(id);
     if (contestoPartenze.azione === 'fermate') {
-      const primoCalcolo = calcolo.find((c) => c.tragittoId === primoTragittoId);
-      if (primoCalcolo) apriModificaOperativa(primoCalcolo);
+      for (const id of contestoPartenze.tragittiIds) {
+        const calcoloTragitto = calcolo.find((c) => c.tragittoId === id);
+        if (calcoloTragitto) apriModificaOperativa(calcoloTragitto);
+      }
     }
   }, [contestoPartenze, eventoCompleto, calcolo]);
 
@@ -821,7 +828,103 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                   : <p className="testo-intro">Nessun preventivo ancora registrato.</p>}
               </div>
             );
-            if (contestoPartenze?.tabOrigine === 'da-confermare') return null;
+            if (contestoPartenze?.tabOrigine === 'da-confermare') {
+              caricaVenditeSeServe(tragitto.tragittoId);
+              const vendite = venditeMap.get(tragitto.tragittoId);
+              const fermateSelezionate = simulatoreFermateMap.get(tragitto.tragittoId) ?? new Set<string>();
+              const costoSimulato = simulatoreCostoMap.get(tragitto.tragittoId);
+              const postiDiPareggio = Math.round(postiPerBusGlobale * (sogliaOccupazionePercento / 100));
+              const fermateVere = tragittoVero?.fermate.filter((f) => f.attivo) ?? [];
+              const fermateVereSelezionate = fermateVere.filter((f) => fermateSelezionate.has(f.id));
+              const prenotazioniSelezionate = fermateVereSelezionate.reduce((tot, f) => tot + (vendite?.perFermata.find((v) => v.citta === f.citta)?.confermati ?? 0), 0);
+              const incassoAtteso = fermateVereSelezionate.reduce((tot, f) => {
+                const confermatiFermata = vendite?.perFermata.find((v) => v.citta === f.citta)?.confermati ?? 0;
+                return tot + confermatiFermata * (f.prezzo ? Number(f.prezzo) : 0);
+              }, 0);
+              const margineAtteso = costoSimulato != null ? incassoAtteso - costoSimulato : null;
+              const sopraSoglia = prenotazioniSelezionate >= postiDiPareggio;
+              const serieGrafico: SerieGrafico[] = [...new Set((vendite?.andamento ?? []).map((a) => a.citta))].map((citta) => ({
+                nome: citta,
+                punti: (vendite?.andamento ?? []).filter((a) => a.citta === citta).map((a) => ({ x: a.data, y: a.cumulativo })),
+              }));
+
+              return (
+                <div style={{ marginTop: 14 }}>
+                  <p className="section-label" style={{ marginBottom: 8 }}>Cruscotto Vendite</p>
+                  {!vendite ? (
+                    <p style={{ color: 'var(--mist)' }}>Carico le prenotazioni...</p>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 6 }}>Prenotazioni confermate per fermata</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginBottom: 14 }}>
+                        {vendite.perFermata.length === 0
+                          ? <p className="testo-intro">Nessuna prenotazione confermata ancora.</p>
+                          : vendite.perFermata.map((v) => (
+                            <span key={v.citta} style={{ fontSize: 13 }}>{v.citta}: <strong>{v.confermati}</strong></span>
+                          ))}
+                      </div>
+
+                      {vendite.andamento.length > 0 && (
+                        <div style={{ marginBottom: 18 }}>
+                          <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 6 }}>Andamento nel tempo (cumulativo, per capire il ritmo)</p>
+                          <GraficoLinee serie={serieGrafico} />
+                        </div>
+                      )}
+
+                      <p className="section-label" style={{ marginBottom: 8 }}>Simulatore — conviene dividere?</p>
+                      {!vedeEconomia ? (
+                        <p className="testo-intro">Non hai il permesso per vedere costi e margini previsti.</p>
+                      ) : (
+                      <>
+                      <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 10 }}>
+                        Scegli quali fermate coprirebbe una Linea candidata, scrivi un costo ipotetico — ti mostro se le prenotazioni di adesso bastano già a coprire la soglia di pareggio.
+                      </p>
+                      {fermateVere.length === 0 ? (
+                        <p className="testo-intro">Nessuna fermata attiva su questo tragitto.</p>
+                      ) : (
+                        <div style={{ marginBottom: 10 }}>
+                          {fermateVere.map((f) => (
+                            <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 4, cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={fermateSelezionate.has(f.id)}
+                                onChange={(e) => setSimulatoreFermateMap((prev) => {
+                                  const nuovo = new Map(prev);
+                                  const set = new Set(nuovo.get(tragitto.tragittoId) ?? []);
+                                  if (e.target.checked) set.add(f.id); else set.delete(f.id);
+                                  nuovo.set(tragitto.tragittoId, set);
+                                  return nuovo;
+                                })}
+                              />
+                              {f.citta} <span style={{ color: 'var(--mist)' }}>({vendite.perFermata.find((v) => v.citta === f.citta)?.confermati ?? 0} confermati)</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      <div className="campo" style={{ maxWidth: 220, marginBottom: 10 }}>
+                        <label>Costo ipotetico del bus (€)</label>
+                        <CampoNumero valuta value={costoSimulato} onChange={(v) => setSimulatoreCostoMap((prev) => new Map(prev).set(tragitto.tragittoId, v))} />
+                      </div>
+                      {fermateSelezionate.size > 0 && (
+                        <div className="section-card" style={{ fontSize: 13 }}>
+                          <p style={{ marginBottom: 4 }}>Posti di pareggio: <strong>{postiDiPareggio}</strong> <span style={{ color: 'var(--mist)' }}>(posti bus {postiPerBusGlobale} × soglia {sogliaOccupazionePercento}%)</span></p>
+                          <p style={{ marginBottom: 4 }}>
+                            Prenotazioni attuali su queste fermate: <strong style={{ color: sopraSoglia ? '#5be0a0' : 'var(--pink)' }}>{prenotazioniSelezionate}</strong>
+                            {' — '}{sopraSoglia ? 'sopra la soglia di pareggio' : 'ancora sotto la soglia di pareggio'}
+                          </p>
+                          <p style={{ marginBottom: 4 }}>Incasso atteso da queste fermate: <strong>€{incassoAtteso.toFixed(2)}</strong></p>
+                          {margineAtteso !== null && (
+                            <p>Margine previsto: <strong style={{ color: margineAtteso >= 0 ? '#5be0a0' : 'var(--pink)' }}>€{margineAtteso.toFixed(2)}</strong></p>
+                          )}
+                        </div>
+                      )}
+                      </>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            }
 
             // Il riepilogo a righe (Fermate/Preventivo/Linee/Costo) resta
             // solo per "Confermato"/"Passate" (o senza contesto, caso di
@@ -857,7 +960,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                   <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }} onClick={() => apriPaginaLinee(tragitto.tragittoId)}>Modifica</button>
                 </div>
                 {vedeEconomia && dati && (
-                  <div style={{ ...rigaStile, borderBottom: 'none' }}>
+                  <div style={{ ...rigaStile, borderBottom: dati.perLinea.length > 1 ? '1px solid var(--line)' : 'none' }}>
                     <div>
                       <strong style={{ fontSize: 13.5 }}>Costo</strong>{' '}
                       <span style={{ color: '#5be0a0', fontSize: 13 }}>· Incassato €{dati.incassato.toFixed(2)}</span>
@@ -865,6 +968,21 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                     </div>
                   </div>
                 )}
+                {/* Dettaglio per singola Linea — solo con più di una, con
+                    una sola il totale qui sopra è già la stessa cosa,
+                    ripeterlo sarebbe ridondante. Serve a capire QUALE
+                    Linea guadagna di più quando i costi sono diversi
+                    (es. un bus da Milano e uno da Reggio Emilia con
+                    fornitori diversi). */}
+                {vedeEconomia && dati && dati.perLinea.length > 1 && dati.perLinea.map((pl, idx) => (
+                  <div key={pl.lineaId} style={{ ...rigaStile, paddingLeft: 14, borderBottom: idx === dati.perLinea.length - 1 ? 'none' : '1px solid var(--line)' }}>
+                    <div>
+                      <span style={{ fontSize: 12.5, color: 'var(--mist)' }}>{pl.lineaNome}</span>{' '}
+                      <span style={{ color: '#5be0a0', fontSize: 12.5 }}>· Incassato €{pl.incassato.toFixed(2)}</span>
+                      {pl.costoCensito && <span style={{ color: pl.guadagno >= 0 ? '#5be0a0' : 'var(--pink)', fontSize: 12.5 }}> · Guadagno €{pl.guadagno.toFixed(2)}</span>}
+                    </div>
+                  </div>
+                ))}
               </div>
             );
           })()}

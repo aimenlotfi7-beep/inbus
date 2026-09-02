@@ -76,7 +76,12 @@ export interface BusDiLinea {
 }
 export interface Linea { id: string; nome: string; fermate: FermataLinea[]; bus: BusDiLinea[]; }
 export interface PasseggeroBus { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string; }
-export interface RiepilogoEconomicoTratta { tragittoId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; }
+export interface RiepilogoEconomicoLinea { lineaId: string; lineaNome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; }
+export interface RiepilogoEconomicoTratta { tragittoId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; perLinea: RiepilogoEconomicoLinea[]; }
+export interface VenditePerFermata {
+  perFermata: { citta: string; confermati: number }[];
+  andamento: { data: string; citta: string; cumulativo: number }[];
+}
 
 export const eventiApi = {
   list: (filtri?: { citta?: string; genere?: string; ricerca?: string; soloFuturi?: boolean; soloVisibili?: boolean }) => {
@@ -111,8 +116,11 @@ export const eventiApi = {
   rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
   listaPasseggeriBus: (id: string, busId: string) => api.get<PasseggeroBus[]>(`/api/eventi/${id}/bus/${busId}/passeggeri`),
   riepilogoEconomico: (id: string) => api.get<RiepilogoEconomicoTratta[]>(`/api/eventi/${id}/riepilogo-economico`),
+  venditePerFermata: (tragittoId: string) => api.get<VenditePerFermata>(`/api/eventi/tragitti/${tragittoId}/vendite`),
   allertePartenze: () => api.get<{ conteggio: number }>('/api/eventi/allerte-partenze'),
-  eventiDaConfermare: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-confermare'),
+  eventiDaCalcolareOrari: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-calcolare-orari'),
+  eventiDaPrezzare: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-prezzare'),
+  eventiDaCostruireLinee: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-costruire-linee'),
   allertePartenzePerEvento: () => api.get<Record<string, number>>('/api/eventi/allerte-partenze-per-evento'),
   elencoPartenze: () => api.get<Array<{
     tragittoId: string; tragittoNome: string;

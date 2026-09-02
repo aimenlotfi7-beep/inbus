@@ -12,7 +12,9 @@ eventiRouter.get('/', valida(listaEventiQuerySchema, 'query'), asyncHandler(even
 // IMPORTANTE: va registrata PRIMA di GET '/:id', altrimenti Express la
 // interpreterebbe come una richiesta per un evento con id "allerte-partenze".
 eventiRouter.get('/allerte-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenze));
-eventiRouter.get('/eventi-da-confermare', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiDaConfermare));
+eventiRouter.get('/eventi-da-calcolare-orari', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiDaCalcolareOrari));
+eventiRouter.get('/eventi-da-prezzare', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiDaPrezzare));
+eventiRouter.get('/eventi-da-costruire-linee', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiDaCostruireLinee));
 eventiRouter.get('/allerte-partenze-per-evento', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenzePerEvento));
 eventiRouter.get('/elenco-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.elencoPartenze));
 eventiRouter.get('/statistiche-per-evento', richiedeAuth, richiedePermesso('eventi.visualizza'), asyncHandler(eventiController.statistichePerEvento));
@@ -59,6 +61,7 @@ eventiRouter.post('/linee/:lineaId/bus', richiedeAuth, richiedePermesso('eventi.
 eventiRouter.put('/:id/linee/:lineaId/percorso', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaPercorsoLineaSchema), asyncHandler(eventiController.aggiornaPercorsoLinea));
 eventiRouter.put('/linee/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaBusDiLineaSchema), asyncHandler(eventiController.aggiornaBusDiLinea));
 eventiRouter.get('/tragitti/:tragittoId/linee', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaLinee));
+eventiRouter.get('/tragitti/:tragittoId/vendite', richiedeAuth, richiedePermesso('eventi.economia'), asyncHandler(eventiController.venditePerFermata));
 eventiRouter.post('/linee/:lineaId/versa', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.versaLinea));
 eventiRouter.put('/tragitti/:tragittoId/operativo', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaTragittoOperativoSchema), asyncHandler(eventiController.aggiornaTragittoOperativo));
 eventiRouter.put('/tragitti/:tragittoId/preventivo', richiedeAuth, richiedePermesso('eventi.crea'), valida(registraPreventivoSchema), asyncHandler(eventiController.registraPreventivo));

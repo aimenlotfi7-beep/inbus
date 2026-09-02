@@ -103,19 +103,26 @@ export function AdminLayout({
   // funziona nulla del layout mobile in generale.
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
   const [allertePartenze, setAllertePartenze] = useState(0);
-  const [eventiDaConfermare, setEventiDaConfermare] = useState(0);
+  const [eventiDaCalcolareOrari, setEventiDaCalcolareOrari] = useState(0);
+  const [eventiDaPrezzare, setEventiDaPrezzare] = useState(0);
+  const [eventiDaCostruireLinee, setEventiDaCostruireLinee] = useState(0);
   const [inAttesa, setInAttesa] = useState(0);
   const [rimborsiInAttesa, setRimborsiInAttesa] = useState(0);
 
-  // Notifica sulla voce "Partenze": quante tratte, in tutti gli eventi,
-  // hanno più passeggeri confermati dei posti previsti, più quanti
-  // eventi hanno ancora almeno un tragitto "da confermare" (nessun bus
-  // vero registrato — non possono nemmeno andare in vendita finché non
-  // lo si fa). Solo per chi ha il permesso di vedere quella sezione.
+  // Notifiche su ogni tappa di Partenze dove c'è davvero qualcosa da
+  // lavorare — "Orari" quanti eventi non hanno ancora nessun orario
+  // impostato, "Prezzi" quanti non sono ancora prezzati, "Da
+  // Confermare" quanti sono prezzati ma senza ancora una Linea,
+  // "Confermato" le tratte con più passeggeri confermati dei posti
+  // previsti. "Passate" non ne ha una — è solo archivio, niente da
+  // lavorare lì per definizione. Solo per chi ha il permesso di vedere
+  // quella sezione.
   useEffect(() => {
     if (!haPermesso(sessione, 'eventi.partenze')) return;
     eventiApi.allertePartenze().then((r) => setAllertePartenze(r.conteggio)).catch(() => {});
-    eventiApi.eventiDaConfermare().then((r) => setEventiDaConfermare(r.conteggio)).catch(() => {});
+    eventiApi.eventiDaCalcolareOrari().then((r) => setEventiDaCalcolareOrari(r.conteggio)).catch(() => {});
+    eventiApi.eventiDaPrezzare().then((r) => setEventiDaPrezzare(r.conteggio)).catch(() => {});
+    eventiApi.eventiDaCostruireLinee().then((r) => setEventiDaCostruireLinee(r.conteggio)).catch(() => {});
     listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
   }, [sessione]);
 
@@ -139,7 +146,9 @@ export function AdminLayout({
   // anche quando il gruppo è chiuso a tendina su mobile — altrimenti
   // una notifica dentro un gruppo chiuso passerebbe inosservata).
   function notificaVoce(id: string): number {
-    if (id === 'partenze-da-confermare') return eventiDaConfermare;
+    if (id === 'partenze-orari') return eventiDaCalcolareOrari;
+    if (id === 'partenze-prezzi') return eventiDaPrezzare;
+    if (id === 'partenze-da-confermare') return eventiDaCostruireLinee;
     if (id === 'partenze-confermato') return allertePartenze;
     if (id === 'lista-attesa') return inAttesa;
     if (id === 'rimborsi') return rimborsiInAttesa;
@@ -230,7 +239,9 @@ export function AdminLayout({
                       <span
                         className="side-badge"
                         title={
-                          voce.id === 'partenze-da-confermare' ? `${eventiDaConfermare} evento/i con almeno un tragitto da confermare`
+                          voce.id === 'partenze-orari' ? `${eventiDaCalcolareOrari} evento/i senza ancora nessun orario impostato`
+                            : voce.id === 'partenze-prezzi' ? `${eventiDaPrezzare} evento/i con almeno un tragitto non ancora prezzato`
+                            : voce.id === 'partenze-da-confermare' ? `${eventiDaCostruireLinee} evento/i con almeno un tragitto prezzato ma senza ancora una Linea`
                             : voce.id === 'partenze-confermato' ? `${allertePartenze} tratta/e con posti superati`
                             : voce.id === 'lista-attesa' ? `${inAttesa} iscrizione/i in attesa di promozione`
                             : voce.id === 'rimborsi' ? `${rimborsiInAttesa} richiesta/e di rimborso da gestire`
