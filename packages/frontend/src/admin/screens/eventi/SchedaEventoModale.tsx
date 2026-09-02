@@ -1084,7 +1084,7 @@ export function SchedaEventoModale({
           {tragitto.fermate.map((f, idxFermata) => (
             <div key={idxFermata} style={{ marginBottom: 6 }}>
               {idxFermata === 0 && (
-                <p style={{ marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--pink)' }}>Partenza</p>
+                <p style={{ marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--green)' }}>Partenza</p>
               )}
               <div
                 draggable
