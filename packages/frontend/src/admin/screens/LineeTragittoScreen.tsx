@@ -143,7 +143,7 @@ export function LineeTragittoScreen() {
       fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo ?? undefined,
       orario: f.orario ?? undefined, orarioRitorno: f.orarioRitorno ?? undefined, indirizzoRitorno: f.indirizzoRitorno ?? undefined,
       prezzo: f.prezzo ? Number(f.prezzo) : undefined, postiMax: f.postiMax ?? undefined,
-      tipo: f.tipo, sogliaMinima: f.sogliaMinima ?? undefined,
+      sogliaMinima: f.sogliaMinima ?? undefined,
       attivo: f.id === fermataId ? !f.attivo : f.attivo,
     }));
     try {

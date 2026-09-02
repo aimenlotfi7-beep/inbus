@@ -18,11 +18,10 @@ const fermataSchema = z.object({
   // Limite posti facoltativo per questa singola fermata — se assente,
   // la fermata condivide i posti di tutto il bus (come prima).
   postiMax: z.number().int().positive().optional(),
-  // Partenza/Passaggio + soglia minima (solo se Partenza) + disattivabile
+  // Soglia minima (facoltativa su OGNI fermata) + disattivabile
   // singolarmente — le fermate vengono cancellate e ricreate a ogni
   // salvataggio (sia da Eventi che da Partenze): questi campi DEVONO
   // essere qui, altrimenti andrebbero persi ogni volta.
-  tipo: z.enum(['PARTENZA', 'PASSAGGIO']).default('PASSAGGIO'),
   sogliaMinima: z.number().int().positive().nullable().optional(),
   attivo: z.boolean().default(true),
 });

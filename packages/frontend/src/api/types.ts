@@ -12,7 +12,6 @@ export interface Fermata {
   prezzo: string | null;
   postiMax: number | null;
   postiPrenotati: number;
-  tipo: 'PARTENZA' | 'PASSAGGIO';
   sogliaMinima: number | null;
   attivo: boolean;
 }
@@ -87,7 +86,6 @@ export interface OpzionePartenza {
   orarioRitorno: string | null;
   indirizzoRitorno: string | null;
   prezzoEffettivo: number;
-  tipoPartenza: boolean;
   sogliaMinima: number | null;
   partecipantiAttuali: number | null;
 }

@@ -17,7 +17,7 @@ import {
 } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
-import { leggiPostiPerBus, leggiSogliaMinimaPartenza } from '../impostazioni/impostazioni.routes.js';
+import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoSchema } from './eventi.dto.js';
 import { rilevaVariazioni, generaComunicazioniVariazione } from '../variazioni/variazioni.service.js';
@@ -214,7 +214,6 @@ async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction
         indirizzoRitorno: f.indirizzoRitorno,
         postiMax: f.postiMax,
         prezzo: f.prezzo?.toFixed(2),
-        tipo: f.tipo,
         sogliaMinima: f.sogliaMinima,
         attivo: f.attivo,
       }))
@@ -300,7 +299,6 @@ async function sincronizzaTuttiITragitti(
             indirizzoRitorno: f.indirizzoRitorno,
             postiMax: f.postiMax,
             prezzo: f.prezzo?.toFixed(2),
-            tipo: f.tipo,
             sogliaMinima: f.sogliaMinima,
             attivo: f.attivo,
           }))
@@ -645,23 +643,26 @@ export const eventiService = {
       // conferme prima di essere garantita (vedi le Linee, ancora da
       // costruire — questo è il dato che il cliente deve poter vedere
       // già da ora, indipendentemente da quando arriva quella parte).
-      tipoPartenza: boolean;
       sogliaMinima: number | null;
       partecipantiAttuali: number | null;
     }> = [];
 
-    // Una sola query per TUTTE le fermate "Partenza" di tutti i
-    // tragitti mostrati — prima girava dentro il ciclo, una query per
-    // ogni fermata (N+1, lento se un evento ha molte fermate).
-    const fermatePartenza = tragittiDaMostrare.flatMap((t) => t.fermate.filter((f) => f.tipo === 'PARTENZA').map((f) => ({ tragittoId: t.id, citta: f.citta })));
+    // Una sola query per TUTTE le fermate con una soglia minima
+    // impostata, di tutti i tragitti mostrati — prima girava dentro il
+    // ciclo, una query per ogni fermata (N+1, lento se un evento ha
+    // molte fermate). Facoltativa su OGNI fermata ora (prima solo su
+    // quelle marcate "Partenza", un concetto tolto insieme al campo
+    // "tipo" — la sola presenza di una soglia scritta basta a dire che
+    // va controllata).
+    const fermateConSoglia = tragittiDaMostrare.flatMap((t) => t.fermate.filter((f) => f.sogliaMinima != null).map((f) => ({ tragittoId: t.id, citta: f.citta })));
     const contiPartenza = new Map<string, number>(); // chiave: `${tragittoId}::${citta}`
-    if (fermatePartenza.length > 0) {
+    if (fermateConSoglia.length > 0) {
       const righe = await db.select({
         tragittoId: prenotazioni.tragittoId,
         citta: prenotazioni.fermataCitta,
         tot: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)`,
       }).from(prenotazioni)
-        .where(and(inArray(prenotazioni.tragittoId, [...new Set(fermatePartenza.map((f) => f.tragittoId))]), eq(prenotazioni.stato, 'CONFERMATA')))
+        .where(and(inArray(prenotazioni.tragittoId, [...new Set(fermateConSoglia.map((f) => f.tragittoId))]), eq(prenotazioni.stato, 'CONFERMATA')))
         .groupBy(prenotazioni.tragittoId, prenotazioni.fermataCitta);
       for (const r of righe) contiPartenza.set(`${r.tragittoId}::${r.citta}`, Number(r.tot));
     }
@@ -683,7 +684,7 @@ export const eventiService = {
         const postiDisponibiliFermata = f.postiMax != null
           ? Math.min(tragitto.postiDisponibili, Math.max(0, f.postiMax - f.postiPrenotati))
           : tragitto.postiDisponibili;
-        const partecipantiAttuali = f.tipo === 'PARTENZA' ? (contiPartenza.get(`${tragitto.id}::${f.citta}`) ?? 0) : null;
+        const partecipantiAttuali = f.sogliaMinima != null ? (contiPartenza.get(`${tragitto.id}::${f.citta}`) ?? 0) : null;
         opzioni.push({
           tragittoId: tragitto.id,
           postiDisponibili: postiDisponibiliFermata,
@@ -694,8 +695,7 @@ export const eventiService = {
           orarioRitorno: f.orarioRitorno,
           indirizzoRitorno: f.indirizzoRitorno,
           prezzoEffettivo,
-          tipoPartenza: f.tipo === 'PARTENZA',
-          sogliaMinima: f.tipo === 'PARTENZA' ? (f.sogliaMinima ?? await leggiSogliaMinimaPartenza()) : null,
+          sogliaMinima: f.sogliaMinima,
           partecipantiAttuali,
         });
       }
@@ -857,7 +857,7 @@ export const eventiService = {
             citta: f.citta, indirizzo: f.indirizzo,
             orario: f.orario, orarioRitorno: f.orarioRitorno, indirizzoRitorno: f.indirizzoRitorno,
             postiMax: f.postiMax, prezzo: f.prezzo?.toFixed(2),
-            tipo: f.tipo, sogliaMinima: f.sogliaMinima, attivo: f.attivo,
+            sogliaMinima: f.sogliaMinima, attivo: f.attivo,
           }))
         );
       }

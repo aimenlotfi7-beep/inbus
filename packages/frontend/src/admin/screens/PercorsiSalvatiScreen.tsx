@@ -48,7 +48,7 @@ export function PercorsiSalvatiScreen() {
   }
   function apriModifica(t: PercorsoSalvato) {
     setInModifica(t); setNome(t.nome);
-    const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, tipo: f.tipo, sogliaMinima: f.sogliaMinima }));
+    const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, sogliaMinima: f.sogliaMinima }));
     const fermateIniziali: FermataPercorsoSalvato[] = fermateNormalizzate.length >= 2 ? fermateNormalizzate : [{ citta: '', indirizzo: '' }, { citta: '', indirizzo: '' }];
     setFermate(fermateIniziali);
     setSnapshotIniziale(JSON.stringify({ nome: t.nome, fermate: fermateIniziali }));
@@ -83,7 +83,7 @@ export function PercorsiSalvatiScreen() {
   const [salvando, setSalvando] = useState(false);
   async function salva() {
     if (salvando) return;
-    if (!nome.trim()) { alert('Dai un nome al percorso prima di salvarlo.'); return; }
+    if (!nome.trim()) { alert('Dai un nome al tragitto prima di salvarlo.'); return; }
     // Le due Teste (prima e ultima fermata, posizione) possono restare
     // senza indirizzo — quello vero si scrive in Eventi, quando il
     // percorso viene applicato. Le fermate intermedie lo richiedono
@@ -104,7 +104,7 @@ export function PercorsiSalvatiScreen() {
     }
   }
   async function elimina(t: PercorsoSalvato) {
-    if (!confirm(`Eliminare il percorso "${t.nome}"?`)) return;
+    if (!confirm(`Eliminare il tragitto "${t.nome}"?`)) return;
     await percorsiSalvatiApi.remove(t.id);
     ricarica();
   }
@@ -118,8 +118,8 @@ export function PercorsiSalvatiScreen() {
 
   if (modaleAperta) {
     return (
-      <PaginaSezione titolo={inModifica ? 'Modifica percorso' : 'Nuovo percorso'} onIndietro={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
-        <div className="campo"><label>Nome percorso</label><input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
+      <PaginaSezione titolo={inModifica ? 'Modifica tragitto' : 'Nuovo tragitto'} onIndietro={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
+        <div className="campo"><label>Nome tragitto</label><input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
 
         <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate (le due Teste si scrivono in Eventi)</p>
         {fermate.map((f, idx) => (
@@ -161,40 +161,32 @@ export function PercorsiSalvatiScreen() {
                 ← Torna a scegliere dall'anagrafica
               </button>
             )}
-            {/* "Fermata di Partenza" (col significato di soglia minima —
-                diverso dall'etichetta sopra, che è solo la posizione
-                nell'ordine) si decide qui sul percorso, non più in
-                Eventi: se lo stesso percorso si applica a più eventi,
-                ha senso stabilirlo una volta sola. */}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11.5, color: 'var(--mist)' }}>
-              <input
-                type="checkbox"
-                checked={f.tipo === 'PARTENZA'}
-                onChange={(e) => aggiornaFermata(idx, 'tipo', e.target.checked ? 'PARTENZA' : 'PASSAGGIO')}
+            {/* Facoltativa su OGNI fermata (non più solo su una "di
+                Partenza" — quel concetto è stato tolto insieme al
+                campo che lo teneva) — se vuota, nessun controllo per
+                questa fermata, senza nessun valore di riserva a cui
+                ricadere. Decisa qui sul percorso, non più in Eventi:
+                se lo stesso percorso si applica a più eventi, ha senso
+                stabilirla una volta sola. */}
+            <div style={{ marginTop: 8, maxWidth: 260 }}>
+              <CampoNumero
+                placeholder="Soglia minima partecipanti (facoltativa)"
+                value={f.sogliaMinima ?? undefined}
+                onChange={(v) => aggiornaFermata(idx, 'sogliaMinima', v !== undefined ? String(v) : '')}
               />
-              Richiede un minimo di partecipanti per convenire (es. la fermata più lontana)
-            </label>
-            {f.tipo === 'PARTENZA' && (
-              <div style={{ marginTop: 4, maxWidth: 220 }}>
-                <CampoNumero
-                  placeholder="Soglia minima (default generale se vuoto)"
-                  value={f.sogliaMinima ?? undefined}
-                  onChange={(v) => aggiornaFermata(idx, 'sogliaMinima', v !== undefined ? String(v) : '')}
-                />
-              </div>
-            )}
+            </div>
           </div>
         ))}
         <button className="btn btn-ghost" style={{ marginBottom: 18 }} onClick={aggiungiFermata}>+ Aggiungi fermata</button>
 
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva percorso'}</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva tragitto'}</button>
       </PaginaSezione>
     );
   }
 
   return (
     <div>
-      <PanelHead titolo="Percorsi salvati" azione={tab === 'elenco' && <button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo percorso</button>} />
+      <PanelHead titolo="Tragitti salvati" azione={tab === 'elenco' && <button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo tragitto</button>} />
       <div className="mini-tabs" style={{ marginBottom: 18 }}>
         <button type="button" className={`mini-tab${tab === 'elenco' ? ' active' : ''}`} onClick={() => setTab('elenco')}>Elenco</button>
         <button type="button" className={`mini-tab${tab === 'cartina' ? ' active' : ''}`} onClick={() => setTab('cartina')}>Cartina</button>
@@ -202,7 +194,7 @@ export function PercorsiSalvatiScreen() {
 
       {tab === 'cartina' ? (
         <div>
-          <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 10 }}>Scegli uno o più percorsi da confrontare — con più di uno, si vedono sovrapposti sulla stessa cartina.</p>
+          <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 10 }}>Scegli uno o più tragitti da confrontare — con più di uno, si vedono sovrapposti sulla stessa cartina.</p>
           {percorsiCartinaIds.map((id, idx) => (
             <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, maxWidth: 480 }}>
               <select
@@ -210,15 +202,15 @@ export function PercorsiSalvatiScreen() {
                 value={id}
                 onChange={(e) => setPercorsiCartinaIds(percorsiCartinaIds.map((v, i) => (i === idx ? e.target.value : v)))}
               >
-                <option value="">— Seleziona un percorso —</option>
-                <option value="__tutti__">— Tutti i percorsi insieme —</option>
+                <option value="">— Seleziona un tragitto —</option>
+                <option value="__tutti__">— Tutti i tragitti insieme —</option>
                 {percorsi.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
               {percorsiCartinaIds.length > 1 && (
                 <button
                   type="button" className="btn btn-ghost" style={{ padding: '4px 10px', color: 'var(--pink)', flexShrink: 0 }}
                   onClick={() => setPercorsiCartinaIds(percorsiCartinaIds.filter((_, i) => i !== idx))}
-                  title="Togli questo percorso dal confronto"
+                  title="Togli questo tragitto dal confronto"
                 >
                   ✕
                 </button>
@@ -226,7 +218,7 @@ export function PercorsiSalvatiScreen() {
             </div>
           ))}
           <div style={{ marginBottom: 16 }}>
-            <button type="button" className="btn btn-ghost" onClick={() => setPercorsiCartinaIds([...percorsiCartinaIds, ''])}>+ Aggiungi un altro percorso</button>
+            <button type="button" className="btn btn-ghost" onClick={() => setPercorsiCartinaIds([...percorsiCartinaIds, ''])}>+ Aggiungi un altro tragitto</button>
           </div>
           {(() => {
             const tappeDiPercorso = (p: PercorsoSalvato): TappaMappa[] => p.fermate.map((f, idx) => {
@@ -249,7 +241,7 @@ export function PercorsiSalvatiScreen() {
             // (capita facile con tanti percorsi) — tolto, non avrebbe
             // senso confrontarlo con se stesso.
             const idsScelti = [...new Set(percorsiCartinaIds.filter((id) => id.trim() !== ''))];
-            if (idsScelti.length === 0) return <p style={{ color: 'var(--mist)' }}>Scegli almeno un percorso per vederlo sulla cartina.</p>;
+            if (idsScelti.length === 0) return <p style={{ color: 'var(--mist)' }}>Scegli almeno un tragitto per vederlo sulla cartina.</p>;
 
             // "Tutti insieme" scelto in una qualsiasi casella prevale
             // sulle altre — non avrebbe senso combinarlo con singoli
@@ -259,14 +251,14 @@ export function PercorsiSalvatiScreen() {
             const percorsiMappa: PercorsoMappa[] = percorsiDaMostrare
               .map((p) => ({ id: p.id, nome: p.nome, tappe: tappeDiPercorso(p) }))
               .filter((p) => p.tappe.length >= 2); // un percorso con meno di 2 fermate non ha niente da disegnare, lo salto invece di farlo fallire
-            if (percorsiMappa.length === 0) return <p style={{ color: 'var(--mist)' }}>Nessuno dei percorsi scelti ha ancora abbastanza fermate da disegnare.</p>;
+            if (percorsiMappa.length === 0) return <p style={{ color: 'var(--mist)' }}>Nessuno dei tragitti scelti ha ancora abbastanza fermate da disegnare.</p>;
             return <MappaPercorso key={idsScelti.includes('__tutti__') ? '__tutti__' : idsScelti.join(',')} percorsi={percorsiMappa} />;
           })()}
         </div>
       ) : (
         <>
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome percorso o città..." />
-      {!tragittiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun percorso trovato.' : 'Nessun percorso ancora.'}</p>}
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome tragitto o città..." />
+      {!tragittiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun tragitto trovato.' : 'Nessun tragitto ancora.'}</p>}
       <div className="cards-list">
         {tragittiFiltrati.map((t) => (
           <div key={t.id} className="evento-card" onClick={() => apriModifica(t)}>

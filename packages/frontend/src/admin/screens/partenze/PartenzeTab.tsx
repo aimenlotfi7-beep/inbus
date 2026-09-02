@@ -254,7 +254,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
         orario: f.orario ?? undefined, orarioRitorno: f.orarioRitorno ?? undefined, indirizzoRitorno: f.indirizzoRitorno ?? undefined,
         prezzo: f.prezzo ? Number(f.prezzo) : undefined,
         postiMax: f.postiMax ?? undefined,
-        tipo: f.tipo, sogliaMinima: f.sogliaMinima, attivo: f.attivo,
+        sogliaMinima: f.sogliaMinima, attivo: f.attivo,
       })),
     }));
     setStatoCalcoloOrariMap((prev) => new Map(prev).set(tragitto.tragittoId, ''));

@@ -484,6 +484,13 @@
       "when": 1788282003955,
       "tag": "0068_rimuovi_margine_percorsi_salvati",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1788343999380,
+      "tag": "0069_rimuovi_tipo_fermata",
+      "breakpoints": true
     }
   ]
 }

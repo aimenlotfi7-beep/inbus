@@ -49,14 +49,6 @@ export const canaleVenditaEnum = pgEnum('canale_vendita', ['INBUS', 'WHITE_LABEL
 export const tipoCouponEnum = pgEnum('tipo_coupon', ['PERCENTUALE', 'FISSO']);
 export const autoreMessaggioEnum = pgEnum('autore_messaggio', ['CLIENTE', 'ADMIN']);
 export const statoListaAttesaEnum = pgEnum('stato_lista_attesa', ['IN_ATTESA', 'PROMOSSA']);
-// Una fermata di "Partenza" (tipicamente la più lontana, dove il bus
-// deve fare una deviazione dedicata) ha senso solo se raggiunge un
-// minimo di partecipanti — sotto soglia non conviene costruirci una
-// Linea. Una di "Passaggio" (nel mezzo del tragitto) non ha questo
-// problema, il bus ci passa comunque. Un percorso può avere più
-// fermate di Partenza "candidate" — non è detto sia sempre e solo la
-// più lontana in assoluto.
-export const tipoFermataEnum = pgEnum('tipo_fermata', ['PARTENZA', 'PASSAGGIO']);
 // Etichetta di scarsità/abbondanza mostrata ai clienti al posto del
 // numero esatto di posti — impostata a mano dal gestionale, indipendente
 // dai posti reali (serve per creare percezione di scarsità o urgenza).
@@ -337,14 +329,11 @@ export const fermate = pgTable('fermate', {
   postiPrenotati: integer('posti_prenotati').notNull().default(0),
   lat: doublePrecision('lat'),
   lng: doublePrecision('lng'),
-  // Vedi tipoFermataEnum sopra — di default "Passaggio" (la maggior
-  // parte delle fermate lo sono). Solo se "Partenza" ha senso guardare
-  // sogliaMinima.
-  tipo: tipoFermataEnum('tipo').notNull().default('PASSAGGIO'),
-  // Sotto quanti partecipanti una fermata di Partenza non conviene
-  // includerla in una Linea — null = usa il default generale impostato
-  // in Impostazioni. Visibile al cliente in fase di prenotazione, se
-  // sta scegliendo proprio questa fermata.
+  // Facoltativa su OGNI fermata (non più solo su una "di Partenza" —
+  // quel concetto/campo è stato tolto): se valorizzata, sotto quel
+  // numero di partecipanti non conviene includerla in una Linea. Se
+  // vuota, nessun controllo per questa fermata — non c'è più un
+  // valore di riserva generale a cui ricadere.
   sogliaMinima: integer('soglia_minima'),
   // Una fermata disattivata singolarmente non è più prenotabile, pur
   // restando configurata (stesso principio già usato per tragitti.attivo
@@ -464,11 +453,10 @@ export const fermatePercorsoSalvato = pgTable('fermate_percorso_salvato', {
   // livello di colonna.
   indirizzo: text('indirizzo'),
   orario: text('orario'),
-  // Vedi tipoFermataEnum — deciso qui, sul percorso (il modello
-  // riutilizzabile), non più evento per evento: se uno stesso percorso
-  // si applica a più eventi, ha senso stabilire una volta sola quale
-  // fermata è "Partenza" invece di rifarlo ogni volta in Eventi.
-  tipo: tipoFermataEnum('tipo').notNull().default('PASSAGGIO'),
+  // Facoltativa su ogni fermata, decisa qui sul percorso (il modello
+  // riutilizzabile) — se uno stesso percorso si applica a più eventi,
+  // ha senso stabilire una volta sola la soglia invece di rifarlo ogni
+  // volta in Eventi.
   sogliaMinima: integer('soglia_minima'),
 });
 

@@ -1,6 +1,6 @@
 import { prenotazioniService } from '../modules/prenotazioni/prenotazioni.service.js';
 import { creditoService } from '../modules/credito/credito.service.js';
-import { disattivaFermatePartenzaSottoSoglia } from '../modules/variazioni/variazioni.service.js';
+import { disattivaFermateSottoSoglia } from '../modules/variazioni/variazioni.service.js';
 
 const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
 const UN_ORA_MS = 60 * 60 * 1000;
@@ -48,7 +48,7 @@ export function avviaSchedulerRiordinoEta() {
     // e comunicata PRIMA di calcolare il riordino per età — altrimenti
     // rischierei di assegnare posti su una fermata che sta per sparire).
     try {
-      const { disattivate } = await disattivaFermatePartenzaSottoSoglia();
+      const { disattivate } = await disattivaFermateSottoSoglia();
       if (disattivate > 0) console.log(`Fermate "Partenza" disattivate per soglia non raggiunta: ${disattivate}.`);
     } catch (err) {
       console.error('Errore durante il controllo soglia minima fermate:', err);

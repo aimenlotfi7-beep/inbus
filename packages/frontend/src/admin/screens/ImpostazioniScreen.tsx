@@ -11,7 +11,6 @@ const IMPOSTAZIONI: { chiave: string; etichetta: string; default: string; suffis
   { chiave: 'posti_per_bus', etichetta: 'Posti per bus (usato per "Calcola bus necessari" in Partenze)', default: '50' },
   { chiave: 'credito_per_passeggero', etichetta: 'Credito fedeltà per passeggero (€)', default: '0.5' },
   { chiave: 'soglia_posticipo_variazione_minuti', etichetta: 'Soglia posticipo per notifica variazione (minuti — l\'anticipo e il cambio città/indirizzo notificano sempre, senza soglia)', default: '20' },
-  { chiave: 'soglia_minima_fermata_partenza', etichetta: 'Soglia minima partecipanti per una fermata "Partenza" (sotto questo numero non conviene includerla in una Linea)', default: '10' },
   { chiave: 'soglia_occupazione_pareggio', etichetta: 'Riempimento minimo assunto per il calcolo prezzi (0,5 = pareggio a metà bus pieno; più basso = prezzi più alti, più prudente)', default: '0.5' },
   { chiave: 'quota_fissa_percentuale', etichetta: 'Quota fissa sul prezzo medio (0,5 = metà fissa per tutti, metà cresce con la distanza; più alto = meno differenza tra fermate vicine e lontane)', default: '0.5' },
 ];

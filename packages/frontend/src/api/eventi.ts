@@ -4,7 +4,7 @@ import type { Evento, OpzionePartenza } from './types';
 export interface FermataInput {
   fermataAnagraficaId?: string | null;
   citta: string; indirizzo?: string | null; orario?: string; orarioRitorno?: string; indirizzoRitorno?: string; prezzo?: number; postiMax?: number;
-  tipo?: 'PARTENZA' | 'PASSAGGIO'; sogliaMinima?: number | null; attivo?: boolean;
+  sogliaMinima?: number | null; attivo?: boolean;
 }
 export interface TragittoInput {
   id?: string; // presente = tratta già esistente, assente = nuova

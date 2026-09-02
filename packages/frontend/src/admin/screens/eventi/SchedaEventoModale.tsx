@@ -215,7 +215,7 @@ export function SchedaEventoModale({
           // non ne aveva uno salvato, arriva `null`, non `undefined` — va
           // convertito subito, altrimenti finirebbe di nuovo a rimbalzare
           // in giro come null fino a far fallire la validazione al salvataggio.
-          fermate: l.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ? Number(f.prezzo) : undefined, postiMax: f.postiMax ?? undefined, tipo: f.tipo, sogliaMinima: f.sogliaMinima, attivo: f.attivo })),
+          fermate: l.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? undefined, prezzo: f.prezzo ? Number(f.prezzo) : undefined, postiMax: f.postiMax ?? undefined, sogliaMinima: f.sogliaMinima, attivo: f.attivo })),
         })),
       };
     } else {
@@ -435,19 +435,19 @@ export function SchedaEventoModale({
       try {
         const trovata = await fermateAnagraficaApi.trovaOCrea({ nome: f.citta, citta: f.citta, indirizzo: f.indirizzo ?? '' });
         setFermateAnagrafica((prev) => prev.some((fa) => fa.id === trovata.id) ? prev : [...prev, trovata]);
-        return { fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
+        return { fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo, sogliaMinima: f.sogliaMinima };
       } catch {
         // Se la richiesta fallisce (es. problema di rete), meglio non
         // bloccare tutto il tragitto — questa singola fermata resta
         // testuale, modificabile e sistemabile a mano dall'admin,
         // invece di far fallire l'intera applicazione del percorso.
-        return { fermataAnagraficaId: null, citta: f.citta, indirizzo: f.indirizzo, tipo: f.tipo, sogliaMinima: f.sogliaMinima };
+        return { fermataAnagraficaId: null, citta: f.citta, indirizzo: f.indirizzo, sogliaMinima: f.sogliaMinima };
       }
     }));
     // La Testa di partenza NON passa dall'anagrafica finché non ha un
     // indirizzo vero (niente da cercare/creare senza un indirizzo) —
     // resta testuale, prima fermata del tragitto.
-    const fermataPartenza: FermataInput = { fermataAnagraficaId: null, citta: testaPartenza.citta, indirizzo: testaPartenza.indirizzo ?? '', tipo: testaPartenza.tipo, sogliaMinima: testaPartenza.sogliaMinima };
+    const fermataPartenza: FermataInput = { fermataAnagraficaId: null, citta: testaPartenza.citta, indirizzo: testaPartenza.indirizzo ?? '', sogliaMinima: testaPartenza.sogliaMinima };
 
     const nuovoTragitto: TragittoInput = {
       nome: percorso.nome,
@@ -523,7 +523,6 @@ export function SchedaEventoModale({
         indirizzo: attuale.arrivoIndirizzo ?? '',
         orario: attuale.arrivoOrario,
         prezzo: vecchiaPartenza.prezzo,
-        tipo: vecchiaPartenza.tipo,
         sogliaMinima: vecchiaPartenza.sogliaMinima,
       };
       tragitti[idxAttuale] = {
@@ -952,7 +951,7 @@ export function SchedaEventoModale({
       <>
       {percorsiSalvati.length > 0 && (
         <div className="section-card" style={{ marginBottom: 16 }}>
-          <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi un tragitto da un percorso salvato</p>
+          <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi un tragitto da quelli salvati</p>
           <select
             value=""
             onChange={(e) => {
@@ -1053,28 +1052,6 @@ export function SchedaEventoModale({
               ↔ Inverti
             </button>
           </div>
-          <p className="section-label" style={{ marginBottom: 6, fontSize: 15, fontWeight: 700, color: 'var(--pink)' }}>
-            Arrivo
-          </p>
-          <div className="form-grid" style={{ marginBottom: 10 }}>
-            <label>Città di arrivo
-              <input
-                value={tragitto.arrivoCitta ?? ''}
-                onChange={(e) => aggiornaTragitto(idxTragitto, 'arrivoCitta', e.target.value)}
-                placeholder="es. Roma"
-              />
-            </label>
-            <label>Indirizzo di arrivo
-              <input
-                value={tragitto.arrivoIndirizzo ?? ''}
-                onChange={(e) => aggiornaTragitto(idxTragitto, 'arrivoIndirizzo', e.target.value)}
-                placeholder="es. Piazzale Clodio, Roma"
-              />
-            </label>
-            <label>Orario di arrivo
-              <OrarioInput value={tragitto.arrivoOrario ?? ''} onChange={(v) => aggiornaTragitto(idxTragitto, 'arrivoOrario', v)} />
-            </label>
-          </div>
           <p className="section-label" style={{ marginBottom: 6, display: 'flex', alignItems: 'center' }}>
             Fermate
             <InfoTooltip>{mappaTooltip.fermate_orario_intro ?? TOOLTIP_DEFAULT.fermate_orario_intro}</InfoTooltip>
@@ -1154,24 +1131,48 @@ export function SchedaEventoModale({
                   ← Torna a scegliere dall'anagrafica
                 </button>
               )}
-              {/* Partenza/Passaggio + soglia minima si decidono ORA sui
-                  Percorsi salvati, non più qui — arrivano già impostati
-                  quando applichi un percorso. Qui resta solo
-                  un'indicazione, per sapere a colpo d'occhio quali
-                  fermate sono "Partenza" mentre costruisci l'evento. */}
-              {f.tipo === 'PARTENZA' && (
+              {/* La soglia minima si decide ORA sui Percorsi salvati,
+                  non più qui — arriva già impostata quando applichi un
+                  percorso (o si scrive qui per un tragitto manuale, in
+                  Aggiungi fermata). Facoltativa su ogni fermata, non
+                  solo su una "di Partenza" — quel concetto è stato
+                  tolto. Qui resta solo un'indicazione, per sapere a
+                  colpo d'occhio quali fermate ce l'hanno mentre
+                  costruisci l'evento. */}
+              {f.sogliaMinima != null && (
                 <p style={{ marginLeft: 22, marginTop: 4, fontSize: 11.5, color: 'var(--mist)' }}>
-                  ◔ Fermata di Partenza{f.sogliaMinima ? ` — soglia minima ${f.sogliaMinima} partecipanti` : ' (soglia di default)'} — impostata dal percorso salvato, si cambia solo lì
+                  ◔ Soglia minima {f.sogliaMinima} partecipanti — impostata dal tragitto salvato, si cambia solo lì
                 </p>
               )}
             </div>
           ))}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>
+
+          <p style={{ marginTop: 14, marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--pink)' }}>Arrivo</p>
+          <div className="form-grid" style={{ marginBottom: 10 }}>
+            <label>Città di arrivo
+              <input
+                value={tragitto.arrivoCitta ?? ''}
+                onChange={(e) => aggiornaTragitto(idxTragitto, 'arrivoCitta', e.target.value)}
+                placeholder="es. Roma"
+              />
+            </label>
+            <label>Indirizzo di arrivo
+              <input
+                value={tragitto.arrivoIndirizzo ?? ''}
+                onChange={(e) => aggiornaTragitto(idxTragitto, 'arrivoIndirizzo', e.target.value)}
+                placeholder="es. Piazzale Clodio, Roma"
+              />
+            </label>
+            <label>Orario di arrivo
+              <OrarioInput value={tragitto.arrivoOrario ?? ''} onChange={(v) => aggiornaTragitto(idxTragitto, 'arrivoOrario', v)} />
+            </label>
+          </div>
           </>
           )}
         </div>
       );})}
-      <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTragittoManuale}>+ Aggiungi tragitto manuale (senza percorso salvato)</button>
+      <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTragittoManuale}>+ Aggiungi tragitto manuale (senza tragitto salvato)</button>
       </>
       )}
     </>

@@ -43,18 +43,6 @@ export async function leggiSogliaPosticipoMinuti(): Promise<number> {
   return Number.isFinite(valore) && valore >= 0 ? valore : DEFAULT_SOGLIA_POSTICIPO_MINUTI;
 }
 
-/** Sotto quanti partecipanti una fermata di "Partenza" non conviene
- *  includerla in una Linea — usata quando la fermata stessa non ha una
- *  soglia specifica impostata (fermate.sogliaMinima è null). */
-export const CHIAVE_SOGLIA_MINIMA_PARTENZA = 'soglia_minima_fermata_partenza';
-const DEFAULT_SOGLIA_MINIMA_PARTENZA = 10;
-
-export async function leggiSogliaMinimaPartenza(): Promise<number> {
-  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_SOGLIA_MINIMA_PARTENZA)).limit(1);
-  const valore = riga ? Number(riga.valore) : NaN;
-  return Number.isFinite(valore) && valore >= 0 ? valore : DEFAULT_SOGLIA_MINIMA_PARTENZA;
-}
-
 export const impostazioniRouter = Router();
 impostazioniRouter.use(richiedeAuth);
 

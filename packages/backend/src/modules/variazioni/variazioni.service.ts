@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { variazioni, variazioniRisposte, prenotazioni, richiesteRimborso, eventi, tragitti, utenti, fermate } from '../../db/schema.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
-import { leggiSogliaPosticipoMinuti, leggiSogliaMinimaPartenza } from '../impostazioni/impostazioni.routes.js';
+import { leggiSogliaPosticipoMinuti } from '../impostazioni/impostazioni.routes.js';
 import { NonTrovato } from '../../shared/errors.js';
 
 type FermataConfronto = { citta: string; indirizzo: string; orario?: string | null };
@@ -200,11 +200,15 @@ export async function rispondiVariazione(token: string, risposta: 'ACCETTATA' | 
  *  già costruito per le Variazioni vere e proprie (email + scelta
  *  accetta/rimborso) — dal punto di vista del cliente è esattamente lo
  *  stesso tipo di avviso, solo con una causa diversa. */
-export async function disattivaFermatePartenzaSottoSoglia() {
+export async function disattivaFermateSottoSoglia() {
   const oraAdesso = new Date();
   const tra24Ore = new Date(oraAdesso.getTime() + 24 * 3600 * 1000);
 
-  const fermatePartenza = await db.select({
+  // Facoltativa su OGNI fermata ora (prima solo su quelle marcate
+  // "Partenza", un concetto tolto insieme al campo "tipo") — la sola
+  // presenza di una soglia scritta (isNotNull) basta a dire che questa
+  // fermata va controllata.
+  const fermateConSoglia = await db.select({
     fermataId: fermate.id,
     tragittoId: fermate.tragittoId,
     citta: fermate.citta,
@@ -215,10 +219,10 @@ export async function disattivaFermatePartenzaSottoSoglia() {
   }).from(fermate)
     .innerJoin(tragitti, eq(tragitti.id, fermate.tragittoId))
     .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-    .where(and(eq(fermate.tipo, 'PARTENZA'), eq(fermate.attivo, true)));
+    .where(and(isNotNull(fermate.sogliaMinima), eq(fermate.attivo, true)));
 
   let disattivate = 0;
-  for (const f of fermatePartenza) {
+  for (const f of fermateConSoglia) {
     if (!f.orario) continue; // senza orario non posso calcolare quando parte davvero
     const [ore, minuti] = f.orario.split(':').map(Number);
     if (Number.isNaN(ore) || Number.isNaN(minuti)) continue;
@@ -226,7 +230,9 @@ export async function disattivaFermatePartenzaSottoSoglia() {
     partenzaVera.setHours(ore, minuti, 0, 0);
     if (partenzaVera > tra24Ore) continue; // non ancora nelle prossime 24 ore, troppo presto per decidere
 
-    const soglia = f.sogliaMinima ?? await leggiSogliaMinimaPartenza();
+    // Garantita non-nulla dal filtro isNotNull qui sopra — non c'è più
+    // un valore di riserva generale a cui ricadere se manca.
+    const soglia = f.sogliaMinima!;
     const [conteggio] = await db.select({ tot: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)` }).from(prenotazioni)
       .where(and(eq(prenotazioni.tragittoId, f.tragittoId), eq(prenotazioni.fermataCitta, f.citta), eq(prenotazioni.stato, 'CONFERMATA')));
     const partecipantiAttuali = Number(conteggio?.tot ?? 0);
