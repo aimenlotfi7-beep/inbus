@@ -85,7 +85,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   // caricati una volta sola all'apertura, con gli stessi default già
   // usati finora se non sono ancora stati impostati esplicitamente
   // (così non cambia nulla per chi non li ha mai toccati).
-  const [parametriFormula, setParametriFormula] = useState({ sogliaOccupazione: 0.5, quotaFissaPercentuale: 0.5 });
+  const [sogliaOccupazionePercento, setSogliaOccupazionePercento] = useState(50);
   const [prezziCalcolatiMap, setPrezziCalcolatiMap] = useState<Map<string, { fermataId: string; citta: string; distanza: number; prezzo: number }[]>>(new Map());
   const [calcolandoPreventivoSet, setCalcolandoPreventivoSet] = useState<Set<string>>(new Set());
   const [statoCalcoloPreventivoMap, setStatoCalcoloPreventivoMap] = useState<Map<string, string>>(new Map());
@@ -155,16 +155,10 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
     ricarica();
     fermateAnagraficaApi.list().then(setFermateAnagrafica).catch(() => setFermateAnagrafica([]));
     impostazioniApi.list().then((righe) => {
-      const trova = (chiave: string, fallback: number) => {
-        const riga = righe.find((r) => r.chiave === chiave);
-        const numero = riga ? Number(riga.valore) : NaN;
-        return Number.isFinite(numero) && numero > 0 ? numero : fallback;
-      };
-      setParametriFormula({
-        sogliaOccupazione: trova('soglia_occupazione_pareggio', 0.5),
-        quotaFissaPercentuale: trova('quota_fissa_percentuale', 0.5),
-      });
-    }).catch(() => {}); // se non risponde, restano i default — meglio che bloccare il calcolo
+      const riga = righe.find((r) => r.chiave === 'soglia_occupazione_pareggio');
+      const numero = riga ? Number(riga.valore) : NaN;
+      if (Number.isFinite(numero) && numero > 0 && numero <= 100) setSogliaOccupazionePercento(numero);
+    }).catch(() => {}); // se non risponde, resta il default — meglio che bloccare il calcolo
   }, [eventoId]);
 
   // Atterraggio diretto da una card di Partenze — una volta sola,
@@ -323,6 +317,16 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
    *  che la fermata alla distanza MEDIA paghi esattamente il prezzo
    *  medio minimo — le più lontane pagano di più, le più vicine di
    *  meno, mai sotto la metà del prezzo medio). */
+  /** Calcola il prezzo di ogni fermata dal preventivo, con la formula
+   *  confermata insieme:
+   *  Posti di pareggio = Posti bus × Soglia di occupazione (%)
+   *  Prezzo minimo = Costo bus ÷ Posti di pareggio
+   *  Costo al km per persona = (Costo bus ÷ KM totali) ÷ Posti di pareggio
+   *  Prezzo fermata = Prezzo minimo + (Costo al km per persona × KM
+   *    percorsi da quella fermata fino all'arrivo)
+   *  Mai sotto il prezzo minimo (l'arrivo, a 0 km, paga esattamente
+   *  quello) — chi sale più lontano paga di più, in proporzione a
+   *  quanto usa davvero il bus. */
   async function calcolaPrezziPreventivo(tragittoId: string) {
     const formPreventivo = formPreventivoMap.get(tragittoId);
     if (!eventoCompleto || !formPreventivo?.costo || !formPreventivo?.postiBus) {
@@ -341,8 +345,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
     setCalcolandoPreventivoSet((prev) => new Set(prev).add(tragittoId));
     setStatoCalcoloPreventivoMap((prev) => new Map(prev).set(tragittoId, 'Localizzo gli indirizzi...'));
 
+    // L'arrivo non è mai collegato all'anagrafica (l'indirizzo si
+    // scrive a mano in Eventi) — va sempre geocodificato per testo.
     const rArrivo = await geocodifica(arrivoIndirizzo);
-    await attesa(1100);
     if (!rArrivo.coordinate) {
       setStatoCalcoloPreventivoMap((prev) => new Map(prev).set(tragittoId, rArrivo.erroreRete ? 'Richiesta a OpenStreetMap non riuscita (rete/firewall).' : 'Indirizzo di arrivo non localizzato — controllalo.'));
       setCalcolandoPreventivoSet((prev) => { const s = new Set(prev); s.delete(tragittoId); return s; });
@@ -351,11 +356,19 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
 
     const distanze: { fermataId: string; citta: string; distanza: number | null }[] = [];
     for (const f of fermateValide) {
-      const r = await geocodifica(`${f.indirizzo}, ${f.citta}`);
-      await attesa(1100);
-      if (!r.coordinate) { distanze.push({ fermataId: f.id, citta: f.citta, distanza: null }); continue; }
-      const km = await distanzaViaggio(r.coordinate, rArrivo.coordinate);
-      await attesa(300);
+      // Se la fermata è collegata all'anagrafica e questa ha già
+      // lat/lng verificate, le uso direttamente invece di farla
+      // ricercare di nuovo per testo — un indirizzo può non essere
+      // trovato dalla ricerca testuale anche quando è del tutto
+      // valido (stessa causa già risolta altrove, es. "Piacenza Sud").
+      const anagrafica = f.fermataAnagraficaId ? fermateAnagrafica.find((fa) => fa.id === f.fermataAnagraficaId) : null;
+      let coordinateFermata = anagrafica?.lat != null && anagrafica?.lng != null ? { lat: anagrafica.lat, lng: anagrafica.lng } : null;
+      if (!coordinateFermata) {
+        const r = await geocodifica(`${f.indirizzo}, ${f.citta}`);
+        coordinateFermata = r.coordinate;
+      }
+      if (!coordinateFermata) { distanze.push({ fermataId: f.id, citta: f.citta, distanza: null }); continue; }
+      const km = await distanzaViaggio(coordinateFermata, rArrivo.coordinate);
       distanze.push({ fermataId: f.id, citta: f.citta, distanza: km });
     }
 
@@ -366,14 +379,18 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
       return;
     }
 
-    const prezzoMedioMinimo = formPreventivo.costo / (formPreventivo.postiBus * parametriFormula.sogliaOccupazione);
-    const distanzaMedia = valide.reduce((tot, d) => tot + d.distanza, 0) / valide.length;
-    const quotaFissa = parametriFormula.quotaFissaPercentuale * prezzoMedioMinimo;
-    const tariffaPerKm = distanzaMedia > 0 ? quotaFissa / distanzaMedia : 0;
+    const postiDiPareggio = formPreventivo.postiBus * (sogliaOccupazionePercento / 100);
+    const prezzoMinimo = formPreventivo.costo / postiDiPareggio;
+    // I KM totali del tragitto = la distanza più lunga tra tutte
+    // quelle calcolate (di norma la Testa di partenza, il punto più
+    // lontano dall'arrivo) — non serve un valore a parte, è già il
+    // massimo di quello appena calcolato per ogni fermata.
+    const kmTotali = Math.max(...valide.map((d) => d.distanza));
+    const costoAlKmPerPersona = kmTotali > 0 ? (formPreventivo.costo / kmTotali) / postiDiPareggio : 0;
 
     setPrezziCalcolatiMap((prev) => new Map(prev).set(tragittoId, valide.map((d) => ({
       fermataId: d.fermataId, citta: d.citta, distanza: d.distanza,
-      prezzo: Math.round(quotaFissa + tariffaPerKm * d.distanza),
+      prezzo: Math.round(prezzoMinimo + costoAlKmPerPersona * d.distanza),
     }))));
     const nonLocalizzate = distanze.length - valide.length;
     setStatoCalcoloPreventivoMap((prev) => new Map(prev).set(tragittoId, nonLocalizzate > 0 ? `Fatto, ma ${nonLocalizzate} fermata/e non localizzata/e: resta senza prezzo, va impostato a mano dopo.` : 'Prezzi calcolati — controllali prima di confermare.'));
