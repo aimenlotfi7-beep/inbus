@@ -16,9 +16,8 @@ import type { SezioneGestionale } from './AdminLayout';
  * vera del "lag" segnalato aprendo/lasciando quelle sezioni.
  *
  * `parametriExtra` imposta ulteriori parametri nell'indirizzo insieme
- * al cambio sezione (es. `evento`/`tragitto` per la pagina Linee,
- * `partenzeTab` per dire a Partenze quale tab aprire) — un valore
- * `null` toglie quel parametro invece di impostarlo.
+ * al cambio sezione (es. `evento`/`tragitto` per la pagina Linee) — un
+ * valore `null` toglie quel parametro invece di impostarlo.
  */
 export const NavigazioneContext = createContext<
   (sezione: SezioneGestionale, parametriExtra?: Record<string, string | null>) => void

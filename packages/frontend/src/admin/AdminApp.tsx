@@ -29,8 +29,7 @@ import { ContenutiScreen } from './screens/ContenutiScreen';
 import { AmministratoriScreen } from './screens/AmministratoriScreen';
 import { RuoliScreen } from './screens/RuoliScreen';
 import { TestiTooltipScreen } from './screens/TestiTooltipScreen';
-import { PartenzeScreen } from './screens/PartenzeScreen';
-import { PreventiviScreen } from './screens/PreventiviScreen';
+import { PartenzeOrariScreen, PartenzePrezziScreen, PartenzeDaConfermareScreen, PartenzeConfermatoScreen, PartenzePassateScreen } from './screens/PartenzeScreen';
 import { LineeTragittoScreen } from './screens/LineeTragittoScreen';
 import { ListaAttesaScreen } from './screens/ListaAttesaScreen';
 import { OfferteScreen } from './screens/OfferteScreen';
@@ -71,8 +70,11 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   amministratori: AmministratoriScreen,
   ruoli: RuoliScreen,
   'testi-tooltip': TestiTooltipScreen,
-  partenze: PartenzeScreen,
-  preventivi: PreventiviScreen,
+  'partenze-orari': PartenzeOrariScreen,
+  'partenze-prezzi': PartenzePrezziScreen,
+  'partenze-da-confermare': PartenzeDaConfermareScreen,
+  'partenze-confermato': PartenzeConfermatoScreen,
+  'partenze-passate': PartenzePassateScreen,
   linee: LineeTragittoScreen,
   impostazioni: ImpostazioniScreen,
   'template-email': TemplateEmailScreen,
@@ -110,8 +112,11 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   amministratori: 'utenze.gestisci',
   ruoli: 'permessi.gestisci',
   'testi-tooltip': 'impostazioni.gestisci',
-  partenze: 'eventi.partenze',
-  preventivi: 'eventi.partenze',
+  'partenze-orari': 'eventi.partenze',
+  'partenze-prezzi': 'eventi.partenze',
+  'partenze-da-confermare': 'eventi.partenze',
+  'partenze-confermato': 'eventi.partenze',
+  'partenze-passate': 'eventi.partenze',
   linee: 'eventi.crea',
   impostazioni: 'impostazioni.gestisci',
   'template-email': 'template-email.gestisci',

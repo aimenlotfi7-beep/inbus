@@ -73,14 +73,13 @@ export function LineeTragittoScreen() {
     // browser. "evento"/"tragitto" vanno tolti esplicitamente
     // dall'indirizzo (prima un ricaricamento completo li avrebbe
     // "ripuliti" da solo insieme a tutto il resto — qui no, restano se
-    // non li tolgo apposta). "Orari"/"Prezzo" vivono nella sezione
-    // "Preventivi" (separata da "Partenze") — instrado verso quella,
-    // non più sempre verso "Partenze" come prima della divisione.
-    if (tabDestinazione === 'fermate' || tabDestinazione === 'da-prezzare') {
-      navigaSezione('preventivi', { evento: null, tragitto: null, preventiviTab: tabDestinazione });
-    } else {
-      navigaSezione('partenze', { evento: null, tragitto: null, partenzeTab: tabDestinazione ?? null });
-    }
+    // non li tolgo apposta). Le 5 tappe sono ora sezioni separate del
+    // menu — punto direttamente a quella giusta, non serve più un
+    // parametro extra per dire quale tab aprire.
+    const sezione = tabDestinazione === 'fermate' ? 'partenze-orari'
+      : tabDestinazione === 'da-prezzare' ? 'partenze-prezzi'
+      : 'partenze-da-confermare';
+    navigaSezione(sezione, { evento: null, tragitto: null });
   }
 
   if (!eventoId || !tragittoId) {

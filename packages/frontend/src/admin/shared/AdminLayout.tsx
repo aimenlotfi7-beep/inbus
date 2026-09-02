@@ -6,7 +6,8 @@ import { richiesteRimborsoApi } from '../../api/richiesteRimborso';
 import { chatApi } from '../../api/chat';
 
 export type SezioneGestionale =
-  | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino' | 'preventivi' | 'partenze'
+  | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino'
+  | 'partenze-orari' | 'partenze-prezzi' | 'partenze-da-confermare' | 'partenze-confermato' | 'partenze-passate'
   | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi' | 'variazioni'
   | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
   | 'fornitori' | 'fermate' | 'tragitti'
@@ -26,8 +27,11 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'calendario', label: 'Calendario', permesso: 'eventi.calendario' },
   ]},
   { titolo: 'Partenze', voci: [
-    { id: 'preventivi', label: 'Preventivi', permesso: 'eventi.partenze' },
-    { id: 'partenze', label: 'Partenze', permesso: 'eventi.partenze' },
+    { id: 'partenze-orari', label: 'Orari', permesso: 'eventi.partenze' },
+    { id: 'partenze-prezzi', label: 'Prezzi', permesso: 'eventi.partenze' },
+    { id: 'partenze-da-confermare', label: 'Da Confermare', permesso: 'eventi.partenze' },
+    { id: 'partenze-confermato', label: 'Confermato', permesso: 'eventi.partenze' },
+    { id: 'partenze-passate', label: 'Passate', permesso: 'eventi.partenze' },
     { id: 'variazioni', label: 'Variazioni', permesso: 'prenotazioni.pagamenti' },
   ]},
   { titolo: 'Vendite', voci: [
@@ -135,7 +139,8 @@ export function AdminLayout({
   // anche quando il gruppo è chiuso a tendina su mobile — altrimenti
   // una notifica dentro un gruppo chiuso passerebbe inosservata).
   function notificaVoce(id: string): number {
-    if (id === 'partenze') return allertePartenze + eventiDaConfermare;
+    if (id === 'partenze-da-confermare') return eventiDaConfermare;
+    if (id === 'partenze-confermato') return allertePartenze;
     if (id === 'lista-attesa') return inAttesa;
     if (id === 'rimborsi') return rimborsiInAttesa;
     if (id === 'chat') return chatNonLette;
@@ -225,11 +230,8 @@ export function AdminLayout({
                       <span
                         className="side-badge"
                         title={
-                          voce.id === 'partenze'
-                            ? [
-                                allertePartenze > 0 ? `${allertePartenze} tratta/e con posti superati` : null,
-                                eventiDaConfermare > 0 ? `${eventiDaConfermare} evento/i con almeno un tragitto da confermare` : null,
-                              ].filter(Boolean).join(' · ')
+                          voce.id === 'partenze-da-confermare' ? `${eventiDaConfermare} evento/i con almeno un tragitto da confermare`
+                            : voce.id === 'partenze-confermato' ? `${allertePartenze} tratta/e con posti superati`
                             : voce.id === 'lista-attesa' ? `${inAttesa} iscrizione/i in attesa di promozione`
                             : voce.id === 'rimborsi' ? `${rimborsiInAttesa} richiesta/e di rimborso da gestire`
                             : voce.id === 'chat' ? `${chatNonLette} conversazione/i con messaggi non letti`

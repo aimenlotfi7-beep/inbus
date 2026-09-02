@@ -38,7 +38,7 @@ function statoTragitto(tragitto: CalcoloBusTragitto) {
 /** Sezione "Partenze" di un singolo evento: riepilogo generale, calcolo
  *  bus necessari, copertura tratte, censimento bus fisici. Va dentro la
  *  scheda dell'evento (tab). */
-export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, onSalvato }: {
+export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: {
   eventoId: string;
   servizi?: { key: string; nome: string }[];
   // Arrivando da una card di Partenze (raggruppata per evento, che può
@@ -47,11 +47,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
   // specifico (filtra i servizi mostrati a solo quelli coinvolti) e
   // quale azione eseguire subito sul primo di loro.
   contestoPartenze?: { tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi'; tabOrigine: 'fermate' | 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate' } | null;
-  // Dalla vista "Confermato" (righe Fermate/Preventivo/Linee), cliccando
-  // "Modifica" si torna alla lista di Partenze con la tab in alto
-  // corrispondente già selezionata — non un editor in linea qui, per
-  // scelta esplicita.
-  onNavigaTab?: (tab: 'fermate' | 'da-prezzare' | 'da-confermare') => void;
   // Avvisa il componente che ha aperto questa scheda (risale fino a
   // PartenzeScreen) dopo OGNI salvataggio fatto qui dentro — altrimenti
   // la lista/cache lì fuori resta con dati vecchi: tornando indietro e
@@ -560,52 +555,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
       {calcoloVisibile.length === 0 && (
         <p className="testo-intro">Questa scheda non ha ancora nessun tragitto configurato — vai nella tab "Dettagli" per aggiungerne uno.</p>
       )}
-
-      {contestoPartenze && (() => {
-        const ETICHETTE_CONTESTO: Record<string, string> = {
-          fermate: 'Orari', 'da-prezzare': 'Prezzo', 'da-confermare': 'Linee Bus', confermato: 'Confermato', passate: 'Passate',
-        };
-        const tragittiVeri = contestoPartenze.tragittiIds
-          .map((id) => eventoCompleto ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === id) : undefined)
-          .filter((t): t is NonNullable<typeof t> => !!t);
-        // Sblocco progressivo — si può passare al passo successivo solo
-        // se quello precedente è compilato per TUTTI i tragitti di
-        // questo contesto (un evento a più servizi deve averli pronti
-        // entrambi, non solo uno).
-        const fermateCompilate = tragittiVeri.length > 0 && tragittiVeri.every((t) => t.fermate.some((f) => f.orario));
-        const preventivoCompilato = tragittiVeri.length > 0 && tragittiVeri.every((t) => !!t.preventivoCosto);
-        const lineeCompilate = tragittiVeri.length > 0 && tragittiVeri.every((t) => busLista.some((b) => b.tragittiIds.includes(t.id)));
-        const SBLOCCO: Record<string, boolean> = {
-          fermate: true,
-          'da-prezzare': fermateCompilate,
-          'da-confermare': fermateCompilate && preventivoCompilato,
-          confermato: fermateCompilate && preventivoCompilato && lineeCompilate,
-          passate: true,
-        };
-        return (
-          <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-            {(['fermate', 'da-prezzare', 'da-confermare', 'confermato', 'passate'] as const).map((t) => {
-              // Solo questi tre hanno un posto dove atterrare da qui (un
-              // editor in linea per quel tragitto) — "Confermato" e
-              // "Passate" restano solo indicazione visiva, mai cliccabili.
-              const navigabile = t === 'fermate' || t === 'da-prezzare' || t === 'da-confermare';
-              const cliccabile = navigabile && SBLOCCO[t] && t !== contestoPartenze.tabOrigine;
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  className={`mini-tab${t === contestoPartenze.tabOrigine ? ' active' : ''}`}
-                  style={{ cursor: cliccabile ? 'pointer' : 'default', opacity: navigabile && !SBLOCCO[t] ? 0.5 : 1 }}
-                  disabled={!cliccabile}
-                  onClick={cliccabile ? () => onNavigaTab?.(t as 'fermate' | 'da-prezzare' | 'da-confermare') : undefined}
-                >
-                  {ETICHETTE_CONTESTO[t]}
-                </button>
-              );
-            })}
-          </div>
-        );
-      })()}
 
       {calcoloVisibile.map((tragitto) => {
         const stato = statoTragitto(tragitto);
