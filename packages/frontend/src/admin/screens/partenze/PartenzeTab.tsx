@@ -421,14 +421,28 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
     setCalcolandoOrariSet((prev) => new Set(prev).add(tragittoId));
     setStatoCalcoloOrariMap((prev) => new Map(prev).set(tragittoId, 'Localizzo gli indirizzi...'));
 
-    const indirizziCompleti = [...fermateValide.map((f) => `${f.indirizzo}, ${f.citta}`), arrivoIndirizzoContesto];
+    // Se una fermata è collegata all'anagrafica e questa ha già
+    // lat/lng verificate, le uso direttamente invece di farla
+    // ricercare di nuovo per testo — un indirizzo può non essere
+    // trovato dalla ricerca testuale anche quando è del tutto valido
+    // (stessa causa già risolta altrove, es. "Piacenza Sud"). Geocodifico
+    // da capo solo le fermate senza collegamento e l'arrivo (che quasi
+    // mai ne ha uno, l'indirizzo si scrive a mano in Eventi).
+    const puntiDaLocalizzare = [...fermateValide.map((f) => ({
+      indirizzoCompleto: `${f.indirizzo}, ${f.citta}`,
+      lat: f.fermataAnagraficaId ? fermateAnagrafica.find((fa) => fa.id === f.fermataAnagraficaId)?.lat : null,
+      lng: f.fermataAnagraficaId ? fermateAnagrafica.find((fa) => fa.id === f.fermataAnagraficaId)?.lng : null,
+    })), { indirizzoCompleto: arrivoIndirizzoContesto, lat: null, lng: null }];
     const coordinate: (Awaited<ReturnType<typeof geocodifica>>['coordinate'])[] = [];
     let problemaRete = false;
-    for (const indirizzo of indirizziCompleti) {
-      const r = await geocodifica(indirizzo);
+    for (const punto of puntiDaLocalizzare) {
+      if (punto.lat != null && punto.lng != null) { coordinate.push({ lat: punto.lat, lng: punto.lng }); continue; }
+      const r = await geocodifica(punto.indirizzoCompleto);
       coordinate.push(r.coordinate);
       if (r.erroreRete) problemaRete = true;
-      await attesa(1100);
+      // Nessuna attesa manuale qui — geocodifica() aspetta già da sola
+      // il proprio turno (limite condiviso di Nominatim), aggiungerne
+      // un'altra qui raddoppiava inutilmente il tempo d'attesa.
     }
     if (problemaRete) {
       setStatoCalcoloOrariMap((prev) => new Map(prev).set(tragittoId, 'Richiesta a OpenStreetMap non riuscita (rete/firewall). Apri la Console (F12) per il dettaglio.'));
@@ -682,21 +696,36 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
                 </div>
                 {statoCalcoloOrari && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoCalcoloOrari}</p>}
                 {formOperativo.fermate.map((f, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
-                    <span style={{ flex: 1, fontSize: 13.5 }}>{f.citta} <span style={{ color: 'var(--mist)' }}>— {f.indirizzo}</span></span>
-                    <div style={{ width: 110 }}>
-                      <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermataOperativa(tragitto.tragittoId, idx, 'orario', v)} />
+                  <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
+                    {/* flex-basis 240px: su schermi larghi sta sulla
+                        stessa riga di orario/rimuovi, su mobile (dove
+                        non c'entra) va a capo da sola invece di
+                        tagliarsi — prima l'indirizzo spariva proprio
+                        da mobile per mancanza di spazio. */}
+                    <div style={{ flex: '1 1 240px', display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <span style={{ fontSize: 13.5, flexShrink: 0 }}>{f.citta}</span>
+                      <input
+                        value={f.indirizzo ?? ''}
+                        onChange={(e) => aggiornaFermataOperativa(tragitto.tragittoId, idx, 'indirizzo', e.target.value)}
+                        placeholder="Indirizzo"
+                        style={{ flex: 1, minWidth: 0, fontSize: 12.5, padding: '4px 8px' }}
+                      />
                     </div>
-                    <button
-                      type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
-                      onClick={() => setFormOperativoMap((prev) => {
-                        const f2 = prev.get(tragitto.tragittoId);
-                        if (!f2) return prev;
-                        return new Map(prev).set(tragitto.tragittoId, { ...f2, fermate: f2.fermate.filter((_, i) => i !== idx) });
-                      })}
-                    >
-                      Rimuovi
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <div style={{ width: 110 }}>
+                        <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermataOperativa(tragitto.tragittoId, idx, 'orario', v)} />
+                      </div>
+                      <button
+                        type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
+                        onClick={() => setFormOperativoMap((prev) => {
+                          const f2 = prev.get(tragitto.tragittoId);
+                          if (!f2) return prev;
+                          return new Map(prev).set(tragitto.tragittoId, { ...f2, fermate: f2.fermate.filter((_, i) => i !== idx) });
+                        })}
+                      >
+                        Rimuovi
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {fermateAnagrafica.length > 0 && (
