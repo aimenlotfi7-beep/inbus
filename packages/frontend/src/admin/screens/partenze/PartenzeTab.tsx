@@ -72,6 +72,12 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
   // (bug segnalato: "non riesco a calcolare gli orari per il secondo
   // tragitto e continuare").
   const [formOperativoMap, setFormOperativoMap] = useState<Map<string, { prezzoExtra: number; fermate: FermataInput[] }>>(new Map());
+  // Chiave composita `${tragittoId}::${idx}` — quale riga fermata ha
+  // l'indirizzo espanso (doppio tap/clic sulla città). Chiuso di
+  // default: su mobile una riga con solo città+orario+rimuovi sta
+  // tutta su una riga sola, l'indirizzo (il pezzo più largo) si apre
+  // solo quando serve davvero modificarlo.
+  const [fermateIndirizzoEspanso, setFermateIndirizzoEspanso] = useState<Set<string>>(new Set());
   const [salvandoOperativoSet, setSalvandoOperativoSet] = useState<Set<string>>(new Set());
   const [calcolandoOrariSet, setCalcolandoOrariSet] = useState<Set<string>>(new Set());
   const [statoCalcoloOrariMap, setStatoCalcoloOrariMap] = useState<Map<string, string>>(new Map());
@@ -695,24 +701,33 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
                   </div>
                 </div>
                 {statoCalcoloOrari && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoCalcoloOrari}</p>}
-                {formOperativo.fermate.map((f, idx) => (
-                  <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
-                    {/* flex-basis 240px: su schermi larghi sta sulla
-                        stessa riga di orario/rimuovi, su mobile (dove
-                        non c'entra) va a capo da sola invece di
-                        tagliarsi — prima l'indirizzo spariva proprio
-                        da mobile per mancanza di spazio. */}
-                    <div style={{ flex: '1 1 240px', display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                      <span style={{ fontSize: 13.5, flexShrink: 0 }}>{f.citta}</span>
-                      <input
-                        value={f.indirizzo ?? ''}
-                        onChange={(e) => aggiornaFermataOperativa(tragitto.tragittoId, idx, 'indirizzo', e.target.value)}
-                        placeholder="Indirizzo"
-                        style={{ flex: 1, minWidth: 0, fontSize: 12.5, padding: '4px 8px' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <div style={{ width: 110 }}>
+                {formOperativo.fermate.map((f, idx) => {
+                  const chiaveEspanso = `${tragitto.tragittoId}::${idx}`;
+                  const espansa = fermateIndirizzoEspanso.has(chiaveEspanso);
+                  return (
+                  <div key={idx} style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {/* Doppio tap (mobile) o doppio clic (desktop) —
+                          un tap solo è troppo facile da toccare per
+                          sbaglio scorrendo la lista, il doppio evita
+                          aperture accidentali. */}
+                      <div
+                        onDoubleClick={() => setFermateIndirizzoEspanso((prev) => {
+                          const nuovo = new Set(prev);
+                          if (nuovo.has(chiaveEspanso)) nuovo.delete(chiaveEspanso); else nuovo.add(chiaveEspanso);
+                          return nuovo;
+                        })}
+                        title="Doppio tap per modificare l'indirizzo"
+                        style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 6, cursor: 'pointer' }}
+                      >
+                        <span style={{ fontSize: 13.5, flexShrink: 0 }}>{f.citta}</span>
+                        {!espansa && (
+                          <span style={{ fontSize: 12, color: 'var(--mist)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            — {f.indirizzo || 'nessun indirizzo'}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ width: 110, flexShrink: 0 }}>
                         <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermataOperativa(tragitto.tragittoId, idx, 'orario', v)} />
                       </div>
                       <button
@@ -726,8 +741,18 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onNavigaTab, 
                         Rimuovi
                       </button>
                     </div>
+                    {espansa && (
+                      <input
+                        value={f.indirizzo ?? ''}
+                        onChange={(e) => aggiornaFermataOperativa(tragitto.tragittoId, idx, 'indirizzo', e.target.value)}
+                        placeholder="Indirizzo"
+                        autoFocus
+                        style={{ width: '100%', marginTop: 6, fontSize: 12.5, padding: '4px 8px' }}
+                      />
+                    )}
                   </div>
-                ))}
+                  );
+                })}
                 {fermateAnagrafica.length > 0 && (
                   <select
                     style={{ marginTop: 10 }}
