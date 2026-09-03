@@ -616,14 +616,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             const tv = [...(eventoCompleto?.tragitti ?? []), ...(eventoCompleto?.servizi.flatMap((s) => s.tragitti) ?? [])].find((x) => x.id === t.tragittoId);
             const fattoQui = contestoPartenze?.tabOrigine === 'fermate' ? tv?.fermate.some((f) => f.orario)
               : contestoPartenze?.tabOrigine === 'da-prezzare' ? !!tv?.preventivoCosto
-              : false;
+              : null; // "fatto/da fare" non si applica a Da Confermare/Confermato allo stesso modo — resta neutra
             return (
               <button
                 key={t.tragittoId} type="button"
-                className={`mini-tab${tragittoTabSelezionato?.tragittoId === t.tragittoId ? ' active' : ''}${fattoQui ? ' completato' : ''}`}
+                className={`mini-tab${tragittoTabSelezionato?.tragittoId === t.tragittoId ? ' active' : ''}${fattoQui === null ? '' : fattoQui ? ' completato' : ' attenzione'}`}
                 onClick={() => setTabTragittoAttivo(t.tragittoId)}
               >
-                {fattoQui && '✓ '}{t.nome}
+                {t.nome}
               </button>
             );
           })}

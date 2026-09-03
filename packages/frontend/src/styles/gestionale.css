@@ -356,6 +356,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .mini-tab:focus, .mini-tab:focus-visible{outline:none; box-shadow:none;}
 .mini-tab.active{border-color:var(--blue); color:var(--paper); background:rgba(37,99,235,.1);}
 .mini-tab.completato{border-color:var(--green); color:var(--green);}
+.mini-tab.attenzione{border-color:var(--pink); color:var(--pink);}
 
 /* Sotto-tab (dentro una sezione, es. Info/Descrizione dentro "Info
    evento") — più piccole e discrete delle tab principali, per capire a
