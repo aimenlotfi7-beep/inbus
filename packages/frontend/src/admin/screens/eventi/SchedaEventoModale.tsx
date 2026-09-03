@@ -59,6 +59,12 @@ export function SchedaEventoModale({
   onSalvato: () => void;
 }) {
   const [percorsiSalvati, setPercorsiSalvati] = useState<PercorsoSalvato[]>([]);
+  // Selezione a due passi per "Aggiungi da quelli salvati" — prima la
+  // città di arrivo, poi (dentro quella) i tragitti veri, uno alla
+  // volta o tutti insieme. Si azzera ogni volta che si cambia servizio
+  // attivo, per non lasciare una selezione a metà da un altro contesto.
+  const [cittaPercorsoScelta, setCittaPercorsoScelta] = useState('');
+  const [percorsiSelezionatiIds, setPercorsiSelezionatiIds] = useState<Set<string>>(new Set());
   const [fermateAnagrafica, setFermateAnagrafica] = useState<FermataAnagrafica[]>([]);
   const [categorie, setCategorie] = useState<Categoria[]>([]);
   const [layoutDisponibili, setLayoutDisponibili] = useState<LayoutBiglietto[]>([]);
@@ -963,31 +969,90 @@ export function SchedaEventoModale({
 
       {modalitaServizi !== null && !servizioSenzaNomeAttivo && (
       <>
-      {percorsiSalvati.length > 0 && (
-        <div className="section-card" style={{ marginBottom: 16 }}>
-          <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi un tragitto da quelli salvati</p>
-          <select
-            value=""
-            onChange={(e) => {
-              const t = percorsiSalvati.find((x) => x.id === e.target.value);
-              // Un percorso può essere riusato su servizi diversi (es.
-              // Milano-Roma sia sul servizio delle 14:00 sia su quello
-              // delle 18:00) — non può essere doppio solo dentro lo
-              // STESSO servizio.
-              const contesto = servizioIdContestoAttuale();
-              const giaUsatoQui = (form.tragitti ?? []).some((l) => l.nome === t?.nome && (l.servizioId ?? null) === contesto);
-              if (t && !giaUsatoQui) aggiungiTragittoDaPercorso(t);
-            }}
-          >
-            <option value="">Scegli un tragitto...</option>
-            {percorsiSalvati.map((t) => {
-              const contesto = servizioIdContestoAttuale();
-              const giaUsatoQui = (form.tragitti ?? []).some((l) => l.nome === t.nome && (l.servizioId ?? null) === contesto);
-              return <option key={t.id} value={t.id} disabled={giaUsatoQui}>{t.nome}{giaUsatoQui ? ' (già aggiunto a questo servizio)' : ''}</option>;
-            })}
-          </select>
-        </div>
-      )}
+      {percorsiSalvati.length > 0 && (() => {
+        const contesto = servizioIdContestoAttuale();
+        function giaUsato(t: PercorsoSalvato) {
+          return (form.tragitti ?? []).some((l) => l.nome === t.nome && (l.servizioId ?? null) === contesto);
+        }
+        // Stessa regola già usata per il raggruppamento in Tragitti
+        // Salvati — l'arrivo è l'ultima fermata dell'elenco, nessun
+        // campo a parte.
+        function arrivoDi(t: PercorsoSalvato) {
+          return t.fermate[t.fermate.length - 1]?.citta?.trim() || '— senza arrivo —';
+        }
+        const cittaConConteggio = [...new Map(percorsiSalvati.map((t) => [arrivoDi(t), true])).keys()]
+          .map((citta) => ({ citta, conteggio: percorsiSalvati.filter((t) => arrivoDi(t) === citta).length }))
+          .sort((a, b) => b.conteggio - a.conteggio || a.citta.localeCompare(b.citta));
+        const percorsiDellaCitta = cittaPercorsoScelta ? percorsiSalvati.filter((t) => arrivoDi(t) === cittaPercorsoScelta) : [];
+        const tuttiSelezionabiliSelezionati = percorsiDellaCitta.length > 0 && percorsiDellaCitta.every((t) => giaUsato(t) || percorsiSelezionatiIds.has(t.id));
+
+        function aggiungiSelezionati() {
+          for (const t of percorsiDellaCitta) {
+            if (percorsiSelezionatiIds.has(t.id) && !giaUsato(t)) aggiungiTragittoDaPercorso(t);
+          }
+          setPercorsiSelezionatiIds(new Set());
+          setCittaPercorsoScelta('');
+        }
+
+        return (
+          <div className="section-card" style={{ marginBottom: 16 }}>
+            <p className="section-label" style={{ marginBottom: 10 }}>Aggiungi un tragitto da quelli salvati</p>
+            <div className="campo" style={{ marginBottom: cittaPercorsoScelta ? 10 : 0 }}>
+              <label>Città di arrivo</label>
+              <select
+                value={cittaPercorsoScelta}
+                onChange={(e) => { setCittaPercorsoScelta(e.target.value); setPercorsiSelezionatiIds(new Set()); }}
+              >
+                <option value="">Scegli una città di arrivo...</option>
+                {cittaConConteggio.map(({ citta, conteggio }) => (
+                  <option key={citta} value={citta}>{citta} ({conteggio})</option>
+                ))}
+              </select>
+            </div>
+
+            {cittaPercorsoScelta && (
+              <>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '10px 0', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={tuttiSelezionabiliSelezionati}
+                    onChange={(e) => {
+                      const selezionabili = percorsiDellaCitta.filter((t) => !giaUsato(t)).map((t) => t.id);
+                      setPercorsiSelezionatiIds(e.target.checked ? new Set(selezionabili) : new Set());
+                    }}
+                    style={{ width: 'auto' }}
+                  />
+                  Tutti insieme ({percorsiDellaCitta.filter((t) => !giaUsato(t)).length})
+                </label>
+                <div style={{ maxHeight: 220, overflowY: 'auto', marginBottom: 10 }}>
+                  {percorsiDellaCitta.map((t) => {
+                    const usato = giaUsato(t);
+                    return (
+                      <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, padding: '4px 0', opacity: usato ? .5 : 1, cursor: usato ? 'default' : 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={percorsiSelezionatiIds.has(t.id)}
+                          disabled={usato}
+                          onChange={(e) => setPercorsiSelezionatiIds((prev) => {
+                            const nuovo = new Set(prev);
+                            if (e.target.checked) nuovo.add(t.id); else nuovo.delete(t.id);
+                            return nuovo;
+                          })}
+                          style={{ width: 'auto' }}
+                        />
+                        {t.nome}{usato ? ' (già aggiunto a questo servizio)' : ''}
+                      </label>
+                    );
+                  })}
+                </div>
+                <button type="button" className="btn btn-primary" disabled={percorsiSelezionatiIds.size === 0} onClick={aggiungiSelezionati}>
+                  Aggiungi {percorsiSelezionatiIds.size > 0 ? `(${percorsiSelezionatiIds.size})` : ''}
+                </button>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {(form.tragitti ?? []).map((tragitto, idxTragitto) => {
         // Mostra solo i tragitti del contesto giusto: in modalità

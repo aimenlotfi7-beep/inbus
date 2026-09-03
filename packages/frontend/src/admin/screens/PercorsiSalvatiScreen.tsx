@@ -22,6 +22,12 @@ import { MappaPercorso, type TappaMappa, type PercorsoMappa } from '../shared/Ma
  */
 export function PercorsiSalvatiScreen() {
   const [tab, setTab] = useState<'elenco' | 'cartina'>('elenco');
+  // Nell'Elenco, prima si sceglie la città di ARRIVO (una card per
+  // ognuna, con quanti tragitti la raggiungono), poi dentro quella si
+  // vede l'elenco vero — utile soprattutto ora che stiamo per caricare
+  // centinaia di percorsi dai competitor, altrimenti una lista sola
+  // diventerebbe ingestibile da scorrere.
+  const [cittaSelezionata, setCittaSelezionata] = useState<string | null>(null);
   const [percorsiCartinaIds, setPercorsiCartinaIds] = useState<string[]>(['']);
   const [percorsi, setTragitti] = useState<PercorsoSalvato[]>([]);
   const [inModifica, setInModifica] = useState<PercorsoSalvato | null>(null);
@@ -112,9 +118,28 @@ export function PercorsiSalvatiScreen() {
   const modificato = snapshotIniziale !== '' && JSON.stringify({ nome, fermate }) !== snapshotIniziale;
   const chiediConferma = useAvvisoModificheNonSalvate(modificato);
 
+  // L'arrivo di un percorso salvato è l'ULTIMA fermata dell'elenco
+  // (le due Teste sono le fermate ai due estremi) — nessun campo a
+  // parte, è già così nel modello.
+  function arrivoDi(t: PercorsoSalvato): string {
+    return t.fermate[t.fermate.length - 1]?.citta?.trim() || '— senza arrivo —';
+  }
+
   const tragittiFiltrati = ricerca.trim()
     ? percorsi.filter((t) => `${t.nome} ${t.fermate.map((f) => f.citta).join(' ')}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : percorsi;
+
+  // Raggruppo per città di arrivo — solo quando non è ancora stata
+  // scelta una città specifica (altrimenti serve solo l'elenco
+  // filtrato su quella, già sopra).
+  const cittaConConteggio = cittaSelezionata === null
+    ? [...new Map(tragittiFiltrati.map((t) => [arrivoDi(t), true])).keys()]
+      .map((citta) => ({ citta, conteggio: tragittiFiltrati.filter((t) => arrivoDi(t) === citta).length }))
+      .sort((a, b) => b.conteggio - a.conteggio || a.citta.localeCompare(b.citta))
+    : [];
+  const tragittiDellaCitta = cittaSelezionata !== null
+    ? tragittiFiltrati.filter((t) => arrivoDi(t) === cittaSelezionata)
+    : [];
 
   if (modaleAperta) {
     return (
@@ -257,17 +282,39 @@ export function PercorsiSalvatiScreen() {
         </div>
       ) : (
         <>
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome tragitto o città..." />
-      {!tragittiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun tragitto trovato.' : 'Nessun tragitto ancora.'}</p>}
-      <div className="cards-list">
-        {tragittiFiltrati.map((t) => (
-          <div key={t.id} className="evento-card" onClick={() => apriModifica(t)}>
-            <h3>{t.nome}</h3>
-            <p>{t.fermate.map((f) => f.citta).filter(Boolean).join(' → ') || 'Nessuna fermata'}</p>
-            <button className="btn btn-ghost" style={{ marginTop: 10, fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(t); }}>Elimina</button>
+      <RicercaSezione
+        valore={ricerca}
+        onChange={setRicerca}
+        placeholder={cittaSelezionata === null ? 'Cerca per città di arrivo...' : 'Cerca per nome tragitto o città...'}
+      />
+      {cittaSelezionata === null ? (
+        <>
+          {!cittaConConteggio.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessuna città trovata.' : 'Nessun tragitto ancora.'}</p>}
+          <div className="cards-list">
+            {cittaConConteggio.map(({ citta, conteggio }) => (
+              <div key={citta} className="evento-card" onClick={() => setCittaSelezionata(citta)}>
+                <h3>{citta}</h3>
+                <p>{conteggio} tragitt{conteggio === 1 ? 'o' : 'i'}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      ) : (
+        <>
+          <button type="button" className="btn btn-ghost" style={{ marginBottom: 14 }} onClick={() => setCittaSelezionata(null)}>← Torna alle città</button>
+          <p className="section-label" style={{ marginBottom: 10 }}>Arrivo: {cittaSelezionata}</p>
+          {!tragittiDellaCitta.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun tragitto trovato.' : 'Nessun tragitto per questa città.'}</p>}
+          <div className="cards-list">
+            {tragittiDellaCitta.map((t) => (
+              <div key={t.id} className="evento-card" onClick={() => apriModifica(t)}>
+                <h3>{t.nome}</h3>
+                <p>{t.fermate.map((f) => f.citta).filter(Boolean).join(' → ') || 'Nessuna fermata'}</p>
+                <button className="btn btn-ghost" style={{ marginTop: 10, fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(t); }}>Elimina</button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
         </>
       )}
     </div>
