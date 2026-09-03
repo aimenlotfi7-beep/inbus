@@ -130,8 +130,12 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
 
       if (!mappaRef.current && contenitoreRef.current) {
         mappaRef.current = L.map(contenitoreRef.current);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap',
+        // Stile chiaro, quasi bianco e nero, con le scritte delle
+        // città sempre leggibili — CartoDB "Positron", gratuito, nessuna
+        // chiave richiesta (al contrario di es. Stamen Toner, che dal
+        // 2023 richiede un account Stadia Maps).
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          attribution: '© OpenStreetMap © CARTO',
           maxZoom: 19,
         }).addTo(mappaRef.current);
         // Cliccare sulla cartina ma FUORI da una linea (sullo sfondo)

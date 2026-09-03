@@ -3,14 +3,10 @@ import { eventiApi, type VenditePerFermata } from '../../../api/eventi';
 import type { Evento } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { impostazioniApi } from '../../../api/impostazioni';
-import { geocodifica, type Coordinate } from '../../shared/geo';
+import { geocodifica, durataViaggio, type Coordinate } from '../../shared/geo';
 import { PanelHead } from '../../shared/PanelHead';
 import { CampoNumero } from '../../shared/CampoNumero';
 
-/** In km, in linea d'aria — semplice e veloce apposta per questa prima
- *  versione (Fase 1, solo analisi): un raffronto sul tracciato stradale
- *  vero (come già fa la Cartina Percorsi con OSRM) è previsto come
- *  passo successivo, se questo primo giro si rivela utile davvero. */
 function distanzaLineaRetta(a: Coordinate, b: Coordinate): number {
   const R = 6371;
   const dLat = (b.lat - a.lat) * Math.PI / 180;
@@ -25,42 +21,47 @@ function minutiDa(orario: string): number | null {
   return Number(m[1]) * 60 + Number(m[2]);
 }
 
-interface FermataConCoordinate { id: string; citta: string; orario: string | null; coord: Coordinate | null; nonLocalizzata: boolean; prezzo: number | null; confermati: number; }
-interface TragittoAnalisi { tragittoId: string; nome: string; orarioPartenza: string | null; fermate: FermataConCoordinate[]; preventivoCosto: number | null; }
-interface CoppiaVicina { fermataA: FermataConCoordinate; fermataB: FermataConCoordinate; distanzaKm: number; }
-interface CoppiaTragitti { a: TragittoAnalisi; b: TragittoAnalisi; differenzaMinuti: number; coppieFermate: CoppiaVicina[]; }
-// Un GRUPPO può avere più di due tragitti — se A è vicino a B, e B è
-// vicino a C, i tre finiscono nello stesso gruppo anche se A e C non
-// sono direttamente vicini tra loro (il bus li tocca comunque tutti e
-// tre in sequenza). "coppie" tiene il dettaglio di OGNI legame diretto
-// trovato dentro il gruppo, per la tabella di trasparenza.
-interface GruppoTragitti { tragitti: TragittoAnalisi[]; coppie: CoppiaTragitti[]; }
+interface FermataNodo {
+  id: string;
+  tragittoId: string;
+  tragittoNome: string;
+  citta: string;
+  orarioMinuti: number;
+  coord: Coordinate;
+  distanzaArrivo: number; // km in linea d'aria dalla fermata al SUO arrivo — serve per la linearità
+  prezzo: number | null;
+  confermati: number;
+  preventivoCosto: number | null;
+}
 
-/** Strumento in prova (Fase 1 del progetto "Linee combinate" di cui
- *  abbiamo parlato) — SOLO lettura, nessuna scrittura su nulla: legge
- *  gli stessi dati già visibili in Partenze (tragitti, fermate,
- *  orari), non li tocca, non è collegato a nessuna schermata di
- *  Partenze. Serve a scoprire, dentro UN evento, quali coppie di
- *  tragitti hanno fermate vicine E orari di partenza compatibili —
- *  candidati papabili per un domani costruire un bus unico che li
- *  copra entrambi (quella parte, la Fase 2/3, non è ancora costruita:
- *  oggi una Linea resta legata a un solo tragitto). */
+interface CollegamentoTratta { da: FermataNodo; a: FermataNodo; minutiGuida: number; minutiDisponibili: number; }
+interface PercorsoCandidato { fermate: FermataNodo[]; collegamenti: CollegamentoTratta[]; }
+
+/** Strumento in prova (progetto "Linee combinate" di cui abbiamo
+ *  parlato) — SOLO lettura, nessuna scrittura su nulla: legge gli
+ *  stessi dati già visibili in Partenze/Eventi, non li tocca, non è
+ *  collegato a nessuna loro schermata.
+ *
+ *  Il parametro centrale è la SINGOLA FERMATA, non il tragitto intero
+ *  (deciso insieme) — costruisce un percorso vero attraversando
+ *  fermate di tragitti diversi, con questa regola: una fermata può
+ *  seguirne un'altra SOLO SE il tempo di guida vero tra le due (dato
+ *  reale OSRM, lo stesso già usato per "Calcola orari") è minore o
+ *  uguale alla differenza tra i loro orari — così l'orario promesso a
+ *  OGNI fermata resta esattamente quello, per nessun cliente cambia
+ *  nulla. In più, il percorso deve restare LINEARE: ogni fermata deve
+ *  essere più vicina al proprio arrivo di quella prima di lei (mai un
+ *  passo indietro — lo stesso controllo di cui parlavamo per gli
+ *  errori tipo "Lecce-Bari-Roma"). */
 export function AnalisiPercorsiScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [eventoId, setEventoId] = useState('');
-  const [raggioKm, setRaggioKm] = useState(30);
-  const [finestraMinuti, setFinestraMinuti] = useState(90);
   const [analizzando, setAnalizzando] = useState(false);
   const [progresso, setProgresso] = useState('');
-  const [risultati, setRisultati] = useState<GruppoTragitti[] | null>(null);
+  const [percorsi, setPercorsi] = useState<PercorsoCandidato[] | null>(null);
   const [erroreAnalisi, setErroreAnalisi] = useState('');
-  const [tragittiAnalizzati, setTragittiAnalizzati] = useState(0);
   const [postiPerBusGlobale, setPostiPerBusGlobale] = useState(50);
   const [sogliaOccupazionePercento, setSogliaOccupazionePercento] = useState(50);
-  // Costo ipotetico di un bus combinato, digitato dall'utente per
-  // ogni coppia candidata — deciso insieme: lo strumento propone,
-  // non scrive né inventa un costo da solo (nessun preventivo vero
-  // esiste ancora per un bus che non c'è).
   const [costoCombinatoMap, setCostoCombinatoMap] = useState<Map<number, number | undefined>>(new Map());
 
   useEffect(() => {
@@ -77,7 +78,8 @@ export function AnalisiPercorsiScreen() {
     if (!eventoId) return;
     setAnalizzando(true);
     setErroreAnalisi('');
-    setRisultati(null);
+    setPercorsi(null);
+    setCostoCombinatoMap(new Map());
     setProgresso('Carico l\'evento...');
     try {
       const evento = await eventiApi.getById(eventoId);
@@ -92,103 +94,103 @@ export function AnalisiPercorsiScreen() {
       const anagrafica = await fermateAnagraficaApi.list();
       const mappaAnagrafica = new Map<string, FermataAnagrafica>(anagrafica.map((f) => [f.id, f]));
 
-      const analisi: TragittoAnalisi[] = [];
+      async function localizza(indirizzo: string, citta: string, fermataAnagraficaId?: string | null): Promise<Coordinate | null> {
+        const daAnagrafica = fermataAnagraficaId ? mappaAnagrafica.get(fermataAnagraficaId) : null;
+        if (daAnagrafica?.lat != null && daAnagrafica?.lng != null) return { lat: daAnagrafica.lat, lng: daAnagrafica.lng };
+        if (!indirizzo?.trim()) return null;
+        const r = await geocodifica(`${indirizzo}, ${citta}`);
+        return r.coordinate;
+      }
+
+      // Fase 1 — costruisco tutti i nodi (una fermata = un nodo), con
+      // coordinate, distanza dal proprio arrivo, prezzo e prenotazioni
+      // vere già confermate.
+      const nodi: FermataNodo[] = [];
       for (const t of tuttiITragitti) {
-        const fermateAttive = t.fermate.filter((f) => f.attivo);
+        if (!t.arrivoIndirizzo?.trim() && !t.arrivoCitta?.trim()) continue; // niente arrivo, non calcolabile: tragitto saltato
+        setProgresso(`Localizzo l'arrivo di "${t.nome}"...`);
+        const coordArrivo = await localizza(t.arrivoIndirizzo ?? '', t.arrivoCitta ?? '', null);
+        if (!coordArrivo) continue;
+
         let vendite: VenditePerFermata | null = null;
-        try { vendite = await eventiApi.venditePerFermata(t.id); } catch { /* nessun permesso o nessuna prenotazione ancora — 0 ovunque, non blocca l'analisi */ }
-        const fermateConCoord: FermataConCoordinate[] = [];
+        try { vendite = await eventiApi.venditePerFermata(t.id); } catch { /* nessuna prenotazione ancora o permesso mancante — 0 ovunque, non blocca */ }
+
+        const fermateAttive = t.fermate.filter((f) => f.attivo);
         for (const f of fermateAttive) {
-          setProgresso(`Localizzo le fermate di "${t.nome}" (${fermateConCoord.length + 1}/${fermateAttive.length})...`);
-          const daAnagrafica = f.fermataAnagraficaId ? mappaAnagrafica.get(f.fermataAnagraficaId) : null;
-          let coord: Coordinate | null = daAnagrafica?.lat != null && daAnagrafica?.lng != null ? { lat: daAnagrafica.lat, lng: daAnagrafica.lng } : null;
-          if (!coord && f.indirizzo?.trim()) {
-            const r = await geocodifica(`${f.indirizzo}, ${f.citta}`);
-            coord = r.coordinate;
-          }
-          const confermati = vendite?.perFermata.find((v) => v.citta === f.citta)?.confermati ?? 0;
-          fermateConCoord.push({ id: f.id, citta: f.citta, orario: f.orario ?? null, coord, nonLocalizzata: !coord, prezzo: f.prezzo ? Number(f.prezzo) : null, confermati });
-        }
-        analisi.push({
-          tragittoId: t.id, nome: t.nome,
-          orarioPartenza: fermateAttive[0]?.orario ?? null,
-          preventivoCosto: t.preventivoCosto ? Number(t.preventivoCosto) : null,
-          fermate: fermateConCoord,
-        });
-        setTragittiAnalizzati((n) => n + 1);
-      }
-
-      // Prima ogni coppia compatibile (stesso identico calcolo di
-      // prima — orario + fermate vicine), poi le raggruppo: se A è
-      // vicino a B, e B è vicino a C, i tre finiscono nello STESSO
-      // gruppo anche se A e C non sono direttamente vicini tra loro —
-      // un bus che tocca prima A poi B poi C li serve comunque tutti
-      // e tre in sequenza, non serve che ogni coppia sia vicina a ogni
-      // altra ("unione degli insiemi collegati", non solo confronto a
-      // due a due).
-      const coppieTrovate: CoppiaTragitti[] = [];
-      for (let i = 0; i < analisi.length; i++) {
-        for (let j = i + 1; j < analisi.length; j++) {
-          const a = analisi[i];
-          const b = analisi[j];
-          const minA = a.orarioPartenza ? minutiDa(a.orarioPartenza) : null;
-          const minB = b.orarioPartenza ? minutiDa(b.orarioPartenza) : null;
-          if (minA === null || minB === null) continue; // orario mancante su uno dei due: filtro decisivo, si scarta
-          const differenzaMinuti = Math.abs(minA - minB);
-          if (differenzaMinuti > finestraMinuti) continue;
-
-          const coppieFermate: CoppiaVicina[] = [];
-          for (const fa of a.fermate) {
-            if (!fa.coord) continue;
-            for (const fb of b.fermate) {
-              if (!fb.coord) continue;
-              const distanzaKm = distanzaLineaRetta(fa.coord, fb.coord);
-              if (distanzaKm <= raggioKm) coppieFermate.push({ fermataA: fa, fermataB: fb, distanzaKm });
-            }
-          }
-          if (coppieFermate.length > 0) {
-            coppieFermate.sort((x, y) => x.distanzaKm - y.distanzaKm);
-            coppieTrovate.push({ a, b, differenzaMinuti, coppieFermate });
-          }
+          setProgresso(`Localizzo le fermate di "${t.nome}" (${nodi.length + 1} finora)...`);
+          if (!f.orario) continue; // senza orario non si può verificare la compatibilità: fermata scartata
+          const orarioMinuti = minutiDa(f.orario);
+          if (orarioMinuti === null) continue;
+          const coord = await localizza(f.indirizzo ?? '', f.citta, f.fermataAnagraficaId);
+          if (!coord) continue;
+          nodi.push({
+            id: f.id, tragittoId: t.id, tragittoNome: t.nome, citta: f.citta,
+            orarioMinuti, coord, distanzaArrivo: distanzaLineaRetta(coord, coordArrivo),
+            prezzo: f.prezzo ? Number(f.prezzo) : null,
+            confermati: vendite?.perFermata.find((v) => v.citta === f.citta)?.confermati ?? 0,
+            preventivoCosto: t.preventivoCosto ? Number(t.preventivoCosto) : null,
+          });
         }
       }
 
-      // Unione degli insiemi (union-find) sugli indici dei tragitti —
-      // ogni coppia compatibile trovata sopra "fonde" i due gruppi a
-      // cui appartengono i suoi due tragitti.
-      const genitore = analisi.map((_, i) => i);
-      function trova(i: number): number { return genitore[i] === i ? i : (genitore[i] = trova(genitore[i])); }
-      function unisci(i: number, j: number) { const ri = trova(i), rj = trova(j); if (ri !== rj) genitore[ri] = rj; }
-      for (const c of coppieTrovate) unisci(analisi.indexOf(c.a), analisi.indexOf(c.b));
+      if (nodi.length < 2) {
+        setErroreAnalisi('Non ci sono abbastanza fermate localizzabili (con orario e indirizzo validi) da confrontare.');
+        return;
+      }
 
-      const indiciPerRadice = new Map<number, number[]>();
-      analisi.forEach((_, i) => {
-        const r = trova(i);
-        indiciPerRadice.set(r, [...(indiciPerRadice.get(r) ?? []), i]);
-      });
+      // Fase 2 — costruzione dei percorsi: in ordine di orario
+      // (prima chi parte prima), ogni fermata si aggiunge alla fine di
+      // un percorso già in costruzione SOLO se sia il tempo di guida
+      // vero (OSRM) sia la linearità tornano; altrimenti apre un
+      // percorso nuovo. Fermate dello STESSO tragitto non si
+      // aggiungono mai una all'altra (sono già collegate per
+      // definizione, non è quello che stiamo cercando).
+      const inOrdine = [...nodi].sort((a, b) => a.orarioMinuti - b.orarioMinuti);
+      const percorsiInCostruzione: PercorsoCandidato[] = [];
+      let contatoreGuida = 0;
 
-      const gruppi: GruppoTragitti[] = [...indiciPerRadice.values()]
-        .filter((indici) => indici.length > 1) // scarto i tragitti rimasti da soli, senza nessun collegamento
-        .map((indici) => ({
-          tragitti: indici.map((i) => analisi[i]),
-          coppie: coppieTrovate.filter((c) => indici.includes(analisi.indexOf(c.a))),
-        }));
-      gruppi.sort((x, y) => y.tragitti.length - x.tragitti.length); // i gruppi più grandi (più tragitti insieme) prima
-      setRisultati(gruppi);
+      for (const nodo of inOrdine) {
+        let aggiunto = false;
+        for (const percorso of percorsiInCostruzione) {
+          const coda = percorso.fermate[percorso.fermate.length - 1];
+          if (coda.tragittoId === nodo.tragittoId) continue; // stesso tragitto, non è un collegamento nuovo
+          if (nodo.distanzaArrivo >= coda.distanzaArrivo) continue; // non più vicino dell'ultima — romperebbe la linearità
+          const minutiDisponibili = nodo.orarioMinuti - coda.orarioMinuti;
+          if (minutiDisponibili <= 0) continue; // stesso ordine di orario già garantito dal ciclo, ma per sicurezza
+
+          setProgresso(`Verifico il tempo di guida reale (${++contatoreGuida})...`);
+          const minutiGuida = await durataViaggio(coda.coord, nodo.coord);
+          if (minutiGuida !== null && minutiGuida <= minutiDisponibili) {
+            percorso.fermate.push(nodo);
+            percorso.collegamenti.push({ da: coda, a: nodo, minutiGuida, minutiDisponibili });
+            aggiunto = true;
+            break;
+          }
+        }
+        if (!aggiunto) percorsiInCostruzione.push({ fermate: [nodo], collegamenti: [] });
+      }
+
+      // Solo i percorsi che toccano DAVVERO più di un tragitto sono
+      // interessanti — uno con fermate di un solo tragitto è
+      // semplicemente il tragitto così com'è già, niente di nuovo da
+      // proporre.
+      const risultato = percorsiInCostruzione
+        .filter((p) => new Set(p.fermate.map((f) => f.tragittoId)).size > 1)
+        .sort((a, b) => b.fermate.length - a.fermate.length);
+      setPercorsi(risultato);
     } catch (e) {
       setErroreAnalisi(e instanceof Error ? e.message : 'Analisi non riuscita — controlla la connessione e riprova.');
     } finally {
       setAnalizzando(false);
       setProgresso('');
-      setTragittiAnalizzati(0);
     }
   }
 
   return (
     <div>
       <PanelHead
-        titolo="Tragitti vicini (beta)"
-        info="Strumento in prova — cerca, dentro un evento, coppie di tragitti con fermate vicine e orari di partenza compatibili: candidati papabili per un domani condividere un bus unico. Solo lettura, non modifica nulla."
+        titolo="Percorso combinato (beta)"
+        info="Strumento in prova — costruisce un percorso attraverso le fermate di più tragitti dello stesso evento, garantendo che l'orario promesso a ognuna resti esattamente quello (tempo di guida reale entro la differenza tra gli orari) e che il percorso sia sempre lineare, mai un passo indietro. Solo lettura, non modifica nulla."
       />
 
       <div className="section-card" style={{ maxWidth: 620, marginBottom: 20 }}>
@@ -201,104 +203,85 @@ export function AnalisiPercorsiScreen() {
             ))}
           </select>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-          <div className="campo">
-            <label>Raggio massimo tra le fermate (km)</label>
-            <input type="number" min={1} value={raggioKm} onChange={(e) => setRaggioKm(Number(e.target.value) || 30)} />
-          </div>
-          <div className="campo">
-            <label>Finestra oraria tollerata (minuti)</label>
-            <input type="number" min={0} value={finestraMinuti} onChange={(e) => setFinestraMinuti(Number(e.target.value) || 90)} />
-          </div>
-        </div>
         <button className="btn btn-primary" onClick={analizza} disabled={!eventoId || analizzando}>
-          {analizzando ? 'Analizzo...' : 'Analizza'}
+          {analizzando ? 'Analizzo...' : 'Costruisci percorsi'}
         </button>
         {analizzando && progresso && (
-          <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 8 }}>{progresso}{tragittiAnalizzati > 0 && ` (${tragittiAnalizzati} tragitti già analizzati)`}</p>
+          <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 8 }}>{progresso}</p>
         )}
+        <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 10 }}>
+          Ogni coppia di fermate candidate richiede una verifica sul tempo di guida vero — con molte fermate insieme
+          può richiedere qualche decina di secondi, non è istantaneo.
+        </p>
       </div>
 
       {erroreAnalisi && <p style={{ color: 'var(--pink)' }}>{erroreAnalisi}</p>}
 
-      {risultati && risultati.length === 0 && (
-        <p className="testo-intro">Nessun gruppo di tragitti trovato entro {raggioKm}km e {finestraMinuti} minuti di differenza sulla partenza.</p>
+      {percorsi && percorsi.length === 0 && (
+        <p className="testo-intro">Nessun percorso combinato possibile trovato — nessuna fermata di tragitti diversi rispetta sia il tempo di guida reale sia la linearità.</p>
       )}
 
-      {risultati && risultati.length > 0 && (
+      {percorsi && percorsi.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {risultati.map((g, idx) => {
+          {percorsi.map((p, idx) => {
             const postiPareggio = Math.round(postiPerBusGlobale * (sogliaOccupazionePercento / 100));
-            const tutteLeFermate = g.tragitti.flatMap((t) => t.fermate);
-            const passeggeriCombinati = tutteLeFermate.reduce((s, f) => s + f.confermati, 0);
-            const incassoCombinato = tutteLeFermate.reduce((s, f) => s + f.confermati * (f.prezzo ?? 0), 0);
+            const passeggeriTotali = p.fermate.reduce((s, f) => s + f.confermati, 0);
+            const incassoTotale = p.fermate.reduce((s, f) => s + f.confermati * (f.prezzo ?? 0), 0);
             const costoCombinato = costoCombinatoMap.get(idx);
-            const margineCombinato = costoCombinato != null ? incassoCombinato - costoCombinato : null;
-            const tuttiHannoPreventivo = g.tragitti.every((t) => t.preventivoCosto != null);
-            const costoSeparato = tuttiHannoPreventivo ? g.tragitti.reduce((s, t) => s + t.preventivoCosto!, 0) : null;
-            const margineSeparato = costoSeparato != null ? incassoCombinato - costoSeparato : null;
+            const margineCombinato = costoCombinato != null ? incassoTotale - costoCombinato : null;
+            const tragittiCoinvolti = [...new Map(p.fermate.map((f) => [f.tragittoId, f])).values()];
+            const tuttiHannoPreventivo = tragittiCoinvolti.every((f) => f.preventivoCosto != null);
+            const costoSeparato = tuttiHannoPreventivo ? tragittiCoinvolti.reduce((s, f) => s + f.preventivoCosto!, 0) : null;
+            const margineSeparato = costoSeparato != null ? incassoTotale - costoSeparato : null;
             return (
-            <div key={idx} className="section-card">
-              <p style={{ fontWeight: 700, marginBottom: 4 }}>
-                {g.tragitti.map((t, i) => (
-                  <span key={t.tragittoId}>
-                    {i > 0 && ' + '}
-                    {t.nome} <span style={{ color: 'var(--mist)', fontWeight: 400 }}>({t.orarioPartenza})</span>
-                  </span>
+              <div key={idx} className="section-card">
+                <p style={{ fontWeight: 700, marginBottom: 4 }}>
+                  Percorso di {p.fermate.length} fermate, da {tragittiCoinvolti.length} tragitti diversi
+                </p>
+                <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 10 }}>
+                  {p.fermate.map((f) => `${f.citta} (${f.tragittoNome})`).join(' → ')}
+                </p>
+                {p.collegamenti.map((c, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: i === p.collegamenti.length - 1 ? 'none' : '1px solid var(--line)', fontSize: 13 }}>
+                    <span>{c.da.citta} → {c.a.citta}</span>
+                    <span style={{ color: 'var(--mist)' }}>{c.minutiGuida} min di guida, {c.minutiDisponibili} min disponibili</span>
+                  </div>
                 ))}
-              </p>
-              <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 10 }}>
-                {g.tragitti.length} tragitti collegati · {g.coppie.reduce((s, c) => s + c.coppieFermate.length, 0)} coppia/e di fermate vicine trovate
-              </p>
-              {g.coppie.map((c, ci) => (
-                <div key={ci} style={{ marginBottom: 8 }}>
-                  {g.coppie.length > 1 && <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 2 }}>{c.a.nome} ↔ {c.b.nome} — partenze a {c.differenzaMinuti} minuti di distanza</p>}
-                  {c.coppieFermate.map((cf, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: i === c.coppieFermate.length - 1 ? 'none' : '1px solid var(--line)', fontSize: 13 }}>
-                      <span>{cf.fermataA.citta} ↔ {cf.fermataB.citta}</span>
-                      <span style={{ color: 'var(--mist)' }}>{cf.distanzaKm.toFixed(1)} km (linea d'aria)</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
 
-              <p className="section-label" style={{ marginTop: 16, marginBottom: 8 }}>Simula un bus unico per tutto il gruppo</p>
-              <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 10 }}>
-                Somma di TUTTE le fermate di tutti i {g.tragitti.length} tragitti insieme — un bus che copre l'intero giro di ognuno.
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 20px', marginBottom: 10, fontSize: 13 }}>
-                <span>Passeggeri confermati: <strong>{passeggeriCombinati}</strong></span>
-                <span>Posti di pareggio: <strong>{postiPareggio}</strong> <span style={{ color: 'var(--mist)' }}>(posti bus {postiPerBusGlobale} × soglia {sogliaOccupazionePercento}%)</span></span>
-                <span style={{ color: passeggeriCombinati >= postiPareggio ? '#5be0a0' : 'var(--pink)' }}>
-                  {passeggeriCombinati >= postiPareggio ? '✓ sopra la soglia di pareggio' : '⚠ ancora sotto la soglia di pareggio'}
-                </span>
-                {passeggeriCombinati > postiPerBusGlobale && (
-                  <span style={{ color: '#f0b429' }}>⚠ supera i posti di un bus solo ({postiPerBusGlobale}) — potrebbero servirne due</span>
-                )}
+                <p className="section-label" style={{ marginTop: 16, marginBottom: 8 }}>Simula questo percorso come un bus unico</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 20px', marginBottom: 10, fontSize: 13 }}>
+                  <span>Passeggeri confermati: <strong>{passeggeriTotali}</strong></span>
+                  <span>Posti di pareggio: <strong>{postiPareggio}</strong> <span style={{ color: 'var(--mist)' }}>(posti bus {postiPerBusGlobale} × soglia {sogliaOccupazionePercento}%)</span></span>
+                  <span style={{ color: passeggeriTotali >= postiPareggio ? '#5be0a0' : 'var(--pink)' }}>
+                    {passeggeriTotali >= postiPareggio ? '✓ sopra la soglia di pareggio' : '⚠ ancora sotto la soglia di pareggio'}
+                  </span>
+                  {passeggeriTotali > postiPerBusGlobale && (
+                    <span style={{ color: '#f0b429' }}>⚠ supera i posti di un bus solo ({postiPerBusGlobale})</span>
+                  )}
+                </div>
+                <div className="campo" style={{ maxWidth: 220, marginBottom: 10 }}>
+                  <label>Costo ipotetico bus unico (€)</label>
+                  <CampoNumero valuta value={costoCombinato} onChange={(v) => setCostoCombinatoMap((prev) => new Map(prev).set(idx, v))} />
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.7 }}>
+                  <p>Incasso totale (i prezzi per fermata non cambiano, uniti o separati): <strong>€{incassoTotale.toFixed(2)}</strong></p>
+                  {margineCombinato !== null && (
+                    <p>Margine con bus unico: <strong style={{ color: margineCombinato >= 0 ? '#5be0a0' : 'var(--pink)' }}>€{margineCombinato.toFixed(2)}</strong></p>
+                  )}
+                  {margineSeparato !== null ? (
+                    <p>Margine con {tragittiCoinvolti.length} bus separati (dai preventivi già registrati): <strong style={{ color: margineSeparato >= 0 ? '#5be0a0' : 'var(--pink)' }}>€{margineSeparato.toFixed(2)}</strong></p>
+                  ) : (
+                    <p style={{ color: 'var(--mist)' }}>Manca il preventivo su almeno un tragitto coinvolto — non posso confrontare col caso "bus separati".</p>
+                  )}
+                  {margineCombinato !== null && margineSeparato !== null && (
+                    <p style={{ marginTop: 6, fontWeight: 700, color: margineCombinato > margineSeparato ? '#5be0a0' : 'var(--pink)' }}>
+                      {margineCombinato > margineSeparato
+                        ? `Conviene unire — margine migliore di €${(margineCombinato - margineSeparato).toFixed(2)}`
+                        : `Conviene tenerli separati — margine migliore di €${(margineSeparato - margineCombinato).toFixed(2)}`}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="campo" style={{ maxWidth: 220, marginBottom: 10 }}>
-                <label>Costo ipotetico bus unico (€)</label>
-                <CampoNumero valuta value={costoCombinato} onChange={(v) => setCostoCombinatoMap((prev) => new Map(prev).set(idx, v))} />
-              </div>
-              <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-                <p>Incasso totale (stesso, unito o separato — i prezzi per fermata non cambiano): <strong>€{incassoCombinato.toFixed(2)}</strong></p>
-                {margineCombinato !== null && (
-                  <p>Margine con bus unico: <strong style={{ color: margineCombinato >= 0 ? '#5be0a0' : 'var(--pink)' }}>€{margineCombinato.toFixed(2)}</strong></p>
-                )}
-                {margineSeparato !== null ? (
-                  <p>Margine con {g.tragitti.length} bus separati (dai preventivi già registrati, €{g.tragitti.map((t) => t.preventivoCosto!.toFixed(0)).join(' + ')}): <strong style={{ color: margineSeparato >= 0 ? '#5be0a0' : 'var(--pink)' }}>€{margineSeparato.toFixed(2)}</strong></p>
-                ) : (
-                  <p style={{ color: 'var(--mist)' }}>Manca il preventivo su almeno un tragitto del gruppo — non posso confrontare col caso "bus separati".</p>
-                )}
-                {margineCombinato !== null && margineSeparato !== null && (
-                  <p style={{ marginTop: 6, fontWeight: 700, color: margineCombinato > margineSeparato ? '#5be0a0' : 'var(--pink)' }}>
-                    {margineCombinato > margineSeparato
-                      ? `Conviene unire — margine migliore di €${(margineCombinato - margineSeparato).toFixed(2)}`
-                      : `Conviene tenerli separati — margine migliore di €${(margineSeparato - margineCombinato).toFixed(2)}`}
-                  </p>
-                )}
-              </div>
-            </div>
             );
           })}
         </div>
