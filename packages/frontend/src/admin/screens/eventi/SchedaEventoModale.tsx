@@ -456,6 +456,7 @@ export function SchedaEventoModale({
       servizioId: servizioIdContestoAttuale(),
       fermate: [fermataPartenza, ...fermateConAnagrafica],
       arrivoCitta: testaArrivo?.citta || undefined,
+      arrivoIndirizzo: testaArrivo?.indirizzo || undefined,
     };
     // Aggiornamento FUNZIONALE (legge lo stato più recente al momento
     // vero dell'esecuzione, non quello catturato quando la funzione è
@@ -478,9 +479,20 @@ export function SchedaEventoModale({
    *  Ripetibile avanti e indietro quante volte serve: applicandola due
    *  volte di fila si torna esattamente al punto di partenza (uno
    *  scambio pulito, mai con perdita di dati). */
+  // Impedisce due inversioni sovrapposte sullo stesso tragitto — tra il
+  // click e la fine della verifica prenotazioni (una chiamata di rete)
+  // c'è una finestra in cui un secondo click partirebbe usando ancora i
+  // dati di PRIMA della prima inversione, risultando in una città
+  // d'arrivo sbagliata/vecchia una volta finite entrambe.
+  const [inversioneInCorso, setInversioneInCorso] = useState<Set<string>>(new Set());
+
   async function invertiTragitto(idxTragitto: number) {
     const t = (form.tragitti ?? [])[idxTragitto];
     if (!t) return;
+    const chiaveGuardiano = t.id ?? `nuovo-${idxTragitto}`;
+    if (inversioneInCorso.has(chiaveGuardiano)) return;
+    setInversioneInCorso((prev) => new Set(prev).add(chiaveGuardiano));
+    try {
 
     // Stesso controllo già usato per rimuoviTragitto — invertire
     // scambia partenza e arrivo: se la città che era "partenza" (dove
@@ -534,6 +546,9 @@ export function SchedaEventoModale({
       };
       return { ...f, tragitti };
     });
+    } finally {
+      setInversioneInCorso((prev) => { const s = new Set(prev); s.delete(chiaveGuardiano); return s; });
+    }
   }
   // Se il nome segue la forma "Partenza → Arrivo" (quella usata dai
   // Percorsi Salvati, e proposta di default quando se ne applica uno),
@@ -1046,6 +1061,7 @@ export function SchedaEventoModale({
             <button
               type="button" className="btn btn-ghost" style={{ fontSize: 12, whiteSpace: 'nowrap' }}
               onClick={() => invertiTragitto(idxTragitto)}
+              disabled={inversioneInCorso.has(tragitto.id ?? `nuovo-${idxTragitto}`)}
               title="Scambia partenza e arrivo, gira anche l'ordine delle fermate intermedie (e il nome, se segue la forma 'A → B')"
             >
               ↔ Inverti

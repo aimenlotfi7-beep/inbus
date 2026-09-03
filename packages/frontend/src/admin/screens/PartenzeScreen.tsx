@@ -185,7 +185,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
                 badge={testoBadge && <span style={{ color: tuttoFatto ? 'var(--green)' : undefined }}>{testoBadge}</span>}
                 extra={
                   <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 2 }}>
-                    {gruppo.map((p) => p.servizioNome ?? p.tragittoNome).join(', ')}
+                    {gruppo.length} tragitt{gruppo.length === 1 ? 'o' : 'i'}
                     {(tab === 'da-confermare' || tab === 'confermato') && ` · ${gruppo.reduce((s, p) => s + p.totalePasseggeri, 0)}/${gruppo.reduce((s, p) => s + p.postiTotali, 0)} posti`}
                   </p>
                 }

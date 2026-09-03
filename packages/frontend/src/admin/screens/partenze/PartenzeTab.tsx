@@ -108,6 +108,13 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState('');
   const [aperte, setAperte] = useState<Set<string>>(new Set());
+  // Quale tragitto è "attivo" quando si arriva da una card con più di
+  // uno insieme (es. andata+ritorno) — una tab a testa invece di
+  // vederli tutti impilati in una pagina lunga, come richiesto (stesso
+  // schema di Tragitti Salvati: clic sulla tab, appare solo quella
+  // pagina). null finché non è ancora stato scelto nulla — in quel
+  // caso si sceglie il primo disponibile al momento del rendering.
+  const [tabTragittoAttivo, setTabTragittoAttivo] = useState<string | null>(null);
   // Caricate su richiesta, solo per i tragitti espansi in "Confermato"
   // (riga "Linee" del riepilogo a righe) — non serve per tutti gli
   // altri contesti, niente da guadagnare a caricarle sempre.
@@ -541,6 +548,16 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
     : calcolo
   ).filter((l) => !contestoPartenze || contestoPartenze.tragittiIds.includes(l.tragittoId));
 
+  // Arrivando da una card con più di un tragitto insieme (es.
+  // andata+ritorno) — una tab a testa invece di vederli tutti impilati
+  // in una pagina lunga da scorrere, stesso schema già usato in
+  // Tragitti Salvati: si clicca la tab, compare solo quella pagina.
+  const mostraTabTragitti = !!contestoPartenze && calcoloVisibile.length > 1;
+  const tragittoTabSelezionato = mostraTabTragitti
+    ? (calcoloVisibile.find((t) => t.tragittoId === tabTragittoAttivo) ?? calcoloVisibile[0])
+    : null;
+  const calcoloDaRenderizzare = tragittoTabSelezionato ? [tragittoTabSelezionato] : calcoloVisibile;
+
   return (
     <div>
       {servizi && servizi.length > 0 && (
@@ -589,7 +606,21 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         <p className="testo-intro">Questa scheda non ha ancora nessun tragitto configurato — vai nella tab "Dettagli" per aggiungerne uno.</p>
       )}
 
-      {calcoloVisibile.map((tragitto) => {
+      {mostraTabTragitti && (
+        <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+          {calcoloVisibile.map((t) => (
+            <button
+              key={t.tragittoId} type="button"
+              className={`mini-tab${tragittoTabSelezionato?.tragittoId === t.tragittoId ? ' active' : ''}`}
+              onClick={() => setTabTragittoAttivo(t.tragittoId)}
+            >
+              {t.nome}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {calcoloDaRenderizzare.map((tragitto) => {
         const stato = statoTragitto(tragitto);
         const busTragitto = busLista.filter((b) => b.tragittiIds.includes(tragitto.tragittoId));
         const espansa = aperte.has(tragitto.tragittoId);
@@ -905,7 +936,16 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
 
               return (
                 <div style={{ marginTop: 14 }}>
-                  <p className="section-label" style={{ marginBottom: 8 }}>Cruscotto Vendite</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <p className="section-label" style={{ margin: 0 }}>Cruscotto Vendite</p>
+                    {/* Prima si saltava qui in automatico appena aperto il
+                        tragitto — tolto insieme al Cruscotto, ma senza
+                        lasciare un modo per raggiungere comunque la
+                        pagina vera dove si aggiungono i bus. Corretto. */}
+                    <button type="button" className="btn btn-primary" style={{ fontSize: 13, padding: '7px 16px' }} onClick={() => apriPaginaLinee(tragitto.tragittoId)}>
+                      Gestisci Linee →
+                    </button>
+                  </div>
                   {!vendite ? (
                     <p style={{ color: 'var(--mist)' }}>Carico le prenotazioni...</p>
                   ) : (
