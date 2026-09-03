@@ -13,6 +13,7 @@ export type SezioneGestionale =
   | 'fornitori' | 'fermate' | 'tragitti'
   | 'chat' | 'contenuti' | 'comunicazioni'
   | 'amministratori' | 'ruoli' | 'impostazioni' | 'template-email' | 'layout-biglietto' | 'testi-tooltip'
+  | 'beta-tragitti-vicini'
   // "linee" non compare in nessun GRUPPI qui sotto: non è una voce di
   // menu, si raggiunge solo dal pulsante "Gestisci Linee" dentro un
   // tragitto in Partenze — una vera pagina a sé (indirizzo proprio:
@@ -72,6 +73,13 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
     { id: 'testi-tooltip', label: 'Testi tooltip', permesso: 'impostazioni.gestisci' },
     { id: 'impostazioni', label: 'Impostazioni', permesso: 'impostazioni.gestisci' },
+  ]},
+  // Sezione a parte per gli strumenti ancora in prova — SOLO lettura
+  // dei dati già esistenti (eventi/tragitti/fermate), nessuna scrittura
+  // e nessun collegamento dentro le schermate di Partenze: può essere
+  // tolta o cambiata in qualunque momento senza toccare nient'altro.
+  { titolo: 'Beta', voci: [
+    { id: 'beta-tragitti-vicini', label: 'Tragitti vicini', permesso: 'eventi.partenze' },
   ]},
 ];
 

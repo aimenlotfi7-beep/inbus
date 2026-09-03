@@ -36,6 +36,7 @@ import { OfferteScreen } from './screens/OfferteScreen';
 import { ImpostazioniScreen } from './screens/ImpostazioniScreen';
 import { TemplateEmailScreen } from './screens/TemplateEmailScreen';
 import { LayoutBigliettoScreen } from './screens/LayoutBigliettoScreen';
+import { AnalisiPercorsiScreen } from './screens/beta/AnalisiPercorsiScreen';
 import { authApi, haPermesso, type SessioneAdmin } from '../api/auth';
 
 function StatisticheSenzaHeader() {
@@ -79,6 +80,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   impostazioni: ImpostazioniScreen,
   'template-email': TemplateEmailScreen,
   'layout-biglietto': LayoutBigliettoScreen,
+  'beta-tragitti-vicini': AnalisiPercorsiScreen,
 };
 
 // Permesso richiesto per ogni sezione, usato per bloccare l'accesso
@@ -121,6 +123,7 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   impostazioni: 'impostazioni.gestisci',
   'template-email': 'template-email.gestisci',
   'layout-biglietto': 'layout-biglietto.gestisci',
+  'beta-tragitti-vicini': 'eventi.partenze',
 };
 
 /** Legge la sezione attiva dall'indirizzo (?sezione=...) — così se
