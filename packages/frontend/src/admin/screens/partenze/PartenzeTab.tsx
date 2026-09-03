@@ -591,6 +591,12 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         // contenuto ancora visibile sotto, dato che quei pannelli non
         // dipendono da "espansa").
         const mostraContenuto = espansa || formOperativoMap.has(tragitto.tragittoId) || formPreventivoMap.has(tragitto.tragittoId);
+        // Serve solo per il badge "Orari impostati" in questa tappa —
+        // CalcoloBusTragitto (sopra) non porta l'orario, va preso dai
+        // dati veri del tragitto (stesso criterio già usato lato
+        // server per "fermateCompilate": almeno una fermata con orario).
+        const tragittoVeroPerOrari = [...(eventoCompleto?.tragitti ?? []), ...(eventoCompleto?.servizi.flatMap((s) => s.tragitti) ?? [])].find((t) => t.id === tragitto.tragittoId);
+        const orariImpostati = tragittoVeroPerOrari?.fermate.some((f) => f.orario) ?? false;
         return (
         <div key={tragitto.tragittoId} className="section-card" style={stato.classe === 'non-coperta' ? { borderColor: 'var(--pink)' } : undefined}>
           <div
@@ -599,8 +605,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
           >
             <div>
               <h3>{mostraContenuto ? '▾' : '▸'} {tragitto.nome}</h3>
-              <p className="section-sub">
-                {tragitto.totalePasseggeri} passeggeri confermati su {tragitto.postiTotali} posti previsti · {busTragitto.length} bus censit{busTragitto.length === 1 ? 'o' : 'i'}
+              {contestoPartenze?.tabOrigine !== 'fermate' && (
+                <p className="section-sub">
+                  {tragitto.totalePasseggeri} passeggeri confermati su {tragitto.postiTotali >= 999999 ? 'posti illimitati (nessun bus ancora)' : `${tragitto.postiTotali} posti previsti`} · {busTragitto.length} bus censit{busTragitto.length === 1 ? 'o' : 'i'}
                 {vedeEconomia && (() => {
                   const dati = economia.find((e) => e.tragittoId === tragitto.tragittoId);
                   if (!dati) return null;
@@ -615,9 +622,16 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                   );
                 })()}
               </p>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-              <span className={`badge ${stato.classe}`}>{stato.etichetta}</span>
+              {contestoPartenze?.tabOrigine === 'fermate' ? (
+                <span className={`badge ${orariImpostati ? 'coperta' : 'attenzione'}`}>
+                  {orariImpostati ? '✓ Orari impostati' : '◔ Orari da impostare'}
+                </span>
+              ) : (
+                <span className={`badge ${stato.classe}`}>{stato.etichetta}</span>
+              )}
               {tragitto.stato === 'PREZZATO' && (
                 <span style={{ fontSize: 10.5, color: 'var(--mist)' }}>Prezzato, bus vero ancora da opzionare</span>
               )}
@@ -818,14 +832,46 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                       <span style={{ color: 'var(--mist)' }}>{f.orario ?? '— orario non impostato'}</span>
                     </div>
                   ))}
+                {/* L'arrivo (città/indirizzo/orario) è un dato NECESSARIO
+                    per calcolare gli orari (vedi calcolaOrariDaArrivo più
+                    sopra) ma prima non compariva mai qui — l'unico
+                    segnale, se mancava, era un errore al clic su
+                    "Calcola orari". Ora si vede sempre, cosi' si
+                    controlla a colpo d'occhio invece di doverlo
+                    indovinare o tornare su Eventi per controllare. */}
+                <p className="section-label" style={{ marginTop: 14, marginBottom: 8 }}>Arrivo</p>
+                {tragittoVero?.arrivoCitta || tragittoVero?.arrivoIndirizzo || tragittoVero?.arrivoOrario ? (
+                  <p style={{ fontSize: 13.5 }}>
+                    {tragittoVero.arrivoCitta || '— città mancante'}
+                    {tragittoVero.arrivoIndirizzo && ` — ${tragittoVero.arrivoIndirizzo}`}
+                    {' · '}
+                    <span style={{ color: tragittoVero.arrivoOrario ? 'var(--mist)' : 'var(--pink)' }}>
+                      {tragittoVero.arrivoOrario ?? 'orario mancante'}
+                    </span>
+                  </p>
+                ) : (
+                  <p style={{ color: 'var(--pink)', fontSize: 13.5 }}>Non impostato — vai su Eventi, nella scheda di questo tragitto, per scriverlo.</p>
+                )}
+                <button type="button" className="btn btn-ghost" style={{ marginTop: 10 }} onClick={() => apriModificaOperativa(tragitto)}>Modifica</button>
               </div>
             );
             if (contestoPartenze?.tabOrigine === 'da-prezzare') return (
               <div style={{ marginTop: 14 }}>
                 <p className="section-label" style={{ marginBottom: 8 }}>Preventivo</p>
                 {tragittoVero?.preventivoCosto
-                  ? <p style={{ fontSize: 13.5 }}>€{Number(tragittoVero.preventivoCosto).toFixed(0)} · {tragittoVero.preventivoPostiBus ?? '—'} posti presunti</p>
-                  : <p className="testo-intro">Nessun preventivo ancora registrato.</p>}
+                  ? <p style={{ fontSize: 13.5, marginBottom: 12 }}>€{Number(tragittoVero.preventivoCosto).toFixed(0)} · {tragittoVero.preventivoPostiBus ?? '—'} posti presunti</p>
+                  : <p className="testo-intro" style={{ marginBottom: 12 }}>Nessun preventivo ancora registrato.</p>}
+                <p className="section-label" style={{ marginBottom: 8 }}>Fermate — orario e prezzo</p>
+                {!tragittoVero || tragittoVero.fermate.length === 0
+                  ? <p className="testo-intro">Nessuna fermata su questo tragitto.</p>
+                  : tragittoVero.fermate.map((f) => (
+                    <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
+                      <span>{f.citta}</span>
+                      <span style={{ color: 'var(--mist)' }}>{f.orario ?? '— orario non impostato'}</span>
+                      <span style={{ fontWeight: 600 }}>{f.prezzo ? `€${Number(f.prezzo).toFixed(2)}` : '— prezzo non impostato'}</span>
+                    </div>
+                  ))}
+                <button type="button" className="btn btn-ghost" style={{ marginTop: 10 }} onClick={() => apriPreventivo(tragitto.tragittoId)}>Modifica</button>
               </div>
             );
             if (contestoPartenze?.tabOrigine === 'da-confermare') {
