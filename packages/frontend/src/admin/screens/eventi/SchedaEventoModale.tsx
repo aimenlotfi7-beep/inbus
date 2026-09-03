@@ -698,9 +698,25 @@ export function SchedaEventoModale({
       setSubTabImmagini('immagini');
       return;
     }
-    const tratteValide = (form.tragitti ?? [])
-      .filter((l) => l.nome.trim())
-      .map((l) => ({ ...l, fermate: l.fermate.filter((f, idx) => f.citta.trim() && (idx === 0 || f.indirizzo?.trim())) }));
+    // Prima un tragitto senza nome, o una sua fermata senza città (o
+    // senza indirizzo, per le fermate diverse dalla prima) venivano
+    // scartati in silenzio al salvataggio — bastava dimenticare di
+    // compilare un campo e quel pezzo di lavoro spariva senza nessun
+    // avviso. Ora blocca, con lo stesso stile degli altri controlli
+    // qui sopra (servizi/immagini).
+    const tragittoIncompleto = (form.tragitti ?? []).find((l) => {
+      if (!l.nome.trim()) return true;
+      return l.fermate.some((f, idx) => !f.citta.trim() || (idx !== 0 && !f.indirizzo?.trim()));
+    });
+    if (tragittoIncompleto) {
+      alert(`Il tragitto "${tragittoIncompleto.nome.trim() || '(senza nome)'}" non è completo — manca il nome, oppure la città/indirizzo di una fermata. Completalo o eliminalo prima di salvare.`);
+      setStep(2);
+      if (tragittoIncompleto.servizioId) { setModalitaServizi('multiplo'); setServizioTabAttivo(tragittoIncompleto.servizioId); }
+      return;
+    }
+    // Ora garantito completo dal controllo appena sopra — non serve
+    // più scartare nulla, solo usare i dati così come sono.
+    const tratteValide = form.tragitti ?? [];
     const payload = {
       ...form,
       // Solo i tragitti liberi restano qui — quelli dentro un servizio

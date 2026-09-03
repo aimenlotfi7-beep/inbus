@@ -90,13 +90,20 @@ export function PercorsiSalvatiScreen() {
   async function salva() {
     if (salvando) return;
     if (!nome.trim()) { alert('Dai un nome al tragitto prima di salvarlo.'); return; }
+    if (fermate.length < 2) { alert('Servono almeno due fermate — le due Teste (partenza e arrivo).'); return; }
     // Le due Teste (prima e ultima fermata, posizione) possono restare
     // senza indirizzo — quello vero si scrive in Eventi, quando il
     // percorso viene applicato. Le fermate intermedie lo richiedono
-    // comunque.
-    const fermateValide = fermate.filter((f, idx) => f.citta.trim() && (idx === 0 || idx === fermate.length - 1 || f.indirizzo?.trim()));
-    if (fermateValide.length < 2) { alert('Servono almeno due fermate — le due Teste (partenza e arrivo).'); return; }
-    const payload = { nome, fermate: fermateValide };
+    // comunque. Prima le fermate incomplete venivano scartate in
+    // silenzio (il salvataggio andava comunque a buon fine se ne
+    // restavano almeno due) — ora blocca con un avviso chiaro, invece
+    // di far sparire senza spiegazioni una fermata dimenticata a metà.
+    const incomplete = fermate.filter((f, idx) => !f.citta.trim() || (idx !== 0 && idx !== fermate.length - 1 && !f.indirizzo?.trim()));
+    if (incomplete.length > 0) {
+      alert(`${incomplete.length} fermata/e non è/sono completa/e — manca la città (o l'indirizzo, per le fermate intermedie). Completala o eliminala prima di salvare.`);
+      return;
+    }
+    const payload = { nome, fermate };
     setSalvando(true);
     try {
       if (inModifica) await percorsiSalvatiApi.update(inModifica.id, payload);
