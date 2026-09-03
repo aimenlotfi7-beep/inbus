@@ -4,7 +4,7 @@ import { variazioniApi, type InfoVariazione } from '../api/variazioni';
 import { ErroreApi } from '../api/client';
 import { Layout } from '../Layout';
 
-type Stato = 'caricamento' | 'pronto' | 'invio' | 'fatto' | 'non-trovato';
+type Stato = 'caricamento' | 'pronto' | 'invio' | 'fatto' | 'non-trovato' | 'errore';
 
 /** Pagina pubblica aperta dal link nella mail di variazione — nessun
  *  login, il token stesso fa da autenticazione (stesso schema già
@@ -19,7 +19,7 @@ export function VariazionePage() {
     if (!token) return;
     variazioniApi.getByToken(token)
       .then((d) => { setDati(d); setStato(d.giaRisposto ? 'fatto' : 'pronto'); })
-      .catch(() => setStato('non-trovato'));
+      .catch((e) => setStato(e instanceof ErroreApi && e.status === 404 ? 'non-trovato' : 'errore'));
   }, [token]);
 
   async function rispondi(risposta: 'ACCETTATA' | 'RIMBORSO_RICHIESTO') {
@@ -46,7 +46,13 @@ export function VariazionePage() {
           </div>
         )}
 
-        {dati && stato !== 'non-trovato' && (
+        {stato === 'errore' && (
+          <div className="checkout-summary">
+            Non riusciamo a caricare questa pagina in questo momento — potrebbe essere un problema temporaneo di connessione. <a href="" onClick={(e) => { e.preventDefault(); window.location.reload(); }}>Riprova</a>.
+          </div>
+        )}
+
+        {dati && stato !== 'non-trovato' && stato !== 'errore' && (
           <div className="evento-pagina-checkout" style={{ position: 'static' }}>
             <h3>Una variazione al tuo viaggio</h3>
             <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 16 }}>PNR {dati.pnr}</p>

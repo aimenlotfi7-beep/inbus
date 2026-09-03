@@ -5,6 +5,7 @@ import '../styles/pagina.css';
 import { PublicPageLayout } from '../PublicPageLayout';
 import { pagineApi, type PaginaCms } from '../api/pagine';
 import { ErroreApi } from '../api/client';
+import { sanificaHtml } from '../shared/sanificaHtml';
 
 export function PaginaPage({ chiaveFissa }: { chiaveFissa?: string }) {
   const { chiave: chiaveParam } = useParams();
@@ -45,7 +46,7 @@ export function PaginaPage({ chiaveFissa }: { chiaveFissa?: string }) {
         <h1>{pagina?.titolo ?? (errore ? 'Pagina non trovata' : 'Pagina')}</h1>
         {errore
           ? <div className="contenuto"><p>{errore}</p></div>
-          : pagina && <div className="contenuto" dangerouslySetInnerHTML={{ __html: pagina.contenuto }} />}
+          : pagina && <div className="contenuto" dangerouslySetInnerHTML={{ __html: sanificaHtml(pagina.contenuto) }} />}
       </main>
     </PublicPageLayout>
   );
@@ -76,8 +77,8 @@ function FaqList({ contenuto }: { contenuto: string }) {
     <>
       {coppie.map((c, idx) => (
         <div className="faq-item" key={idx}>
-          <h3 dangerouslySetInnerHTML={{ __html: c.domanda }} />
-          <div dangerouslySetInnerHTML={{ __html: c.rispostaHtml }} />
+          <h3 dangerouslySetInnerHTML={{ __html: sanificaHtml(c.domanda) }} />
+          <div dangerouslySetInnerHTML={{ __html: sanificaHtml(c.rispostaHtml) }} />
         </div>
       ))}
     </>

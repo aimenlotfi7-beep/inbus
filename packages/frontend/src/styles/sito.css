@@ -782,6 +782,14 @@
 .accordion-evento-pulsanti .btn.active{background:var(--pink); border-color:var(--pink); color:#fff;}
 
 /* ---------- CHECKOUT: scelta viaggio (quando l'evento ne ha piu' di uno) ---------- */
+/* Per collegare una <label> a un campo senza cambiare l'aspetto del
+   form (che oggi si affida solo al placeholder) — resta leggibile da
+   uno screen reader, invisibile a schermo. */
+.sr-only{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+
 .checkout-servizio-card{
   display:flex; flex-direction:column; gap:4px; text-align:left;
   background:#fff; border:1px solid #e5ded0; border-radius:12px; padding:16px 18px; cursor:pointer;

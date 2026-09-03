@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { prenotazioniApi, type DettaglioPrenotazione } from '../api/prenotazioni';
 import { ticketApi, type Biglietto } from '../api/ticket';
 import { calcolaStatoPrenotazione } from './statoPrenotazione';
@@ -19,6 +19,7 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
 }) {
   const [dettaglio, setDettaglio] = useState<DettaglioPrenotazione | null>(null);
   const [biglietti, setBiglietti] = useState<Biglietto[]>([]);
+  const idTitolo = useId();
   // Aggiornato ogni minuto — serve per far scorrere il conto alla
   // rovescia senza dover ricaricare la pagina.
   const [adesso, setAdesso] = useState(() => Date.now());
@@ -31,6 +32,17 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
     prenotazioniApi.dettaglioPerCliente(pnr, email).then(setDettaglio).catch(() => setDettaglio(null));
     ticketApi.lista(pnr, email).then(setBiglietti);
   }, [pnr, email]);
+
+  // Chi naviga solo da tastiera prima non aveva alcun modo di chiudere
+  // il popup — stesso comportamento del tasto ✕. In cima, prima di
+  // ogni return, perché gli hook non possono essere condizionali.
+  useEffect(() => {
+    function allaPressione(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', allaPressione);
+    return () => window.removeEventListener('keydown', allaPressione);
+  }, [onClose]);
 
   async function richiediRimborso() {
     const motivo = prompt('Vuoi aggiungere una nota per l\'amministrazione? (facoltativo, puoi lasciare vuoto)') ?? '';
@@ -50,8 +62,8 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
   if (!dettaglio) {
     return (
       <div className="travel-overlay" onClick={onClose}>
-        <div className="travel-card" onClick={(e) => e.stopPropagation()}>
-          <button className="travel-close" onClick={onClose}>✕</button>
+        <div className="travel-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Dettaglio viaggio">
+          <button className="travel-close" onClick={onClose} aria-label="Chiudi">✕</button>
           <p style={{ color: 'var(--mist)', marginTop: 30 }}>Carico...</p>
         </div>
       </div>
@@ -81,14 +93,14 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
 
   return (
     <div className="travel-overlay" onClick={onClose}>
-      <div className="travel-card" onClick={(e) => e.stopPropagation()}>
-        <button className="travel-close" onClick={onClose}>✕</button>
+      <div className="travel-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby={idTitolo}>
+        <button className="travel-close" onClick={onClose} aria-label="Chiudi">✕</button>
 
         <span className={`badge ${stato.classe}`}>
           {stato.chiave === 'confermata' ? '✓ ' : stato.chiave === 'acconto_scaduto' ? '⚠ ' : ''}{stato.etichetta}
         </span>
 
-        <h1 style={{ margin: '10px 0 2px' }}>{ev?.artista ?? 'Evento'}</h1>
+        <h1 id={idTitolo} style={{ margin: '10px 0 2px' }}>{ev?.artista ?? 'Evento'}</h1>
         {ev && (
           <p style={{ color: 'var(--mist)', fontSize: 13.5, margin: 0 }}>
             {new Date(ev.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}

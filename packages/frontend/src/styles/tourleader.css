@@ -46,3 +46,14 @@
   }
   .success-box h2{font-family:'Anton',sans-serif; text-transform:uppercase; margin:0 0 12px;}
   .success-box p{color:var(--mist); font-size:14px;}
+
+  /* Sotto i 768px la sidebar (210px fissi) diventa una barra
+     orizzontale in alto invece di rubare larghezza al contenuto —
+     l'uso reale di questa app è quasi sempre da telefono, sul bus. */
+  @media (max-width:768px){
+    .tourleader-shell{ flex-direction:column; }
+    .tourleader-aside{ width:100% !important; flex-direction:row !important; align-items:center; padding:10px 14px !important; flex-wrap:wrap; gap:8px; }
+    .tourleader-nav{ flex-direction:row !important; flex:none !important; gap:4px !important; }
+    .tourleader-piede{ padding:0 !important; border-top:none !important; margin:0 0 0 auto !important; display:flex; align-items:center; gap:8px; }
+    .tourleader-piede p{ display:none; }
+  }

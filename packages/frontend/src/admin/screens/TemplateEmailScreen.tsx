@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { templateEmailApi, type TemplateEmail } from '../../api/templateEmail';
 import { ErroreApi } from '../../api/client';
+import { sanificaHtml } from '../../shared/sanificaHtml';
 import { PanelHead } from '../shared/PanelHead';
 import { CaricaFile } from '../shared/CaricaFile';
 import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
@@ -174,7 +175,7 @@ export function TemplateEmailScreen() {
               <p className="section-label" style={{ marginBottom: 8 }}>Anteprima</p>
               <div
                 style={{ background: '#fff', color: '#111', border: '1px solid var(--line)', borderRadius: 8, padding: 16, fontSize: 14 }}
-                dangerouslySetInnerHTML={{ __html: corpo }}
+                dangerouslySetInnerHTML={{ __html: sanificaHtml(corpo) }}
               />
             </div>
           </div>

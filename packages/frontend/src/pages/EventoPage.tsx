@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { eventiApi } from '../api/eventi';
+import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
 import { prezzoMinimoEvento } from '../api/prezzi';
 import { useSeoTags } from '../features/useSeoTags';
@@ -16,7 +17,7 @@ const ETICHETTA_STATO: Record<NonNullable<Evento['statoDisponibilita']>, string>
   ESAURITO: 'Posti terminati',
 };
 
-type Stato = 'caricamento' | 'pronto' | 'non-trovato';
+type Stato = 'caricamento' | 'pronto' | 'non-trovato' | 'errore';
 
 /** Pagina propria per ogni evento — indicizzabile da Google e
  *  condivisibile con un'anteprima specifica (titolo, immagine, prezzo).
@@ -48,7 +49,7 @@ export function EventoPage() {
     setStato('caricamento');
     eventiApi.getBySlug(slug)
       .then((e) => { setEvento(e); setStato('pronto'); })
-      .catch(() => setStato('non-trovato'));
+      .catch((e) => setStato(e instanceof ErroreApi && e.status === 404 ? 'non-trovato' : 'errore'));
   }, [slug]);
 
   const prezzoMinimo = evento ? prezzoMinimoEvento(evento) : null;
@@ -84,6 +85,12 @@ export function EventoPage() {
         {stato === 'non-trovato' && (
           <div className="checkout-summary">
             Questo evento non è (più) disponibile. Puoi vedere tutti gli eventi in <a href="/">home page</a>.
+          </div>
+        )}
+
+        {stato === 'errore' && (
+          <div className="checkout-summary">
+            Non riusciamo a caricare questo evento in questo momento — potrebbe essere un problema temporaneo di connessione. <a href="" onClick={(e) => { e.preventDefault(); window.location.reload(); }}>Riprova</a>.
           </div>
         )}
 

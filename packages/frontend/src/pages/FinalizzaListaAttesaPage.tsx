@@ -30,7 +30,7 @@ export function FinalizzaListaAttesaPage() {
         setFermataId((preferita ?? primaConPosti)?.fermataId ?? '');
         setStato('pronto');
       })
-      .catch(() => setStato('non-trovato'));
+      .catch((e) => setStato(e instanceof ErroreApi && e.status === 404 ? 'non-trovato' : 'errore'));
   }, [token]);
 
   const opzioneScelta = opzioni.find((o) => o.fermataId === fermataId);
@@ -65,6 +65,12 @@ export function FinalizzaListaAttesaPage() {
         {stato === 'non-trovato' && (
           <div className="checkout-summary">
             Questo link non è valido, è scaduto, oppure la prenotazione è già stata completata in precedenza.
+          </div>
+        )}
+
+        {!dati && stato === 'errore' && (
+          <div className="checkout-summary">
+            Non riusciamo a caricare questa pagina in questo momento — potrebbe essere un problema temporaneo di connessione. <a href="" onClick={(e) => { e.preventDefault(); window.location.reload(); }}>Riprova</a>.
           </div>
         )}
 

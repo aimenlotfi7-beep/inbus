@@ -415,10 +415,11 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 </p>
               )}
 
-              <label className="field-label">Passeggeri</label>
+              <label className="field-label" htmlFor="checkout-passeggeri">Passeggeri</label>
               <div className="qty-control">
                 <button type="button" onClick={() => setPasseggeri((p) => Math.max(1, p - 1))} aria-label="Togli passeggero">−</button>
                 <input
+                  id="checkout-passeggeri"
                   type="text"
                   inputMode="numeric"
                   style={{ width: 56, textAlign: 'center', padding: '10px 4px' }}
@@ -460,23 +461,27 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 </div>
               ) : (
                 <>
-                  <label className="field-label">Email</label>
-                  <input type="email" value={email} disabled style={{ opacity: .6 }} />
+                  <label className="field-label" htmlFor="checkout-email">Email</label>
+                  <input id="checkout-email" type="email" value={email} disabled style={{ opacity: .6 }} />
                   <p className="hint">I biglietti verranno inviati a questa email.</p>
 
-                  <label className="field-label">Telefono</label>
-                  <input type="tel" value={telefono} disabled style={{ opacity: .6 }} />
+                  <label className="field-label" htmlFor="checkout-telefono">Telefono</label>
+                  <input id="checkout-telefono" type="tel" value={telefono} disabled style={{ opacity: .6 }} />
 
                   <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>Lista passeggeri</p>
                   <div className="checkout-passeggeri-scorrevole">
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-                      <input placeholder="Nome passeggero 1" autoComplete="given-name" value={nome} onChange={(e) => setNome(e.target.value)} />
-                      <input placeholder="Cognome" autoComplete="family-name" value={cognome} onChange={(e) => setCognome(e.target.value)} />
+                      <label className="sr-only" htmlFor="checkout-nome-1">Nome passeggero 1</label>
+                      <input id="checkout-nome-1" placeholder="Nome passeggero 1" autoComplete="given-name" value={nome} onChange={(e) => setNome(e.target.value)} />
+                      <label className="sr-only" htmlFor="checkout-cognome-1">Cognome passeggero 1</label>
+                      <input id="checkout-cognome-1" placeholder="Cognome" autoComplete="family-name" value={cognome} onChange={(e) => setCognome(e.target.value)} />
                     </div>
                     {partecipanti.map((p, idx) => (
                       <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-                        <input placeholder={`Nome passeggero ${idx + 2}`} value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} />
-                        <input placeholder="Cognome" value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} />
+                        <label className="sr-only" htmlFor={`checkout-nome-${idx + 2}`}>{`Nome passeggero ${idx + 2}`}</label>
+                        <input id={`checkout-nome-${idx + 2}`} placeholder={`Nome passeggero ${idx + 2}`} value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} />
+                        <label className="sr-only" htmlFor={`checkout-cognome-${idx + 2}`}>{`Cognome passeggero ${idx + 2}`}</label>
+                        <input id={`checkout-cognome-${idx + 2}`} placeholder="Cognome" value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} />
                       </div>
                     ))}
                   </div>
@@ -572,9 +577,10 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                   )}
 
                   <div style={{ margin: '10px 0' }}>
-                    <label className="field-label">Hai un codice coupon?</label>
+                    <label className="field-label" htmlFor="checkout-coupon">Hai un codice coupon?</label>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input
+                        id="checkout-coupon"
                         type="text"
                         value={couponCodice}
                         onChange={(e) => { setCouponCodice(e.target.value.toUpperCase()); setCouponVerificato(null); setCouponErrore(''); }}
@@ -614,16 +620,16 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
 
                   {metodoPagamento === 'carta' && (
                     <div style={{ marginBottom: 14 }}>
-                      <label className="field-label">Numero carta</label>
-                      <input type="text" inputMode="numeric" placeholder="0000 0000 0000 0000" autoComplete="cc-number" />
+                      <label className="field-label" htmlFor="checkout-carta-numero">Numero carta</label>
+                      <input id="checkout-carta-numero" type="text" inputMode="numeric" placeholder="0000 0000 0000 0000" autoComplete="cc-number" />
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
                         <div>
-                          <label className="field-label">Scadenza</label>
-                          <input type="text" placeholder="MM/AA" autoComplete="cc-exp" />
+                          <label className="field-label" htmlFor="checkout-carta-scadenza">Scadenza</label>
+                          <input id="checkout-carta-scadenza" type="text" placeholder="MM/AA" autoComplete="cc-exp" />
                         </div>
                         <div>
-                          <label className="field-label">CVV</label>
-                          <input type="text" inputMode="numeric" placeholder="123" autoComplete="cc-csc" />
+                          <label className="field-label" htmlFor="checkout-carta-cvv">CVV</label>
+                          <input id="checkout-carta-cvv" type="text" inputMode="numeric" placeholder="123" autoComplete="cc-csc" />
                         </div>
                       </div>
                     </div>

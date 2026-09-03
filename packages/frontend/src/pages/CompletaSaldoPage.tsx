@@ -6,7 +6,7 @@ import { Layout } from '../Layout';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
-type Stato = 'caricamento' | 'chiedi-email' | 'pronto' | 'invio' | 'completato' | 'non-trovato';
+type Stato = 'caricamento' | 'chiedi-email' | 'pronto' | 'invio' | 'completato' | 'non-trovato' | 'errore';
 
 export function CompletaSaldoPage() {
   const { pnr } = useParams<{ pnr: string }>();
@@ -31,7 +31,7 @@ export function CompletaSaldoPage() {
     setStato('caricamento');
     prenotazioniApi.getSaldo(pnr, email)
       .then((d) => { setDati(d); setStato(d.saldoPagato ? 'completato' : 'pronto'); })
-      .catch(() => setStato('non-trovato'));
+      .catch((e) => setStato(e instanceof ErroreApi && e.status === 404 ? 'non-trovato' : 'errore'));
   }, [pnr, email]);
 
   function confermaEmail() {
@@ -80,6 +80,12 @@ export function CompletaSaldoPage() {
 
         {stato === 'non-trovato' && (
           <div className="checkout-summary">Prenotazione non trovata. Controlla il link ricevuto via email.</div>
+        )}
+
+        {stato === 'errore' && (
+          <div className="checkout-summary">
+            Non riusciamo a caricare questa pagina in questo momento — potrebbe essere un problema temporaneo di connessione. <a href="" onClick={(e) => { e.preventDefault(); window.location.reload(); }}>Riprova</a>.
+          </div>
         )}
 
         {stato === 'chiedi-email' && (

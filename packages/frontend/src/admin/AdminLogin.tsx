@@ -5,7 +5,7 @@ import { erroreValidazionePassword } from '../features/validazionePassword';
 
 type Vista = 'login' | 'richiedi-reset' | 'nuova-password';
 
-export function AdminLogin({ onLogin }: { onLogin: (sessione: SessioneAdmin) => void }) {
+export function AdminLogin({ onLogin, messaggioIniziale }: { onLogin: (sessione: SessioneAdmin) => void; messaggioIniziale?: string }) {
   const [vista, setVista] = useState<Vista>('login');
   const [tokenReset, setTokenReset] = useState('');
 
@@ -18,7 +18,7 @@ export function AdminLogin({ onLogin }: { onLogin: (sessione: SessioneAdmin) => 
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errore, setErrore] = useState('');
+  const [errore, setErrore] = useState(messaggioIniziale ?? '');
   const [caricamento, setCaricamento] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {

@@ -136,6 +136,7 @@ function leggiSezioneDaUrl(): SezioneGestionale | 'home' {
 
 export function AdminApp() {
   const [sessione, setSessione] = useState<SessioneAdmin | null>(null);
+  const [sessioneScaduta, setSessioneScaduta] = useState(false);
   const [caricamentoIniziale, setCaricamentoIniziale] = useState(true);
   const [sezione, setSezioneState] = useState<SezioneGestionale | 'home'>(leggiSezioneDaUrl);
 
@@ -166,6 +167,16 @@ export function AdminApp() {
       .finally(() => setCaricamentoIniziale(false));
   }, []);
 
+  // Il client API (api/client.ts) segnala così un 401 su QUALUNQUE
+  // chiamata — il token è già stato tolto da localStorage lì, qui basta
+  // riportare la sessione a "non loggato": AdminApp torna da sola alla
+  // schermata di accesso, senza un ricaricamento completo della pagina.
+  useEffect(() => {
+    function allo401() { setSessione(null); setSezione('home'); setSessioneScaduta(true); }
+    window.addEventListener('inbus-401-admin', allo401);
+    return () => window.removeEventListener('inbus-401-admin', allo401);
+  }, []);
+
   function logout() {
     localStorage.removeItem('inbus_admin_token');
     setSessione(null);
@@ -183,7 +194,7 @@ export function AdminApp() {
   }
 
   if (caricamentoIniziale) return null; // evita un lampo di schermata di login mentre verifichiamo il token
-  if (!sessione) return <AdminLogin onLogin={setSessione} />;
+  if (!sessione) return <AdminLogin onLogin={setSessione} messaggioIniziale={sessioneScaduta ? 'La tua sessione è scaduta — accedi di nuovo.' : undefined} />;
 
   return (
     <SessioneContext.Provider value={sessione}>

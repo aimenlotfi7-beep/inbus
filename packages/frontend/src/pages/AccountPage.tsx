@@ -46,6 +46,25 @@ export function AccountPage() {
   // qualsiasi punto ci si trovi.
   const [pnrAperto, setPnrAperto] = useState<string | null>(null);
 
+  // Prima Dashboard e Viaggi lo scaricavano OGNUNA per conto proprio
+  // (stessa lista di prenotazioni, stesso giro "un evento per volta" a
+  // recuperare i dettagli) — ogni volta che si passava dall'una
+  // all'altra, si rifaceva tutto da capo. Un solo posto, condiviso da
+  // entrambe via props.
+  const [viaggi, setViaggi] = useState<Prenotazione[] | null>(null);
+  const [eventiPerId, setEventiPerId] = useState<Record<string, Evento>>({});
+  useEffect(() => {
+    if (!email) return;
+    prenotazioniApi.listByEmail(email).then(async (lista) => {
+      setViaggi(lista);
+      const idUnici = [...new Set(lista.map((p) => p.eventoId))];
+      const eventi = await Promise.all(idUnici.map((id) => eventiApi.getById(id).catch(() => null)));
+      const mappa: Record<string, Evento> = {};
+      eventi.forEach((ev) => { if (ev) mappa[ev.id] = ev; });
+      setEventiPerId(mappa);
+    });
+  }, [email]);
+
   // Niente più email digitata a mano: se non c'è un accesso vero
   // (token valido), si va dritti alla pagina di accesso — tornando qui
   // dopo, grazie al parametro "dopo".
@@ -100,9 +119,9 @@ export function AccountPage() {
       <div id="accountShell">
         {sezione !== 'eventi' && (
           <div className="account-content">
-            {sezione === 'dashboard' && <SezioneDashboard email={email} onNavigare={setSezione} onAprireViaggio={setPnrAperto} />}
+            {sezione === 'dashboard' && <SezioneDashboard email={email} viaggi={viaggi} eventiPerId={eventiPerId} onNavigare={setSezione} onAprireViaggio={setPnrAperto} />}
             {sezione === 'profilo' && <SezioneProfilo email={email} />}
-            {sezione === 'viaggi' && <SezioneViaggi email={email} onAprireViaggio={setPnrAperto} />}
+            {sezione === 'viaggi' && <SezioneViaggi email={email} viaggi={viaggi} eventiPerId={eventiPerId} onAprireViaggio={setPnrAperto} />}
             {sezione === 'lista-attesa' && <SezioneListaAttesa email={email} />}
             {sezione === 'credito' && <SezioneCredito email={email} />}
             {sezione === 'privacy' && <SezionePrivacy email={email} />}
@@ -331,16 +350,19 @@ function SezionePrivacy({ email }: { email: string }) {
 /** Il "centro di controllo" — prima cosa che il cliente vede entrando
  *  nella sua area: se ha un viaggio futuro, è la prima cosa in
  *  assoluto che vede, non deve andarselo a cercare. */
-function SezioneDashboard({ email, onNavigare, onAprireViaggio }: { email: string; onNavigare: (s: Sezione) => void; onAprireViaggio: (pnr: string) => void }) {
-  const [viaggi, setViaggi] = useState<Prenotazione[] | null>(null);
-  const [eventoProssimo, setEventoProssimo] = useState<Evento | null>(null);
+function SezioneDashboard({ email, viaggi, eventiPerId, onNavigare, onAprireViaggio }: {
+  email: string;
+  viaggi: Prenotazione[] | null;
+  eventiPerId: Record<string, Evento>;
+  onNavigare: (s: Sezione) => void;
+  onAprireViaggio: (pnr: string) => void;
+}) {
   const [nome, setNome] = useState('');
   const [messaggiNonLetti, setMessaggiNonLetti] = useState(0);
   const [inListaAttesa, setInListaAttesa] = useState(0);
 
   useEffect(() => {
     clienteAuthApi.me().then((d) => setNome(d.nome ?? ''));
-    prenotazioniApi.listByEmail(email).then(setViaggi);
     chatApi.storicoCliente(email).then((conv) => {
       const attiva = conv.find((c) => c.stato !== 'CHIUSA');
       setMessaggiNonLetti(attiva?.messaggi.filter((m) => m.autore === 'ADMIN').length ?? 0);
@@ -348,20 +370,16 @@ function SezioneDashboard({ email, onNavigare, onAprireViaggio }: { email: strin
     listaAttesaApi.mieIscrizioni(email).then((l) => setInListaAttesa(l.length)).catch(() => {});
   }, [email]);
 
-  useEffect(() => {
-    if (!viaggi) return;
-    const oggi = new Date().toISOString().slice(0, 10);
-    const confermati = viaggi.filter((p) => p.stato === 'CONFERMATA');
-    (async () => {
-      // Serve la data dell'EVENTO (non della prenotazione) per sapere
-      // davvero qual è il più vicino nel tempo — le carico tutte e
-      // scelgo quella con la data più vicina, non semplicemente la
-      // prima prenotazione fatta.
-      const coppie = await Promise.all(confermati.map(async (p) => ({ p, ev: await eventiApi.getById(p.eventoId).catch(() => null) })));
-      const future = coppie.filter((c) => c.ev && c.ev.data >= oggi).sort((a, b) => a.ev!.data.localeCompare(b.ev!.data));
-      setEventoProssimo(future[0]?.ev ?? null);
-    })();
-  }, [viaggi]);
+  // Il "prossimo evento" ora si ricava dai dati già arrivati dal padre
+  // (viaggi + eventiPerId, condivisi con la sezione Viaggi) invece di
+  // un giro proprio a recuperare di nuovo gli stessi dettagli evento.
+  const oggi = new Date().toISOString().slice(0, 10);
+  const confermati = viaggi?.filter((p) => p.stato === 'CONFERMATA') ?? [];
+  const futuri = confermati
+    .map((p) => ({ p, ev: eventiPerId[p.eventoId] }))
+    .filter((c): c is { p: Prenotazione; ev: Evento } => !!c.ev && c.ev.data >= oggi)
+    .sort((a, b) => a.ev.data.localeCompare(b.ev.data));
+  const eventoProssimo = futuri[0]?.ev ?? null;
 
   const prenotazioneProssima = eventoProssimo ? viaggi?.find((p) => p.eventoId === eventoProssimo.id && p.stato === 'CONFERMATA') : null;
 
@@ -497,21 +515,13 @@ function SezioneListaAttesa({ email }: { email: string }) {
   );
 }
 
-function SezioneViaggi({ email, onAprireViaggio }: { email: string; onAprireViaggio: (pnr: string) => void }) {
+function SezioneViaggi({ email, viaggi, eventiPerId, onAprireViaggio }: {
+  email: string;
+  viaggi: Prenotazione[] | null;
+  eventiPerId: Record<string, Evento>;
+  onAprireViaggio: (pnr: string) => void;
+}) {
   const [tab, setTab] = useState<'prossimi' | 'passati'>('prossimi');
-  const [viaggi, setViaggi] = useState<Prenotazione[] | null>(null);
-  const [eventiPerId, setEventiPerId] = useState<Record<string, Evento>>({});
-
-  useEffect(() => {
-    prenotazioniApi.listByEmail(email).then(async (lista) => {
-      setViaggi(lista);
-      const idUnici = [...new Set(lista.map((p) => p.eventoId))];
-      const eventi = await Promise.all(idUnici.map((id) => eventiApi.getById(id).catch(() => null)));
-      const mappa: Record<string, Evento> = {};
-      eventi.forEach((ev) => { if (ev) mappa[ev.id] = ev; });
-      setEventiPerId(mappa);
-    });
-  }, [email]);
 
   async function richiediRimborso(pnr: string) {
     const motivo = prompt('Vuoi aggiungere una nota per l\'amministrazione? (facoltativo, puoi lasciare vuoto)') ?? '';

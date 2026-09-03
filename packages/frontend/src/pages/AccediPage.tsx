@@ -8,7 +8,7 @@ export function AccediPage() {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errore, setErrore] = useState('');
+  const [errore, setErrore] = useState(searchParams.get('motivo') === 'scaduta' ? 'La tua sessione è scaduta — accedi di nuovo.' : '');
   const [caricamento, setCaricamento] = useState(false);
   const [inviandoVerifica, setInviandoVerifica] = useState(false);
   const navigate = useNavigate();
