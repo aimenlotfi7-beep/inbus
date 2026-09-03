@@ -608,15 +608,25 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
 
       {mostraTabTragitti && (
         <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-          {calcoloVisibile.map((t) => (
-            <button
-              key={t.tragittoId} type="button"
-              className={`mini-tab${tragittoTabSelezionato?.tragittoId === t.tragittoId ? ' active' : ''}`}
-              onClick={() => setTabTragittoAttivo(t.tragittoId)}
-            >
-              {t.nome}
-            </button>
-          ))}
+          {calcoloVisibile.map((t) => {
+            // Stesso criterio già usato nel contenuto della tappa
+            // corrente (orario impostato / preventivo salvato) — così
+            // la tab stessa diventa verde una volta fatta, non solo il
+            // contenuto dentro, visibile anche senza doverci cliccare.
+            const tv = [...(eventoCompleto?.tragitti ?? []), ...(eventoCompleto?.servizi.flatMap((s) => s.tragitti) ?? [])].find((x) => x.id === t.tragittoId);
+            const fattoQui = contestoPartenze?.tabOrigine === 'fermate' ? tv?.fermate.some((f) => f.orario)
+              : contestoPartenze?.tabOrigine === 'da-prezzare' ? !!tv?.preventivoCosto
+              : false;
+            return (
+              <button
+                key={t.tragittoId} type="button"
+                className={`mini-tab${tragittoTabSelezionato?.tragittoId === t.tragittoId ? ' active' : ''}${fattoQui ? ' completato' : ''}`}
+                onClick={() => setTabTragittoAttivo(t.tragittoId)}
+              >
+                {fattoQui && '✓ '}{t.nome}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -897,7 +907,10 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             );
             if (contestoPartenze?.tabOrigine === 'da-prezzare') return (
               <div style={{ marginTop: 14 }}>
-                <p className="section-label" style={{ marginBottom: 8 }}>Preventivo</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <p className="section-label" style={{ margin: 0 }}>Preventivo</p>
+                  {tragittoVero?.preventivoCosto && <span className="badge coperta">✓ Prezzato</span>}
+                </div>
                 {tragittoVero?.preventivoCosto
                   ? <p style={{ fontSize: 13.5, marginBottom: 12 }}>€{Number(tragittoVero.preventivoCosto).toFixed(0)} · {tragittoVero.preventivoPostiBus ?? '—'} posti presunti</p>
                   : <p className="testo-intro" style={{ marginBottom: 12 }}>Nessun preventivo ancora registrato.</p>}

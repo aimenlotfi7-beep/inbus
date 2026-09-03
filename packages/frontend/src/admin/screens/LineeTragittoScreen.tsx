@@ -285,46 +285,6 @@ export function LineeTragittoScreen() {
     <div>
       <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => tornaAPartenze()}>← Torna a Partenze</button>
 
-      {/* Stesso indicatore di Partenze, con lo stesso sblocco
-          progressivo — qui si arriva sempre dal contesto "Da
-          confermare" (unico che porta a questa pagina), quindi è
-          sempre quella evidenziata. "Confermato"/"Passate" restano
-          solo visive (nessun editor dove atterrare da lì). */}
-      {(() => {
-        const ETICHETTE_CONTESTO: Record<string, string> = {
-          fermate: 'Orari', 'da-prezzare': 'Prezzo', 'da-confermare': 'Linee Bus', confermato: 'Confermato', passate: 'Passate',
-        };
-        const fermateCompilate = tragittoVero.fermate.some((f) => f.orario);
-        const preventivoCompilato = !!tragittoVero.preventivoCosto;
-        const SBLOCCO: Record<string, boolean> = {
-          fermate: true,
-          'da-prezzare': fermateCompilate,
-          'da-confermare': fermateCompilate && preventivoCompilato,
-          confermato: true, // già ci sei: questa pagina Linee esiste solo perché la Linea è in corso di costruzione qui
-          passate: true,
-        };
-        return (
-          <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-            {(['fermate', 'da-prezzare', 'da-confermare', 'confermato', 'passate'] as const).map((t) => {
-              const navigabile = t === 'fermate' || t === 'da-prezzare' || t === 'da-confermare';
-              const cliccabile = navigabile && SBLOCCO[t] && t !== 'da-confermare';
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  className={`mini-tab${t === 'da-confermare' ? ' active' : ''}`}
-                  style={{ cursor: cliccabile ? 'pointer' : 'default', opacity: navigabile && !SBLOCCO[t] ? 0.5 : 1 }}
-                  disabled={!cliccabile}
-                  onClick={cliccabile ? () => tornaAPartenze(t as 'fermate' | 'da-prezzare' | 'da-confermare') : undefined}
-                >
-                  {ETICHETTE_CONTESTO[t]}
-                </button>
-              );
-            })}
-          </div>
-        );
-      })()}
-
       {/* 1. RIEPILOGO PARTENZA */}
       <PanelHead titolo={tragittoVero.nome} info={evento.artista} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
