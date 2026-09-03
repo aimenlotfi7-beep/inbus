@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS "richieste_rimborso_una_in_attesa" ON "richieste_rimborso" USING btree ("prenotazione_id") WHERE "richieste_rimborso"."stato" = 'IN_ATTESA';

@@ -47,8 +47,8 @@ export const prenotazioniApi = {
    *  server la ricalcola e la valida esattamente allo stesso modo). */
   creaOrdine: (articoli: CreaPrenotazionePayload[]) =>
     apiConToken('inbus_cliente_token').post<{ ordine: { id: string; totale: string }; prenotazioni: Prenotazione[] }>('/api/prenotazioni/ordine', { articoli }),
-  getSaldo: (pnr: string) => api.get<DifferenzaSaldo>(`/api/prenotazioni/${pnr}/saldo`),
-  saldaResto: (pnr: string, couponCodice?: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`, couponCodice ? { couponCodice } : undefined),
+  getSaldo: (pnr: string, email: string) => api.get<DifferenzaSaldo>(`/api/prenotazioni/${pnr}/saldo?email=${encodeURIComponent(email)}`),
+  saldaResto: (pnr: string, email: string, couponCodice?: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`, { email, ...(couponCodice && { couponCodice }) }),
   listByEmail: (email: string) => api.get<Prenotazione[]>(`/api/prenotazioni/by-email?email=${encodeURIComponent(email)}`),
   dettaglioPerCliente: (pnr: string, email: string) =>
     api.get<DettaglioPrenotazione>(`/api/prenotazioni/${pnr}/dettaglio-cliente?email=${encodeURIComponent(email)}`),

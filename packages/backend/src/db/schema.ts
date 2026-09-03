@@ -17,11 +17,13 @@ import {
   pgEnum,
   primaryKey,
   unique,
+  uniqueIndex,
+  index,
   jsonb,
   doublePrecision,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import { createId } from '@paralleldrive/cuid2';
 
 const id = () => text('id').primaryKey().$defaultFn(() => createId());
@@ -282,7 +284,9 @@ export const tragitti = pgTable('tragitti', {
   // prenotazioni collegate non può essere cancellata per davvero senza
   // lasciarle orfane, quindi la si "nasconde" invece di eliminarla.
   eliminatoIl: timestamp('eliminato_il'),
-});
+}, (t) => ({
+  perEvento: index('tragitti_evento_idx').on(t.eventoId),
+}));
 
 // Anagrafica fermate — il luogo fisico, riutilizzabile in quanti
 // tragitti si vuole (Milano Lambrate esiste una volta sola qui,
@@ -339,7 +343,9 @@ export const fermate = pgTable('fermate', {
   // restando configurata (stesso principio già usato per tragitti.attivo
   // — non si elimina, si sospende).
   attivo: boolean('attivo').notNull().default(true),
-});
+}, (t) => ({
+  perTragitto: index('fermate_tragitto_idx').on(t.tragittoId),
+}));
 
 // ---------------------------------------------------------------------
 // BUS FISICI (Sezione Partenze: censimento dei mezzi reali e delle tratte
@@ -375,7 +381,9 @@ export const busFisici = pgTable('bus_fisici', {
   lineaId: text('linea_id').references((): AnyPgColumn => linee.id, { onDelete: 'cascade' }),
   note: text('note'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
-});
+}, (t) => ({
+  perLinea: index('bus_fisici_linea_idx').on(t.lineaId),
+}));
 
 // Un bus può coprire più tragitti diversi; un tragitto può essere
 // coperta da più bus se la capienza di uno solo non basta.
@@ -412,7 +420,9 @@ export const linee = pgTable('linee', {
   nome: text('nome').notNull(), // es. "Linea 1" — assegnato in automatico, modificabile
   ordine: integer('ordine').notNull().default(0),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
-});
+}, (t) => ({
+  perTragitto: index('linee_tragitto_idx').on(t.tragittoId),
+}));
 
 // Le fermate coperte dalla Linea (nell'ordine CRONOLOGICO reale, non
 // quello di inserimento — vedi il servizio che le riordina da solo in
@@ -613,7 +623,19 @@ export const prenotazioni = pgTable('prenotazioni', {
   ticketEmessoIl: timestamp('ticket_emesso_il'),
   ticketUtilizzatoIl: timestamp('ticket_utilizzato_il'),
   creataIl: timestamp('creata_il').notNull().defaultNow(),
-});
+}, (t) => ({
+  // Le colonne più filtrate in tutto il codice (calcolo posti,
+  // riepiloghi economici, vendite per fermata, controllo accessi) —
+  // senza questi indici, ogni query del genere farebbe una scansione
+  // completa della tabella man mano che le prenotazioni crescono.
+  // Una foreign key da sola NON crea un indice sul lato che referenzia
+  // (solo sul lato referenziato) — vanno aggiunti a mano.
+  perTragitto: index('prenotazioni_tragitto_idx').on(t.tragittoId),
+  perEvento: index('prenotazioni_evento_idx').on(t.eventoId),
+  perStato: index('prenotazioni_stato_idx').on(t.stato),
+  perUtente: index('prenotazioni_utente_idx').on(t.utenteId),
+  perFermata: index('prenotazioni_fermata_citta_idx').on(t.tragittoId, t.fermataCitta),
+}));
 
 // Un partecipante per passeggero della prenotazione (il richiedente è
 // sempre il primo, ordine 0 — i suoi contatti completi, email e telefono,
@@ -1056,7 +1078,14 @@ export const richiesteRimborso = pgTable('richieste_rimborso', {
   noteAdmin: text('note_admin'),
   richiestaIl: timestamp('richiesta_il').notNull().defaultNow(),
   gestitaIl: timestamp('gestita_il'),
-});
+}, (t) => ({
+  // Al massimo UNA richiesta "in attesa" per prenotazione — non un
+  // controllo applicativo (SELECT poi INSERT, con una finestra dove
+  // un doppio click può crearne due), ma un vincolo vero del database:
+  // il secondo INSERT fallisce da solo se ce n'è già una in attesa,
+  // qualunque sia la velocità con cui arrivano le due richieste.
+  unaSolaInAttesa: uniqueIndex('richieste_rimborso_una_in_attesa').on(t.prenotazioneId).where(sql`${t.stato} = 'IN_ATTESA'`),
+}));
 
 export const layoutBiglietto = pgTable('layout_biglietto', {
   id: id(),

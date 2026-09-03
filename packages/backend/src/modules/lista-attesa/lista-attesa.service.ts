@@ -189,32 +189,51 @@ export const listaAttesaService = {
   async finalizza(token: string, input: { tragittoId: string; fermataId: string; tipoPagamento: 'COMPLETO' | 'ACCONTO'; metodoPagamento: 'CARTA' | 'PAYPAL' | 'SATISPAY' | 'DA_CONCORDARE' }) {
     const [riga] = await db.select().from(listaAttesa).where(eq(listaAttesa.token, token)).limit(1);
     if (!riga) throw new NonTrovato('Link');
-    if (riga.completata) throw new ConflittoDati('Questa prenotazione è già stata completata.');
 
-    // Questo flusso arriva da un link segreto mandato via email (non da
-    // un login vero) — stesso livello di identità già accettato altrove
-    // (es. richieste di rimborso): l'email combacia, è sufficiente per
-    // questo caso specifico. Se non esiste ancora un account con
-    // quell'email, ne creo uno "leggero" (senza password) — dovrà
-    // comunque registrarsi per accedere alla sua area personale in
-    // futuro, ma la prenotazione da qui non resta bloccata.
-    const { utentiService } = await import('../utenti/utenti.service.js');
-    const utente = await utentiService.upsertByEmail({
-      email: riga.email, nome: riga.nome, cognome: riga.cognome ?? '', telefono: riga.telefono ?? '',
-    });
+    // Blocco atomico SUBITO, prima di creare la prenotazione vera —
+    // due click quasi simultanei sullo stesso link (due browser, o un
+    // doppio click): solo uno dei due riceve una riga da RETURNING,
+    // l'altro capisce che è già stata presa in carico da qualcun altro
+    // (non necessariamente completata con successo ancora, ma di
+    // sicuro non deve procedere anche lui in parallelo).
+    const [rigaBloccata] = await db.update(listaAttesa)
+      .set({ completata: true })
+      .where(and(eq(listaAttesa.id, riga.id), eq(listaAttesa.completata, false)))
+      .returning();
+    if (!rigaBloccata) throw new ConflittoDati('Questa prenotazione è già stata completata.');
 
-    const prenotazione = await prenotazioniService.crea({
-      eventoId: riga.eventoId,
-      tragittoId: input.tragittoId,
-      fermataId: input.fermataId,
-      passeggeri: riga.passeggeri,
-      tipoPagamento: input.tipoPagamento,
-      metodoPagamento: input.metodoPagamento,
-      cliente: { email: riga.email, nome: riga.nome, cognome: riga.cognome ?? '', telefono: riga.telefono ?? '' },
-      partecipanti: riga.partecipantiJson ? JSON.parse(riga.partecipantiJson) : [],
-    }, utente.id);
+    try {
+      // Questo flusso arriva da un link segreto mandato via email (non da
+      // un login vero) — stesso livello di identità già accettato altrove
+      // (es. richieste di rimborso): l'email combacia, è sufficiente per
+      // questo caso specifico. Se non esiste ancora un account con
+      // quell'email, ne creo uno "leggero" (senza password) — dovrà
+      // comunque registrarsi per accedere alla sua area personale in
+      // futuro, ma la prenotazione da qui non resta bloccata.
+      const { utentiService } = await import('../utenti/utenti.service.js');
+      const utente = await utentiService.upsertByEmail({
+        email: riga.email, nome: riga.nome, cognome: riga.cognome ?? '', telefono: riga.telefono ?? '',
+      });
 
-    await db.update(listaAttesa).set({ completata: true }).where(eq(listaAttesa.id, riga.id));
-    return prenotazione;
+      const prenotazione = await prenotazioniService.crea({
+        eventoId: riga.eventoId,
+        tragittoId: input.tragittoId,
+        fermataId: input.fermataId,
+        passeggeri: riga.passeggeri,
+        tipoPagamento: input.tipoPagamento,
+        metodoPagamento: input.metodoPagamento,
+        cliente: { email: riga.email, nome: riga.nome, cognome: riga.cognome ?? '', telefono: riga.telefono ?? '' },
+        partecipanti: riga.partecipantiJson ? JSON.parse(riga.partecipantiJson) : [],
+      }, utente.id);
+
+      return prenotazione;
+    } catch (err) {
+      // La prenotazione vera non è andata a buon fine (es. posti
+      // esauriti nel frattempo) — "sblocco" di nuovo questa riga,
+      // altrimenti il cliente resterebbe bloccato per sempre senza
+      // aver mai ottenuto nulla.
+      await db.update(listaAttesa).set({ completata: false }).where(eq(listaAttesa.id, riga.id));
+      throw err;
+    }
   },
 };

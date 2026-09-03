@@ -1,16 +1,24 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { prenotazioniApi, type DifferenzaSaldo } from '../api/prenotazioni';
 import { ErroreApi } from '../api/client';
 import { Layout } from '../Layout';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
-type Stato = 'caricamento' | 'pronto' | 'invio' | 'completato' | 'non-trovato';
+type Stato = 'caricamento' | 'chiedi-email' | 'pronto' | 'invio' | 'completato' | 'non-trovato';
 
 export function CompletaSaldoPage() {
   const { pnr } = useParams<{ pnr: string }>();
-  const [stato, setStato] = useState<Stato>('caricamento');
+  const [searchParams] = useSearchParams();
+  // I link generati oggi includono già l'email (prova di proprietà —
+  // il link stesso arriva solo nell'inbox del titolare). I link
+  // mandati PRIMA di questa correzione non ce l'hanno: per quelli,
+  // chiediamola a mano invece di rompere link già in giro.
+  const emailDaLink = searchParams.get('email');
+  const [email, setEmail] = useState(emailDaLink ?? '');
+  const [emailDigitata, setEmailDigitata] = useState('');
+  const [stato, setStato] = useState<Stato>(emailDaLink ? 'caricamento' : 'chiedi-email');
   const [dati, setDati] = useState<DifferenzaSaldo | null>(null);
   const [messaggioErrore, setMessaggioErrore] = useState('');
   const [couponCodice, setCouponCodice] = useState('');
@@ -19,11 +27,17 @@ export function CompletaSaldoPage() {
   const [verificandoCoupon, setVerificandoCoupon] = useState(false);
 
   useEffect(() => {
-    if (!pnr) return;
-    prenotazioniApi.getSaldo(pnr)
+    if (!pnr || !email) return;
+    setStato('caricamento');
+    prenotazioniApi.getSaldo(pnr, email)
       .then((d) => { setDati(d); setStato(d.saldoPagato ? 'completato' : 'pronto'); })
       .catch(() => setStato('non-trovato'));
-  }, [pnr]);
+  }, [pnr, email]);
+
+  function confermaEmail() {
+    if (!emailDigitata.trim()) return;
+    setEmail(emailDigitata.trim());
+  }
 
   async function verificaCoupon() {
     if (!couponCodice.trim() || !dati) return;
@@ -47,11 +61,11 @@ export function CompletaSaldoPage() {
   }
 
   async function salda() {
-    if (!pnr) return;
+    if (!pnr || !email) return;
     setStato('invio');
     setMessaggioErrore('');
     try {
-      await prenotazioniApi.saldaResto(pnr, couponVerificato ? couponCodice.trim() : undefined);
+      await prenotazioniApi.saldaResto(pnr, email, couponVerificato ? couponCodice.trim() : undefined);
       setStato('completato');
     } catch (e) {
       setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
@@ -66,6 +80,28 @@ export function CompletaSaldoPage() {
 
         {stato === 'non-trovato' && (
           <div className="checkout-summary">Prenotazione non trovata. Controlla il link ricevuto via email.</div>
+        )}
+
+        {stato === 'chiedi-email' && (
+          <div className="evento-pagina-checkout" style={{ position: 'static' }}>
+            <h3>Completa il saldo</h3>
+            <p style={{ fontSize: 13.5, color: 'var(--mist)', margin: '0 0 14px' }}>
+              Per motivi di sicurezza, conferma l'indirizzo email con cui hai prenotato.
+            </p>
+            <div className="campo">
+              <label>Email</label>
+              <input
+                type="email"
+                value={emailDigitata}
+                onChange={(e) => setEmailDigitata(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), confermaEmail())}
+                placeholder="La tua email"
+              />
+            </div>
+            <button className="search-cta" style={{ marginTop: 10 }} disabled={!emailDigitata.trim()} onClick={confermaEmail}>
+              Continua
+            </button>
+          </div>
         )}
 
         {(dati && (stato === 'completato' || stato === 'pronto' || stato === 'invio')) && (

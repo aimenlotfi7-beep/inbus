@@ -1,4 +1,4 @@
-import { and, eq, sql, desc, inArray, isNull, gte } from 'drizzle-orm';
+import { and, eq, ne, sql, desc, inArray, isNull, gte } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
 import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, lineaFermate, busFisici } from '../../db/schema.js';
@@ -35,12 +35,12 @@ function generaPnr() {
 /** Il coupon vale solo per l'acquisto pieno, non per il solo acconto —
  *  chi prenota ad acconto potrà comunque usarlo al momento di saldare
  *  il resto (vedi saldaResto più sotto), non qui. */
-async function validaCoupon(codice: string | undefined, importo: number, eventoId: string, tipoPagamento: 'COMPLETO' | 'ACCONTO') {
-  if (!codice) return { sconto: 0, coupon: null as Awaited<ReturnType<typeof couponService.valida>>['coupon'] | null };
+async function validaCoupon(tx: Tx, codice: string | undefined, importo: number, eventoId: string, tipoPagamento: 'COMPLETO' | 'ACCONTO') {
+  if (!codice) return { sconto: 0, coupon: null as Awaited<ReturnType<typeof couponService.verificaEIncrementaUtilizzo>>['coupon'] | null };
   if (tipoPagamento !== 'COMPLETO') {
     throw new ErroreApplicativo('Il coupon si può usare solo con il pagamento completo — con l\'acconto potrai applicarlo quando salderai il resto.', 400, 'COUPON_NON_VALIDO');
   }
-  return couponService.valida(codice, importo, eventoId);
+  return couponService.verificaEIncrementaUtilizzo(tx, codice, importo, eventoId);
 }
 
 /** Ricalcola il totale "vero" di una prenotazione (prezzo pieno, non
@@ -143,11 +143,11 @@ async function creaRigaInterna(
   let prezzoEffettivo = prezzoNormale;
   if (input.offertaId) {
     const { offerteService } = await import('../offerte/offerte.service.js');
-    const offerta = await offerteService.verificaEIncrementaUtilizzo(input.offertaId, input.eventoId);
+    const offerta = await offerteService.verificaEIncrementaUtilizzo(tx, input.offertaId, input.eventoId);
     prezzoEffettivo = applicaScontoOfferta(prezzoNormale, offerta);
   }
   const importoBase = prezzoEffettivo * input.passeggeri;
-  const { sconto, coupon: couponUsato } = await validaCoupon(input.couponCodice, importoBase, input.eventoId, input.tipoPagamento);
+  const { sconto, coupon: couponUsato } = await validaCoupon(tx, input.couponCodice, importoBase, input.eventoId, input.tipoPagamento);
 
   const acconto = evento.accontoEur ? Number(evento.accontoEur) : env.ACCONTO_FISSO_EUR;
   const totale = importoBase - sconto;
@@ -255,7 +255,7 @@ async function inviaConfermaPrenotazione(risultato: Awaited<ReturnType<typeof cr
         passeggeri: String(risultato.passeggeri),
         totale: Number(risultato.totale).toFixed(2),
         evento: risultato.eventoArtista,
-        link_saldo: urlSito(`/completa-saldo/${risultato.pnr}`),
+        link_saldo: urlSito(`/completa-saldo/${risultato.pnr}?email=${encodeURIComponent(risultato.utenteEmail)}`),
       });
       await inviaEmail({ a: risultato.utenteEmail, oggetto, html });
     }
@@ -453,6 +453,20 @@ export const prenotazioniService = {
       if (!p) throw new NonTrovato('Prenotazione');
       if (p.stato === 'CANCELLATA') return p;
 
+      // Atomico: la transizione di stato stessa fa da lucchetto — due
+      // cancellazioni quasi simultanee sullo stesso PNR, solo una vince
+      // questo UPDATE (l'altra vede l'elenco vuoto e sa che è già
+      // stata cancellata un istante fa, evitando di liberare gli
+      // stessi posti due volte). Prima di questo, i posti si
+      // liberavano SUBITO, col rischio di farlo due volte se
+      // arrivavano due richieste quasi insieme.
+      const [aggiornata] = await tx
+        .update(prenotazioni)
+        .set({ stato: 'CANCELLATA', motivoCancellazione: 'Cancellata dal cliente' })
+        .where(and(eq(prenotazioni.pnr, pnr), ne(prenotazioni.stato, 'CANCELLATA')))
+        .returning();
+      if (!aggiornata) return p; // già cancellata un istante fa da un'altra richiesta, nessun altro effetto da rifare
+
       await tx
         .update(tragitti)
         .set({ postiDisponibili: sql`${tragitti.postiDisponibili} + ${p.passeggeri}` })
@@ -467,12 +481,6 @@ export const prenotazioniService = {
         .update(fermate)
         .set({ postiPrenotati: sql`GREATEST(0, ${fermate.postiPrenotati} - ${p.passeggeri})` })
         .where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.tragittoId, p.tragittoId), sql`${fermate.postiMax} IS NOT NULL`));
-
-      const [aggiornata] = await tx
-        .update(prenotazioni)
-        .set({ stato: 'CANCELLATA', motivoCancellazione: 'Cancellata dal cliente' })
-        .where(eq(prenotazioni.pnr, pnr))
-        .returning();
 
       return aggiornata;
     });
@@ -493,32 +501,41 @@ export const prenotazioniService = {
   /** Segna il saldo come pagato (simulato: non c'è un vero gateway di
    *  pagamento collegato, coerente col resto del checkout). Usato dalla
    *  pagina pubblica raggiunta tramite il link del promemoria saldo. */
-  async saldaResto(pnr: string, couponCodice?: string) {
-    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
-    if (!p) throw new NonTrovato('Prenotazione');
-    if (p.stato !== 'CONFERMATA') throw new ConflittoDati('Questa prenotazione non è più valida.');
-    if (p.saldoPagato) return p;
+  async saldaResto(pnr: string, email: string, couponCodice?: string) {
+    const { riga: aggiornata, appenaSaldata } = await db.transaction(async (tx) => {
+      const [p] = await tx.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
+      if (!p) throw new NonTrovato('Prenotazione');
+      const [utente] = await tx.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+      if (!utente || utente.email.toLowerCase() !== email.toLowerCase()) throw new NonTrovato('Prenotazione');
+      if (p.stato !== 'CONFERMATA') throw new ConflittoDati('Questa prenotazione non è più valida.');
+      if (p.saldoPagato) return { riga: p, appenaSaldata: false };
 
-    let totaleReale = await calcolaTotaleReale(p);
-    let couponUsato: Awaited<ReturnType<typeof couponService.valida>>['coupon'] | null = null;
-    if (couponCodice) {
-      const { sconto, coupon: c } = await couponService.valida(couponCodice, totaleReale, p.eventoId);
-      totaleReale = Math.max(0, totaleReale - sconto);
-      couponUsato = c;
-    }
+      let totaleReale = await calcolaTotaleReale(p);
+      let couponUsato: Awaited<ReturnType<typeof couponService.verificaEIncrementaUtilizzo>>['coupon'] | null = null;
+      if (couponCodice) {
+        const { sconto, coupon: c } = await couponService.verificaEIncrementaUtilizzo(tx, couponCodice, totaleReale, p.eventoId);
+        totaleReale = Math.max(0, totaleReale - sconto);
+        couponUsato = c;
+      }
 
-    const [aggiornata] = await db
-      .update(prenotazioni)
-      .set({
-        saldoPagato: true, saldoPagatoIl: new Date(), totale: totaleReale.toFixed(2),
-        ...(couponUsato && { couponCodice: couponUsato.codice }),
-      })
-      .where(eq(prenotazioni.pnr, pnr))
-      .returning();
+      // Atomico anche qui: la condizione "saldoPagato = false" si
+      // riverifica proprio nel comando che lo imposta — due richieste
+      // di saldo quasi simultanee sulla stessa prenotazione, solo una
+      // delle due riesce (la seconda vede l'elenco vuoto invece di
+      // pagare/emettere il biglietto una seconda volta).
+      const [riga] = await tx
+        .update(prenotazioni)
+        .set({
+          saldoPagato: true, saldoPagatoIl: new Date(), totale: totaleReale.toFixed(2),
+          ...(couponUsato && { couponCodice: couponUsato.codice }),
+        })
+        .where(and(eq(prenotazioni.pnr, pnr), eq(prenotazioni.saldoPagato, false)))
+        .returning();
+      if (!riga) throw new ConflittoDati('Il saldo di questa prenotazione è già stato pagato un istante fa.');
+      return { riga, appenaSaldata: true };
+    });
 
-    if (couponUsato) {
-      await db.update(coupon).set({ usiAttuali: sql`${coupon.usiAttuali} + 1` }).where(eq(coupon.id, couponUsato.id));
-    }
+    if (!appenaSaldata) return aggiornata; // era già saldata prima di questa chiamata, nessun biglietto da rigenerare
 
     // Ora che ha saldato per intero, il biglietto vero (PDF+QR) può
     // essere emesso — fuori dalla transazione: se l'email fallisce, il
@@ -537,9 +554,11 @@ export const prenotazioniService = {
   /** Quanto manca da pagare su una prenotazione ad acconto (per mostrarlo
    *  nella pagina pubblica di completamento saldo, senza doverlo
    *  ricalcolare lato frontend). */
-  async differenzaSaldo(pnr: string) {
+  async differenzaSaldo(pnr: string, email: string) {
     const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
     if (!p) throw new NonTrovato('Prenotazione');
+    const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+    if (!utente || utente.email.toLowerCase() !== email.toLowerCase()) throw new NonTrovato('Prenotazione');
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
     const totaleReale = await calcolaTotaleReale(p);
     return {
@@ -572,8 +591,8 @@ export const prenotazioniService = {
     if (!utente) throw new NonTrovato('Cliente');
 
     const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
-    const dati = await this.differenzaSaldo(p.pnr);
-    const link = urlSito(`/completa-saldo/${p.pnr}`);
+    const dati = await this.differenzaSaldo(p.pnr, utente.email);
+    const link = urlSito(`/completa-saldo/${p.pnr}?email=${encodeURIComponent(utente.email)}`);
     const { templateEmailService } = await import('../template-email/template-email.service.js');
     const { oggetto, html } = await templateEmailService.renderizza('promemoria_saldo', {
       nome: utente.nome ?? '',
@@ -720,8 +739,8 @@ export const prenotazioniService = {
       if (!p.scadenzaSaldo || p.scadenzaSaldo > domani || p.scadenzaSaldo < oraAdesso) continue;
       const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
       if (!utente) continue;
-      const dati = await this.differenzaSaldo(p.pnr);
-      const link = urlSito(`/completa-saldo/${p.pnr}`);
+      const dati = await this.differenzaSaldo(p.pnr, utente.email);
+      const link = urlSito(`/completa-saldo/${p.pnr}?email=${encodeURIComponent(utente.email)}`);
       const { templateEmailService } = await import('../template-email/template-email.service.js');
       const { oggetto, html } = await templateEmailService.renderizza('promemoria_saldo', {
         nome: utente.nome ?? '',

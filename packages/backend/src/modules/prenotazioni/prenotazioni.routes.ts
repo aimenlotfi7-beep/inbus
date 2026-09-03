@@ -50,10 +50,10 @@ export const prenotazioniController = {
     res.status(204).send();
   },
   async differenzaSaldo(req: Request, res: Response) {
-    res.json(await prenotazioniService.differenzaSaldo(req.params.pnr));
+    res.json(await prenotazioniService.differenzaSaldo(req.params.pnr, String(req.query.email)));
   },
   async saldaResto(req: Request, res: Response) {
-    res.json(await prenotazioniService.saldaResto(req.params.pnr, req.body?.couponCodice));
+    res.json(await prenotazioniService.saldaResto(req.params.pnr, req.body.email, req.body?.couponCodice));
   },
   async inviaSollecitoManuale(req: Request, res: Response) {
     res.json(await prenotazioniService.inviaSollecitoManuale(req.params.pnr));
@@ -78,8 +78,8 @@ prenotazioniRouter.post('/', richiedeAuthCliente, valida(creaPrenotazioneSchema)
 prenotazioniRouter.post('/ordine', richiedeAuthCliente, valida(creaOrdineSchema), asyncHandler(prenotazioniController.creaOrdine));
 prenotazioniRouter.get('/by-email', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.listByEmail));
 prenotazioniRouter.get('/:pnr/dettaglio-cliente', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.dettaglioPerCliente));
-prenotazioniRouter.get('/:pnr/saldo', limitePnr, asyncHandler(prenotazioniController.differenzaSaldo));
-prenotazioniRouter.post('/:pnr/salda', limitePnr, asyncHandler(prenotazioniController.saldaResto));
+prenotazioniRouter.get('/:pnr/saldo', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.differenzaSaldo));
+prenotazioniRouter.post('/:pnr/salda', limitePnr, valida(z.object({ email: z.string().email(), couponCodice: z.string().optional() })), asyncHandler(prenotazioniController.saldaResto));
 
 // Amministrazione: cancellazione vera di una prenotazione — protetta
 // (era rimasta pubblica per errore: il cliente non può più cancellare

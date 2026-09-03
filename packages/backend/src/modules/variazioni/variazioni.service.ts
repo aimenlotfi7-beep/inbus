@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { variazioni, variazioniRisposte, prenotazioni, richiesteRimborso, eventi, tragitti, utenti, fermate } from '../../db/schema.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
@@ -164,9 +164,16 @@ export async function infoRispostaVariazione(token: string) {
 export async function rispondiVariazione(token: string, risposta: 'ACCETTATA' | 'RIMBORSO_RICHIESTO') {
   const [riga] = await db.select().from(variazioniRisposte).where(eq(variazioniRisposte.token, token)).limit(1);
   if (!riga) throw new NonTrovato('Link');
-  if (riga.risposta) return; // già risposto una volta, non si sovrascrive
 
-  await db.update(variazioniRisposte).set({ risposta, rispostoIl: new Date() }).where(eq(variazioniRisposte.id, riga.id));
+  // Atomico: la condizione "risposta IS NULL" si riverifica proprio
+  // nel comando che la imposta — un doppio click sullo stesso link
+  // (o due tab aperte), solo uno dei due riesce, l'altro vede l'elenco
+  // vuoto e capisce che si è già risposto un istante fa.
+  const [rigaAggiornata] = await db.update(variazioniRisposte)
+    .set({ risposta, rispostoIl: new Date() })
+    .where(and(eq(variazioniRisposte.id, riga.id), isNull(variazioniRisposte.risposta)))
+    .returning();
+  if (!rigaAggiornata) return; // già risposto una volta, non si sovrascrive (comportamento invariato, solo ora davvero senza corsa)
 
   if (risposta === 'RIMBORSO_RICHIESTO') {
     // Segnalata come "da variazione" — priorità diversa dalle altre,

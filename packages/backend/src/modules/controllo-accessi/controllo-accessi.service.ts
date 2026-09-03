@@ -1,4 +1,4 @@
-import { eq, inArray, and, sql } from 'drizzle-orm';
+import { eq, inArray, and, isNull, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { busFisici, linee, lineaFermate, fermate, tragitti, eventi, prenotazioni, partecipantiPrenotazione } from '../../db/schema.js';
 import { NonTrovato, VietatoDaiPermessi } from '../../shared/errors.js';
@@ -129,9 +129,18 @@ export const controlloAccessiService = {
     }
 
     const nome = `${partecipante.nome} ${partecipante.cognome}`;
-    if (partecipante.ticketUtilizzatoIl) return { esito: 'gia_a_bordo', nome };
 
-    await db.update(partecipantiPrenotazione).set({ ticketUtilizzatoIl: new Date() }).where(eq(partecipantiPrenotazione.id, partecipante.id));
+    // Atomico: la condizione "non ancora usato" si riverifica proprio
+    // nel comando che lo segna usato — due scansioni quasi simultanee
+    // dello stesso QR (due dispositivi, o un doppio tap), solo una
+    // riesce, l'altra vede l'elenco vuoto e capisce che è già stato
+    // validato un istante fa (mostra "già a bordo", non "valido" una
+    // seconda volta).
+    const [aggiornato] = await db.update(partecipantiPrenotazione)
+      .set({ ticketUtilizzatoIl: new Date() })
+      .where(and(eq(partecipantiPrenotazione.id, partecipante.id), isNull(partecipantiPrenotazione.ticketUtilizzatoIl)))
+      .returning();
+    if (!aggiornato) return { esito: 'gia_a_bordo', nome };
     return { esito: 'valido', nome };
   },
 
@@ -190,9 +199,14 @@ export const controlloAccessiService = {
       throw new VietatoDaiPermessi('Questo passeggero non è su una tua tratta.');
     }
 
-    if (!partecipante.ticketUtilizzatoIl) {
-      await db.update(partecipantiPrenotazione).set({ ticketUtilizzatoIl: new Date() }).where(eq(partecipantiPrenotazione.id, partecipanteId));
-    }
+    // Stesso motivo del controllo atomico in scansiona() qui sopra —
+    // anche se qui il danno pratico di una doppia corsa è minore (non
+    // cambia la risposta), resta comunque scorretto lasciare che due
+    // richieste quasi simultanee sovrascrivano lo stesso orario due
+    // volte invece di una.
+    await db.update(partecipantiPrenotazione)
+      .set({ ticketUtilizzatoIl: new Date() })
+      .where(and(eq(partecipantiPrenotazione.id, partecipanteId), isNull(partecipantiPrenotazione.ticketUtilizzatoIl)));
     return { nome: `${partecipante.nome} ${partecipante.cognome}` };
   },
 };

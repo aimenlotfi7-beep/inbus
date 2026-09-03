@@ -30,8 +30,22 @@ export const richiesteRimborsoService = {
       .where(eq(richiesteRimborso.prenotazioneId, p.id));
     if (esistente?.stato === 'IN_ATTESA') throw new ConflittoDati('C\'è già una richiesta di rimborso in attesa per questa prenotazione.');
 
-    const [nuova] = await db.insert(richiesteRimborso).values({ prenotazioneId: p.id, motivo }).returning();
-    return nuova;
+    // Il controllo sopra copre il caso normale con un messaggio
+    // chiaro — ma tra quel controllo e questo INSERT c'è comunque una
+    // finestra (due richieste quasi simultanee). Il database stesso
+    // blocca il doppione grazie al vincolo di unicità parziale sulla
+    // tabella (una sola riga IN_ATTESA per prenotazione): se capita
+    // proprio in quella finestra, l'INSERT fallisce e lo trasformiamo
+    // nello stesso messaggio comprensibile invece di un errore grezzo.
+    try {
+      const [nuova] = await db.insert(richiesteRimborso).values({ prenotazioneId: p.id, motivo }).returning();
+      return nuova;
+    } catch (err) {
+      if (err && typeof err === 'object' && 'code' in err && err.code === '23505') {
+        throw new ConflittoDati('C\'è già una richiesta di rimborso in attesa per questa prenotazione.');
+      }
+      throw err;
+    }
   },
 
   async list() {

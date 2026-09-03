@@ -1,10 +1,12 @@
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, or, isNull, gt, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { offerteEvento, eventi } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { includeCompleto } from '../eventi/eventi.service.js';
 import type { CreaOffertaInput, aggiornaOffertaSchema } from './offerte.dto.js';
 import type { z } from 'zod';
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export const offerteService = {
   async listByEvento(eventoId: string) {
@@ -79,17 +81,32 @@ export const offerteService = {
   /** Stessa verifica di sopra, pensata per essere richiamata al momento
    *  della prenotazione vera (dopo aver deciso che va a buon fine) — poi
    *  incrementa il contatore utilizzi. */
-  async verificaEIncrementaUtilizzo(id: string, eventoId: string) {
-    const [o] = await db.select().from(offerteEvento).where(eq(offerteEvento.id, id)).limit(1);
+  /** Controllo e incremento in UN solo comando atomico
+   *  (UPDATE...WHERE...RETURNING), non due passaggi separati come
+   *  prima — due richieste quasi simultanee sull'ultimo uso
+   *  disponibile: solo una delle due riceve una riga da RETURNING,
+   *  l'altra capisce che l'offerta è stata appena esaurita da qualcun
+   *  altro. Richiede "tx" — va chiamata dentro la transazione della
+   *  prenotazione, non più fuori (un fallimento successivo di quella
+   *  transazione ora annulla anche questo incremento, non lo lascia
+   *  "fantasma"). */
+  async verificaEIncrementaUtilizzo(tx: Tx, id: string, eventoId: string) {
+    const [o] = await tx.select().from(offerteEvento).where(eq(offerteEvento.id, id)).limit(1);
     if (!o) throw new NonTrovato('Offerta');
     if (o.eventoId !== eventoId) throw new ConflittoDati('Questa offerta non è valida per questo evento.');
     if (!o.attiva) throw new ConflittoDati('Questa offerta non è più attiva.');
     const adesso = new Date();
     if (o.validoDal && adesso < o.validoDal) throw new ConflittoDati('Questa offerta non è ancora disponibile.');
     if (o.validoAl && adesso > o.validoAl) throw new ConflittoDati('Questa offerta è scaduta.');
-    if (o.limiteUtilizzi !== null && o.utilizzi >= o.limiteUtilizzi) throw new ConflittoDati('Questa offerta è esaurita.');
 
-    await db.update(offerteEvento).set({ utilizzi: o.utilizzi + 1 }).where(eq(offerteEvento.id, id));
-    return o;
+    const [aggiornata] = await tx.update(offerteEvento)
+      .set({ utilizzi: sql`${offerteEvento.utilizzi} + 1` })
+      .where(and(
+        eq(offerteEvento.id, id),
+        or(isNull(offerteEvento.limiteUtilizzi), gt(offerteEvento.limiteUtilizzi, offerteEvento.utilizzi)),
+      ))
+      .returning();
+    if (!aggiornata) throw new ConflittoDati('Questa offerta è appena stata esaurita — qualcun altro l\'ha usata un istante fa.');
+    return aggiornata;
   },
 };

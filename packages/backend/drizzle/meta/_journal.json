@@ -491,6 +491,20 @@
       "when": 1788343999380,
       "tag": "0069_rimuovi_tipo_fermata",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1788384630632,
+      "tag": "0070_aggiungi_vincolo_una_richiesta_rimborso_in_attesa",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1788416732261,
+      "tag": "0071_aggiungi_indici_prestazioni",
+      "breakpoints": true
     }
   ]
 }
