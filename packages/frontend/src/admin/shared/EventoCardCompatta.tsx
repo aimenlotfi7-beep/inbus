@@ -27,13 +27,19 @@ interface EventoMinimo {
  *  (es. "3 in attesa", "⚠ 2"). "richiedeIntervento" contorna la card
  *  di rosso — pensato per quando il badge da solo, con tanti eventi in
  *  elenco, rischia di passare inosservato. "completata" fa lo stesso
- *  ma di verde — il contorno colorato si AGGIUNGE al badge testuale,
- *  non lo sostituisce (i due possono benissimo comparire insieme). */
-export function EventoCardCompatta({ evento, onClick, badge, richiedeIntervento, completata, extra, opacitaRidotta, mostraLinkPubblico, footer, selezionato }: {
+ *  ma di verde. "parziale" (giallo) è per il caso in mezzo — un evento
+ *  con più tragitti insieme, dove ALCUNI sono a posto per questa tappa
+ *  e ALTRI no ancora (es. metà evento già in vendita, l'altra metà da
+ *  prezzare): né tutto fatto né niente fatto, va distinto da entrambi.
+ *  Solo UNO tra richiedeIntervento/parziale/completata deve essere
+ *  vero alla volta — il contorno colorato si AGGIUNGE al badge
+ *  testuale, non lo sostituisce (i due possono comparire insieme). */
+export function EventoCardCompatta({ evento, onClick, badge, richiedeIntervento, parziale, completata, extra, opacitaRidotta, mostraLinkPubblico, footer, selezionato }: {
   evento: EventoMinimo;
   onClick: () => void;
   badge?: ReactNode;
   richiedeIntervento?: boolean;
+  parziale?: boolean;
   completata?: boolean;
   extra?: ReactNode;
   opacitaRidotta?: boolean;
@@ -43,7 +49,7 @@ export function EventoCardCompatta({ evento, onClick, badge, richiedeIntervento,
 }) {
   return (
     <div
-      className={`evento-card-compatta${richiedeIntervento ? ' richiede-intervento' : ''}${completata ? ' completata' : ''}${selezionato ? ' selezionata' : ''}`}
+      className={`evento-card-compatta${richiedeIntervento ? ' richiede-intervento' : ''}${parziale ? ' parziale' : ''}${completata ? ' completata' : ''}${selezionato ? ' selezionata' : ''}`}
       onClick={onClick}
       style={opacitaRidotta ? { opacity: .65 } : undefined}
     >

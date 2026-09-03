@@ -164,6 +164,13 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
           {cardsFiltrate.map((gruppo) => {
             const stati = gruppo.map((p) => etichettaStato(p, tab));
             const tuttoFatto = stati.every((s) => s.fatto);
+            const nienteFatto = stati.every((s) => !s.fatto);
+            // Un evento con più tragitti insieme (es. andata+ritorno, o
+            // più servizi) può avere alcuni già a posto e altri no per
+            // questa tappa — né "tutto fatto" né "niente fatto", un
+            // terzo stato a parte (giallo) per non confonderlo con
+            // nessuno dei due.
+            const parziale = !tuttoFatto && !nienteFatto;
             // Se alcuni sono fatti e altri no (evento a più servizi), o
             // se sono tutti da fare ma con etichette diverse, mostro
             // solo un conteggio generico invece di scegliere a caso
@@ -173,6 +180,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
             const nienteDaMostrare = stati.every((s) => !s.testo);
             const testoBadge = nienteDaMostrare ? undefined
               : tuttoFatto ? '✓ Fatto'
+              : parziale ? `✓ ${stati.length - daFare.length}/${stati.length} pronti`
               : etichetteDaFareUniche.length === 1 ? etichetteDaFareUniche[0]
               : `${daFare.length} da lavorare`;
             return (
@@ -180,9 +188,10 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
                 key={gruppo[0].evento.id}
                 evento={gruppo[0].evento}
                 onClick={() => apriGruppo(gruppo)}
-                richiedeIntervento={tab !== 'passate' && !tuttoFatto}
+                richiedeIntervento={tab !== 'passate' && nienteFatto}
+                parziale={tab !== 'passate' && parziale}
                 completata={tab !== 'passate' && tuttoFatto}
-                badge={testoBadge && <span style={{ color: tuttoFatto ? 'var(--green)' : undefined }}>{testoBadge}</span>}
+                badge={testoBadge && <span style={{ color: tuttoFatto ? 'var(--green)' : parziale ? '#f0b429' : undefined }}>{testoBadge}</span>}
                 extra={
                   <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 2 }}>
                     {gruppo.length} tragitt{gruppo.length === 1 ? 'o' : 'i'}

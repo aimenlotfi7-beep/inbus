@@ -532,6 +532,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
    apposta per quando ci sono tanti eventi in elenco e il piccolo badge
    da solo rischia di passare inosservato scorrendo la griglia. */
 .evento-card-compatta.richiede-intervento{border:1px solid var(--pink); box-shadow:0 0 14px 1px rgba(255,61,122,.45);}
+.evento-card-compatta.parziale{border:1px solid #f0b429; box-shadow:0 0 14px 1px rgba(240,180,41,.4);}
 .evento-card-compatta.completata{border:1px solid var(--green); box-shadow:0 0 14px 1px rgba(22,163,74,.4);}
 .evento-card-compatta.selezionata{border-color:var(--pink);}
 
