@@ -91,8 +91,12 @@ export async function durataViaggio(a: Coordinate, b: Coordinate): Promise<numbe
       return null;
     }
     const dati = await res.json();
-    if (dati?.routes?.[0]) return Math.round(dati.routes[0].duration / 60);
-    return null;
+    const minuti = dati?.routes?.[0]?.duration != null ? Math.round(dati.routes[0].duration / 60) : NaN;
+    // Non basta che la "route" esista — un campo mancante o non numerico
+    // dentro una risposta comunque "valida" darebbe NaN, che passerebbe
+    // inosservato nei controlli a valle (si aspettano solo null) e
+    // finirebbe per propagarsi come "NaN:NaN" negli orari calcolati.
+    return Number.isFinite(minuti) ? minuti : null;
   } catch (e) {
     console.error('Calcolo durata viaggio fallito:', e);
     return null;
@@ -113,8 +117,8 @@ export async function distanzaViaggio(a: Coordinate, b: Coordinate): Promise<num
       return null;
     }
     const dati = await res.json();
-    if (dati?.routes?.[0]) return Math.round(dati.routes[0].distance / 1000);
-    return null;
+    const km = dati?.routes?.[0]?.distance != null ? Math.round(dati.routes[0].distance / 1000) : NaN;
+    return Number.isFinite(km) ? km : null;
   } catch (e) {
     console.error('Calcolo distanza viaggio fallito:', e);
     return null;

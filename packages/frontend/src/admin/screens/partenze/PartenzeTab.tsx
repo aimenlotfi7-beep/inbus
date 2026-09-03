@@ -483,6 +483,15 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
     }
 
     let cursore = Number(arrivoOrarioContesto.split(':')[0]) * 60 + Number(arrivoOrarioContesto.split(':')[1]);
+    if (!Number.isFinite(cursore)) {
+      // L'orario di arrivo non è nel formato atteso "HH:MM" (es. spazi,
+      // un separatore diverso, un valore scritto a mano non valido) —
+      // prima il calcolo proseguiva comunque, propagando "NaN:NaN" su
+      // ogni fermata senza nessuna spiegazione del perché.
+      setStatoCalcoloOrariMap((prev) => new Map(prev).set(tragittoId, `L'orario di arrivo ("${arrivoOrarioContesto}") non è in un formato valido (HH:MM) — correggilo in Eventi, nella scheda di questo tragitto.`));
+      setCalcolandoOrariSet((prev) => { const s = new Set(prev); s.delete(tragittoId); return s; });
+      return;
+    }
     const orariCalcolati = new Array<string>(fermateValide.length);
     let errori = 0;
     for (let i = fermateValide.length - 1; i >= 0; i--) {
