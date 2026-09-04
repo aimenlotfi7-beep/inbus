@@ -392,7 +392,7 @@ function SezioneDashboard({ email, viaggi, eventiPerId, onNavigare, onAprireViag
       {viaggi === null && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
 
       {viaggi !== null && eventoProssimo && prenotazioneProssima && (
-        <div className="panel-box" style={{ background: 'linear-gradient(135deg, rgba(255,61,122,.12), rgba(91,141,255,.08))', borderColor: 'var(--pink)' }}>
+        <div className="panel-box" style={{ background: 'linear-gradient(135deg, rgba(242,23,100,.12), rgba(170,72,209,.1))', borderColor: 'var(--pink)' }}>
           {giorniAlViaggio === 0 ? (
             <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 20, textTransform: 'uppercase', color: 'var(--pink)', margin: '0 0 6px' }}>🚌 Il tuo viaggio è oggi!</p>
           ) : giorniAlViaggio === 1 ? (

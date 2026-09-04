@@ -157,6 +157,19 @@ export function HomePage() {
       if (inPausaCarosello.current) return;
       const el = caroselloHeroRef.current;
       if (!el) return;
+      // Sotto la soglia del giro infinito (vedi salvaguardiaGiroInfinito
+      // più sopra) non ci sono cloni, quindi lo scorrimento arriva a un
+      // vero e proprio fondo scala — continuare a chiamare scrollBy da
+      // lì non farebbe più nulla (il browser è già al massimo), dando
+      // l'illusione che il carosello si sia fermato. In quel caso si
+      // torna semplicemente all'inizio.
+      if (eventi.length < SOGLIA_MINIMA_GIRO_INFINITO) {
+        const fineCorsa = el.scrollWidth - el.clientWidth;
+        if (el.scrollLeft >= fineCorsa - 4) {
+          el.scrollTo({ left: 0, behavior: 'smooth' });
+          return;
+        }
+      }
       // Avanza sempre, mai un controllo "sono alla fine?" qui — il
       // giro infinito (cloni + salto invisibile, vedi
       // salvaguardiaGiroInfinito più sopra, agganciata allo scroll)
