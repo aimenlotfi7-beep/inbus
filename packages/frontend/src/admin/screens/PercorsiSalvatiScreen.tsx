@@ -31,6 +31,11 @@ export function PercorsiSalvatiScreen() {
   const [percorsiCartinaIds, setPercorsiCartinaIds] = useState<string[]>(['']);
   const [percorsi, setTragitti] = useState<PercorsoSalvato[]>([]);
   const [inModifica, setInModifica] = useState<PercorsoSalvato | null>(null);
+  // Diverso da inModifica: qui il salvataggio crea un tragitto NUOVO
+  // (non aggiorna l'originale) — serve solo per sapere da chi si è
+  // clonato, per il controllo anti-doppione e per mostrare "Inverti"
+  // (disponibile SOLO in questo caso, mai più in Creazione Evento).
+  const [clonatoDa, setClonatoDa] = useState<PercorsoSalvato | null>(null);
   const [nome, setNome] = useState('');
   const [fermate, setFermate] = useState<FermataPercorsoSalvato[]>([]);
   const [modaleAperta, setModaleAperta] = useState(false);
@@ -43,7 +48,7 @@ export function PercorsiSalvatiScreen() {
   useEffect(() => { fermateAnagraficaApi.list().then(setFermateAnagrafica).catch(() => setFermateAnagrafica([])); }, []);
 
   function apriNuovo() {
-    setInModifica(null); setNome('');
+    setInModifica(null); setClonatoDa(null); setNome('');
     // Le due Teste (partenza e arrivo) sono sempre presenti, anche
     // senza nessuna fermata intermedia in mezzo — un percorso senza
     // almeno queste due non ha senso.
@@ -53,12 +58,37 @@ export function PercorsiSalvatiScreen() {
     setModaleAperta(true);
   }
   function apriModifica(t: PercorsoSalvato) {
-    setInModifica(t); setNome(t.nome);
+    setInModifica(t); setClonatoDa(null); setNome(t.nome);
     const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, sogliaMinima: f.sogliaMinima }));
     const fermateIniziali: FermataPercorsoSalvato[] = fermateNormalizzate.length >= 2 ? fermateNormalizzate : [{ citta: '', indirizzo: '' }, { citta: '', indirizzo: '' }];
     setFermate(fermateIniziali);
     setSnapshotIniziale(JSON.stringify({ nome: t.nome, fermate: fermateIniziali }));
     setModaleAperta(true);
+  }
+  // Apre lo stesso modulo di apriModifica, ma NON in modifica — al
+  // salvataggio crea un tragitto nuovo, non tocca l'originale. Utile
+  // per riciclare un percorso già fatto per la direzione opposta (es.
+  // Milano→Roma diventa Roma→Milano) senza doverlo scrivere da capo.
+  function apriClona(t: PercorsoSalvato) {
+    setInModifica(null); setClonatoDa(t); setNome(t.nome);
+    const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, sogliaMinima: f.sogliaMinima }));
+    const fermateIniziali: FermataPercorsoSalvato[] = fermateNormalizzate.length >= 2 ? fermateNormalizzate : [{ citta: '', indirizzo: '' }, { citta: '', indirizzo: '' }];
+    setFermate(fermateIniziali);
+    // Confrontato con QUESTO snapshot al salvataggio — se non è
+    // cambiato niente, il salvataggio va bloccato (altrimenti si
+    // crea un doppione identico all'originale appena clonato).
+    setSnapshotIniziale(JSON.stringify({ nome: t.nome, fermate: fermateIniziali }));
+    setModaleAperta(true);
+  }
+  // Disponibile SOLO quando si è arrivati qui da "Clona" — un
+  // tragitto già salvato non si inverte più direttamente (si clona
+  // e si inverte la copia, l'originale resta intatto).
+  function invertiFermatePercorso() {
+    setFermate((f) => [...f].reverse());
+    setNome((n) => {
+      const parti = n.split(' → ');
+      return parti.length === 2 ? `${parti[1]} → ${parti[0]}` : n;
+    });
   }
 
   function aggiornaFermata(idx: number, campo: keyof FermataPercorsoSalvato, valore: string) {
@@ -91,6 +121,13 @@ export function PercorsiSalvatiScreen() {
     if (salvando) return;
     if (!nome.trim()) { alert('Dai un nome al tragitto prima di salvarlo.'); return; }
     if (fermate.length < 2) { alert('Servono almeno due fermate — le due Teste (partenza e arrivo).'); return; }
+    // Clonato ma non toccato per niente — salvarlo così com'è
+    // creerebbe un doppione identico all'originale, per la stessa
+    // identica destinazione.
+    if (clonatoDa && JSON.stringify({ nome, fermate }) === snapshotIniziale) {
+      alert('Non hai cambiato nulla rispetto al tragitto clonato — salvarlo così creerebbe un doppione identico. Modifica qualcosa (es. inverti, o cambia una fermata) prima di salvare.');
+      return;
+    }
     // Le due Teste (prima e ultima fermata, posizione) possono restare
     // senza indirizzo — quello vero si scrive in Eventi, quando il
     // percorso viene applicato. Le fermate intermedie lo richiedono
@@ -103,7 +140,11 @@ export function PercorsiSalvatiScreen() {
       alert(`${incomplete.length} fermata/e non è/sono completa/e — manca la città (o l'indirizzo, per le fermate intermedie). Completala o eliminala prima di salvare.`);
       return;
     }
-    const payload = { nome, fermate };
+    // Forzo l'indirizzo vuoto sull'arrivo anche qui, non solo nella UI —
+    // un percorso salvato PRIMA di questo cambio potrebbe ancora averne
+    // uno scritto, e va ripulito al primo salvataggio successivo.
+    const fermateDaSalvare = fermate.map((f, idx) => idx === fermate.length - 1 ? { ...f, indirizzo: '' } : f);
+    const payload = { nome, fermate: fermateDaSalvare };
     setSalvando(true);
     try {
       if (inModifica) await percorsiSalvatiApi.update(inModifica.id, payload);
@@ -150,18 +191,42 @@ export function PercorsiSalvatiScreen() {
 
   if (modaleAperta) {
     return (
-      <PaginaSezione titolo={inModifica ? 'Modifica tragitto' : 'Nuovo tragitto'} onIndietro={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
+      <PaginaSezione titolo={inModifica ? 'Modifica tragitto' : clonatoDa ? `Clona: ${clonatoDa.nome}` : 'Nuovo tragitto'} onIndietro={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
         <div className="campo"><label>Nome tragitto</label><input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
 
+        {clonatoDa && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+            {/* Disponibile SOLO qui (clonazione) — un tragitto già
+                salvato non si inverte più direttamente: prima si clona,
+                poi si inverte la copia, così l'originale resta intatto
+                e riutilizzabile per la direzione originale. */}
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={invertiFermatePercorso}>↔ Inverti</button>
+          </div>
+        )}
+
         <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate (le due Teste si scrivono in Eventi)</p>
-        {fermate.map((f, idx) => (
+        {fermate.map((f, idx) => {
+          const eArrivo = idx === fermate.length - 1;
+          return (
           <div key={idx} style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: (idx === 0 || idx === fermate.length - 1) ? '#5be0a0' : 'var(--amber)' }}>
-                {idx === 0 || idx === fermate.length - 1 ? 'TESTA' : `FERMATA ${idx + 1}`}
+              <span style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: (idx === 0 || eArrivo) ? '#5be0a0' : 'var(--amber)' }}>
+                {idx === 0 ? 'TESTA — PARTENZA' : eArrivo ? 'TESTA — ARRIVO' : `FERMATA ${idx + 1}`}
               </span>
               <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 11, color: 'var(--pink)' }} onClick={() => rimuoviFermata(idx)}>✕</button>
             </div>
+            {eArrivo ? (
+              // L'arrivo ha SOLO una città, mai un indirizzo — quello
+              // vero cambia da un evento all'altro (la stessa città può
+              // avere venue diverse, es. Roma: Circo Massimo una volta,
+              // Stadio un'altra) e si scrive sempre in Eventi, mai qui.
+              // Niente anagrafica per questo motivo — porterebbe sempre
+              // un indirizzo fisso con sé.
+              <>
+                <input placeholder="Città di arrivo" value={f.citta} onChange={(e) => aggiornaFermata(idx, 'citta', e.target.value)} />
+                <p style={{ fontSize: 10.5, color: 'var(--mist)', marginTop: 4 }}>L'indirizzo esatto si sceglie in Eventi — la stessa città può avere venue diverse a seconda dell'evento.</p>
+              </>
+            ) : (
             <div style={{ display: 'grid', gridTemplateColumns: f.fermataAnagraficaId !== null ? '1fr .6fr' : '1fr 1.4fr .6fr', gap: 8 }}>
               {f.fermataAnagraficaId !== null ? (
                 // Di default (e finché non si sceglie "scrivi
@@ -181,11 +246,12 @@ export function PercorsiSalvatiScreen() {
               ) : (
                 <>
                   <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idx, 'citta', e.target.value)} />
-                  <input placeholder={(idx === 0 || idx === fermate.length - 1) ? 'Indirizzo (facoltativo — si scrive in Eventi)' : 'Indirizzo'} value={f.indirizzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
+                  <input placeholder={idx === 0 ? 'Indirizzo (facoltativo — si scrive in Eventi)' : 'Indirizzo'} value={f.indirizzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
                 </>
               )}
             </div>
-            {f.fermataAnagraficaId === null && fermateAnagrafica.length > 0 && (
+            )}
+            {!eArrivo && f.fermataAnagraficaId === null && fermateAnagrafica.length > 0 && (
               <button
                 type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px', marginTop: 6 }}
                 onClick={() => setFermate(fermate.map((ff, i) => i === idx ? { ...ff, fermataAnagraficaId: undefined, citta: '', indirizzo: '' } : ff))}
@@ -208,7 +274,8 @@ export function PercorsiSalvatiScreen() {
               />
             </div>
           </div>
-        ))}
+          );
+        })}
         <button className="btn btn-ghost" style={{ marginBottom: 18 }} onClick={aggiungiFermata}>+ Aggiungi fermata</button>
 
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva tragitto'}</button>
@@ -316,7 +383,10 @@ export function PercorsiSalvatiScreen() {
               <div key={t.id} className="evento-card" onClick={() => apriModifica(t)}>
                 <h3>{t.nome}</h3>
                 <p>{t.fermate.map((f) => f.citta).filter(Boolean).join(' → ') || 'Nessuna fermata'}</p>
-                <button className="btn btn-ghost" style={{ marginTop: 10, fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(t); }}>Elimina</button>
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={(e) => { e.stopPropagation(); apriClona(t); }} title="Crea un tragitto nuovo a partire da questo — utile per es. invertire la direzione senza toccare l'originale">⧉ Clona</button>
+                  <button className="btn btn-ghost" style={{ fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(t); }}>Elimina</button>
+                </div>
               </div>
             ))}
           </div>

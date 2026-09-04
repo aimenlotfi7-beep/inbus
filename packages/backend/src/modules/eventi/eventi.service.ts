@@ -609,13 +609,6 @@ export const eventiService = {
     await db.update(tragitti).set({ eliminatoIl: null }).where(eq(tragitti.id, id));
   },
 
-  /** Somma i posti disponibili su tutte le tragitti di un evento —
-   *  liberi E dentro ogni servizio, stesso motivo delle altre funzioni
-   *  qui sopra corrette allo stesso modo. */
-  postiTotaliDisponibili(evento: Awaited<ReturnType<typeof getById>>) {
-    return [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].reduce((somma, l) => somma + l.postiDisponibili, 0);
-  },
-
   /** Una riga per ogni fermata prenotabile, con il prezzo effettivo già
    *  calcolato (sovrascrive prezzo base+extra se la fermata ha un prezzo
    *  proprio) — usata dal checkout sul sito pubblico. */

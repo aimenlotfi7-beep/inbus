@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
  *  dal campo senza compilare i minuti, li imposta da sola a "00" invece
  *  di lasciare il valore vuoto/non valido — risparmia di dover scrivere
  *  ":00" ogni volta per gli orari in punto. */
-export function OrarioInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+export function OrarioInput({ value, onChange, placeholder, style }: { value: string; onChange: (v: string) => void; placeholder?: string; style?: React.CSSProperties }) {
   const [testo, setTesto] = useState(value);
 
   useEffect(() => setTesto(value), [value]);
@@ -31,6 +31,7 @@ export function OrarioInput({ value, onChange, placeholder }: { value: string; o
       inputMode="numeric"
       placeholder={placeholder ?? 'HH:MM'}
       value={testo}
+      style={style}
       onChange={(e) => setTesto(e.target.value)}
       onBlur={() => {
         const norm = normalizza(testo);

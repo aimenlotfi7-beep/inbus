@@ -64,6 +64,10 @@ export function SchedaEventoModale({
   // volta o tutti insieme. Si azzera ogni volta che si cambia servizio
   // attivo, per non lasciare una selezione a metà da un altro contesto.
   const [cittaPercorsoScelta, setCittaPercorsoScelta] = useState('');
+  // Il flag "imposta arrivo per tutti" — uno per contesto (un servizio
+  // a testa, o "liberi"/singolo) così attivarlo su un servizio non
+  // tocca gli altri. Mappa per chiave = servizioIdContestoAttuale().
+  const [arrivoPerTuttiMap, setArrivoPerTuttiMap] = useState<Map<string | null, { attivo: boolean; citta: string; indirizzo: string; orario: string }>>(new Map());
   const [percorsiSelezionatiIds, setPercorsiSelezionatiIds] = useState<Set<string>>(new Set());
   const [fermateAnagrafica, setFermateAnagrafica] = useState<FermataAnagrafica[]>([]);
   const [categorie, setCategorie] = useState<Categoria[]>([]);
@@ -479,94 +483,7 @@ export function SchedaEventoModale({
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
   }
 
-  /** Inverte un tragitto GIÀ aggiunto — scambia la Testa di partenza
-   *  (prima fermata) con la Testa di arrivo (arrivoCitta/Indirizzo/
-   *  Orario), e gira l'ordine di tutte le fermate intermedie in mezzo.
-   *  Ripetibile avanti e indietro quante volte serve: applicandola due
-   *  volte di fila si torna esattamente al punto di partenza (uno
-   *  scambio pulito, mai con perdita di dati). */
-  // Impedisce due inversioni sovrapposte sullo stesso tragitto — tra il
-  // click e la fine della verifica prenotazioni (una chiamata di rete)
-  // c'è una finestra in cui un secondo click partirebbe usando ancora i
-  // dati di PRIMA della prima inversione, risultando in una città
-  // d'arrivo sbagliata/vecchia una volta finite entrambe.
-  const [inversioneInCorso, setInversioneInCorso] = useState<Set<string>>(new Set());
-
-  async function invertiTragitto(idxTragitto: number) {
-    const t = (form.tragitti ?? [])[idxTragitto];
-    if (!t) return;
-    const chiaveGuardiano = t.id ?? `nuovo-${idxTragitto}`;
-    if (inversioneInCorso.has(chiaveGuardiano)) return;
-    setInversioneInCorso((prev) => new Set(prev).add(chiaveGuardiano));
-    try {
-
-    // Stesso controllo già usato per rimuoviTragitto — invertire
-    // scambia partenza e arrivo: se la città che era "partenza" (dove
-    // i clienti si sono davvero imbarcati) diventa "arrivo", quella
-    // città sparisce dall'elenco delle fermate prenotabili — le
-    // prenotazioni vere restano nel database, ma diventano difficili
-    // da gestire nell'interfaccia. Una riga appena aggiunta (senza id,
-    // mai salvata) non può averne, si salta il controllo.
-    if (t.id) {
-      try {
-        const { haPrenotazioni, quante } = await eventiApi.tragittoHaPrenotazioniConfermate(t.id);
-        if (haPrenotazioni) {
-          alert(`Questo tragitto ha ${quante} prenotazion${quante > 1 ? 'i' : 'e'} confermat${quante > 1 ? 'e' : 'a'} — non può essere invertito. Sposta quelle prenotazioni prima di invertirlo.`);
-          return;
-        }
-      } catch {
-        alert('Impossibile verificare le prenotazioni di questo tragitto — controlla la connessione e riprova.');
-        return;
-      }
-    }
-
-    // Individuato per ID (stabile) quando il tragitto è già salvato —
-    // non per riferimento oggetto, che durante l'attesa di rete qui
-    // sopra può non corrispondere più anche se è "lo stesso" tragitto
-    // logicamente (basta un altro giro di render nel frattempo, React
-    // può ricreare l'oggetto). Un tragitto appena aggiunto (senza id
-    // ancora) non può cambiare riferimento nello stesso modo — lì
-    // resta valida la posizione originale.
-    setForm((f) => {
-      const tragitti = [...(f.tragitti ?? [])];
-      const idxAttuale = t.id ? tragitti.findIndex((x) => x.id === t.id) : idxTragitto;
-      if (idxAttuale === -1 || !tragitti[idxAttuale]) return f; // rimosso da un'altra azione nel frattempo
-      const attuale = tragitti[idxAttuale];
-      if (attuale.fermate.length === 0) return f;
-      const [vecchiaPartenza, ...intermedie] = attuale.fermate;
-      const nuovaPartenza: FermataInput = {
-        fermataAnagraficaId: null,
-        citta: attuale.arrivoCitta ?? '',
-        indirizzo: attuale.arrivoIndirizzo ?? '',
-        orario: attuale.arrivoOrario,
-        prezzo: vecchiaPartenza.prezzo,
-        sogliaMinima: vecchiaPartenza.sogliaMinima,
-      };
-      tragitti[idxAttuale] = {
-        ...attuale,
-        nome: invertiNomeTragitto(attuale.nome),
-        fermate: [nuovaPartenza, ...[...intermedie].reverse()],
-        arrivoCitta: vecchiaPartenza.citta || undefined,
-        arrivoIndirizzo: vecchiaPartenza.indirizzo || undefined,
-        arrivoOrario: vecchiaPartenza.orario,
-      };
-      return { ...f, tragitti };
-    });
-    } finally {
-      setInversioneInCorso((prev) => { const s = new Set(prev); s.delete(chiaveGuardiano); return s; });
-    }
-  }
-  // Se il nome segue la forma "Partenza → Arrivo" (quella usata dai
-  // Percorsi Salvati, e proposta di default quando se ne applica uno),
-  // lo capovolge insieme all'inversione vera — "Varese → Roma" diventa
-  // "Roma → Varese". Un nome scritto a mano senza quella freccia
-  // (es. "Andata mattina") resta invariato — non c'è un ordine
-  // riconoscibile da capovolgere.
-  function invertiNomeTragitto(nome: string): string {
-    const parti = nome.split(' → ');
-    if (parti.length !== 2) return nome;
-    return `${parti[1]} → ${parti[0]}`;
-  }  function aggiungiTragittoManuale() {
+  function aggiungiTragittoManuale() {
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
     setForm((f) => ({ ...f, tragitti: [...(f.tragitti ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, attivo: true, servizioId: servizioIdContestoAttuale(), fermate: [{ citta: '', indirizzo: '' }] }] }));
   }
@@ -985,6 +902,52 @@ export function SchedaEventoModale({
 
       {modalitaServizi !== null && !servizioSenzaNomeAttivo && (
       <>
+      {(() => {
+        const contesto = servizioIdContestoAttuale();
+        const arrivoPerTutti = arrivoPerTuttiMap.get(contesto) ?? { attivo: false, citta: '', indirizzo: '', orario: '' };
+        const etichettaContesto = modalitaServizi === 'multiplo' && servizioTabAttivo && servizioTabAttivo !== 'liberi'
+          ? servizi.find((v) => v.key === servizioTabAttivo)?.nome ?? 'questo servizio'
+          : 'questi tragitti';
+
+        function aggiornaFlag(attivo: boolean) {
+          setArrivoPerTuttiMap((prev) => new Map(prev).set(contesto, { ...arrivoPerTutti, attivo }));
+        }
+        function aggiornaCampoCondiviso(campo: 'citta' | 'indirizzo' | 'orario', valore: string) {
+          const nuovo = { ...arrivoPerTutti, [campo]: valore };
+          setArrivoPerTuttiMap((prev) => new Map(prev).set(contesto, nuovo));
+          // Si applica SUBITO a ogni tragitto di questo stesso contesto,
+          // ogni volta che si scrive — non serve un pulsante "applica"
+          // a parte.
+          setForm((f) => ({
+            ...f,
+            tragitti: (f.tragitti ?? []).map((t) => (t.servizioId ?? null) === contesto
+              ? { ...t, arrivoCitta: nuovo.citta, arrivoIndirizzo: nuovo.indirizzo, arrivoOrario: nuovo.orario }
+              : t),
+          }));
+        }
+
+        return (
+          <div className="section-card" style={{ marginBottom: 16 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={arrivoPerTutti.attivo} onChange={(e) => aggiornaFlag(e.target.checked)} style={{ width: 'auto' }} />
+              Imposta lo stesso arrivo per tutti i tragitti di {etichettaContesto}
+            </label>
+            {arrivoPerTutti.attivo && (
+              <div className="form-grid" style={{ marginTop: 10 }}>
+                <label>Città di arrivo
+                  <input value={arrivoPerTutti.citta} onChange={(e) => aggiornaCampoCondiviso('citta', e.target.value)} placeholder="es. Roma" />
+                </label>
+                <label>Indirizzo di arrivo
+                  <input value={arrivoPerTutti.indirizzo} onChange={(e) => aggiornaCampoCondiviso('indirizzo', e.target.value)} placeholder="es. Piazzale Clodio, Roma" />
+                </label>
+                <label>Orario di arrivo
+                  <OrarioInput value={arrivoPerTutti.orario} onChange={(v) => aggiornaCampoCondiviso('orario', v)} />
+                </label>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       {percorsiSalvati.length > 0 && (() => {
         const contesto = servizioIdContestoAttuale();
         function giaUsato(t: PercorsoSalvato) {
@@ -1138,16 +1101,6 @@ export function SchedaEventoModale({
 
           {espansa && (
           <>
-          <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              type="button" className="btn btn-ghost" style={{ fontSize: 12, whiteSpace: 'nowrap' }}
-              onClick={() => invertiTragitto(idxTragitto)}
-              disabled={inversioneInCorso.has(tragitto.id ?? `nuovo-${idxTragitto}`)}
-              title="Scambia partenza e arrivo, gira anche l'ordine delle fermate intermedie (e il nome, se segue la forma 'A → B')"
-            >
-              ↔ Inverti
-            </button>
-          </div>
           <p className="section-label" style={{ marginBottom: 6, display: 'flex', alignItems: 'center' }}>
             Fermate
             <InfoTooltip>{mappaTooltip.fermate_orario_intro ?? TOOLTIP_DEFAULT.fermate_orario_intro}</InfoTooltip>
@@ -1245,9 +1198,19 @@ export function SchedaEventoModale({
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>
 
           <p style={{ marginTop: 14, marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--pink)' }}>Arrivo</p>
+          {(() => {
+            // Solo uno stile diverso (leggermente oscurato) per far
+            // capire da dove viene il valore — il campo resta
+            // comunque modificabile cliccandoci, come richiesto: chi
+            // vuole un'eccezione per UN tragitto specifico può
+            // scriverci sopra senza dover prima disattivare il flag.
+            const daArrivoPerTutti = arrivoPerTuttiMap.get(tragitto.servizioId ?? null)?.attivo ?? false;
+            const stileOscurato = daArrivoPerTutti ? { opacity: .6, background: 'var(--night)' } : undefined;
+            return (
           <div className="form-grid" style={{ marginBottom: 10 }}>
             <label>Città di arrivo
               <input
+                style={stileOscurato}
                 value={tragitto.arrivoCitta ?? ''}
                 onChange={(e) => aggiornaTragitto(idxTragitto, 'arrivoCitta', e.target.value)}
                 placeholder="es. Roma"
@@ -1255,15 +1218,18 @@ export function SchedaEventoModale({
             </label>
             <label>Indirizzo di arrivo
               <input
+                style={stileOscurato}
                 value={tragitto.arrivoIndirizzo ?? ''}
                 onChange={(e) => aggiornaTragitto(idxTragitto, 'arrivoIndirizzo', e.target.value)}
                 placeholder="es. Piazzale Clodio, Roma"
               />
             </label>
             <label>Orario di arrivo
-              <OrarioInput value={tragitto.arrivoOrario ?? ''} onChange={(v) => aggiornaTragitto(idxTragitto, 'arrivoOrario', v)} />
+              <OrarioInput style={stileOscurato} value={tragitto.arrivoOrario ?? ''} onChange={(v) => aggiornaTragitto(idxTragitto, 'arrivoOrario', v)} />
             </label>
           </div>
+            );
+          })()}
           </>
           )}
         </div>

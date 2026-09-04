@@ -88,8 +88,4 @@ export const authService = {
       throw new NonAutorizzato('Sessione scaduta o non valida, effettua di nuovo il login');
     }
   },
-
-  async hashPassword(password: string) {
-    return bcrypt.hash(password, 10);
-  },
 };
