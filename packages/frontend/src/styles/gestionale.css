@@ -581,13 +581,22 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .gruppo-modulo{margin-bottom:20px;}
 .gruppo-modulo:last-child{margin-bottom:0;}
 
-/* ---------- Indirizzo fermata: sempre visibile su desktop, su
-   mobile si apre solo tenendo premuto sulla città (vedi
-   avviaPressioneLunga in SchedaEventoModale.tsx), si richiude
-   togliendo il focus dal campo. ---------- */
+/* ---------- Indirizzo fermata: sulla stessa riga della città, sempre
+   visibile su desktop. Su mobile la riga è trascinabile (riordino
+   fermate) — una pressione prolungata sulla città confliggerebbe col
+   gesto di trascinamento, quindi lì resta chiuso di default e si apre
+   con un tap normale sul pulsantino 📍 (mai un tocco lungo). ---------- */
+.apri-indirizzo-mobile{display:none;}
 @media (max-width:760px){
   .indirizzo-fermata-riga{display:none;}
-  .indirizzo-fermata-riga.espansa{display:block;}
+  .indirizzo-fermata-riga.espansa{display:block; width:100%;}
+  .apri-indirizzo-mobile{
+    display:block; width:100%; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    font-size:11px; padding:6px 8px; background:transparent; border:1px dashed var(--line); border-radius:8px; color:var(--mist);
+  }
+  /* Quando il campo è aperto (.espansa), il pulsante che lo apre non
+     serve più — è il fratello successivo nel markup, "~" lo trova. */
+  .indirizzo-fermata-riga.espansa ~ .apri-indirizzo-mobile{display:none;}
 }
 
 /* ---------- Riga fermata (Creazione Evento): il <select> della
@@ -599,6 +608,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
    il tooltip "title") si nasconde per lasciare spazio. ---------- */
 .riga-fermata select, .riga-fermata input{min-width:0;}
 @media (max-width:760px){
+  .riga-fermata{grid-template-columns:16px 1fr 56px 56px auto auto !important;}
   .riga-fermata{gap:3px;}
   .riga-fermata select, .riga-fermata input{font-size:13px; text-overflow:ellipsis; padding-left:6px; padding-right:6px;}
   .etichetta-attiva-fermata{display:none;}

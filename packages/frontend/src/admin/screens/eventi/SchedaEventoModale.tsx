@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
 import { InfoTooltip } from '../../shared/InfoTooltip';
 import { TOOLTIP_DEFAULT } from '../../tooltipDefaults';
@@ -171,19 +171,13 @@ export function SchedaEventoModale({
   }
   const [nuovaImmagine, setNuovaImmagine] = useState('');
   const [trascinata, setTrascinata] = useState<{ tragitto: number; fermata: number } | null>(null);
-  // Solo per il layout mobile (la stessa riga resta sempre visibile su
-  // desktop, via CSS) — tenendo premuto sulla città si "apre" il campo
-  // indirizzo di QUELLA fermata, chiudendolo togliendo il focus
-  // (onBlur). Chiave "idxTragitto-idxFermata", una alla volta.
+  // Indirizzo e città sulla stessa riga, sempre visibile su desktop.
+  // Su mobile la riga è trascinabile (per riordinare le fermate) — una
+  // pressione prolungata confliggerebbe col gesto di trascinamento,
+  // quindi si apre con un tap normale sul pulsantino 📍 (vedi
+  // "apri-indirizzo-mobile" più sotto), si richiude togliendo il focus
+  // dal campo (onBlur). Chiave "idxTragitto-idxFermata", una alla volta.
   const [indirizzoEspansoMobile, setIndirizzoEspansoMobile] = useState<string | null>(null);
-  const timerPressioneRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  function avviaPressioneLunga(chiave: string) {
-    if (timerPressioneRef.current) clearTimeout(timerPressioneRef.current);
-    timerPressioneRef.current = setTimeout(() => setIndirizzoEspansoMobile(chiave), 450);
-  }
-  function annullaPressioneLunga() {
-    if (timerPressioneRef.current) { clearTimeout(timerPressioneRef.current); timerPressioneRef.current = null; }
-  }
   const [formIniziale, setFormIniziale] = useState('');
 
   const [categorieEvento, setCategorieEvento] = useState<CategoriaEvento[]>([]);
@@ -1139,16 +1133,11 @@ export function SchedaEventoModale({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => onDropSu(idxTragitto, idxFermata)}
                 style={{
-                  display: 'grid', gridTemplateColumns: '16px 1fr auto auto auto', gap: 6, alignItems: 'center',
+                  display: 'grid', gridTemplateColumns: '16px 1fr 1fr 68px auto auto', gap: 6, alignItems: 'center',
                   opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
                 }}
               >
                 <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
-                <div
-                  onTouchStart={() => avviaPressioneLunga(`${idxTragitto}-${idxFermata}`)}
-                  onTouchEnd={annullaPressioneLunga}
-                  onTouchMove={annullaPressioneLunga}
-                >
                 {/* !== null da solo non basta — dati salvati prima che
                     il controllo qui sotto intercettasse "__manuale__"
                     potrebbero avere quella stringa letterale scritta
@@ -1160,9 +1149,9 @@ export function SchedaEventoModale({
                   // Di default (e finché non si sceglie "scrivi
                   // manualmente") si parte da qui — un elenco leggibile,
                   // non un'iconcina minuscola. La città arriva
-                  // dall'anagrafica; l'indirizzo si scrive comunque
-                  // sempre qui sotto (riga a parte), modificabile anche
-                  // partendo da quello suggerito dall'anagrafica.
+                  // dall'anagrafica; l'indirizzo (qui accanto, stessa
+                  // riga) resta comunque modificabile anche partendo
+                  // da quello suggerito.
                   <select
                     value={f.fermataAnagraficaId ?? ''}
                     onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
@@ -1186,6 +1175,32 @@ export function SchedaEventoModale({
                 ) : (
                   <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
                 )}
+                {/* Indirizzo sulla stessa riga della città, sempre
+                    visibile su desktop. Su mobile — la riga è
+                    trascinabile per riordinare le fermate, quindi una
+                    pressione prolungata qui confliggerebbe col gesto
+                    di trascinamento — resta chiuso di default e si
+                    apre con un tocco normale sull'iconetta 📍 qui
+                    sotto (className diverso da quello del campo,
+                    sempre visibile, per non nascondere anche il modo
+                    di aprirlo), si richiude togliendo il focus dal
+                    campo (onBlur). */}
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className={`indirizzo-fermata-riga${indirizzoEspansoMobile === `${idxTragitto}-${idxFermata}` ? ' espansa' : ''}`}
+                    value={f.indirizzo ?? ''}
+                    onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)}
+                    onBlur={() => setIndirizzoEspansoMobile(null)}
+                    placeholder="Indirizzo"
+                  />
+                  <button
+                    type="button"
+                    className="apri-indirizzo-mobile"
+                    onClick={() => setIndirizzoEspansoMobile(`${idxTragitto}-${idxFermata}`)}
+                    title="Modifica indirizzo"
+                  >
+                    📍{f.indirizzo ? '' : ' Indirizzo'}
+                  </button>
                 </div>
                 <div style={{ width: 68 }} title="Soglia minima partecipanti (facoltativa) — sotto questo numero la fermata non viene considerata raggiunta">
                   <CampoNumero
@@ -1219,24 +1234,6 @@ export function SchedaEventoModale({
                   ← Torna a scegliere dall'anagrafica
                 </button>
               )}
-              {/* Indirizzo sempre come campo vero, etichettato e
-                  modificabile — stesso stile di Città/Indirizzo di
-                  arrivo qui sotto — non più solo una scritta di sola
-                  lettura sotto il menu anagrafica. La soglia minima si
-                  è spostata nella riga principale qui sopra, piccola,
-                  accanto ad Attiva — prima occupava un intero blocco a
-                  parte. */}
-              <label
-                className={`indirizzo-fermata-riga${indirizzoEspansoMobile === `${idxTragitto}-${idxFermata}` ? ' espansa' : ''}`}
-                style={{ display: 'block', marginLeft: 22, marginTop: 6, fontSize: 11 }}
-              >Indirizzo
-                <input
-                  value={f.indirizzo ?? ''}
-                  onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)}
-                  onBlur={() => setIndirizzoEspansoMobile(null)}
-                  placeholder="es. Via Roma 12"
-                />
-              </label>
             </div>
           ))}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>
