@@ -589,3 +589,17 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
   .indirizzo-fermata-riga{display:none;}
   .indirizzo-fermata-riga.espansa{display:block;}
 }
+
+/* ---------- Riga fermata (Creazione Evento): il <select> della
+   città può forzare una larghezza minima basata sul testo più lungo
+   delle sue opzioni, ignorando i vincoli della griglia — su schermi
+   stretti la riga intera si allunga oltre lo schermo invece di
+   restringersi. min-width:0 lascia che si adatti davvero; il testo
+   "Attiva/Esclusa" (resta comunque leggibile al tocco/hover tramite
+   il tooltip "title") si nasconde per lasciare spazio. ---------- */
+.riga-fermata select, .riga-fermata input{min-width:0;}
+@media (max-width:760px){
+  .riga-fermata{gap:4px;}
+  .riga-fermata select, .riga-fermata input{font-size:13px; text-overflow:ellipsis;}
+  .etichetta-attiva-fermata{display:none;}
+}

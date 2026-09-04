@@ -1126,6 +1126,7 @@ export function SchedaEventoModale({
                 <p style={{ marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--green)' }}>Partenza</p>
               )}
               <div
+                className="riga-fermata"
                 draggable
                 onDragStart={() => onDragStart(idxTragitto, idxFermata)}
                 onDragOver={(e) => e.preventDefault()}
@@ -1177,7 +1178,7 @@ export function SchedaEventoModale({
                   style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: f.attivo === false ? 'var(--pink)' : 'var(--mist)', cursor: 'pointer', whiteSpace: 'nowrap' }}
                 >
                   <input type="checkbox" checked={f.attivo !== false} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'attivo', e.target.checked)} style={{ width: 'auto' }} />
-                  {f.attivo === false ? 'Esclusa' : 'Attiva'}
+                  <span className="etichetta-attiva-fermata">{f.attivo === false ? 'Esclusa' : 'Attiva'}</span>
                 </label>
                 <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
               </div>
