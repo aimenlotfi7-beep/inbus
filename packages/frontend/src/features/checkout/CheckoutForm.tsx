@@ -550,7 +550,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 </>
               ) : (
                 <>
-                  <div style={{ background: '#faf7f0', border: '1px solid #e5ded0', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13 }}>
+                  <div style={{ background: '#f5f6fa', border: '1px solid #e3e3ea', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13 }}>
                     <p style={{ margin: '0 0 4px', fontWeight: 700 }}>{evento.artista}</p>
                     <p style={{ margin: 0, opacity: .75 }}>
                       {opzioneScelta?.fermataCitta}{opzioneScelta?.fermataOrario ? ` — ore ${opzioneScelta.fermataOrario}` : ''} · {passeggeri} passeggero{passeggeri > 1 ? 'i' : ''}

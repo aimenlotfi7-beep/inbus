@@ -65,7 +65,7 @@ export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }:
       {aperto && (
         <div style={{
           position: 'absolute', zIndex: 20, top: '100%', left: 0, right: 0, marginTop: 4,
-          background: '#fff', border: '1px solid #e5ded0', borderRadius: 10, maxHeight: 260, overflowY: 'auto',
+          background: '#fff', border: '1px solid #e3e3ea', borderRadius: 10, maxHeight: 260, overflowY: 'auto',
           boxShadow: '0 6px 18px rgba(0,0,0,.12)',
         }}>
           {filtrate.length === 0 && <p style={{ padding: '10px 14px', fontSize: 13, opacity: .6, margin: 0 }}>Nessuna fermata trovata.</p>}
