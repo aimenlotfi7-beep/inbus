@@ -48,7 +48,7 @@ export function PromoterPage() {
 
         {!loggato && (
           <div className="login-box">
-            <p>Inserisci email e password che ti ha fornito lo staff OoneWay.</p>
+            <p>Inserisci email e password che ti ha fornito lo staff INBUS.</p>
             <input type="email" placeholder="La tua email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <input type="text" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && accedi()} />

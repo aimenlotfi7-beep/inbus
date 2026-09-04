@@ -104,7 +104,7 @@ export function AccountPage() {
         <Link className="logo" to="/">IN<span>BUS</span></Link>
         <div className="header-right">
           <div className={`my-inbus-wrap${menuAperto ? ' open' : ''}`}>
-            <button className="my-inbus-btn" onClick={() => setMenuAperto(!menuAperto)}>My OoneWay <span className="caret">▾</span></button>
+            <button className="my-inbus-btn" onClick={() => setMenuAperto(!menuAperto)}>My INBUS <span className="caret">▾</span></button>
             <div className={`my-inbus-dropdown${menuAperto ? '' : ' hidden'}`}>
               <div className="dropdown-chi">Accesso come<b>{email}</b></div>
               {vociMenu.map((v) => (
@@ -323,7 +323,7 @@ function SezionePrivacy({ email }: { email: string }) {
       />
       <BloccoConsenso
         titolo="Comunicazioni di marketing"
-        descrizione="Desidero ricevere email su novità, nuovi eventi e promozioni da OoneWay."
+        descrizione="Desidero ricevere email su novità, nuovi eventi e promozioni da INBUS."
         valore={preferenze.consensoMarketing}
         onScegli={(v) => aggiorna('consensoMarketing', v)}
         salvando={salvando}
@@ -392,7 +392,7 @@ function SezioneDashboard({ email, viaggi, eventiPerId, onNavigare, onAprireViag
       {viaggi === null && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
 
       {viaggi !== null && eventoProssimo && prenotazioneProssima && (
-        <div className="panel-box" style={{ background: 'linear-gradient(135deg, rgba(242,23,100,.12), rgba(170,72,209,.1))', borderColor: 'var(--pink)' }}>
+        <div className="panel-box" style={{ background: 'linear-gradient(135deg, rgba(255,61,122,.12), rgba(91,141,255,.08))', borderColor: 'var(--pink)' }}>
           {giorniAlViaggio === 0 ? (
             <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 20, textTransform: 'uppercase', color: 'var(--pink)', margin: '0 0 6px' }}>🚌 Il tuo viaggio è oggi!</p>
           ) : giorniAlViaggio === 1 ? (
@@ -627,7 +627,7 @@ function SezioneChat({ email }: { email: string }) {
 
   return (
     <section className="acc-sezione">
-      <h1>Chat con lo staff OoneWay</h1>
+      <h1>Chat con lo staff INBUS</h1>
       <div className="acc-chat-box">
         {!attiva && (
           <div id="accChatEventoScelta">
@@ -644,7 +644,7 @@ function SezioneChat({ email }: { email: string }) {
           {attiva?.messaggi.map((m) => (
             <div className={`chat-bubble-mini ${m.autore.toLowerCase()}`} key={m.id}>
               {m.testo}
-              <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff OoneWay'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
+              <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff INBUS'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
             </div>
           ))}
         </div>
@@ -666,7 +666,7 @@ function SezioneChat({ email }: { email: string }) {
                 {c.messaggi.map((m) => (
                   <div key={m.id} className={`chat-bubble-mini ${m.autore.toLowerCase()}`}>
                     {m.testo}
-                    <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff OoneWay'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
+                    <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff INBUS'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
                   </div>
                 ))}
               </div>

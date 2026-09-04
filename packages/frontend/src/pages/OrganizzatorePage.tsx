@@ -42,11 +42,11 @@ export function OrganizzatorePage() {
 
       <main>
         <h1 className="page-title">Area Organizzatore</h1>
-        <p className="page-sub">Accedi per vedere gli eventi che OoneWay ti ha associato.</p>
+        <p className="page-sub">Accedi per vedere gli eventi che INBUS ti ha associato.</p>
 
         {!loggato && (
           <div className="login-box">
-            <p>Inserisci email e password che ti ha fornito lo staff OoneWay.</p>
+            <p>Inserisci email e password che ti ha fornito lo staff INBUS.</p>
             <input type="email" placeholder="La tua email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && accedi()} />
@@ -99,7 +99,7 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
       <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '4px 0 14px' }}>I tuoi eventi</h2>
 
       {!eventiOrdinati.length && (
-        <div className="empty-box">Non hai ancora nessun evento associato — contatta OoneWay per farti assegnare i tuoi eventi.</div>
+        <div className="empty-box">Non hai ancora nessun evento associato — contatta INBUS per farti assegnare i tuoi eventi.</div>
       )}
 
       {eventiOrdinati.map((ev) => {

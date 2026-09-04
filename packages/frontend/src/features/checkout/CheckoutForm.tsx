@@ -36,7 +36,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   // colori sovrascrivono quelli del sito per TUTTO il modulo — non
   // solo la vetrina/anteprima come prima, anche lo stepper, i
   // pulsanti, i pallini. Facoltativo: senza, il checkout resta uguale
-  // a sempre (i colori standard del sito OoneWay).
+  // a sempre (i colori standard del sito INBUS).
   temaColori?: { sfondo: string; superficie: string; testoPrincipale: string; testoSecondario: string; cta: string; testoCta: string; bordi: string };
 }) {
   const [stato, setStato] = useState<Stato>('caricamento');
@@ -550,7 +550,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 </>
               ) : (
                 <>
-                  <div style={{ background: '#f5f6fa', border: '1px solid #e3e3ea', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13 }}>
+                  <div style={{ background: '#faf7f0', border: '1px solid #e5ded0', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13 }}>
                     <p style={{ margin: '0 0 4px', fontWeight: 700 }}>{evento.artista}</p>
                     <p style={{ margin: 0, opacity: .75 }}>
                       {opzioneScelta?.fermataCitta}{opzioneScelta?.fermataOrario ? ` — ore ${opzioneScelta.fermataOrario}` : ''} · {passeggeri} passeggero{passeggeri > 1 ? 'i' : ''}

@@ -38,7 +38,7 @@
     height: 30px;
     min-width: 30px;
 
-    border: 1px solid #d6d6de;
+    border: 1px solid #d8d0c0;
     border-radius: 50%;
 
     font-size: 13px;
@@ -84,7 +84,7 @@
     content: '';
     width: 14px;
     height: 1px;
-    background: #d6d6de;
+    background: #d8d0bf;
     margin-left: 6px;
   }
 }

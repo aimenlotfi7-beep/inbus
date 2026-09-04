@@ -1,20 +1,16 @@
 
   :root{
-    /* Palette OoneWay — estratta per davvero dal file del logo (non a
-       occhio): sfondo, rosa e viola sono i colori esatti usati lì,
-       cosi' il sito e il logo sembrano davvero la stessa identita'. */
-    --night:#0b0b0d;
-    --dusk:#1c1520;
-    --dusk-2:#241a2b;
-    --pink:#f21764;
-    --pink-dim: #f2176455;
-    --purple:#aa48d1;
+    --night:#100e1c;
+    --dusk:#221a38;
+    --dusk-2:#2b2145;
+    --pink:#ff3d7a;
+    --pink-dim: #ff3d7a55;
     --amber:#ffb347;
-    --paper:#f3f5fc;
-    --ink:#0b0b0d;
-    --mist:#a2a4b1;
-    --mist-dim:#a2a4b188;
-    --line: rgba(243,245,252,0.12);
+    --paper:#f6f1e7;
+    --ink:#171220;
+    --mist:#a99fc2;
+    --mist-dim:#a99fc288;
+    --line: rgba(246,241,231,0.12);
     --radius: 14px;
     /* Colori dedicati al pulsante CTA principale del checkout — separati
        da --night/--paper (che servono anche ad altro, come lo sfondo
@@ -53,9 +49,11 @@
     border-bottom:1px solid var(--line);
   }
   .logo{
-    display:flex; align-items:center;
+    font-family:'Poppins',sans-serif; font-weight:800;
+    font-size:24px; letter-spacing:.5px;
+    display:flex; align-items:baseline; gap:4px;
   }
-  .logo img{ height:32px; width:auto; display:block; }
+  .logo span{color:var(--pink);}
   .header-sinistra{display:flex; align-items:center; gap:40px;}
   nav.links{display:flex; gap:32px; font-size:14px; color:var(--mist);}
   nav.links a:hover{color:var(--paper);}
@@ -73,7 +71,7 @@
     transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
     white-space:nowrap;
   }
-  .btn-primary{background:linear-gradient(135deg, var(--pink), var(--purple)); color:var(--paper);}
+  .btn-primary{background:var(--pink); color:var(--night);}
   .btn-primary:hover{transform:translateY(-2px); box-shadow:0 10px 24px var(--pink-dim);}
   .btn-ghost{border-color:var(--line); color:var(--paper); background:transparent;}
   .btn-ghost:hover{border-color:var(--mist);}
@@ -97,7 +95,7 @@
   }
   .mobile-nav.open{display:flex;}
   .mobile-nav a{padding:13px 10px; border-radius:8px; font-size:15.5px; color:var(--paper);}
-  .mobile-nav a:active{background:rgba(242,23,100,.1);}
+  .mobile-nav a:active{background:rgba(255,61,122,.1);}
   @media (min-width:901px){ .mobile-nav{display:none !important;} }
 
   /* ---------- HERO ---------- */
@@ -105,8 +103,8 @@
     position:relative;
     padding:clamp(48px,9vw,110px) clamp(20px,5vw,64px) 40px;
     background:
-      radial-gradient(ellipse 70% 55% at 18% -10%, #3a1a4a 0%, transparent 60%),
-      radial-gradient(ellipse 60% 50% at 100% 0%, #4a1235 0%, transparent 55%),
+      radial-gradient(ellipse 70% 55% at 18% -10%, #3a2160 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 100% 0%, #4a1a3c 0%, transparent 55%),
       var(--night);
     overflow:hidden;
   }
@@ -201,11 +199,7 @@
     margin:0 0 22px;
     text-transform:uppercase;
   }
-  h1.hero-title .line2{
-    display:block;
-    background:linear-gradient(100deg, var(--pink), var(--purple));
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-  }
+  h1.hero-title .line2{color:var(--pink); display:block;}
   .hero-sub{
     max-width:46ch; color:var(--mist); font-size:17px; line-height:1.55; margin-bottom:34px;
   }
@@ -232,22 +226,22 @@
   .ticket-head{
     display:flex; justify-content:space-between; align-items:center;
     font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
-    color:#68687a; border-bottom:1px dashed #c7c7d0; padding-bottom:14px; margin-bottom:18px;
+    color:#6a6270; border-bottom:1px dashed #c9c2b4; padding-bottom:14px; margin-bottom:18px;
   }
   .ticket-head b{color:var(--ink);}
   .field-row{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;}
   .field{
     display:flex; flex-direction:column; gap:6px;
-    background:#fff; border:1px solid #e3e3ea; border-radius:10px; padding:10px 12px;
+    background:#fff; border:1px solid #e5ded0; border-radius:10px; padding:10px 12px;
   }
-  .field label{font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:#83838f; font-weight:700;}
+  .field label{font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:#8a8272; font-weight:700;}
   .field select, .field input{
     border:none; font-family:'Poppins',sans-serif; font-size:16px; font-weight:600; color:var(--ink);
     background:transparent; outline:none; padding:0;
   }
   .qty-control{display:flex; align-items:center; gap:10px;}
   .qty-control button{
-    width:38px; height:38px; border-radius:50%; border:1px solid #d6d6de; background:#fff;
+    width:38px; height:38px; border-radius:50%; border:1px solid #d8d0bf; background:#fff;
     font-size:18px; cursor:pointer; line-height:1; color:var(--ink);
   }
   .search-cta{
@@ -260,7 +254,7 @@
   .search-cta:hover{background:#000;}
   .search-cta svg{width:16px; height:16px; fill:var(--pink);}
   .search-cta-secondaria{
-    width:100%; margin-top:8px; background:#fff; color:var(--ink); border:1px solid #e3e3ea;
+    width:100%; margin-top:8px; background:#fff; color:var(--ink); border:1px solid #e5ded0;
     font-family:'Poppins',sans-serif; font-weight:800; letter-spacing:1px; font-size:15px; text-transform:uppercase;
     padding:14px; border-radius:10px; cursor:pointer; transition:border-color .15s ease;
   }
@@ -271,11 +265,7 @@
   .section-title{
     font-family:'Poppins',sans-serif; font-weight:800; font-size:clamp(26px,3.4vw,38px); text-transform:uppercase; letter-spacing:.4px; margin:0;
   }
-  .section-title em{
-    font-style:normal;
-    background:linear-gradient(100deg, var(--pink), var(--purple));
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-  }
+  .section-title em{font-style:normal; color:var(--pink);}
   .breadcrumb{display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:13px; margin:8px 0 2px; color:var(--mist);}
   .breadcrumb a{color:var(--mist); text-decoration:none;}
   .breadcrumb a:hover{color:var(--pink); text-decoration:underline;}
@@ -293,7 +283,7 @@
     border:1px solid var(--line); color:var(--mist); background:transparent; cursor:pointer;
     transition:all .15s ease;
   }
-  .chip.active, .chip:hover{border-color:var(--pink); color:var(--paper); background:rgba(242,23,100,.08);}
+  .chip.active, .chip:hover{border-color:var(--pink); color:var(--paper); background:rgba(255,61,122,.08);}
 
   .grid{
     display:grid; grid-template-columns:repeat(auto-fill, minmax(270px,1fr)); gap:22px;
@@ -317,7 +307,7 @@
     width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:transparent;
     color:var(--paper); font-size:20px; cursor:pointer; line-height:1;
   }
-  .carosello-frecce button:hover{border-color:var(--pink); background:rgba(242,23,100,.1);}
+  .carosello-frecce button:hover{border-color:var(--pink); background:rgba(255,61,122,.1);}
   @media (max-width:600px){ .carosello-frecce{display:none;} }
 
   .card{
@@ -328,7 +318,7 @@
   .card:hover{transform:translateY(-5px); border-color:var(--pink-dim);}
   .card-visual{
     aspect-ratio:1080/1350; position:relative; overflow:hidden;
-    background:linear-gradient(135deg, var(--dusk-2), #351a42);
+    background:linear-gradient(135deg, var(--dusk-2), #3a2050);
     background-size:cover; background-position:center;
     display:flex; align-items:flex-end; padding:14px;
   }
@@ -344,7 +334,7 @@
   }
   .card-visual .beam{
     position:absolute; inset:0; opacity:.5;
-    background: repeating-linear-gradient(100deg, transparent 0 22px, rgba(242,23,100,.18) 22px 24px);
+    background: repeating-linear-gradient(100deg, transparent 0 22px, rgba(255,61,122,.18) 22px 24px);
   }
   .card-badge-price{
     position:absolute; top:14px; right:14px; z-index:1;
@@ -378,13 +368,13 @@
     width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:transparent;
     color:var(--paper); font-size:15px; cursor:pointer; flex-shrink:0;
   }
-  .chat-cta:hover{border-color:var(--pink); background:rgba(242,23,100,.1);}
+  .chat-cta:hover{border-color:var(--pink); background:rgba(255,61,122,.1);}
 
   /* ---------- HOW IT WORKS ---------- */
   .how{padding:90px clamp(20px,5vw,64px); background:var(--dusk); position:relative; overflow:hidden;}
   .how::before{
     content:""; position:absolute; top:-40%; right:-10%; width:600px; height:600px; border-radius:50%;
-    background:radial-gradient(circle, rgba(242,23,100,.12), transparent 70%);
+    background:radial-gradient(circle, rgba(255,61,122,.12), transparent 70%);
   }
   .how-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:30px; position:relative; z-index:2;}
   @media (max-width:860px){.how-grid{grid-template-columns:1fr;}}
@@ -412,7 +402,7 @@
   .strip-item span{font-size:11.5px; color:var(--mist); text-transform:uppercase; letter-spacing:1px;}
 
   /* ---------- FOOTER ---------- */
-  footer{padding:70px clamp(20px,5vw,64px) 30px; background:var(--night);}
+  footer{padding:70px clamp(20px,5vw,64px) 30px; background:#0b0a14;}
   .footer-grid{
     display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap:40px; padding-bottom:44px; border-bottom:1px solid var(--line);
   }
@@ -472,8 +462,8 @@
   }
   .modal-close:hover{opacity:1;}
   .checkout-summary{
-    background:#fff; border:1px solid #e3e3ea; border-radius:10px;
-    padding:12px 14px; margin-bottom:14px; font-size:13px; color:#68687a; line-height:1.6;
+    background:#fff; border:1px solid #e5ded0; border-radius:10px;
+    padding:12px 14px; margin-bottom:14px; font-size:13px; color:#6a6270; line-height:1.6;
   }
   .checkout-summary b{color:var(--ink);}
 
@@ -486,10 +476,10 @@
   }
   .checkout-col-info .tag{
     font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:1px;
-    background:rgba(242,23,100,.15); color:var(--pink); padding:5px 10px; border-radius:999px;
+    background:rgba(255,61,122,.15); color:var(--pink); padding:5px 10px; border-radius:999px;
   }
   .checkout-cover{
-    width:100%; height:190px; border-radius:12px; background:linear-gradient(135deg, var(--dusk-2), #351a42);
+    width:100%; height:190px; border-radius:12px; background:linear-gradient(135deg, var(--dusk-2), #3a2050);
     background-size:cover; background-position:center; margin-bottom:18px;
   }
   .checkout-col-info h2{font-family:'Poppins',sans-serif; font-weight:800; text-transform:uppercase; margin:14px 0 8px; font-size:24px;}
@@ -508,7 +498,7 @@
     width:100%; aspect-ratio:1080/1350; background-size:cover; background-position:center;
     border-radius:16px; position:relative; overflow:hidden; margin-bottom:20px;
   }
-  .evento-pagina-hero.senza-foto{background:linear-gradient(135deg, #3a1a4a, var(--night));}
+  .evento-pagina-hero.senza-foto{background:linear-gradient(135deg, #3a2160, var(--night));}
   .evento-pagina-hero .tag{position:absolute; top:14px; left:14px;}
   .evento-pagina-info h1{font-family:'Poppins',sans-serif; font-weight:800; text-transform:uppercase; font-size:28px; margin:0 0 10px;}
   .evento-pagina-info .meta-riga{color:var(--mist); font-size:14.5px; margin:0 0 4px;}
@@ -603,19 +593,19 @@
     .checkout-modal{padding:20px; max-height:none;}
   }
   .checkout-modal .field-label, .checkout-form .field-label{
-    font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:#83838f; font-weight:700;
+    font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:#8a8272; font-weight:700;
     display:block; margin:14px 0 6px;
   }
   .checkout-modal select, .checkout-modal input, .checkout-form select, .checkout-form input{
     width:100%; font-family:'Poppins',sans-serif; font-size:16px; font-weight:600; color:var(--ink);
-    background:#fff; border:1px solid #e3e3ea; border-radius:8px; padding:10px 12px; box-sizing:border-box;
+    background:#fff; border:1px solid #e5ded0; border-radius:8px; padding:10px 12px; box-sizing:border-box;
   }
-  .checkout-modal .hint, .checkout-form .hint{color:#83838f; font-size:11.5px; margin:6px 0 0;}
+  .checkout-modal .hint, .checkout-form .hint{color:#8a8272; font-size:11.5px; margin:6px 0 0;}
   .checkout-modal .hint a, .checkout-form .hint a{color:var(--pink); text-decoration:underline; font-weight:600;}
   .checkout-modal .qty-row, .checkout-form .qty-row{display:flex; align-items:center; justify-content:space-between; margin-top:14px;}
   .payment-methods{display:flex; flex-direction:column; gap:8px; margin-top:8px;}
   .payment-option{
-    display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e3e3ea;
+    display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e5ded0;
     border-radius:10px; padding:10px 12px; cursor:pointer; font-size:13px; transition:border-color .15s ease;
   }
   .payment-option.active{border-color:var(--pink);}
@@ -625,17 +615,17 @@
   .codice-con-azione{display:flex; gap:8px;}
   .codice-con-azione input{flex:1;}
   .checkout-modal .btn-ghost, .checkout-form .btn-ghost{
-    background:#fff; border:1px solid #e3e3ea; color:var(--ink); font-size:12.5px; padding:0 16px; border-radius:8px; cursor:pointer;
+    background:#fff; border:1px solid #e5ded0; color:var(--ink); font-size:12.5px; padding:0 16px; border-radius:8px; cursor:pointer;
   }
   .chat-bubble-mini{max-width:82%; padding:9px 13px; border-radius:12px; font-size:13px; line-height:1.5;}
   .chat-bubble-mini.cliente{background:var(--pink); color:#fff; align-self:flex-end; border-bottom-right-radius:2px;}
-  .chat-bubble-mini.admin{background:#eef0f6; color:var(--ink); align-self:flex-start; border-bottom-left-radius:2px;}
+  .chat-bubble-mini.admin{background:#f1ede2; color:var(--ink); align-self:flex-start; border-bottom-left-radius:2px;}
   .chat-bubble-mini .meta{font-size:10px; opacity:.7; margin-top:3px;}
   .chat-cliente-messages{display:flex; flex-direction:column; gap:10px; max-height:320px; overflow-y:auto; margin-bottom:14px;}
   /* ---------- RIFINITURE SCHERMI MOLTO PICCOLI ---------- */
   @media (max-width:480px){
     header{padding:14px 16px;}
-    .logo img{height:26px;}
+    .logo{font-size:20px;}
     .hero{padding-left:16px; padding-right:16px; padding-top:32px;}
     .ticket{padding:20px 18px 18px;}
     .field-row{grid-template-columns:1fr;}
@@ -654,20 +644,20 @@
   }
   .checkout-stepper::-webkit-scrollbar{display:none;}
   .checkout-step-dot{
-    display:flex; align-items:center; gap:6px; font-size:11px; color:#9a9aa6; font-weight:600; flex-shrink:0; white-space:nowrap;
+    display:flex; align-items:center; gap:6px; font-size:11px; color:#a89f8c; font-weight:600; flex-shrink:0; white-space:nowrap;
   }
   /* Il pallino tondo col numero — selettore sulla SUA classe, non su
      "span" in generale (altro span dentro lo stesso step è l'etichetta
      di testo, che NON deve diventare anche lei un tondino 24x24). */
   .checkout-step-numero{
-    width:24px; height:24px; border-radius:50%; border:1.5px solid #d6d6de; display:flex; align-items:center;
-    justify-content:center; font-size:11px; color:#9a9aa6; flex-shrink:0;
+    width:24px; height:24px; border-radius:50%; border:1.5px solid #d8d0bf; display:flex; align-items:center;
+    justify-content:center; font-size:11px; color:#a89f8c; flex-shrink:0;
   }
   .checkout-step-dot.active{color:var(--ink);}
   .checkout-step-dot.active .checkout-step-numero{border-color:var(--pink); color:var(--pink);}
   .checkout-step-dot.completato{color:var(--ink);}
   .checkout-step-dot.completato .checkout-step-numero{background:var(--pink); border-color:var(--pink); color:#fff;}
-  .checkout-step-dot:not(:last-child)::after{content:''; width:14px; height:1px; background:#d6d6de; margin-left:2px;}
+  .checkout-step-dot:not(:last-child)::after{content:''; width:14px; height:1px; background:#d8d0bf; margin-left:2px;}
 
   /* Su schermi stretti: si vede SOLO l'etichetta dello step attivo
      (senza il suo pallino), tutti gli altri step mostrano SOLO il
@@ -682,7 +672,7 @@
   }
   .checkout-riepilogo-persistente{
     display:flex; justify-content:space-between; align-items:center; gap:10px;
-    background:#f5f6fa; border:1px solid #e3e3ea; border-radius:10px; padding:10px 14px; margin-bottom:20px;
+    background:#faf7f0; border:1px solid #e5ded0; border-radius:10px; padding:10px 14px; margin-bottom:20px;
   }
   /* Con tanti passeggeri (es. 15+) questa era la vera causa del
      riepilogo che "spariva" scorrendo — l'intera card cresceva a
@@ -694,7 +684,7 @@
     max-height:280px; overflow-y:auto; padding-right:6px; margin-right:-6px;
   }
   .checkout-riepilogo-persistente b{font-size:13.5px;}
-  .checkout-riepilogo-riga{font-size:11.5px; color:#83838f; display:block; margin-top:2px;}
+  .checkout-riepilogo-riga{font-size:11.5px; color:#8a8171; display:block; margin-top:2px;}
   .checkout-riepilogo-totale{font-family:'Anton',sans-serif; font-size:18px; white-space:nowrap;}
   .checkout-step-nav{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:auto; padding-top:18px;}
 
@@ -766,13 +756,13 @@
    dei puntini rispetto a tutte le altre tappe (bug trovato/segnalato:
    uno spostamento con margine negativo rompeva l'allineamento). */
 .percorso-tappa.evidenziata .percorso-tappa-corpo{
-  background:rgba(242,23,100,.12); border:1px solid var(--pink); border-radius:8px; padding:8px 12px;
+  background:rgba(255,61,122,.12); border:1px solid var(--pink); border-radius:8px; padding:8px 12px;
 }
 .percorso-tappa-puntino{
   position:absolute; left:-22px; top:4px; width:10px; height:10px; border-radius:50%;
   background:var(--pink); border:2px solid var(--night);
 }
-.percorso-tappa-puntino.arrivo{background:var(--purple);}
+.percorso-tappa-puntino.arrivo{background:var(--blue, #5b8dff);}
 .percorso-tappa:not(:last-child)::before{
   content:''; position:absolute; left:-18px; top:14px; bottom:-4px; width:1px; background:rgba(255,255,255,.15);
 }
@@ -782,7 +772,7 @@
 .percorso-posti{font-size:11px; padding:2px 9px; border-radius:999px; font-weight:600;}
 .percorso-posti.disponibile{background:rgba(72,214,140,.15); color:#5be0a0;}
 .percorso-posti.pochi{background:rgba(255,180,80,.15); color:#e0a95b;}
-.percorso-posti.esaurito{background:rgba(242,23,100,.15); color:var(--pink);}
+.percorso-posti.esaurito{background:rgba(255,61,122,.15); color:var(--pink);}
 
 /* ---------- ACCORDION EVENTO (Descrizione/Informazioni/Partenze) ---------- */
 .accordion-evento{margin-top:22px;}
@@ -800,7 +790,7 @@
 
 .checkout-servizio-card{
   display:flex; flex-direction:column; gap:4px; text-align:left;
-  background:#fff; border:1px solid #e3e3ea; border-radius:12px; padding:16px 18px; cursor:pointer;
+  background:#fff; border:1px solid #e5ded0; border-radius:12px; padding:16px 18px; cursor:pointer;
   transition:border-color .15s ease;
 }
 .checkout-servizio-card:hover{border-color:var(--pink);}
@@ -809,7 +799,7 @@
 
 /* ---------- CHECKOUT: metodo di pagamento ---------- */
 .mini-tab{
-  background:#fff; border:1px solid #e3e3ea; border-radius:999px; padding:9px 16px;
+  background:#fff; border:1px solid #e5ded0; border-radius:999px; padding:9px 16px;
   font-size:13px; color:var(--ink); cursor:pointer; opacity:.75;
 }
 .mini-tab.active{background:var(--pink); border-color:var(--pink); color:#fff; opacity:1; font-weight:600;}

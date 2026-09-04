@@ -1,6 +1,6 @@
 
   :root{
-    --night:#0b0b0d; --dusk:#1c1520; --dusk-2:#241a2b; --pink:#f21764; --paper:#f3f5fc; --mist:#a2a4b1; --line:rgba(243,245,252,.12);
+    --night:#100e1c; --dusk:#221a38; --dusk-2:#2b2145; --pink:#ff3d7a; --paper:#f6f1e7; --mist:#a99fc2; --line:rgba(246,241,231,.12);
   }
   *{box-sizing:border-box;}
   body{margin:0; background:var(--night); color:var(--paper); font-family:'Space Grotesk',sans-serif;}
@@ -10,13 +10,13 @@
   .logo span{color:var(--pink);}
   main{max-width:760px; margin:0 auto; padding:clamp(30px,6vw,60px) 20px 80px;}
   h1{font-family:'Anton',sans-serif; text-transform:uppercase; font-size:clamp(28px,4vw,38px); margin:0 0 30px;}
-  .contenuto{color:#d4d6e0; font-size:15.5px; line-height:1.8;}
+  .contenuto{color:#d9d2e8; font-size:15.5px; line-height:1.8;}
   .contenuto h3{color:var(--paper); font-family:'Anton',sans-serif; text-transform:uppercase; font-size:18px; margin:28px 0 10px;}
   .contenuto h3:first-child{margin-top:0;}
   .contenuto p{margin:0 0 14px;}
 
   /* ---------- FOOTER (identico al sito, sempre visibile) ---------- */
-  footer{padding:60px clamp(20px,5vw,64px) 30px; background:#0b0b0d;}
+  footer{padding:60px clamp(20px,5vw,64px) 30px; background:#0b0a14;}
   .footer-grid{
     display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap:40px; padding-bottom:44px; border-bottom:1px solid var(--line);
     max-width:1100px; margin:0 auto;

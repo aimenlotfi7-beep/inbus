@@ -43,8 +43,8 @@ export function WidgetPubblicoPage() {
     }
   }
 
-  if (vista === 'caricamento') return <Sfondo colore="#0b0b0d"><p style={{ color: '#a2a4b1' }}>Carico...</p></Sfondo>;
-  if (vista === 'errore') return <Sfondo colore="#0b0b0d"><p style={{ color: '#a2a4b1' }}>{erroreVista}</p></Sfondo>;
+  if (vista === 'caricamento') return <Sfondo colore="#14121f"><p style={{ color: '#a99fc2' }}>Carico...</p></Sfondo>;
+  if (vista === 'errore') return <Sfondo colore="#14121f"><p style={{ color: '#a99fc2' }}>{erroreVista}</p></Sfondo>;
   if (!dati || !publicWidgetId) return null;
 
   if (vista === 'checkout' && eventoCompleto) {
