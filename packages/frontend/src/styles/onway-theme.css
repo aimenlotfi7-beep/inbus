@@ -98,7 +98,7 @@ h1.hero-title .line2{ color:var(--ow-accent); }
 .logo{
   display:inline-flex; align-items:baseline; gap:0;
   font-family:'Archivo', Helvetica, sans-serif; font-weight:400;
-  font-size:24px; letter-spacing:-.035em; line-height:1;
+  font-size:34px; letter-spacing:-.035em; line-height:1;
   color:var(--ow-paper);
 }
 .logo-on{ font-weight:400; }

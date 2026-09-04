@@ -625,7 +625,7 @@
   /* ---------- RIFINITURE SCHERMI MOLTO PICCOLI ---------- */
   @media (max-width:480px){
     header{padding:14px 16px;}
-    .logo{font-size:20px;}
+    .logo{font-size:28px;}
     .hero{padding-left:16px; padding-right:16px; padding-top:32px;}
     .ticket{padding:20px 18px 18px;}
     .field-row{grid-template-columns:1fr;}
