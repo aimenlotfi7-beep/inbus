@@ -1,16 +1,20 @@
 
   :root{
-    --night:#100e1c;
-    --dusk:#221a38;
-    --dusk-2:#2b2145;
-    --pink:#ff3d7a;
-    --pink-dim: #ff3d7a55;
+    /* Palette OoneWay — estratta per davvero dal file del logo (non a
+       occhio): sfondo, rosa e viola sono i colori esatti usati lì,
+       cosi' il sito e il logo sembrano davvero la stessa identita'. */
+    --night:#0b0b0d;
+    --dusk:#1c1520;
+    --dusk-2:#241a2b;
+    --pink:#f21764;
+    --pink-dim: #f2176455;
+    --purple:#aa48d1;
     --amber:#ffb347;
-    --paper:#f6f1e7;
-    --ink:#171220;
-    --mist:#a99fc2;
-    --mist-dim:#a99fc288;
-    --line: rgba(246,241,231,0.12);
+    --paper:#f3f5fc;
+    --ink:#0b0b0d;
+    --mist:#a2a4b1;
+    --mist-dim:#a2a4b188;
+    --line: rgba(243,245,252,0.12);
     --radius: 14px;
     /* Colori dedicati al pulsante CTA principale del checkout — separati
        da --night/--paper (che servono anche ad altro, come lo sfondo
@@ -49,11 +53,9 @@
     border-bottom:1px solid var(--line);
   }
   .logo{
-    font-family:'Poppins',sans-serif; font-weight:800;
-    font-size:24px; letter-spacing:.5px;
-    display:flex; align-items:baseline; gap:4px;
+    display:flex; align-items:center;
   }
-  .logo span{color:var(--pink);}
+  .logo img{ height:32px; width:auto; display:block; }
   .header-sinistra{display:flex; align-items:center; gap:40px;}
   nav.links{display:flex; gap:32px; font-size:14px; color:var(--mist);}
   nav.links a:hover{color:var(--paper);}
@@ -71,7 +73,7 @@
     transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
     white-space:nowrap;
   }
-  .btn-primary{background:var(--pink); color:var(--night);}
+  .btn-primary{background:linear-gradient(135deg, var(--pink), var(--purple)); color:var(--paper);}
   .btn-primary:hover{transform:translateY(-2px); box-shadow:0 10px 24px var(--pink-dim);}
   .btn-ghost{border-color:var(--line); color:var(--paper); background:transparent;}
   .btn-ghost:hover{border-color:var(--mist);}
@@ -625,7 +627,7 @@
   /* ---------- RIFINITURE SCHERMI MOLTO PICCOLI ---------- */
   @media (max-width:480px){
     header{padding:14px 16px;}
-    .logo{font-size:20px;}
+    .logo img{height:26px;}
     .hero{padding-left:16px; padding-right:16px; padding-top:32px;}
     .ticket{padding:20px 18px 18px;}
     .field-row{grid-template-columns:1fr;}

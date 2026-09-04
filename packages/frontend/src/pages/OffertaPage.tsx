@@ -35,10 +35,10 @@ export function OffertaPage() {
   const copertina = evento?.immagini[0]?.url;
 
   useSeoTags({
-    title: evento && offerta ? `${evento.artista} — ${offerta.nome} | INBUS` : 'Offerta | INBUS',
+    title: evento && offerta ? `${evento.artista} — ${offerta.nome} | OoneWay` : 'Offerta | OoneWay',
     description: evento && offerta
-      ? `Offerta speciale "${offerta.nome}": -${offerta.scontoPercentuale.toFixed(0)}% sul bus per ${evento.artista} a ${evento.citta}. Prenota il tuo posto con INBUS.`
-      : 'Offerta speciale INBUS.',
+      ? `Offerta speciale "${offerta.nome}": -${offerta.scontoPercentuale.toFixed(0)}% sul bus per ${evento.artista} a ${evento.citta}. Prenota il tuo posto con OoneWay.`
+      : 'Offerta speciale OoneWay.',
     image: copertina,
     url: window.location.href,
     jsonLd: evento && offerta ? {

@@ -61,7 +61,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <>
       <header>
         <div className="header-sinistra">
-          <Link to="/" className="logo">IN<span>BUS</span></Link>
+          <Link to="/" className="logo"><img src="/logo-ooneway-header.png" alt="OoneWay" /></Link>
           <nav className="links">
             <Link to="/#consigliati">Eventi Consigliati</Link>
           </nav>
@@ -141,7 +141,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <footer id="assistenza">
         <div className="footer-grid">
           <div>
-            <div className="logo">IN<span>BUS</span></div>
+            <div className="logo"><img src="/logo-ooneway-header.png" alt="OoneWay" style={{ height: 36 }} /></div>
             <p style={{ color: 'var(--mist)', fontSize: 13.5, maxWidth: '32ch', marginTop: 14 }}>Il modo più comodo e sicuro per arrivare ai tuoi concerti preferiti, in tutta Italia.</p>
           </div>
           <div>
@@ -178,7 +178,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <span className="payment-badge">📲 Satispay</span>
         </div>
         <div className="footer-bottom">
-          <span>© 2026 INBUS</span>
+          <span>© 2026 OoneWay</span>
           <span>Progettato per viaggiare a ritmo di musica 🎸</span>
           <LinkPreferenzeCookie />
         </div>

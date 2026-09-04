@@ -43,7 +43,7 @@ export function AccediPage() {
     <div className="pagina-auth">
       <form onSubmit={accedi} className="box-auth">
         <h1>Accedi</h1>
-        <p className="sottotitolo-auth">Entra nel tuo account INBUS per prenotare e vedere i tuoi viaggi.</p>
+        <p className="sottotitolo-auth">Entra nel tuo account OoneWay per prenotare e vedere i tuoi viaggi.</p>
 
         <label>Email</label>
         <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />

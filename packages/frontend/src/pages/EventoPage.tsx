@@ -56,10 +56,10 @@ export function EventoPage() {
   const copertina = evento?.immagini[0]?.url;
 
   useSeoTags({
-    title: evento ? `${evento.artista} — ${evento.luogo}, ${evento.citta} | INBUS` : 'Evento | INBUS',
+    title: evento ? `${evento.artista} — ${evento.luogo}, ${evento.citta} | OoneWay` : 'Evento | OoneWay',
     description: evento
-      ? (evento.descrizioneSeo?.trim() || `Bus per ${evento.artista} il ${new Date(evento.data).toLocaleDateString('it-IT')} a ${evento.citta}${prezzoMinimo !== null ? ` — a partire da €${prezzoMinimo.toFixed(2)}` : ''}. Prenota il tuo posto con INBUS.`)
-      : 'Prenota il tuo bus per l\'evento con INBUS.',
+      ? (evento.descrizioneSeo?.trim() || `Bus per ${evento.artista} il ${new Date(evento.data).toLocaleDateString('it-IT')} a ${evento.citta}${prezzoMinimo !== null ? ` — a partire da €${prezzoMinimo.toFixed(2)}` : ''}. Prenota il tuo posto con OoneWay.`)
+      : 'Prenota il tuo bus per l\'evento con OoneWay.',
     image: copertina,
     url: window.location.href,
     jsonLd: evento ? {
@@ -100,7 +100,7 @@ export function EventoPage() {
               <div className={`evento-pagina-hero${copertina ? '' : ' senza-foto'}`} style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
                 <span className="tag">{evento.genere}</span>
                 <div style={{ position: 'absolute', top: 14, right: 14 }}>
-                  <PulsanteCondividi soloIcona titolo={`${evento.artista} — INBUS`} testo={`Vieni con noi in bus a vedere ${evento.artista}, ${evento.luogo} (${evento.citta})`} />
+                  <PulsanteCondividi soloIcona titolo={`${evento.artista} — OoneWay`} testo={`Vieni con noi in bus a vedere ${evento.artista}, ${evento.luogo} (${evento.citta})`} />
                 </div>
               </div>
 

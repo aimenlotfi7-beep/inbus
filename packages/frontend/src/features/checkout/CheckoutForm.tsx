@@ -36,7 +36,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   // colori sovrascrivono quelli del sito per TUTTO il modulo — non
   // solo la vetrina/anteprima come prima, anche lo stepper, i
   // pulsanti, i pallini. Facoltativo: senza, il checkout resta uguale
-  // a sempre (i colori standard del sito INBUS).
+  // a sempre (i colori standard del sito OoneWay).
   temaColori?: { sfondo: string; superficie: string; testoPrincipale: string; testoSecondario: string; cta: string; testoCta: string; bordi: string };
 }) {
   const [stato, setStato] = useState<Stato>('caricamento');

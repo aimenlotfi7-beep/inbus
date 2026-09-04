@@ -6,6 +6,7 @@ import { impostazioniApi } from '../../../api/impostazioni';
 import { geocodifica, durataViaggio, type Coordinate } from '../../shared/geo';
 import { PanelHead } from '../../shared/PanelHead';
 import { CampoNumero } from '../../shared/CampoNumero';
+import { MappaPercorso, type PercorsoMappa } from '../../shared/MappaPercorso';
 
 function distanzaLineaRetta(a: Coordinate, b: Coordinate): number {
   const R = 6371;
@@ -55,6 +56,7 @@ interface PercorsoCandidato { fermate: FermataNodo[]; collegamenti: Collegamento
  *  errori tipo "Lecce-Bari-Roma"). */
 export function AnalisiPercorsiScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
+  const [tab, setTab] = useState<'elenco' | 'mappa'>('elenco');
   const [eventoId, setEventoId] = useState('');
   const [analizzando, setAnalizzando] = useState(false);
   const [progresso, setProgresso] = useState('');
@@ -217,6 +219,33 @@ export function AnalisiPercorsiScreen() {
 
       {erroreAnalisi && <p style={{ color: 'var(--pink)' }}>{erroreAnalisi}</p>}
 
+      {percorsi && percorsi.length > 0 && (
+        <div className="mini-tabs" style={{ marginBottom: 16 }}>
+          <button type="button" className={`mini-tab${tab === 'elenco' ? ' active' : ''}`} onClick={() => setTab('elenco')}>Elenco</button>
+          <button type="button" className={`mini-tab${tab === 'mappa' ? ' active' : ''}`} onClick={() => setTab('mappa')}>Mappa</button>
+        </div>
+      )}
+
+      {tab === 'mappa' && percorsi && percorsi.length > 0 && (
+        <MappaPercorso
+          percorsi={percorsi.map((p, idx): PercorsoMappa => ({
+            id: String(idx),
+            nome: `Percorso ${idx + 1} (${p.fermate.length} fermate, ${new Set(p.fermate.map((f) => f.tragittoId)).size} tragitti)`,
+            tappe: p.fermate.map((f) => ({
+              etichetta: `${f.citta} (${f.tragittoNome})`,
+              citta: f.citta,
+              // Le coordinate le abbiamo già (calcolate durante
+              // l'analisi) — passate dirette, niente da geocodificare
+              // di nuovo.
+              lat: f.coord.lat,
+              lng: f.coord.lng,
+            })),
+          }))}
+        />
+      )}
+
+      {tab === 'elenco' && (
+      <>
       {percorsi && percorsi.length === 0 && (
         <p className="testo-intro">Nessun percorso combinato possibile trovato — nessuna fermata di tragitti diversi rispetta sia il tempo di guida reale sia la linearità.</p>
       )}
@@ -285,6 +314,8 @@ export function AnalisiPercorsiScreen() {
             );
           })}
         </div>
+      )}
+      </>
       )}
     </div>
   );

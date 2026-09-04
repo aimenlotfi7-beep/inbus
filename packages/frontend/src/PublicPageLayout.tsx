@@ -7,7 +7,7 @@ export function PublicPageLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <header>
-        <Link className="logo" to="/">IN<span>BUS</span></Link>
+        <Link className="logo" to="/"><img src="/logo-ooneway-header.png" alt="OoneWay" /></Link>
       </header>
 
       {children}
@@ -15,7 +15,7 @@ export function PublicPageLayout({ children }: { children: ReactNode }) {
       <footer id="assistenza">
         <div className="footer-grid">
           <div>
-            <Link className="logo" to="/">IN<span>BUS</span></Link>
+            <Link className="logo" to="/"><img src="/logo-ooneway-header.png" alt="OoneWay" style={{ height: 36 }} /></Link>
             <p style={{ color: 'var(--mist)', fontSize: 13.5, maxWidth: '32ch', marginTop: 14 }}>Il modo più comodo e sicuro per arrivare ai tuoi concerti preferiti, in tutta Italia.</p>
           </div>
           <div>
@@ -53,7 +53,7 @@ export function PublicPageLayout({ children }: { children: ReactNode }) {
           <span className="payment-badge">📲 Satispay</span>
         </div>
         <div className="footer-bottom">
-          <span>© 2026 INBUS — mockup di progetto, tutti i marchi citati sono di proprietà dei rispettivi titolari.</span>
+          <span>© 2026 OoneWay — mockup di progetto, tutti i marchi citati sono di proprietà dei rispettivi titolari.</span>
           <span>Progettato per viaggiare a ritmo di musica 🎸</span>
         </div>
       </footer>
