@@ -623,7 +623,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 className={`mini-tab${tragittoTabSelezionato?.tragittoId === t.tragittoId ? ' active' : ''}${fattoQui === null ? '' : fattoQui ? ' completato' : ' attenzione'}`}
                 onClick={() => setTabTragittoAttivo(t.tragittoId)}
               >
-                {t.nome}
+                {t.nome} ({tv?.fermate.filter((f) => f.attivo !== false).length ?? 0})
               </button>
             );
           })}
@@ -634,13 +634,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         const stato = statoTragitto(tragitto);
         const busTragitto = busLista.filter((b) => b.tragittiIds.includes(tragitto.tragittoId));
         const espansa = aperte.has(tragitto.tragittoId);
-        // La freccia (e la logica "c'è contenuto sotto") deve riflettere
-        // anche i pannelli Fermate/Preventivo aperti, non solo "espansa"
-        // — altrimenti cliccare l'intestazione per "richiudere" mentre
-        // un pannello è aperto lascerebbe la freccia sbagliata (▸ con
-        // contenuto ancora visibile sotto, dato che quei pannelli non
-        // dipendono da "espansa").
-        const mostraContenuto = espansa || formOperativoMap.has(tragitto.tragittoId) || formPreventivoMap.has(tragitto.tragittoId);
         // Serve solo per il badge "Orari impostati" in questa tappa —
         // CalcoloBusTragitto (sopra) non porta l'orario, va preso dai
         // dati veri del tragitto (stesso criterio già usato lato
@@ -650,11 +643,19 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         return (
         <div key={tragitto.tragittoId} className="section-card" style={stato.classe === 'non-coperta' ? { borderColor: 'var(--pink)' } : undefined}>
           <div
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}
-            onClick={() => toggleApertura(tragitto.tragittoId)}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: contestoPartenze ? 'default' : 'pointer' }}
+            // Comprimere/espandere ha senso solo nell'elenco generale
+            // (più tragitti impilati insieme, serve un modo per non
+            // vederli tutti aperti) — arrivando da una card/tappa
+            // specifica il contenuto sotto è comunque sempre mostrato
+            // per intero (early return più sotto, prima di arrivare a
+            // "!espansa"), quindi cliccare qui non faceva nclient
+            // nulla di visibile: solo la freccia cambiava, un controllo
+            // finto. Tolto in quel caso, come segnalato.
+            onClick={contestoPartenze ? undefined : () => toggleApertura(tragitto.tragittoId)}
           >
             <div>
-              <h3>{mostraContenuto ? '▾' : '▸'} {tragitto.nome}</h3>
+              <h3>{!contestoPartenze && (espansa ? '▾ ' : '▸ ')}{tragitto.nome}</h3>
               {contestoPartenze?.tabOrigine !== 'fermate' && (
                 <p className="section-sub">
                   {tragitto.totalePasseggeri} passeggeri confermati su {tragitto.postiTotali >= 999999 ? 'posti illimitati (nessun bus ancora)' : `${tragitto.postiTotali} posti previsti`} · {busTragitto.length} bus censit{busTragitto.length === 1 ? 'o' : 'i'}
@@ -873,7 +874,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             // quelli si riapre l'editor dal contesto giusto).
             if (contestoPartenze?.tabOrigine === 'fermate') return (
               <div style={{ marginTop: 14 }}>
-                <p className="section-label" style={{ marginBottom: 8 }}>Fermate</p>
+                <p className="section-label" style={{ marginBottom: 8 }}>Fermate ({tragittoVero?.fermate.filter((f) => f.attivo !== false).length ?? 0})</p>
                 {!tragittoVero || tragittoVero.fermate.length === 0
                   ? <p className="testo-intro">Nessuna fermata su questo tragitto.</p>
                   : tragittoVero.fermate.map((f) => (
@@ -914,7 +915,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 {tragittoVero?.preventivoCosto
                   ? <p style={{ fontSize: 13.5, marginBottom: 12 }}>€{Number(tragittoVero.preventivoCosto).toFixed(0)} · {tragittoVero.preventivoPostiBus ?? '—'} posti presunti</p>
                   : <p className="testo-intro" style={{ marginBottom: 12 }}>Nessun preventivo ancora registrato.</p>}
-                <p className="section-label" style={{ marginBottom: 8 }}>Fermate — orario e prezzo</p>
+                <p className="section-label" style={{ marginBottom: 8 }}>Fermate — orario e prezzo ({tragittoVero?.fermate.filter((f) => f.attivo !== false).length ?? 0})</p>
                 {!tragittoVero || tragittoVero.fermate.length === 0
                   ? <p className="testo-intro">Nessuna fermata su questo tragitto.</p>
                   : tragittoVero.fermate.map((f) => (
