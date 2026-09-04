@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { haPermesso, type SessioneAdmin } from '../../api/auth';
+import { LogoOnWay } from '../../features/LogoOnWay';
 import { eventiApi } from '../../api/eventi';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import { richiesteRimborsoApi } from '../../api/richiesteRimborso';
@@ -186,7 +187,7 @@ export function AdminLayout({
       <aside className="sidebar">
         <div className="sidebar-riga-alto">
           <div className="logo sidebar-logo" title="Torna alla Home" onClick={onVaiHome}>
-            IN<span>BUS</span> <small>gestionale</small>
+            <LogoOnWay come="testo" freccia="mono" /> <small>gestionale</small>
           </div>
           {/* Solo mobile (il CSS lo nasconde su desktop) — apre il
               pannello a schermo intero con tutti i gruppi in elenco

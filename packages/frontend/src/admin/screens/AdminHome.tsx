@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { eventiApi } from '../../api/eventi';
+import { LogoOnWay } from '../../features/LogoOnWay';
 import { utentiApi } from '../../api/utenti';
 import type { Evento } from '../../api/types';
 import type { SezioneGestionale } from '../shared/AdminLayout';
@@ -30,7 +31,7 @@ export function AdminHome({ onVaiA }: { onVaiA: (s: SezioneGestionale) => void }
   return (
     <section id="tab-home" className="tab-panel">
       <div className="home-search-center">
-        <div className="logo home-logo">IN<span>BUS</span> <small>gestionale</small></div>
+        <div className="logo home-logo"><LogoOnWay come="testo" freccia="mono" /> <small>gestionale</small></div>
         <p className="home-search-sub">Cerca un evento o un cliente</p>
         <div className="home-search-box">
           <input
