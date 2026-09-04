@@ -645,8 +645,15 @@ export function SchedaEventoModale({
       return;
     }
     // Ora garantito completo dal controllo appena sopra — non serve
-    // più scartare nulla, solo usare i dati così come sono.
-    const tratteValide = form.tragitti ?? [];
+    // più scartare nulla, solo usare i dati così come sono. Normalizzo
+    // però "__manuale__" a null se per caso è rimasto scritto lì da
+    // dati vecchi (prima che selezionaFermataAnagrafica lo
+    // intercettasse) — altrimenti quella fermata resterebbe "rotta"
+    // per sempre, anche dopo aver risalvato.
+    const tratteValide = (form.tragitti ?? []).map((l) => ({
+      ...l,
+      fermate: l.fermate.map((f) => f.fermataAnagraficaId === '__manuale__' ? { ...f, fermataAnagraficaId: null } : f),
+    }));
     const payload = {
       ...form,
       // Solo i tragitti liberi restano qui — quelli dentro un servizio
@@ -1132,7 +1139,7 @@ export function SchedaEventoModale({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => onDropSu(idxTragitto, idxFermata)}
                 style={{
-                  display: 'grid', gridTemplateColumns: '16px 1fr auto auto', gap: 6, alignItems: 'center',
+                  display: 'grid', gridTemplateColumns: '16px 1fr auto auto auto', gap: 6, alignItems: 'center',
                   opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
                 }}
               >
@@ -1142,7 +1149,14 @@ export function SchedaEventoModale({
                   onTouchEnd={annullaPressioneLunga}
                   onTouchMove={annullaPressioneLunga}
                 >
-                {f.fermataAnagraficaId !== null ? (
+                {/* !== null da solo non basta — dati salvati prima che
+                    il controllo qui sotto intercettasse "__manuale__"
+                    potrebbero avere quella stringa letterale scritta
+                    nel campo (invece di null), che il menu riconosce
+                    come opzione valida e mostra selezionata — nascondendo
+                    la città vera dietro quella scritta, invece di
+                    mostrare il campo manuale come dovrebbe. */}
+                {f.fermataAnagraficaId && f.fermataAnagraficaId !== '__manuale__' ? (
                   // Di default (e finché non si sceglie "scrivi
                   // manualmente") si parte da qui — un elenco leggibile,
                   // non un'iconcina minuscola. La città arriva
@@ -1173,6 +1187,13 @@ export function SchedaEventoModale({
                   <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
                 )}
                 </div>
+                <div style={{ width: 68 }} title="Soglia minima partecipanti (facoltativa) — sotto questo numero la fermata non viene considerata raggiunta">
+                  <CampoNumero
+                    placeholder="Min."
+                    value={f.sogliaMinima ?? undefined}
+                    onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'sogliaMinima', v !== undefined ? String(v) : '')}
+                  />
+                </div>
                 <label
                   title={f.attivo === false ? 'Fermata esclusa — non compare più nelle Linee né sul sito' : 'Fermata attiva — clicca per escluderla (es. per scarse adesioni), senza doverla rimuovere del tutto'}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: f.attivo === false ? 'var(--pink)' : 'var(--mist)', cursor: 'pointer', whiteSpace: 'nowrap' }}
@@ -1182,7 +1203,7 @@ export function SchedaEventoModale({
                 </label>
                 <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
               </div>
-              {f.fermataAnagraficaId === null && fermateAnagrafica.length > 0 && (
+              {(!f.fermataAnagraficaId || f.fermataAnagraficaId === '__manuale__') && fermateAnagrafica.length > 0 && (
                 <button
                   type="button"
                   className="btn btn-ghost"
@@ -1201,34 +1222,21 @@ export function SchedaEventoModale({
               {/* Indirizzo sempre come campo vero, etichettato e
                   modificabile — stesso stile di Città/Indirizzo di
                   arrivo qui sotto — non più solo una scritta di sola
-                  lettura sotto il menu anagrafica. La soglia minima
-                  (decisa qui sul tragitto vero, non più sui Percorsi
-                  salvati — la stessa fermata può averne bisogno di una
-                  diversa a seconda dell'evento) affiancata, compatta:
-                  prima occupava un intero blocco a parte, qui basta un
-                  numero piccolo. */}
-              <div style={{ marginLeft: 22, marginTop: 6, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                <label
-                  className={`indirizzo-fermata-riga${indirizzoEspansoMobile === `${idxTragitto}-${idxFermata}` ? ' espansa' : ''}`}
-                  style={{ flex: 1, fontSize: 11 }}
-                >Indirizzo
-                  <input
-                    value={f.indirizzo ?? ''}
-                    onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)}
-                    onBlur={() => setIndirizzoEspansoMobile(null)}
-                    placeholder="es. Via Roma 12"
-                  />
-                </label>
-                <div style={{ width: 120 }}>
-                  <label style={{ fontSize: 11 }}>Min. partecipanti
-                    <CampoNumero
-                      placeholder="facoltativo"
-                      value={f.sogliaMinima ?? undefined}
-                      onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'sogliaMinima', v !== undefined ? String(v) : '')}
-                    />
-                  </label>
-                </div>
-              </div>
+                  lettura sotto il menu anagrafica. La soglia minima si
+                  è spostata nella riga principale qui sopra, piccola,
+                  accanto ad Attiva — prima occupava un intero blocco a
+                  parte. */}
+              <label
+                className={`indirizzo-fermata-riga${indirizzoEspansoMobile === `${idxTragitto}-${idxFermata}` ? ' espansa' : ''}`}
+                style={{ display: 'block', marginLeft: 22, marginTop: 6, fontSize: 11 }}
+              >Indirizzo
+                <input
+                  value={f.indirizzo ?? ''}
+                  onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)}
+                  onBlur={() => setIndirizzoEspansoMobile(null)}
+                  placeholder="es. Via Roma 12"
+                />
+              </label>
             </div>
           ))}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>

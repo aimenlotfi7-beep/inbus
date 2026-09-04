@@ -599,7 +599,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
    il tooltip "title") si nasconde per lasciare spazio. ---------- */
 .riga-fermata select, .riga-fermata input{min-width:0;}
 @media (max-width:760px){
-  .riga-fermata{gap:4px;}
-  .riga-fermata select, .riga-fermata input{font-size:13px; text-overflow:ellipsis;}
+  .riga-fermata{gap:3px;}
+  .riga-fermata select, .riga-fermata input{font-size:13px; text-overflow:ellipsis; padding-left:6px; padding-right:6px;}
   .etichetta-attiva-fermata{display:none;}
 }
