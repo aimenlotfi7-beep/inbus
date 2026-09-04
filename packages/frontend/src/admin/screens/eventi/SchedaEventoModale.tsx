@@ -1128,27 +1128,34 @@ export function SchedaEventoModale({
                   // manualmente") si parte da qui — un elenco leggibile,
                   // non un'iconcina minuscola. Città/indirizzo arrivano
                   // dall'anagrafica quando si sceglie una voce vera.
-                  <select
-                    style={{ gridColumn: 'span 2' }}
-                    value={f.fermataAnagraficaId ?? ''}
-                    onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
-                  >
-                    <option value="" disabled>— Scegli una fermata dall'anagrafica —</option>
-                    {fermateAnagrafica.map((fa) => {
-                      // Non ha senso la stessa fermata due volte nello
-                      // stesso tragitto (es. "Milano" scelta sia come
-                      // fermata 1 che come fermata 3) — disabilitata se
-                      // già usata da UN'ALTRA riga qui sotto (non questa
-                      // stessa, che deve restare selezionabile/invariata).
-                      const usataAltrove = tragitto.fermate.some((altra, i) => i !== idxFermata && altra.fermataAnagraficaId === fa.id);
-                      return (
-                        <option key={fa.id} value={fa.id} disabled={usataAltrove}>
-                          {fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}{usataAltrove ? ' (già in questo tragitto)' : ''}
-                        </option>
-                      );
-                    })}
-                    <option value="__manuale__">✎ Scrivi manualmente, senza anagrafica...</option>
-                  </select>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <select
+                      style={{ width: '100%' }}
+                      value={f.fermataAnagraficaId ?? ''}
+                      onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
+                    >
+                      <option value="" disabled>— Scegli una fermata dall'anagrafica —</option>
+                      {fermateAnagrafica.map((fa) => {
+                        // Non ha senso la stessa fermata due volte nello
+                        // stesso tragitto (es. "Milano" scelta sia come
+                        // fermata 1 che come fermata 3) — disabilitata se
+                        // già usata da UN'ALTRA riga qui sotto (non questa
+                        // stessa, che deve restare selezionabile/invariata).
+                        const usataAltrove = tragitto.fermate.some((altra, i) => i !== idxFermata && altra.fermataAnagraficaId === fa.id);
+                        return (
+                          <option key={fa.id} value={fa.id} disabled={usataAltrove}>
+                            {fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}{usataAltrove ? ' (già in questo tragitto)' : ''}
+                          </option>
+                        );
+                      })}
+                      <option value="__manuale__">✎ Scrivi manualmente, senza anagrafica...</option>
+                    </select>
+                    {/* Prima l'indirizzo vero restava invisibile una
+                        volta scelta la fermata dall'anagrafica — si
+                        vedeva solo il nome nel menu, non dove porta
+                        davvero. Ora sempre leggibile qui sotto. */}
+                    {f.indirizzo && <p style={{ fontSize: 11, color: 'var(--mist)', margin: '4px 0 0' }}>📍 {f.indirizzo}</p>}
+                  </div>
                 ) : (
                   <>
                     <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
@@ -1180,19 +1187,20 @@ export function SchedaEventoModale({
                   ← Torna a scegliere dall'anagrafica
                 </button>
               )}
-              {/* La soglia minima si decide ORA sui Percorsi salvati,
-                  non più qui — arriva già impostata quando applichi un
-                  percorso (o si scrive qui per un tragitto manuale, in
-                  Aggiungi fermata). Facoltativa su ogni fermata, non
-                  solo su una "di Partenza" — quel concetto è stato
-                  tolto. Qui resta solo un'indicazione, per sapere a
-                  colpo d'occhio quali fermate ce l'hanno mentre
-                  costruisci l'evento. */}
-              {f.sogliaMinima != null && (
-                <p style={{ marginLeft: 22, marginTop: 4, fontSize: 11.5, color: 'var(--mist)' }}>
-                  ◔ Soglia minima {f.sogliaMinima} partecipanti — impostata dal tragitto salvato, si cambia solo lì
-                </p>
-              )}
+              {/* Prima si decideva sui Percorsi salvati (arrivava già
+                  impostata) — ora si decide sempre qui, sul tragitto
+                  vero dell'evento, non più sul modello riusabile: la
+                  stessa fermata può avere bisogno di soglie diverse a
+                  seconda dell'evento. Facoltativa, se vuota nessun
+                  controllo per questa fermata, nessun valore di
+                  riserva a cui ricadere. */}
+              <div style={{ marginLeft: 22, marginTop: 6, maxWidth: 260 }}>
+                <CampoNumero
+                  placeholder="Soglia minima partecipanti (facoltativa)"
+                  value={f.sogliaMinima ?? undefined}
+                  onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'sogliaMinima', v !== undefined ? String(v) : '')}
+                />
+              </div>
             </div>
           ))}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>

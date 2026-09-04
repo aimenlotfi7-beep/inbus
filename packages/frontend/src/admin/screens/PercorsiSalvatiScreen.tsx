@@ -3,7 +3,6 @@ import { percorsiSalvatiApi, type PercorsoSalvato, type FermataPercorsoSalvato }
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../api/fermateAnagrafica';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
-import { CampoNumero } from '../shared/CampoNumero';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { useAvvisoModificheNonSalvate } from '../shared/useAvvisoModificheNonSalvate';
@@ -259,20 +258,6 @@ export function PercorsiSalvatiScreen() {
                 ← Torna a scegliere dall'anagrafica
               </button>
             )}
-            {/* Facoltativa su OGNI fermata (non più solo su una "di
-                Partenza" — quel concetto è stato tolto insieme al
-                campo che lo teneva) — se vuota, nessun controllo per
-                questa fermata, senza nessun valore di riserva a cui
-                ricadere. Decisa qui sul percorso, non più in Eventi:
-                se lo stesso percorso si applica a più eventi, ha senso
-                stabilirla una volta sola. */}
-            <div style={{ marginTop: 8, maxWidth: 260 }}>
-              <CampoNumero
-                placeholder="Soglia minima partecipanti (facoltativa)"
-                value={f.sogliaMinima ?? undefined}
-                onChange={(v) => aggiornaFermata(idx, 'sogliaMinima', v !== undefined ? String(v) : '')}
-              />
-            </div>
           </div>
           );
         })}
@@ -384,7 +369,7 @@ export function PercorsiSalvatiScreen() {
                 <h3>{t.nome}</h3>
                 <p>{t.fermate.map((f) => f.citta).filter(Boolean).join(' → ') || 'Nessuna fermata'}</p>
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={(e) => { e.stopPropagation(); apriClona(t); }} title="Crea un tragitto nuovo a partire da questo — utile per es. invertire la direzione senza toccare l'originale">⧉ Clona</button>
+                  <button className="btn btn-ghost" style={{ fontSize: 13, padding: '3px 8px' }} onClick={(e) => { e.stopPropagation(); apriClona(t); }} title="Clona — crea un tragitto nuovo a partire da questo, utile per es. invertire la direzione senza toccare l'originale">⧉</button>
                   <button className="btn btn-ghost" style={{ fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(t); }}>Elimina</button>
                 </div>
               </div>
