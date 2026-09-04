@@ -56,10 +56,10 @@ export function EventoPage() {
   const copertina = evento?.immagini[0]?.url;
 
   useSeoTags({
-    title: evento ? `${evento.artista} — ${evento.luogo}, ${evento.citta} | INBUS` : 'Evento | INBUS',
+    title: evento ? `${evento.artista} — ${evento.luogo}, ${evento.citta} | OnWay` : 'Evento | OnWay',
     description: evento
-      ? (evento.descrizioneSeo?.trim() || `Bus per ${evento.artista} il ${new Date(evento.data).toLocaleDateString('it-IT')} a ${evento.citta}${prezzoMinimo !== null ? ` — a partire da €${prezzoMinimo.toFixed(2)}` : ''}. Prenota il tuo posto con INBUS.`)
-      : 'Prenota il tuo bus per l\'evento con INBUS.',
+      ? (evento.descrizioneSeo?.trim() || `Bus per ${evento.artista} il ${new Date(evento.data).toLocaleDateString('it-IT')} a ${evento.citta}${prezzoMinimo !== null ? ` — a partire da €${prezzoMinimo.toFixed(2)}` : ''}. Prenota il tuo posto con OnWay.`)
+      : 'Prenota il tuo bus per l\'evento con OnWay.',
     image: copertina,
     url: window.location.href,
     jsonLd: evento ? {

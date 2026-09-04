@@ -65,7 +65,7 @@ export async function inviaEmail({ a, oggetto, html, allegati }: {
   if (r) {
     try {
       const { error } = await r.emails.send({
-        from: env.RESEND_FROM || 'INBUS <onboarding@resend.dev>',
+        from: env.RESEND_FROM || 'OnWay <onboarding@resend.dev>',
         to: a,
         subject: oggetto,
         html,

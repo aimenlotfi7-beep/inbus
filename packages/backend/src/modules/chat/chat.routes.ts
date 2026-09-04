@@ -104,7 +104,7 @@ export const chatService = {
       eventoId: conv.eventoId,
       conversazioneId: conv.id,
       autore: 'ADMIN',
-      nome: 'Staff INBUS',
+      nome: 'Staff OnWay',
       testo,
       letto: true,
     }).returning();

@@ -81,7 +81,7 @@ export const comunicazioniService = {
             }).returning();
           }
           await db.insert(messaggiChat).values({
-            eventoId, conversazioneId: conversazione.id, autore: 'ADMIN', nome: 'INBUS',
+            eventoId, conversazioneId: conversazione.id, autore: 'ADMIN', nome: 'OnWay',
             testo: `${input.oggetto}\n\n${input.corpo}`,
           });
           await db.update(conversazioniChat).set({ ultimoMessaggioIl: new Date() }).where(eq(conversazioniChat.id, conversazione.id));

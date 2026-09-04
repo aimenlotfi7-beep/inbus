@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { CarrelloProvider } from './features/carrello/CarrelloContext';
 import './styles/sito.css';
+import './styles/onway-theme.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

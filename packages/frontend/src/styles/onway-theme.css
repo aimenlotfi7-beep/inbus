@@ -1,0 +1,283 @@
+/* ============================================================
+   OnWay — tema di marca
+   Da incollare DOPO sito.css (o in fondo a sito.css).
+   Non modifica gestionale.css: dell'area admin cambia solo il logo.
+   ------------------------------------------------------------
+   REGOLA UNICA DA RICORDARE
+   Il giallo --ow-accent è un colore di RIEMPIMENTO, non di testo.
+   Su fondo chiaro il giallo come testo dà 1,3:1 — illeggibile.
+   Testo interattivo su fondo chiaro = --ow-ink con sottolineatura.
+   ============================================================ */
+
+:root{
+  /* --- Fondamentali --- */
+  --ow-night:      #0E1116;  /* fondo base */
+  --ow-surface:    #171B22;  /* card, pannelli */
+  --ow-surface-2:  #212733;  /* chip, elementi rialzati */
+  --ow-paper:      #F7F5F1;  /* superfici chiare + testo su scuro */
+  --ow-ink:        #14161A;  /* testo su chiaro */
+  --ow-line:       rgba(247,245,241,.12);
+  --ow-line-ink:   #E0DCD3;
+
+  /* --- Testo secondario --- */
+  --ow-muted:      #A7B0BE;  /* su scuro   — 8,7:1  AAA */
+  --ow-muted-ink:  #4A5058;  /* su chiaro  — 7,5:1  AAA */
+
+  /* --- Accento (solo riempimento) --- */
+  --ow-accent:       #FFD400; /* su scuro come testo 13,3:1 AAA */
+  --ow-accent-press: #E6BE00;
+  --ow-accent-soft:  rgba(255,212,0,.14);
+
+  /* --- Semantici: coppia scuro / chiaro --- */
+  --ow-ok:       #57D39A;  --ow-ok-ink:      #0A5A3A;  /* 10,1:1 / 7,6:1 */
+  --ow-warn:     #FFB43D;  --ow-warn-ink:    #6B4300;  /* 10,7:1 / 7,9:1 */
+  --ow-danger:   #FF8A8A;  --ow-danger-ink:  #A31414;  /*  8,4:1 / 7,3:1 */
+
+  --ow-radius:    14px;
+  --ow-radius-sm: 10px;
+  --ow-pill:      999px;
+
+  /* --- Rimappatura delle variabili esistenti di sito.css --- */
+  --night:   var(--ow-night);
+  --dusk:    var(--ow-surface);
+  --dusk-2:  var(--ow-surface-2);
+  --paper:   var(--ow-paper);
+  --ink:     var(--ow-ink);
+  --mist:    var(--ow-muted);
+  --mist-dim:#A7B0BE99;
+  --line:    var(--ow-line);
+  --radius:  var(--ow-radius);
+  /* --pink era l'accento: resta mappato sul giallo SOLO perché nel
+     foglio originale compare quasi sempre su fondo scuro. Tutti i suoi
+     usi su fondo chiaro sono corretti a mano più sotto. */
+  --pink:     var(--ow-accent);
+  --pink-dim: rgba(255,212,0,.34);
+  --amber:    var(--ow-warn);
+  --cta-sfondo: var(--ow-accent);
+  --cta-testo:  var(--ow-ink);
+}
+
+/* ============================================================
+   TIPOGRAFIA
+   In index.html sostituire il link Google Fonts con:
+   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+   Poppins, Anton e Space Grotesk non servono più.
+   ============================================================ */
+body,
+.btn, .logo, .card-body h3, .section-title, h1.hero-title,
+.field select, .field input, .search-cta, .search-cta-secondaria,
+.categoria-chip, .header-ricerca input, .stat b, .strip-item b,
+.how-num, .how-step h4, .checkout-modal h3, .checkout-form h3,
+.checkout-col-info h2, .evento-pagina-info h1,
+.checkout-modal select, .checkout-modal input,
+.checkout-form select, .checkout-form input{
+  font-family:'Archivo', Helvetica, Arial, sans-serif;
+}
+.checkout-riepilogo-totale,
+.checkout-riepilogo-chiuso b,
+.barra-prenota-fissa-mobile b{
+  font-family:'Archivo', Helvetica, sans-serif; font-weight:800; letter-spacing:-.02em;
+}
+h1.hero-title{ font-weight:800; letter-spacing:-.035em; text-transform:none; }
+h1.hero-title .line2{ color:var(--ow-accent); }
+.section-title{ letter-spacing:-.02em; }
+.section-title em{ color:var(--ow-accent); }
+.eyebrow{ color:var(--ow-accent); }
+.eyebrow::before{ background:var(--ow-accent); }
+::selection{ background:var(--ow-accent); color:var(--ow-ink); }
+
+/* ============================================================
+   LOGO
+   Markup da aggiornare in Layout.tsx e PublicPageLayout.tsx:
+     <Link to="/" className="logo">on<span>Way</span></Link>
+   Nessun simbolo accanto al logotipo: il marchio E' il logotipo,
+   con la W disegnata su misura e la freccia gialla in punta.
+   Il simbolo autonomo (per favicon/app/avatar) e' la stessa W
+   dentro un quadrato: classe .ow-mark qui sotto.
+   ============================================================ */
+.logo{
+  display:inline-flex; align-items:baseline; gap:0;
+  font-family:'Archivo', Helvetica, sans-serif; font-weight:400;
+  font-size:24px; letter-spacing:-.035em; line-height:1;
+  color:var(--ow-paper);
+}
+.logo-on{ font-weight:400; }
+.logo-ay{ font-weight:800; }
+/* La W del logotipo: SVG, altezza pari alla cap-height del testo.
+   Il bordo inferiore del viewBox coincide con la linea di base, per
+   questo l'allineamento baseline del flex la appoggia correttamente. */
+.logo-w{ display:block; height:.735em; width:auto; margin:0; }
+/* Logo su superficie chiara (checkout, biglietto, email, admin) */
+.logo.logo-su-chiaro{ color:var(--ow-ink); }
+/* Retrocompatibilita' con il markup vecchio IN<span>BUS</span> */
+.logo span{ color:inherit; }
+
+/* Solo simbolo: favicon, icona app, avatar social, schermata scansione.
+   La W del logotipo dentro un quadrato scuro, freccia gialla. */
+.ow-mark{
+  display:block; width:32px; height:32px; border-radius:8px;
+  background:var(--ow-surface-2) no-repeat center/62% 62%;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-13 -27 144 144' fill='none'%3E%3Cpolyline points='8,32 30,84 52,40 74,68 102,20' stroke='%23F7F5F1' stroke-width='17' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpolygon points='115.1,-2.4 118.4,29.6 85.6,10.4' fill='%23FFD400'/%3E%3C/svg%3E");
+}
+/* Versione monocroma per favicon 16px e stampa: tratto piu' spesso */
+.ow-mark-mono{
+  background-color:var(--ow-ink); border-radius:4px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-16 -28 136 136' fill='none'%3E%3Cpolyline points='8,32 30,84 52,40 74,68 102,20' stroke='%23F7F5F1' stroke-width='21' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpolygon points='117.1,-5.9 121.8,31.6 82.2,8.4' fill='%23F7F5F1'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   FOCUS VISIBILE — mancava del tutto: obbligatorio per la tastiera
+   ============================================================ */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, [tabindex]:focus-visible{
+  outline:3px solid var(--ow-accent); outline-offset:2px; border-radius:4px;
+}
+
+/* ============================================================
+   BOTTONI E CTA
+   ============================================================ */
+.btn{ font-family:'Archivo', Helvetica, sans-serif; font-weight:700; min-height:44px; }
+.btn-primary{ background:var(--ow-accent); color:var(--ow-ink); }
+.btn-primary:hover{ background:var(--ow-accent-press); box-shadow:0 10px 24px rgba(255,212,0,.22); }
+.btn-ghost{ border-color:rgba(247,245,241,.28); color:var(--ow-paper); }
+.btn-ghost:hover{ border-color:var(--ow-paper); background:rgba(247,245,241,.06); }
+.search-cta{ background:var(--ow-accent); color:var(--ow-ink); font-weight:800; text-transform:none; letter-spacing:0; }
+.search-cta:hover{ background:var(--ow-accent-press); }
+.search-cta svg{ fill:var(--ow-ink); }
+.search-cta-secondaria{ color:var(--ow-ink); border-color:var(--ow-line-ink); text-transform:none; letter-spacing:0; }
+/* La card intera è già un <Link> (riceve il focus da tastiera) — il
+   .card-cta al suo interno è solo uno <span>, mai un elemento separato
+   con proprio focus: qui perde l'aspetto da pulsante indipendente,
+   diventa un'etichetta con freccia, per non promettere un'interazione
+   (tab/invio) che di fatto non riceve. */
+.card-cta{ background:none; color:var(--ow-accent); font-weight:700; padding:0; }
+.card-cta:hover{ background:none; color:var(--ow-accent-press); }
+.carrello-badge{ background:var(--ow-accent); color:var(--ow-ink); }
+.cart-count{ background:var(--ow-accent); color:var(--ow-ink); }
+
+/* Chip e filtri */
+.categoria-chip{ font-family:'Archivo', Helvetica, sans-serif; background:var(--ow-surface-2);
+  border-color:rgba(247,245,241,.16); color:var(--ow-paper); min-height:38px; }
+.categoria-chip:hover{ border-color:var(--ow-accent); }
+.categoria-chip.active{ background:var(--ow-accent); border-color:var(--ow-accent); color:var(--ow-ink); }
+.chip{ color:var(--ow-muted); }
+.chip:hover{ border-color:var(--ow-accent); color:var(--ow-paper); background:var(--ow-accent-soft); }
+.chip.active{ background:var(--ow-accent); border-color:var(--ow-accent); color:var(--ow-ink); font-weight:700; }
+
+/* ============================================================
+   HERO E SFONDI — via i gradienti viola/magenta
+   ============================================================ */
+.hero{ background:radial-gradient(ellipse 70% 55% at 15% -15%, #1B2130 0%, transparent 62%), var(--ow-night); }
+.how{ background:var(--ow-surface); }
+.how::before{ background:radial-gradient(circle, rgba(255,212,0,.08), transparent 70%); }
+.how-num{ -webkit-text-stroke:1.5px var(--ow-accent); }
+.strip-item b{ color:var(--ow-accent); }
+footer{ background:#0A0C10; }
+.footer-grid ul a:hover{ color:var(--ow-accent); }
+.card-visual .tag{ color:var(--ow-accent); background:rgba(14,17,22,.8); }
+.card-visual .beam{ background:repeating-linear-gradient(100deg, transparent 0 22px, rgba(255,212,0,.14) 22px 24px); }
+.card:hover{ border-color:rgba(255,212,0,.45); }
+.card-visual{ background:linear-gradient(135deg, var(--ow-surface-2), #2C3444); }
+.ticket::before, .ticket::after{ background:var(--ow-night); }
+.toast .dot{ background:var(--ow-accent); }
+
+/* Stati posti — semantici, non solo colore: l'etichetta resta testuale */
+.posti-basso{ color:var(--ow-warn); }
+.card-ribbon.pochi{ background:var(--ow-warn); color:var(--ow-ink); }
+.card-ribbon.esaurito{ background:rgba(247,245,241,.16); color:var(--ow-paper); }
+.percorso-posti.disponibile{ background:rgba(87,211,154,.16); color:var(--ow-ok); }
+.percorso-posti.pochi{ background:rgba(255,180,61,.16); color:var(--ow-warn); }
+.percorso-posti.esaurito{ background:rgba(255,138,138,.16); color:var(--ow-danger); }
+.percorso-tappa-puntino{ background:var(--ow-accent); border-color:var(--ow-night); }
+.percorso-tappa.evidenziata .percorso-tappa-corpo{ background:var(--ow-accent-soft); border-color:var(--ow-accent); }
+
+/* ============================================================
+   SUPERFICI CHIARE — qui il giallo NON può fare da testo.
+   Testo interattivo = ink sottolineato; errori = rosso scuro.
+   ============================================================ */
+.checkout-modal .hint a, .checkout-form .hint a,
+#checkoutDocumenti a{
+  color:var(--ow-ink); text-decoration:underline; font-weight:700;
+}
+.checkout-modal .errore, .checkout-form .errore{ color:var(--ow-danger-ink); font-weight:600; }
+.payment-option.active{ border-color:var(--ow-ink); box-shadow:inset 0 0 0 1px var(--ow-ink); }
+.payment-option input{ accent-color:var(--ow-ink); }
+.mini-tab.active{ background:var(--ow-ink); border-color:var(--ow-ink); color:var(--ow-paper); }
+.checkout-servizio-card:hover{ border-color:var(--ow-ink); }
+.checkout-step-dot.active .checkout-step-numero{ border-color:var(--ow-ink); color:var(--ow-ink); background:var(--ow-accent); }
+.checkout-step-dot.completato .checkout-step-numero{ background:var(--ow-ink); border-color:var(--ow-ink); color:var(--ow-paper); }
+.checkout-step-dot{ color:var(--ow-muted-ink); }
+.checkout-riepilogo-chiuso .checkout-riepilogo-cta{ background:var(--ow-accent); color:var(--ow-ink); font-weight:700; }
+.barra-prenota-fissa-mobile button{ background:var(--ow-accent); color:var(--ow-ink); font-weight:800; }
+.chat-bubble-mini.cliente{ background:var(--ow-ink); color:var(--ow-paper); }
+.chat-bubble-mini.admin{ background:#EDE9E0; color:var(--ow-ink); }
+.field label, .checkout-modal .field-label, .checkout-form .field-label{ color:var(--ow-muted-ink); }
+.checkout-modal .hint, .checkout-form .hint{ color:var(--ow-muted-ink); }
+.ticket-head{ color:var(--ow-muted-ink); border-bottom-color:var(--ow-line-ink); }
+.field, .checkout-modal input, .checkout-modal select,
+.checkout-form input, .checkout-form select{ border-color:var(--ow-line-ink); }
+.checkout-summary{ border-color:var(--ow-line-ink); color:var(--ow-muted-ink); }
+.checkout-riepilogo-persistente{ background:#FBF9F5; border-color:var(--ow-line-ink); }
+.checkout-riepilogo-riga{ color:var(--ow-muted-ink); }
+.qty-control button{ border-color:var(--ow-line-ink); min-width:44px; min-height:44px; }
+
+/* Banner cookie + assistenza */
+.cookie-banner{ background:var(--ow-surface-2); }
+.cookie-banner p a{ color:var(--ow-paper); }
+.cookie-toggle input:checked + .cookie-toggle-slider{ background:var(--ow-accent); }
+.cookie-categoria-sempre-attivo{ color:var(--ow-ok); }
+.whatsapp-float{ background:#1E8E4E; box-shadow:0 8px 24px rgba(30,142,78,.4); }
+
+/* Le emoji nel footer non fanno parte del marchio: via.
+   In Layout.tsx / PublicPageLayout.tsx togliere 💳 🅿️ 📲 🎸 dai
+   .payment-badge e dal footer-bottom, lasciando solo il testo. */
+.payment-badge{ background:var(--ow-surface-2); color:var(--ow-paper); }
+
+/* ============================================================
+   RESIDUI CON rgba() SCRITTO A MANO IN sito.css — non passano dalla
+   variabile --pink, quindi la rimappatura in testa a questo file non
+   li raggiunge da sola: vanno sovrascritti qui uno per uno.
+   ============================================================ */
+.mobile-nav a:active{ background:rgba(255,212,0,.1); }
+.carosello-frecce button:hover{ background:rgba(255,212,0,.1); }
+.chat-cta:hover{ background:rgba(255,212,0,.1); }
+.checkout-col-info .tag{ background:rgba(255,212,0,.15); color:var(--ow-ink); }
+
+/* ============================================================
+   AREE ACCOUNT — account.css, promoter.css, tourleader.css
+   ereditano i token qui sopra; questi sono i punti che nei loro
+   fogli sono scritti a mano e non passano dalle variabili.
+   ============================================================ */
+.account-tab.active, .promoter-tab.active, .tourleader-tab.active{
+  background:var(--ow-accent); color:var(--ow-ink); border-color:var(--ow-accent); font-weight:700;
+}
+.badge-stato-confermata{ background:rgba(87,211,154,.16); color:var(--ow-ok); }
+.badge-stato-attesa{ background:rgba(255,180,61,.16); color:var(--ow-warn); }
+.badge-stato-annullata{ background:rgba(255,138,138,.16); color:var(--ow-danger); }
+
+/* Scansione biglietti: esito a tutto schermo, leggibile in piena luce */
+.scan-esito-ok{ background:var(--ow-ok); color:#04180E; }
+.scan-esito-ko{ background:var(--ow-danger-ink); color:var(--ow-paper); }
+
+/* ============================================================
+   GESTIONALE ADMIN — nient'altro che il logo, come richiesto.
+   ============================================================ */
+.gestionale .logo, .admin-logo{
+  font-family:'Archivo', Helvetica, sans-serif; font-weight:400; letter-spacing:-.035em;
+  color:var(--ow-ink); display:flex; align-items:center;
+}
+.gestionale .logo span, .admin-logo span{ font-weight:800; color:var(--ow-ink); }
+/* Nel gestionale il logotipo va da solo, senza simbolo accanto. */
+
+/* ============================================================
+   EMAIL TRANSAZIONALI — l'HTML delle email non legge questo file:
+   servono valori scritti a mano. Usare esattamente questi.
+     fondo pagina      #F7F5F1
+     testo             #14161A
+     testo secondario  #4A5058
+     bordo             #E0DCD3
+     barra superiore   #0E1116  (logo in #F7F5F1)
+     pulsante          fondo #FFD400, testo #14161A, raggio 10px
+     link in linea     #14161A sottolineato
+     mai               giallo come colore di testo
+   ============================================================ */

@@ -107,7 +107,7 @@ export function WhiteLabelPreview({ tema, evento, larghezza = 360, onCtaClick }:
 
       {elementiVisibili.informazioni && (
         <p style={{ fontSize: tipografia.dimensioneTestoPx * 0.8, color: colori.testoSecondario, marginTop: stile.spaziaturaPx * 0.5, textAlign: 'center' }}>
-          Viaggio organizzato da INBUS
+          Viaggio organizzato da OnWay
         </p>
       )}
     </div>

@@ -245,7 +245,7 @@ export async function disegnaBigliettoPdf(config: ConfigurazioneLayout, dati: {
           } catch { /* immagine non caricabile, si salta */ }
         }
       } else if (sezione === 'titolo') {
-        doc.fillColor(colore).font('Helvetica-Bold').fontSize(22).text('INBUS', pos.x, pos.y, { width: pos.larghezza });
+        doc.fillColor(colore).font('Helvetica-Bold').fontSize(22).text('OnWay', pos.x, pos.y, { width: pos.larghezza });
         doc.font('Helvetica').fontSize(11).fillColor('#666').text('BIGLIETTO DIGITALE', pos.x, doc.y, { width: pos.larghezza });
       } else if (sezione === 'evento') {
         doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('EVENTO', pos.x, pos.y, { width: pos.larghezza });

@@ -149,7 +149,7 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
                         Scarica
                       </a>
                       <PulsanteCondividi
-                        titolo={`Biglietto INBUS — ${ev?.artista ?? ''}`}
+                        titolo={`Biglietto OnWay — ${ev?.artista ?? ''}`}
                         testo={`Ecco il biglietto per ${b.nome} ${b.cognome} — ${ev?.artista ?? ''}`}
                         link={ticketApi.urlDownload(b.token)}
                         etichetta="Condividi"

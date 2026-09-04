@@ -14,10 +14,10 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
   {
     chiave: 'reset_password',
     nome: 'Recupero password',
-    oggetto: 'Reimposta la tua password — INBUS',
+    oggetto: 'Reimposta la tua password — OnWay',
     corpo: `
       <p>Ciao {{nome}},</p>
-      <p>Hai chiesto di reimpostare la password del tuo account INBUS. Clicca qui sotto per sceglierne una nuova.</p>
+      <p>Hai chiesto di reimpostare la password del tuo account OnWay. Clicca qui sotto per sceglierne una nuova.</p>
       <p><a href="{{link}}">Reimposta la password</a></p>
       <p>Il link resta valido per {{ore_validita}} ore. Se non sei stato tu a farne richiesta, ignora pure questa email — la tua password attuale resta invariata.</p>
     `,
@@ -26,10 +26,10 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
   {
     chiave: 'verifica_email',
     nome: 'Conferma email (registrazione nuovo account)',
-    oggetto: 'Conferma la tua email — INBUS',
+    oggetto: 'Conferma la tua email — OnWay',
     corpo: `
       <p>Ciao {{nome}},</p>
-      <p>Grazie per esserti registrato su INBUS — manca solo un passaggio: conferma la tua email cliccando qui sotto.</p>
+      <p>Grazie per esserti registrato su OnWay — manca solo un passaggio: conferma la tua email cliccando qui sotto.</p>
       <p><a href="{{link}}">Conferma la tua email</a></p>
       <p>Il link resta valido per {{ore_validita}} ore. Se non sei stato tu a registrarti, ignora pure questa email.</p>
     `,

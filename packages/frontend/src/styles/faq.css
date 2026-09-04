@@ -1,7 +1,6 @@
 
-  :root{
-    --night:#100e1c; --dusk:#221a38; --dusk-2:#2b2145; --pink:#ff3d7a; --paper:#f6f1e7; --mist:#a99fc2; --line:rgba(246,241,231,.12);
-  }
+  /* Niente più :root locale — eredita dal tema globale (sito.css, poi
+     onway-theme.css), stesso motivo di account.css. */
   *{box-sizing:border-box;}
   body{margin:0; background:var(--night); color:var(--paper); font-family:'Space Grotesk',sans-serif;}
   a{color:inherit; text-decoration:none;}
@@ -12,7 +11,7 @@
   h1{font-family:'Anton',sans-serif; text-transform:uppercase; font-size:clamp(28px,4vw,38px); margin:0 0 30px;}
   .faq-item{background:var(--dusk); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:12px;}
   .faq-item h3{margin:0 0 8px; font-size:16px; color:var(--paper);}
-  .faq-item p{margin:0; color:#d9d2e8; font-size:14.5px; line-height:1.7;}
+  .faq-item p{margin:0; color:var(--mist); font-size:14.5px; line-height:1.7;}
 
   /* ---------- FOOTER (identico al sito, sempre visibile) ---------- */
   footer{padding:60px clamp(20px,5vw,64px) 30px; background:#0b0a14;}

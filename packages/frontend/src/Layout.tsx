@@ -4,6 +4,7 @@ import { CookieBanner, LinkPreferenzeCookie } from './features/CookieBanner';
 import { clienteLoggato } from './features/clienteSessione';
 import { useCarrello } from './features/carrello/CarrelloContext';
 import { categorieEventoApi, type CategoriaEvento } from './api/categorieEvento';
+import { LogoOnWay } from './features/LogoOnWay';
 
 export function Layout({ children }: { children: ReactNode }) {
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
@@ -61,7 +62,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <>
       <header>
         <div className="header-sinistra">
-          <Link to="/" className="logo">IN<span>BUS</span></Link>
+          <LogoOnWay />
           <nav className="links">
             <Link to="/#consigliati">Eventi Consigliati</Link>
           </nav>
@@ -141,8 +142,8 @@ export function Layout({ children }: { children: ReactNode }) {
       <footer id="assistenza">
         <div className="footer-grid">
           <div>
-            <div className="logo">IN<span>BUS</span></div>
-            <p style={{ color: 'var(--mist)', fontSize: 13.5, maxWidth: '32ch', marginTop: 14 }}>Il modo più comodo e sicuro per arrivare ai tuoi concerti preferiti, in tutta Italia.</p>
+            <LogoOnWay come="testo" />
+            <p style={{ color: 'var(--mist)', fontSize: 13.5, maxWidth: '32ch', marginTop: 14 }}>Non vendiamo un viaggio. Portiamo le persone verso un'esperienza.</p>
           </div>
           <div>
             <h5>Naviga</h5>
@@ -173,13 +174,12 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
         <div className="payment-trust-row">
           <span>Pagamenti sicuri accettati:</span>
-          <span className="payment-badge">💳 Carta</span>
-          <span className="payment-badge">🅿️ PayPal</span>
-          <span className="payment-badge">📲 Satispay</span>
+          <span className="payment-badge">Carta</span>
+          <span className="payment-badge">PayPal</span>
+          <span className="payment-badge">Satispay</span>
         </div>
         <div className="footer-bottom">
-          <span>© 2026 INBUS</span>
-          <span>Progettato per viaggiare a ritmo di musica 🎸</span>
+          <span>© 2026 OnWay</span>
           <LinkPreferenzeCookie />
         </div>
       </footer>
