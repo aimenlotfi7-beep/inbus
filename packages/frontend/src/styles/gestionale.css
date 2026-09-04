@@ -580,3 +580,12 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .testo-intro{color:var(--mist); font-size:14px; line-height:1.6; margin-bottom:16px;}
 .gruppo-modulo{margin-bottom:20px;}
 .gruppo-modulo:last-child{margin-bottom:0;}
+
+/* ---------- Indirizzo fermata: sempre visibile su desktop, su
+   mobile si apre solo tenendo premuto sulla città (vedi
+   avviaPressioneLunga in SchedaEventoModale.tsx), si richiude
+   togliendo il focus dal campo. ---------- */
+@media (max-width:760px){
+  .indirizzo-fermata-riga{display:none;}
+  .indirizzo-fermata-riga.espansa{display:block;}
+}

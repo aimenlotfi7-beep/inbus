@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
 import { InfoTooltip } from '../../shared/InfoTooltip';
 import { TOOLTIP_DEFAULT } from '../../tooltipDefaults';
@@ -171,6 +171,19 @@ export function SchedaEventoModale({
   }
   const [nuovaImmagine, setNuovaImmagine] = useState('');
   const [trascinata, setTrascinata] = useState<{ tragitto: number; fermata: number } | null>(null);
+  // Solo per il layout mobile (la stessa riga resta sempre visibile su
+  // desktop, via CSS) — tenendo premuto sulla città si "apre" il campo
+  // indirizzo di QUELLA fermata, chiudendolo togliendo il focus
+  // (onBlur). Chiave "idxTragitto-idxFermata", una alla volta.
+  const [indirizzoEspansoMobile, setIndirizzoEspansoMobile] = useState<string | null>(null);
+  const timerPressioneRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function avviaPressioneLunga(chiave: string) {
+    if (timerPressioneRef.current) clearTimeout(timerPressioneRef.current);
+    timerPressioneRef.current = setTimeout(() => setIndirizzoEspansoMobile(chiave), 450);
+  }
+  function annullaPressioneLunga() {
+    if (timerPressioneRef.current) { clearTimeout(timerPressioneRef.current); timerPressioneRef.current = null; }
+  }
   const [formIniziale, setFormIniziale] = useState('');
 
   const [categorieEvento, setCategorieEvento] = useState<CategoriaEvento[]>([]);
@@ -1118,50 +1131,47 @@ export function SchedaEventoModale({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => onDropSu(idxTragitto, idxFermata)}
                 style={{
-                  display: 'grid', gridTemplateColumns: '16px 1fr 1.3fr auto auto', gap: 6, alignItems: 'center',
+                  display: 'grid', gridTemplateColumns: '16px 1fr auto auto', gap: 6, alignItems: 'center',
                   opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
                 }}
               >
                 <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
+                <div
+                  onTouchStart={() => avviaPressioneLunga(`${idxTragitto}-${idxFermata}`)}
+                  onTouchEnd={annullaPressioneLunga}
+                  onTouchMove={annullaPressioneLunga}
+                >
                 {f.fermataAnagraficaId !== null ? (
                   // Di default (e finché non si sceglie "scrivi
                   // manualmente") si parte da qui — un elenco leggibile,
-                  // non un'iconcina minuscola. Città/indirizzo arrivano
-                  // dall'anagrafica quando si sceglie una voce vera.
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <select
-                      style={{ width: '100%' }}
-                      value={f.fermataAnagraficaId ?? ''}
-                      onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
-                    >
-                      <option value="" disabled>— Scegli una fermata dall'anagrafica —</option>
-                      {fermateAnagrafica.map((fa) => {
-                        // Non ha senso la stessa fermata due volte nello
-                        // stesso tragitto (es. "Milano" scelta sia come
-                        // fermata 1 che come fermata 3) — disabilitata se
-                        // già usata da UN'ALTRA riga qui sotto (non questa
-                        // stessa, che deve restare selezionabile/invariata).
-                        const usataAltrove = tragitto.fermate.some((altra, i) => i !== idxFermata && altra.fermataAnagraficaId === fa.id);
-                        return (
-                          <option key={fa.id} value={fa.id} disabled={usataAltrove}>
-                            {fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}{usataAltrove ? ' (già in questo tragitto)' : ''}
-                          </option>
-                        );
-                      })}
-                      <option value="__manuale__">✎ Scrivi manualmente, senza anagrafica...</option>
-                    </select>
-                    {/* Prima l'indirizzo vero restava invisibile una
-                        volta scelta la fermata dall'anagrafica — si
-                        vedeva solo il nome nel menu, non dove porta
-                        davvero. Ora sempre leggibile qui sotto. */}
-                    {f.indirizzo && <p style={{ fontSize: 11, color: 'var(--mist)', margin: '4px 0 0' }}>📍 {f.indirizzo}</p>}
-                  </div>
+                  // non un'iconcina minuscola. La città arriva
+                  // dall'anagrafica; l'indirizzo si scrive comunque
+                  // sempre qui sotto (riga a parte), modificabile anche
+                  // partendo da quello suggerito dall'anagrafica.
+                  <select
+                    value={f.fermataAnagraficaId ?? ''}
+                    onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
+                  >
+                    <option value="" disabled>— Scegli una fermata dall'anagrafica —</option>
+                    {fermateAnagrafica.map((fa) => {
+                      // Non ha senso la stessa fermata due volte nello
+                      // stesso tragitto (es. "Milano" scelta sia come
+                      // fermata 1 che come fermata 3) — disabilitata se
+                      // già usata da UN'ALTRA riga qui sotto (non questa
+                      // stessa, che deve restare selezionabile/invariata).
+                      const usataAltrove = tragitto.fermate.some((altra, i) => i !== idxFermata && altra.fermataAnagraficaId === fa.id);
+                      return (
+                        <option key={fa.id} value={fa.id} disabled={usataAltrove}>
+                          {fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}{usataAltrove ? ' (già in questo tragitto)' : ''}
+                        </option>
+                      );
+                    })}
+                    <option value="__manuale__">✎ Scrivi manualmente, senza anagrafica...</option>
+                  </select>
                 ) : (
-                  <>
-                    <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
-                    <input placeholder="Indirizzo" value={f.indirizzo ?? ''} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)} />
-                  </>
+                  <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
                 )}
+                </div>
                 <label
                   title={f.attivo === false ? 'Fermata esclusa — non compare più nelle Linee né sul sito' : 'Fermata attiva — clicca per escluderla (es. per scarse adesioni), senza doverla rimuovere del tutto'}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: f.attivo === false ? 'var(--pink)' : 'var(--mist)', cursor: 'pointer', whiteSpace: 'nowrap' }}
@@ -1187,19 +1197,36 @@ export function SchedaEventoModale({
                   ← Torna a scegliere dall'anagrafica
                 </button>
               )}
-              {/* Prima si decideva sui Percorsi salvati (arrivava già
-                  impostata) — ora si decide sempre qui, sul tragitto
-                  vero dell'evento, non più sul modello riusabile: la
-                  stessa fermata può avere bisogno di soglie diverse a
-                  seconda dell'evento. Facoltativa, se vuota nessun
-                  controllo per questa fermata, nessun valore di
-                  riserva a cui ricadere. */}
-              <div style={{ marginLeft: 22, marginTop: 6, maxWidth: 260 }}>
-                <CampoNumero
-                  placeholder="Soglia minima partecipanti (facoltativa)"
-                  value={f.sogliaMinima ?? undefined}
-                  onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'sogliaMinima', v !== undefined ? String(v) : '')}
-                />
+              {/* Indirizzo sempre come campo vero, etichettato e
+                  modificabile — stesso stile di Città/Indirizzo di
+                  arrivo qui sotto — non più solo una scritta di sola
+                  lettura sotto il menu anagrafica. La soglia minima
+                  (decisa qui sul tragitto vero, non più sui Percorsi
+                  salvati — la stessa fermata può averne bisogno di una
+                  diversa a seconda dell'evento) affiancata, compatta:
+                  prima occupava un intero blocco a parte, qui basta un
+                  numero piccolo. */}
+              <div style={{ marginLeft: 22, marginTop: 6, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                <label
+                  className={`indirizzo-fermata-riga${indirizzoEspansoMobile === `${idxTragitto}-${idxFermata}` ? ' espansa' : ''}`}
+                  style={{ flex: 1, fontSize: 11 }}
+                >Indirizzo
+                  <input
+                    value={f.indirizzo ?? ''}
+                    onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)}
+                    onBlur={() => setIndirizzoEspansoMobile(null)}
+                    placeholder="es. Via Roma 12"
+                  />
+                </label>
+                <div style={{ width: 120 }}>
+                  <label style={{ fontSize: 11 }}>Min. partecipanti
+                    <CampoNumero
+                      placeholder="facoltativo"
+                      value={f.sogliaMinima ?? undefined}
+                      onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'sogliaMinima', v !== undefined ? String(v) : '')}
+                    />
+                  </label>
+                </div>
               </div>
             </div>
           ))}
