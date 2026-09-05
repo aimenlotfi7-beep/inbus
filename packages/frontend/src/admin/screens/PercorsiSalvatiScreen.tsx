@@ -44,6 +44,10 @@ export function PercorsiSalvatiScreen() {
   const [nome, setNome] = useState('');
   const [fermate, setFermate] = useState<FermataPercorsoSalvato[]>([]);
   const [modaleAperta, setModaleAperta] = useState(false);
+  // Nel modulo di modifica/creazione, sulla mappa a destra si può
+  // sovrapporre UN altro tragitto già salvato della stessa
+  // destinazione (per confrontarli) — quale, si sceglie qui.
+  const [tragittoSovrapposto, setTragittoSovrapposto] = useState<string | null>(null);
   const [snapshotIniziale, setSnapshotIniziale] = useState('');
   const [ricerca, setRicerca] = useState('');
   const [fermateAnagrafica, setFermateAnagrafica] = useState<FermataAnagrafica[]>([]);
@@ -60,17 +64,17 @@ export function PercorsiSalvatiScreen() {
     // destinazione già scelta (o appena creata), l'arrivo parte già
     // compilato con quella città — non serve riscriverla ogni volta.
     const fermateVuote = [{ citta: '', indirizzo: '' }, { citta: cittaSelezionata ?? '', indirizzo: '' }];
-    setFermate(fermateVuote);
+    setFermate(fermateVuote); setFermateVisualizzate(fermateVuote);
     setSnapshotIniziale(JSON.stringify({ nome: '', fermate: fermateVuote }));
-    setModaleAperta(true);
+    setTragittoSovrapposto(null); setModaleAperta(true);
   }
   function apriModifica(t: PercorsoSalvato) {
     setInModifica(t); setClonatoDa(null); setNome(t.nome);
     const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, sogliaMinima: f.sogliaMinima }));
     const fermateIniziali: FermataPercorsoSalvato[] = fermateNormalizzate.length >= 2 ? fermateNormalizzate : [{ citta: '', indirizzo: '' }, { citta: '', indirizzo: '' }];
-    setFermate(fermateIniziali);
+    setFermate(fermateIniziali); setFermateVisualizzate(fermateIniziali);
     setSnapshotIniziale(JSON.stringify({ nome: t.nome, fermate: fermateIniziali }));
-    setModaleAperta(true);
+    setTragittoSovrapposto(null); setModaleAperta(true);
   }
   // Apre lo stesso modulo di apriModifica, ma NON in modifica — al
   // salvataggio crea un tragitto nuovo, non tocca l'originale. Utile
@@ -80,12 +84,12 @@ export function PercorsiSalvatiScreen() {
     setInModifica(null); setClonatoDa(t); setNome(t.nome);
     const fermateNormalizzate = t.fermate.map((f) => ({ fermataAnagraficaId: f.fermataAnagraficaId ?? null, citta: f.citta, indirizzo: f.indirizzo, sogliaMinima: f.sogliaMinima }));
     const fermateIniziali: FermataPercorsoSalvato[] = fermateNormalizzate.length >= 2 ? fermateNormalizzate : [{ citta: '', indirizzo: '' }, { citta: '', indirizzo: '' }];
-    setFermate(fermateIniziali);
+    setFermate(fermateIniziali); setFermateVisualizzate(fermateIniziali);
     // Confrontato con QUESTO snapshot al salvataggio — se non è
     // cambiato niente, il salvataggio va bloccato (altrimenti si
     // crea un doppione identico all'originale appena clonato).
     setSnapshotIniziale(JSON.stringify({ nome: t.nome, fermate: fermateIniziali }));
-    setModaleAperta(true);
+    setTragittoSovrapposto(null); setModaleAperta(true);
   }
   // Disponibile SOLO quando si è arrivati qui da "Clona" — un
   // tragitto già salvato non si inverte più direttamente (si clona
@@ -192,9 +196,49 @@ export function PercorsiSalvatiScreen() {
     ? tragittiFiltrati.filter((t) => arrivoDi(t) === cittaSelezionata)
     : [];
 
+  // La mappa fa geocodifica vera (rete, una richiesta al secondo) per
+  // ogni città/indirizzo scritto a testo — senza un ritardo, ogni
+  // carattere digitato scatenerebbe una nuova richiesta. Si aggiorna
+  // solo dopo una pausa nella digitazione (800ms), non a ogni tasto.
+  const [fermateVisualizzate, setFermateVisualizzate] = useState<FermataPercorsoSalvato[]>(fermate);
+  useEffect(() => {
+    const timer = setTimeout(() => setFermateVisualizzate(fermate), 800);
+    return () => clearTimeout(timer);
+  }, [fermate]);
+
   if (modaleAperta) {
+    // Riusata sia per il tragitto live (in costruzione, "fermate")
+    // sia per un tragitto già salvato scelto come sovrapposizione —
+    // stessa identica forma dei dati in entrambi i casi.
+    const tappeDiFermate = (elenco: FermataPercorsoSalvato[]): TappaMappa[] => elenco.map((f, idx) => {
+      const anagrafica = f.fermataAnagraficaId ? fermateAnagrafica.find((fa) => fa.id === f.fermataAnagraficaId) : null;
+      return {
+        etichetta: `${(idx === 0 || idx === elenco.length - 1) ? 'Testa' : `Fermata ${idx + 1}`} — ${f.citta}`,
+        citta: f.citta,
+        indirizzo: f.indirizzo,
+        lat: anagrafica?.lat,
+        lng: anagrafica?.lng,
+      };
+    });
+    // La destinazione del tragitto in costruzione è sempre l'ultima
+    // fermata dell'elenco (live — si aggiorna scrivendo) — gli altri
+    // tragitti proponibili per il confronto sono quelli che vanno
+    // nella STESSA destinazione, esclusi il tragitto che si sta
+    // modificando (non avrebbe senso sovrapporlo a se stesso) e quello
+    // da cui si è clonato (è sostanzialmente lo stesso, appena copiato).
+    const destinazioneLive = fermate[fermate.length - 1]?.citta?.trim();
+    const tragittiStessaDestinazione = destinazioneLive
+      ? percorsi.filter((p) => arrivoDi(p) === destinazioneLive && p.id !== inModifica?.id && p.id !== clonatoDa?.id)
+      : [];
+    const percorsiMappaLive: PercorsoMappa[] = [{ id: '__live__', nome: nome.trim() || '(nuovo tragitto)', tappe: tappeDiFermate(fermateVisualizzate) }];
+    if (tragittoSovrapposto) {
+      const trovato = percorsi.find((p) => p.id === tragittoSovrapposto);
+      if (trovato) percorsiMappaLive.push({ id: trovato.id, nome: trovato.nome, tappe: tappeDiFermate(trovato.fermate) });
+    }
     return (
-      <PaginaSezione titolo={inModifica ? 'Modifica tragitto' : clonatoDa ? `Clona: ${clonatoDa.nome}` : 'Nuovo tragitto'} onIndietro={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))}>
+      <PaginaSezione titolo={inModifica ? 'Modifica tragitto' : clonatoDa ? `Clona: ${clonatoDa.nome}` : 'Nuovo tragitto'} onIndietro={() => setModaleAperta(false)} richiediConferma={() => chiediConferma(() => setModaleAperta(false))} larga>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
+      <div>
         <div className="campo"><label>Nome tragitto</label><input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
 
         {clonatoDa && (
@@ -261,6 +305,22 @@ export function PercorsiSalvatiScreen() {
         <button className="btn btn-ghost" style={{ marginBottom: 18 }} onClick={aggiungiFermata}>+ Aggiungi fermata</button>
 
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva tragitto'}</button>
+      </div>
+      <div style={{ position: 'sticky', top: 0 }}>
+        <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Cartina — in tempo reale</p>
+        {tragittiStessaDestinazione.length > 0 && (
+          <div className="mini-tabs" style={{ marginBottom: 10, flexWrap: 'wrap' }}>
+            <button type="button" className={`mini-tab${tragittoSovrapposto === null ? ' active' : ''}`} onClick={() => setTragittoSovrapposto(null)}>Solo questo</button>
+            {tragittiStessaDestinazione.map((p) => (
+              <button key={p.id} type="button" className={`mini-tab${tragittoSovrapposto === p.id ? ' active' : ''}`} onClick={() => setTragittoSovrapposto(p.id)}>
+                {p.nome}
+              </button>
+            ))}
+          </div>
+        )}
+        <MappaPercorso percorsi={percorsiMappaLive} />
+      </div>
+      </div>
       </PaginaSezione>
     );
   }
