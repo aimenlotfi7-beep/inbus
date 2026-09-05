@@ -11,13 +11,17 @@ import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 const fermataPercorsoSchema = z.object({
   fermataAnagraficaId: z.string().nullable().optional(),
   citta: z.string().min(1),
-  // Facoltativo SOLO per le due "Teste" (prima e ultima fermata
-  // dell'elenco) — quelle si scrivono in Eventi quando il percorso
-  // viene applicato (partenza e arrivo veri dipendono dall'evento
-  // specifico). Le fermate intermedie lo richiedono comunque —
-  // controllato sotto, nel refine, dato che qui Zod non sa ancora la
-  // posizione di questa riga nell'elenco.
-  indirizzo: z.string().min(1).nullable().optional(),
+  // Facoltativo SOLO per l'ultima fermata (l'arrivo) — quello si
+  // scrive in Eventi quando il percorso viene applicato (l'arrivo vero
+  // dipende dall'evento specifico, es. stesso concerto ma location
+  // diverse). La partenza invece è un luogo fisso e va sempre indicata
+  // qui, come tutte le fermate intermedie — controllato sotto, nel
+  // refine, dato che qui Zod non sa ancora la posizione di questa riga
+  // nell'elenco. z.string() da solo (non .min(1)) perché deve poter
+  // essere anche stringa vuota, non solo null/assente — altrimenti il
+  // salvataggio dell'arrivo (indirizzo sempre '') verrebbe rifiutato
+  // qui, prima ancora di arrivare al refine che lo permetterebbe.
+  indirizzo: z.string().nullable().optional(),
   // Facoltativa su OGNI fermata (non più solo su una "di Partenza" —
   // quel concetto/campo è stato tolto): se valorizzata, sotto quel
   // numero di partecipanti non conviene includerla in una Linea.
@@ -30,18 +34,18 @@ const percorsoSalvatoSchema = z.object({
   // entrambe per avere senso.
   fermate: z.array(fermataPercorsoSchema).min(2, 'Servono almeno due fermate — le due Teste (partenza e arrivo).'),
 }).refine(
-  // Le due Teste (prima e ultima fermata dell'elenco, per posizione)
-  // possono restare senza indirizzo. Tutte le fermate intermedie lo
-  // richiedono comunque.
-  (t) => t.fermate.every((f, idx) => idx === 0 || idx === t.fermate.length - 1 || f.indirizzo?.trim()),
-  { message: 'Ogni fermata intermedia deve avere un indirizzo — solo le due Teste (partenza e arrivo) possono esserne senza.', path: ['fermate'] }
+  // Solo l'ultima fermata dell'elenco (l'arrivo) può restare senza
+  // indirizzo. La partenza (prima fermata) e tutte le intermedie lo
+  // richiedono sempre.
+  (t) => t.fermate.every((f, idx) => idx === t.fermate.length - 1 || f.indirizzo?.trim()),
+  { message: 'Ogni fermata, tranne l\'arrivo, deve avere un indirizzo.', path: ['fermate'] }
 );
 const aggiornaPercorsoSalvatoSchema = z.object({
   nome: z.string().min(1).optional(),
   fermate: z.array(fermataPercorsoSchema).min(2, 'Servono almeno due fermate — le due Teste (partenza e arrivo).').optional(),
 }).refine(
-  (t) => !t.fermate || t.fermate.every((f, idx) => idx === 0 || idx === t.fermate!.length - 1 || f.indirizzo?.trim()),
-  { message: 'Ogni fermata intermedia deve avere un indirizzo — solo le due Teste (partenza e arrivo) possono esserne senza.', path: ['fermate'] }
+  (t) => !t.fermate || t.fermate.every((f, idx) => idx === t.fermate!.length - 1 || f.indirizzo?.trim()),
+  { message: 'Ogni fermata, tranne l\'arrivo, deve avere un indirizzo.', path: ['fermate'] }
 );
 
 async function getById(id: string) {

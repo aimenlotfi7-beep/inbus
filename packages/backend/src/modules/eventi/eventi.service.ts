@@ -285,9 +285,23 @@ async function sincronizzaTuttiITragitti(
       // Le fermate non hanno prenotazioni collegate direttamente (le
       // prenotazioni salvano città/indirizzo come testo, non un
       // riferimento), quindi qui si possono sostituire liberamente.
+      // MA le Linee sì (linea_fermate → fermate.id, con cancellazione
+      // a cascata) — cancellare e ricreare le fermate ad ogni
+      // salvataggio, anche per una modifica banale al tragitto (es.
+      // solo il nome), altrimenti spezzerebbe in silenzio la copertura
+      // di una Linea già costruita. Salvo prima chi copriva cosa (per
+      // città, l'identificatore più stabile fra vecchia e nuova riga —
+      // l'id cambia sempre, la città no), poi ricollego alle nuove
+      // fermate dopo averle inserite.
+      const collegamentiLineaDaPreservare = await tx
+        .select({ citta: fermate.citta, lineaId: lineaFermate.lineaId, ordine: lineaFermate.ordine })
+        .from(lineaFermate)
+        .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
+        .where(eq(fermate.tragittoId, giaEsistente.id));
+
       await tx.delete(fermate).where(eq(fermate.tragittoId, giaEsistente.id));
       if (tragitto.fermate.length) {
-        await tx.insert(fermate).values(
+        const nuoveFermate = await tx.insert(fermate).values(
           tragitto.fermate.map((f, ordine) => ({
             tragittoId: giaEsistente.id,
             ordine,
@@ -302,7 +316,16 @@ async function sincronizzaTuttiITragitti(
             sogliaMinima: f.sogliaMinima,
             attivo: f.attivo,
           }))
-        );
+        ).returning({ id: fermate.id, citta: fermate.citta });
+
+        if (collegamentiLineaDaPreservare.length) {
+          const daRicollegare = nuoveFermate.flatMap((nf) =>
+            collegamentiLineaDaPreservare
+              .filter((c) => c.citta === nf.citta)
+              .map((c) => ({ lineaId: c.lineaId, fermataId: nf.id, ordine: c.ordine }))
+          );
+          if (daRicollegare.length) await tx.insert(lineaFermate).values(daRicollegare);
+        }
       }
     } else {
       await inserisciTragitto(tx, eventoId, servizioId, tragitto);
@@ -841,9 +864,21 @@ export const eventiService = {
         prezzoExtra: input.prezzoExtra.toFixed(2),
       }).where(eq(tragitti.id, tragittoId));
 
+      // Stessa preservazione già fatta in salvaTragitti qui sopra —
+      // le Linee (linea_fermate → fermate.id, cancellazione a
+      // cascata) qui sono ancora più a rischio: questa funzione si usa
+      // da Partenze, DOPO che le Linee sono già state costruite in
+      // molti casi. Salvo chi copriva cosa (per città) prima di
+      // cancellare, ricollego alle nuove fermate dopo.
+      const collegamentiLineaDaPreservare = await tx
+        .select({ citta: fermate.citta, lineaId: lineaFermate.lineaId, ordine: lineaFermate.ordine })
+        .from(lineaFermate)
+        .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
+        .where(eq(fermate.tragittoId, tragittoId));
+
       await tx.delete(fermate).where(eq(fermate.tragittoId, tragittoId));
       if (input.fermate.length) {
-        await tx.insert(fermate).values(
+        const nuoveFermate = await tx.insert(fermate).values(
           input.fermate.map((f, ordine) => ({
             tragittoId, ordine,
             fermataAnagraficaId: f.fermataAnagraficaId,
@@ -852,7 +887,16 @@ export const eventiService = {
             postiMax: f.postiMax, prezzo: f.prezzo?.toFixed(2),
             sogliaMinima: f.sogliaMinima, attivo: f.attivo,
           }))
-        );
+        ).returning({ id: fermate.id, citta: fermate.citta });
+
+        if (collegamentiLineaDaPreservare.length) {
+          const daRicollegare = nuoveFermate.flatMap((nf) =>
+            collegamentiLineaDaPreservare
+              .filter((c) => c.citta === nf.citta)
+              .map((c) => ({ lineaId: c.lineaId, fermataId: nf.id, ordine: c.ordine }))
+          );
+          if (daRicollegare.length) await tx.insert(lineaFermate).values(daRicollegare);
+        }
       }
     });
 

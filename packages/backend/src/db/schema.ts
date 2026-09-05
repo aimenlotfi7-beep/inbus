@@ -452,15 +452,16 @@ export const fermatePercorsoSalvato = pgTable('fermate_percorso_salvato', {
   // fermata al volo senza passare dall'anagrafica.
   fermataAnagraficaId: text('fermata_anagrafica_id').references(() => fermateAnagrafica.id),
   citta: text('citta').notNull(),
-  // Facoltativo SOLO per le due "Teste" (prima e ultima fermata
-  // dell'elenco, vedi tipo qui sotto per un concetto diverso) — la
-  // partenza e l'arrivo veri dipendono dall'evento specifico, si
-  // scrivono in Eventi quando il percorso viene applicato. Le fermate
-  // intermedie restano invece sempre con l'indirizzo vero già pronto
-  // qui — quelle non cambiano da un evento all'altro, sono punti di
-  // ritrovo fissi e riusabili. Il controllo che le intermedie lo
-  // richiedano comunque è applicativo (rotte/validazione), non qui a
-  // livello di colonna.
+  // Facoltativo SOLO per l'ultima fermata (l'arrivo, vedi tipo qui
+  // sotto per un concetto diverso) — l'arrivo vero dipende
+  // dall'evento specifico (stesso percorso, location diverse a
+  // seconda dell'evento), si scrive in Eventi quando il percorso
+  // viene applicato. La partenza è invece un luogo fisso — va sempre
+  // indicata qui, come le fermate intermedie, che restano con
+  // l'indirizzo vero già pronto — quelle non cambiano da un evento
+  // all'altro, sono punti di ritrovo fissi e riusabili. Il controllo
+  // che partenza e intermedie lo richiedano comunque è applicativo
+  // (rotte/validazione), non qui a livello di colonna.
   indirizzo: text('indirizzo'),
   orario: text('orario'),
   // Facoltativa su ogni fermata, decisa qui sul percorso (il modello
