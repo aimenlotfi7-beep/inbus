@@ -27,7 +27,13 @@ export function PercorsiSalvatiScreen() {
   // centinaia di percorsi dai competitor, altrimenti una lista sola
   // diventerebbe ingestibile da scorrere.
   const [cittaSelezionata, setCittaSelezionata] = useState<string | null>(null);
-  const [percorsiCartinaIds, setPercorsiCartinaIds] = useState<string[]>(['']);
+  // "+ Nuova destinazione" — apre un campo per scrivere il nome della
+  // città PRIMA che esista un solo tragitto per quella destinazione
+  // (altrimenti una città compare in elenco solo quando già la
+  // raggiunge almeno un tragitto, vedi cittaConConteggio più sotto).
+  const [creandoNuovaDestinazione, setCreandoNuovaDestinazione] = useState(false);
+  const [nuovaDestinazioneNome, setNuovaDestinazioneNome] = useState('');
+  const [percorsiCartinaScelte, setPercorsiCartinaScelte] = useState<{ citta: string; tragittoId: string }[]>([{ citta: '', tragittoId: '' }]);
   const [percorsi, setTragitti] = useState<PercorsoSalvato[]>([]);
   const [inModifica, setInModifica] = useState<PercorsoSalvato | null>(null);
   // Diverso da inModifica: qui il salvataggio crea un tragitto NUOVO
@@ -50,8 +56,10 @@ export function PercorsiSalvatiScreen() {
     setInModifica(null); setClonatoDa(null); setNome('');
     // Le due Teste (partenza e arrivo) sono sempre presenti, anche
     // senza nessuna fermata intermedia in mezzo — un percorso senza
-    // almeno queste due non ha senso.
-    const fermateVuote = [{ citta: '', indirizzo: '' }, { citta: '', indirizzo: '' }];
+    // almeno queste due non ha senso. Se si sta creando dentro una
+    // destinazione già scelta (o appena creata), l'arrivo parte già
+    // compilato con quella città — non serve riscriverla ogni volta.
+    const fermateVuote = [{ citta: '', indirizzo: '' }, { citta: cittaSelezionata ?? '', indirizzo: '' }];
     setFermate(fermateVuote);
     setSnapshotIniziale(JSON.stringify({ nome: '', fermate: fermateVuote }));
     setModaleAperta(true);
@@ -278,31 +286,44 @@ export function PercorsiSalvatiScreen() {
 
       {tab === 'cartina' ? (
         <div>
-          <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 10 }}>Scegli uno o più tragitti da confrontare — con più di uno, si vedono sovrapposti sulla stessa cartina.</p>
-          {percorsiCartinaIds.map((id, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, maxWidth: 480 }}>
-              <select
-                style={{ flex: 1 }}
-                value={id}
-                onChange={(e) => setPercorsiCartinaIds(percorsiCartinaIds.map((v, i) => (i === idx ? e.target.value : v)))}
-              >
-                <option value="">— Seleziona un tragitto —</option>
-                <option value="__tutti__">— Tutti i tragitti insieme —</option>
-                {percorsi.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-              </select>
-              {percorsiCartinaIds.length > 1 && (
-                <button
-                  type="button" className="btn btn-ghost" style={{ padding: '4px 10px', color: 'var(--pink)', flexShrink: 0 }}
-                  onClick={() => setPercorsiCartinaIds(percorsiCartinaIds.filter((_, i) => i !== idx))}
-                  title="Togli questo tragitto dal confronto"
+          <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 10 }}>Scegli una città di arrivo, poi quale tragitto vederci — con più di uno, si vedono sovrapposti sulla stessa cartina.</p>
+          {(() => {
+            const cittaDisponibili = [...new Set(percorsi.map((p) => arrivoDi(p)))].sort((a, b) => a.localeCompare(b));
+            return percorsiCartinaScelte.map((scelta, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, maxWidth: 560 }}>
+                <select
+                  style={{ flex: 1 }}
+                  value={scelta.citta}
+                  onChange={(e) => setPercorsiCartinaScelte(percorsiCartinaScelte.map((v, i) => (i === idx ? { citta: e.target.value, tragittoId: '' } : v)))}
                 >
-                  ✕
-                </button>
-              )}
-            </div>
-          ))}
+                  <option value="">— Scegli una città di arrivo —</option>
+                  <option value="__tutti__">— Tutti i tragitti insieme —</option>
+                  {cittaDisponibili.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                {scelta.citta && scelta.citta !== '__tutti__' && (
+                  <select
+                    style={{ flex: 1 }}
+                    value={scelta.tragittoId}
+                    onChange={(e) => setPercorsiCartinaScelte(percorsiCartinaScelte.map((v, i) => (i === idx ? { ...v, tragittoId: e.target.value } : v)))}
+                  >
+                    <option value="">— Scegli un tragitto —</option>
+                    {percorsi.filter((p) => arrivoDi(p) === scelta.citta).map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
+                )}
+                {percorsiCartinaScelte.length > 1 && (
+                  <button
+                    type="button" className="btn btn-ghost" style={{ padding: '4px 10px', color: 'var(--pink)', flexShrink: 0 }}
+                    onClick={() => setPercorsiCartinaScelte(percorsiCartinaScelte.filter((_, i) => i !== idx))}
+                    title="Togli questo tragitto dal confronto"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ));
+          })()}
           <div style={{ marginBottom: 16 }}>
-            <button type="button" className="btn btn-ghost" onClick={() => setPercorsiCartinaIds([...percorsiCartinaIds, ''])}>+ Aggiungi un altro tragitto</button>
+            <button type="button" className="btn btn-ghost" onClick={() => setPercorsiCartinaScelte([...percorsiCartinaScelte, { citta: '', tragittoId: '' }])}>+ Aggiungi un altro tragitto</button>
           </div>
           {(() => {
             const tappeDiPercorso = (p: PercorsoSalvato): TappaMappa[] => p.fermate.map((f, idx) => {
@@ -321,22 +342,29 @@ export function PercorsiSalvatiScreen() {
               };
             });
 
-            // Stesso percorso scelto per sbaglio in due caselle diverse
-            // (capita facile con tanti percorsi) — tolto, non avrebbe
-            // senso confrontarlo con se stesso.
-            const idsScelti = [...new Set(percorsiCartinaIds.filter((id) => id.trim() !== ''))];
-            if (idsScelti.length === 0) return <p style={{ color: 'var(--mist)' }}>Scegli almeno un tragitto per vederlo sulla cartina.</p>;
+            // "Tutti insieme" scelto in una qualsiasi riga prevale sulle
+            // altre — non avrebbe senso combinarlo con singoli tragitti
+            // scelti a parte, li contiene già tutti.
+            if (percorsiCartinaScelte.some((s) => s.citta === '__tutti__')) {
+              const percorsiMappaTutti: PercorsoMappa[] = percorsi
+                .map((p) => ({ id: p.id, nome: p.nome, tappe: tappeDiPercorso(p) }))
+                .filter((p) => p.tappe.length >= 2);
+              if (percorsiMappaTutti.length === 0) return <p style={{ color: 'var(--mist)' }}>Nessun tragitto ha ancora abbastanza fermate da disegnare.</p>;
+              return <MappaPercorso key="__tutti__" percorsi={percorsiMappaTutti} />;
+            }
 
-            // "Tutti insieme" scelto in una qualsiasi casella prevale
-            // sulle altre — non avrebbe senso combinarlo con singoli
-            // percorsi scelti a parte, li contiene già tutti.
-            const percorsiDaMostrare = idsScelti.includes('__tutti__') ? percorsi : idsScelti.map((id) => percorsi.find((p) => p.id === id)).filter((p): p is PercorsoSalvato => !!p);
+            // Stesso tragitto scelto per sbaglio in due righe diverse —
+            // tolto, non avrebbe senso confrontarlo con se stesso.
+            const idsScelti = [...new Set(percorsiCartinaScelte.map((s) => s.tragittoId).filter((id) => id.trim() !== ''))];
+            if (idsScelti.length === 0) return <p style={{ color: 'var(--mist)' }}>Scegli una città e un tragitto per vederlo sulla cartina.</p>;
+
+            const percorsiDaMostrare = idsScelti.map((id) => percorsi.find((p) => p.id === id)).filter((p): p is PercorsoSalvato => !!p);
 
             const percorsiMappa: PercorsoMappa[] = percorsiDaMostrare
               .map((p) => ({ id: p.id, nome: p.nome, tappe: tappeDiPercorso(p) }))
               .filter((p) => p.tappe.length >= 2); // un percorso con meno di 2 fermate non ha niente da disegnare, lo salto invece di farlo fallire
             if (percorsiMappa.length === 0) return <p style={{ color: 'var(--mist)' }}>Nessuno dei tragitti scelti ha ancora abbastanza fermate da disegnare.</p>;
-            return <MappaPercorso key={idsScelti.includes('__tutti__') ? '__tutti__' : idsScelti.join(',')} percorsi={percorsiMappa} />;
+            return <MappaPercorso key={idsScelti.join(',')} percorsi={percorsiMappa} />;
           })()}
         </div>
       ) : (
@@ -348,7 +376,31 @@ export function PercorsiSalvatiScreen() {
       />
       {cittaSelezionata === null ? (
         <>
-          {!cittaConConteggio.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessuna città trovata.' : 'Nessun tragitto ancora.'}</p>}
+          {creandoNuovaDestinazione ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, maxWidth: 420 }}>
+              <input
+                autoFocus
+                placeholder="Nome della città (es. Monaco di Baviera)"
+                value={nuovaDestinazioneNome}
+                onChange={(e) => setNuovaDestinazioneNome(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && nuovaDestinazioneNome.trim()) { setCittaSelezionata(nuovaDestinazioneNome.trim()); setCreandoNuovaDestinazione(false); setNuovaDestinazioneNome(''); }
+                  if (e.key === 'Escape') { setCreandoNuovaDestinazione(false); setNuovaDestinazioneNome(''); }
+                }}
+              />
+              <button
+                type="button" className="btn btn-primary" style={{ flexShrink: 0 }}
+                disabled={!nuovaDestinazioneNome.trim()}
+                onClick={() => { setCittaSelezionata(nuovaDestinazioneNome.trim()); setCreandoNuovaDestinazione(false); setNuovaDestinazioneNome(''); }}
+              >
+                Vai →
+              </button>
+              <button type="button" className="btn btn-ghost" style={{ flexShrink: 0 }} onClick={() => { setCreandoNuovaDestinazione(false); setNuovaDestinazioneNome(''); }}>Annulla</button>
+            </div>
+          ) : (
+            <button type="button" className="btn btn-primary" style={{ marginBottom: 14 }} onClick={() => setCreandoNuovaDestinazione(true)}>+ Nuova destinazione</button>
+          )}
+          {!cittaConConteggio.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessuna città trovata.' : 'Nessuna destinazione ancora — crea la prima con "+ Nuova destinazione".'}</p>}
           <div className="cards-list">
             {cittaConConteggio.map(({ citta, conteggio }) => (
               <div key={citta} className="evento-card" onClick={() => setCittaSelezionata(citta)}>
