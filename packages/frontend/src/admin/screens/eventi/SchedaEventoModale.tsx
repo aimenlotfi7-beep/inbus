@@ -1146,7 +1146,7 @@ export function SchedaEventoModale({
                     come opzione valida e mostra selezionata — nascondendo
                     la città vera dietro quella scritta, invece di
                     mostrare il campo manuale come dovrebbe. */}
-                {f.fermataAnagraficaId && f.fermataAnagraficaId !== '__manuale__' ? (
+                {f.fermataAnagraficaId !== '__manuale__' && !(f.fermataAnagraficaId == null && f.citta) ? (
                   // Di default (e finché non si sceglie "scrivi
                   // manualmente") si parte da qui — un elenco leggibile,
                   // non un'iconcina minuscola. La città arriva
@@ -1224,7 +1224,7 @@ export function SchedaEventoModale({
                 </label>
                 <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
               </div>
-              {(!f.fermataAnagraficaId || f.fermataAnagraficaId === '__manuale__') && fermateAnagrafica.length > 0 && (
+              {f.fermataAnagraficaId === '__manuale__' && fermateAnagrafica.length > 0 && (
                 <button
                   type="button"
                   className="btn btn-ghost"
