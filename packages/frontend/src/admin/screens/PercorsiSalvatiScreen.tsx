@@ -309,14 +309,16 @@ export function PercorsiSalvatiScreen() {
       <div style={{ position: 'sticky', top: 0 }}>
         <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Cartina — in tempo reale</p>
         {tragittiStessaDestinazione.length > 0 && (
-          <div className="mini-tabs" style={{ marginBottom: 10, flexWrap: 'wrap' }}>
-            <button type="button" className={`mini-tab${tragittoSovrapposto === null ? ' active' : ''}`} onClick={() => setTragittoSovrapposto(null)}>Solo questo</button>
+          <select
+            style={{ marginBottom: 10, width: '100%' }}
+            value={tragittoSovrapposto ?? ''}
+            onChange={(e) => setTragittoSovrapposto(e.target.value || null)}
+          >
+            <option value="">Solo questo (nessun confronto)</option>
             {tragittiStessaDestinazione.map((p) => (
-              <button key={p.id} type="button" className={`mini-tab${tragittoSovrapposto === p.id ? ' active' : ''}`} onClick={() => setTragittoSovrapposto(p.id)}>
-                {p.nome}
-              </button>
+              <option key={p.id} value={p.id}>{p.nome}</option>
             ))}
-          </div>
+          </select>
         )}
         <MappaPercorso percorsi={percorsiMappaLive} />
       </div>
