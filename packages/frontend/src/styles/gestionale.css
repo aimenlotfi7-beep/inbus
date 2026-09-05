@@ -314,8 +314,8 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .mini-tab:hover{color:var(--paper); border-color:var(--blue-dim);}
 .mini-tab:focus, .mini-tab:focus-visible{outline:none; box-shadow:none;}
 .mini-tab.active{border-color:var(--blue); color:var(--paper); background:rgba(37,99,235,.1);}
-.mini-tab.completato{border-color:var(--green); color:var(--green);}
-.mini-tab.attenzione{border-color:var(--pink); color:var(--pink);}
+.mini-tab.completato{background:var(--green); border-color:var(--green); color:#fff;}
+.mini-tab.attenzione{background:var(--pink); border-color:var(--pink); color:#fff;}
 
 /* Sotto-tab (dentro una sezione, es. Info/Descrizione dentro "Info
    evento") — più piccole e discrete delle tab principali, per capire a
@@ -461,6 +461,13 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 }
 .data-table td{padding:10px 12px; border-bottom:1px solid var(--line);}
 .badge{padding:3px 10px; border-radius:999px; font-size:11px; text-transform:uppercase; letter-spacing:.5px;}
+/* Varianti a sfondo pieno (testo sempre bianco) per le etichette di
+   stato dentro Partenze — verde/arancio/rosso, non il pattern
+   "sfondo tenue + testo colorato" usato dalle altre .badge.X qui
+   sotto (quelle restano come sono, usate in altre schermate). */
+.badge-stato-verde{background:var(--green); color:#fff;}
+.badge-stato-arancio{background:var(--amber); color:#fff;}
+.badge-stato-rosso{background:var(--pink); color:#fff;}
 .badge.confermata{background:rgba(255,179,71,.15); color:var(--amber);}
 .badge.cancellata{background:rgba(255,61,122,.15); color:var(--pink);}
 

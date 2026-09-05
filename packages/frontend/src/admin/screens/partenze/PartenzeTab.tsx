@@ -677,11 +677,11 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
               {contestoPartenze?.tabOrigine === 'fermate' ? (
-                <span className={`badge ${orariImpostati ? 'coperta' : 'attenzione'}`}>
+                <span className={`badge ${orariImpostati ? 'badge-stato-verde' : 'badge-stato-arancio'}`}>
                   {orariImpostati ? '✓ Orari impostati' : '◔ Orari da impostare'}
                 </span>
               ) : (
-                <span className={`badge ${stato.classe}`}>{stato.etichetta}</span>
+                <span className={`badge ${stato.classe === 'coperta' ? 'badge-stato-verde' : stato.classe === 'attenzione' ? 'badge-stato-arancio' : stato.classe === 'non-coperta' ? 'badge-stato-rosso' : stato.classe}`}>{stato.etichetta}</span>
               )}
               {tragitto.stato === 'PREZZATO' && (
                 <span style={{ fontSize: 10.5, color: 'var(--mist)' }}>Prezzato, bus vero ancora da opzionare</span>
@@ -896,7 +896,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                     {tragittoVero.arrivoCitta || '— città mancante'}
                     {tragittoVero.arrivoIndirizzo && ` — ${tragittoVero.arrivoIndirizzo}`}
                     {' · '}
-                    <span style={{ color: tragittoVero.arrivoOrario ? 'var(--green)' : 'var(--pink)' }}>
+                    <span style={{ color: tragittoVero.arrivoOrario ? 'var(--mist)' : 'var(--pink)' }}>
                       {tragittoVero.arrivoOrario ?? 'orario mancante'}
                     </span>
                   </p>
@@ -910,7 +910,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
               <div style={{ marginTop: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <p className="section-label" style={{ margin: 0 }}>Preventivo</p>
-                  {tragittoVero?.preventivoCosto && <span className="badge coperta">✓ Prezzato</span>}
+                  {tragittoVero?.preventivoCosto && <span style={{ background: 'var(--green)', color: '#fff', padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>✓ Prezzato</span>}
                 </div>
                 {tragittoVero?.preventivoCosto
                   ? <p style={{ fontSize: 13.5, marginBottom: 12 }}>€{Number(tragittoVero.preventivoCosto).toFixed(0)} · {tragittoVero.preventivoPostiBus ?? '—'} posti presunti</p>
