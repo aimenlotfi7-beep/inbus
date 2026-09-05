@@ -102,10 +102,6 @@ export function PercorsiSalvatiScreen() {
     setFermate(fermate.map((f, i) => i === idx ? { ...f, [campo]: campo === 'sogliaMinima' ? (Number(valore) || undefined) : valore } : f));
   }
   function selezionaFermataAnagrafica(idx: number, anagraficaId: string) {
-    if (anagraficaId === '__manuale__') {
-      setFermate(fermate.map((f, i) => i === idx ? { ...f, fermataAnagraficaId: null } : f));
-      return;
-    }
     const trovata = fermateAnagrafica.find((f) => f.id === anagraficaId);
     if (!trovata) return;
     setFermate(fermate.map((f, i) => i === idx ? { ...f, fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo } : f));
@@ -236,9 +232,11 @@ export function PercorsiSalvatiScreen() {
             ) : (
             <div style={{ display: 'grid', gridTemplateColumns: f.fermataAnagraficaId !== null ? '1fr .6fr' : '1fr 1.4fr .6fr', gap: 8 }}>
               {f.fermataAnagraficaId !== null ? (
-                // Di default (e finché non si sceglie "scrivi
-                // manualmente") si parte da qui — stesso identico
-                // sistema già usato per le fermate dei tragitti veri.
+                // Le fermate intermedie si scelgono SOLO dall'anagrafica
+                // già censita, come in Creazione Evento — se manca una
+                // città, va prima aggiunta lì. Il ramo "input" qui sotto
+                // resta solo per compatibilità con dati vecchi salvati
+                // prima di questo cambio (fermataAnagraficaId=null).
                 <select
                   style={{ gridColumn: 'span 1' }}
                   value={f.fermataAnagraficaId ?? ''}
@@ -248,7 +246,6 @@ export function PercorsiSalvatiScreen() {
                   {fermateAnagrafica.map((fa) => (
                     <option key={fa.id} value={fa.id}>{fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}</option>
                   ))}
-                  <option value="__manuale__">✎ Scrivi manualmente, senza anagrafica...</option>
                 </select>
               ) : (
                 <>
@@ -257,14 +254,6 @@ export function PercorsiSalvatiScreen() {
                 </>
               )}
             </div>
-            )}
-            {!eArrivo && f.fermataAnagraficaId === null && fermateAnagrafica.length > 0 && (
-              <button
-                type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px', marginTop: 6 }}
-                onClick={() => setFermate(fermate.map((ff, i) => i === idx ? { ...ff, fermataAnagraficaId: undefined, citta: '', indirizzo: '' } : ff))}
-              >
-                ← Torna a scegliere dall'anagrafica
-              </button>
             )}
           </div>
           );
@@ -380,6 +369,7 @@ export function PercorsiSalvatiScreen() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, maxWidth: 420 }}>
               <input
                 autoFocus
+                style={{ flex: 1 }}
                 placeholder="Nome della città (es. Monaco di Baviera)"
                 value={nuovaDestinazioneNome}
                 onChange={(e) => setNuovaDestinazioneNome(e.target.value)}
@@ -403,7 +393,7 @@ export function PercorsiSalvatiScreen() {
           {!cittaConConteggio.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessuna città trovata.' : 'Nessuna destinazione ancora — crea la prima con "+ Nuova destinazione".'}</p>}
           <div className="cards-list">
             {cittaConConteggio.map(({ citta, conteggio }) => (
-              <div key={citta} className="evento-card" onClick={() => setCittaSelezionata(citta)}>
+              <div key={citta} className="evento-card" onClick={() => { setCittaSelezionata(citta); setCreandoNuovaDestinazione(false); setNuovaDestinazioneNome(''); }}>
                 <h3>{citta}</h3>
                 <p>{conteggio} tragitt{conteggio === 1 ? 'o' : 'i'}</p>
               </div>
@@ -412,7 +402,7 @@ export function PercorsiSalvatiScreen() {
         </>
       ) : (
         <>
-          <button type="button" className="btn btn-ghost" style={{ marginBottom: 14 }} onClick={() => setCittaSelezionata(null)}>← Torna alle città</button>
+          <button type="button" className="btn btn-ghost" style={{ marginBottom: 14 }} onClick={() => { setCittaSelezionata(null); setCreandoNuovaDestinazione(false); setNuovaDestinazioneNome(''); }}>← Torna alle città</button>
           <p className="section-label" style={{ marginBottom: 10 }}>Arrivo: {cittaSelezionata}</p>
           {!tragittiDellaCitta.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun tragitto trovato.' : 'Nessun tragitto per questa città.'}</p>}
           <div className="cards-list">
