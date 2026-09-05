@@ -85,7 +85,6 @@ select{
 }
 
 .logo{font-family:'Poppins',sans-serif; font-weight:800; font-size:22px; display:flex; align-items:baseline; gap:6px;}
-.logo span{color:var(--blue);}
 .logo small{font-family:'Space Mono',monospace; font-size:11px; color:var(--mist); letter-spacing:1px; text-transform:uppercase;}
 /* Dimensionamento della W disegnata (SVG) del logo OnWay — regole
    minime copiate da onway-theme.css, SOLO quelle di misura, non i
