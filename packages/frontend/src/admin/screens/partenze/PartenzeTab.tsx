@@ -275,6 +275,15 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   async function salvaOperativo(tragittoId: string) {
     const form = formOperativoMap.get(tragittoId);
     if (!form) return;
+    // Dopo il calcolo automatico, una fermata il cui indirizzo non è
+    // stato localizzato resta senza orario (vedi calcolaOrariDaArrivo)
+    // — prima si poteva comunque salvare così, lasciandola vuota in
+    // silenzio. Ora blocca, va completata a mano prima di salvare.
+    const senzaOrario = form.fermate.filter((f) => f.attivo !== false && !f.orario?.trim());
+    if (senzaOrario.length > 0) {
+      alert(`${senzaOrario.length} fermata/e attiva/e ${senzaOrario.length === 1 ? 'è' : 'sono'} ancora senza orario (${senzaOrario.map((f) => f.citta).join(', ')}) — completa/e a mano prima di salvare.`);
+      return;
+    }
     setSalvandoOperativoSet((prev) => new Set(prev).add(tragittoId));
     try {
       await eventiApi.aggiornaTragittoOperativo(tragittoId, form);
