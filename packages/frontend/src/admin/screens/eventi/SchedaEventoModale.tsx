@@ -1256,11 +1256,18 @@ export function SchedaEventoModale({
           </div>
             );
           })()}
+          {/* Solo in modifica di un evento già esistente — in
+              creazione questa sezione è uno dei quattro step del
+              wizard (vedi più sotto "Vista CREAZIONE"), non ha senso
+              proporre "Crea evento" da qui, a metà, prima che gli
+              altri step siano stati anche solo visti. */}
+          {evento && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
             <button className="btn btn-primary" onClick={salva} disabled={salvando}>
-              {salvando ? (evento ? 'Salvo...' : 'Creo...') : (evento ? 'Salva modifica' : 'Crea evento')}
+              {salvando ? 'Salvo...' : 'Salva modifica'}
             </button>
           </div>
+          )}
           </>
           )}
         </div>
