@@ -1132,6 +1132,7 @@ export function SchedaEventoModale({
                 onDragStart={() => onDragStart(idxTragitto, idxFermata)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => onDropSu(idxTragitto, idxFermata)}
+                onDragEnd={() => setTrascinata(null)}
                 style={{
                   display: 'grid', gridTemplateColumns: '16px 1fr 1fr 68px auto auto', gap: 6, alignItems: 'center',
                   opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
@@ -1202,7 +1203,12 @@ export function SchedaEventoModale({
                     📍{f.indirizzo ? '' : ' Indirizzo'}
                   </button>
                 </div>
-                <div style={{ width: 68 }} title="Soglia minima partecipanti (facoltativa) — sotto questo numero la fermata non viene considerata raggiunta">
+                <div
+                  style={{ width: 68 }}
+                  title="Soglia minima partecipanti (facoltativa) — sotto questo numero la fermata non viene considerata raggiunta"
+                  draggable
+                  onDragStart={(e) => e.stopPropagation()}
+                >
                   <CampoNumero
                     placeholder="Min."
                     value={f.sogliaMinima ?? undefined}
@@ -1248,7 +1254,7 @@ export function SchedaEventoModale({
             const daArrivoPerTutti = arrivoPerTuttiMap.get(tragitto.servizioId ?? null)?.attivo ?? false;
             const stileOscurato = daArrivoPerTutti ? { opacity: .6, background: 'var(--night)' } : undefined;
             return (
-          <div className="form-grid" style={{ marginBottom: 10 }}>
+          <div className="form-grid" style={{ marginBottom: 10, gridTemplateColumns: '1fr 1fr 110px' }}>
             <label>Città di arrivo
               <input
                 style={stileOscurato}
@@ -1275,6 +1281,11 @@ export function SchedaEventoModale({
           )}
         </div>
       );})}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+        <button className="btn btn-primary" onClick={salva} disabled={salvando}>
+          {salvando ? (evento ? 'Salvo...' : 'Creo...') : (evento ? 'Salva modifica' : 'Crea evento')}
+        </button>
+      </div>
       <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTragittoManuale}>+ Aggiungi tragitto manuale (senza tragitto salvato)</button>
       </>
       )}
