@@ -308,13 +308,9 @@ export function SchedaEventoModale({
   function selezionaFermataAnagrafica(idxTragitto: number, idxFermata: number, anagraficaId: string) {
     const tragitti = [...(form.tragitti ?? [])];
     const fermate = [...tragitti[idxTragitto].fermate];
-    if (anagraficaId === '__manuale__') {
-      fermate[idxFermata] = { ...fermate[idxFermata], fermataAnagraficaId: null };
-    } else {
-      const trovata = fermateAnagrafica.find((f) => f.id === anagraficaId);
-      if (!trovata) return;
-      fermate[idxFermata] = { ...fermate[idxFermata], fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo };
-    }
+    const trovata = fermateAnagrafica.find((f) => f.id === anagraficaId);
+    if (!trovata) return;
+    fermate[idxFermata] = { ...fermate[idxFermata], fermataAnagraficaId: trovata.id, citta: trovata.citta, indirizzo: trovata.indirizzo };
     tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate };
     setForm({ ...form, tragitti });
   }
@@ -1171,7 +1167,6 @@ export function SchedaEventoModale({
                         </option>
                       );
                     })}
-                    <option value="__manuale__">✎ Scrivi manualmente, senza anagrafica...</option>
                   </select>
                 ) : (
                   <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
@@ -1224,22 +1219,6 @@ export function SchedaEventoModale({
                 </label>
                 <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
               </div>
-              {f.fermataAnagraficaId === '__manuale__' && fermateAnagrafica.length > 0 && (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  style={{ fontSize: 11, marginLeft: 22, marginTop: 2, padding: 0 }}
-                  onClick={() => setForm((prev) => {
-                    const tragitti = [...(prev.tragitti ?? [])];
-                    const fermate = [...tragitti[idxTragitto].fermate];
-                    fermate[idxFermata] = { ...fermate[idxFermata], fermataAnagraficaId: undefined };
-                    tragitti[idxTragitto] = { ...tragitti[idxTragitto], fermate };
-                    return { ...prev, tragitti };
-                  })}
-                >
-                  ← Torna a scegliere dall'anagrafica
-                </button>
-              )}
             </div>
           ))}
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>
@@ -1271,13 +1250,13 @@ export function SchedaEventoModale({
                 placeholder="es. Piazzale Clodio, Roma"
               />
             </label>
-            <label>Orario di arrivo
+            <label>Orario
               <OrarioInput style={stileOscurato} value={tragitto.arrivoOrario ?? ''} onChange={(v) => aggiornaTragitto(idxTragitto, 'arrivoOrario', v)} />
             </label>
           </div>
             );
           })()}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
             <button className="btn btn-primary" onClick={salva} disabled={salvando}>
               {salvando ? (evento ? 'Salvo...' : 'Creo...') : (evento ? 'Salva modifica' : 'Crea evento')}
             </button>
