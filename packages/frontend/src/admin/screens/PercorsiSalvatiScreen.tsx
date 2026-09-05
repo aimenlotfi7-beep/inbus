@@ -134,7 +134,7 @@ export function PercorsiSalvatiScreen() {
     // silenzio (il salvataggio andava comunque a buon fine se ne
     // restavano almeno due) — ora blocca con un avviso chiaro, invece
     // di far sparire senza spiegazioni una fermata dimenticata a metà.
-    const incomplete = fermate.filter((f, idx) => !f.citta.trim() || (idx !== 0 && idx !== fermate.length - 1 && !f.indirizzo?.trim()));
+    const incomplete = fermate.filter((f, idx) => !f.citta.trim() || (idx !== fermate.length - 1 && !f.indirizzo?.trim()));
     if (incomplete.length > 0) {
       alert(`${incomplete.length} fermata/e non è/sono completa/e — manca la città (o l'indirizzo, per le fermate intermedie). Completala o eliminala prima di salvare.`);
       return;
@@ -245,7 +245,7 @@ export function PercorsiSalvatiScreen() {
               ) : (
                 <>
                   <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idx, 'citta', e.target.value)} />
-                  <input placeholder={idx === 0 ? 'Indirizzo (facoltativo — si scrive in Eventi)' : 'Indirizzo'} value={f.indirizzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
+                  <input placeholder="Indirizzo" value={f.indirizzo ?? ''} onChange={(e) => aggiornaFermata(idx, 'indirizzo', e.target.value)} />
                 </>
               )}
             </div>

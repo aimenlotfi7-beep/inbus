@@ -630,7 +630,7 @@ export function SchedaEventoModale({
     // qui sopra (servizi/immagini).
     const tragittoIncompleto = (form.tragitti ?? []).find((l) => {
       if (!l.nome.trim()) return true;
-      return l.fermate.some((f, idx) => !f.citta.trim() || (idx !== 0 && !f.indirizzo?.trim()));
+      return l.fermate.some((f) => !f.citta.trim() || !f.indirizzo?.trim());
     });
     if (tragittoIncompleto) {
       alert(`Il tragitto "${tragittoIncompleto.nome.trim() || '(senza nome)'}" non è completo — manca il nome, oppure la città/indirizzo di una fermata. Completalo o eliminalo prima di salvare.`);
