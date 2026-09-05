@@ -191,7 +191,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
                 richiedeIntervento={tab !== 'passate' && nienteFatto}
                 parziale={tab !== 'passate' && parziale}
                 completata={tab !== 'passate' && tuttoFatto}
-                badge={testoBadge && <span style={{ color: tuttoFatto ? 'var(--green)' : parziale ? '#f0b429' : undefined }}>{testoBadge}</span>}
+                badge={testoBadge && <span style={{ color: tuttoFatto ? 'var(--green)' : parziale ? '#f0b429' : 'var(--pink)' }}>{testoBadge}</span>}
                 extra={
                   <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 2 }}>
                     {gruppo.length} tragitt{gruppo.length === 1 ? 'o' : 'i'}

@@ -896,7 +896,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                     {tragittoVero.arrivoCitta || '— città mancante'}
                     {tragittoVero.arrivoIndirizzo && ` — ${tragittoVero.arrivoIndirizzo}`}
                     {' · '}
-                    <span style={{ color: tragittoVero.arrivoOrario ? 'var(--mist)' : 'var(--pink)' }}>
+                    <span style={{ color: tragittoVero.arrivoOrario ? 'var(--green)' : 'var(--pink)' }}>
                       {tragittoVero.arrivoOrario ?? 'orario mancante'}
                     </span>
                   </p>

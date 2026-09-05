@@ -1211,7 +1211,7 @@ export function SchedaEventoModale({
                 </div>
                 <label
                   title={f.attivo === false ? 'Fermata esclusa — non compare più nelle Linee né sul sito' : 'Fermata attiva — clicca per escluderla (es. per scarse adesioni), senza doverla rimuovere del tutto'}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: f.attivo === false ? 'var(--pink)' : 'var(--mist)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: f.attivo === false ? 'var(--pink)' : 'var(--green)', cursor: 'pointer', whiteSpace: 'nowrap' }}
                 >
                   <input type="checkbox" checked={f.attivo !== false} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'attivo', e.target.checked)} style={{ width: 'auto' }} />
                   <span className="etichetta-attiva-fermata">{f.attivo === false ? 'Esclusa' : 'Attiva'}</span>
