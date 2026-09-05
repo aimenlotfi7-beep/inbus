@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LogoOnWay } from '../features/LogoOnWay';
 import { Link } from 'react-router-dom';
 import { organizzatoriApi } from '../api/organizzatori';
 import '../styles/promoter.css';
@@ -21,7 +22,7 @@ export function OrganizzatorePasswordDimenticataPage() {
   return (
     <div className="pagina-partner">
       <header>
-        <div className="logo">IN<span>BUS</span><small>organizzatore</small></div>
+        <div className="logo"><LogoOnWay come="testo" /><small>organizzatore</small></div>
         <Link className="back-link" to="/organizzatore">← Torna al login</Link>
       </header>
       <main>

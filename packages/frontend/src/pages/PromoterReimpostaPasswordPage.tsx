@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LogoOnWay } from '../features/LogoOnWay';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { promoterApi } from '../api/promoter';
 import { ErroreApi } from '../api/client';
@@ -33,7 +34,7 @@ export function PromoterReimpostaPasswordPage() {
   return (
     <div className="pagina-partner">
       <header>
-        <div className="logo">IN<span>BUS</span><small>promoter</small></div>
+        <div className="logo"><LogoOnWay come="testo" /><small>promoter</small></div>
         <Link className="back-link" to="/promoter">← Torna al login</Link>
       </header>
       <main>

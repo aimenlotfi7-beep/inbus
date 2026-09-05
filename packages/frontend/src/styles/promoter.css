@@ -29,7 +29,6 @@
     background:var(--sidebar-bg); color:var(--sidebar-text); position:sticky; top:0; z-index:10;
   }
   .logo{font-family:'Poppins',sans-serif; font-weight:800; font-size:20px; display:flex; align-items:baseline; gap:4px;}
-  .logo span{color:var(--blue);}
   .logo small{font-size:11px; color:var(--sidebar-mist); margin-left:8px; text-transform:uppercase; letter-spacing:1px;}
   .back-link{font-size:13.5px; color:var(--sidebar-mist);}
   .back-link:hover{color:var(--sidebar-text);}

@@ -16,7 +16,6 @@
     background:rgba(16,14,28,.85); backdrop-filter:blur(10px);
   }
   .logo{font-family:'Anton',sans-serif; font-size:20px; display:flex; align-items:baseline; gap:4px;}
-  .logo span{color:var(--pink);}
   .back-link{font-size:13.5px; color:var(--mist);}
   .back-link:hover{color:var(--paper);}
   .btn{

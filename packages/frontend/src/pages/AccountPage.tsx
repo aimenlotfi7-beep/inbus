@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import '../styles/account.css';
+import { LogoOnWay } from '../features/LogoOnWay';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { utentiApi, type PreferenzePrivacy } from '../api/utenti';
 import { eventiApi } from '../api/eventi';
@@ -101,7 +102,7 @@ export function AccountPage() {
   return (
     <>
       <header>
-        <Link className="logo" to="/">IN<span>BUS</span></Link>
+        <LogoOnWay />
         <div className="header-right">
           <div className={`my-inbus-wrap${menuAperto ? ' open' : ''}`}>
             <button className="my-inbus-btn" onClick={() => setMenuAperto(!menuAperto)}>My OnWay <span className="caret">▾</span></button>

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 /** La forma minima necessaria per disegnare la card — non l'intero
  *  tipo Evento (che non tutte le schermate hanno a disposizione: alcune
@@ -34,10 +34,14 @@ interface EventoMinimo {
  *  Solo UNO tra richiedeIntervento/parziale/completata deve essere
  *  vero alla volta — il contorno colorato si AGGIUNGE al badge
  *  testuale, non lo sostituisce (i due possono comparire insieme). */
-export function EventoCardCompatta({ evento, onClick, badge, richiedeIntervento, parziale, completata, extra, opacitaRidotta, mostraLinkPubblico, footer, selezionato }: {
+export function EventoCardCompatta({ evento, onClick, badge, badgeColore, richiedeIntervento, parziale, completata, extra, opacitaRidotta, mostraLinkPubblico, footer, selezionato }: {
   evento: EventoMinimo;
   onClick: () => void;
   badge?: ReactNode;
+  /** Sfondo del badge — facoltativo, di default resta rosso (comportamento
+   *  di sempre). Serve quando il badge deve rispecchiare uno stato che non
+   *  è sempre "attenzione" (es. verde se fatto, arancio se parziale). */
+  badgeColore?: string;
   richiedeIntervento?: boolean;
   parziale?: boolean;
   completata?: boolean;
@@ -56,7 +60,7 @@ export function EventoCardCompatta({ evento, onClick, badge, richiedeIntervento,
       {evento.immagineUrl && (
         <div className="evento-card-compatta-copertina">
           <img src={evento.immagineUrl} alt="" />
-          {badge && <div className="evento-card-compatta-badge">{badge}</div>}
+          {badge && <div className="evento-card-compatta-badge" style={badgeColore ? { '--badge-colore': badgeColore } as CSSProperties : undefined}>{badge}</div>}
           {mostraLinkPubblico && evento.slug && (
             <button
               type="button"

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { LogoOnWay } from '../features/LogoOnWay';
 import { Link } from 'react-router-dom';
 import '../styles/promoter.css';
 import { organizzatoriApi, type Organizzatore, type EventoAssegnato, type StatisticheGenerali, type StatisticaEvento } from '../api/organizzatori';
@@ -35,7 +36,7 @@ export function OrganizzatorePage() {
   return (
     <div className="pagina-partner">
       <header>
-        <div className="logo">IN<span>BUS</span><small>organizzatore</small></div>
+        <div className="logo"><LogoOnWay come="testo" /><small>organizzatore</small></div>
         <Link className="back-link" to="/">← Torna al sito</Link>
         <button className={`btn btn-ghost${!loggato ? ' hidden' : ''}`} onClick={esci}>Esci</button>
       </header>

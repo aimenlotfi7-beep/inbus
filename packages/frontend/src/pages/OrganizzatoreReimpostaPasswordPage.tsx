@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LogoOnWay } from '../features/LogoOnWay';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { organizzatoriApi } from '../api/organizzatori';
 import { ErroreApi } from '../api/client';
@@ -33,7 +34,7 @@ export function OrganizzatoreReimpostaPasswordPage() {
   return (
     <div className="pagina-partner">
       <header>
-        <div className="logo">IN<span>BUS</span><small>organizzatore</small></div>
+        <div className="logo"><LogoOnWay come="testo" /><small>organizzatore</small></div>
         <Link className="back-link" to="/organizzatore">← Torna al login</Link>
       </header>
       <main>
