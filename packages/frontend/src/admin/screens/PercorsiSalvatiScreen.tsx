@@ -267,7 +267,11 @@ export function PercorsiSalvatiScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Tragitti salvati" azione={tab === 'elenco' && <button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo tragitto</button>} />
+      <PanelHead titolo="Tragitti salvati" azione={tab === 'elenco' && (
+        cittaSelezionata === null
+          ? <button className="btn btn-primary" onClick={() => setCreandoNuovaDestinazione(true)}>+ Nuova destinazione</button>
+          : <button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo tragitto</button>
+      )} />
       <div className="mini-tabs" style={{ marginBottom: 18 }}>
         <button type="button" className={`mini-tab${tab === 'elenco' ? ' active' : ''}`} onClick={() => setTab('elenco')}>Elenco</button>
         <button type="button" className={`mini-tab${tab === 'cartina' ? ' active' : ''}`} onClick={() => setTab('cartina')}>Cartina</button>
@@ -365,7 +369,7 @@ export function PercorsiSalvatiScreen() {
       />
       {cittaSelezionata === null ? (
         <>
-          {creandoNuovaDestinazione ? (
+          {creandoNuovaDestinazione && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, maxWidth: 420 }}>
               <input
                 autoFocus
@@ -387,8 +391,6 @@ export function PercorsiSalvatiScreen() {
               </button>
               <button type="button" className="btn btn-ghost" style={{ flexShrink: 0 }} onClick={() => { setCreandoNuovaDestinazione(false); setNuovaDestinazioneNome(''); }}>Annulla</button>
             </div>
-          ) : (
-            <button type="button" className="btn btn-primary" style={{ marginBottom: 14 }} onClick={() => setCreandoNuovaDestinazione(true)}>+ Nuova destinazione</button>
           )}
           {!cittaConConteggio.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessuna città trovata.' : 'Nessuna destinazione ancora — crea la prima con "+ Nuova destinazione".'}</p>}
           <div className="cards-list">
