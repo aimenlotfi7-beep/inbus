@@ -1277,15 +1277,15 @@ export function SchedaEventoModale({
           </div>
             );
           })()}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+            <button className="btn btn-primary" onClick={salva} disabled={salvando}>
+              {salvando ? (evento ? 'Salvo...' : 'Creo...') : (evento ? 'Salva modifica' : 'Crea evento')}
+            </button>
+          </div>
           </>
           )}
         </div>
       );})}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-        <button className="btn btn-primary" onClick={salva} disabled={salvando}>
-          {salvando ? (evento ? 'Salvo...' : 'Creo...') : (evento ? 'Salva modifica' : 'Crea evento')}
-        </button>
-      </div>
       <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTragittoManuale}>+ Aggiungi tragitto manuale (senza tragitto salvato)</button>
       </>
       )}
