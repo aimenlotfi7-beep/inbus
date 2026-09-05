@@ -347,7 +347,7 @@ export const layoutBigliettoService = {
   async generaAnteprima(configurazioneTesto: string) {
     const config = validaConfigurazione(configurazioneTesto);
     const QRCode = (await import('qrcode')).default;
-    const qrDataUrl = await QRCode.toDataURL('INBUS:TICKET:IB1DI38J:anteprima', { margin: 1, width: 300 });
+    const qrDataUrl = await QRCode.toDataURL('ONWAY:TICKET:IB1DI38J:anteprima', { margin: 1, width: 300 });
     return disegnaBigliettoPdf(config, {
       artista: 'Nome Artista (prova)',
       dataEvento: new Date(),

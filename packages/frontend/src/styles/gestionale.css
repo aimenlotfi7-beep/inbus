@@ -93,9 +93,9 @@ select{
    invece di "brand"). Senza queste due righe l'SVG non ha altezza
    impostata da nessuna parte e il browser gli assegna una dimensione
    predefinita enorme (spesso 300x150px). */
-.logo-w{ display:block; height:.735em; width:auto; margin:0; }
-.logo-on{ font-weight:400; }
-.logo-ay{ font-weight:800; }
+.logo-w{ display:block; width:.904em; height:.72em; margin:0; overflow:visible; }
+.logo-on{ font-weight:800; }
+.logo-ay{ font-weight:800; margin-left:-.05em; }
 /* Solo la sidebar ha sfondo scuro (--sidebar-bg) — lì il logo va
    bianco per essere visibile (eredita currentColor). Login/dashboard/
    home hanno sfondo chiaro: .logo senza questa regola eredita già il
@@ -401,7 +401,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .evento-card-compatta-copertina{position:relative; width:100%; aspect-ratio:4/5; background:var(--night);}
 .evento-card-compatta-copertina img{width:100%; height:100%; object-fit:cover; display:block;}
 .evento-card-compatta-badge{
-  position:absolute; top:5px; right:5px; background:var(--pink); color:#fff; font-size:9px; font-weight:700;
+  position:absolute; top:5px; right:5px; background:var(--badge-colore, var(--pink)); color:#fff; font-size:9px; font-weight:700;
   padding:2px 6px; border-radius:999px; line-height:1.3;
 }
 .evento-card-compatta-link-pubblico{

@@ -36,7 +36,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   // colori sovrascrivono quelli del sito per TUTTO il modulo — non
   // solo la vetrina/anteprima come prima, anche lo stepper, i
   // pulsanti, i pallini. Facoltativo: senza, il checkout resta uguale
-  // a sempre (i colori standard del sito INBUS).
+  // a sempre (i colori standard del sito OnWay).
   temaColori?: { sfondo: string; superficie: string; testoPrincipale: string; testoSecondario: string; cta: string; testoCta: string; bordi: string };
 }) {
   const [stato, setStato] = useState<Stato>('caricamento');
@@ -557,7 +557,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                     </p>
                   </div>
 
-                  <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, margin: '0 0 6px' }}>
+                  <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, margin: '0 0 6px' }}>
                     {creditoApplicato > 0 ? (
                       <>
                         <span style={{ textDecoration: 'line-through', opacity: .5, fontSize: 16, marginRight: 8 }}>€{totale.toFixed(2)}</span>

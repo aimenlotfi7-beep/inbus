@@ -529,7 +529,7 @@
     display:none; width:100%; align-items:center; justify-content:space-between;
     background:none; border:none; padding:0; font-size:15px; cursor:pointer;
   }
-  .checkout-riepilogo-chiuso b{font-family:'Anton',sans-serif; font-size:19px;}
+  .checkout-riepilogo-chiuso b{font-family:'Poppins',sans-serif; font-weight:800; font-size:19px;}
   .checkout-riepilogo-cta{
     background:var(--pink); color:#fff; font-weight:700; padding:11px 22px; border-radius:999px; font-size:14.5px;
   }
@@ -578,7 +578,7 @@
       padding-bottom:calc(14px + env(safe-area-inset-bottom)); /* iPhone con barra home */
       box-shadow:0 -4px 18px rgba(0,0,0,.25);
     }
-    .barra-prenota-fissa-mobile b{font-family:'Anton',sans-serif; font-size:18px;}
+    .barra-prenota-fissa-mobile b{font-family:'Poppins',sans-serif; font-weight:800; font-size:18px;}
     .barra-prenota-fissa-mobile button{
       background:var(--pink); color:#fff; font-weight:700; padding:12px 26px; border-radius:999px;
       border:none; font-size:15px; cursor:pointer; white-space:nowrap;
@@ -685,7 +685,7 @@
   }
   .checkout-riepilogo-persistente b{font-size:13.5px;}
   .checkout-riepilogo-riga{font-size:11.5px; color:#8a8171; display:block; margin-top:2px;}
-  .checkout-riepilogo-totale{font-family:'Anton',sans-serif; font-size:18px; white-space:nowrap;}
+  .checkout-riepilogo-totale{font-family:'Poppins',sans-serif; font-weight:800; font-size:18px; white-space:nowrap;}
   .checkout-step-nav{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:auto; padding-top:18px;}
 
   /* ---------- Banner consenso cookie ---------- */

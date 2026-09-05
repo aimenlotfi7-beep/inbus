@@ -20,7 +20,7 @@ export function TourLeaderBusListPage() {
       <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1f2430', margin: '0 0 4px' }}>I tuoi eventi</h1>
       <p style={{ color: '#6b7280', fontSize: 13.5, marginBottom: 20 }}>Ogni evento a cui sei assegnato — apri per vedere i partecipanti o scansionare.</p>
 
-      {errore && <p style={{ color: '#dc2626' }}>{errore}</p>}
+      {errore && <p style={{ color: 'var(--ow-danger-ink, #A31414)' }}>{errore}</p>}
       {!bus && !errore && <p style={{ color: '#6b7280' }}>Carico...</p>}
       {bus?.length === 0 && <p style={{ color: '#6b7280' }}>Non hai ancora nessun evento assegnato.</p>}
 

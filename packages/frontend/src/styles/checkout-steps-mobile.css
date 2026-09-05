@@ -69,12 +69,13 @@
 
   /*
    * STEP COMPLETATO:
-   * pallino rosa con spunta bianca.
+   * pallino con sfondo giallo — mai testo bianco sopra (1,5:1), usa
+   * l'inchiostro scuro (13,3:1), come da regola del brand.
    */
   .checkout-step-dot.completato > span:first-child {
-    background: var(--pink);
-    border-color: var(--pink);
-    color: #fff;
+    background: var(--ow-ink);
+    border-color: var(--ow-ink);
+    color: var(--ow-paper);
   }
 
   /*

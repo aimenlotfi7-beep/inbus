@@ -6,7 +6,7 @@
      sempre alla vecchia palette qualunque tema si applicasse sopra. */
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
-  body{background:var(--night); color:var(--paper); font-family:'Space Grotesk',sans-serif; -webkit-font-smoothing:antialiased;}
+  body{background:var(--night); color:var(--paper); font-family:'Poppins',sans-serif; -webkit-font-smoothing:antialiased;}
   a{color:inherit; text-decoration:none;}
   .hidden{display:none !important;}
 
@@ -15,19 +15,19 @@
     padding:16px clamp(20px,5vw,64px); border-bottom:1px solid var(--line);
     background:rgba(16,14,28,.85); backdrop-filter:blur(10px);
   }
-  .logo{font-family:'Anton',sans-serif; font-size:20px; display:flex; align-items:baseline; gap:4px;}
+  .logo{font-family:'Poppins',sans-serif; font-size:20px; display:flex; align-items:baseline; gap:4px;}
   .back-link{font-size:13.5px; color:var(--mist);}
   .back-link:hover{color:var(--paper);}
   .btn{
-    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13.5px;
+    font-family:'Poppins',sans-serif; font-weight:600; font-size:13.5px;
     padding:10px 18px; border-radius:999px; border:1px solid transparent; cursor:pointer;
   }
   .btn-ghost{border-color:var(--line); color:var(--paper); background:transparent;}
   .btn-ghost:hover{border-color:var(--mist);}
   .btn-primary{background:var(--pink); color:var(--night);}
   .btn-primary:hover{filter:brightness(1.05);}
-  .btn-danger{background:transparent; border-color:var(--pink-dim); color:var(--pink); font-size:12px; padding:8px 14px;}
-  .errore{color:var(--pink); font-size:13px; min-height:16px;}
+  .btn-danger{background:transparent; border-color:var(--ow-danger); color:var(--ow-danger); font-size:12px; padding:8px 14px;}
+  .errore{color:var(--ow-danger); font-size:13px; min-height:16px;}
 
   /* ---------- LOGIN ---------- */
   .login-wrap{max-width:800px; margin:0 auto; padding:clamp(24px,5vw,56px) clamp(20px,5vw,32px);}
@@ -38,7 +38,7 @@
   .login-box p{color:var(--mist); font-size:13.5px; margin:14px 0 18px;}
   .login-box input{
     width:100%; padding:12px 14px; border-radius:8px; border:1px solid var(--line);
-    background:var(--night); color:var(--paper); font-size:14px; margin-bottom:14px; font-family:'Space Grotesk',sans-serif;
+    background:var(--night); color:var(--paper); font-size:14px; margin-bottom:14px; font-family:'Poppins',sans-serif;
   }
   .login-box .btn{width:100%; padding:12px; font-size:14px;}
 
@@ -46,7 +46,7 @@
   .header-right{display:flex; align-items:center; gap:12px;}
   .my-inbus-wrap{position:relative;}
   .my-inbus-btn{
-    background:transparent; border:1px solid var(--line); color:var(--paper); font-family:'Space Grotesk',sans-serif;
+    background:transparent; border:1px solid var(--line); color:var(--paper); font-family:'Poppins',sans-serif;
     font-weight:600; font-size:13px; padding:9px 16px; border-radius:999px; cursor:pointer; display:flex; align-items:center; gap:6px;
   }
   .my-inbus-btn:hover{border-color:var(--pink);}
@@ -60,7 +60,7 @@
   .dropdown-chi b{color:var(--paper); display:block; margin-top:2px; word-break:break-all; font-size:13px;}
   .acc-nav-btn{
     display:flex; align-items:center; gap:8px; text-align:left; width:100%;
-    font-family:'Space Grotesk',sans-serif; font-size:13.5px; font-weight:600;
+    font-family:'Poppins',sans-serif; font-size:13.5px; font-weight:600;
     padding:10px 12px; border-radius:8px; border:none; background:transparent; color:var(--mist); cursor:pointer;
   }
   .acc-nav-btn.active, .acc-nav-btn:hover{background:rgba(255,212,0,.1); color:var(--paper);}
@@ -72,7 +72,7 @@
 
   /* ---------- CONTENUTO ACCOUNT (a piena larghezza, senza sidebar) ---------- */
   .account-content{max-width:1100px; margin:0 auto; padding:clamp(20px,4vw,40px);}
-  .account-content h1{font-family:'Anton',sans-serif; text-transform:uppercase; font-size:22px; margin:0 0 22px;}
+  .account-content h1{font-family:'Poppins',sans-serif; font-size:22px; margin:0 0 22px;}
 
   /* ---------- SEZIONE EVENTI = IL SITO VERO E PROPRIO, A PIENA LARGHEZZA ---------- */
   .acc-sezione-sito{width:100%; height:calc(100vh - 65px);}
@@ -95,7 +95,7 @@
   .viaggio-card .tag{
     font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; color:var(--amber); letter-spacing:1px;
   }
-  .viaggio-card h3{margin:6px 0 4px; font-family:'Anton',sans-serif; font-weight:400; font-size:19px; display:flex; align-items:center; gap:10px;}
+  .viaggio-card h3{margin:6px 0 4px; font-family:'Poppins',sans-serif; font-weight:400; font-size:19px; display:flex; align-items:center; gap:10px;}
   .viaggio-chat-btn{
     background:transparent; border:1px solid var(--line); color:var(--paper); border-radius:50%;
     width:28px; height:28px; font-size:13px; cursor:pointer; flex-shrink:0;
@@ -103,7 +103,7 @@
   .viaggio-chat-btn:hover{border-color:var(--pink); background:rgba(255,212,0,.1);}
   .viaggio-card p{margin:2px 0; color:var(--mist); font-size:13px;}
   .viaggio-right{text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:8px; min-width:140px;}
-  .viaggio-right .totale{font-family:'Anton',sans-serif; font-size:20px; color:var(--pink);}
+  .viaggio-right .totale{font-family:'Poppins',sans-serif; font-size:20px; color:var(--pink);}
   .badge{padding:4px 12px; border-radius:999px; font-size:10.5px; text-transform:uppercase; letter-spacing:.5px;}
   .badge.confermata, .badge.pagato{background:rgba(72,214,140,.15); color:#5be0a0;}
   .badge.cancellata, .badge.scaduto{background:rgba(255,138,138,.15); color:var(--ow-danger);}
@@ -112,7 +112,7 @@
 
   .viaggio-azioni{display:flex; flex-direction:column; gap:8px; margin-top:8px;}
   .btn-mini{
-    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:11.5px;
+    font-family:'Poppins',sans-serif; font-weight:600; font-size:11.5px;
     padding:8px 14px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--paper); cursor:pointer;
   }
   .btn-mini:hover{border-color:var(--mist);}
@@ -135,12 +135,12 @@
   .panel-box{
     background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); padding:22px; margin-bottom:24px;
   }
-  .panel-box h2{font-family:'Anton',sans-serif; text-transform:uppercase; font-size:16px; margin:0 0 16px;}
+  .panel-box h2{font-family:'Poppins',sans-serif; font-size:16px; margin:0 0 16px;}
   .form-grid-account{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   .form-grid-account label{display:flex; flex-direction:column; gap:5px; font-size:11px; color:var(--mist); text-transform:uppercase; letter-spacing:.5px;}
   .form-grid-account label.full{grid-column:1/-1;}
   .form-grid-account input{
-    font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--paper);
+    font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
     background:var(--night); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
   }
   @media (max-width:600px){ .form-grid-account{grid-template-columns:1fr;} }
@@ -179,7 +179,7 @@
   .acc-evento-body .tag{
     font-family:'Space Mono',monospace; font-size:10px; text-transform:uppercase; color:var(--amber); letter-spacing:1px;
   }
-  .acc-evento-body h3{margin:6px 0 4px; font-family:'Anton',sans-serif; font-weight:400; font-size:17px;}
+  .acc-evento-body h3{margin:6px 0 4px; font-family:'Poppins',sans-serif; font-weight:400; font-size:17px;}
   .acc-evento-body p{margin:0 0 12px; color:var(--mist); font-size:12.5px;}
   .acc-evento-foot{display:flex; align-items:center; justify-content:space-between;}
   .acc-evento-foot b{font-family:'Space Mono',monospace; font-size:15px;}
@@ -193,11 +193,11 @@
   .saldo-modal{
     background:var(--paper); color:var(--ink); border-radius:18px; padding:28px; width:100%; max-width:420px; position:relative;
   }
-  .saldo-modal h3{font-family:'Anton',sans-serif; text-transform:uppercase; margin:0 0 16px;}
+  .saldo-modal h3{font-family:'Poppins',sans-serif; margin:0 0 16px;}
   .saldo-modal .modal-close{position:absolute; top:16px; right:16px; background:none; border:none; color:var(--ink); font-size:18px; cursor:pointer;}
   .saldo-modal .field-label{font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:var(--ow-muted-ink); font-weight:700; display:block; margin:14px 0 6px;}
   .saldo-modal input[type=text]{
-    width:100%; font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600; color:var(--ink);
+    width:100%; font-family:'Poppins',sans-serif; font-size:14px; font-weight:600; color:var(--ink);
     background:#fff; border:1px solid var(--ow-line-ink); border-radius:8px; padding:10px 12px;
   }
   .saldo-modal .payment-methods{display:flex; flex-direction:column; gap:8px; margin-top:8px;}
@@ -232,7 +232,7 @@
   background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
   padding:32px; width:100%; max-width:400px;
 }
-.box-auth h1{font-family:'Anton',sans-serif; text-transform:uppercase; font-size:24px; margin:0 0 8px;}
+.box-auth h1{font-family:'Poppins',sans-serif; font-size:24px; margin:0 0 8px;}
 .sottotitolo-auth{color:var(--mist); font-size:13.5px; margin:0 0 20px; line-height:1.5;}
 .box-auth label{display:block; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mist); margin:14px 0 6px;}
 .box-auth input{
@@ -241,7 +241,7 @@
 }
 .due-colonne-auth{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
 .errore-auth{background:rgba(255,138,138,.1); border:1px solid rgba(255,138,138,.3); border-radius:8px; padding:10px 14px; margin-top:16px;}
-.errore-auth p{color:var(--pink); font-size:13px; margin:0;}
+.errore-auth p{color:var(--ow-danger); font-size:13px; margin:0;}
 .link-auth{background:none; border:none; color:var(--blue); font-size:13px; text-decoration:underline; cursor:pointer; padding:6px 0 0; display:block;}
 .box-auth .search-cta{width:100%; margin-top:22px; border:none; cursor:pointer;}
 
@@ -304,5 +304,5 @@
 /* ---------- CREDITO (statistiche in riga) ---------- */
 .stats-row{display:flex; gap:14px; flex-wrap:wrap;}
 .stat-box{background:var(--dusk); border:1px solid var(--line); border-radius:12px; padding:16px 20px; flex:1; min-width:150px;}
-.stat-box b{display:block; font-family:'Anton',sans-serif; font-size:20px;}
+.stat-box b{display:block; font-family:'Poppins',sans-serif; font-size:20px;}
 .stat-box span{font-size:11px; color:var(--mist); text-transform:uppercase; letter-spacing:.5px;}

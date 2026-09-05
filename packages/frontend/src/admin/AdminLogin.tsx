@@ -43,7 +43,7 @@ export function AdminLogin({ onLogin, messaggioIniziale }: { onLogin: (sessione:
   return (
     <div className="login-screen">
       <form className="login-box" onSubmit={handleSubmit}>
-        <div className="logo"><LogoOnWay come="testo" freccia="mono" /> <small>gestionale</small></div>
+        <div className="logo"><LogoOnWay come="testo" variante="nera" /> <small>gestionale</small></div>
         <p>Accedi con le tue credenziali di amministrazione.</p>
         <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
@@ -78,7 +78,7 @@ function RichiediReset({ onIndietro }: { onIndietro: () => void }) {
   return (
     <div className="login-screen">
       <form className="login-box" onSubmit={invia}>
-        <div className="logo"><LogoOnWay come="testo" freccia="mono" /> <small>gestionale</small></div>
+        <div className="logo"><LogoOnWay come="testo" variante="nera" /> <small>gestionale</small></div>
         <p>Scrivi la tua email: se corrisponde a un account, ti mandiamo un link per scegliere una nuova password.</p>
         {inviato ? (
           <p style={{ fontSize: 13.5 }}>✓ Controlla la posta (anche lo spam).</p>
@@ -120,7 +120,7 @@ function NuovaPassword({ token, onFatto }: { token: string; onFatto: () => void 
   return (
     <div className="login-screen">
       <div className="login-box">
-        <div className="logo"><LogoOnWay come="testo" freccia="mono" /> <small>gestionale</small></div>
+        <div className="logo"><LogoOnWay come="testo" variante="nera" /> <small>gestionale</small></div>
         {fatto ? (
           <>
             <p style={{ fontSize: 13.5 }}>✓ Fatto — la tua password è stata cambiata.</p>

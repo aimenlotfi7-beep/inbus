@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { LogoOnWay } from './LogoOnWay';
 import { Link, useNavigate } from 'react-router-dom';
 import { nomeTourLeader, logoutTourLeader } from '../api/tourLeaderAuth';
 
@@ -13,7 +14,7 @@ export function TourLeaderLayout({ vocedAttiva, children }: { vocedAttiva: 'cerc
   return (
     <div className="tourleader-shell" style={{ minHeight: '100vh', display: 'flex', fontFamily: "'Poppins',sans-serif", background: '#f3f4f6' }}>
       <aside className="tourleader-aside" style={{ width: 210, flexShrink: 0, background: '#14121f', color: '#e7e5f0', display: 'flex', flexDirection: 'column', padding: '20px 0' }}>
-        <div style={{ padding: '0 20px 20px', fontWeight: 800, fontSize: 17 }}>IN<span style={{ color: '#2563eb' }}>BUS</span></div>
+        <div style={{ padding: '0 20px 20px' }}><LogoOnWay come="testo" chiaro /></div>
         <nav className="tourleader-nav" style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
           <Link
             to="/scansione/cerca"

@@ -12,8 +12,8 @@ const TESTO_ESITO: Record<EsitoScansione['esito'], string> = {
 const COLORE_ESITO: Record<EsitoScansione['esito'], string> = {
   valido: '#16a34a',
   gia_a_bordo: '#16a34a',
-  bus_sbagliato: '#dc2626',
-  non_valido: '#dc2626',
+  bus_sbagliato: 'var(--ow-danger-ink, #A31414)',
+  non_valido: 'var(--ow-danger-ink, #A31414)',
 };
 
 /** Pagina di scansione — inquadra il QR del biglietto con la fotocamera
@@ -86,9 +86,11 @@ export function TourLeaderScanPage() {
 
   async function gestisciScansione(contenuto: string) {
     if (!busId) return;
-    // "INBUS:TICKET:PNR:token" — ci interessa solo l'ultima parte.
+    // "INBUS:TICKET:PNR:token" (biglietti vecchi) o "ONWAY:TICKET:PNR:token"
+    // (nuovi, dal rebrand) — accetta entrambi in lettura, il generatore
+    // lato backend ora emette solo ONWAY.
     const parti = contenuto.split(':');
-    if (parti.length < 4 || parti[0] !== 'INBUS' || parti[1] !== 'TICKET') return; // non è un nostro QR, ignoro senza dare errore
+    if (parti.length < 4 || (parti[0] !== 'INBUS' && parti[0] !== 'ONWAY') || parti[1] !== 'TICKET') return; // non è un nostro QR, ignoro senza dare errore
     const token = parti.slice(3).join(':');
 
     inCooldown.current = true;
@@ -116,7 +118,7 @@ export function TourLeaderScanPage() {
         )}
       </div>
 
-      {errore && <p style={{ color: '#dc2626', padding: 20, textAlign: 'center' }}>{errore}</p>}
+      {errore && <p style={{ color: 'var(--ow-danger-ink, #A31414)', padding: 20, textAlign: 'center' }}>{errore}</p>}
 
       <div style={{ position: 'relative' }}>
         <video ref={videoRef} playsInline muted style={{ width: '100%', display: 'block' }} />

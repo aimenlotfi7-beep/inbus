@@ -100,7 +100,7 @@ export function EventoPage() {
               <div className={`evento-pagina-hero${copertina ? '' : ' senza-foto'}`} style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
                 <span className="tag">{evento.genere}</span>
                 <div style={{ position: 'absolute', top: 14, right: 14 }}>
-                  <PulsanteCondividi soloIcona titolo={`${evento.artista} — INBUS`} testo={`Vieni con noi in bus a vedere ${evento.artista}, ${evento.luogo} (${evento.citta})`} />
+                  <PulsanteCondividi soloIcona titolo={`${evento.artista} — OnWay`} testo={`Vieni con noi in bus a vedere ${evento.artista}, ${evento.luogo} (${evento.citta})`} />
                 </div>
               </div>
 
@@ -115,7 +115,7 @@ export function EventoPage() {
               )}
 
               {prezzoMinimo !== null && (
-                <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, marginTop: 14 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
+                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, marginTop: 14 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
               )}
 
               <SezioniAccordion evento={evento} />

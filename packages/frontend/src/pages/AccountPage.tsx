@@ -194,7 +194,7 @@ function SezioneCredito({ email }: { email: string }) {
 
       <div className="panel-box" style={{ background: 'rgba(72,214,140,.1)', borderColor: 'var(--green)' }}>
         <h2>Disponibile ora</h2>
-        <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 30, color: 'var(--green)', margin: '4px 0' }}>
+        <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 30, color: 'var(--green)', margin: '4px 0' }}>
           €{(disponibile ?? 0).toFixed(2)}
         </p>
         <p style={{ color: 'var(--mist)', fontSize: 13 }}>
@@ -395,9 +395,9 @@ function SezioneDashboard({ email, viaggi, eventiPerId, onNavigare, onAprireViag
       {viaggi !== null && eventoProssimo && prenotazioneProssima && (
         <div className="panel-box" style={{ background: 'linear-gradient(135deg, rgba(255,212,0,.14), rgba(255,212,0,.04))', borderColor: 'var(--pink)' }}>
           {giorniAlViaggio === 0 ? (
-            <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 20, textTransform: 'uppercase', color: 'var(--pink)', margin: '0 0 6px' }}>🚌 Il tuo viaggio è oggi!</p>
+            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 20, color: 'var(--pink)', margin: '0 0 6px' }}>Il tuo viaggio è oggi!</p>
           ) : giorniAlViaggio === 1 ? (
-            <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 20, textTransform: 'uppercase', color: 'var(--pink)', margin: '0 0 6px' }}>📍 Domani si parte!</p>
+            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 20, color: 'var(--pink)', margin: '0 0 6px' }}>Domani si parte!</p>
           ) : (
             <p style={{ textTransform: 'uppercase', fontSize: 11, letterSpacing: 1, color: 'var(--mist)', margin: '0 0 6px' }}>Il tuo prossimo viaggio</p>
           )}
@@ -465,23 +465,18 @@ function SezioneDashboard({ email, viaggi, eventiPerId, onNavigare, onAprireViag
 
       <div className="acc-dashboard-grid">
         <button className="acc-dashboard-tile" onClick={() => onNavigare('viaggi')}>
-          <span className="acc-dashboard-tile-icona">🎫</span>
           <span>Le mie prenotazioni</span>
         </button>
         <button className="acc-dashboard-tile" onClick={() => onNavigare('lista-attesa')}>
-          <span className="acc-dashboard-tile-icona">⏳</span>
           <span>Lista d'attesa{inListaAttesa > 0 ? ` (${inListaAttesa})` : ''}</span>
         </button>
         <button className="acc-dashboard-tile" onClick={() => onNavigare('chat')}>
-          <span className="acc-dashboard-tile-icona">💬</span>
           <span>Messaggi{messaggiNonLetti > 0 ? ` (${messaggiNonLetti})` : ''}</span>
         </button>
         <button className="acc-dashboard-tile" onClick={() => onNavigare('profilo')}>
-          <span className="acc-dashboard-tile-icona">👤</span>
           <span>Il mio profilo</span>
         </button>
         <a className="acc-dashboard-tile" href="/faq">
-          <span className="acc-dashboard-tile-icona">🛟</span>
           <span>Assistenza</span>
         </a>
       </div>
@@ -571,7 +566,7 @@ function SezioneViaggi({ email, viaggi, eventiPerId, onAprireViaggio }: {
               <p>{p.passeggeri} passegger{p.passeggeri > 1 ? 'i' : 'o'} · <span className="pnr-tag">PNR {p.pnr}</span></p>
               <div className="viaggio-riepilogo">
                 <div className="riepilogo-riga">
-                  <span className="riepilogo-label">📍 Fermata</span>
+                  <span className="riepilogo-label">Fermata</span>
                   <span>{p.fermataCitta}{p.fermataOrario ? ` · ore ${p.fermataOrario}` : ''}</span>
                 </div>
               </div>

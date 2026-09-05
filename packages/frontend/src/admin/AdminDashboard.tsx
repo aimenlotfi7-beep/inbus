@@ -51,7 +51,7 @@ export function AdminDashboard({ onLogout, soloContenuto }: { onLogout: () => vo
   return (
     <div>
       <header style={{ padding: '18px clamp(20px,5vw,64px)', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div className="logo"><LogoOnWay come="testo" freccia="mono" /> <small>gestionale</small></div>
+        <div className="logo"><LogoOnWay come="testo" variante="nera" /> <small>gestionale</small></div>
         <button className="btn btn-ghost" onClick={onLogout}>Esci</button>
       </header>
       <main style={{ padding: 'clamp(20px,4vw,40px)' }}>{contenuto}</main>

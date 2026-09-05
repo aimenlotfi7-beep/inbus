@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import '../styles/tourleader.css';
+import { LogoOnWay } from '../features/LogoOnWay';
 import { tourLeaderApi } from '../api/tourleader';
 import { eventiApi } from '../api/eventi';
 import type { Evento } from '../api/types';
@@ -42,7 +43,7 @@ export function TourLeaderPage() {
   return (
     <>
       <header>
-        <div className="logo">IN<span>BUS</span></div>
+        <div className="logo"><LogoOnWay come="testo" /></div>
         <Link className="back-link" to="/">← Torna al sito</Link>
       </header>
 

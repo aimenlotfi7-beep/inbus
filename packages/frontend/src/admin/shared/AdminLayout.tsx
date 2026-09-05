@@ -187,7 +187,7 @@ export function AdminLayout({
       <aside className="sidebar">
         <div className="sidebar-riga-alto">
           <div className="logo sidebar-logo" title="Torna alla Home" onClick={onVaiHome}>
-            <LogoOnWay come="testo" freccia="mono" /> <small>gestionale</small>
+            <LogoOnWay come="testo" variante="bianca" /> <small>gestionale</small>
           </div>
           {/* Solo mobile (il CSS lo nasconde su desktop) — apre il
               pannello a schermo intero con tutti i gruppi in elenco

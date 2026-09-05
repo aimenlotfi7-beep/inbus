@@ -83,7 +83,7 @@ export function OffertaPage() {
               </p>
 
               {prezzoMinimo !== null && (
-                <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, marginTop: 14 }}>
+                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, marginTop: 14 }}>
                   da €{applicaScontoOfferta(prezzoMinimo, offerta.scontoPercentuale).toFixed(2)}
                   <span style={{ fontSize: 13, opacity: .7 }}> invece di €{prezzoMinimo.toFixed(2)}</span>
                 </p>

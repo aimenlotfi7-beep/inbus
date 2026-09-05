@@ -181,7 +181,7 @@ export function CarrelloPage() {
               </>
             )}
 
-            <p style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, margin: '18px 0 6px' }}>
+            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, margin: '18px 0 6px' }}>
               Totale stimato: €{totaleStimato.toFixed(2)}
             </p>
             <p style={{ fontSize: 11, opacity: .65, marginTop: -4 }}>

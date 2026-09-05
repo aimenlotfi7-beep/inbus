@@ -70,7 +70,7 @@ export const ticketService = {
       const tokenPersonale = generaToken();
       await db.update(partecipantiPrenotazione).set({ ticketToken: tokenPersonale }).where(eq(partecipantiPrenotazione.id, pt.id));
 
-      const qrDataUrl = await QRCode.toDataURL(`INBUS:TICKET:${p.pnr}:${tokenPersonale}`, { margin: 1, width: 300 });
+      const qrDataUrl = await QRCode.toDataURL(`ONWAY:TICKET:${p.pnr}:${tokenPersonale}`, { margin: 1, width: 300 });
       const pdfBuffer = await disegnaBigliettoPdf(configEffettiva, {
         artista: evento.artista,
         dataEvento: evento.data,
@@ -186,7 +186,7 @@ export const ticketService = {
     const layoutIdEffettivo = await risolviLayoutBigliettoId(p.whiteLabelId, evento.layoutBigliettoId);
     const config = await layoutBigliettoService.getPerEvento(layoutIdEffettivo);
     const configEffettiva = evento.ticketColoreAccento ? { ...config, coloreAccento: evento.ticketColoreAccento } : config;
-    const qrDataUrl = await QRCode.toDataURL(`INBUS:TICKET:${p.pnr}:${token}`, { margin: 1, width: 300 });
+    const qrDataUrl = await QRCode.toDataURL(`ONWAY:TICKET:${p.pnr}:${token}`, { margin: 1, width: 300 });
     const pdfBuffer = await disegnaBigliettoPdf(configEffettiva, {
       artista: evento.artista,
       dataEvento: evento.data,
