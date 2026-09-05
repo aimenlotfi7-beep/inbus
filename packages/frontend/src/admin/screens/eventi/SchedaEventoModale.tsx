@@ -468,8 +468,13 @@ export function SchedaEventoModale({
       attivo: true,
       servizioId: servizioIdContestoAttuale(),
       fermate: [fermataPartenza, ...fermateConAnagrafica],
-      arrivoCitta: testaArrivo?.citta || undefined,
-      arrivoIndirizzo: testaArrivo?.indirizzo || undefined,
+      // Se "arrivo per tutti" è già attivo per questo servizio,
+      // prevale su quello del percorso applicato — è il punto stesso
+      // del flag: un unico arrivo condiviso da tutti i tragitti di
+      // quel servizio, non uno diverso per ognuno.
+      ...(arrivoPerTuttiMap.get(servizioIdContestoAttuale())?.attivo
+        ? (() => { const a = arrivoPerTuttiMap.get(servizioIdContestoAttuale())!; return { arrivoCitta: a.citta, arrivoIndirizzo: a.indirizzo, arrivoOrario: a.orario }; })()
+        : { arrivoCitta: testaArrivo?.citta || undefined, arrivoIndirizzo: testaArrivo?.indirizzo || undefined }),
     };
     // Aggiornamento FUNZIONALE (legge lo stato più recente al momento
     // vero dell'esecuzione, non quello catturato quando la funzione è
@@ -487,8 +492,18 @@ export function SchedaEventoModale({
   }
 
   function aggiungiTragittoManuale() {
+    const servizioContesto = servizioIdContestoAttuale();
+    // Se "arrivo per tutti" è già attivo per questo servizio, il
+    // nuovo tragitto lo eredita subito — senza questo, nasceva senza
+    // arrivo, con la sezione "per tutti" sopra che sembrava selezionata
+    // (il flag è per servizio) ma il campo di QUESTO tragitto restava
+    // vuoto finché non si ritoccava qualcosa per farlo risincronizzare.
+    const arrivoCondiviso = arrivoPerTuttiMap.get(servizioContesto);
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
-    setForm((f) => ({ ...f, tragitti: [...(f.tragitti ?? []), { nome: '', postiTotali: 50, prezzoExtra: 0, attivo: true, servizioId: servizioIdContestoAttuale(), fermate: [{ citta: '', indirizzo: '' }] }] }));
+    setForm((f) => ({ ...f, tragitti: [...(f.tragitti ?? []), {
+      nome: '', postiTotali: 50, prezzoExtra: 0, attivo: true, servizioId: servizioContesto, fermate: [{ citta: '', indirizzo: '' }],
+      ...(arrivoCondiviso?.attivo ? { arrivoCitta: arrivoCondiviso.citta, arrivoIndirizzo: arrivoCondiviso.indirizzo, arrivoOrario: arrivoCondiviso.orario } : {}),
+    }] }));
   }
 
 
