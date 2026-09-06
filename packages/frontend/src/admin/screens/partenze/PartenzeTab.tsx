@@ -649,6 +649,11 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         // server per "fermateCompilate": almeno una fermata con orario).
         const tragittoVeroPerOrari = [...(eventoCompleto?.tragitti ?? []), ...(eventoCompleto?.servizi.flatMap((s) => s.tragitti) ?? [])].find((t) => t.id === tragitto.tragittoId);
         const orariImpostati = tragittoVeroPerOrari?.fermate.some((f) => f.orario) ?? false;
+        // Stesso identico criterio, qui per il badge "Prezzato" nella
+        // tab Prezzi — la copertura bus (stato.classe) non c'entra con
+        // "ho gia' un preventivo dal fornitore o no", che e' la sola
+        // cosa rilevante mentre si sta prezzando.
+        const prezzato = !!tragittoVeroPerOrari?.preventivoCosto;
         return (
         <div key={tragitto.tragittoId} className="section-card" style={stato.classe === 'non-coperta' ? { borderColor: 'var(--pink)' } : undefined}>
           <div
@@ -688,6 +693,10 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
               {contestoPartenze?.tabOrigine === 'fermate' ? (
                 <span className={`badge ${orariImpostati ? 'badge-stato-verde' : 'badge-stato-arancio'}`}>
                   {orariImpostati ? '✓ Orari impostati' : '◔ Orari da impostare'}
+                </span>
+              ) : contestoPartenze?.tabOrigine === 'da-prezzare' ? (
+                <span className={`badge ${prezzato ? 'badge-stato-verde' : 'badge-stato-arancio'}`}>
+                  {prezzato ? '✓ Prezzato' : '◔ Da prezzare'}
                 </span>
               ) : (
                 <span className={`badge ${stato.classe === 'coperta' ? 'badge-stato-verde' : stato.classe === 'attenzione' ? 'badge-stato-arancio' : stato.classe === 'non-coperta' ? 'badge-stato-rosso' : stato.classe}`}>{stato.etichetta}</span>

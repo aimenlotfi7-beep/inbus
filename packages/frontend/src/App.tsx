@@ -12,6 +12,7 @@ import { OrganizzatorePage } from './pages/OrganizzatorePage';
 import { OrganizzatorePasswordDimenticataPage } from './pages/OrganizzatorePasswordDimenticataPage';
 import { OrganizzatoreReimpostaPasswordPage } from './pages/OrganizzatoreReimpostaPasswordPage';
 import { TourLeaderPage } from './pages/TourLeaderPage';
+import { FornitoreRegistrazionePage } from './pages/FornitoreRegistrazionePage';
 import { FinalizzaListaAttesaPage } from './pages/FinalizzaListaAttesaPage';
 import { VariazionePage } from './pages/VariazionePage';
 import { CompletaSaldoPage } from './pages/CompletaSaldoPage';
@@ -71,6 +72,7 @@ export function App() {
       <Route path="/organizzatore/password-dimenticata" element={<OrganizzatorePasswordDimenticataPage />} />
       <Route path="/organizzatore/reimposta-password/:token" element={<OrganizzatoreReimpostaPasswordPage />} />
       <Route path="/tour-leader" element={<TourLeaderPage />} />
+      <Route path="/fornitore/registrati" element={<FornitoreRegistrazionePage />} />
       <Route path="/finalizza/:token" element={<FinalizzaListaAttesaPage />} />
       <Route path="/variazione/:token" element={<VariazionePage />} />
       <Route path="/completa-saldo/:pnr" element={<CompletaSaldoPage />} />

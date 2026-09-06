@@ -4,6 +4,7 @@ import { LogoOnWay } from '../../features/LogoOnWay';
 import { eventiApi } from '../../api/eventi';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import { richiesteRimborsoApi } from '../../api/richiesteRimborso';
+import { fornitoriApi } from '../../api/fornitori';
 import { chatApi } from '../../api/chat';
 
 export type SezioneGestionale =
@@ -117,6 +118,7 @@ export function AdminLayout({
   const [eventiDaCostruireLinee, setEventiDaCostruireLinee] = useState(0);
   const [inAttesa, setInAttesa] = useState(0);
   const [rimborsiInAttesa, setRimborsiInAttesa] = useState(0);
+  const [fornitoriInAttesa, setFornitoriInAttesa] = useState(0);
 
   // Notifiche su ogni tappa di Partenze dove c'è davvero qualcosa da
   // lavorare — "Orari" quanti eventi non hanno ancora nessun orario
@@ -143,6 +145,13 @@ export function AdminLayout({
     richiesteRimborsoApi.contaInAttesa().then((r) => setRimborsiInAttesa(r.conteggio)).catch(() => {});
   }, [sessione]);
 
+  // Separato allo stesso modo — permesso diverso (fornitori, non
+  // partenze/pagamenti).
+  useEffect(() => {
+    if (!haPermesso(sessione, 'fornitori.visualizza')) return;
+    fornitoriApi.contaInAttesa().then((r) => setFornitoriInAttesa(r.conteggio)).catch(() => {});
+  }, [sessione]);
+
   const [chatNonLette, setChatNonLette] = useState(0);
   useEffect(() => {
     if (!haPermesso(sessione, 'chat.visualizza')) return;
@@ -162,6 +171,7 @@ export function AdminLayout({
     if (id === 'lista-attesa') return inAttesa;
     if (id === 'rimborsi') return rimborsiInAttesa;
     if (id === 'chat') return chatNonLette;
+    if (id === 'fornitori') return fornitoriInAttesa;
     return 0;
   }
 
@@ -255,6 +265,7 @@ export function AdminLayout({
                             : voce.id === 'lista-attesa' ? `${inAttesa} iscrizione/i in attesa di promozione`
                             : voce.id === 'rimborsi' ? `${rimborsiInAttesa} richiesta/e di rimborso da gestire`
                             : voce.id === 'chat' ? `${chatNonLette} conversazione/i con messaggi non letti`
+                            : voce.id === 'fornitori' ? `${fornitoriInAttesa} fornitore/i in attesa di approvazione`
                             : undefined
                         }
                       >

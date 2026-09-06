@@ -193,6 +193,8 @@ export const allegatiEvento = pgTable('allegati_evento', {
 // ---------------------------------------------------------------------
 // FORNITORI (agenzie bus) — dichiarati prima dei tragitti per il riferimento
 // ---------------------------------------------------------------------
+export const statoFornitoreEnum = pgEnum('stato_fornitore', ['IN_ATTESA', 'APPROVATO', 'DISATTIVATO']);
+
 export const fornitori = pgTable('fornitori', {
   id: id(),
   nome: text('nome').notNull(),
@@ -204,6 +206,32 @@ export const fornitori = pgTable('fornitori', {
   note: text('note'),
   lat: doublePrecision('lat'),
   lng: doublePrecision('lng'),
+  // Un fornitore creato dall'admin (schermata Fornitori, come sempre)
+  // nasce già APPROVATO — l'approvazione manuale serve solo per chi si
+  // autoregistra dal form pubblico (chiunque potrebbe compilarlo).
+  stato: statoFornitoreEnum('stato').notNull().default('APPROVATO'),
+  // Se attivo, quando questo fornitore rientra nel raggio km della
+  // PRIMA richiesta preventivo di un tragitto, la mail gli parte da
+  // sola — non aspetta una scelta manuale. Le richieste successive
+  // sullo stesso tragitto (dopo un cambio di fermate) restano sempre
+  // manuali, indipendentemente da questo flag.
+  invioAutomatico: boolean('invio_automatico').notNull().default(false),
+  // Campi facoltativi in più, oltre a quelli fissi qui sopra — quali
+  // esistono si decide da un'altra schermata (fornitoriCampiExtraConfig
+  // qui sotto): [{etichetta, valore}, ...]. Non tipizzato oltre
+  // testo semplice, per scelta (vedi conversazione).
+  campiExtra: jsonb('campi_extra').$type<{ etichetta: string; valore: string }[]>(),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+});
+
+// Quali campi extra (oltre ai fissi) compaiono nel form pubblico di
+// autoregistrazione — l'admin li aggiunge/toglie da una schermata di
+// impostazioni, senza dover toccare il codice. Solo testo semplice
+// (niente tipi/validazioni particolari), come deciso in conversazione.
+export const fornitoriCampiExtraConfig = pgTable('fornitori_campi_extra_config', {
+  id: id(),
+  etichetta: text('etichetta').notNull(),
+  ordine: integer('ordine').notNull().default(0),
 });
 
 // ---------------------------------------------------------------------

@@ -505,6 +505,13 @@
       "when": 1788416732261,
       "tag": "0071_aggiungi_indici_prestazioni",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1788695503069,
+      "tag": "0072_public_sunfire",
+      "breakpoints": true
     }
   ]
 }
