@@ -81,13 +81,14 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   // "Da Confermare" e "Confermato" contemporaneamente).
   function tabsDi(p: Partenza): TabPartenze[] {
     if (passata(p)) return ['passate'];
-    if (p.stato === 'DA_CONFERMARE') return ['fermate', 'da-prezzare']; // non ancora prezzato, vive solo in Orari/Prezzi
-    const risultato: TabPartenze[] = ['fermate', 'da-prezzare', 'da-confermare'];
+    if (p.stato === 'DA_CONFERMARE') return ['fermate', 'preventivi', 'da-prezzare']; // non ancora prezzato, vive solo in Orari/Preventivi/Prezzi
+    const risultato: TabPartenze[] = ['fermate', 'preventivi', 'da-prezzare', 'da-confermare'];
     if (p.stato !== 'PREZZATO') risultato.push('confermato'); // "Confermato" resta un insieme a parte
     return risultato;
   }
   function fattoInTab(p: Partenza, tabAttuale: TabPartenze): boolean {
     if (tabAttuale === 'fermate') return p.fermateCompilate;
+    if (tabAttuale === 'preventivi') return !!p.fornitoreId;
     if (tabAttuale === 'da-prezzare') return !!p.preventivoCosto;
     if (tabAttuale === 'da-confermare') return p.stato === 'CONFERMATO' && !scoperta(p);
     if (tabAttuale === 'confermato') return !scoperta(p); // qui dentro lo stato è già sempre CONFERMATO, per costruzione
@@ -95,6 +96,14 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   }
   function etichettaStato(p: Partenza, tabAttuale: TabPartenze): { fatto: boolean; testo: string } {
     if (tabAttuale === 'fermate') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: '✓ Fatto' } : { fatto: false, testo: '◔ Da calcolare/esportare' };
+    if (tabAttuale === 'preventivi') {
+      if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: '✓ Accettato' };
+      // Prima servono gli orari (la richiesta al fornitore mostra
+      // fermate/orari) — senza, non ha ancora senso segnalarlo come
+      // "da fare" qui, resta solo un'attesa neutra.
+      if (!p.fermateCompilate) return { fatto: true, testo: '' };
+      return { fatto: false, testo: '◔ Da richiedere' };
+    }
     if (tabAttuale === 'da-prezzare') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: '✓ Fatto' } : { fatto: false, testo: '◔ Da prezzare' };
     if (tabAttuale === 'da-confermare') {
       if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: '✓ Confermata' };
@@ -206,6 +215,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
             <p style={{ color: 'var(--mist)' }}>
               {ricerca ? 'Nessuna partenza trovata.'
                 : tab === 'fermate' ? 'Nessuna partenza da lavorare per gli orari, al momento.'
+                : tab === 'preventivi' ? 'Nessuna partenza da richiedere per un preventivo al momento.'
                 : tab === 'da-prezzare' ? 'Nessuna partenza da prezzare al momento.'
                 : tab === 'da-confermare' ? 'Nessuna Linea Bus da costruire al momento.'
                 : tab === 'confermato' ? 'Nessuna partenza confermata al momento.'

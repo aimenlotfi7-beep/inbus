@@ -14,6 +14,7 @@ eventiRouter.get('/', valida(listaEventiQuerySchema, 'query'), asyncHandler(even
 eventiRouter.get('/allerte-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenze));
 eventiRouter.get('/eventi-da-calcolare-orari', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiDaCalcolareOrari));
 eventiRouter.get('/eventi-da-prezzare', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiDaPrezzare));
+eventiRouter.get('/eventi-preventivi-da-richiedere', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiPreventiviDaRichiedere));
 eventiRouter.get('/eventi-da-costruire-linee', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiDaCostruireLinee));
 eventiRouter.get('/allerte-partenze-per-evento', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenzePerEvento));
 eventiRouter.get('/elenco-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.elencoPartenze));

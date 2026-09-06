@@ -120,13 +120,14 @@ export const eventiApi = {
   allertePartenze: () => api.get<{ conteggio: number }>('/api/eventi/allerte-partenze'),
   eventiDaCalcolareOrari: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-calcolare-orari'),
   eventiDaPrezzare: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-prezzare'),
+  eventiPreventiviDaRichiedere: () => api.get<{ conteggio: number }>('/api/eventi/eventi-preventivi-da-richiedere'),
   eventiDaCostruireLinee: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-costruire-linee'),
   allertePartenzePerEvento: () => api.get<Record<string, number>>('/api/eventi/allerte-partenze-per-evento'),
   elencoPartenze: () => api.get<Array<{
     tragittoId: string; tragittoNome: string;
     stato: 'DA_CONFERMARE' | 'PREZZATO' | 'CONFERMATO';
     postiTotali: number; totalePasseggeri: number;
-    preventivoCosto: string | null; fermateCompilate: boolean; servizioNome: string | null; servizioId: string | null;
+    preventivoCosto: string | null; fornitoreId: string | null; fermateCompilate: boolean; servizioNome: string | null; servizioId: string | null;
     evento: { id: string; artista: string; genere: string; data: string; citta: string; luogo: string; slug: string; immagineUrl: string | null };
   }>>('/api/eventi/elenco-partenze'),
   statistichePerEvento: () => api.get<Record<string, { partecipanti: number; busCensiti: number }>>('/api/eventi/statistiche-per-evento'),

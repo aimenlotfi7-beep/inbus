@@ -120,6 +120,9 @@ export const eventiController = {
   async eventiDaPrezzare(_req: Request, res: Response) {
     res.json({ conteggio: await eventiService.contaEventiDaPrezzare() });
   },
+  async eventiPreventiviDaRichiedere(_req: Request, res: Response) {
+    res.json({ conteggio: await eventiService.contaEventiPreventiviDaRichiedere() });
+  },
   async eventiDaCostruireLinee(_req: Request, res: Response) {
     res.json({ conteggio: await eventiService.contaEventiDaCostruireLinee() });
   },

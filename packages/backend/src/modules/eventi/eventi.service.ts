@@ -1500,6 +1500,27 @@ export const eventiService = {
     return new Set(senzaOrario.map((r) => r.eventoId)).size;
   },
 
+  /** Eventi con almeno un tragitto già pronto per chiedere un
+   *  preventivo (orario impostato) ma senza ancora un fornitore
+   *  accettato — il segnale "c'è qualcosa da fare in Preventivi",
+   *  distinto da "risposte arrivate da valutare" (contaDaValutare, nel
+   *  modulo preventivi) che invece guarda le richieste già inviate. */
+  async contaEventiPreventiviDaRichiedere() {
+    const righeTragitti = await db
+      .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id, fornitoreId: tragitti.fornitoreId })
+      .from(tragitti)
+      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(and(eq(tragitti.attivo, true), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`, isNull(tragitti.fornitoreId)));
+    if (righeTragitti.length === 0) return 0;
+
+    const tragittiIds = righeTragitti.map((r) => r.tragittoId);
+    const fermateConOrarioPerPreventivo = await db.select({ tragittoId: fermate.tragittoId, orario: fermate.orario })
+      .from(fermate).where(inArray(fermate.tragittoId, tragittiIds));
+    const conOrarioPerPreventivo = new Set(fermateConOrarioPerPreventivo.filter((f) => f.orario).map((f) => f.tragittoId));
+    const pronti = righeTragitti.filter((r) => conOrarioPerPreventivo.has(r.tragittoId));
+    return new Set(pronti.map((r) => r.eventoId)).size;
+  },
+
   // Nome corretto: questi tragitti hanno stato interno "DA_CONFERMARE"
   // (prima ancora di essere prezzati) - da non confondere con la tappa
   // di menu "Da Confermare" (quella per costruire le Linee, tragitti
@@ -1598,6 +1619,7 @@ export const eventiService = {
       attivo: tragitti.attivo,
       postiTotali: tragitti.postiTotali,
       preventivoCosto: tragitti.preventivoCosto,
+      fornitoreId: tragitti.fornitoreId,
       eventoId: eventi.id,
       eventoArtista: eventi.artista,
       eventoGenere: eventi.genere,
@@ -1649,6 +1671,7 @@ export const eventiService = {
       postiTotali: r.postiTotali,
       totalePasseggeri: mappaPasseggeri.get(r.tragittoId) ?? 0,
       preventivoCosto: r.preventivoCosto,
+      fornitoreId: r.fornitoreId,
       fermateCompilate: mappaFermateCompilate.get(r.tragittoId) ?? false,
       servizioNome: r.servizioNome,
       servizioId: r.servizioId,

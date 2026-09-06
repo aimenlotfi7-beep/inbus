@@ -119,6 +119,7 @@ export function AdminLayout({
   const [eventiDaPrezzare, setEventiDaPrezzare] = useState(0);
   const [eventiDaCostruireLinee, setEventiDaCostruireLinee] = useState(0);
   const [preventiviDaValutare, setPreventiviDaValutare] = useState(0);
+  const [eventiPreventiviDaRichiedere, setEventiPreventiviDaRichiedere] = useState(0);
   const [inAttesa, setInAttesa] = useState(0);
   const [rimborsiInAttesa, setRimborsiInAttesa] = useState(0);
   const [fornitoriInAttesa, setFornitoriInAttesa] = useState(0);
@@ -137,6 +138,7 @@ export function AdminLayout({
     eventiApi.eventiDaCalcolareOrari().then((r) => setEventiDaCalcolareOrari(r.conteggio)).catch(() => {});
     eventiApi.eventiDaPrezzare().then((r) => setEventiDaPrezzare(r.conteggio)).catch(() => {});
     eventiApi.eventiDaCostruireLinee().then((r) => setEventiDaCostruireLinee(r.conteggio)).catch(() => {});
+    eventiApi.eventiPreventiviDaRichiedere().then((r) => setEventiPreventiviDaRichiedere(r.conteggio)).catch(() => {});
     preventiviApi.contaDaValutare().then((r) => setPreventiviDaValutare(r.conteggio)).catch(() => {});
     listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
   }, [sessione]);
@@ -171,7 +173,7 @@ export function AdminLayout({
     if (id === 'partenze-orari') return eventiDaCalcolareOrari;
     if (id === 'partenze-prezzi') return eventiDaPrezzare;
     if (id === 'partenze-da-confermare') return eventiDaCostruireLinee;
-    if (id === 'partenze-preventivi') return preventiviDaValutare;
+    if (id === 'partenze-preventivi') return preventiviDaValutare + eventiPreventiviDaRichiedere;
     if (id === 'partenze-confermato') return allertePartenze;
     if (id === 'lista-attesa') return inAttesa;
     if (id === 'rimborsi') return rimborsiInAttesa;
@@ -266,7 +268,7 @@ export function AdminLayout({
                           voce.id === 'partenze-orari' ? `${eventiDaCalcolareOrari} evento/i senza ancora nessun orario impostato`
                             : voce.id === 'partenze-prezzi' ? `${eventiDaPrezzare} evento/i con almeno un tragitto non ancora prezzato`
                             : voce.id === 'partenze-da-confermare' ? `${eventiDaCostruireLinee} evento/i con almeno un tragitto prezzato ma senza ancora una Linea`
-                            : voce.id === 'partenze-preventivi' ? `${preventiviDaValutare} tragitto/i con almeno una risposta preventivo da valutare`
+                            : voce.id === 'partenze-preventivi' ? `${eventiPreventiviDaRichiedere} evento/i pronto/i per una richiesta preventivo, ${preventiviDaValutare} con risposte da valutare`
                             : voce.id === 'partenze-confermato' ? `${allertePartenze} tratta/e con posti superati`
                             : voce.id === 'lista-attesa' ? `${inAttesa} iscrizione/i in attesa di promozione`
                             : voce.id === 'rimborsi' ? `${rimborsiInAttesa} richiesta/e di rimborso da gestire`
