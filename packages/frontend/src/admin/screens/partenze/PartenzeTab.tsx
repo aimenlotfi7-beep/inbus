@@ -5,6 +5,7 @@ import type { Evento } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { impostazioniApi } from '../../../api/impostazioni';
 import { preventiviApi, type FornitoreCandidato, type RichiestaConRisposta } from '../../../api/preventivi';
+import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import { ErroreApi } from '../../../api/client';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { OrarioInput } from '../../shared/OrarioInput';
@@ -92,7 +93,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   // confermare": una stima (non un bus vero opzionato) che sblocca la
   // vendita e calcola i prezzi per fermata dal modello di pareggio.
   // Stessa ragione sopra: mappa per tragittoId, non un solo tragitto.
-  const [formPreventivoMap, setFormPreventivoMap] = useState<Map<string, { costo?: number; postiBus?: number }>>(new Map());
+  const [formPreventivoMap, setFormPreventivoMap] = useState<Map<string, { costo?: number; postiBus?: number; fornitoreId?: string; file?: File }>>(new Map());
+  const [fornitoriLista, setFornitoriLista] = useState<Fornitore[]>([]);
+  useEffect(() => { fornitoriApi.list().then((f) => setFornitoriLista(f.filter((x) => x.stato === 'APPROVATO'))).catch(() => {}); }, []);
   // I due numeri della formula prezzi, configurabili da Impostazioni —
   // caricati una volta sola all'apertura, con gli stessi default già
   // usati finora se non sono ancora stati impostati esplicitamente
@@ -527,10 +530,22 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
     if (!formPreventivo?.costo || !formPreventivo?.postiBus || !prezziCalcolati) return;
     setSalvandoPreventivoSet((prev) => new Set(prev).add(tragittoId));
     try {
+      let fileContenuto: string | undefined;
+      if (formPreventivo.file) {
+        fileContenuto = await new Promise<string>((risolvi, rifiuta) => {
+          const lettore = new FileReader();
+          lettore.onload = () => risolvi((lettore.result as string).split(',')[1]);
+          lettore.onerror = () => rifiuta(new Error('Lettura file fallita'));
+          lettore.readAsDataURL(formPreventivo.file!);
+        });
+      }
       await eventiApi.registraPreventivo(tragittoId, {
         preventivoCosto: formPreventivo.costo,
         preventivoPostiBus: formPreventivo.postiBus,
         prezziPerFermata: prezziCalcolati.map((p) => ({ fermataId: p.fermataId, prezzo: p.prezzo })),
+        fornitoreId: formPreventivo.fornitoreId,
+        fileNome: formPreventivo.file?.name,
+        fileContenuto,
       });
       chiudiPreventivo(tragittoId);
       ricarica();
@@ -951,6 +966,18 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                   </label>
                   <label>Posti presunti del bus
                     <CampoNumero value={formPreventivo.postiBus} onChange={(v) => setFormPreventivoMap((prev) => new Map(prev).set(tragitto.tragittoId, { ...prev.get(tragitto.tragittoId), postiBus: v }))} />
+                  </label>
+                  <label>Fornitore <span style={{ color: 'var(--mist)', fontWeight: 400 }}>(da chi arriva questo prezzo)</span>
+                    <select
+                      value={formPreventivo.fornitoreId ?? ''}
+                      onChange={(e) => setFormPreventivoMap((prev) => new Map(prev).set(tragitto.tragittoId, { ...prev.get(tragitto.tragittoId), fornitoreId: e.target.value || undefined }))}
+                    >
+                      <option value="">— Nessuno indicato —</option>
+                      {fornitoriLista.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                    </select>
+                  </label>
+                  <label className="full">Allega il suo preventivo (facoltativo)
+                    <input type="file" accept="application/pdf,image/*" onChange={(e) => setFormPreventivoMap((prev) => new Map(prev).set(tragitto.tragittoId, { ...prev.get(tragitto.tragittoId), file: e.target.files?.[0] }))} />
                   </label>
                 </div>
                 <button type="button" className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => calcolaPrezziPreventivo(tragitto.tragittoId)} disabled={calcolandoPreventivo}>

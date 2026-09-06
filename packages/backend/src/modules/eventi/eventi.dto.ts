@@ -176,4 +176,12 @@ export const registraPreventivoSchema = z.object({
     fermataId: z.string(),
     prezzo: z.number().nonnegative(),
   })),
+  // Facoltativo — ma se manca, dopo non si sa più da chi è arrivato
+  // questo prezzo (vedi conversazione: "devo censire comunque il
+  // preventivo e indicare da quale fornitore deriva").
+  fornitoreId: z.string().optional(),
+  // Facoltativo — un file allegato anche per un inserimento manuale
+  // (non solo per chi risponde tramite il link email), come richiesto.
+  fileNome: z.string().optional(),
+  fileContenuto: z.string().optional(), // base64
 });

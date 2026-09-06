@@ -111,7 +111,7 @@ export const eventiApi = {
 
   aggiornaTragittoOperativo: (tragittoId: string, input: { prezzoExtra?: number; fermate: FermataInput[] }) =>
     api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/operativo`, input),
-  registraPreventivo: (tragittoId: string, input: { preventivoCosto: number; preventivoPostiBus: number; prezziPerFermata: { fermataId: string; prezzo: number }[] }) =>
+  registraPreventivo: (tragittoId: string, input: { preventivoCosto: number; preventivoPostiBus: number; prezziPerFermata: { fermataId: string; prezzo: number }[]; fornitoreId?: string; fileNome?: string; fileContenuto?: string }) =>
     api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/preventivo`, input),
   rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
   listaPasseggeriBus: (id: string, busId: string) => api.get<PasseggeroBus[]>(`/api/eventi/${id}/bus/${busId}/passeggeri`),

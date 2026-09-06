@@ -14,7 +14,10 @@ import {
   tourLeader,
   utenti,
   partecipantiPrenotazione,
+  preventiviRichieste,
+  preventiviRisposte,
 } from '../../db/schema.js';
+import crypto from 'node:crypto';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
@@ -918,10 +921,28 @@ export const eventiService = {
       await tx.update(tragitti).set({
         preventivoCosto: input.preventivoCosto.toFixed(2),
         preventivoPostiBus: input.preventivoPostiBus,
+        // Facoltativo — ma se non indicato qui, non si perde quello già
+        // presente (es. un preventivo accettato in precedenza tramite
+        // la tab Preventivi, poi ritoccato qui solo nel prezzo).
+        ...(input.fornitoreId && { fornitoreId: input.fornitoreId }),
         // Solo un passaggio in avanti — non tocca un tragitto già
         // "Confermato" (avrebbe un bus vero, non ha senso retrocederlo).
         ...(esiste.stato === 'DA_CONFERMARE' && { stato: 'PREZZATO' as const }),
       }).where(eq(tragitti.id, tragittoId));
+
+      // Un inserimento manuale con fornitore indicato genera comunque
+      // una riga richiesta+risposta — così compare insieme alle altre
+      // nella tab Preventivi, non in un posto a parte, anche se qui
+      // nessuna mail è stata davvero inviata (il fornitore l'aveva già
+      // dato fuori dal sistema, es. telefono/mail diretta).
+      if (input.fornitoreId) {
+        const [richiesta] = await tx.insert(preventiviRichieste).values({
+          tragittoId, fornitoreId: input.fornitoreId, token: crypto.randomBytes(24).toString('hex'), tipoInvio: 'MANUALE',
+        }).returning();
+        await tx.insert(preventiviRisposte).values({
+          richiestaId: richiesta.id, prezzo: input.preventivoCosto.toFixed(2), fileNome: input.fileNome, fileContenuto: input.fileContenuto,
+        });
+      }
 
       for (const { fermataId, prezzo } of input.prezziPerFermata) {
         await tx.update(fermate).set({ prezzo: prezzo.toFixed(2) })
