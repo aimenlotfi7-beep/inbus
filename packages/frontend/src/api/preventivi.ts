@@ -40,6 +40,7 @@ export const preventiviApi = {
   richiedi: (tragittoId: string, input: { lat?: number; lng?: number; raggioKm?: number; fornitoriManualiIds: string[] }) =>
     api.post<{ inviateAutomatiche: number; inviateManuali: number }>(`/api/preventivi/richiedi/${tragittoId}`, input),
   listaPerTragitto: (tragittoId: string) => api.get<RichiestaConRisposta[]>(`/api/preventivi/tragitto/${tragittoId}`),
+  contaDaValutare: () => api.get<{ conteggio: number }>('/api/preventivi/conta-da-valutare'),
   accetta: (rispostaId: string) => api.put<{ ok: boolean }>(`/api/preventivi/risposte/${rispostaId}/accetta`, {}),
   caricaFileFirmato: (rispostaId: string, fileNome: string, fileContenuto: string) =>
     api.post<{ ok: boolean }>(`/api/preventivi/risposte/${rispostaId}/file-firmato`, { fileNome, fileContenuto }),

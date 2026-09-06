@@ -5,11 +5,12 @@ import { eventiApi } from '../../api/eventi';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import { richiesteRimborsoApi } from '../../api/richiesteRimborso';
 import { fornitoriApi } from '../../api/fornitori';
+import { preventiviApi } from '../../api/preventivi';
 import { chatApi } from '../../api/chat';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino'
-  | 'partenze-orari' | 'partenze-prezzi' | 'partenze-da-confermare' | 'partenze-confermato' | 'partenze-passate'
+  | 'partenze-orari' | 'partenze-preventivi' | 'partenze-prezzi' | 'partenze-da-confermare' | 'partenze-confermato' | 'partenze-passate'
   | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi' | 'variazioni'
   | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
   | 'fornitori' | 'fermate' | 'tragitti'
@@ -31,6 +32,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   ]},
   { titolo: 'Partenze', voci: [
     { id: 'partenze-orari', label: 'Orari', permesso: 'eventi.partenze' },
+    { id: 'partenze-preventivi', label: 'Preventivi', permesso: 'eventi.partenze' },
     { id: 'partenze-prezzi', label: 'Prezzi', permesso: 'eventi.partenze' },
     { id: 'partenze-da-confermare', label: 'Da Confermare', permesso: 'eventi.partenze' },
     { id: 'partenze-confermato', label: 'Confermato', permesso: 'eventi.partenze' },
@@ -116,6 +118,7 @@ export function AdminLayout({
   const [eventiDaCalcolareOrari, setEventiDaCalcolareOrari] = useState(0);
   const [eventiDaPrezzare, setEventiDaPrezzare] = useState(0);
   const [eventiDaCostruireLinee, setEventiDaCostruireLinee] = useState(0);
+  const [preventiviDaValutare, setPreventiviDaValutare] = useState(0);
   const [inAttesa, setInAttesa] = useState(0);
   const [rimborsiInAttesa, setRimborsiInAttesa] = useState(0);
   const [fornitoriInAttesa, setFornitoriInAttesa] = useState(0);
@@ -134,6 +137,7 @@ export function AdminLayout({
     eventiApi.eventiDaCalcolareOrari().then((r) => setEventiDaCalcolareOrari(r.conteggio)).catch(() => {});
     eventiApi.eventiDaPrezzare().then((r) => setEventiDaPrezzare(r.conteggio)).catch(() => {});
     eventiApi.eventiDaCostruireLinee().then((r) => setEventiDaCostruireLinee(r.conteggio)).catch(() => {});
+    preventiviApi.contaDaValutare().then((r) => setPreventiviDaValutare(r.conteggio)).catch(() => {});
     listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
   }, [sessione]);
 
@@ -167,6 +171,7 @@ export function AdminLayout({
     if (id === 'partenze-orari') return eventiDaCalcolareOrari;
     if (id === 'partenze-prezzi') return eventiDaPrezzare;
     if (id === 'partenze-da-confermare') return eventiDaCostruireLinee;
+    if (id === 'partenze-preventivi') return preventiviDaValutare;
     if (id === 'partenze-confermato') return allertePartenze;
     if (id === 'lista-attesa') return inAttesa;
     if (id === 'rimborsi') return rimborsiInAttesa;
@@ -261,6 +266,7 @@ export function AdminLayout({
                           voce.id === 'partenze-orari' ? `${eventiDaCalcolareOrari} evento/i senza ancora nessun orario impostato`
                             : voce.id === 'partenze-prezzi' ? `${eventiDaPrezzare} evento/i con almeno un tragitto non ancora prezzato`
                             : voce.id === 'partenze-da-confermare' ? `${eventiDaCostruireLinee} evento/i con almeno un tragitto prezzato ma senza ancora una Linea`
+                            : voce.id === 'partenze-preventivi' ? `${preventiviDaValutare} tragitto/i con almeno una risposta preventivo da valutare`
                             : voce.id === 'partenze-confermato' ? `${allertePartenze} tratta/e con posti superati`
                             : voce.id === 'lista-attesa' ? `${inAttesa} iscrizione/i in attesa di promozione`
                             : voce.id === 'rimborsi' ? `${rimborsiInAttesa} richiesta/e di rimborso da gestire`

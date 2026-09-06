@@ -8,11 +8,11 @@ import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
 import { useMappaTooltip } from '../shared/useMappaTooltip';
 
-export type TabPartenze = 'fermate' | 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate';
+export type TabPartenze = 'fermate' | 'preventivi' | 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate';
 type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
 
 const TITOLI: Record<TabPartenze, string> = {
-  fermate: 'Orari', 'da-prezzare': 'Prezzi', 'da-confermare': 'Da Confermare', confermato: 'Confermato', passate: 'Passate',
+  fermate: 'Orari', preventivi: 'Preventivi', 'da-prezzare': 'Prezzi', 'da-confermare': 'Da Confermare', confermato: 'Confermato', passate: 'Passate',
 };
 
 /**
@@ -223,6 +223,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
 // stessa identica schermata sopra, solo con davanti già scelto quale
 // delle 5 tappe mostrare.
 export const PartenzeOrariScreen = () => <PartenzeScreen tab="fermate" />;
+export const PartenzePreventiviScreen = () => <PartenzeScreen tab="preventivi" />;
 export const PartenzePrezziScreen = () => <PartenzeScreen tab="da-prezzare" />;
 export const PartenzeDaConfermareScreen = () => <PartenzeScreen tab="da-confermare" />;
 export const PartenzeConfermatoScreen = () => <PartenzeScreen tab="confermato" />;

@@ -29,7 +29,7 @@ import { ContenutiScreen } from './screens/ContenutiScreen';
 import { AmministratoriScreen } from './screens/AmministratoriScreen';
 import { RuoliScreen } from './screens/RuoliScreen';
 import { TestiTooltipScreen } from './screens/TestiTooltipScreen';
-import { PartenzeOrariScreen, PartenzePrezziScreen, PartenzeDaConfermareScreen, PartenzeConfermatoScreen, PartenzePassateScreen } from './screens/PartenzeScreen';
+import { PartenzeOrariScreen, PartenzePreventiviScreen, PartenzePrezziScreen, PartenzeDaConfermareScreen, PartenzeConfermatoScreen, PartenzePassateScreen } from './screens/PartenzeScreen';
 import { LineeTragittoScreen } from './screens/LineeTragittoScreen';
 import { ListaAttesaScreen } from './screens/ListaAttesaScreen';
 import { OfferteScreen } from './screens/OfferteScreen';
@@ -72,6 +72,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   ruoli: RuoliScreen,
   'testi-tooltip': TestiTooltipScreen,
   'partenze-orari': PartenzeOrariScreen,
+  'partenze-preventivi': PartenzePreventiviScreen,
   'partenze-prezzi': PartenzePrezziScreen,
   'partenze-da-confermare': PartenzeDaConfermareScreen,
   'partenze-confermato': PartenzeConfermatoScreen,
@@ -115,6 +116,7 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   ruoli: 'permessi.gestisci',
   'testi-tooltip': 'impostazioni.gestisci',
   'partenze-orari': 'eventi.partenze',
+  'partenze-preventivi': 'eventi.partenze',
   'partenze-prezzi': 'eventi.partenze',
   'partenze-da-confermare': 'eventi.partenze',
   'partenze-confermato': 'eventi.partenze',

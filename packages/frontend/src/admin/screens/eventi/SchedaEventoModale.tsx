@@ -54,7 +54,7 @@ export function SchedaEventoModale({
   soloQuestaTab?: boolean;
   // Arrivando da una card di Partenze — quale tragitto aprire subito,
   // e con quale azione (vedi PartenzeTab).
-  contestoPartenze?: { tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi'; tabOrigine: 'fermate' | 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate' } | null;
+  contestoPartenze?: { tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi'; tabOrigine: 'fermate' | 'preventivi' | 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate' } | null;
   onClose: () => void;
   onSalvato: () => void;
 }) {

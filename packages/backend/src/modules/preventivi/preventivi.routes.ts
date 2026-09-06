@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import crypto from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, and, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { preventiviRichieste, preventiviRisposte, fornitori, tragitti, eventi, fermate } from '../../db/schema.js';
@@ -177,6 +177,18 @@ export const preventiviService = {
     }
     return { ok: true };
   },
+  // Per il badge nel menu — una risposta "da valutare" è una risposta
+  // arrivata per un tragitto che NON ha ancora un fornitore accettato
+  // (una volta accettato uno, tutte le altre risposte per quel
+  // tragitto restano solo storico, non più "da decidere").
+  contaDaValutare: async () => {
+    const risposte = await db.select({ tragittoId: preventiviRichieste.tragittoId }).from(preventiviRisposte)
+      .innerJoin(preventiviRichieste, eq(preventiviRichieste.id, preventiviRisposte.richiestaId));
+    const tragittiIds = [...new Set(risposte.map((r) => r.tragittoId))];
+    if (tragittiIds.length === 0) return 0;
+    const tragittiSenzaAccettazione = await db.select({ id: tragitti.id }).from(tragitti).where(and(inArray(tragitti.id, tragittiIds), isNull(tragitti.fornitoreId)));
+    return tragittiSenzaAccettazione.length;
+  },
 };
 
 export const preventiviRouter = Router();
@@ -205,6 +217,9 @@ preventiviRouter.post('/richiedi/:tragittoId', richiedePermesso('eventi.partenze
 }));
 preventiviRouter.get('/tragitto/:tragittoId', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.listaPerTragitto(req.params.tragittoId));
+}));
+preventiviRouter.get('/conta-da-valutare', richiedePermesso('eventi.partenze'), asyncHandler(async (_req: Request, res: Response) => {
+  res.json({ conteggio: await preventiviService.contaDaValutare() });
 }));
 preventiviRouter.put('/risposte/:id/accetta', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.accetta(req.params.id));

@@ -38,6 +38,9 @@ export interface Tragitto {
   preventivoPostiBus: number | null;
   referenteNome: string | null;
   referenteTelefono: string | null;
+  fornitoreId: string | null;
+  partenzaLat: number | null;
+  partenzaLng: number | null;
   fermate: Fermata[];
 }
 
