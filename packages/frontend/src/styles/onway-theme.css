@@ -122,20 +122,14 @@ h1.hero-title .line2{ color:var(--ow-accent); }
      W nera    -> pin bianchi
    ============================================================ */
 .logo{
-  display:inline-flex; align-items:baseline; gap:0;
-  font-family:'Poppins', Helvetica, sans-serif; font-weight:800;
-  font-size:34px; letter-spacing:-.035em; line-height:1;
-  color:var(--ow-paper);
+  display:inline-flex; align-items:center; gap:0; line-height:1;
+  font-size:34px;
 }
-.logo-on{ font-weight:800; }
-.logo-ay{ font-weight:800; margin-left:-.05em; }
-/* Il box dell'SVG include le spalle laterali e l'altezza d'inchiostro
-   pari alla cap-height di Poppins ExtraBold: nessun margine di
-   compensazione, nessuna sporgenza sotto la linea di base. */
-.logo-w{ display:block; width:.904em; height:.72em; margin:0; overflow:visible; }
-.logo.logo-su-chiaro{ color:var(--ow-ink); }
-/* Retrocompatibilità con il markup vecchio IN<span>BUS</span> */
-.logo span{ color:inherit; }
+/* L'intero logotipo (lettere+W+pin) è un solo SVG, non più testo+SVG
+   misti — width:auto mantiene le proporzioni del file originale
+   (1774x887), height fissa la dimensione in base al contesto di testo
+   circostante (stessa logica di prima, solo un elemento invece di tre). */
+.logo-svg{ display:block; height:1.05em; width:auto; }
 .logo small{
   font-family:'Space Mono', monospace; font-size:.32em; letter-spacing:.12em;
   text-transform:uppercase; color:var(--ow-muted); margin-left:.3em;

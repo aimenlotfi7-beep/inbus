@@ -93,9 +93,7 @@ select{
    invece di "brand"). Senza queste due righe l'SVG non ha altezza
    impostata da nessuna parte e il browser gli assegna una dimensione
    predefinita enorme (spesso 300x150px). */
-.logo-w{ display:block; width:.904em; height:.72em; margin:0; overflow:visible; }
-.logo-on{ font-weight:800; }
-.logo-ay{ font-weight:800; margin-left:-.05em; }
+.logo-svg{ display:block; height:1.05em; width:auto; }
 /* Solo la sidebar ha sfondo scuro (--sidebar-bg) — lì il logo va
    bianco per essere visibile (eredita currentColor). Login/dashboard/
    home hanno sfondo chiaro: .logo senza questa regola eredita già il
