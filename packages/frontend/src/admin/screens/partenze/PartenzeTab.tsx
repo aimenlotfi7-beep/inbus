@@ -665,7 +665,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
           >
             <div>
               <h3>{!contestoPartenze && (espansa ? '▾ ' : '▸ ')}{tragitto.nome}</h3>
-              {contestoPartenze?.tabOrigine !== 'fermate' && (
+              {contestoPartenze?.tabOrigine !== 'fermate' && contestoPartenze?.tabOrigine !== 'da-prezzare' && (
                 <p className="section-sub">
                   {tragitto.totalePasseggeri} passeggeri confermati su {tragitto.postiTotali >= 999999 ? 'posti illimitati (nessun bus ancora)' : `${tragitto.postiTotali} posti previsti`} · {busTragitto.length} bus censit{busTragitto.length === 1 ? 'o' : 'i'}
                 {vedeEconomia && (() => {
