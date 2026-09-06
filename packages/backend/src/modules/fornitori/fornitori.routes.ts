@@ -11,14 +11,14 @@ import { limiteRegistrazione } from '../../shared/rateLimit.js';
 
 const fornitoreSchema = z.object({
   nome: z.string().min(1),
-  partitaIva: z.string().optional(),
-  referente: z.string().optional(),
-  telefono: z.string().optional(),
-  email: z.string().email().optional(),
-  indirizzo: z.string().optional(),
-  note: z.string().optional(),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
+  partitaIva: z.string().nullable().optional(),
+  referente: z.string().nullable().optional(),
+  telefono: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional(),
+  indirizzo: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  lat: z.number().nullable().optional(),
+  lng: z.number().nullable().optional(),
   invioAutomatico: z.boolean().optional(),
 });
 const aggiornaFornitoreSchema = fornitoreSchema.partial();
