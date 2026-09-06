@@ -9,6 +9,7 @@ import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
+import { templateEmailService } from '../template-email/template-email.service.js';
 import { leggiRaggioKmPreventivo, leggiNotificaNonScelti } from '../impostazioni/impostazioni.routes.js';
 import { limitePnr } from '../../shared/rateLimit.js';
 import { distanzaKm, calcolaKmApprossimati } from '../../shared/distanza.js';
@@ -71,11 +72,13 @@ async function inviaRichiestaSingola(tragittoId: string, fornitore: typeof forni
   await db.insert(preventiviRichieste).values({ tragittoId, fornitoreId: fornitore.id, token, tipoInvio });
   if (!fornitore.email) return; // fornitore senza email: registrato ma non contattabile, resta in lista come tentativo fallito silenzioso
   const link = urlSito(`/fornitore/preventivo/${token}`);
-  await inviaEmail({
-    a: fornitore.email,
-    oggetto: `Richiesta preventivo — ${evento?.artista ?? 'evento'} (${tragitto.nome})`,
-    html: `<p>Buongiorno,</p><p>Le chiediamo un preventivo per il seguente tragitto: <b>${tragitto.nome}</b>, evento <b>${evento?.artista ?? ''}</b> del ${evento?.data ? new Date(evento.data).toLocaleDateString('it-IT') : ''}.</p><p><a href="${link}">Apri la richiesta e rispondi</a></p><p>Il link mostra tutti i dettagli (fermate, orari) e permette di caricare il proprio preventivo.</p>`,
+  const { oggetto, html } = await templateEmailService.renderizza('preventivo_richiesta', {
+    evento: evento?.artista ?? 'evento',
+    tragitto: tragitto.nome,
+    data: evento?.data ? new Date(evento.data).toLocaleDateString('it-IT') : '',
+    link,
   });
+  await inviaEmail({ a: fornitore.email, oggetto, html });
 }
 
 export const preventiviService = {
@@ -164,11 +167,8 @@ export const preventiviService = {
         if (!altraRisposta) continue; // non aveva risposto — niente da avvisare
         const [altroFornitore] = await db.select().from(fornitori).where(eq(fornitori.id, altra.fornitoreId)).limit(1);
         if (!altroFornitore?.email) continue;
-        await inviaEmail({
-          a: altroFornitore.email,
-          oggetto: 'Aggiornamento sulla richiesta preventivo',
-          html: '<p>Grazie per il preventivo inviato — per questo tragitto abbiamo scelto un altro fornitore. Ci teniamo comunque a ringraziarla per la disponibilità, e restiamo a disposizione per le prossime richieste.</p>',
-        });
+        const { oggetto, html } = await templateEmailService.renderizza('preventivo_non_scelto', {});
+        await inviaEmail({ a: altroFornitore.email, oggetto, html });
       }
     }
     return { ok: true };
@@ -180,10 +180,10 @@ export const preventiviService = {
     const [fornitore] = richiesta ? await db.select().from(fornitori).where(eq(fornitori.id, richiesta.fornitoreId)).limit(1) : [];
     await db.update(preventiviRisposte).set({ fileFirmatoNome: fileNome, fileFirmatoContenuto: fileContenuto, fileFirmatoInviatoIl: new Date() }).where(eq(preventiviRisposte.id, rispostaId));
     if (fornitore?.email) {
+      const { oggetto, html } = await templateEmailService.renderizza('preventivo_firmato', {});
       await inviaEmail({
         a: fornitore.email,
-        oggetto: 'Preventivo confermato e firmato',
-        html: '<p>In allegato trova il preventivo confermato, firmato per accettazione.</p>',
+        oggetto, html,
         allegati: [{ nomeFile: fileNome, contenuto: Buffer.from(fileContenuto, 'base64'), tipo: 'application/pdf' }],
       });
     }

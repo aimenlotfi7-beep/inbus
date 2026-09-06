@@ -87,6 +87,36 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
     `,
     segnaposto: ['nome', 'evento', 'link'],
   },
+  {
+    chiave: 'preventivo_richiesta',
+    nome: 'Richiesta preventivo a un fornitore',
+    oggetto: 'Richiesta preventivo — {{evento}} ({{tragitto}})',
+    corpo: `
+      <p>Buongiorno,</p>
+      <p>Le chiediamo un preventivo per il seguente tragitto: <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}}.</p>
+      <p><a href="{{link}}">Apri la richiesta e rispondi</a></p>
+      <p>Il link mostra tutti i dettagli (fermate, orari) e permette di caricare il proprio preventivo.</p>
+    `,
+    segnaposto: ['evento', 'tragitto', 'data', 'link'],
+  },
+  {
+    chiave: 'preventivo_non_scelto',
+    nome: 'Avviso al fornitore non scelto (dopo aver accettato un altro preventivo)',
+    oggetto: 'Aggiornamento sulla richiesta preventivo',
+    corpo: `
+      <p>Grazie per il preventivo inviato — per questo tragitto abbiamo scelto un altro fornitore. Ci teniamo comunque a ringraziarla per la disponibilità, e restiamo a disposizione per le prossime richieste.</p>
+    `,
+    segnaposto: [],
+  },
+  {
+    chiave: 'preventivo_firmato',
+    nome: 'Invio preventivo confermato e firmato (con allegato)',
+    oggetto: 'Preventivo confermato e firmato',
+    corpo: `
+      <p>In allegato trova il preventivo confermato, firmato per accettazione.</p>
+    `,
+    segnaposto: [],
+  },
 ];
 
 /** Vecchio testo del modello "conferma_acconto" (prima del link corretto
