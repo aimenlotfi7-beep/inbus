@@ -731,8 +731,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         <p className="testo-intro">Questa scheda non ha ancora nessun tragitto configurato — vai nella tab "Dettagli" per aggiungerne uno.</p>
       )}
 
+      <div className="partenze-layout">
       {mostraTabTragitti && (
-        <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+        <div className="mini-tabs partenze-tabs-colonna" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
           {calcoloVisibile.map((t) => {
             // Stesso criterio già usato nel contenuto della tappa
             // corrente (orario impostato / preventivo salvato) — così
@@ -755,6 +756,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         </div>
       )}
 
+      <div className="partenze-contenuto">
       {calcoloDaRenderizzare.map((tragitto) => {
         const stato = statoTragitto(tragitto);
         const busTragitto = busLista.filter((b) => b.tragittiIds.includes(tragitto.tragittoId));
@@ -1347,6 +1349,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         </div>
         );
       })}
+      </div>
+      </div>
 
     </div>
   );

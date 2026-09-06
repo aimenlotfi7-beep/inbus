@@ -320,6 +320,21 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
   border:1px solid var(--line); color:var(--mist); background:var(--dusk); cursor:pointer;
 }
 .mini-tab:hover{color:var(--paper); border-color:var(--blue-dim);}
+
+/* Solo dentro Partenze (dettaglio di un evento con più tragitti) — le
+   tab dei tragitti passano da riga orizzontale (sopra, che va a capo
+   con molti tragitti) a colonna verticale a sinistra, col contenuto a
+   destra. Solo da desktop: su mobile resta lo stack di sempre (righe
+   troppo strette per stare fianco a fianco). */
+@media (min-width:900px){
+  .partenze-layout{ display:flex; gap:24px; align-items:flex-start; }
+  .partenze-layout .partenze-tabs-colonna{
+    flex-direction:column; flex-shrink:0; width:230px;
+    overflow-x:visible; overflow-y:auto; max-height:calc(100vh - 200px);
+  }
+  .partenze-layout .partenze-tabs-colonna .mini-tab{ width:100%; text-align:left; }
+  .partenze-layout .partenze-contenuto{ flex:1; min-width:0; }
+}
 .mini-tab:focus, .mini-tab:focus-visible{outline:none; box-shadow:none;}
 .mini-tab.active{border-color:var(--blue); color:var(--paper); background:rgba(37,99,235,.1);}
 .mini-tab.completato{background:var(--green); border-color:var(--green); color:#fff;}
