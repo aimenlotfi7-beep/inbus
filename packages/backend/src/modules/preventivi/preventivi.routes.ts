@@ -287,6 +287,12 @@ preventiviRouter.get('/candidati/:tragittoId', richiedePermesso('eventi.partenze
   const lat = Number(req.query.lat), lng = Number(req.query.lng);
   const raggioKm = req.query.raggioKm ? Number(req.query.raggioKm) : await leggiRaggioKmPreventivo();
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new ConflittoDati('Coordinate della partenza mancanti.');
+  // Salvata qui, non solo in /richiedi — altrimenti il primo giro su un
+  // tragitto calcola le coordinate solo per QUESTA lista (senza
+  // persisterle), e /richiedi subito dopo le ritrova ancora vuote,
+  // bloccandosi con "manca la posizione della partenza" anche se in
+  // realtà era già stata appena geocodificata un attimo prima.
+  await db.update(tragitti).set({ partenzaLat: lat, partenzaLng: lng }).where(eq(tragitti.id, req.params.tragittoId));
   res.json(await candidatiPerTragitto(req.params.tragittoId, lat, lng, raggioKm));
 }));
 preventiviRouter.post('/richiedi/:tragittoId', richiedePermesso('eventi.partenze'), valida(richiediSchema), asyncHandler(async (req: Request, res: Response) => {

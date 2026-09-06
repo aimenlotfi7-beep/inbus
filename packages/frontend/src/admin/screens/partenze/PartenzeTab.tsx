@@ -338,8 +338,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
       if (lat == null || lng == null) {
         const partenza = tragittoVero.fermate[0];
         if (!partenza?.citta) { alert('Manca la città di partenza su questo tragitto — sistemala in Eventi prima di richiedere un preventivo.'); return; }
-        const r = await geocodifica(partenza.citta);
-        if (!r.coordinate) { alert('Città di partenza non trovata — controllala in Eventi prima di richiedere un preventivo.'); return; }
+        const r = await geocodifica(partenza.indirizzo ? `${partenza.indirizzo}, ${partenza.citta}` : partenza.citta);
+        if (!r.coordinate) { alert('Indirizzo di partenza non trovato — controllalo in Eventi prima di richiedere un preventivo.'); return; }
         lat = r.coordinate.lat; lng = r.coordinate.lng;
       }
       const candidati = await preventiviApi.candidati(tragittoId, lat, lng);

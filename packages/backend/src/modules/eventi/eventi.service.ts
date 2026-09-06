@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, isNull, sql, gte, lt } from 'drizzle-orm';
+import { and, eq, ilike, inArray, isNull, sql, gte, lt, asc } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
   eventi,
@@ -39,11 +39,16 @@ export const includeCompleto = {
   // con servizioId impostato finiva ANCHE qui (oltre che dentro il suo
   // servizio, sotto), duplicando ogni sua fermata ovunque venga
   // mostrato il percorso completo.
-  tragitti: { where: and(isNull(tragitti.eliminatoIl), isNull(tragitti.servizioId)), with: { fermate: true } },
+  // fermate ordinate per "ordine" (il campo logico, non l'ordine del
+  // database) — senza, "la prima fermata" nell'array potrebbe NON
+  // essere davvero la partenza, se le fermate sono state riordinate
+  // dopo la creazione. Bug corretto qui: mancava su entrambe le
+  // relazioni (tragitti liberi e dentro i servizi).
+  tragitti: { where: and(isNull(tragitti.eliminatoIl), isNull(tragitti.servizioId)), with: { fermate: { orderBy: () => [asc(fermate.ordine)] } } },
   // I servizi (se l'evento ne ha) — ognuno con le proprie tratte. Un
   // evento senza nessun servizio (il caso normale) ha semplicemente un
   // array vuoto qui: tutto continua a funzionare come prima.
-  servizi: { with: { tragitti: { where: isNull(tragitti.eliminatoIl), with: { fermate: true } } } },
+  servizi: { with: { tragitti: { where: isNull(tragitti.eliminatoIl), with: { fermate: { orderBy: () => [asc(fermate.ordine)] } } } } },
   immagini: true,
   allegati: true,
 } as const;
