@@ -7,6 +7,7 @@ import { NonTrovato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
+import { limiteRegistrazione } from '../../shared/rateLimit.js';
 
 const fornitoreSchema = z.object({
   nome: z.string().min(1),
@@ -37,7 +38,7 @@ const registrazioneSchema = z.object({
   indirizzo: z.string().min(1, 'L\'indirizzo è obbligatorio — serve per calcolare la distanza dagli eventi.'),
   lat: z.number().optional(),
   lng: z.number().optional(),
-  campiExtra: z.array(z.object({ etichetta: z.string(), valore: z.string() })).optional(),
+  campiExtra: z.array(z.object({ etichetta: z.string().max(200), valore: z.string().max(2000) })).max(30).optional(),
 });
 
 const campoExtraConfigSchema = z.object({ etichetta: z.string().min(1), ordine: z.number().int().default(0) });
@@ -103,7 +104,7 @@ export const fornitoriRouter = Router();
 fornitoriRouter.get('/campi-extra-config', asyncHandler(async (_req: Request, res: Response) => {
   res.json(await fornitoriService.listaCampiExtraConfig());
 }));
-fornitoriRouter.post('/registrazione', valida(registrazioneSchema), asyncHandler(async (req: Request, res: Response) => {
+fornitoriRouter.post('/registrazione', limiteRegistrazione, valida(registrazioneSchema), asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json(await fornitoriService.registraPubblico(req.body));
 }));
 

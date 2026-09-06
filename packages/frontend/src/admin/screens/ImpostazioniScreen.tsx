@@ -11,6 +11,7 @@ const IMPOSTAZIONI: { chiave: string; etichetta: string; default: string; suffis
   { chiave: 'posti_per_bus', etichetta: 'Posti per bus (usato per "Calcola bus necessari" in Partenze)', default: '50' },
   { chiave: 'credito_per_passeggero', etichetta: 'Credito fedeltà per passeggero (€)', default: '0.5' },
   { chiave: 'soglia_posticipo_variazione_minuti', etichetta: 'Soglia posticipo per notifica variazione (minuti — l\'anticipo e il cambio città/indirizzo notificano sempre, senza soglia; 0 o vuoto = avvisa sempre anche per il posticipo)', default: '0' },
+  { chiave: 'raggio_km_preventivo', etichetta: 'Raggio (km, linea d\'aria) per cercare fornitori vicini a una richiesta preventivo — modificabile comunque per singola richiesta', default: '40' },
 ];
 
 // Chiave della formula prezzi (sezione dedicata più sotto, separata
@@ -23,6 +24,7 @@ const DEFAULT_SOGLIA_OCCUPAZIONE = '50';
 export function ImpostazioniScreen() {
   const [valori, setValori] = useState<Record<string, string>>({});
   const [sogliaOccupazione, setSogliaOccupazione] = useState(DEFAULT_SOGLIA_OCCUPAZIONE);
+  const [notificaNonScelti, setNotificaNonScelti] = useState(true);
   const [caricamento, setCaricamento] = useState(true);
   const [salvataggio, setSalvataggio] = useState<string | null>(null);
 
@@ -37,6 +39,8 @@ export function ImpostazioniScreen() {
         setValori(mappa);
         const rigaSoglia = lista.find((r) => r.chiave === CHIAVE_SOGLIA_OCCUPAZIONE);
         if (rigaSoglia) setSogliaOccupazione(rigaSoglia.valore);
+        const rigaNotifica = lista.find((r) => r.chiave === 'notifica_fornitori_non_scelti');
+        if (rigaNotifica) setNotificaNonScelti(rigaNotifica.valore === 'true');
       })
       .finally(() => setCaricamento(false));
   }, []);
@@ -75,6 +79,19 @@ export function ImpostazioniScreen() {
       alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
       setSalvataggio(null);
+    }
+  }
+
+  // Booleana, salvata subito al clic — non ha senso un pulsante
+  // "Salva" a parte per un solo sì/no.
+  async function alternaNotificaNonScelti() {
+    const nuovo = !notificaNonScelti;
+    setNotificaNonScelti(nuovo);
+    try {
+      await impostazioniApi.set('notifica_fornitori_non_scelti', String(nuovo));
+    } catch (e) {
+      setNotificaNonScelti(!nuovo); // ripristina se il salvataggio fallisce
+      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     }
   }
 
@@ -129,6 +146,17 @@ export function ImpostazioniScreen() {
             <button className="btn btn-ghost" onClick={salvaSogliaOccupazione} disabled={salvataggio === CHIAVE_SOGLIA_OCCUPAZIONE}>
               {salvataggio === CHIAVE_SOGLIA_OCCUPAZIONE ? 'Salvataggio...' : 'Salva'}
             </button>
+          </div>
+
+          {/* Sezione preventivi fornitori — il raggio km vive
+              nell'elenco generico sopra (numerico, stesso schema delle
+              altre), questa qui è solo per il sì/no della notifica. */}
+          <div className="section-card">
+            <p className="section-label" style={{ marginBottom: 8 }}>Preventivi fornitori</p>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input type="checkbox" checked={notificaNonScelti} onChange={alternaNotificaNonScelti} style={{ width: 'auto' }} />
+              Avvisa via mail i fornitori non scelti, quando ne accetti un altro per lo stesso tragitto
+            </label>
           </div>
         </div>
       )}

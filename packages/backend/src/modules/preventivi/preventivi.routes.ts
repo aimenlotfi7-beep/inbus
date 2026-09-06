@@ -9,7 +9,8 @@ import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
-import { leggiRaggioKmPreventivo } from '../impostazioni/impostazioni.routes.js';
+import { leggiRaggioKmPreventivo, leggiNotificaNonScelti } from '../impostazioni/impostazioni.routes.js';
+import { limitePnr } from '../../shared/rateLimit.js';
 import { distanzaKm, calcolaKmApprossimati } from '../../shared/distanza.js';
 
 function generaToken() {
@@ -150,6 +151,26 @@ export const preventiviService = {
     // diverso da uno scritto a mano con fornitore indicato.
     const kmAccettati = await calcolaKmApprossimati(richiesta.tragittoId);
     await db.update(tragitti).set({ preventivoCosto: risposta.prezzo, fornitoreId: richiesta.fornitoreId, ...(kmAccettati != null && { kmAccettati }) }).where(eq(tragitti.id, richiesta.tragittoId));
+
+    // Avviso agli altri fornitori che avevano risposto per lo stesso
+    // tragitto (non a chi non ha ancora risposto — non ha senso
+    // avvisare chi non sapeva nemmeno se sarebbe stato considerato) —
+    // impostazione fissa, non a ogni accettazione, come deciso.
+    if (await leggiNotificaNonScelti()) {
+      const altreRichieste = await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.tragittoId, richiesta.tragittoId));
+      for (const altra of altreRichieste) {
+        if (altra.id === richiesta.id) continue;
+        const [altraRisposta] = await db.select().from(preventiviRisposte).where(eq(preventiviRisposte.richiestaId, altra.id)).limit(1);
+        if (!altraRisposta) continue; // non aveva risposto — niente da avvisare
+        const [altroFornitore] = await db.select().from(fornitori).where(eq(fornitori.id, altra.fornitoreId)).limit(1);
+        if (!altroFornitore?.email) continue;
+        await inviaEmail({
+          a: altroFornitore.email,
+          oggetto: 'Aggiornamento sulla richiesta preventivo',
+          html: '<p>Grazie per il preventivo inviato — per questo tragitto abbiamo scelto un altro fornitore. Ci teniamo comunque a ringraziarla per la disponibilità, e restiamo a disposizione per le prossime richieste.</p>',
+        });
+      }
+    }
     return { ok: true };
   },
   caricaFileFirmato: async (rispostaId: string, fileNome: string, fileContenuto: string) => {
@@ -253,10 +274,10 @@ export const preventiviRouter = Router();
 // ROTTE PUBBLICHE — il fornitore risponde tramite il link ricevuto via
 // email, nessun accesso da amministratore, nessuna password.
 // ---------------------------------------------------------------------
-preventiviRouter.get('/pubblico/:token', asyncHandler(async (req: Request, res: Response) => {
+preventiviRouter.get('/pubblico/:token', limitePnr, asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.getPubblico(req.params.token));
 }));
-preventiviRouter.post('/pubblico/:token/rispondi', valida(rispondiSchema), asyncHandler(async (req: Request, res: Response) => {
+preventiviRouter.post('/pubblico/:token/rispondi', limitePnr, valida(rispondiSchema), asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json(await preventiviService.rispondi(req.params.token, req.body));
 }));
 

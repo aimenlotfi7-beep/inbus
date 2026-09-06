@@ -54,7 +54,11 @@ export function creaApp() {
     const aperto = req.path.startsWith('/api/public/') || req.path.startsWith('/api/cliente-auth/');
     callback(null, { origin: aperto ? true : env.CORS_ORIGIN });
   }));
-  app.use(express.json());
+  // Default di Express (100kb) troppo piccolo per un PDF allegato in
+  // base64 (i preventivi dei fornitori) — anche un PDF semplice lo
+  // supera facilmente, fallendo altrimenti in silenzio con un errore
+  // generico "Payload Too Large".
+  app.use(express.json({ limit: '15mb' }));
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
 

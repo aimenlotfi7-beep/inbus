@@ -421,7 +421,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
       ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragittoId)
       : undefined;
     if (tragittoVero?.preventivoCosto) {
-      setFormPreventivoMap((prev) => new Map(prev).set(tragittoId, { costo: Number(tragittoVero.preventivoCosto), postiBus: tragittoVero.preventivoPostiBus ?? undefined }));
+      setFormPreventivoMap((prev) => new Map(prev).set(tragittoId, { costo: Number(tragittoVero.preventivoCosto), postiBus: tragittoVero.preventivoPostiBus ?? undefined, fornitoreId: tragittoVero.fornitoreId ?? undefined }));
       // Mostro subito i prezzi già salvati per ogni fermata (senza
       // dover ricalcolare/richiamare OpenStreetMap solo per vederli) —
       // la distanza qui non è nota (andrebbe ricalcolata), la mostro
@@ -1131,7 +1131,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                       })}
                       <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                         <button type="button" className="btn btn-primary" disabled={inviandoRichiesta} onClick={() => inviaRichiesta(tragitto.tragittoId)}>{inviandoRichiesta ? 'Invio...' : 'Invia richiesta'}</button>
-                        <button type="button" className="btn btn-ghost" onClick={() => setCandidatiMap((prev) => { const m = new Map(prev); m.delete(tragitto.tragittoId); return m; })}>Annulla</button>
+                        <button type="button" className="btn btn-ghost" onClick={() => { setCandidatiMap((prev) => { const m = new Map(prev); m.delete(tragitto.tragittoId); return m; }); setManualiSelezionatiMap((prev) => { const m = new Map(prev); m.delete(tragitto.tragittoId); return m; }); }}>Annulla</button>
                       </div>
                     </div>
                   )}

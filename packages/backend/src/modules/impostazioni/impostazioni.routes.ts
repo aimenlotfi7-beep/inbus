@@ -60,6 +60,17 @@ export async function leggiRaggioKmPreventivo(): Promise<number> {
   return Number.isFinite(valore) && valore > 0 ? valore : DEFAULT_RAGGIO_KM_PREVENTIVO;
 }
 
+/** Se attivo, accettando un preventivo si avvisano via mail gli altri
+ *  fornitori che avevano risposto per lo stesso tragitto — spiegando
+ *  che è stato scelto un altro. Impostazione fissa (non a ogni
+ *  accettazione), come deciso in conversazione. Default: attivo. */
+export const CHIAVE_NOTIFICA_NON_SCELTI = 'notifica_fornitori_non_scelti';
+
+export async function leggiNotificaNonScelti(): Promise<boolean> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_NOTIFICA_NON_SCELTI)).limit(1);
+  return riga ? riga.valore === 'true' : true;
+}
+
 export const impostazioniRouter = Router();
 impostazioniRouter.use(richiedeAuth);
 
