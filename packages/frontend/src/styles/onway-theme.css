@@ -123,7 +123,7 @@ h1.hero-title .line2{ color:var(--ow-accent); }
    ============================================================ */
 .logo{
   display:inline-flex; align-items:center; gap:0; line-height:1;
-  font-size:34px;
+  font-size:46px;
 }
 /* L'intero logotipo (lettere+W+pin) è un solo SVG, non più testo+SVG
    misti — width:auto mantiene le proporzioni del file originale
