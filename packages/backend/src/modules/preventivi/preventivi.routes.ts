@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import crypto from 'node:crypto';
-import { eq, and, inArray, isNull } from 'drizzle-orm';
+import { eq, and, inArray, isNull, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { preventiviRichieste, preventiviRisposte, fornitori, tragitti, eventi, fermate } from '../../db/schema.js';
@@ -193,6 +193,58 @@ export const preventiviService = {
     const differenza = Math.abs(kmAttuali - t.kmAccettati) / t.kmAccettati;
     return { kmAccettati: t.kmAccettati, kmAttuali, cambiatoParecchio: differenza > 0.15 };
   },
+  // Per ogni fornitore: quante richieste ha ricevuto, quante ha
+  // risposto, quante volte è stato scelto (accettato), prezzo medio di
+  // quelle accettate. dataDa facoltativo — filtra per quando è stata
+  // fatta la richiesta (creataIl), non quando è stata accettata (non
+  // teniamo quella data a parte, l'accettazione aggiorna solo il
+  // tragitto).
+  statistichePerFornitore: async (dataDa?: Date) => {
+    const tuttiFornitori = await db.select().from(fornitori);
+    const risultato = [];
+    for (const f of tuttiFornitori) {
+      const condizioniRichieste = dataDa ? and(eq(preventiviRichieste.fornitoreId, f.id), gte(preventiviRichieste.creataIl, dataDa)) : eq(preventiviRichieste.fornitoreId, f.id);
+      const richiesteDiQuesto = await db.select().from(preventiviRichieste).where(condizioniRichieste);
+      if (richiesteDiQuesto.length === 0) continue; // fornitore mai contattato — non serve una riga vuota nella tabella
+      const richiesteIds = richiesteDiQuesto.map((r) => r.id);
+      const risposteDiQuesto = await db.select().from(preventiviRisposte).where(inArray(preventiviRisposte.richiestaId, richiesteIds));
+      const tragittiAccettati = await db.select().from(tragitti).where(and(eq(tragitti.fornitoreId, f.id), inArray(tragitti.id, richiesteDiQuesto.map((r) => r.tragittoId))));
+      const prezziAccettati = tragittiAccettati.filter((t) => t.preventivoCosto).map((t) => Number(t.preventivoCosto));
+      risultato.push({
+        fornitore: f,
+        richiesteRicevute: richiesteDiQuesto.length,
+        risposteDate: risposteDiQuesto.length,
+        volteScelto: tragittiAccettati.length,
+        prezzoMedio: prezziAccettati.length ? prezziAccettati.reduce((a, b) => a + b, 0) / prezziAccettati.length : null,
+      });
+    }
+    return risultato.sort((a, b) => b.volteScelto - a.volteScelto);
+  },
+  // Storico prezzi per coppia partenza→arrivo (solo tragitti con un
+  // preventivo accettato) — €/km oltre al prezzo totale, per
+  // confrontare tratte con un numero diverso di fermate (vedi
+  // conversazione). dataDa filtra sulla creazione del tragitto stesso
+  // (non teniamo una data di accettazione a parte).
+  storicoPerTratta: async (dataDa?: Date) => {
+    const condizioniBase = [sql`${tragitti.preventivoCosto} IS NOT NULL`, sql`${tragitti.fornitoreId} IS NOT NULL`];
+    if (dataDa) condizioniBase.push(gte(eventi.data, dataDa));
+    const righe = await db.select({ tragitto: tragitti, evento: eventi }).from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId)).where(and(...condizioniBase));
+    const conPartenza = [];
+    for (const r of righe) {
+      const [partenza] = await db.select().from(fermate).where(and(eq(fermate.tragittoId, r.tragitto.id), eq(fermate.ordine, 0))).limit(1);
+      if (!partenza) continue;
+      conPartenza.push({
+        partenza: partenza.citta,
+        arrivo: r.tragitto.arrivoCitta ?? '—',
+        prezzo: Number(r.tragitto.preventivoCosto),
+        km: r.tragitto.kmAccettati,
+        data: r.evento.data,
+        nomeTragitto: r.tragitto.nome,
+        artista: r.evento.artista,
+      });
+    }
+    return conPartenza.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+  },
 };
 
 export const preventiviRouter = Router();
@@ -227,6 +279,14 @@ preventiviRouter.get('/conta-da-valutare', richiedePermesso('eventi.partenze'), 
 }));
 preventiviRouter.get('/verifica-km/:tragittoId', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.verificaKm(req.params.tragittoId));
+}));
+preventiviRouter.get('/statistiche/fornitori', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
+  const dataDa = req.query.dataDa ? new Date(req.query.dataDa as string) : undefined;
+  res.json(await preventiviService.statistichePerFornitore(dataDa));
+}));
+preventiviRouter.get('/statistiche/tratte', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
+  const dataDa = req.query.dataDa ? new Date(req.query.dataDa as string) : undefined;
+  res.json(await preventiviService.storicoPerTratta(dataDa));
 }));
 preventiviRouter.put('/risposte/:id/accetta', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.accetta(req.params.id));
