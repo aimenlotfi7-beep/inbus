@@ -41,6 +41,7 @@ export const preventiviApi = {
     api.post<{ inviateAutomatiche: number; inviateManuali: number }>(`/api/preventivi/richiedi/${tragittoId}`, input),
   listaPerTragitto: (tragittoId: string) => api.get<RichiestaConRisposta[]>(`/api/preventivi/tragitto/${tragittoId}`),
   contaDaValutare: () => api.get<{ conteggio: number }>('/api/preventivi/conta-da-valutare'),
+  verificaKm: (tragittoId: string) => api.get<{ kmAccettati: number | null; kmAttuali: number | null; cambiatoParecchio: boolean }>(`/api/preventivi/verifica-km/${tragittoId}`),
   accetta: (rispostaId: string) => api.put<{ ok: boolean }>(`/api/preventivi/risposte/${rispostaId}/accetta`, {}),
   caricaFileFirmato: (rispostaId: string, fileNome: string, fileContenuto: string) =>
     api.post<{ ok: boolean }>(`/api/preventivi/risposte/${rispostaId}/file-firmato`, { fileNome, fileContenuto }),

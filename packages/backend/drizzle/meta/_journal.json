@@ -519,6 +519,13 @@
       "when": 1788696302935,
       "tag": "0073_cynical_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1788698992929,
+      "tag": "0074_safe_the_order",
+      "breakpoints": true
     }
   ]
 }

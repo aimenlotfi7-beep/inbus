@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { eventiApi, type Linea, type BusDiLineaInput, type CalcoloBusTragitto } from '../../api/eventi';
 import type { Evento, Fermata } from '../../api/types';
 import { fornitoriApi, type Fornitore } from '../../api/fornitori';
+import { preventiviApi } from '../../api/preventivi';
 import { tourLeaderApi, type TourLeader } from '../../api/tourleader';
 import { ErroreApi } from '../../api/client';
 import { CampoNumero } from '../shared/CampoNumero';
@@ -39,6 +40,7 @@ export function LineeTragittoScreen() {
   const [stepPopup, setStepPopup] = useState<1 | 2>(1);
   const [formBus, setFormBus] = useState<BusDiLineaInput & { postiBus?: number }>(BUS_VUOTO);
   const [fermateSelezionate, setFermateSelezionate] = useState<string[]>([]);
+  const [verificaKm, setVerificaKm] = useState<{ kmAccettati: number | null; kmAttuali: number | null; cambiatoParecchio: boolean } | null>(null);
   const [salvando, setSalvando] = useState(false);
 
   // Modifica di una Linea già esistente.
@@ -65,10 +67,11 @@ export function LineeTragittoScreen() {
     ricarica();
     fornitoriApi.list().then(setFornitori).catch(() => setFornitori([]));
     tourLeaderApi.list().then(setTourLeaders).catch(() => setTourLeaders([]));
+    if (tragittoId) preventiviApi.verificaKm(tragittoId).then(setVerificaKm).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventoId, tragittoId]);
 
-  function tornaAPartenze(tabDestinazione?: 'fermate' | 'da-prezzare' | 'da-confermare') {
+  function tornaAPartenze(tabDestinazione?: 'fermate' | 'preventivi' | 'da-prezzare' | 'da-confermare') {
     // Cambio di sezione interno — non più una navigazione vera del
     // browser. "evento"/"tragitto" vanno tolti esplicitamente
     // dall'indirizzo (prima un ricaricamento completo li avrebbe
@@ -77,6 +80,7 @@ export function LineeTragittoScreen() {
     // menu — punto direttamente a quella giusta, non serve più un
     // parametro extra per dire quale tab aprire.
     const sezione = tabDestinazione === 'fermate' ? 'partenze-orari'
+      : tabDestinazione === 'preventivi' ? 'partenze-preventivi'
       : tabDestinazione === 'da-prezzare' ? 'partenze-prezzi'
       : 'partenze-da-confermare';
     navigaSezione(sezione, { evento: null, tragitto: null });
@@ -148,6 +152,7 @@ export function LineeTragittoScreen() {
     try {
       await eventiApi.aggiornaTragittoOperativo(idTragitto, { fermate: fermateAggiornate });
       ricarica();
+      preventiviApi.verificaKm(idTragitto).then(setVerificaKm).catch(() => {});
     } catch (e) {
       alert(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: errore di rete.');
     }
@@ -287,6 +292,12 @@ export function LineeTragittoScreen() {
 
       {/* 1. RIEPILOGO PARTENZA */}
       <PanelHead titolo={tragittoVero.nome} info={evento.artista} />
+      {verificaKm?.cambiatoParecchio && (
+        <div style={{ background: 'var(--dusk)', border: '1px solid var(--amber)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span><b style={{ color: 'var(--amber)' }}>⚠ Le fermate sono cambiate parecchio</b> da quando hai accettato il preventivo (~{Math.round(verificaKm.kmAccettati!)} km allora, ~{Math.round(verificaKm.kmAttuali!)} km ora) — potrebbe servire un nuovo preventivo.</span>
+          <button type="button" className="btn btn-ghost" style={{ flexShrink: 0 }} onClick={() => tornaAPartenze('preventivi')}>Vai a Preventivi →</button>
+        </div>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
         {tutteLeFermateOrdinate.map((f) => {
           // Una fermata esclusa (es. per scarse adesioni) non ha senso

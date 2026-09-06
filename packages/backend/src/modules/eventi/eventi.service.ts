@@ -24,6 +24,7 @@ import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoSchema } from './eventi.dto.js';
 import { rilevaVariazioni, generaComunicazioniVariazione } from '../variazioni/variazioni.service.js';
+import { calcolaKmApprossimati } from '../../shared/distanza.js';
 import type { z } from 'zod';
 
 // Include standard riusato da list/getById: evento con tutte le sue
@@ -918,6 +919,7 @@ export const eventiService = {
     if (!esiste) throw new NonTrovato('Tragitto');
 
     await db.transaction(async (tx) => {
+      const kmAccettati = input.fornitoreId ? await calcolaKmApprossimati(tragittoId) : null;
       await tx.update(tragitti).set({
         preventivoCosto: input.preventivoCosto.toFixed(2),
         preventivoPostiBus: input.preventivoPostiBus,
@@ -925,6 +927,7 @@ export const eventiService = {
         // presente (es. un preventivo accettato in precedenza tramite
         // la tab Preventivi, poi ritoccato qui solo nel prezzo).
         ...(input.fornitoreId && { fornitoreId: input.fornitoreId }),
+        ...(kmAccettati != null && { kmAccettati }),
         // Solo un passaggio in avanti — non tocca un tragitto già
         // "Confermato" (avrebbe un bus vero, non ha senso retrocederlo).
         ...(esiste.stato === 'DA_CONFERMARE' && { stato: 'PREZZATO' as const }),

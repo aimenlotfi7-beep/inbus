@@ -310,6 +310,14 @@ export const tragitti = pgTable('tragitti', {
   // ogni richiesta successiva sullo stesso tragitto.
   partenzaLat: doublePrecision('partenza_lat'),
   partenzaLng: doublePrecision('partenza_lng'),
+  // Km totali (linea d'aria, somma tratta per tratta tra le fermate
+  // ATTIVE al momento) calcolati quando si accetta/registra un
+  // preventivo — se poi le fermate cambiano (es. si toglie la
+  // partenza in Linee), si può ricalcolare e confrontare per capire se
+  // serve un nuovo preventivo. Non è la distanza di guida vera (troppo
+  // costosa da tenere sempre aggiornata), solo un indicatore per
+  // accorgersi di un cambio grosso.
+  kmAccettati: doublePrecision('km_accettati'),
   // Sezione "Partenze": indica se questa tratta è coperta (bus prenotato
   // con l'agenzia/fornitore), a prescindere dal calcolo automatico dei
   // bus necessari, che resta solo un suggerimento.

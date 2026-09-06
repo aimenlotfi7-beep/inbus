@@ -10,20 +10,10 @@ import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
 import { leggiRaggioKmPreventivo } from '../impostazioni/impostazioni.routes.js';
+import { distanzaKm, calcolaKmApprossimati } from '../../shared/distanza.js';
 
 function generaToken() {
   return crypto.randomBytes(24).toString('hex');
-}
-
-// Distanza in linea d'aria tra due punti (km) — formula haversine,
-// come deciso in conversazione (niente km di guida reali, troppo
-// lento/costoso per un controllo che si rifà spesso).
-function distanzaKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 const richiediSchema = z.object({
@@ -158,7 +148,8 @@ export const preventiviService = {
     // Scrive esattamente negli stessi campi già usati per l'inserimento
     // a mano in Prezzi — un preventivo accettato non è concettualmente
     // diverso da uno scritto a mano con fornitore indicato.
-    await db.update(tragitti).set({ preventivoCosto: risposta.prezzo, fornitoreId: richiesta.fornitoreId }).where(eq(tragitti.id, richiesta.tragittoId));
+    const kmAccettati = await calcolaKmApprossimati(richiesta.tragittoId);
+    await db.update(tragitti).set({ preventivoCosto: risposta.prezzo, fornitoreId: richiesta.fornitoreId, ...(kmAccettati != null && { kmAccettati }) }).where(eq(tragitti.id, richiesta.tragittoId));
     return { ok: true };
   },
   caricaFileFirmato: async (rispostaId: string, fileNome: string, fileContenuto: string) => {
@@ -188,6 +179,19 @@ export const preventiviService = {
     if (tragittiIds.length === 0) return 0;
     const tragittiSenzaAccettazione = await db.select({ id: tragitti.id }).from(tragitti).where(and(inArray(tragitti.id, tragittiIds), isNull(tragitti.fornitoreId)));
     return tragittiSenzaAccettazione.length;
+  },
+  // Per il banner in Linee — confronta i km salvati al momento
+  // dell'accettazione con quelli ricalcolati ORA sulle fermate attive.
+  // "Cambiato parecchio" = oltre il 15% di differenza, soglia semplice
+  // per non segnalare ogni minima imprecisione della geocodifica.
+  verificaKm: async (tragittoId: string) => {
+    const [t] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!t) throw new NonTrovato('Tragitto');
+    if (t.kmAccettati == null) return { kmAccettati: null, kmAttuali: null, cambiatoParecchio: false };
+    const kmAttuali = await calcolaKmApprossimati(tragittoId);
+    if (kmAttuali == null) return { kmAccettati: t.kmAccettati, kmAttuali: null, cambiatoParecchio: false };
+    const differenza = Math.abs(kmAttuali - t.kmAccettati) / t.kmAccettati;
+    return { kmAccettati: t.kmAccettati, kmAttuali, cambiatoParecchio: differenza > 0.15 };
   },
 };
 
@@ -220,6 +224,9 @@ preventiviRouter.get('/tragitto/:tragittoId', richiedePermesso('eventi.partenze'
 }));
 preventiviRouter.get('/conta-da-valutare', richiedePermesso('eventi.partenze'), asyncHandler(async (_req: Request, res: Response) => {
   res.json({ conteggio: await preventiviService.contaDaValutare() });
+}));
+preventiviRouter.get('/verifica-km/:tragittoId', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
+  res.json(await preventiviService.verificaKm(req.params.tragittoId));
 }));
 preventiviRouter.put('/risposte/:id/accetta', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.accetta(req.params.id));

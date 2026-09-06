@@ -1,0 +1,1 @@
+ALTER TABLE "tragitti" ADD COLUMN "km_accettati" double precision;
