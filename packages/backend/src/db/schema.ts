@@ -303,6 +303,13 @@ export const tragitti = pgTable('tragitti', {
   // set null: un fornitore eliminato non deve bloccare tragitti/bus
   // già collegati — restano intatti, solo senza più quel riferimento.
   fornitoreId: text('fornitore_id').references(() => fornitori.id, { onDelete: 'set null' }),
+  // Coordinate della Testa di partenza (prima fermata, sempre testuale
+  // — vedi sopra) — geocodificate nel browser al momento della PRIMA
+  // richiesta preventivo per questo tragitto (shared/geo.ts, stessa
+  // funzione già usata altrove), salvate qui per non doverlo rifare a
+  // ogni richiesta successiva sullo stesso tragitto.
+  partenzaLat: doublePrecision('partenza_lat'),
+  partenzaLng: doublePrecision('partenza_lng'),
   // Sezione "Partenze": indica se questa tratta è coperta (bus prenotato
   // con l'agenzia/fornitore), a prescindere dal calcolo automatico dei
   // bus necessari, che resta solo un suggerimento.
@@ -374,6 +381,48 @@ export const fermate = pgTable('fermate', {
 }, (t) => ({
   perTragitto: index('fermate_tragitto_idx').on(t.tragittoId),
 }));
+
+// ---------------------------------------------------------------------
+// PREVENTIVI FORNITORI (richieste inviate + risposte ricevute) — una
+// riga per ogni singola coppia tragitto+fornitore contattato, MAI
+// raggruppate: una "richiesta con più tragitti insieme" (vista admin)
+// genera semplicemente più righe qui, una per tragitto — arrivano
+// email separate, ognuna col proprio link (vedi conversazione).
+// ---------------------------------------------------------------------
+export const tipoInvioRichiestaEnum = pgEnum('tipo_invio_richiesta', ['AUTOMATICO', 'MANUALE']);
+
+export const preventiviRichieste = pgTable('preventivi_richieste', {
+  id: id(),
+  tragittoId: text('tragitto_id').notNull().references(() => tragitti.id, { onDelete: 'cascade' }),
+  fornitoreId: text('fornitore_id').notNull().references(() => fornitori.id, { onDelete: 'cascade' }),
+  // Il link nella mail al fornitore punta a .../preventivo/<token> — non
+  // richiede nessun accesso/login, il token stesso è la chiave.
+  token: text('token').notNull().unique(),
+  tipoInvio: tipoInvioRichiestaEnum('tipo_invio').notNull(),
+  creataIl: timestamp('creata_il').notNull().defaultNow(),
+});
+
+export const preventiviRisposte = pgTable('preventivi_risposte', {
+  id: id(),
+  // unique: una sola risposta per richiesta — una volta inviata è
+  // definitiva (il fornitore non può più modificarla da solo, deve
+  // scrivere all'admin — vedi conversazione).
+  richiestaId: text('richiesta_id').notNull().references(() => preventiviRichieste.id, { onDelete: 'cascade' }).unique(),
+  prezzo: numeric('prezzo', { precision: 10, scale: 2 }).notNull(),
+  // File nel database per ora (base64 in una colonna text) — soluzione
+  // temporanea, come discusso: da spostare su un servizio dedicato
+  // quando si aggiungeranno anche le immagini altrove nel sito.
+  fileNome: text('file_nome'),
+  fileContenuto: text('file_contenuto'),
+  // Compilati DOPO, quando l'admin scarica il file del fornitore, lo
+  // firma a mano (per ora — firma digitale vera è un lavoro a parte,
+  // rimandato) e ricarica qui la versione firmata — l'invio al
+  // fornitore parte in automatico appena questi due si valorizzano.
+  fileFirmatoNome: text('file_firmato_nome'),
+  fileFirmatoContenuto: text('file_firmato_contenuto'),
+  fileFirmatoInviatoIl: timestamp('file_firmato_inviato_il'),
+  inviataIl: timestamp('inviata_il').notNull().defaultNow(),
+});
 
 // ---------------------------------------------------------------------
 // BUS FISICI (Sezione Partenze: censimento dei mezzi reali e delle tratte

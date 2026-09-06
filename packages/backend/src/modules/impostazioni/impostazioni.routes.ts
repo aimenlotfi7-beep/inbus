@@ -35,12 +35,29 @@ export async function leggiCreditoPerPasseggero(): Promise<number> {
  *  manderebbero email inutili. L'anticipo (qualunque entità) e il
  *  cambio città/indirizzo restano SEMPRE notificati, senza soglia. */
 export const CHIAVE_SOGLIA_POSTICIPO_MINUTI = 'soglia_posticipo_variazione_minuti';
-const DEFAULT_SOGLIA_POSTICIPO_MINUTI = 20;
 
+// Nessun valore di riserva — se non impostata esplicitamente qui sotto
+// (in Impostazioni), la soglia resta a 0: qualunque posticipo, anche
+// di un minuto solo, notifica il cliente. Meglio avvisare in più che
+// restare in silenzio per un numero mai confermato da chi gestisce il
+// sito (stessa scelta già fatta per la soglia minima partecipanti).
 export async function leggiSogliaPosticipoMinuti(): Promise<number> {
   const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_SOGLIA_POSTICIPO_MINUTI)).limit(1);
   const valore = riga ? Number(riga.valore) : NaN;
-  return Number.isFinite(valore) && valore >= 0 ? valore : DEFAULT_SOGLIA_POSTICIPO_MINUTI;
+  return Number.isFinite(valore) && valore >= 0 ? valore : 0;
+}
+
+/** Raggio in km (linea d'aria) di default per cercare i fornitori
+ *  vicini alla partenza di un tragitto, quando si richiede un
+ *  preventivo — modificabile per singola richiesta, questo è solo il
+ *  punto di partenza proposto. */
+export const CHIAVE_RAGGIO_KM_PREVENTIVO = 'raggio_km_preventivo';
+const DEFAULT_RAGGIO_KM_PREVENTIVO = 40;
+
+export async function leggiRaggioKmPreventivo(): Promise<number> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_RAGGIO_KM_PREVENTIVO)).limit(1);
+  const valore = riga ? Number(riga.valore) : NaN;
+  return Number.isFinite(valore) && valore > 0 ? valore : DEFAULT_RAGGIO_KM_PREVENTIVO;
 }
 
 export const impostazioniRouter = Router();

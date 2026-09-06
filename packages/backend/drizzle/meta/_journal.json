@@ -512,6 +512,13 @@
       "when": 1788695503069,
       "tag": "0072_public_sunfire",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1788696302935,
+      "tag": "0073_cynical_shaman",
+      "breakpoints": true
     }
   ]
 }
