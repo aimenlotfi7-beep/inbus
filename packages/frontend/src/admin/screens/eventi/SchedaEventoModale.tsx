@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { notifica } from '../../shared/notifiche';
 import type { ContestoPartenze } from '../partenze/tipi';
+import { TragittoCard } from './TragittoCard';
 import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
 import { InfoTooltip } from '../../shared/InfoTooltip';
 import { TOOLTIP_DEFAULT } from '../../tooltipDefaults';
@@ -411,9 +412,6 @@ export function SchedaEventoModale({
   }
 
   // ---- Riordino fermate trascinandole (drag & drop nativo, senza librerie) ----
-  function onDragStart(idxTragitto: number, idxFermata: number) {
-    setTrascinata({ tragitto: idxTragitto, fermata: idxFermata });
-  }
   function onDropSu(idxTragitto: number, idxFermataDestinazione: number) {
     if (!trascinata || trascinata.tragitto !== idxTragitto) { setTrascinata(null); return; }
     const tragitti = [...(form.tragitti ?? [])];
@@ -1150,233 +1148,33 @@ export function SchedaEventoModale({
           if (!contestoGiusto) return null;
         }
         const espansa = tragittiAperti.has(idxTragitto);
-        const disattivato = tragitto.attivo === false;
         return (
-        <div key={idxTragitto} className="section-card" style={disattivato ? { opacity: .55, background: 'repeating-linear-gradient(135deg, var(--dusk), var(--dusk) 10px, var(--dusk-2) 10px, var(--dusk-2) 20px)' } : undefined}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={() => toggleTragittoAperto(idxTragitto)}>
-              <span style={{ color: 'var(--mist)', fontSize: 13 }}>{espansa ? '▾' : '▸'}</span>
-              <div style={{ flex: 1 }}>
-                <input
-                  value={tragitto.nome}
-                  onChange={(e) => aggiornaTragitto(idxTragitto, 'nome', e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  placeholder="Tragitto senza nome"
-                  style={{ background: 'none', border: 'none', padding: 0, margin: 0, fontWeight: 700, fontSize: 'inherit', color: 'inherit', width: '100%', cursor: 'text' }}
-                />
-                {disattivato && <span className="badge attenzione" style={{ marginLeft: 8 }}>Disattivato</span>}
-                {!espansa && (
-                  <p className="section-sub" style={{ margin: '2px 0 0' }}>
-                    {tragitto.fermate.length} fermat{tragitto.fermate.length === 1 ? 'a' : 'e'}
-                    {tragitto.fermate.some((f) => f.citta) && ` — ${tragitto.fermate.filter((f) => f.citta).map((f) => `${f.citta}${f.orario ? ` (${f.orario})` : ''}`).join(', ')}`}
-                  </p>
-                )}
-              </div>
-            </div>
-            <label
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--mist)', cursor: 'pointer', flexShrink: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              title="Disattivato: resta configurato, ma non è più prenotabile sul sito"
-            >
-              <input
-                type="checkbox"
-                checked={!disattivato}
-                onChange={(e) => aggiornaTragitto(idxTragitto, 'attivo', e.target.checked)}
-                style={{ width: 'auto' }}
-              />
-              Attivo
-            </label>
-            <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12.5, flexShrink: 0 }} onClick={() => rimuoviTragitto(idxTragitto)}>Rimuovi tragitto</button>
-          </div>
-
-          {/* Solo qui, nella tab "Tragitti liberi" — un modo diretto per
-              organizzarli dentro un servizio vero, senza doverli
-              ricreare da zero (utile qualunque sia la causa per cui un
-              tragitto è finito qui invece che in un servizio con nome). */}
-          {modalitaServizi === 'multiplo' && !tragitto.servizioId && servizi.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <select
-                value=""
-                onChange={(e) => { if (e.target.value) aggiornaTragitto(idxTragitto, 'servizioId', e.target.value); }}
-                style={{ fontSize: 12.5, maxWidth: 260 }}
-              >
-                <option value="" disabled>↳ Sposta in un servizio...</option>
-                {servizi.map((v) => <option key={v.key} value={v.key}>{v.nome || 'Senza nome'}</option>)}
-              </select>
-            </div>
-          )}
-
-          {espansa && (
-          <>
-          <p className="section-label" style={{ marginBottom: 6, display: 'flex', alignItems: 'center' }}>
-            Fermate
-            <InfoTooltip>{mappaTooltip.fermate_orario_intro ?? TOOLTIP_DEFAULT.fermate_orario_intro}</InfoTooltip>
-          </p>
-
-          <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla.</p>
-          {tragitto.fermate.map((f, idxFermata) => (
-            <div key={idxFermata} style={{ marginBottom: 6 }}>
-              {idxFermata === 0 && (
-                <p style={{ marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--green)' }}>Partenza</p>
-              )}
-              <div
-                className="riga-fermata"
-                draggable
-                onDragStart={() => onDragStart(idxTragitto, idxFermata)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => onDropSu(idxTragitto, idxFermata)}
-                onDragEnd={() => setTrascinata(null)}
-                style={{
-                  display: 'grid', gridTemplateColumns: '16px 1fr 1fr 68px auto auto', gap: 6, alignItems: 'center',
-                  opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
-                }}
-              >
-                <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
-                {/* !== null da solo non basta — dati salvati prima che
-                    il controllo qui sotto intercettasse "__manuale__"
-                    potrebbero avere quella stringa letterale scritta
-                    nel campo (invece di null), che il menu riconosce
-                    come opzione valida e mostra selezionata — nascondendo
-                    la città vera dietro quella scritta, invece di
-                    mostrare il campo manuale come dovrebbe. */}
-                {f.fermataAnagraficaId !== '__manuale__' && !(f.fermataAnagraficaId == null && f.citta) ? (
-                  // Di default (e finché non si sceglie "scrivi
-                  // manualmente") si parte da qui — un elenco leggibile,
-                  // non un'iconcina minuscola. La città arriva
-                  // dall'anagrafica; l'indirizzo (qui accanto, stessa
-                  // riga) resta comunque modificabile anche partendo
-                  // da quello suggerito.
-                  <select
-                    value={f.fermataAnagraficaId ?? ''}
-                    onChange={(e) => selezionaFermataAnagrafica(idxTragitto, idxFermata, e.target.value)}
-                  >
-                    <option value="" disabled>— Scegli una fermata dall'anagrafica —</option>
-                    {fermateAnagrafica.map((fa) => {
-                      // Non ha senso la stessa fermata due volte nello
-                      // stesso tragitto (es. "Milano" scelta sia come
-                      // fermata 1 che come fermata 3) — disabilitata se
-                      // già usata da UN'ALTRA riga qui sotto (non questa
-                      // stessa, che deve restare selezionabile/invariata).
-                      const usataAltrove = tragitto.fermate.some((altra, i) => i !== idxFermata && altra.fermataAnagraficaId === fa.id);
-                      return (
-                        <option key={fa.id} value={fa.id} disabled={usataAltrove}>
-                          {fa.nome === fa.citta ? fa.nome : `${fa.nome} — ${fa.citta}`}{usataAltrove ? ' (già in questo tragitto)' : ''}
-                        </option>
-                      );
-                    })}
-                  </select>
-                ) : (
-                  <input placeholder="Città" value={f.citta} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'citta', e.target.value)} />
-                )}
-                {/* Indirizzo sulla stessa riga della città, sempre
-                    visibile su desktop. Su mobile — la riga è
-                    trascinabile per riordinare le fermate, quindi una
-                    pressione prolungata qui confliggerebbe col gesto
-                    di trascinamento — resta chiuso di default e si
-                    apre con un tocco normale sull'iconetta 📍 qui
-                    sotto (className diverso da quello del campo,
-                    sempre visibile, per non nascondere anche il modo
-                    di aprirlo), si richiude togliendo il focus dal
-                    campo (onBlur). */}
-                <div style={{ position: 'relative' }}>
-                  <input
-                    className={`indirizzo-fermata-riga${indirizzoEspansoMobile === `${idxTragitto}-${idxFermata}` ? ' espansa' : ''}`}
-                    value={f.indirizzo ?? ''}
-                    onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'indirizzo', e.target.value)}
-                    onBlur={() => setIndirizzoEspansoMobile(null)}
-                    placeholder="Indirizzo"
-                  />
-                  <button
-                    type="button"
-                    className="apri-indirizzo-mobile"
-                    onClick={() => setIndirizzoEspansoMobile(`${idxTragitto}-${idxFermata}`)}
-                    title="Modifica indirizzo"
-                  >
-                    📍{f.indirizzo ? '' : ' Indirizzo'}
-                  </button>
-                </div>
-                <div
-                  style={{ width: 68 }}
-                  title="Soglia minima partecipanti (facoltativa) — sotto questo numero la fermata non viene considerata raggiunta"
-                  draggable
-                  onDragStart={(e) => e.stopPropagation()}
-                >
-                  <CampoNumero
-                    placeholder="Min."
-                    value={f.sogliaMinima ?? undefined}
-                    onChange={(v) => aggiornaFermata(idxTragitto, idxFermata, 'sogliaMinima', v !== undefined ? String(v) : '')}
-                  />
-                </div>
-                <label
-                  title={f.attivo === false ? 'Fermata esclusa — non compare più nelle Linee né sul sito' : 'Fermata attiva — clicca per escluderla (es. per scarse adesioni), senza doverla rimuovere del tutto'}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: f.attivo === false ? 'var(--pink)' : 'var(--mist)', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                >
-                  <input type="checkbox" checked={f.attivo !== false} onChange={(e) => aggiornaFermata(idxTragitto, idxFermata, 'attivo', e.target.checked)} style={{ width: 'auto' }} />
-                  <span className="etichetta-attiva-fermata">{f.attivo === false ? 'Esclusa' : 'Attiva'}</span>
-                </label>
-                <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', padding: '4px 8px' }} onClick={() => rimuoviFermata(idxTragitto, idxFermata)} title="Rimuovi fermata">✕</button>
-              </div>
-            </div>
-          ))}
-          <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => aggiungiFermata(idxTragitto)}>+ Aggiungi fermata</button>
-
-          <p style={{ marginTop: 14, marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--pink)' }}>Arrivo</p>
-          {(() => {
-            // Solo uno stile diverso (leggermente oscurato) per far
-            // capire da dove viene il valore — il campo resta
-            // comunque modificabile cliccandoci, come richiesto: chi
-            // vuole un'eccezione per UN tragitto specifico può
-            // scriverci sopra senza dover prima disattivare il flag.
-            const daArrivoPerTutti = arrivoPerTuttiMap.get(tragitto.servizioId ?? null)?.attivo ?? false;
-            const stileOscurato = daArrivoPerTutti ? { opacity: .6, background: 'var(--night)' } : undefined;
-            // Blocco vero (non un avviso) — questo tragitto non è
-            // quello che ha stabilito l'arrivo dell'evento, il campo
-            // città diventa fisso su quel valore. L'indirizzo/orario
-            // restano modificabili (stesso punto di arrivo può avere
-            // un orario diverso per fermata/tragitto).
-            const cittaBloccataQui = arrivoEvento.indice >= 0 && idxTragitto !== arrivoEvento.indice ? arrivoEvento.citta : undefined;
-            return (
-          <div className="form-grid" style={{ marginBottom: 10, gridTemplateColumns: '1fr 1fr 110px' }}>
-            <label>Città di arrivo
-              <input
-                style={cittaBloccataQui ? { opacity: .6, background: 'var(--night)', cursor: 'not-allowed' } : stileOscurato}
-                value={cittaBloccataQui ?? tragitto.arrivoCitta ?? ''}
-                disabled={!!cittaBloccataQui}
-                title={cittaBloccataQui ? `Stessa città di arrivo di tutto l'evento — per cambiarla ovunque, modificala su "${nomeTragittoBloccante}".` : undefined}
-                onChange={(e) => aggiornaTragitto(idxTragitto, 'arrivoCitta', e.target.value)}
-                placeholder="es. Roma"
-              />
-            </label>
-            <label>Indirizzo di arrivo
-              <input
-                style={stileOscurato}
-                value={tragitto.arrivoIndirizzo ?? ''}
-                onChange={(e) => aggiornaTragitto(idxTragitto, 'arrivoIndirizzo', e.target.value)}
-                placeholder="es. Piazzale Clodio, Roma"
-              />
-            </label>
-            <label>Orario
-              <OrarioInput style={stileOscurato} value={tragitto.arrivoOrario ?? ''} onChange={(v) => aggiornaTragitto(idxTragitto, 'arrivoOrario', v)} />
-            </label>
-          </div>
-            );
-          })()}
-          {/* Solo in modifica di un evento già esistente — in
-              creazione questa sezione è uno dei quattro step del
-              wizard (vedi più sotto "Vista CREAZIONE"), non ha senso
-              proporre "Crea evento" da qui, a metà, prima che gli
-              altri step siano stati anche solo visti. */}
-          {evento && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
-            <button className="btn btn-primary" onClick={salva} disabled={salvando}>
-              {salvando ? 'Salvo...' : 'Salva modifica'}
-            </button>
-          </div>
-          )}
-          </>
-          )}
-        </div>
-      );});
+          <TragittoCard
+            key={idxTragitto}
+            tragitto={tragitto}
+            idxTragitto={idxTragitto}
+            espansa={espansa}
+            onToggleAperto={() => toggleTragittoAperto(idxTragitto)}
+            serviziAssegnabili={modalitaServizi === 'multiplo' ? servizi : []}
+            fermateAnagrafica={fermateAnagrafica}
+            trascinata={trascinata}
+            setTrascinata={setTrascinata}
+            onDropSu={(idxFermata) => onDropSu(idxTragitto, idxFermata)}
+            indirizzoEspansoMobile={indirizzoEspansoMobile}
+            setIndirizzoEspansoMobile={setIndirizzoEspansoMobile}
+            cittaBloccata={arrivoEvento.indice >= 0 && idxTragitto !== arrivoEvento.indice ? arrivoEvento.citta : undefined}
+            nomeTragittoBloccante={nomeTragittoBloccante}
+            mappaTooltip={mappaTooltip}
+            daArrivoPerTutti={arrivoPerTuttiMap.get(tragitto.servizioId ?? null)?.attivo ?? false}
+            onAggiorna={(campo, valore) => aggiornaTragitto(idxTragitto, campo, valore)}
+            onAggiornaFermata={(idxFermata, campo, valore) => aggiornaFermata(idxTragitto, idxFermata, campo, valore)}
+            onAggiungiFermata={() => aggiungiFermata(idxTragitto)}
+            onRimuoviFermata={(idxFermata) => rimuoviFermata(idxTragitto, idxFermata)}
+            onSelezionaAnagrafica={(idxFermata, id) => selezionaFermataAnagrafica(idxTragitto, idxFermata, id)}
+            onRimuoviTragitto={() => rimuoviTragitto(idxTragitto)}
+            salvaRapido={evento ? { onSalva: salva, salvando } : undefined}
+          />
+        );});
       })()}
       <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTragittoManuale}>+ Aggiungi tragitto manuale (senza tragitto salvato)</button>
       </>
