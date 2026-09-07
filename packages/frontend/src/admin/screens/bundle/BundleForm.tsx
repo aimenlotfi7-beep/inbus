@@ -169,6 +169,14 @@ export function BundleForm({ bundleId, onChiudi }: { bundleId: string | null; on
 }
 
 function BundleInfo({ form, agg }: { form: BundleInput; agg: (p: Partial<BundleInput>) => void }) {
+  // Copertina in due modi, come le immagini evento: carica un file
+  // oppure incolla direttamente un link (es. un'immagine già online).
+  const [linkCopertina, setLinkCopertina] = useState('');
+  function aggiungiDaLink() {
+    if (!linkCopertina.trim()) return;
+    agg({ copertinaUrl: linkCopertina.trim() });
+    setLinkCopertina('');
+  }
   return (
     <div className="section-card" style={{ marginBottom: 16 }}>
       <p className="section-label">Informazioni</p>
@@ -177,6 +185,10 @@ function BundleInfo({ form, agg }: { form: BundleInput; agg: (p: Partial<BundleI
       <div className="campo">
         <label>Copertina (propria del bundle, non di un evento)</label>
         {form.copertinaUrl && <img src={form.copertinaUrl} alt="" style={{ maxWidth: 240, borderRadius: 8, display: 'block', marginBottom: 8 }} />}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <input placeholder="https://... (o carica un file)" value={linkCopertina} onChange={(e) => setLinkCopertina(e.target.value)} style={{ flex: 1 }} />
+          <button type="button" className="btn btn-ghost" onClick={aggiungiDaLink}>+ Aggiungi</button>
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <CaricaFile onCaricato={(url) => agg({ copertinaUrl: url })} etichetta="+ Carica copertina" />
           {form.copertinaUrl && <button type="button" className="btn btn-ghost" onClick={() => agg({ copertinaUrl: null })}>Rimuovi</button>}
