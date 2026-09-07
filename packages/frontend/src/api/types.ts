@@ -91,6 +91,7 @@ export interface OpzionePartenza {
   prezzoEffettivo: number;
   sogliaMinima: number | null;
   partecipantiAttuali: number | null;
+  fermataRegione: string | null;
 }
 
 export interface Prenotazione {

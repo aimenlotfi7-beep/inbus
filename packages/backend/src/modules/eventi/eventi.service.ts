@@ -5,6 +5,7 @@ import {
   tragitti,
   servizi,
   fermate,
+  fermateAnagrafica,
   immaginiEvento,
   allegatiEvento,
   prenotazioni,
@@ -672,6 +673,10 @@ export const eventiService = {
       // già da ora, indipendentemente da quando arriva quella parte).
       sogliaMinima: number | null;
       partecipantiAttuali: number | null;
+      // Regione della fermata (se scelta dall'anagrafica) — per
+      // raggruppare il menu a tendina sul sito, come le fermate
+      // e i fornitori nel gestionale.
+      fermataRegione: string | null;
     }> = [];
 
     // Una sola query per TUTTE le fermate con una soglia minima
@@ -692,6 +697,15 @@ export const eventiService = {
         .where(and(inArray(prenotazioni.tragittoId, [...new Set(fermateConSoglia.map((f) => f.tragittoId))]), eq(prenotazioni.stato, 'CONFERMATA')))
         .groupBy(prenotazioni.tragittoId, prenotazioni.fermataCitta);
       for (const r of righe) contiPartenza.set(`${r.tragittoId}::${r.citta}`, Number(r.tot));
+    }
+
+    // Una sola query per la regione di TUTTE le fermate collegate
+    // all'anagrafica, di tutti i tragitti mostrati — non una per fermata.
+    const idAnagraficaUsati = [...new Set(tragittiDaMostrare.flatMap((t) => t.fermate.map((f) => f.fermataAnagraficaId).filter((id): id is string => !!id)))];
+    const regionePerAnagrafica = new Map<string, string | null>();
+    if (idAnagraficaUsati.length > 0) {
+      const righe = await db.select({ id: fermateAnagrafica.id, regione: fermateAnagrafica.regione }).from(fermateAnagrafica).where(inArray(fermateAnagrafica.id, idAnagraficaUsati));
+      for (const r of righe) regionePerAnagrafica.set(r.id, r.regione);
     }
 
     for (const tragitto of tragittiDaMostrare) {
@@ -724,6 +738,7 @@ export const eventiService = {
           prezzoEffettivo,
           sogliaMinima: f.sogliaMinima,
           partecipantiAttuali,
+          fermataRegione: f.fermataAnagraficaId ? regionePerAnagrafica.get(f.fermataAnagraficaId) ?? null : null,
         });
       }
     }

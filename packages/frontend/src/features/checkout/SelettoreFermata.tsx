@@ -11,7 +11,16 @@ export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }:
   onSeleziona: (fermataId: string) => void;
   testoOpzione: (o: OpzionePartenza) => string;
 }) {
-  const opzioniOrdinate = [...opzioni].sort((a, b) => a.fermataCitta.localeCompare(b.fermataCitta, 'it'));
+  // Ordinate per regione (alfabetico, "Senza regione" sempre in
+  // fondo) e poi per città dentro ogni regione — come Fornitori e
+  // Fermate nel gestionale, per lo stesso identico motivo: con molte
+  // fermate diventa più facile scorrere una lista organizzata invece
+  // di una sola sequenza alfabetica lunga.
+  const opzioniOrdinate = [...opzioni].sort((a, b) => {
+    const ra = a.fermataRegione ?? 'zzz', rb = b.fermataRegione ?? 'zzz';
+    if (ra !== rb) return ra.localeCompare(rb, 'it');
+    return a.fermataCitta.localeCompare(b.fermataCitta, 'it');
+  });
   const scelta = opzioniOrdinate.find((o) => o.fermataId === valore) ?? null;
 
   const [testo, setTesto] = useState(scelta ? testoOpzione(scelta) : '');
@@ -69,19 +78,31 @@ export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }:
           boxShadow: '0 6px 18px rgba(0,0,0,.12)',
         }}>
           {filtrate.length === 0 && <p style={{ padding: '10px 14px', fontSize: 13, opacity: .6, margin: 0 }}>Nessuna fermata trovata.</p>}
-          {filtrate.map((o) => (
-            <button
-              key={o.fermataId}
-              type="button"
-              onClick={() => scegli(o)}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13.5,
-                background: o.fermataId === valore ? '#faf4ea' : 'transparent', border: 'none', cursor: 'pointer',
-              }}
-            >
-              {testoOpzione(o)}
-            </button>
-          ))}
+          {filtrate.map((o, i) => {
+            // Intestazione di regione solo quando cambia rispetto alla
+            // fermata precedente nell'elenco già ordinato — non una per
+            // fermata, una per gruppo.
+            const regionePrecedente = i > 0 ? (filtrate[i - 1].fermataRegione ?? 'Senza regione') : null;
+            const regioneCorrente = o.fermataRegione ?? 'Senza regione';
+            const nuovaRegione = regioneCorrente !== regionePrecedente;
+            return (
+              <div key={o.fermataId}>
+                {nuovaRegione && (
+                  <p style={{ margin: 0, padding: '8px 14px 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .3, opacity: .55 }}>{regioneCorrente}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => scegli(o)}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13.5,
+                    background: o.fermataId === valore ? '#faf4ea' : 'transparent', border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  {testoOpzione(o)}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
