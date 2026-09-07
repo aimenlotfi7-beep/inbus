@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { tourLeaderApi, type TourLeader, type CandidaturaInput } from '../../api/tourleader';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
@@ -60,7 +61,7 @@ export function TourLeaderScreen() {
       const { email, password } = await tourLeaderApi.attivaAccesso(t.id);
       setCredenzialiGenerate({ nomeCompleto: `${t.nome} ${t.cognome}`, email, password });
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: errore di rete.');
     }
   }
 
@@ -70,7 +71,7 @@ export function TourLeaderScreen() {
   async function salva() {
     if (salvando) return;
     if (!form.nome.trim() || !form.cognome.trim() || !form.email.trim()) {
-      alert('Compila almeno nome, cognome ed email.');
+      notifica('Compila almeno nome, cognome ed email.');
       return;
     }
     setSalvando(true);
@@ -79,7 +80,7 @@ export function TourLeaderScreen() {
       setFormAperto(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
       setSalvando(false);
     }

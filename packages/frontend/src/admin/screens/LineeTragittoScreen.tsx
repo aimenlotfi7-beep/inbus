@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { eventiApi, type Linea, type BusDiLineaInput, type CalcoloBusTragitto } from '../../api/eventi';
 import type { Evento, Fermata } from '../../api/types';
 import { fornitoriApi, type Fornitore } from '../../api/fornitori';
@@ -154,7 +155,7 @@ export function LineeTragittoScreen() {
       ricarica();
       preventiviApi.verificaKm(idTragitto).then(setVerificaKm).catch(() => {});
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: errore di rete.');
     }
   }
 
@@ -182,11 +183,11 @@ export function LineeTragittoScreen() {
 
   async function salvaNuovaLinea() {
     if (!formBus.riferimento || !formBus.postiBus) {
-      alert('Indica un riferimento per il bus e quanti posti ha.');
+      notifica('Indica un riferimento per il bus e quanti posti ha.');
       return;
     }
     if (fermateSelezionate.length === 0) {
-      alert('Seleziona almeno una fermata per la Linea.');
+      notifica('Seleziona almeno una fermata per la Linea.');
       return;
     }
     setSalvando(true);
@@ -195,7 +196,7 @@ export function LineeTragittoScreen() {
       setPopupAperto(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
       setSalvando(false);
     }
@@ -222,7 +223,7 @@ export function LineeTragittoScreen() {
       setModificaBusId(null);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
       setSalvando(false);
     }
@@ -234,7 +235,7 @@ export function LineeTragittoScreen() {
   }
   async function salvaBusAggiunto() {
     if (!lineaAttivaId || !formNuovoBus.riferimento || !formNuovoBus.postiBus) {
-      alert('Indica un riferimento e quanti posti ha il bus.');
+      notifica('Indica un riferimento e quanti posti ha il bus.');
       return;
     }
     setSalvando(true);
@@ -243,7 +244,7 @@ export function LineeTragittoScreen() {
       setAggiungiBusAperto(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
       setSalvando(false);
     }
@@ -255,10 +256,10 @@ export function LineeTragittoScreen() {
     try {
       const { versate, restanoInAttesa } = await eventiApi.versaLinea(lineaAttivaId);
       ricarica();
-      if (versate === 0 && restanoInAttesa > 0) alert('Nessun posto libero sui bus di questa Linea — aggiungine un altro, o aumenta i posti di quello che c\'è.');
-      else if (restanoInAttesa > 0) alert(`Versate ${versate} prenotazion${versate === 1 ? 'e' : 'i'} — ${restanoInAttesa} restano in attesa, non c'è più posto sui bus di questa Linea.`);
+      if (versate === 0 && restanoInAttesa > 0) notifica('Nessun posto libero sui bus di questa Linea — aggiungine un altro, o aumenta i posti di quello che c\'è.');
+      else if (restanoInAttesa > 0) notifica(`Versate ${versate} prenotazion${versate === 1 ? 'e' : 'i'} — ${restanoInAttesa} restano in attesa, non c'è più posto sui bus di questa Linea.`);
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Versamento non riuscito: ${e.message}` : 'Versamento non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Versamento non riuscito: ${e.message}` : 'Versamento non riuscito: errore di rete.');
     } finally {
       setVersando(false);
     }
@@ -271,7 +272,7 @@ export function LineeTragittoScreen() {
   }
   async function salvaModificaPercorso() {
     if (!lineaAttivaId || percorsoModificato.length === 0) {
-      alert('Seleziona almeno una fermata.');
+      notifica('Seleziona almeno una fermata.');
       return;
     }
     setSalvando(true);
@@ -280,7 +281,7 @@ export function LineeTragittoScreen() {
       setModificaPercorsoAperta(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
       setSalvando(false);
     }
@@ -418,7 +419,7 @@ export function LineeTragittoScreen() {
                 <button
                   className="btn btn-primary" style={{ flex: 1 }}
                   onClick={() => {
-                    if (!formBus.riferimento || !formBus.postiBus) { alert('Indica un riferimento e i posti del bus.'); return; }
+                    if (!formBus.riferimento || !formBus.postiBus) { notifica('Indica un riferimento e i posti del bus.'); return; }
                     setStepPopup(2);
                   }}
                 >

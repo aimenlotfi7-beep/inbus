@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../../shared/notifiche';
 import { listaAttesaApi, type IscrizioneListaAttesa } from '../../../api/listaAttesa';
 import { ErroreApi } from '../../../api/client';
 
@@ -27,7 +28,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
       }
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+      notifica(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
     }
   }
 
@@ -47,10 +48,10 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
     if (!confirm(`Promuovere tutte le ${inAttesa.length} iscrizioni in attesa? A ognuno arriverà un'email con il link per completare la prenotazione — chi trova i posti già esauriti nel frattempo resterà segnalato come non riuscito, senza bloccare gli altri.`)) return;
     try {
       const { promosse, fallite } = await listaAttesaApi.promuoviTutte(eventoId);
-      alert(`Fatto — ${promosse} promosse${fallite > 0 ? `, ${fallite} non riuscite (probabilmente posti esauriti nel frattempo)` : ''}.`);
+      notifica(`Fatto — ${promosse} promosse${fallite > 0 ? `, ${fallite} non riuscite (probabilmente posti esauriti nel frattempo)` : ''}.`);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+      notifica(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
     }
   }
 

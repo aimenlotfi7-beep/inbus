@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { pagineApi, type PaginaCms, type ContenutoSito } from '../../api/pagine';
 import { categorieApi, type Categoria } from '../../api/categorie';
 import { categorieEventoApi, type CategoriaEvento } from '../../api/categorieEvento';
@@ -31,7 +32,7 @@ export function ContenutiScreen() {
       await categorieApi.create(nome.trim());
       ricaricaGeneri();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Impossibile creare: ${e.message}` : 'Impossibile creare: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Impossibile creare: ${e.message}` : 'Impossibile creare: errore di rete.');
     }
   }
   async function eliminaGenere(g: Categoria) {
@@ -40,7 +41,7 @@ export function ContenutiScreen() {
       await categorieApi.remove(g.id);
       ricaricaGeneri();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
     }
   }
   async function nuovaCategoriaEvento() {
@@ -50,7 +51,7 @@ export function ContenutiScreen() {
       await categorieEventoApi.create(nome.trim());
       ricaricaCategorieEvento();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Impossibile creare: ${e.message}` : 'Impossibile creare: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Impossibile creare: ${e.message}` : 'Impossibile creare: errore di rete.');
     }
   }
   async function eliminaCategoriaEvento(c: CategoriaEvento) {
@@ -59,7 +60,7 @@ export function ContenutiScreen() {
       await categorieEventoApi.remove(c.id);
       ricaricaCategorieEvento();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
     }
   }
 

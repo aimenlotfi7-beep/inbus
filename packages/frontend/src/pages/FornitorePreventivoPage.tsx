@@ -86,7 +86,14 @@ export function FornitorePreventivoPage() {
           </div>
         )}
 
-        {dati && !dati.giaRisposto && !inviato && (
+        {dati?.scaduto && !dati.giaRisposto && (
+          <div className="success-box">
+            <h2>Link scaduto</h2>
+            <p>Questa richiesta di preventivo non è più aperta. Se vuole ancora inviare un'offerta, contatti direttamente chi le ha scritto.</p>
+          </div>
+        )}
+
+        {dati && !dati.giaRisposto && !dati.scaduto && !inviato && (
           <form onSubmit={(e) => e.preventDefault()}>
             <div className="form-grid">
               <label>Prezzo (€) <input type="text" inputMode="decimal" placeholder="es. 850" value={prezzo} onChange={(e) => setPrezzo(e.target.value)} required /></label>

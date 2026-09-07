@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../api/layoutBiglietto';
 import { PanelHead } from '../shared/PanelHead';
 import { CaricaFile } from '../shared/CaricaFile';
@@ -166,7 +167,7 @@ export function LayoutBigliettoScreen() {
   }
 
   async function salva() {
-    if (!nome.trim()) { alert('Dai un nome al layout prima di salvare.'); return; }
+    if (!nome.trim()) { notifica('Dai un nome al layout prima di salvare.'); return; }
     setSalvando(true);
     try {
       const configurazione = JSON.stringify(config);
@@ -178,7 +179,7 @@ export function LayoutBigliettoScreen() {
       }
       ricarica();
     } catch (e) {
-      alert(e instanceof Error ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito.');
+      notifica(e instanceof Error ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito.');
     } finally {
       setSalvando(false);
     }
@@ -188,7 +189,7 @@ export function LayoutBigliettoScreen() {
     try {
       await layoutBigliettoApi.scaricaAnteprima(JSON.stringify(config));
     } catch (e) {
-      alert(e instanceof Error ? `Anteprima non riuscita: ${e.message}` : 'Anteprima non riuscita.');
+      notifica(e instanceof Error ? `Anteprima non riuscita: ${e.message}` : 'Anteprima non riuscita.');
     } finally {
       setGenerandoAnteprima(false);
     }
@@ -206,7 +207,7 @@ export function LayoutBigliettoScreen() {
       setSelezionato(null);
       ricarica();
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Eliminazione non riuscita.');
+      notifica(e instanceof Error ? e.message : 'Eliminazione non riuscita.');
     }
   }
 

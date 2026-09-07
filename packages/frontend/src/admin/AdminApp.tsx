@@ -38,6 +38,7 @@ import { TemplateEmailScreen } from './screens/TemplateEmailScreen';
 import { LayoutBigliettoScreen } from './screens/LayoutBigliettoScreen';
 import { AnalisiPercorsiScreen } from './screens/beta/AnalisiPercorsiScreen';
 import { authApi, haPermesso, type SessioneAdmin } from '../api/auth';
+import { Toaster } from './shared/Toaster';
 
 function StatisticheSenzaHeader() {
   return <AdminDashboard onLogout={() => {}} soloContenuto />;
@@ -207,6 +208,7 @@ export function AdminApp() {
         <AdminLayout sessione={sessione} sezioneAttiva={sezione} onCambiaSezione={cambiaSezione} onVaiHome={() => setSezione('home')} onLogout={logout}>
           {sezione === 'home' ? <AdminHome onVaiA={cambiaSezione} /> : (() => { const Schermata = SCHERMATE[sezione]; return <Schermata />; })()}
         </AdminLayout>
+        <Toaster />
       </NavigazioneContext.Provider>
     </SessioneContext.Provider>
   );

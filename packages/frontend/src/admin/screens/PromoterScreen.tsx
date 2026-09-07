@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { promoterApi, type Promoter, type PromoterInput } from '../../api/promoter';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
@@ -44,7 +45,7 @@ export function PromoterScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
     } finally {
       setSalvando(false);
     }

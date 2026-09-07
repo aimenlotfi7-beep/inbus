@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { templateEmailApi, type TemplateEmail } from '../../api/templateEmail';
 import { ErroreApi } from '../../api/client';
 import { sanificaHtml } from '../../shared/sanificaHtml';
@@ -46,13 +47,13 @@ export function TemplateEmailScreen() {
 
   async function salva() {
     if (!selezionato) return;
-    if (!oggetto.trim() || !corpo.trim()) { alert('Oggetto e corpo non possono essere vuoti.'); return; }
+    if (!oggetto.trim() || !corpo.trim()) { notifica('Oggetto e corpo non possono essere vuoti.'); return; }
     setSalvando(true);
     try {
       await templateEmailApi.aggiorna(selezionato.chiave, { oggetto, corpo });
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
       setSalvando(false);
     }

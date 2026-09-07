@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { prenotazioniAdminApi, type PrenotazioneRiga, type EventoConPrenotazioni } from '../../api/prenotazioniAdmin';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
@@ -83,7 +84,7 @@ export function PrenotazioniScreen() {
       await prenotazioniAdminApi.cancella(r.pnr);
       ricaricaPrenotazioni();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Cancellazione non riuscita: ${e.message}` : 'Cancellazione non riuscita: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Cancellazione non riuscita: ${e.message}` : 'Cancellazione non riuscita: impossibile contattare il server.');
     }
   }
   async function eliminaDefinitivamente(r: PrenotazioneRiga) {
@@ -92,16 +93,16 @@ export function PrenotazioniScreen() {
       await prenotazioniAdminApi.eliminaDefinitivamente(r.pnr);
       ricaricaPrenotazioni();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Eliminazione non riuscita: ${e.message}` : 'Eliminazione non riuscita: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Eliminazione non riuscita: ${e.message}` : 'Eliminazione non riuscita: impossibile contattare il server.');
     }
   }
   async function rigeneraBiglietto(r: PrenotazioneRiga) {
     if (!confirm(`Rigenerare il biglietto per ${r.pnr}? Utile se non era mai stato emesso (es. per un problema tecnico) — non tocca il biglietto se esiste già.`)) return;
     try {
       await prenotazioniAdminApi.rigeneraBiglietto(r.pnr);
-      alert('Fatto — se il cliente ora apre "I miei biglietti" nella sua area, dovrebbe trovarlo.');
+      notifica('Fatto — se il cliente ora apre "I miei biglietti" nella sua area, dovrebbe trovarlo.');
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: impossibile contattare il server.');
     }
   }
 

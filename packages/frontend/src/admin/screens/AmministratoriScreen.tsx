@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { amministratoriApi, type Amministratore, type AmministratoreInput, type LogRiga, type EccezionePermesso } from '../../api/amministratori';
 import { ruoliApi, type Ruolo, type Permesso } from '../../api/ruoli';
 import { ErroreApi } from '../../api/client';
@@ -63,7 +64,7 @@ export function AmministratoriScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
     } finally {
       setSalvando(false);
     }
@@ -74,7 +75,7 @@ export function AmministratoriScreen() {
       await amministratoriApi.remove(a.id);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Eliminazione non riuscita: ${e.message}` : 'Eliminazione non riuscita: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Eliminazione non riuscita: ${e.message}` : 'Eliminazione non riuscita: impossibile contattare il server.');
     }
   }
 
@@ -82,7 +83,7 @@ export function AmministratoriScreen() {
     try {
       const dati = await amministratoriApi.permessi(a.id);
       if (dati.ruoloOwner) {
-        alert('Questa utenza ha il ruolo proprietario: ha già tutti i permessi, non servono eccezioni personali.');
+        notifica('Questa utenza ha il ruolo proprietario: ha già tutti i permessi, non servono eccezioni personali.');
         return;
       }
       setPermessiUtenza(a);
@@ -97,7 +98,7 @@ export function AmministratoriScreen() {
       }
       setStatoPermessi(stato);
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Impossibile aprire i permessi: ${e.message}` : 'Impossibile aprire i permessi: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Impossibile aprire i permessi: ${e.message}` : 'Impossibile aprire i permessi: errore di rete.');
     }
   }
 
@@ -123,7 +124,7 @@ export function AmministratoriScreen() {
       await amministratoriApi.salvaPermessi(permessiUtenza.id, eccezioni);
       setPermessiUtenza(null);
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
     }
   }
 

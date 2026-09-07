@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { campagneApi, type Campagna, type CampagnaInput } from '../../api/campagne';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
@@ -29,7 +30,7 @@ export function CampagneScreen() {
   const [salvando, setSalvando] = useState(false);
   async function salva() {
     if (salvando) return;
-    if (!form.nome.trim()) { alert('Dai un nome alla campagna.'); return; }
+    if (!form.nome.trim()) { notifica('Dai un nome alla campagna.'); return; }
     setSalvando(true);
     try {
       if (inModifica) await campagneApi.update(inModifica.id, form);
@@ -37,7 +38,7 @@ export function CampagneScreen() {
       setAperta(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
       setSalvando(false);
     }

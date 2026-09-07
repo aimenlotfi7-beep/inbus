@@ -71,6 +71,20 @@ export async function leggiNotificaNonScelti(): Promise<boolean> {
   return riga ? riga.valore === 'true' : true;
 }
 
+/** Giorni di validità del link inviato al fornitore: dopo, il link
+ *  risponde "scaduto" (niente più risposte tardive su un evento ormai
+ *  organizzato, e un token finito in una mail inoltrata non resta
+ *  utilizzabile per sempre). Chi ha già risposto continua a vedere la
+ *  propria risposta. Nessuna migrazione: si calcola da creataIl. */
+export const CHIAVE_GIORNI_LINK_PREVENTIVO = 'giorni_validita_link_preventivo';
+const DEFAULT_GIORNI_LINK_PREVENTIVO = 60;
+
+export async function leggiGiorniValiditaLinkPreventivo(): Promise<number> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_GIORNI_LINK_PREVENTIVO)).limit(1);
+  const valore = riga ? Number(riga.valore) : NaN;
+  return Number.isFinite(valore) && valore > 0 ? valore : DEFAULT_GIORNI_LINK_PREVENTIVO;
+}
+
 export const impostazioniRouter = Router();
 impostazioniRouter.use(richiedeAuth);
 

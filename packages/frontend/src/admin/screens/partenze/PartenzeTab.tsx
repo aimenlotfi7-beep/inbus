@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { notifica } from '../../shared/notifiche';
 import type { ContestoPartenze } from './tipi';
 import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea, type VenditePerFermata } from '../../../api/eventi';
 import { GraficoLinee, type SerieGrafico } from '../../shared/GraficoLinee';
 import type { Evento } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { impostazioniApi } from '../../../api/impostazioni';
-import { preventiviApi, type FornitoreCandidato, type RichiestaConRisposta } from '../../../api/preventivi';
+import { PreventiviTragitto } from './PreventiviTragitto';
 import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import { ErroreApi } from '../../../api/client';
 import { CampoNumero } from '../../shared/CampoNumero';
@@ -62,6 +63,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   const mappaTooltip = useMappaTooltip();
   const navigaSezione = useNavigazione();
   const vedeEconomia = haPermesso(sessione, 'eventi.economia');
+  const puoAccettarePreventivi = haPermesso(sessione, 'preventivi.accetta');
   const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
   const [eventoCompleto, setEventoCompleto] = useState<Evento | null>(null);
   // Mappa tragittoId -> form in modifica — non più un solo tragitto alla
@@ -71,16 +73,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   // (bug segnalato: "non riesco a calcolare gli orari per il secondo
   // tragitto e continuare").
   const [formOperativoMap, setFormOperativoMap] = useState<Map<string, { prezzoExtra: number; fermate: FermataInput[] }>>(new Map());
-  // Sezione Preventivi — candidati (fornitori nel raggio) e risposte
-  // ricevute, per tragitto (chiave = tragittoId). "candidatiMap" è
-  // svuotata dopo l'invio di una richiesta (si ricarica la lista
-  // risposte, i candidati vanno richiesti di nuovo se serve un altro
-  // giro sullo stesso tragitto).
-  const [candidatiMap, setCandidatiMap] = useState<Map<string, FornitoreCandidato[]>>(new Map());
-  const [risposteMap, setRisposteMap] = useState<Map<string, RichiestaConRisposta[]>>(new Map());
-  const [manualiSelezionatiMap, setManualiSelezionatiMap] = useState<Map<string, Set<string>>>(new Map());
-  const [caricandoCandidatiSet, setCaricandoCandidatiSet] = useState<Set<string>>(new Set());
-  const [inviandoRichiestaSet, setInviandoRichiestaSet] = useState<Set<string>>(new Set());
   // Chiave composita `${tragittoId}::${idx}` — quale riga fermata ha
   // l'indirizzo espanso (doppio tap/clic sulla città). Chiuso di
   // default: su mobile una riga con solo città+orario+rimuovi sta
@@ -97,19 +89,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   const [formPreventivoMap, setFormPreventivoMap] = useState<Map<string, { costo?: number; postiBus?: number; fornitoreId?: string; file?: File }>>(new Map());
   const [fornitoriLista, setFornitoriLista] = useState<Fornitore[]>([]);
   useEffect(() => { fornitoriApi.list().then((f) => setFornitoriLista(f.filter((x) => x.stato === 'APPROVATO'))).catch(() => {}); }, []);
-  // Le risposte preventivo si caricano QUI, non dentro il render: un
-  // fetch avviato mentre si disegna (con setState al ritorno) è il
-  // pattern che prima o poi finisce in un ciclo di richieste. Carica
-  // per tutti i tragitti dell'evento la prima volta che si entra nella
-  // tab Preventivi (sono pochi per evento, non serve filtrare per
-  // quello aperto).
-  useEffect(() => {
-    if (contestoPartenze?.tabOrigine !== 'preventivi') return;
-    for (const t of calcolo) {
-      if (!risposteMap.has(t.tragittoId)) caricaRisposte(t.tragittoId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calcolo, contestoPartenze?.tabOrigine]);
   // I due numeri della formula prezzi, configurabili da Impostazioni —
   // caricati una volta sola all'apertura, con gli stessi default già
   // usati finora se non sono ancora stati impostati esplicitamente
@@ -309,7 +288,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
     // silenzio. Ora blocca, va completata a mano prima di salvare.
     const senzaOrario = form.fermate.filter((f) => f.attivo !== false && !f.orario?.trim());
     if (senzaOrario.length > 0) {
-      alert(`${senzaOrario.length} fermata/e attiva/e ${senzaOrario.length === 1 ? 'è' : 'sono'} ancora senza orario (${senzaOrario.map((f) => f.citta).join(', ')}) — completa/e a mano prima di salvare.`);
+      notifica(`${senzaOrario.length} fermata/e attiva/e ${senzaOrario.length === 1 ? 'è' : 'sono'} ancora senza orario (${senzaOrario.map((f) => f.citta).join(', ')}) — completa/e a mano prima di salvare.`);
       return;
     }
     setSalvandoOperativoSet((prev) => new Set(prev).add(tragittoId));
@@ -319,7 +298,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
       ricarica();
       onSalvato?.();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
       setSalvandoOperativoSet((prev) => { const s = new Set(prev); s.delete(tragittoId); return s; });
     }
@@ -339,103 +318,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
    *  veri già salvati (costo, posti presunti, prezzi attuali per
    *  fermata) invece di partire vuoto: prima, una volta registrato il
    *  preventivo, non c'era più modo di rivederlo — bug corretto qui. */
-  function trovaTragittoVero(tragittoId: string) {
-    return [...(eventoCompleto?.tragitti ?? []), ...(eventoCompleto?.servizi.flatMap((s) => s.tragitti) ?? [])].find((t) => t.id === tragittoId);
-  }
-
-  async function caricaCandidati(tragittoId: string) {
-    const tragittoVero = trovaTragittoVero(tragittoId);
-    if (!tragittoVero) return;
-    setCaricandoCandidatiSet((prev) => new Set(prev).add(tragittoId));
-    try {
-      let lat = tragittoVero.partenzaLat, lng = tragittoVero.partenzaLng;
-      if (lat == null || lng == null) {
-        const partenza = tragittoVero.fermate[0];
-        if (!partenza?.citta) { alert('Manca la città di partenza su questo tragitto — sistemala in Eventi prima di richiedere un preventivo.'); return; }
-        const r = await geocodifica(partenza.indirizzo ? `${partenza.indirizzo}, ${partenza.citta}` : partenza.citta);
-        if (!r.coordinate) { alert('Indirizzo di partenza non trovato — controllalo in Eventi prima di richiedere un preventivo.'); return; }
-        lat = r.coordinate.lat; lng = r.coordinate.lng;
-      }
-      const candidati = await preventiviApi.candidati(tragittoId, lat, lng);
-      setCandidatiMap((prev) => new Map(prev).set(tragittoId, candidati));
-    } catch (e) {
-      alert(e instanceof ErroreApi ? e.message : 'Impossibile caricare i fornitori vicini.');
-    } finally {
-      setCaricandoCandidatiSet((prev) => { const s = new Set(prev); s.delete(tragittoId); return s; });
-    }
-  }
-
-  function toggleManuale(tragittoId: string, fornitoreId: string) {
-    setManualiSelezionatiMap((prev) => {
-      const m = new Map(prev);
-      const set = new Set(m.get(tragittoId) ?? []);
-      if (set.has(fornitoreId)) set.delete(fornitoreId); else set.add(fornitoreId);
-      m.set(tragittoId, set);
-      return m;
-    });
-  }
-
-  async function inviaRichiesta(tragittoId: string) {
-    const tragittoVero = trovaTragittoVero(tragittoId);
-    const manuali = manualiSelezionatiMap.get(tragittoId) ?? new Set<string>();
-    setInviandoRichiestaSet((prev) => new Set(prev).add(tragittoId));
-    try {
-      const risultato = await preventiviApi.richiedi(tragittoId, {
-        lat: tragittoVero?.partenzaLat ?? undefined,
-        lng: tragittoVero?.partenzaLng ?? undefined,
-        fornitoriManualiIds: [...manuali],
-      });
-      alert(`Inviate ${risultato.inviateAutomatiche} richiesta/e automatica/e e ${risultato.inviateManuali} manuale/i.`);
-      setCandidatiMap((prev) => { const m = new Map(prev); m.delete(tragittoId); return m; });
-      setManualiSelezionatiMap((prev) => { const m = new Map(prev); m.delete(tragittoId); return m; });
-      caricaRisposte(tragittoId);
-    } catch (e) {
-      alert(e instanceof ErroreApi ? e.message : 'Invio non riuscito.');
-    } finally {
-      setInviandoRichiestaSet((prev) => { const s = new Set(prev); s.delete(tragittoId); return s; });
-    }
-  }
-
-  function caricaRisposte(tragittoId: string) {
-    preventiviApi.listaPerTragitto(tragittoId).then((r) => setRisposteMap((prev) => new Map(prev).set(tragittoId, r))).catch(() => {});
-  }
-
-  async function accettaPreventivo(rispostaId: string, tragittoId: string) {
-    if (!confirm('Accettare questo preventivo? Il prezzo verrà scritto nel campo Prezzi (sezione Prezzi), da lì si calcola e valida il prezzo di vendita.')) return;
-    await preventiviApi.accetta(rispostaId);
-    caricaRisposte(tragittoId);
-    ricarica();
-  }
-
-  function fileABase64Preventivo(f: File): Promise<string> {
-    return new Promise((risolvi, rifiuta) => {
-      const lettore = new FileReader();
-      lettore.onload = () => risolvi((lettore.result as string).split(',')[1]);
-      lettore.onerror = () => rifiuta(new Error('Lettura file fallita'));
-      lettore.readAsDataURL(f);
-    });
-  }
-
-  async function caricaFileFirmatoPerRisposta(rispostaId: string, tragittoId: string, file: File) {
-    const contenuto = await fileABase64Preventivo(file);
-    await preventiviApi.caricaFileFirmato(rispostaId, file.name, contenuto);
-    caricaRisposte(tragittoId);
-  }
-
-  /** L'allegato non viaggia con la lista (peserebbe MB per riga): lo si
-   *  chiede al server solo al clic. */
-  async function scaricaFileRisposta(rispostaId: string, quale: 'originale' | 'firmato') {
-    try {
-      const { nome, contenuto } = await preventiviApi.scaricaFile(rispostaId, quale);
-      const link = document.createElement('a');
-      link.href = `data:application/octet-stream;base64,${contenuto}`;
-      link.download = nome;
-      link.click();
-    } catch (e) {
-      alert(e instanceof ErroreApi ? e.message : 'Download non riuscito.');
-    }
-  }
-
   function apriPreventivo(tragittoId: string) {
     setAperte((prev) => new Set(prev).add(tragittoId));
     const tragittoVero = eventoCompleto
@@ -572,7 +454,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
       ricarica();
       onSalvato?.();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
     } finally {
       setSalvandoPreventivoSet((prev) => { const s = new Set(prev); s.delete(tragittoId); return s; });
     }
@@ -1098,107 +980,13 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
               </div>
             );
             if (contestoPartenze?.tabOrigine === 'preventivi') {
-              const candidati = candidatiMap.get(tragitto.tragittoId);
-              const risposte = risposteMap.get(tragitto.tragittoId);
-              const manualiSelezionati = manualiSelezionatiMap.get(tragitto.tragittoId) ?? new Set<string>();
-              const caricandoCandidati = caricandoCandidatiSet.has(tragitto.tragittoId);
-              const inviandoRichiesta = inviandoRichiestaSet.has(tragitto.tragittoId);
-
-              // Colore in scala dal più economico (verde) al più caro
-              // (rosso) tra le risposte ricevute — solo tra quelle con
-              // un prezzo vero, non ha senso scalare un valore solo.
-              const prezzi = (risposte ?? []).filter((r) => r.risposta).map((r) => Number(r.risposta!.prezzo));
-              const minPrezzo = Math.min(...prezzi), maxPrezzo = Math.max(...prezzi);
-              function coloreScala(prezzo: number): string {
-                if (prezzi.length < 2 || maxPrezzo === minPrezzo) return 'var(--mist)';
-                const t = (prezzo - minPrezzo) / (maxPrezzo - minPrezzo); // 0 = più economico, 1 = più caro
-                // Verde -> ambra -> rosso, interpolazione semplice sui
-                // tre punti invece di un vero gradiente HSL — basta a
-                // dare l'idea a colpo d'occhio, senza calcoli complessi.
-                if (t < 0.5) return `color-mix(in srgb, var(--green) ${Math.round((1 - t * 2) * 100)}%, var(--amber) ${Math.round(t * 2 * 100)}%)`;
-                return `color-mix(in srgb, var(--amber) ${Math.round((1 - (t - 0.5) * 2) * 100)}%, var(--pink) ${Math.round((t - 0.5) * 2 * 100)}%)`;
-              }
-
               return (
-                <div style={{ marginTop: 14 }}>
-                  <p className="section-label" style={{ marginBottom: 8 }}>Richiedi preventivo</p>
-                  {!candidati ? (
-                    <button type="button" className="btn btn-ghost" disabled={caricandoCandidati} onClick={() => caricaCandidati(tragitto.tragittoId)}>
-                      {caricandoCandidati ? 'Cerco i fornitori vicini...' : '+ Nuova richiesta preventivo'}
-                    </button>
-                  ) : (
-                    <div style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 14 }}>
-                      {candidati.length === 0 && <p className="testo-intro">Nessun fornitore approvato entro il raggio impostato — allarga il raggio in Impostazioni o registra un fornitore più vicino.</p>}
-                      {candidati.filter((c) => c.statoCandidato === 'automatico').length > 0 && (
-                        <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 8 }}>
-                          Invio automatico a: {candidati.filter((c) => c.statoCandidato === 'automatico').map((c) => c.nome).join(', ')}
-                        </p>
-                      )}
-                      {candidati.filter((c) => c.statoCandidato !== 'automatico').map((c) => {
-                        const oscurato = c.statoCandidato === 'gia_contattato';
-                        return (
-                          <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', opacity: oscurato ? .45 : 1, cursor: oscurato ? 'default' : 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              disabled={oscurato}
-                              checked={manualiSelezionati.has(c.id)}
-                              onChange={() => toggleManuale(tragitto.tragittoId, c.id)}
-                              style={{ width: 'auto' }}
-                            />
-                            <span style={{ flex: 1 }}>{c.nome} <span style={{ color: 'var(--mist)', fontSize: 12 }}>({c.distanzaKm} km)</span></span>
-                            {oscurato && <span style={{ fontSize: 11, color: 'var(--mist)' }}>già contattato, non scelto</span>}
-                            {c.statoCandidato === 'accettato_in_precedenza' && <span style={{ fontSize: 11, color: 'var(--green)' }}>fornitore di fiducia per questo tragitto</span>}
-                          </label>
-                        );
-                      })}
-                      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                        <button type="button" className="btn btn-primary" disabled={inviandoRichiesta} onClick={() => inviaRichiesta(tragitto.tragittoId)}>{inviandoRichiesta ? 'Invio...' : 'Invia richiesta'}</button>
-                        <button type="button" className="btn btn-ghost" onClick={() => { setCandidatiMap((prev) => { const m = new Map(prev); m.delete(tragitto.tragittoId); return m; }); setManualiSelezionatiMap((prev) => { const m = new Map(prev); m.delete(tragitto.tragittoId); return m; }); }}>Annulla</button>
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="section-label" style={{ marginTop: 18, marginBottom: 8 }}>Risposte ricevute</p>
-                  {!risposte || risposte.length === 0 ? (
-                    <p className="testo-intro">Nessuna richiesta inviata ancora per questo tragitto.</p>
-                  ) : (
-                    <div className="table-scroll">
-                      <table className="data-table">
-                        <thead><tr><th>Fornitore</th><th>Prezzo</th><th>Stato</th><th></th></tr></thead>
-                        <tbody>
-                          {risposte.map((r) => (
-                            <tr key={r.richiesta.id}>
-                              <td>{r.fornitore.nome}</td>
-                              <td style={{ fontWeight: 700, color: r.risposta ? coloreScala(Number(r.risposta.prezzo)) : 'var(--mist)' }}>
-                                {r.risposta ? `€${Number(r.risposta.prezzo).toFixed(2)}` : '— in attesa'}
-                              </td>
-                              <td style={{ fontSize: 12, color: 'var(--mist)' }}>
-                                {tragittoVero?.fornitoreId === r.fornitore.id ? '✓ Accettato' : r.risposta ? 'Risposto' : 'In attesa'}
-                              </td>
-                              <td style={{ whiteSpace: 'nowrap' }}>
-                                {r.risposta?.haFile && (
-                                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => scaricaFileRisposta(r.risposta!.id, 'originale')}>Scarica file</button>
-                                )}
-                                {r.risposta && tragittoVero?.fornitoreId !== r.fornitore.id && (
-                                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: 'var(--green)' }} onClick={() => accettaPreventivo(r.risposta!.id, tragitto.tragittoId)}>Accetta</button>
-                                )}
-                                {r.risposta && tragittoVero?.fornitoreId === r.fornitore.id && !r.risposta.haFileFirmato && (
-                                  <label className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px', cursor: 'pointer' }}>
-                                    Carica firmato
-                                    <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) caricaFileFirmatoPerRisposta(r.risposta!.id, tragitto.tragittoId, f); }} />
-                                  </label>
-                                )}
-                                {r.risposta?.haFileFirmato && (
-                                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: 'var(--green)' }} onClick={() => scaricaFileRisposta(r.risposta!.id, 'firmato')}>✓ Firmato e inviato — scarica</button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
+                <PreventiviTragitto
+                  tragittoId={tragitto.tragittoId}
+                  tragittoVero={tragittoVero}
+                  puoAccettare={puoAccettarePreventivi}
+                  onAccettato={ricarica}
+                />
               );
             }
             if (contestoPartenze?.tabOrigine === 'da-confermare') {

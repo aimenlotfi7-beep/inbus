@@ -33,6 +33,7 @@ export interface DatiPubbliciPreventivo {
   evento: { artista: string; data: string; luogo: string; citta: string } | null;
   fermate: { citta: string; indirizzo: string | null; orario: string | null }[];
   giaRisposto: boolean;
+  scaduto: boolean;
   risposta: { prezzo: string; fileNome: string | null } | null;
 }
 

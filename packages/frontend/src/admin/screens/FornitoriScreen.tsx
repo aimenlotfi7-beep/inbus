@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { fornitoriApi, type Fornitore, type FornitoreInput, type StatoFornitore, type CampoExtraConfig } from '../../api/fornitori';
 import { geocodifica } from '../shared/geo';
 import { ErroreApi } from '../../api/client';
@@ -59,7 +60,7 @@ export function FornitoriScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
     } finally {
       setSalvando(false);
     }
@@ -76,7 +77,7 @@ export function FornitoriScreen() {
 
   function copiaLinkRegistrazione() {
     navigator.clipboard.writeText(`${window.location.origin}/fornitore/registrati`);
-    alert('Link copiato — condividilo con chi vuoi far registrare come fornitore.');
+    notifica('Link copiato — condividilo con chi vuoi far registrare come fornitore.');
   }
 
   async function aggiungiCampoExtra() {

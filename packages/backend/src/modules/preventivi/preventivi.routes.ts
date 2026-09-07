@@ -10,7 +10,7 @@ import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
 import { templateEmailService } from '../template-email/template-email.service.js';
-import { leggiRaggioKmPreventivo, leggiNotificaNonScelti } from '../impostazioni/impostazioni.routes.js';
+import { leggiRaggioKmPreventivo, leggiNotificaNonScelti, leggiGiorniValiditaLinkPreventivo } from '../impostazioni/impostazioni.routes.js';
 import { limitePnr } from '../../shared/rateLimit.js';
 import { distanzaKm, calcolaKmApprossimati } from '../../shared/distanza.js';
 import { classificaCandidato, destinatariRichiesta } from './classifica-candidato.js';
@@ -58,6 +58,14 @@ async function inviaEmailBestEffort(...args: Parameters<typeof inviaEmail>): Pro
     console.error(`[preventivi] invio email a ${args[0].a} fallito:`, e instanceof Error ? e.message : e);
     return false;
   }
+}
+
+/** Il link è scaduto se la richiesta è più vecchia dei giorni impostati
+ *  E non ha ancora una risposta (chi ha risposto rivede sempre la sua). */
+async function linkScaduto(richiesta: { creataIl: Date }, giaRisposto: boolean): Promise<boolean> {
+  if (giaRisposto) return false;
+  const giorni = await leggiGiorniValiditaLinkPreventivo();
+  return Date.now() - new Date(richiesta.creataIl).getTime() > giorni * 24 * 60 * 60 * 1000;
 }
 
 async function tragittoConEvento(tragittoId: string) {
@@ -167,6 +175,7 @@ export const preventiviService = {
       // Definitiva una volta inviata — se già risposto, il form
       // pubblico mostra sola lettura invece dei campi da compilare.
       giaRisposto: !!risposta,
+      scaduto: await linkScaduto(richiesta, !!risposta),
       risposta: risposta ? { prezzo: risposta.prezzo, fileNome: risposta.fileNome } : null,
     };
   },
@@ -175,6 +184,7 @@ export const preventiviService = {
     if (!richiesta) throw new NonTrovato('Richiesta preventivo');
     const [esistente] = await db.select().from(preventiviRisposte).where(eq(preventiviRisposte.richiestaId, richiesta.id)).limit(1);
     if (esistente) throw new ConflittoDati('Hai già inviato una risposta per questa richiesta — per modificarla, contatta direttamente chi ti ha scritto.');
+    if (await linkScaduto(richiesta, false)) throw new ConflittoDati('Questo link è scaduto — se vuole ancora inviare un preventivo, contatti direttamente chi le ha scritto.');
     try {
       const [nuova] = await db.insert(preventiviRisposte).values({
         richiestaId: richiesta.id,
@@ -377,7 +387,7 @@ preventiviRouter.get('/statistiche/tratte', richiedePermesso('eventi.partenze'),
   const dataDa = req.query.dataDa ? new Date(req.query.dataDa as string) : undefined;
   res.json(await preventiviService.storicoPerTratta(dataDa));
 }));
-preventiviRouter.put('/risposte/:id/accetta', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
+preventiviRouter.put('/risposte/:id/accetta', richiedePermesso('preventivi.accetta'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.accetta(req.params.id));
 }));
 preventiviRouter.get('/risposte/:id/file', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {

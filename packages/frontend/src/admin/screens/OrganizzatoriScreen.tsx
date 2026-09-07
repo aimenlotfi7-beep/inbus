@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { organizzatoriApi, type Organizzatore, type OrganizzatoreInput } from '../../api/organizzatori';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
@@ -43,7 +44,7 @@ export function OrganizzatoriScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
     } finally {
       setSalvando(false);
     }

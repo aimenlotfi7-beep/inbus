@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { ruoliApi, type Ruolo, type Permesso } from '../../api/ruoli';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
@@ -64,20 +65,20 @@ export function RuoliScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
     } finally {
       setSalvando(false);
     }
   }
 
   async function elimina(r: Ruolo) {
-    if (r.owner) { alert('Il ruolo proprietario non può essere eliminato.'); return; }
+    if (r.owner) { notifica('Il ruolo proprietario non può essere eliminato.'); return; }
     if (!confirm(`Eliminare il ruolo "${r.nome}"? Questa azione fallisce se qualche utenza lo sta ancora usando.`)) return;
     try {
       await ruoliApi.remove(r.id);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Eliminazione non riuscita: ${e.message}` : 'Eliminazione non riuscita: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Eliminazione non riuscita: ${e.message}` : 'Eliminazione non riuscita: impossibile contattare il server.');
     }
   }
 

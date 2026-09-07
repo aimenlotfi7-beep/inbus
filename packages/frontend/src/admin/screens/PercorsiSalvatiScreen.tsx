@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { percorsiSalvatiApi, type PercorsoSalvato, type FermataPercorsoSalvato } from '../../api/percorsiSalvati';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../api/fermateAnagrafica';
 import { ErroreApi } from '../../api/client';
@@ -119,20 +120,20 @@ export function PercorsiSalvatiScreen() {
     setFermate(nuove);
   }
   function rimuoviFermata(idx: number) {
-    if (fermate.length <= 2) { alert('Servono sempre almeno due fermate — le due Teste (partenza e arrivo).'); return; }
+    if (fermate.length <= 2) { notifica('Servono sempre almeno due fermate — le due Teste (partenza e arrivo).'); return; }
     setFermate(fermate.filter((_, i) => i !== idx));
   }
 
   const [salvando, setSalvando] = useState(false);
   async function salva() {
     if (salvando) return;
-    if (!nome.trim()) { alert('Dai un nome al tragitto prima di salvarlo.'); return; }
-    if (fermate.length < 2) { alert('Servono almeno due fermate — le due Teste (partenza e arrivo).'); return; }
+    if (!nome.trim()) { notifica('Dai un nome al tragitto prima di salvarlo.'); return; }
+    if (fermate.length < 2) { notifica('Servono almeno due fermate — le due Teste (partenza e arrivo).'); return; }
     // Clonato ma non toccato per niente — salvarlo così com'è
     // creerebbe un doppione identico all'originale, per la stessa
     // identica destinazione.
     if (clonatoDa && JSON.stringify({ nome, fermate }) === snapshotIniziale) {
-      alert('Non hai cambiato nulla rispetto al tragitto clonato — salvarlo così creerebbe un doppione identico. Modifica qualcosa (es. inverti, o cambia una fermata) prima di salvare.');
+      notifica('Non hai cambiato nulla rispetto al tragitto clonato — salvarlo così creerebbe un doppione identico. Modifica qualcosa (es. inverti, o cambia una fermata) prima di salvare.');
       return;
     }
     // Le due Teste (prima e ultima fermata, posizione) possono restare
@@ -144,7 +145,7 @@ export function PercorsiSalvatiScreen() {
     // di far sparire senza spiegazioni una fermata dimenticata a metà.
     const incomplete = fermate.filter((f, idx) => !f.citta.trim() || (idx !== fermate.length - 1 && !f.indirizzo?.trim()));
     if (incomplete.length > 0) {
-      alert(`${incomplete.length} fermata/e non è/sono completa/e — manca la città (o l'indirizzo, per le fermate intermedie). Completala o eliminala prima di salvare.`);
+      notifica(`${incomplete.length} fermata/e non è/sono completa/e — manca la città (o l'indirizzo, per le fermate intermedie). Completala o eliminala prima di salvare.`);
       return;
     }
     // Forzo l'indirizzo vuoto sull'arrivo anche qui, non solo nella UI —
@@ -159,7 +160,7 @@ export function PercorsiSalvatiScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
     } finally {
       setSalvando(false);
     }

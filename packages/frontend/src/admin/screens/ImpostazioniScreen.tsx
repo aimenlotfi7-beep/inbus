@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { impostazioniApi } from '../../api/impostazioni';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
@@ -11,6 +12,7 @@ const IMPOSTAZIONI: { chiave: string; etichetta: string; default: string; suffis
   { chiave: 'posti_per_bus', etichetta: 'Posti per bus (usato per "Calcola bus necessari" in Partenze)', default: '50' },
   { chiave: 'credito_per_passeggero', etichetta: 'Credito fedeltà per passeggero (€)', default: '0.5' },
   { chiave: 'soglia_posticipo_variazione_minuti', etichetta: 'Soglia posticipo per notifica variazione (minuti — l\'anticipo e il cambio città/indirizzo notificano sempre, senza soglia; 0 o vuoto = avvisa sempre anche per il posticipo)', default: '0' },
+  { chiave: 'giorni_validita_link_preventivo', etichetta: 'Giorni di validità del link inviato ai fornitori per rispondere a una richiesta preventivo (dopo, il link risulta scaduto; chi ha già risposto continua a vedere la sua risposta)', default: '60' },
   { chiave: 'raggio_km_preventivo', etichetta: 'Raggio (km, linea d\'aria) per cercare fornitori vicini a una richiesta preventivo — modificabile comunque per singola richiesta', default: '40' },
 ];
 
@@ -48,15 +50,15 @@ export function ImpostazioniScreen() {
   async function salva(chiave: string) {
     const numero = Number(valori[chiave]);
     if (!Number.isFinite(numero) || numero < 0) {
-      alert('Inserisci un numero valido.');
+      notifica('Inserisci un numero valido.');
       return;
     }
     setSalvataggio(chiave);
     try {
       await impostazioniApi.set(chiave, String(numero));
-      alert('Impostazione salvata.');
+      notifica('Impostazione salvata.');
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
       setSalvataggio(null);
     }
@@ -68,15 +70,15 @@ export function ImpostazioniScreen() {
     // (divisione per zero sui posti di pareggio), oltre 100 non
     // avrebbe senso (più del 100% di riempimento del bus).
     if (!Number.isFinite(numero) || numero <= 0 || numero > 100) {
-      alert('Inserisci una percentuale tra 1 e 100.');
+      notifica('Inserisci una percentuale tra 1 e 100.');
       return;
     }
     setSalvataggio(CHIAVE_SOGLIA_OCCUPAZIONE);
     try {
       await impostazioniApi.set(CHIAVE_SOGLIA_OCCUPAZIONE, String(numero));
-      alert('Impostazione salvata.');
+      notifica('Impostazione salvata.');
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
       setSalvataggio(null);
     }
@@ -91,7 +93,7 @@ export function ImpostazioniScreen() {
       await impostazioniApi.set('notifica_fornitori_non_scelti', String(nuovo));
     } catch (e) {
       setNotificaNonScelti(!nuovo); // ripristina se il salvataggio fallisce
-      alert(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     }
   }
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../../shared/notifiche';
 import { offerteApi, type Offerta, type OffertaInput } from '../../../api/offerte';
 import { campagneApi, type Campagna } from '../../../api/campagne';
 import { ErroreApi } from '../../../api/client';
@@ -49,7 +50,7 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
   async function salva() {
     if (salvando) return;
     if (!nome.trim() || !slug.trim() || !scontoPercentuale) {
-      alert('Compila almeno nome, link (slug) e percentuale di sconto.');
+      notifica('Compila almeno nome, link (slug) e percentuale di sconto.');
       return;
     }
     const payload: OffertaInput = {
@@ -65,7 +66,7 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
       setFormAperto(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+      notifica(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
     } finally {
       setSalvando(false);
     }

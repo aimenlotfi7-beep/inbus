@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { eventiApi } from '../../api/eventi';
 import { ErroreApi } from '../../api/client';
 import { prezzoMinimoEvento } from '../../api/prezzi';
@@ -66,7 +67,7 @@ export function EventiScreen() {
       await eventiApi.remove(ev.id);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? e.message : "Eliminazione non riuscita: impossibile contattare il server.");
+      notifica(e instanceof ErroreApi ? e.message : "Eliminazione non riuscita: impossibile contattare il server.");
     }
   }
 

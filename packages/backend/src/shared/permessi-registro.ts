@@ -15,6 +15,11 @@ export interface DefinizionePermesso {
   chiave: string;
   etichetta: string;
   modulo: string;
+  /** Solo la PRIMA volta che questo permesso viene creato: lo ricevono
+   *  anche tutti i ruoli che hanno già il permesso indicato. Serve per
+   *  spezzare un permesso esistente in due senza togliere a nessuno una
+   *  funzione che già usava. Dopo, ogni ruolo si gestisce da Ruoli. */
+  ereditaDa?: string;
 }
 
 export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
@@ -27,6 +32,12 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   { chiave: 'eventi.cestino', etichetta: 'Accedere al Cestino eventi eliminati', modulo: 'Eventi' }, // solo UI
   { chiave: 'eventi.partenze', etichetta: 'Gestire la sezione Partenze (bus e copertura tratte)', modulo: 'Eventi' },
   { chiave: 'eventi.economia', etichetta: 'Vedere i dati economici delle tratte (incassato, costo bus, guadagno)', modulo: 'Eventi' },
+  // Un impegno economico verso un fornitore merita un permesso a sé,
+  // separato da "guardare/gestire le partenze". ereditaDa: al primo
+  // avvio dopo il deploy viene concesso in automatico ai ruoli che
+  // hanno già eventi.partenze — così chi accetta preventivi oggi non
+  // si ritrova la funzione sparita; poi ogni ruolo si regola da Ruoli.
+  { chiave: 'preventivi.accetta', etichetta: 'Accettare un preventivo fornitore (impegno economico)', modulo: 'Eventi', ereditaDa: 'eventi.partenze' },
 
   // Prenotazioni
   { chiave: 'prenotazioni.visualizza', etichetta: 'Visualizzare prenotazioni', modulo: 'Prenotazioni' },

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notifica } from '../shared/notifiche';
 import { fermateAnagraficaApi, type FermataAnagrafica, type FermataAnagraficaInput } from '../../api/fermateAnagrafica';
 import { percorsiSalvatiApi } from '../../api/percorsiSalvati';
 import { ErroreApi } from '../../api/client';
@@ -57,7 +58,7 @@ export function FermateScreen() {
 
   async function salva() {
     if (!form.nome.trim() || !form.citta.trim() || !form.indirizzo.trim()) {
-      alert('Nome, citta e indirizzo sono obbligatori.');
+      notifica('Nome, citta e indirizzo sono obbligatori.');
       return;
     }
     setSalvando(true);
@@ -78,7 +79,7 @@ export function FermateScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? e.message : 'Impossibile salvare. Riprova.');
+      notifica(e instanceof ErroreApi ? e.message : 'Impossibile salvare. Riprova.');
     } finally {
       setSalvando(false);
     }
@@ -90,7 +91,7 @@ export function FermateScreen() {
       await fermateAnagraficaApi.remove(f.id);
       ricarica();
     } catch (e) {
-      alert(e instanceof ErroreApi ? e.message : 'Impossibile eliminare. Riprova.');
+      notifica(e instanceof ErroreApi ? e.message : 'Impossibile eliminare. Riprova.');
     }
   }
 
