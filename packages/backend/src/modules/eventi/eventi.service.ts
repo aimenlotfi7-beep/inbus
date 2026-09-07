@@ -22,7 +22,7 @@ import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
-import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoSchema } from './eventi.dto.js';
+import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema } from './eventi.dto.js';
 import { rilevaVariazioni, generaComunicazioniVariazione } from '../variazioni/variazioni.service.js';
 import { calcolaKmApprossimati } from '../../shared/distanza.js';
 import type { z } from 'zod';
@@ -795,7 +795,13 @@ export const eventiService = {
       // tramite una Linea (bus_fermate o il contenitore) non veniva
       // considerato, un'incoerenza mai notata finché non è rimasta
       // l'unica strada davvero in uso.
-      const coperta = totalePasseggeri > 0 && tragitto.postiTotali >= totalePasseggeri;
+      // Finché non c'è ancora nessun bus vero registrato, postiTotali
+      // resta sul placeholder "quasi illimitato" (vedi più sotto): con
+      // quello, ANCHE UNA SOLA prenotazione risultava "coperta", perché
+      // qualunque numero piccolo sta sotto un placeholder enorme.
+      // "Coperta" deve dire "hai un bus vero che copre tutti", non "il
+      // numero è ancora fittizio" — richiede quindi anche un bus vero.
+      const coperta = totalePasseggeri > 0 && tragitto.postiTotali < POSTI_QUASI_ILLIMITATI && tragitto.postiTotali >= totalePasseggeri;
 
       return {
         tragittoId: tragitto.id,
@@ -921,7 +927,11 @@ export const eventiService = {
    *  vendita (stato "Prezzato") senza bisogno di un bus vero opzionato,
    *  che arriva solo dopo, quando le prenotazioni chiariscono da dove
    *  costruire la prima Linea vera. */
-  async registraPreventivo(tragittoId: string, input: z.infer<typeof registraPreventivoSchema>) {
+  // Sezione PREVENTIVI: registra il costo del bus (fornitore+file
+  // facoltativi) — non tocca i prezzi di vendita, non rende ancora
+  // vendibile il tragitto (serve il passo Prezzi dopo, che li calcola
+  // da questo costo).
+  async registraPreventivoManuale(tragittoId: string, input: z.infer<typeof registraPreventivoManualeSchema>) {
     const [esiste] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
     if (!esiste) throw new NonTrovato('Tragitto');
 
@@ -932,12 +942,9 @@ export const eventiService = {
         preventivoPostiBus: input.preventivoPostiBus,
         // Facoltativo — ma se non indicato qui, non si perde quello già
         // presente (es. un preventivo accettato in precedenza tramite
-        // la tab Preventivi, poi ritoccato qui solo nel prezzo).
+        // la tab Preventivi, poi ritoccato qui solo nel costo).
         ...(input.fornitoreId && { fornitoreId: input.fornitoreId }),
         ...(kmAccettati != null && { kmAccettati }),
-        // Solo un passaggio in avanti — non tocca un tragitto già
-        // "Confermato" (avrebbe un bus vero, non ha senso retrocederlo).
-        ...(esiste.stato === 'DA_CONFERMARE' && { stato: 'PREZZATO' as const }),
       }).where(eq(tragitti.id, tragittoId));
 
       // Un inserimento manuale con fornitore indicato genera comunque
@@ -953,18 +960,33 @@ export const eventiService = {
           richiestaId: richiesta.id, prezzo: input.preventivoCosto.toFixed(2), fileNome: input.fileNome, fileContenuto: input.fileContenuto,
         });
       }
+    });
+  },
 
+  // Sezione PREZZI: i prezzi di vendita per fermata, da un costo GIÀ
+  // noto (impostato in Preventivi) — non tocca fornitore/costo.
+  async calcolaPrezziVendita(tragittoId: string, input: z.infer<typeof calcolaPrezziVenditaSchema>) {
+    const [esiste] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!esiste) throw new NonTrovato('Tragitto');
+    if (!esiste.preventivoCosto) throw new ConflittoDati('Registra prima un preventivo (sezione Preventivi) prima di calcolare i prezzi di vendita.');
+
+    await db.transaction(async (tx) => {
       for (const { fermataId, prezzo } of input.prezziPerFermata) {
         await tx.update(fermate).set({ prezzo: prezzo.toFixed(2) })
           .where(and(eq(fermate.id, fermataId), eq(fermate.tragittoId, tragittoId))); // il secondo controllo è una sicurezza in più, non fidarsi di un id passato dal client senza verificarlo
+      }
+      // Solo un passaggio in avanti — non tocca un tragitto già
+      // "Confermato" (avrebbe un bus vero, non ha senso retrocederlo).
+      if (esiste.stato === 'DA_CONFERMARE') {
+        await tx.update(tragitti).set({ stato: 'PREZZATO' }).where(eq(tragitti.id, tragittoId));
       }
 
       // Da qui il tragitto è prenotabile sul sito — ma se non c'è
       // ancora nessun bus vero registrato in una Linea, le vendite non
       // devono essere limitate: il numero "posti presunti" scritto nel
-      // preventivo qui sopra è solo reportistica, non un tetto alle
-      // vendite (deciso esplicitamente così — si vende prima, si
-      // decidono i bus vengono dopo in base a quanto si è venduto).
+      // preventivo (sezione Preventivi) è solo reportistica, non un
+      // tetto alle vendite (deciso esplicitamente così — si vende
+      // prima, si decidono i bus dopo in base a quanto si è venduto).
       // "Quasi illimitato" invece di un vero infinito: il sito comunque
       // non mostra mai il numero esatto (solo "Posti disponibili"/
       // "Pochi posti"/"Esaurito" a soglie — vedi PercorsoBus.tsx), un

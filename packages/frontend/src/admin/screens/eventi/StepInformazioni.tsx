@@ -59,7 +59,7 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
           </label>
           <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
           <label>Città <input value={form.citta} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>
-          <label>Data <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
+          <label>Data <input type="date" min={new Date().toISOString().slice(0, 10)} value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
           <label>
             <EtichettaTooltip testo="URL" chiave="url" mappaTooltip={mappaTooltip} />
             <input

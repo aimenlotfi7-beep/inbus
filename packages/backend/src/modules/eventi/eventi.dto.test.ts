@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { creaEventoSchema, aggiornaEventoSchema, registraPreventivoSchema } from './eventi.dto.js';
+import { creaEventoSchema, aggiornaEventoSchema, registraPreventivoManualeSchema } from './eventi.dto.js';
 
 const base = { artista: 'Test', genere: 'rock', luogo: 'Arena', citta: 'Bologna', data: '2030-01-01' };
 const tragitto = (nome: string, arrivoCitta?: string) => ({
@@ -29,13 +29,13 @@ describe('invariante: un evento ha UNA sola città di arrivo (lato server)', () 
   });
 });
 
-describe('registraPreventivoSchema — limite allegato', () => {
-  const ok = { preventivoCosto: 800, preventivoPostiBus: 50, prezziPerFermata: [] };
+describe('registraPreventivoManualeSchema — limite allegato', () => {
+  const ok = { preventivoCosto: 800, preventivoPostiBus: 50 };
   it('accetta un file piccolo', () => {
-    expect(registraPreventivoSchema.safeParse({ ...ok, fileNome: 'p.pdf', fileContenuto: 'QUJD' }).success).toBe(true);
+    expect(registraPreventivoManualeSchema.safeParse({ ...ok, fileNome: 'p.pdf', fileContenuto: 'QUJD' }).success).toBe(true);
   });
   it('rifiuta un file oltre 8MB', () => {
     const troppo = 'A'.repeat(8 * 1024 * 1024 * 4 / 3 + 1);
-    expect(registraPreventivoSchema.safeParse({ ...ok, fileNome: 'p.pdf', fileContenuto: troppo }).success).toBe(false);
+    expect(registraPreventivoManualeSchema.safeParse({ ...ok, fileNome: 'p.pdf', fileContenuto: troppo }).success).toBe(false);
   });
 });

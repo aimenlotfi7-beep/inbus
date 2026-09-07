@@ -13,6 +13,7 @@ export interface Fornitore {
   note: string | null;
   lat: number | null;
   lng: number | null;
+  regione: string | null;
   stato: StatoFornitore;
   invioAutomatico: boolean;
   campiExtra: { etichetta: string; valore: string }[] | null;

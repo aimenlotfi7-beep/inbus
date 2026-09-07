@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { bundleApi, type BundlePubblicoDettaglio } from '../api/bundle';
 import { eventiApi } from '../api/eventi';
 import { useCarrello } from '../features/carrello/CarrelloContext';
@@ -12,7 +12,12 @@ import { Layout } from '../Layout';
 export function BundlePage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const carrello = useCarrello();
+  // Stesso meccanismo del checkout evento singolo (CheckoutForm) — letto
+  // qui perché il carrello vive a un URL diverso (/carrello), dove il
+  // parametro si perderebbe.
+  const promoterCodice = new URLSearchParams(location.search).get('promo') || undefined;
   const [bundle, setBundle] = useState<BundlePubblicoDettaglio | null>(null);
   const [stato, setStato] = useState<'caricamento' | 'pronto' | 'non-trovato'>('caricamento');
 
@@ -41,7 +46,7 @@ export function BundlePage() {
             testoConferma="Vai al carrello"
             onConferma={async ({ righe, passeggeri, cliente, partecipanti }) => {
               carrello.impostaBundle(
-                { id: bundle.id, nome: bundle.nome, scontoPercentuale: Number(bundle.scontoPercentuale), ammetteOfferte: bundle.ammetteOfferte, ammetteCredito: bundle.ammetteCredito, ammettePromoter: bundle.ammettePromoter, ammetteAcconto: bundle.ammetteAcconto },
+                { id: bundle.id, nome: bundle.nome, scontoPercentuale: Number(bundle.scontoPercentuale), ammetteOfferte: bundle.ammetteOfferte, ammetteCredito: bundle.ammetteCredito, ammettePromoter: bundle.ammettePromoter, ammetteAcconto: bundle.ammetteAcconto, ...(bundle.ammettePromoter && promoterCodice && { promoterCodice }) },
                 righe.map(({ evento, opzione }) => ({
                   eventoId: evento.id, eventoArtista: evento.artista, eventoData: evento.data,
                   tragittoId: opzione.tragittoId, fermataId: opzione.fermataId, fermataCitta: opzione.fermataCitta, fermataOrario: opzione.fermataOrario,

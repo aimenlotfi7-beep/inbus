@@ -13,6 +13,8 @@
     "db:esegui-sql": "tsx src/db/esegui-sql.ts",
     "db:controlla": "tsx src/db/controlla.ts",
     "db:migra-permessi": "tsx src/db/migra-permessi.ts",
+    "db:geocodifica-fornitori": "tsx src/db/geocodifica-fornitori-esistenti.ts",
+    "db:geocodifica-fermate": "tsx src/db/geocodifica-fermate-esistenti.ts",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx src/db/seed.ts",
     "reset-dati-test": "tsx src/db/reset-dati-test.ts",

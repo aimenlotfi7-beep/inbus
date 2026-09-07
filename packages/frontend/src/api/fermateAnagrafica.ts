@@ -7,6 +7,7 @@ export interface FermataAnagrafica {
   indirizzo: string;
   lat: number | null;
   lng: number | null;
+  regione: string | null;
   note: string | null;
   link: string | null;
 }
@@ -17,6 +18,7 @@ export interface FermataAnagraficaInput {
   indirizzo: string;
   lat?: number | null;
   lng?: number | null;
+  regione?: string | null;
   note?: string | null;
   link?: string | null;
 }

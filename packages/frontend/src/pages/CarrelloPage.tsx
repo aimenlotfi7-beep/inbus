@@ -53,6 +53,7 @@ export function CarrelloPage() {
           offertaId: a.offertaId,
           ...(usaCredito && tipoPagamento === 'COMPLETO' && { usaCredito: true }),
           ...(couponCodice.trim() && tipoPagamento === 'COMPLETO' && { couponCodice: couponCodice.trim() }),
+          ...(bundle?.promoterCodice && { promoterCodice: bundle.promoterCodice }),
         })),
         bundle?.id,
       );
@@ -188,6 +189,7 @@ export function CarrelloPage() {
               <div className="checkout-summary" style={{ marginTop: 14 }}>
                 <b>Bundle: {bundle.nome}</b>
                 <p style={{ fontSize: 12, opacity: .7, margin: '4px 0 0' }}>Il bundle si acquista tutto insieme: togliendo o aggiungendo un evento, lo sconto non si applica più.</p>
+                {bundle.promoterCodice && <p style={{ fontSize: 12, opacity: .7, margin: '4px 0 0' }}>Codice promoter applicato: <b>{bundle.promoterCodice}</b></p>}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 13.5 }}><span>Totale originale</span><span>€{totaleStimato.toFixed(2)}</span></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span>Sconto bundle (−{bundle.scontoPercentuale}%)</span><span>− €{scontoBundleStimato.toFixed(2)}</span></div>
               </div>

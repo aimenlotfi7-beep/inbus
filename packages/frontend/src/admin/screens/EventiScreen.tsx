@@ -8,11 +8,16 @@ import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
+import { useSelezioneUrl } from '../shared/useSelezioneUrl';
 
 export function EventiScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [inModifica, setInModifica] = useState<Evento | null>(null);
-  const [modaleAperta, setModaleAperta] = useState(false);
+  // L'evento aperto sopravvive a un ricaricamento della pagina (?eventoId=
+  // nell'URL) — prima si perdeva sempre, tornando all'elenco.
+  const { id: eventoIdUrl, apri: apriUrl, chiudi: chiudiUrl } = useSelezioneUrl('eventi', 'eventoId');
+  const [nuovoInCorso, setNuovoInCorso] = useState(false);
+  const modaleAperta = nuovoInCorso || !!eventoIdUrl;
   const [ricerca, setRicerca] = useState('');
   const [tab, setTab] = useState<'futuri' | 'passati'>('futuri');
 
@@ -36,13 +41,21 @@ export function EventiScreen() {
   useEffect(() => {
     if (localStorage.getItem('inbus_creazione_evento_in_corso')) {
       setInModifica(null);
-      setModaleAperta(true);
+      setNuovoInCorso(true);
     }
+  }, []);
+  // Se invece era aperto un evento ESISTENTE (eventoId nell'URL), lo
+  // ricarico fresco dal server all'avvio — stesso identico fetch che fa
+  // apriModifica, solo innescato dall'URL invece che da un clic.
+  useEffect(() => {
+    if (!eventoIdUrl) return;
+    eventiApi.getById(eventoIdUrl).then(setInModifica).catch(() => chiudiUrl());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function apriNuovo() {
     setInModifica(null);
-    setModaleAperta(true);
+    setNuovoInCorso(true);
   }
   // Sempre un fetch fresco dal server, non l'oggetto già in memoria
   // dalla lista — quella lista potrebbe non riflettere l'ultimo stato
@@ -50,7 +63,7 @@ export function EventiScreen() {
   // ancora ricaricato in questa schermata), mostrando dati vecchi
   // nell'editor pur essendo tutto corretto sul server.
   async function apriModifica(ev: Evento) {
-    setModaleAperta(true);
+    apriUrl(ev.id);
     setInModifica(ev); // subito, per non far vedere un editor vuoto mentre carica
     try {
       const fresco = await eventiApi.getById(ev.id);
@@ -72,7 +85,7 @@ export function EventiScreen() {
   }
 
   if (modaleAperta) {
-    return <SchedaEventoModale evento={inModifica} tabIniziale="dettagli" soloQuestaTab onClose={() => setModaleAperta(false)} onSalvato={ricarica} />;
+    return <SchedaEventoModale evento={inModifica} tabIniziale="dettagli" soloQuestaTab onClose={() => { setNuovoInCorso(false); chiudiUrl(); setInModifica(null); }} onSalvato={ricarica} />;
   }
 
   return (

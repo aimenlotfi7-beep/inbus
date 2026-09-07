@@ -7,6 +7,7 @@ import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
+import { MappaPuntiFermate } from '../shared/MappaPuntiFermate';
 
 const VUOTO: Partial<FornitoreInput> = { nome: '', partitaIva: '', referente: '', telefono: '', email: '', indirizzo: '', note: '', invioAutomatico: false };
 
@@ -34,6 +35,25 @@ export function FornitoriScreen() {
     ? fornitori.filter((f) => `${f.nome} ${f.referente ?? ''} ${f.indirizzo ?? ''}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : fornitori;
 
+  // Raggruppati per regione, in ordine alfabetico (regione e, dentro,
+  // nome fornitore) — chi non ha ancora una regione nota (mai
+  // geocodificato, o indirizzo non riconosciuto) finisce in un gruppo
+  // a parte, sempre in fondo.
+  const gruppiPerRegione = new Map<string, Fornitore[]>();
+  for (const f of fornitoriFiltrati) {
+    const chiave = f.regione ?? 'Senza regione';
+    const lista = gruppiPerRegione.get(chiave) ?? [];
+    lista.push(f);
+    gruppiPerRegione.set(chiave, lista);
+  }
+  const regioniOrdinate = [...gruppiPerRegione.keys()].sort((a, b) => a === 'Senza regione' ? 1 : b === 'Senza regione' ? -1 : a.localeCompare(b, 'it'));
+  for (const lista of gruppiPerRegione.values()) lista.sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+
+  const [vistaCartina, setVistaCartina] = useState(false);
+  const puntiCartina = fornitoriFiltrati.filter((f) => f.lat != null && f.lng != null).map((f) => ({
+    id: f.id, etichetta: f.nome, citta: f.regione ?? '', indirizzo: f.indirizzo ?? '', lat: f.lat, lng: f.lng, categoria: 'a-volte' as const,
+  }));
+
   const inAttesaCount = fornitori.filter((f) => f.stato === 'IN_ATTESA').length;
 
   function apriNuovo() { setInModifica(null); setForm(VUOTO); setModaleAperta(true); }
@@ -49,12 +69,12 @@ export function FornitoriScreen() {
       // toccato in questa modifica, non va rifatto ogni volta) o se
       // l'indirizzo è cambiato rispetto a quello salvato — altrimenti
       // ogni salvataggio di un fornitore rifarebbe la stessa ricerca.
-      let { lat, lng } = form;
+      let { lat, lng, regione } = form;
       if (form.indirizzo?.trim() && form.indirizzo !== inModifica?.indirizzo) {
         const r = await geocodifica(form.indirizzo);
-        if (r.coordinate) { lat = r.coordinate.lat; lng = r.coordinate.lng; }
+        if (r.coordinate) { lat = r.coordinate.lat; lng = r.coordinate.lng; regione = r.regione; }
       }
-      const daSalvare = { ...form, lat, lng };
+      const daSalvare = { ...form, lat, lng, regione };
       if (inModifica) await fornitoriApi.update(inModifica.id, daSalvare);
       else await fornitoriApi.create(daSalvare);
       setModaleAperta(false);
@@ -137,7 +157,8 @@ export function FornitoriScreen() {
   return (
     <div>
       <PanelHead titolo="Fornitori" azione={
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-ghost" onClick={() => setVistaCartina((v) => !v)}>{vistaCartina ? 'Vedi elenco' : 'Vedi su cartina'}</button>
           <button className="btn btn-ghost" onClick={() => setGestisciCampiExtraAperto(true)}>Campi extra</button>
           <button className="btn btn-ghost" onClick={copiaLinkRegistrazione}>Link registrazione</button>
           <button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo fornitore</button>
@@ -149,28 +170,41 @@ export function FornitoriScreen() {
         </p>
       )}
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, referente o indirizzo..." />
-      <TabellaGenerica
-        righe={fornitoriFiltrati}
-        colonne={[
-          { etichetta: 'Nome', render: (f) => <b>{f.nome}</b> },
-          { etichetta: 'Referente', render: (f) => f.referente ?? '—' },
-          { etichetta: 'Telefono', render: (f) => f.telefono ?? '—' },
-          { etichetta: 'Indirizzo', render: (f) => f.indirizzo ?? '—' },
-          {
-            etichetta: 'Stato',
-            render: (f) => (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <span className={`badge ${CLASSE_STATO[f.stato]}`}>{ETICHETTA_STATO[f.stato]}</span>
-                {f.stato === 'IN_ATTESA' && <button className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => cambiaStato(f, 'APPROVATO')}>Approva</button>}
-                {f.stato === 'APPROVATO' && <button className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px', color: 'var(--pink)' }} onClick={() => cambiaStato(f, 'DISATTIVATO')}>Disattiva</button>}
-                {f.stato === 'DISATTIVATO' && <button className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => cambiaStato(f, 'APPROVATO')}>Riattiva</button>}
-              </div>
-            ),
-          },
-        ]}
-        onModifica={apriModifica}
-        onElimina={elimina}
-      />
+
+      {vistaCartina ? (
+        puntiCartina.length === 0
+          ? <p className="testo-intro">Nessun fornitore con posizione nota da mostrare — la posizione si calcola quando salvi un indirizzo.</p>
+          : <MappaPuntiFermate punti={puntiCartina} />
+      ) : (
+        regioniOrdinate.map((regione) => (
+          <div key={regione} style={{ marginBottom: 24 }}>
+            <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px' }}>{regione}</p>
+            <TabellaGenerica
+              righe={gruppiPerRegione.get(regione)!}
+              colonne={[
+                { etichetta: 'Nome', render: (f) => <b>{f.nome}</b> },
+                { etichetta: 'Referente', render: (f) => f.referente ?? '—' },
+                { etichetta: 'Telefono', render: (f) => f.telefono ?? '—' },
+                { etichetta: 'Email', render: (f) => f.email ?? '—' },
+                { etichetta: 'Indirizzo', render: (f) => f.indirizzo ?? '—' },
+                {
+                  etichetta: 'Stato',
+                  render: (f) => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span className={`badge ${CLASSE_STATO[f.stato]}`}>{ETICHETTA_STATO[f.stato]}</span>
+                      {f.stato === 'IN_ATTESA' && <button className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => cambiaStato(f, 'APPROVATO')}>Approva</button>}
+                      {f.stato === 'APPROVATO' && <button className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px', color: 'var(--pink)' }} onClick={() => cambiaStato(f, 'DISATTIVATO')}>Disattiva</button>}
+                      {f.stato === 'DISATTIVATO' && <button className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => cambiaStato(f, 'APPROVATO')}>Riattiva</button>}
+                    </div>
+                  ),
+                },
+              ]}
+              onModifica={apriModifica}
+              onElimina={elimina}
+            />
+          </div>
+        ))
+      )}
     </div>
   );
 }

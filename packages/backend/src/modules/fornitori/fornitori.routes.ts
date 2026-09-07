@@ -18,6 +18,7 @@ const fornitoreSchema = z.object({
   indirizzo: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   lat: z.number().nullable().optional(),
+  regione: z.string().nullable().optional(),
   lng: z.number().nullable().optional(),
   invioAutomatico: z.boolean().optional(),
 });
@@ -38,6 +39,7 @@ const registrazioneSchema = z.object({
   indirizzo: z.string().min(1, 'L\'indirizzo è obbligatorio — serve per calcolare la distanza dagli eventi.'),
   lat: z.number().optional(),
   lng: z.number().optional(),
+  regione: z.string().optional(),
   campiExtra: z.array(z.object({ etichetta: z.string().max(200), valore: z.string().max(2000) })).max(30).optional(),
 });
 

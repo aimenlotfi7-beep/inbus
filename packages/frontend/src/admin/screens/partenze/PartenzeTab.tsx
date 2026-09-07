@@ -9,7 +9,6 @@ import { impostazioniApi } from '../../../api/impostazioni';
 import { PreventiviTragitto } from './PreventiviTragitto';
 import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import { ErroreApi } from '../../../api/client';
-import { CampoNumero } from '../../shared/CampoNumero';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useSessione } from '../../shared/SessioneContext';
 import { useNavigazione } from '../../shared/NavigazioneContext';
@@ -94,17 +93,13 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   // usati finora se non sono ancora stati impostati esplicitamente
   // (così non cambia nulla per chi non li ha mai toccati).
   const [sogliaOccupazionePercento, setSogliaOccupazionePercento] = useState(50);
-  const [postiPerBusGlobale, setPostiPerBusGlobale] = useState(50);
   // Dati Cruscotto Vendite (Fase 4) — caricati per tragitto solo
   // quando serve davvero (apertura effettiva della tab "Da
   // Confermare"), non per tutti i tragitti visibili in ogni istante.
   const [venditeMap, setVenditeMap] = useState<Map<string, VenditePerFermata>>(new Map());
-  // Simulatore break-even (dentro il Cruscotto Vendite) — quali
   // fermate ipotizzo di coprire con la Linea candidata, e quanto
   // costerebbe: entrambi per tragitto, dato che più tragitti possono
   // essere aperti ed espansi insieme nella stessa pagina.
-  const [simulatoreFermateMap, setSimulatoreFermateMap] = useState<Map<string, Set<string>>>(new Map());
-  const [simulatoreCostoMap, setSimulatoreCostoMap] = useState<Map<string, number | undefined>>(new Map());
   const [prezziCalcolatiMap, setPrezziCalcolatiMap] = useState<Map<string, { fermataId: string; citta: string; distanza: number; prezzo: number }[]>>(new Map());
   const [calcolandoPreventivoSet, setCalcolandoPreventivoSet] = useState<Set<string>>(new Set());
   const [statoCalcoloPreventivoMap, setStatoCalcoloPreventivoMap] = useState<Map<string, string>>(new Map());
@@ -188,9 +183,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
       const riga = righe.find((r) => r.chiave === 'soglia_occupazione_pareggio');
       const numero = riga ? Number(riga.valore) : NaN;
       if (Number.isFinite(numero) && numero > 0 && numero <= 100) setSogliaOccupazionePercento(numero);
-      const rigaPosti = righe.find((r) => r.chiave === 'posti_per_bus');
-      const numeroPosti = rigaPosti ? Number(rigaPosti.valore) : NaN;
-      if (Number.isFinite(numeroPosti) && numeroPosti > 0) setPostiPerBusGlobale(numeroPosti);
     }).catch(() => {}); // se non risponde, resta il default — meglio che bloccare il calcolo
   }, [eventoId]);
 
@@ -358,13 +350,16 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
    *  quello) — chi sale più lontano paga di più, in proporzione a
    *  quanto usa davvero il bus. */
   async function calcolaPrezziPreventivo(tragittoId: string) {
-    const formPreventivo = formPreventivoMap.get(tragittoId);
-    if (!eventoCompleto || !formPreventivo?.costo || !formPreventivo?.postiBus) {
-      setStatoCalcoloPreventivoMap((prev) => new Map(prev).set(tragittoId, 'Inserisci prima costo e posti presunti del bus.'));
+    const tragittoVero = eventoCompleto ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragittoId) : undefined;
+    // Il costo viene da qui — registrato nella sezione Preventivi, non
+    // più da un form in questa sezione (che calcola solo i prezzi di
+    // vendita da un costo già noto).
+    const costo = tragittoVero?.preventivoCosto ? Number(tragittoVero.preventivoCosto) : undefined;
+    const postiBus = tragittoVero?.preventivoPostiBus ?? undefined;
+    if (!tragittoVero || !costo || !postiBus) {
+      setStatoCalcoloPreventivoMap((prev) => new Map(prev).set(tragittoId, 'Manca ancora un preventivo registrato — vai prima nella sezione Preventivi.'));
       return;
     }
-    const tragittoVero = [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragittoId);
-    if (!tragittoVero) return;
     // L'arrivo è del tragitto stesso ora, deciso in Eventi — non più
     // di evento/servizio.
     const arrivoIndirizzo = tragittoVero.arrivoIndirizzo;
@@ -409,14 +404,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
       return;
     }
 
-    const postiDiPareggio = formPreventivo.postiBus * (sogliaOccupazionePercento / 100);
-    const prezzoMinimo = formPreventivo.costo / postiDiPareggio;
+    const postiDiPareggio = postiBus * (sogliaOccupazionePercento / 100);
+    const prezzoMinimo = costo / postiDiPareggio;
     // I KM totali del tragitto = la distanza più lunga tra tutte
     // quelle calcolate (di norma la Testa di partenza, il punto più
     // lontano dall'arrivo) — non serve un valore a parte, è già il
     // massimo di quello appena calcolato per ogni fermata.
     const kmTotali = Math.max(...valide.map((d) => d.distanza));
-    const costoAlKmPerPersona = kmTotali > 0 ? (formPreventivo.costo / kmTotali) / postiDiPareggio : 0;
+    const costoAlKmPerPersona = kmTotali > 0 ? (costo / kmTotali) / postiDiPareggio : 0;
 
     setPrezziCalcolatiMap((prev) => new Map(prev).set(tragittoId, valide.map((d) => ({
       fermataId: d.fermataId, citta: d.citta, distanza: d.distanza,
@@ -427,28 +422,16 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
     setCalcolandoPreventivoSet((prev) => { const s = new Set(prev); s.delete(tragittoId); return s; });
   }
 
+  // Qui si salvano SOLO i prezzi di vendita — il costo/fornitore/file
+  // si registrano in Preventivi (uno step prima), questa sezione li
+  // usa soltanto per calcolare i prezzi, non li modifica più.
   async function salvaPreventivo(tragittoId: string) {
-    const formPreventivo = formPreventivoMap.get(tragittoId);
     const prezziCalcolati = prezziCalcolatiMap.get(tragittoId);
-    if (!formPreventivo?.costo || !formPreventivo?.postiBus || !prezziCalcolati) return;
+    if (!prezziCalcolati) return;
     setSalvandoPreventivoSet((prev) => new Set(prev).add(tragittoId));
     try {
-      let fileContenuto: string | undefined;
-      if (formPreventivo.file) {
-        fileContenuto = await new Promise<string>((risolvi, rifiuta) => {
-          const lettore = new FileReader();
-          lettore.onload = () => risolvi((lettore.result as string).split(',')[1]);
-          lettore.onerror = () => rifiuta(new Error('Lettura file fallita'));
-          lettore.readAsDataURL(formPreventivo.file!);
-        });
-      }
-      await eventiApi.registraPreventivo(tragittoId, {
-        preventivoCosto: formPreventivo.costo,
-        preventivoPostiBus: formPreventivo.postiBus,
+      await eventiApi.calcolaPrezziVendita(tragittoId, {
         prezziPerFermata: prezziCalcolati.map((p) => ({ fermataId: p.fermataId, prezzo: p.prezzo })),
-        fornitoreId: formPreventivo.fornitoreId,
-        fileNome: formPreventivo.file?.name,
-        fileContenuto,
       });
       chiudiPreventivo(tragittoId);
       ricarica();
@@ -719,6 +702,13 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 <span className={`badge ${prezzato ? 'badge-stato-verde' : 'badge-stato-arancio'}`}>
                   {prezzato ? '✓ Prezzato' : '◔ Da prezzare'}
                 </span>
+              ) : contestoPartenze?.tabOrigine === 'preventivi' ? (
+                // Non lo stato generico "Coperta/Da confermare" (parla
+                // di posti e bus, non di preventivi) — qui conta solo
+                // se un fornitore è già stato accettato.
+                <span className={`badge ${tragittoVeroPerOrari?.fornitoreId ? 'badge-stato-verde' : 'badge-stato-arancio'}`}>
+                  {tragittoVeroPerOrari?.fornitoreId ? '✓ Accettato' : '◔ Da richiedere'}
+                </span>
               ) : (
                 <span className={`badge ${stato.classe === 'coperta' ? 'badge-stato-verde' : stato.classe === 'attenzione' ? 'badge-stato-arancio' : stato.classe === 'non-coperta' ? 'badge-stato-rosso' : stato.classe}`}>{stato.etichetta}</span>
               )}
@@ -861,33 +851,34 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
 
             if (formPreventivo) return (
               <div style={{ marginTop: 14 }}>
-                <p className="section-label" style={{ marginBottom: 16, display: 'flex', alignItems: 'center' }}>
-                  Preventivo
-                  <InfoTooltip>{mappaTooltip.preventivo_form_intro ?? TOOLTIP_DEFAULT.preventivo_form_intro}</InfoTooltip>
-                </p>
-                <div className="form-grid" style={{ marginBottom: 16 }}>
-                  <label>Costo del preventivo (€)
-                    <CampoNumero valuta value={formPreventivo.costo} onChange={(v) => setFormPreventivoMap((prev) => new Map(prev).set(tragitto.tragittoId, { ...prev.get(tragitto.tragittoId), costo: v }))} />
-                  </label>
-                  <label>Posti presunti del bus
-                    <CampoNumero value={formPreventivo.postiBus} onChange={(v) => setFormPreventivoMap((prev) => new Map(prev).set(tragitto.tragittoId, { ...prev.get(tragitto.tragittoId), postiBus: v }))} />
-                  </label>
-                  <label>Fornitore <span style={{ color: 'var(--mist)', fontWeight: 400 }}>(da chi arriva questo prezzo)</span>
-                    <select
-                      value={formPreventivo.fornitoreId ?? ''}
-                      onChange={(e) => setFormPreventivoMap((prev) => new Map(prev).set(tragitto.tragittoId, { ...prev.get(tragitto.tragittoId), fornitoreId: e.target.value || undefined }))}
-                    >
-                      <option value="">— Nessuno indicato —</option>
-                      {fornitoriLista.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-                    </select>
-                  </label>
-                  <label className="full">Allega il suo preventivo (facoltativo)
-                    <input type="file" accept="application/pdf,image/*" onChange={(e) => setFormPreventivoMap((prev) => new Map(prev).set(tragitto.tragittoId, { ...prev.get(tragitto.tragittoId), file: e.target.files?.[0] }))} />
-                  </label>
+                {/* Stessa posizione del pulsante "Calcola orari" — riga di
+                    intestazione con il titolo a sinistra, l'azione a destra:
+                    la stessa cosa non deve stare in un posto diverso a
+                    seconda della sezione. */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                  <p className="section-label" style={{ marginBottom: 0, display: 'flex', alignItems: 'center' }}>
+                    Preventivo
+                    <InfoTooltip>{mappaTooltip.preventivo_form_intro ?? TOOLTIP_DEFAULT.preventivo_form_intro}</InfoTooltip>
+                  </p>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => calcolaPrezziPreventivo(tragitto.tragittoId)} disabled={calcolandoPreventivo}>
+                    {calcolandoPreventivo ? 'Calcolo prezzi...' : '↻ Calcola prezzi per fermata'}
+                  </button>
                 </div>
-                <button type="button" className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => calcolaPrezziPreventivo(tragitto.tragittoId)} disabled={calcolandoPreventivo}>
-                  {calcolandoPreventivo ? 'Calcolo prezzi...' : '↻ Calcola prezzi per fermata'}
-                </button>
+                {/* Costo, posti presunti e fornitore si registrano nella
+                    sezione Preventivi (uno step prima) — qui sono di
+                    sola lettura, non più modificabili: una volta
+                    accettato un preventivo, prezzo e fornitore restano
+                    quelli, questa sezione calcola solo i prezzi di
+                    vendita da quel costo. Per cambiarli, si torna in
+                    Preventivi. */}
+                <div className="section-card" style={{ marginBottom: 16, background: 'var(--dusk-2)' }}>
+                  <div className="form-grid">
+                    <div><span style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase' }}>Costo del preventivo</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>€{formPreventivo.costo?.toFixed(2) ?? '—'}</p></div>
+                    <div><span style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase' }}>Posti presunti del bus</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{formPreventivo.postiBus ?? '—'}</p></div>
+                    <div><span style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase' }}>Fornitore</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{fornitoriLista.find((f) => f.id === formPreventivo.fornitoreId)?.nome ?? '— Nessuno indicato —'}</p></div>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 8, marginBottom: 0 }}>Per cambiare costo o fornitore, vai nella sezione Preventivi di questo tragitto.</p>
+                </div>
                 {statoCalcoloPreventivo && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 12 }}>{statoCalcoloPreventivo}</p>}
                 {prezziCalcolati && prezziCalcolati.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
@@ -923,12 +914,27 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             // altrimenti la freccia sembra non "espandere" più nulla.
             // Vista di sola lettura, niente pulsanti di modifica (per
             // quelli si riapre l'editor dal contesto giusto).
-            if (contestoPartenze?.tabOrigine === 'fermate') return (
+            if (contestoPartenze?.tabOrigine === 'fermate') {
+              // Come nella scheda del tragitto (Eventi): partenza e arrivo
+              // sempre in vista, non solo dentro l'elenco generico
+              // "Fermate" — così il tragitto si legge a colpo d'occhio
+              // anche qui, senza dover tornare su Eventi per ricordarselo.
+              const partenzaVero = tragittoVero?.fermate[0];
+              const fermateIntermedie = tragittoVero?.fermate.slice(1) ?? [];
+              return (
               <div style={{ marginTop: 14 }}>
-                <p className="section-label" style={{ marginBottom: 8 }}>Fermate ({tragittoVero?.fermate.filter((f) => f.attivo !== false).length ?? 0})</p>
-                {!tragittoVero || tragittoVero.fermate.length === 0
-                  ? <p className="testo-intro">Nessuna fermata su questo tragitto.</p>
-                  : tragittoVero.fermate.map((f) => (
+                <p className="section-label" style={{ marginBottom: 8 }}>Partenza</p>
+                {partenzaVero ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5, marginBottom: 14 }}>
+                    <span>{partenzaVero.citta}</span>
+                    <span style={{ color: partenzaVero.orario ? 'var(--mist)' : 'var(--pink)' }}>{partenzaVero.orario ?? 'orario mancante'}</span>
+                  </div>
+                ) : <p className="testo-intro" style={{ marginBottom: 14 }}>Nessuna fermata su questo tragitto.</p>}
+
+                <p className="section-label" style={{ marginBottom: 8 }}>Fermate intermedie ({fermateIntermedie.filter((f) => f.attivo !== false).length})</p>
+                {fermateIntermedie.length === 0
+                  ? <p className="testo-intro">Nessuna fermata intermedia — si va dritti dalla partenza all'arrivo.</p>
+                  : fermateIntermedie.map((f) => (
                     <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
                       <span>{f.citta}</span>
                       <span style={{ color: 'var(--mist)' }}>{f.orario ?? '— orario non impostato'}</span>
@@ -956,29 +962,45 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 )}
                 <button type="button" className="btn btn-ghost" style={{ marginTop: 10 }} onClick={() => apriModificaOperativa(tragitto)}>Modifica</button>
               </div>
-            );
-            if (contestoPartenze?.tabOrigine === 'da-prezzare') return (
+              );
+            }
+            if (contestoPartenze?.tabOrigine === 'da-prezzare') {
+              // Catturato qui: dentro le chiusure sotto (.map) il
+              // controllo tipi non restringe in modo affidabile una
+              // variabile presa dall'esterno con optional chaining.
+              const tv = tragittoVero;
+              return (
               <div style={{ marginTop: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <p className="section-label" style={{ margin: 0 }}>Preventivo</p>
-                  {tragittoVero?.preventivoCosto && <span style={{ background: 'var(--green)', color: '#fff', padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>✓ Prezzato</span>}
+                  {tv?.preventivoCosto && <span style={{ background: 'var(--green)', color: '#fff', padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>✓ Prezzato</span>}
                 </div>
-                {tragittoVero?.preventivoCosto
-                  ? <p style={{ fontSize: 13.5, marginBottom: 12 }}>€{Number(tragittoVero.preventivoCosto).toFixed(0)} · {tragittoVero.preventivoPostiBus ?? '—'} posti presunti</p>
+                {tv?.preventivoCosto
+                  ? <p style={{ fontSize: 13.5, marginBottom: 12 }}>€{Number(tv.preventivoCosto).toFixed(0)} · {tv.preventivoPostiBus ?? '—'} posti presunti</p>
                   : <p className="testo-intro" style={{ marginBottom: 12 }}>Nessun preventivo ancora registrato.</p>}
-                <p className="section-label" style={{ marginBottom: 8 }}>Fermate — orario e prezzo ({tragittoVero?.fermate.filter((f) => f.attivo !== false).length ?? 0})</p>
-                {!tragittoVero || tragittoVero.fermate.length === 0
+                <p className="section-label" style={{ marginBottom: 8 }}>Fermate — orario e prezzo ({tv ? tv.fermate.filter((f) => f.attivo !== false).length : 0})</p>
+                {/* Colonne vere (grid), non flex space-between: con testi di
+                    lunghezza diversa (città, orari, prezzi) lo spazio tra
+                    le tre parti cambiava riga per riga — sembrava
+                    disallineato anche quando i dati erano giusti. */}
+                {!tv || tv.fermate.length === 0
                   ? <p className="testo-intro">Nessuna fermata su questo tragitto.</p>
-                  : tragittoVero.fermate.map((f) => (
-                    <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
-                      <span>{f.citta}</span>
-                      <span style={{ color: 'var(--mist)' }}>{f.orario ?? '— orario non impostato'}</span>
-                      <span style={{ fontWeight: 600 }}>{f.prezzo ? `€${Number(f.prezzo).toFixed(2)}` : '— prezzo non impostato'}</span>
+                  : <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 130px', gap: 10, padding: '4px 0', fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .3 }}>
+                      <span>Città</span><span>Orario</span><span>Prezzo</span>
                     </div>
-                  ))}
+                    {tv.fermate.map((f) => (
+                      <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 130px', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
+                        <span>{f.citta}</span>
+                        <span style={{ color: f.orario ? 'var(--mist)' : 'var(--pink)' }}>{f.orario ?? 'non impostato'}</span>
+                        <span style={{ fontWeight: 600, color: f.prezzo ? undefined : 'var(--pink)' }}>{f.prezzo ? `€${Number(f.prezzo).toFixed(2)}` : 'non impostato'}</span>
+                      </div>
+                    ))}
+                  </>}
                 <button type="button" className="btn btn-ghost" style={{ marginTop: 10 }} onClick={() => apriPreventivo(tragitto.tragittoId)}>Modifica</button>
               </div>
-            );
+              );
+            }
             if (contestoPartenze?.tabOrigine === 'preventivi') {
               return (
                 <PreventiviTragitto
@@ -992,18 +1014,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             if (contestoPartenze?.tabOrigine === 'da-confermare') {
               caricaVenditeSeServe(tragitto.tragittoId);
               const vendite = venditeMap.get(tragitto.tragittoId);
-              const fermateSelezionate = simulatoreFermateMap.get(tragitto.tragittoId) ?? new Set<string>();
-              const costoSimulato = simulatoreCostoMap.get(tragitto.tragittoId);
-              const postiDiPareggio = Math.round(postiPerBusGlobale * (sogliaOccupazionePercento / 100));
-              const fermateVere = tragittoVero?.fermate.filter((f) => f.attivo) ?? [];
-              const fermateVereSelezionate = fermateVere.filter((f) => fermateSelezionate.has(f.id));
-              const prenotazioniSelezionate = fermateVereSelezionate.reduce((tot, f) => tot + (vendite?.perFermata.find((v) => v.citta === f.citta)?.confermati ?? 0), 0);
-              const incassoAtteso = fermateVereSelezionate.reduce((tot, f) => {
-                const confermatiFermata = vendite?.perFermata.find((v) => v.citta === f.citta)?.confermati ?? 0;
-                return tot + confermatiFermata * (f.prezzo ? Number(f.prezzo) : 0);
-              }, 0);
-              const margineAtteso = costoSimulato != null ? incassoAtteso - costoSimulato : null;
-              const sopraSoglia = prenotazioniSelezionate >= postiDiPareggio;
               const serieGrafico: SerieGrafico[] = [...new Set((vendite?.andamento ?? []).map((a) => a.citta))].map((citta) => ({
                 nome: citta,
                 punti: (vendite?.andamento ?? []).filter((a) => a.citta === citta).map((a) => ({ x: a.data, y: a.cumulativo })),
@@ -1041,55 +1051,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                         </div>
                       )}
 
-                      <p className="section-label" style={{ marginBottom: 8 }}>Simulatore — conviene dividere?</p>
-                      {!vedeEconomia ? (
-                        <p className="testo-intro">Non hai il permesso per vedere costi e margini previsti.</p>
-                      ) : (
-                      <>
-                      <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 10 }}>
-                        Scegli quali fermate coprirebbe una Linea candidata, scrivi un costo ipotetico — ti mostro se le prenotazioni di adesso bastano già a coprire la soglia di pareggio.
-                      </p>
-                      {fermateVere.length === 0 ? (
-                        <p className="testo-intro">Nessuna fermata attiva su questo tragitto.</p>
-                      ) : (
-                        <div style={{ marginBottom: 10 }}>
-                          {fermateVere.map((f) => (
-                            <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 4, cursor: 'pointer' }}>
-                              <input
-                                type="checkbox"
-                                checked={fermateSelezionate.has(f.id)}
-                                onChange={(e) => setSimulatoreFermateMap((prev) => {
-                                  const nuovo = new Map(prev);
-                                  const set = new Set(nuovo.get(tragitto.tragittoId) ?? []);
-                                  if (e.target.checked) set.add(f.id); else set.delete(f.id);
-                                  nuovo.set(tragitto.tragittoId, set);
-                                  return nuovo;
-                                })}
-                              />
-                              {f.citta} <span style={{ color: 'var(--mist)' }}>({vendite.perFermata.find((v) => v.citta === f.citta)?.confermati ?? 0} confermati)</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                      <div className="campo" style={{ maxWidth: 220, marginBottom: 10 }}>
-                        <label>Costo ipotetico del bus (€)</label>
-                        <CampoNumero valuta value={costoSimulato} onChange={(v) => setSimulatoreCostoMap((prev) => new Map(prev).set(tragitto.tragittoId, v))} />
-                      </div>
-                      {fermateSelezionate.size > 0 && (
-                        <div className="section-card" style={{ fontSize: 13 }}>
-                          <p style={{ marginBottom: 4 }}>Posti di pareggio: <strong>{postiDiPareggio}</strong> <span style={{ color: 'var(--mist)' }}>(posti bus {postiPerBusGlobale} × soglia {sogliaOccupazionePercento}%)</span></p>
-                          <p style={{ marginBottom: 4 }}>
-                            Prenotazioni attuali su queste fermate: <strong style={{ color: sopraSoglia ? '#5be0a0' : 'var(--pink)' }}>{prenotazioniSelezionate}</strong>
-                            {' — '}{sopraSoglia ? 'sopra la soglia di pareggio' : 'ancora sotto la soglia di pareggio'}
-                          </p>
-                          <p style={{ marginBottom: 4 }}>Incasso atteso da queste fermate: <strong>€{incassoAtteso.toFixed(2)}</strong></p>
-                          {margineAtteso !== null && (
-                            <p>Margine previsto: <strong style={{ color: margineAtteso >= 0 ? '#5be0a0' : 'var(--pink)' }}>€{margineAtteso.toFixed(2)}</strong></p>
-                          )}
-                        </div>
-                      )}
-                      </>
-                      )}
                     </>
                   )}
                 </div>

@@ -12,7 +12,7 @@ import { useMappaTooltip } from '../shared/useMappaTooltip';
 import { geocodifica } from '../shared/geo';
 import { MappaPuntiFermate, type CategoriaTesta } from '../shared/MappaPuntiFermate';
 
-const VUOTA: FermataAnagraficaInput = { nome: '', citta: '', indirizzo: '', lat: undefined, lng: undefined, note: '', link: '' };
+const VUOTA: FermataAnagraficaInput = { nome: '', citta: '', indirizzo: '', lat: undefined, lng: undefined, regione: undefined, note: '', link: '' };
 
 /**
  * L'anagrafica delle fermate: il luogo fisico, a se' stante da come
@@ -52,7 +52,7 @@ export function FermateScreen() {
   }
   function apriModifica(f: FermataAnagrafica) {
     setInModifica(f);
-    setForm({ nome: f.nome, citta: f.citta, indirizzo: f.indirizzo, lat: f.lat, lng: f.lng, note: f.note ?? '', link: f.link ?? '' });
+    setForm({ nome: f.nome, citta: f.citta, indirizzo: f.indirizzo, lat: f.lat, lng: f.lng, regione: f.regione, note: f.note ?? '', link: f.link ?? '' });
     setModaleAperta(true);
   }
 
@@ -72,7 +72,7 @@ export function FermateScreen() {
       let formDaSalvare = form;
       if (form.lat == null || form.lng == null) {
         const risultato = await geocodifica(`${form.indirizzo}, ${form.citta}`);
-        if (risultato.coordinate) formDaSalvare = { ...form, lat: risultato.coordinate.lat, lng: risultato.coordinate.lng };
+        if (risultato.coordinate) formDaSalvare = { ...form, lat: risultato.coordinate.lat, lng: risultato.coordinate.lng, regione: risultato.regione };
       }
       if (inModifica) await fermateAnagraficaApi.update(inModifica.id, formDaSalvare);
       else await fermateAnagraficaApi.create(formDaSalvare);
@@ -98,6 +98,19 @@ export function FermateScreen() {
   const fermateFiltrate = ricerca.trim()
     ? fermate.filter((f) => (f.nome + ' ' + f.citta + ' ' + f.indirizzo).toLowerCase().includes(ricerca.trim().toLowerCase()))
     : fermate;
+
+  // Raggruppate per regione, in ordine alfabetico — come Fornitori:
+  // regione in grassetto, dentro le fermate ordinate per città. Chi
+  // non ha ancora una regione nota finisce in un gruppo a parte, in fondo.
+  const gruppiPerRegione = new Map<string, FermataAnagrafica[]>();
+  for (const f of fermateFiltrate) {
+    const chiave = f.regione ?? 'Senza regione';
+    const lista = gruppiPerRegione.get(chiave) ?? [];
+    lista.push(f);
+    gruppiPerRegione.set(chiave, lista);
+  }
+  const regioniOrdinate = [...gruppiPerRegione.keys()].sort((a, b) => a === 'Senza regione' ? 1 : b === 'Senza regione' ? -1 : a.localeCompare(b, 'it'));
+  for (const lista of gruppiPerRegione.values()) lista.sort((a, b) => a.citta.localeCompare(b.citta, 'it'));
 
   // Per ogni fermata dell'anagrafica: guarda TUTTI i Percorsi Salvati
   // che la usano — se compare SEMPRE come Testa (prima o ultima
@@ -156,32 +169,37 @@ export function FermateScreen() {
           {ricerca ? 'Nessuna fermata trovata.' : 'Nessuna fermata in anagrafica ancora.'}
         </p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {fermateFiltrate.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              className="riga-cliccabile"
-              style={{ textAlign: 'left', border: 'none', width: '100%', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
-              onClick={() => apriModifica(f)}
-            >
-              <span>
-                <span className="riga-titolo">{f.nome}</span>
-                <span style={{ color: 'var(--mist)', fontSize: 12.5, marginLeft: 10 }}>{f.citta} · {f.indirizzo}</span>
-                {f.link && <span style={{ color: 'var(--blue)', fontSize: 12, marginLeft: 10 }}>🔗</span>}
-              </span>
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={(e) => { e.stopPropagation(); elimina(f); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); elimina(f); } }}
-                style={{ fontSize: 11, color: 'var(--pink)', flexShrink: 0 }}
-              >
-                Elimina
-              </span>
-            </button>
-          ))}
-        </div>
+        regioniOrdinate.map((regione) => (
+          <div key={regione} style={{ marginBottom: 22 }}>
+            <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px' }}>{regione}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {gruppiPerRegione.get(regione)!.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className="riga-cliccabile"
+                  style={{ textAlign: 'left', border: 'none', width: '100%', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
+                  onClick={() => apriModifica(f)}
+                >
+                  <span>
+                    <span className="riga-titolo">{f.nome}</span>
+                    <span style={{ color: 'var(--mist)', fontSize: 12.5, marginLeft: 10 }}>{f.citta} · {f.indirizzo}</span>
+                    {f.link && <span style={{ color: 'var(--blue)', fontSize: 12, marginLeft: 10 }}>🔗</span>}
+                  </span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); elimina(f); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); elimina(f); } }}
+                    style={{ fontSize: 11, color: 'var(--pink)', flexShrink: 0 }}
+                  >
+                    Elimina
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))
       )}
       </>
       )}

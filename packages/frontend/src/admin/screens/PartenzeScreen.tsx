@@ -6,6 +6,7 @@ import { RicercaSezione } from '../shared/RicercaSezione';
 import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
+import { useNavigazione } from '../shared/NavigazioneContext';
 import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 import type { TabPartenze, AzionePartenze } from './partenze/tipi';
@@ -48,6 +49,15 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [partenze, setPartenze] = useState<Partenza[]>([]);
   const [selezionato, setSelezionato] = useState<{ evento: Evento; tragittiIds: string[]; azione: AzionePartenze; tabOrigine: TabPartenze } | null>(null);
+
+  // La sezione (URL) corrispondente a questa tab — stessa mappa degli
+  // export in fondo al file — serve per scrivere/leggere ?eventoId= e
+  // ?tragittiIds= nell'URL di QUESTA tab specifica.
+  const sezioneUrl: Record<TabPartenze, string> = {
+    fermate: 'partenze-orari', preventivi: 'partenze-preventivi', 'da-prezzare': 'partenze-prezzi',
+    'da-confermare': 'partenze-da-confermare', confermato: 'partenze-confermato', passate: 'partenze-passate',
+  };
+  const naviga = useNavigazione();
   const [ricerca, setRicerca] = useState('');
   const [caricamento, setCaricamento] = useState(true);
 
@@ -82,8 +92,15 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   // "Da Confermare" e "Confermato" contemporaneamente).
   function tabsDi(p: Partenza): TabPartenze[] {
     if (passata(p)) return ['passate'];
-    if (p.stato === 'DA_CONFERMARE') return ['fermate', 'preventivi', 'da-prezzare']; // non ancora prezzato, vive solo in Orari/Preventivi/Prezzi
-    const risultato: TabPartenze[] = ['fermate', 'preventivi', 'da-prezzare', 'da-confermare'];
+    // Preventivi: compare solo quando ci sono orari da mostrare al
+    // fornitore (senza orari non ha senso chiedere un preventivo).
+    // Prezzi: compare solo quando un preventivo esiste già (accettato
+    // o registrato a mano in Preventivi) — Prezzi calcola i prezzi di
+    // vendita da un costo noto, non registra il costo la prima volta.
+    const conPreventivi: TabPartenze[] = p.fermateCompilate ? ['preventivi'] : [];
+    const conPrezzi: TabPartenze[] = p.preventivoCosto ? ['da-prezzare'] : [];
+    if (p.stato === 'DA_CONFERMARE') return ['fermate', ...conPreventivi, ...conPrezzi];
+    const risultato: TabPartenze[] = ['fermate', ...conPreventivi, ...conPrezzi, 'da-confermare'];
     if (p.stato !== 'PREZZATO') risultato.push('confermato'); // "Confermato" resta un insieme a parte
     return risultato;
   }
@@ -140,6 +157,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
     const tragittiIds = gruppo.map((p) => p.tragittoId);
     const eventoId = gruppo[0].evento.id;
     const eventoInMemoria = eventi.find((ev) => ev.id === eventoId);
+    naviga(sezioneUrl[tab] as never, { eventoId, tragittiIds: tragittiIds.join(',') });
     if (eventoInMemoria) setSelezionato({ evento: eventoInMemoria, tragittiIds, azione, tabOrigine: tab }); // subito, non far vedere niente mentre carica
     try {
       const fresco = await eventiApi.getById(eventoId);
@@ -149,6 +167,21 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
     }
   }
 
+  // All'avvio (anche dopo un ricaricamento), se l'URL ha già eventoId e
+  // tragittiIds riapro da sola lo stesso gruppo — stesso fetch di
+  // apriGruppo, innescato dall'URL invece che da un clic. "eventi" deve
+  // essere già arrivato (elencoPartenze), altrimenti aspetto il giro dopo.
+  useEffect(() => {
+    if (selezionato || eventi.length === 0) return;
+    const url = new URLSearchParams(window.location.search);
+    const eventoId = url.get('eventoId');
+    const tragittiIdsUrl = url.get('tragittiIds');
+    if (!eventoId || !tragittiIdsUrl) return;
+    const gruppo = partenze.filter((p) => p.evento.id === eventoId && tragittiIdsUrl.split(',').includes(p.tragittoId));
+    if (gruppo.length > 0) apriGruppo(gruppo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventi, partenze]);
+
   if (selezionato) {
     return (
       <SchedaEventoModale
@@ -156,7 +189,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
         tabIniziale="partenze"
         soloQuestaTab
         contestoPartenze={{ tragittiIds: selezionato.tragittiIds, azione: selezionato.azione, tabOrigine: selezionato.tabOrigine }}
-        onClose={() => setSelezionato(null)}
+        onClose={() => { setSelezionato(null); naviga(sezioneUrl[tab] as never, { eventoId: null, tragittiIds: null }); }}
         onSalvato={ricarica}
       />
     );

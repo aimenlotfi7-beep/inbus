@@ -25,6 +25,9 @@ export interface ArticoloCarrello {
 export interface BundleNelCarrello {
   id: string; nome: string; scontoPercentuale: number;
   ammetteOfferte: boolean; ammetteCredito: boolean; ammettePromoter: boolean; ammetteAcconto: boolean;
+  /** Letto da ?promo= quando il cliente atterra sulla pagina del bundle
+   *  — stesso meccanismo già usato dal checkout dell'evento singolo. */
+  promoterCodice?: string;
 }
 
 interface CarrelloContesto {

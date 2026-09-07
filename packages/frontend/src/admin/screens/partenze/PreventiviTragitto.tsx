@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { preventiviApi, type FornitoreCandidato, type RichiestaConRisposta } from '../../../api/preventivi';
+import { eventiApi } from '../../../api/eventi';
+import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import type { Tragitto } from '../../../api/types';
 import { ErroreApi } from '../../../api/client';
 import { geocodifica } from '../../shared/geo';
 import { notifica } from '../../shared/notifiche';
+import { CampoNumero } from '../../shared/CampoNumero';
 
 /** Sezione "Preventivi" di UN tragitto (dentro Partenze): richiesta ai
  *  fornitori nel raggio, tabella delle risposte, accettazione, file
@@ -21,9 +24,51 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onA
   const [manualiSelezionati, setManualiSelezionati] = useState<Set<string>>(new Set());
   const [caricandoCandidati, setCaricandoCandidati] = useState(false);
   const [inviandoRichiesta, setInviandoRichiesta] = useState(false);
+  // Registrazione manuale del costo — per un preventivo avuto fuori dal
+  // sistema (telefono, mail diretta) invece che tramite una richiesta.
+  // Vive QUI (non più in Prezzi): questa è la sezione che stabilisce
+  // costo e fornitore, Prezzi calcola solo i prezzi di vendita da un
+  // costo già noto.
+  const [apertoManuale, setApertoManuale] = useState(false);
+  const [fornitoriLista, setFornitoriLista] = useState<Fornitore[]>([]);
+  const [formManuale, setFormManuale] = useState<{ costo?: number; postiBus?: number; fornitoreId?: string; file?: File }>({});
+  const [salvandoManuale, setSalvandoManuale] = useState(false);
+  useEffect(() => { fornitoriApi.list().then((f) => setFornitoriLista(f.filter((x) => x.stato === 'APPROVATO'))).catch(() => {}); }, []);
 
   function caricaRisposte() {
     preventiviApi.listaPerTragitto(tragittoId).then(setRisposte).catch(() => {});
+  }
+
+  async function salvaManuale() {
+    if (!formManuale.costo || !formManuale.postiBus) { notifica('Inserisci costo e posti presunti del bus.'); return; }
+    setSalvandoManuale(true);
+    try {
+      let fileContenuto: string | undefined;
+      if (formManuale.file) {
+        fileContenuto = await new Promise<string>((risolvi, rifiuta) => {
+          const lettore = new FileReader();
+          lettore.onload = () => risolvi((lettore.result as string).split(',')[1]);
+          lettore.onerror = () => rifiuta(new Error('Lettura file fallita'));
+          lettore.readAsDataURL(formManuale.file!);
+        });
+      }
+      await eventiApi.registraPreventivoManuale(tragittoId, {
+        preventivoCosto: formManuale.costo,
+        preventivoPostiBus: formManuale.postiBus,
+        fornitoreId: formManuale.fornitoreId,
+        fileNome: formManuale.file?.name,
+        fileContenuto,
+      });
+      notifica('Preventivo registrato — ora puoi calcolare i prezzi di vendita nella sezione Prezzi.', 'successo');
+      setApertoManuale(false);
+      setFormManuale({});
+      caricaRisposte();
+      onAccettato(); // ricarica anche il tragitto nel genitore: preventivoCosto è cambiato
+    } catch (e) {
+      notifica(e instanceof ErroreApi ? e.message : 'Salvataggio non riuscito.');
+    } finally {
+      setSalvandoManuale(false);
+    }
   }
   useEffect(() => { caricaRisposte(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tragittoId]);
 
@@ -52,6 +97,15 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onA
   }
 
   async function inviaRichiesta() {
+    // Niente da inviare (nessun automatico nel raggio, nessuno scelto a
+    // mano) — prima si mandava comunque la richiesta e tornava
+    // "Inviate 0 automatiche e 0 manuali", un messaggio di successo per
+    // un'azione che in realtà non ha fatto nulla.
+    const nessunAutomatico = !candidati?.some((c) => c.statoCandidato === 'automatico');
+    if (nessunAutomatico && manualiSelezionati.size === 0) {
+      notifica('Seleziona almeno un fornitore prima di inviare la richiesta.');
+      return;
+    }
     setInviandoRichiesta(true);
     try {
       const risultato = await preventiviApi.richiedi(tragittoId, {
@@ -132,7 +186,38 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onA
 
   return (
     <div style={{ marginTop: 14 }}>
-      <p className="section-label" style={{ marginBottom: 8 }}>Richiedi preventivo</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+        <p className="section-label" style={{ marginBottom: 0 }}>Richiedi preventivo</p>
+        {!apertoManuale && (
+          <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => setApertoManuale(true)}>+ Registra un preventivo avuto altrove</button>
+        )}
+      </div>
+      {apertoManuale && (
+        <div style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 14 }}>
+          <p className="testo-intro" style={{ marginBottom: 10 }}>Per un preventivo avuto fuori dal sistema (telefono, mail diretta) invece che tramite una richiesta.</p>
+          <div className="form-grid">
+            <label>Costo del preventivo (€)
+              <CampoNumero valuta value={formManuale.costo} onChange={(v) => setFormManuale((f) => ({ ...f, costo: v }))} />
+            </label>
+            <label>Posti presunti del bus
+              <CampoNumero value={formManuale.postiBus} onChange={(v) => setFormManuale((f) => ({ ...f, postiBus: v }))} />
+            </label>
+            <label>Fornitore <span style={{ color: 'var(--mist)', fontWeight: 400 }}>(da chi arriva questo prezzo)</span>
+              <select value={formManuale.fornitoreId ?? ''} onChange={(e) => setFormManuale((f) => ({ ...f, fornitoreId: e.target.value || undefined }))}>
+                <option value="">— Nessuno indicato —</option>
+                {fornitoriLista.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+              </select>
+            </label>
+            <label className="full">Allega il suo preventivo (facoltativo)
+              <input type="file" accept="application/pdf,image/*" onChange={(e) => setFormManuale((f) => ({ ...f, file: e.target.files?.[0] }))} />
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button type="button" className="btn btn-primary" disabled={salvandoManuale} onClick={salvaManuale}>{salvandoManuale ? 'Salvo...' : 'Registra preventivo'}</button>
+            <button type="button" className="btn btn-ghost" onClick={() => { setApertoManuale(false); setFormManuale({}); }}>Annulla</button>
+          </div>
+        </div>
+      )}
       {!candidati ? (
         <button type="button" className="btn btn-ghost" disabled={caricandoCandidati} onClick={caricaCandidati}>
           {caricandoCandidati ? 'Cerco i fornitori vicini...' : '+ Nuova richiesta preventivo'}

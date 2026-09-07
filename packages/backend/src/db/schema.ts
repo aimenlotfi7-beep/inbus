@@ -206,6 +206,9 @@ export const fornitori = pgTable('fornitori', {
   note: text('note'),
   lat: doublePrecision('lat'),
   lng: doublePrecision('lng'),
+  // Regione italiana ("Emilia-Romagna", ...), presa da Nominatim al
+  // momento della geocodifica — usata per raggruppare l'elenco.
+  regione: text('regione'),
   // Un fornitore creato dall'admin (schermata Fornitori, come sempre)
   // nasce già APPROVATO — l'approvazione manuale serve solo per chi si
   // autoregistra dal form pubblico (chiunque potrebbe compilarlo).
@@ -347,6 +350,9 @@ export const fermateAnagrafica = pgTable('fermate_anagrafica', {
   lng: doublePrecision('lng'),
   note: text('note'),
   link: text('link'), // facoltativo — es. Google Maps, sito del punto di ritrovo, ecc.
+  // Regione italiana, presa da Nominatim al momento della geocodifica —
+  // usata per raggruppare l'elenco (gestionale e sito pubblico).
+  regione: text('regione'),
 });
 
 export const fermate = pgTable('fermate', {

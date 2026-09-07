@@ -89,8 +89,12 @@ export const eventiController = {
     await eventiService.aggiornaTragittoOperativo(req.params.tragittoId, req.body);
     res.json({ ok: true });
   },
-  async registraPreventivo(req: Request, res: Response) {
-    await eventiService.registraPreventivo(req.params.tragittoId, req.body);
+  async registraPreventivoManuale(req: Request, res: Response) {
+    await eventiService.registraPreventivoManuale(req.params.tragittoId, req.body);
+    res.json({ ok: true });
+  },
+  async calcolaPrezziVendita(req: Request, res: Response) {
+    await eventiService.calcolaPrezziVendita(req.params.tragittoId, req.body);
     res.json({ ok: true });
   },
 

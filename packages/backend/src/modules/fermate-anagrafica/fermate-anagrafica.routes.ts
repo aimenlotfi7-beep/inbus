@@ -14,6 +14,7 @@ const fermataAnagraficaSchema = z.object({
   indirizzo: z.string().min(1),
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
+  regione: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   link: z.string().nullable().optional(),
 });

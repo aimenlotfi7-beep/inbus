@@ -123,7 +123,19 @@ function verificaUnicaCittaArrivo(
   }
 }
 
-export const creaEventoSchema = creaEventoBase.superRefine(verificaUnicaCittaArrivo);
+/** Solo in CREAZIONE: non si può programmare un evento nel passato.
+ *  In MODIFICA non si applica — un evento già passato deve restare
+ *  modificabile (correggere un refuso, un dato per lo storico), senza
+ *  che la sua data ormai passata blocchi il salvataggio. */
+function verificaDataNonPassata(d: { data?: Date }, ctx: z.RefinementCtx) {
+  if (!d.data) return;
+  const oggi = new Date(); oggi.setHours(0, 0, 0, 0);
+  if (d.data < oggi) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['data'], message: 'La data dell\'evento non può essere nel passato.' });
+  }
+}
+
+export const creaEventoSchema = creaEventoBase.superRefine(verificaUnicaCittaArrivo).superRefine(verificaDataNonPassata);
 export type CreaEventoInput = z.infer<typeof creaEventoSchema>;
 
 export const aggiornaEventoSchema = creaEventoBase.partial().superRefine(verificaUnicaCittaArrivo);
@@ -196,13 +208,12 @@ export const aggiornaTragittoOperativoSchema = z.object({
 // frontend (modello pareggio al 50% + distanza dall'arrivo, richiede
 // geocodifica — più naturale farla lì, stesso posto che già calcola
 // gli orari dall'arrivo) — qui si limita a salvarli.
-export const registraPreventivoSchema = z.object({
+// Sezione PREVENTIVI: registra il costo del bus (fornitore+file
+// facoltativi) — non tocca i prezzi di vendita per fermata, quelli
+// sono un passo successivo (sezione Prezzi, quando il costo è già noto).
+export const registraPreventivoManualeSchema = z.object({
   preventivoCosto: z.number().positive(),
   preventivoPostiBus: z.number().int().positive(),
-  prezziPerFermata: z.array(z.object({
-    fermataId: z.string(),
-    prezzo: z.number().nonnegative(),
-  })),
   // Facoltativo — ma se manca, dopo non si sa più da chi è arrivato
   // questo prezzo (vedi conversazione: "devo censire comunque il
   // preventivo e indicare da quale fornitore deriva").
@@ -212,4 +223,13 @@ export const registraPreventivoSchema = z.object({
   fileNome: z.string().max(200).optional(),
   // Stesso limite per allegato del modulo preventivi (8MB).
   fileContenuto: z.string().max(8 * 1024 * 1024 * 4 / 3, 'Il file supera gli 8MB consentiti.').optional(), // base64
+});
+
+// Sezione PREZZI: i prezzi di vendita per fermata, calcolati da un
+// costo GIÀ noto (impostato in Preventivi) — non tocca fornitore/costo.
+export const calcolaPrezziVenditaSchema = z.object({
+  prezziPerFermata: z.array(z.object({
+    fermataId: z.string(),
+    prezzo: z.number().nonnegative(),
+  })),
 });
