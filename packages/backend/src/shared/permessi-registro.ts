@@ -37,6 +37,11 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   // avvio dopo il deploy viene concesso in automatico ai ruoli che
   // hanno già eventi.partenze — così chi accetta preventivi oggi non
   // si ritrova la funzione sparita; poi ogni ruolo si regola da Ruoli.
+  // Bundle (piu' eventi venduti insieme) — ereditano dai permessi eventi
+  // al primo avvio, poi si regolano da Ruoli.
+  { chiave: 'bundle.visualizza', etichetta: 'Visualizzare i bundle', modulo: 'Eventi', ereditaDa: 'eventi.visualizza' },
+  { chiave: 'bundle.gestisci', etichetta: 'Creare/modificare bundle', modulo: 'Eventi', ereditaDa: 'eventi.crea' },
+  { chiave: 'bundle.elimina', etichetta: 'Eliminare bundle', modulo: 'Eventi', ereditaDa: 'eventi.elimina' },
   { chiave: 'preventivi.accetta', etichetta: 'Accettare un preventivo fornitore (impegno economico)', modulo: 'Eventi', ereditaDa: 'eventi.partenze' },
 
   // Prenotazioni

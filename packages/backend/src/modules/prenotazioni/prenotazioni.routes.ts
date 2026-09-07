@@ -30,7 +30,7 @@ export const prenotazioniController = {
    *  server lo ricalcola sempre da zero sommando ogni articolo. */
   async creaOrdine(req: Request, res: Response) {
     if (!req.cliente) throw new NonAutorizzato();
-    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente.sub);
+    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente.sub, req.body.bundleId);
     res.status(201).json(risultato);
   },
   async dettaglioPerCliente(req: Request, res: Response) {

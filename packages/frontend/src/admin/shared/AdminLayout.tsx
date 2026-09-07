@@ -9,7 +9,7 @@ import { preventiviApi } from '../../api/preventivi';
 import { chatApi } from '../../api/chat';
 
 export type SezioneGestionale =
-  | 'statistiche' | 'eventi' | 'vetrina' | 'calendario' | 'cestino'
+  | 'statistiche' | 'eventi' | 'bundle' | 'vetrina' | 'calendario' | 'cestino'
   | 'partenze-orari' | 'partenze-preventivi' | 'partenze-prezzi' | 'partenze-da-confermare' | 'partenze-confermato' | 'partenze-passate'
   | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi' | 'variazioni'
   | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
@@ -28,6 +28,7 @@ export type SezioneGestionale =
 const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; permesso: string }[] }[] = [
   { titolo: 'Eventi', voci: [
     { id: 'eventi', label: 'Eventi', permesso: 'eventi.visualizza' },
+    { id: 'bundle', label: 'Bundle', permesso: 'bundle.visualizza' },
     { id: 'calendario', label: 'Calendario', permesso: 'eventi.calendario' },
   ]},
   { titolo: 'Partenze', voci: [

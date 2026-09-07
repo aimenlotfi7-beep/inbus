@@ -4,6 +4,8 @@ import { db } from '../../db/client.js';
 import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, lineaFermate, busFisici } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
+import { bundleService } from '../bundle/bundle.service.js';
+import { verificaComposizione, ripartisciSconto } from '../bundle/bundle-regole.js';
 import { couponService } from '../coupon/coupon.service.js';
 import { env } from '../../config/env.js';
 import type { CreaPrenotazioneInput } from './prenotazioni.dto.js';
@@ -82,7 +84,12 @@ async function creaRigaInterna(
   // whiteLabelId arrivasse solo dopo, il biglietto partirebbe già col
   // layout sbagliato (quello dell'evento, mai quello della White
   // Label), esattamente il bug segnalato.
-  canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }
+  canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string },
+  /** Solo per gli ordini bundle: la quota di sconto (in euro, già
+   *  ripartita e arrotondata da bundle-regole.ripartisciSconto) da
+   *  togliere a QUESTA riga prima di coupon/acconto/credito. Assente nel
+   *  flusso singolo: nessun cambio di comportamento. */
+  scontoBundle?: number,
 ) {
   const [utente] = await tx.select().from(utenti).where(eq(utenti.id, utenteId)).limit(1);
   if (!utente) throw new NonAutorizzato('Account non trovato — effettua di nuovo il login.');
@@ -146,7 +153,11 @@ async function creaRigaInterna(
     const offerta = await offerteService.verificaEIncrementaUtilizzo(tx, input.offertaId, input.eventoId);
     prezzoEffettivo = applicaScontoOfferta(prezzoNormale, offerta);
   }
-  const importoBase = prezzoEffettivo * input.passeggeri;
+  // Sconto bundle PRIMA di tutto il resto (coupon, acconto, credito,
+  // commissione): "importoBase" da qui in poi è già il netto bundle,
+  // così ogni calcolo a valle — e ogni report che legge
+  // prenotazioni.totale — lo vede senza saperne nulla.
+  const importoBase = prezzoEffettivo * input.passeggeri - (scontoBundle ?? 0);
   const { sconto, coupon: couponUsato } = await validaCoupon(tx, input.couponCodice, importoBase, input.eventoId, input.tipoPagamento);
 
   const acconto = evento.accontoEur ? Number(evento.accontoEur) : env.ACCONTO_FISSO_EUR;
@@ -196,6 +207,7 @@ async function creaRigaInterna(
       passeggeri: input.passeggeri,
       totale: (input.tipoPagamento === 'ACCONTO' ? acconto : totale - creditoUsato).toFixed(2),
       sconto: sconto.toFixed(2),
+      ...(scontoBundle != null && { scontoBundle: scontoBundle.toFixed(2) }),
       creditoUsato: creditoUsato.toFixed(2),
       couponCodice: couponUsato?.codice,
       offertaId: input.offertaId,
@@ -289,7 +301,7 @@ export const prenotazioniService = {
    *  prenotazione a metà creata. Ogni articolo resta comunque una vera
    *  prenotazione a sé, con il suo PNR, il suo biglietto, la sua email
    *  — semplicemente in più raggruppate sotto lo stesso ordine. */
-  async creaOrdine(articoli: CreaPrenotazioneInput[], utenteId: string) {
+  async creaOrdine(articoli: CreaPrenotazioneInput[], utenteId: string, bundleId?: string) {
     if (articoli.length === 0) {
       throw new ErroreApplicativo('Il carrello è vuoto.', 400, 'CARRELLO_VUOTO');
     }
@@ -297,13 +309,48 @@ export const prenotazioniService = {
       throw new ErroreApplicativo('Troppi articoli in un unico ordine (massimo 20).', 400, 'CARRELLO_TROPPO_GRANDE');
     }
 
+    // ---- BUNDLE: tutte le regole verificate QUI, lato server, prima di
+    // toccare il database. Il form del sito le fa rispettare per UX, ma
+    // una richiesta costruita a mano non può aggirarle.
+    let scontiPerRiga: number[] | undefined;
+    let bundleScelto: Awaited<ReturnType<typeof bundleService.perAcquisto>> | undefined;
+    if (bundleId) {
+      bundleScelto = await bundleService.perAcquisto(bundleId); // lancia se non IN_VENDITA
+      const erroreComposizione = verificaComposizione(
+        { tipo: bundleScelto.tipo, eventiIds: bundleScelto.eventiIds, minEventi: bundleScelto.minEventi, maxEventi: bundleScelto.maxEventi, minPosti: bundleScelto.minPosti, maxPosti: bundleScelto.maxPosti },
+        articoli.map((a) => ({ eventoId: a.eventoId, passeggeri: a.passeggeri })),
+      );
+      if (erroreComposizione) throw new ErroreApplicativo(erroreComposizione, 400, 'BUNDLE_COMPOSIZIONE');
+      if (!bundleScelto.ammetteOfferte && articoli.some((a) => a.couponCodice || a.offertaId)) throw new ErroreApplicativo('Questo bundle non ammette codici sconto o offerte.', 400, 'BUNDLE_NO_OFFERTE');
+      if (!bundleScelto.ammetteAcconto && articoli.some((a) => a.tipoPagamento === 'ACCONTO')) throw new ErroreApplicativo('Questo bundle richiede il pagamento completo.', 400, 'BUNDLE_NO_ACCONTO');
+      if (!bundleScelto.ammettePromoter && articoli.some((a) => a.promoterCodice)) throw new ErroreApplicativo('Questo bundle non è vendibile tramite promoter.', 400, 'BUNDLE_NO_PROMOTER');
+      if (!bundleScelto.ammetteCredito) articoli = articoli.map((a) => ({ ...a, usaCredito: false }));
+      // Sconto ripartito per riga sul prezzo pieno (fermata + extra),
+      // in centesimi esatti — serve il prezzo di ogni riga PRIMA di
+      // crearla: lo si legge qui con la stessa prezzoNormaleFermata
+      // che creaRigaInterna userà poi.
+      const importi: number[] = [];
+      for (const a of articoli) {
+        const [f] = await db.select().from(fermate).where(eq(fermate.id, a.fermataId)).limit(1);
+        const [t] = await db.select().from(tragitti).where(eq(tragitti.id, a.tragittoId)).limit(1);
+        const [e] = await db.select().from(eventi).where(eq(eventi.id, a.eventoId)).limit(1);
+        if (!f || !t || !e || f.tragittoId !== t.id || t.eventoId !== e.id) throw new NonTrovato('Fermata');
+        importi.push(prezzoNormaleFermata(f, e, t) * a.passeggeri);
+      }
+      scontiPerRiga = ripartisciSconto(importi, bundleScelto.scontoPercentuale);
+    }
+
     const { ordine, righe } = await db.transaction(async (tx) => {
       const righeCreate = [];
-      for (const articolo of articoli) {
-        righeCreate.push(await creaRigaInterna(tx, articolo, utenteId));
+      for (const [i, articolo] of articoli.entries()) {
+        righeCreate.push(await creaRigaInterna(tx, articolo, utenteId, undefined, scontiPerRiga?.[i]));
       }
       const totaleOrdine = righeCreate.reduce((somma, r) => somma + Number(r.totale), 0);
-      const [nuovoOrdine] = await tx.insert(ordini).values({ utenteId, totale: totaleOrdine.toFixed(2) }).returning();
+      const scontoBundleTotale = scontiPerRiga ? scontiPerRiga.reduce((a, b) => a + b, 0) : null;
+      const [nuovoOrdine] = await tx.insert(ordini).values({
+        utenteId, totale: totaleOrdine.toFixed(2),
+        ...(bundleScelto && { bundleId: bundleScelto.id, scontoBundle: scontoBundleTotale!.toFixed(2) }),
+      }).returning();
       await tx.update(prenotazioni).set({ ordineId: nuovoOrdine.id }).where(inArray(prenotazioni.id, righeCreate.map((r) => r.id)));
       return { ordine: nuovoOrdine, righe: righeCreate };
     });
@@ -312,6 +359,26 @@ export const prenotazioniService = {
     // biglietto/email per ciascun articolo dell'ordine.
     for (const riga of righe) {
       await inviaConfermaPrenotazione(riga);
+    }
+    // Riepilogo del bundle in una mail sola (best-effort: l'ordine è già
+    // fatto, una mail che fallisce non lo deve annullare).
+    if (bundleScelto && righe[0]?.utenteEmail) {
+      try {
+        const { templateEmailService } = await import('../template-email/template-email.service.js');
+        const { inviaEmail } = await import('../../shared/email.service.js');
+        const totaleOriginale = righe.reduce((s, r) => s + Number(r.totaleComplessivo) + Number(r.scontoBundle ?? 0), 0);
+        const { oggetto, html } = await templateEmailService.renderizza('bundle_conferma', {
+          nome: righe[0].utenteNome || 'cliente',
+          bundle: bundleScelto.nome,
+          eventi: righe.map((r) => r.eventoArtista).join(', '),
+          totaleOriginale: `€${totaleOriginale.toFixed(2)}`,
+          sconto: `€${Number(ordine.scontoBundle ?? 0).toFixed(2)}`,
+          totale: `€${Number(ordine.totale).toFixed(2)}`,
+        });
+        await inviaEmail({ a: righe[0].utenteEmail, oggetto, html });
+      } catch (e) {
+        console.error('[bundle] mail di riepilogo fallita:', e instanceof Error ? e.message : e);
+      }
     }
 
     return { ordine, prenotazioni: righe.map((r) => ({ ...r, ordineId: ordine.id })) };

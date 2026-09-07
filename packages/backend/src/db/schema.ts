@@ -619,8 +619,70 @@ export const ordini = pgTable('ordini', {
   id: id(),
   utenteId: text('utente_id').notNull().references(() => utenti.id),
   totale: numeric('totale', { precision: 10, scale: 2 }).notNull(),
+  // Valorizzati solo se l'ordine è l'acquisto di un bundle: quale, e
+  // quanto sconto complessivo è stato applicato (somma degli
+  // scontoBundle di riga — che sono la verità per riga, vedi
+  // prenotazioni.scontoBundle). set null: eliminare un bundle non deve
+  // toccare gli ordini già fatti.
+  bundleId: text('bundle_id').references(() => bundle.id, { onDelete: 'set null' }),
+  scontoBundle: numeric('sconto_bundle', { precision: 10, scale: 2 }),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
 });
+
+// ---------------------------------------------------------------------
+// BUNDLE — più eventi già esistenti venduti insieme con uno sconto %.
+// Non crea eventi: li raggruppa. Lo STATO (bozza/programmato/in
+// vendita/terminato/disattivato) non si salva, si calcola da date e
+// "attivo" (modules/bundle/bundle-stato.ts). Le regole di business
+// sono nel prompt Bundle, sezione 3.
+// ---------------------------------------------------------------------
+export const tipoBundleEnum = pgEnum('tipo_bundle', ['FISSO', 'LIBERO']);
+
+export const bundle = pgTable('bundle', {
+  id: id(),
+  nome: text('nome').notNull(),
+  slug: text('slug').notNull().unique(),
+  descrizione: text('descrizione'),
+  // Propria del bundle — mai ereditata da un evento.
+  copertinaUrl: text('copertina_url'),
+  tipo: tipoBundleEnum('tipo').notNull(),
+  // Solo LIBERO: quanti eventi il cliente deve/può scegliere.
+  minEventi: integer('min_eventi'),
+  maxEventi: integer('max_eventi'),
+  // Passeggeri per acquisto — lo STESSO numero su tutti gli eventi.
+  minPosti: integer('min_posti').notNull().default(1),
+  maxPosti: integer('max_posti').notNull().default(10),
+  // % sul totale dei posti (prezzo fermata + extra), applicata PRIMA di
+  // coupon, credito e commissione promoter.
+  scontoPercentuale: numeric('sconto_percentuale', { precision: 5, scale: 2 }).notNull(),
+  ammetteOfferte: boolean('ammette_offerte').notNull().default(false),
+  ammetteCredito: boolean('ammette_credito').notNull().default(false),
+  ammettePromoter: boolean('ammette_promoter').notNull().default(false),
+  ammetteAcconto: boolean('ammette_acconto').notNull().default(false),
+  // Istanti (UTC nel DB). L'admin li inserisce nell'ora italiana dal
+  // browser, che li converte; il confronto con "adesso" non dipende dal
+  // fuso, solo la VISUALIZZAZIONE (sempre con timeZone 'Europe/Rome').
+  inizioVendita: timestamp('inizio_vendita'),
+  fineVendita: timestamp('fine_vendita'),
+  visibileSeProgrammato: boolean('visibile_se_programmato').notNull().default(true),
+  visibileSeTerminato: boolean('visibile_se_terminato').notNull().default(false),
+  // false = DISATTIVATO manualmente: prevale su tutto.
+  attivo: boolean('attivo').notNull().default(true),
+  inEvidenzaHome: boolean('in_evidenza_home').notNull().default(false),
+  // Se impostato, il bundle è vendibile anche dal link di questo
+  // organizzatore — ammesso solo se TUTTI gli eventi sono suoi.
+  organizzatoreId: text('organizzatore_id').references(() => organizzatori.id, { onDelete: 'set null' }),
+  eliminatoIl: timestamp('eliminato_il'),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+});
+
+export const bundleEventi = pgTable('bundle_eventi', {
+  bundleId: text('bundle_id').notNull().references(() => bundle.id, { onDelete: 'cascade' }),
+  eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  ordine: integer('ordine').notNull().default(0),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.bundleId, t.eventoId] }),
+}));
 
 // ---------------------------------------------------------------------
 // PRENOTAZIONI (transazioni)
@@ -647,6 +709,11 @@ export const prenotazioni = pgTable('prenotazioni', {
   passeggeri: integer('passeggeri').notNull(),
   totale: numeric('totale', { precision: 10, scale: 2 }).notNull(),
   sconto: numeric('sconto', { precision: 10, scale: 2 }).notNull().default('0'),
+  // Quota dello sconto bundle caduta su QUESTA riga (già dentro
+  // 'totale'): così commissioni promoter, statistiche per evento e
+  // rimborsi — che leggono prenotazioni.totale — restano corretti
+  // senza saperne nulla.
+  scontoBundle: numeric('sconto_bundle', { precision: 10, scale: 2 }),
   couponCodice: text('coupon_codice'),
   tipoPagamento: tipoPagamentoEnum('tipo_pagamento').notNull().default('COMPLETO'),
   saldoPagato: boolean('saldo_pagato').notNull().default(true),
@@ -1157,6 +1224,9 @@ export const variazioniRisposte = pgTable('variazioni_risposte', {
 export const richiesteRimborso = pgTable('richieste_rimborso', {
   id: id(),
   prenotazioneId: text('prenotazione_id').notNull().references(() => prenotazioni.id, { onDelete: 'cascade' }),
+  // Un bundle si rimborsa solo per intero: le richieste delle sue
+  // prenotazioni nascono insieme e portano lo stesso ordineId.
+  ordineId: text('ordine_id').references(() => ordini.id, { onDelete: 'set null' }),
   motivo: text('motivo'),
   stato: statoRichiestaRimborsoEnum('stato').notNull().default('IN_ATTESA'),
   origine: origineRichiestaRimborsoEnum('origine').notNull().default('CLIENTE'),

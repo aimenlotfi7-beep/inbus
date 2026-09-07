@@ -94,7 +94,38 @@ async function main() {
     writeFileSync(resolve(cartella, 'index.html'), costruisciHtml(template, evento));
   }
 
-  console.log(`Pre-rendering completato: ${eventi.length} pagine evento generate con meta tag propri.`);
+  // Bundle: stessa cosa, stessi meta — l'anteprima social di un bundle
+  // vale quanto quella di un evento. Se l'API dei bundle non risponde
+  // (o non esiste ancora), gli eventi restano fatti lo stesso.
+  let bundle = [];
+  try {
+    const r = await fetch(`${apiUrl}/api/bundle/pubblico`);
+    if (r.ok) bundle = await r.json();
+  } catch { /* vedi sopra */ }
+  for (const b of bundle) {
+    if (!b.slug) continue;
+    const cartella = resolve(distDir, 'bundle', b.slug);
+    mkdirSync(cartella, { recursive: true });
+    writeFileSync(resolve(cartella, 'index.html'), costruisciHtmlBundle(template, b));
+  }
+
+  console.log(`Pre-rendering completato: ${eventi.length} pagine evento e ${bundle.length} pagine bundle generate con meta tag propri.`);
+}
+
+function costruisciHtmlBundle(template, b) {
+  const url = `${siteUrl}/bundle/${b.slug}`;
+  const titolo = `${b.nome} — Bundle | INBUS`;
+  const descrizione = (b.descrizione && String(b.descrizione).slice(0, 160)) || `Più eventi insieme con il ${Number(b.scontoPercentuale)}% di sconto. Prenota con INBUS.`;
+  const immagine = b.copertinaUrl;
+  let html = template;
+  html = html.replace(/<title>.*?<\/title>/s, `<title>${escapeHtml(titolo)}</title>`);
+  html = html.replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${escapeHtml(descrizione)}">`);
+  html = html.replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${escapeHtml(titolo)}">`);
+  html = html.replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${escapeHtml(descrizione)}">`);
+  // Stesso schema della pagina evento: og:url e og:image si aggiungono
+  // dopo og:type (il template non li ha).
+  html = html.replace(/<meta property="og:type"[^>]*>/, `<meta property="og:type" content="website">\n<meta property="og:url" content="${escapeHtml(url)}">${immagine ? `\n<meta property="og:image" content="${escapeHtml(immagine)}">` : ''}`);
+  return html;
 }
 
 main();

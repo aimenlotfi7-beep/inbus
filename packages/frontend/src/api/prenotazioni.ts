@@ -45,8 +45,8 @@ export const prenotazioniApi = {
   /** Il carrello — più articoli insieme, un'unica conferma. Ogni
    *  articolo ha la stessa forma di una prenotazione singola (il
    *  server la ricalcola e la valida esattamente allo stesso modo). */
-  creaOrdine: (articoli: CreaPrenotazionePayload[]) =>
-    apiConToken('inbus_cliente_token').post<{ ordine: { id: string; totale: string }; prenotazioni: Prenotazione[] }>('/api/prenotazioni/ordine', { articoli }),
+  creaOrdine: (articoli: CreaPrenotazionePayload[], bundleId?: string) =>
+    apiConToken('inbus_cliente_token').post<{ ordine: { id: string; totale: string }; prenotazioni: Prenotazione[] }>('/api/prenotazioni/ordine', { articoli, ...(bundleId && { bundleId }) }),
   getSaldo: (pnr: string, email: string) => api.get<DifferenzaSaldo>(`/api/prenotazioni/${pnr}/saldo?email=${encodeURIComponent(email)}`),
   saldaResto: (pnr: string, email: string, couponCodice?: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`, { email, ...(couponCodice && { couponCodice }) }),
   listByEmail: (email: string) => api.get<Prenotazione[]>(`/api/prenotazioni/by-email?email=${encodeURIComponent(email)}`),

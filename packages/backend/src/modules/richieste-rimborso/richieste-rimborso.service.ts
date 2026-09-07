@@ -1,6 +1,6 @@
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { richiesteRimborso, prenotazioni, utenti, eventi } from '../../db/schema.js';
+import { richiesteRimborso, prenotazioni, utenti, eventi, ordini } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
 import { creditoService } from '../credito/credito.service.js';
@@ -29,6 +29,26 @@ export const richiesteRimborsoService = {
     const [esistente] = await db.select().from(richiesteRimborso)
       .where(eq(richiesteRimborso.prenotazioneId, p.id));
     if (esistente?.stato === 'IN_ATTESA') throw new ConflittoDati('C\'è già una richiesta di rimborso in attesa per questa prenotazione.');
+
+    // BUNDLE: si rimborsa solo per intero. Se la prenotazione fa parte
+    // di un ordine bundle, la richiesta si apre per TUTTE le
+    // prenotazioni ancora attive di quell'ordine, insieme, con lo
+    // stesso ordineId — l'admin le valuta come una cosa sola. Riusa la
+    // stessa macchina per singola prenotazione (posti liberati,
+    // credito, email), nessun secondo flusso.
+    if (p.ordineId) {
+      const [ord] = await db.select().from(ordini).where(eq(ordini.id, p.ordineId)).limit(1);
+      if (ord?.bundleId) {
+        const sorelle = await db.select().from(prenotazioni).where(and(eq(prenotazioni.ordineId, ord.id), eq(prenotazioni.stato, 'CONFERMATA')));
+        const giaInAttesa = await db.select({ prenotazioneId: richiesteRimborso.prenotazioneId }).from(richiesteRimborso)
+          .where(and(inArray(richiesteRimborso.prenotazioneId, sorelle.map((s) => s.id)), eq(richiesteRimborso.stato, 'IN_ATTESA')));
+        if (giaInAttesa.length > 0) throw new ConflittoDati('C\'è già una richiesta di rimborso in attesa per questo bundle.');
+        const create = await db.insert(richiesteRimborso)
+          .values(sorelle.map((s) => ({ prenotazioneId: s.id, ordineId: ord.id, motivo: motivo ? `[Bundle, ${sorelle.length} eventi] ${motivo}` : `[Bundle, ${sorelle.length} eventi]` })))
+          .returning();
+        return create.find((r) => r.prenotazioneId === p.id) ?? create[0];
+      }
+    }
 
     // Il controllo sopra copre il caso normale con un messaggio
     // chiaro — ma tra quel controllo e questo INSERT c'è comunque una

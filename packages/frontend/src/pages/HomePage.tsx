@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { bundleApi, type BundlePubblico } from '../api/bundle';
+import { BundleCard } from '../features/bundle/BundleCard';
+import { useSearchParams, Link } from 'react-router-dom';
 import { eventiApi } from '../api/eventi';
 import { categorieEventoApi, type CategoriaEvento } from '../api/categorieEvento';
 import { ErroreApi } from '../api/client';
@@ -30,6 +32,7 @@ export function HomePage() {
     caroselloRef.current?.scrollBy({ left: direzione * 600, behavior: 'smooth' });
   }
   const caroselloHeroRef = useRef<HTMLDivElement>(null);
+  const [bundleEvidenza, setBundleEvidenza] = useState<BundlePubblico[]>([]);
   const [eventoCentraleId, setEventoCentraleId] = useState<string | null>(null);
   const [eventi, setEventi] = useState<Evento[]>([]);
   // Testi della sezione hero — modificabili dal gestionale (Contenuti
@@ -117,6 +120,7 @@ export function HomePage() {
   const [eventoInCheckout, setEventoInCheckout] = useState<Evento | null>(null);
 
   useEffect(() => {
+    bundleApi.listaPubblica().then((l) => setBundleEvidenza(l.filter((b) => b.inEvidenzaHome))).catch(() => {});
     eventiApi.list({ soloFuturi: true, soloVisibili: true })
       .then((lista) => {
         setEventi(lista);
@@ -320,6 +324,23 @@ export function HomePage() {
           <div className="carosello-wrap">
             <div className="carosello" ref={caroselloRef}>
               {consigliati.map((ev) => <EventoCard key={ev.id} evento={ev} />)}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {!!bundleEvidenza.length && (
+        <section className="events-section" id="bundle">
+          <div className="section-head">
+            <div>
+              <h2 className="section-title">I <em>bundle</em></h2>
+              <p className="section-sub">Più eventi insieme, con uno sconto dedicato.</p>
+            </div>
+            <Link to="/bundle" className="btn btn-ghost" style={{ alignSelf: "center" }}>Vedi tutti</Link>
+          </div>
+          <div className="carosello-wrap">
+            <div className="carosello carosello-compatto">
+              {bundleEvidenza.map((b) => <BundleCard key={b.id} bundle={b} />)}
             </div>
           </div>
         </section>

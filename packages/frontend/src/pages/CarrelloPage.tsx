@@ -13,7 +13,7 @@ import { clienteLoggato } from '../features/clienteSessione';
  *  che prima stava nello step 3 del checkout: credito, coupon, metodo
  *  di pagamento. */
 export function CarrelloPage() {
-  const { articoli, rimuovi, svuota, totaleStimato } = useCarrello();
+  const { articoli, rimuovi, svuota, totaleStimato, bundle, scontoBundleStimato } = useCarrello();
   const navigate = useNavigate();
   const [cliente, setCliente] = useState<DatiCliente | null>(null);
   const [inviando, setInviando] = useState(false);
@@ -53,7 +53,8 @@ export function CarrelloPage() {
           offertaId: a.offertaId,
           ...(usaCredito && tipoPagamento === 'COMPLETO' && { usaCredito: true }),
           ...(couponCodice.trim() && tipoPagamento === 'COMPLETO' && { couponCodice: couponCodice.trim() }),
-        }))
+        })),
+        bundle?.id,
       );
       setFatto(risultato.prenotazioni.map((p) => ({ pnr: p.pnr })));
       svuota();
@@ -120,13 +121,14 @@ export function CarrelloPage() {
               </div>
             ) : (
               <>
-                {creditoDisponibile > 0 && (
+                {creditoDisponibile > 0 && (!bundle || bundle.ammetteCredito) && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '10px 0', cursor: tipoPagamento === 'COMPLETO' ? 'pointer' : 'default', opacity: tipoPagamento === 'COMPLETO' ? 1 : .5 }}>
                     <input type="checkbox" checked={usaCredito} onChange={(e) => setUsaCredito(e.target.checked)} style={{ width: 'auto' }} disabled={tipoPagamento !== 'COMPLETO'} />
                     Usa il tuo credito fedeltà (€{creditoDisponibile.toFixed(2)} disponibili)
                   </label>
                 )}
 
+                {(!bundle || bundle.ammetteOfferte) && (<>
                 <label className="field-label">Hai un codice coupon?</label>
                 <input
                   type="text"
@@ -139,11 +141,12 @@ export function CarrelloPage() {
                 <p style={{ fontSize: 11.5, opacity: .65, marginTop: 6 }}>
                   Coupon e credito si applicano solo pagando tutto subito — con l'acconto potrai usarli quando salderai il resto.
                 </p>
+                </>)}
 
                 <p className="section-label" style={{ marginTop: 18 }}>Come vuoi pagare?</p>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                   <button type="button" className={`mini-tab${tipoPagamento === 'COMPLETO' ? ' active' : ''}`} onClick={() => setTipoPagamento('COMPLETO')}>Tutto subito</button>
-                  <button type="button" className={`mini-tab${tipoPagamento === 'ACCONTO' ? ' active' : ''}`} onClick={() => setTipoPagamento('ACCONTO')}>Solo acconto</button>
+                  {(!bundle || bundle.ammetteAcconto) && <button type="button" className={`mini-tab${tipoPagamento === 'ACCONTO' ? ' active' : ''}`} onClick={() => setTipoPagamento('ACCONTO')}>Solo acconto</button>}
                 </div>
                 {tipoPagamento === 'ACCONTO' && (
                   <p style={{ fontSize: 11.5, opacity: .7, marginTop: 6 }}>
@@ -181,8 +184,16 @@ export function CarrelloPage() {
               </>
             )}
 
+            {bundle && (
+              <div className="checkout-summary" style={{ marginTop: 14 }}>
+                <b>Bundle: {bundle.nome}</b>
+                <p style={{ fontSize: 12, opacity: .7, margin: '4px 0 0' }}>Il bundle si acquista tutto insieme: togliendo o aggiungendo un evento, lo sconto non si applica più.</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 13.5 }}><span>Totale originale</span><span>€{totaleStimato.toFixed(2)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span>Sconto bundle (−{bundle.scontoPercentuale}%)</span><span>− €{scontoBundleStimato.toFixed(2)}</span></div>
+              </div>
+            )}
             <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, margin: '18px 0 6px' }}>
-              Totale stimato: €{totaleStimato.toFixed(2)}
+              Totale stimato: €{(totaleStimato - scontoBundleStimato).toFixed(2)}
             </p>
             <p style={{ fontSize: 11, opacity: .65, marginTop: -4 }}>
               Il totale definitivo (con coupon/credito applicati) viene sempre ricalcolato dal server al momento di completare l'ordine.

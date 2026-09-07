@@ -526,6 +526,13 @@
       "when": 1788698992929,
       "tag": "0074_safe_the_order",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1788784189652,
+      "tag": "0075_gifted_joshua_kane",
+      "breakpoints": true
     }
   ]
 }

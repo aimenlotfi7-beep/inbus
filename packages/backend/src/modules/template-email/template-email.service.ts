@@ -109,6 +109,18 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
     segnaposto: [],
   },
   {
+    chiave: 'bundle_conferma',
+    nome: 'Riepilogo acquisto bundle (oltre alle conferme dei singoli eventi)',
+    oggetto: 'Il tuo bundle {{bundle}} è confermato',
+    corpo: `
+      <p>Ciao {{nome}},</p>
+      <p>Grazie! Hai acquistato il bundle <b>{{bundle}}</b>: {{eventi}}.</p>
+      <p>Totale originale {{totaleOriginale}} — sconto bundle {{sconto}} — <b>totale {{totale}}</b>.</p>
+      <p>Riceverai una conferma e un biglietto separati per ogni evento.</p>
+    `,
+    segnaposto: ['nome', 'bundle', 'eventi', 'totaleOriginale', 'sconto', 'totale'],
+  },
+  {
     chiave: 'preventivo_firmato',
     nome: 'Invio preventivo confermato e firmato (con allegato)',
     oggetto: 'Preventivo confermato e firmato',

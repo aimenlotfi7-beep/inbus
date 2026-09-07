@@ -49,6 +49,10 @@ export type CreaPrenotazioneInput = z.infer<typeof creaPrenotazioneSchema>;
  *  permettere carrelli assurdi). */
 export const creaOrdineSchema = z.object({
   articoli: z.array(creaPrenotazioneSchema).min(1, 'Il carrello è vuoto.').max(20, 'Troppi articoli in un unico ordine.'),
+  // Se presente, l'ordine è l'acquisto di un bundle: le regole del
+  // bundle (composizione, passeggeri, finestra, interruttori) vengono
+  // verificate lato server in creaOrdine, e lo sconto ripartito per riga.
+  bundleId: z.string().optional(),
 });
 
 export const richiediRimborsoSchema = z.object({

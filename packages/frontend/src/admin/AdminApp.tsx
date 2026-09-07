@@ -14,6 +14,7 @@ import { PagamentiScreen } from './screens/PagamentiScreen';
 import { RimborsiScreen } from './screens/RimborsiScreen';
 import { VariazioniScreen } from './screens/VariazioniScreen';
 import { UtentiScreen } from './screens/UtentiScreen';
+import { BundleScreen } from './screens/bundle/BundleScreen';
 import { FornitoriScreen } from './screens/FornitoriScreen';
 import { PercorsiSalvatiScreen } from './screens/PercorsiSalvatiScreen';
 import { FermateScreen } from './screens/FermateScreen';
@@ -47,6 +48,7 @@ function StatisticheSenzaHeader() {
 const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   statistiche: StatisticheSenzaHeader,
   eventi: EventiScreen,
+  bundle: BundleScreen,
   vetrina: VetrinaScreen,
   calendario: CalendarioScreen,
   cestino: CestinoScreen,
@@ -91,6 +93,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
 const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   statistiche: 'statistiche.visualizza',
   eventi: 'eventi.visualizza',
+  bundle: 'bundle.visualizza',
   vetrina: 'eventi.vetrina',
   calendario: 'eventi.calendario',
   cestino: 'eventi.cestino',
