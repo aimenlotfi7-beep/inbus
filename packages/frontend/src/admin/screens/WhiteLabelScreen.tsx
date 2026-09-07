@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { bundleApi, type BundleRiga } from '../../api/bundle';
 import { whiteLabelApi, type WhiteLabel } from '../../api/whiteLabel';
 import { organizzatoriApi, type Organizzatore } from '../../api/organizzatori';
 import { eventiApi } from '../../api/eventi';
@@ -38,7 +39,7 @@ export function WhiteLabelScreen() {
   if (vista === 'editor' && whiteLabelAttiva) {
     const ev = eventi.find((e) => e.id === whiteLabelAttiva.eventoId);
     return (
-      <PaginaSezione titolo={`White Label — ${whiteLabelAttiva.organizzatoreNome} · ${whiteLabelAttiva.eventoArtista}`} onIndietro={() => { ricarica(); setVista('lista'); }}>
+      <PaginaSezione titolo={`White Label — ${whiteLabelAttiva.organizzatoreNome} · ${whiteLabelAttiva.bundleNome ? `${whiteLabelAttiva.bundleNome} (bundle)` : whiteLabelAttiva.eventoArtista}`} onIndietro={() => { ricarica(); setVista('lista'); }}>
         <div style={{ maxWidth: 480, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <CampoCopiabile etichetta="Link diretto" valore={`${window.location.origin}/w/${whiteLabelAttiva.publicWidgetId}`} link />
           <CampoCopiabile
@@ -68,7 +69,7 @@ export function WhiteLabelScreen() {
         {whiteLabels.map((wl) => (
           <div key={wl.id} className="section-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px' }}>
             <div>
-              <b>{wl.organizzatoreNome}</b> — {wl.eventoArtista}
+              <b>{wl.organizzatoreNome}</b> — {wl.bundleNome ? `${wl.bundleNome} (bundle)` : wl.eventoArtista}
               <span style={{ marginLeft: 10, fontSize: 11.5, color: wl.attiva ? '#5be0a0' : 'var(--mist)' }}>{wl.attiva ? '● Attiva' : '○ Disattivata'}</span>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -96,6 +97,7 @@ function NuovaWhiteLabel({ organizzatori, onIndietro, onCreata }: { organizzator
   const [organizzatoreId, setOrganizzatoreId] = useState('');
   const [eventoId, setEventoId] = useState('');
   const [eventiOrganizzatore, setEventiOrganizzatore] = useState<Evento[]>([]);
+  const [bundleOrganizzatore, setBundleOrganizzatore] = useState<BundleRiga[]>([]);
   const [errore, setErrore] = useState('');
   const [caricamento, setCaricamento] = useState(false);
 
@@ -104,6 +106,8 @@ function NuovaWhiteLabel({ organizzatori, onIndietro, onCreata }: { organizzator
     const org = organizzatori.find((o) => o.id === organizzatoreId);
     if (!org) return;
     eventiApi.list().then((tutti) => setEventiOrganizzatore(tutti.filter((e) => org.eventiAbilitati.includes(e.id))));
+    // I bundle associati a questo organizzatore (scheda Bundle → Vendita).
+    bundleApi.list().then((tutti) => setBundleOrganizzatore(tutti.filter((b) => b.organizzatoreId === organizzatoreId))).catch(() => setBundleOrganizzatore([]));
   }, [organizzatoreId, organizzatori]);
 
   async function crea() {
@@ -111,7 +115,7 @@ function NuovaWhiteLabel({ organizzatori, onIndietro, onCreata }: { organizzator
     setCaricamento(true);
     setErrore('');
     try {
-      const nuova = await whiteLabelApi.create({ organizzatoreId, eventoId });
+      const nuova = await whiteLabelApi.create(eventoId.startsWith('bundle:') ? { organizzatoreId, bundleId: eventoId.slice(7) } : { organizzatoreId, eventoId });
       onCreata(nuova);
     } catch (e) {
       setErrore(e instanceof ErroreApi ? e.message : 'Creazione non riuscita.');
@@ -131,13 +135,14 @@ function NuovaWhiteLabel({ organizzatori, onIndietro, onCreata }: { organizzator
       </div>
       {organizzatoreId && (
         <div className="campo">
-          <label>Evento</label>
+          <label>Evento o bundle</label>
           <select value={eventoId} onChange={(e) => setEventoId(e.target.value)}>
             <option value="">Scegli...</option>
-            {eventiOrganizzatore.map((e) => <option key={e.id} value={e.id}>{e.artista}</option>)}
+            {eventiOrganizzatore.length > 0 && <optgroup label="Eventi">{eventiOrganizzatore.map((e) => <option key={e.id} value={e.id}>{e.artista}</option>)}</optgroup>}
+            {bundleOrganizzatore.length > 0 && <optgroup label="Bundle">{bundleOrganizzatore.map((b) => <option key={b.id} value={`bundle:${b.id}`}>{b.nome} (bundle)</option>)}</optgroup>}
           </select>
-          {eventiOrganizzatore.length === 0 && (
-            <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 6 }}>Questo organizzatore non ha ancora nessun evento associato — vai in "Organizzatori" per associarglielo prima.</p>
+          {eventiOrganizzatore.length === 0 && bundleOrganizzatore.length === 0 && (
+            <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 6 }}>Questo organizzatore non ha ancora nessun evento associato (Organizzatori) né bundle associato (Bundle → Vendita → organizzatore).</p>
           )}
         </div>
       )}

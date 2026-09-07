@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, sql, desc } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { bundle, bundleEventi, eventi, tragitti, immaginiEvento, whiteLabel } from '../../db/schema.js';
+import { bundle, bundleEventi, eventi, tragitti, immaginiEvento } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import type { BundleInput } from './bundle.dto.js';
 import { statoBundle, bundleVisibile } from './bundle-stato.js';
@@ -54,17 +54,6 @@ async function getById(id: string) {
   return b;
 }
 
-/** Un bundle vendibile dal link di un organizzatore deve contenere SOLO
- *  eventi suoi = ogni evento ha una riga white-label attiva per lui. */
-async function verificaOrganizzatore(organizzatoreId: string | null | undefined, eventiIds: string[]) {
-  if (!organizzatoreId) return;
-  const righe = await db.select({ eventoId: whiteLabel.eventoId }).from(whiteLabel)
-    .where(and(eq(whiteLabel.organizzatoreId, organizzatoreId), inArray(whiteLabel.eventoId, eventiIds), eq(whiteLabel.attiva, true)));
-  const coperti = new Set(righe.map((r) => r.eventoId));
-  const mancanti = eventiIds.filter((id) => !coperti.has(id));
-  if (mancanti.length) throw new ConflittoDati(`Il bundle può essere venduto dal link di un organizzatore solo se tutti gli eventi sono suoi: ${mancanti.length} evento/i non hanno un link attivo per questo organizzatore.`);
-}
-
 async function verificaEventiEsistenti(eventiIds: string[]) {
   const trovati = await db.select({ id: eventi.id }).from(eventi).where(and(inArray(eventi.id, eventiIds), isNull(eventi.eliminatoIl)));
   if (trovati.length !== eventiIds.length) throw new ConflittoDati('Uno degli eventi scelti non esiste più.');
@@ -101,7 +90,6 @@ export const bundleService = {
   },
   async create(input: BundleInput) {
     await verificaEventiEsistenti(input.eventiIds);
-    await verificaOrganizzatore(input.organizzatoreId, input.eventiIds);
     const slug = await slugUnivoco(slugDa(input.slug?.trim() || input.nome));
     return db.transaction(async (tx) => {
       const [nuovo] = await tx.insert(bundle).values(colonneDa(input, slug)).returning();
@@ -112,7 +100,6 @@ export const bundleService = {
   async update(id: string, input: BundleInput) {
     const esistente = await getById(id);
     await verificaEventiEsistenti(input.eventiIds);
-    await verificaOrganizzatore(input.organizzatoreId, input.eventiIds);
     const slug = input.slug?.trim() && input.slug.trim() !== esistente.slug ? await slugUnivoco(slugDa(input.slug), id) : esistente.slug;
     return db.transaction(async (tx) => {
       const [agg] = await tx.update(bundle).set(colonneDa(input, slug)).where(eq(bundle.id, id)).returning();
@@ -141,6 +128,17 @@ export const bundleService = {
   async dettaglioPubblico(slug: string) {
     const [b] = await db.select().from(bundle).where(and(eq(bundle.slug, slug), isNull(bundle.eliminatoIl))).limit(1);
     if (!b || !bundleVisibile(b)) throw new NonTrovato('Bundle');
+    return bundleService.proiezionePubblica(b);
+  },
+  /** Per il widget white label: stesso dettaglio, cercato per id; il
+   *  link è dell'organizzatore, quindi si vede anche se sul sito è
+   *  nascosto (bozza e disattivato restano non acquistabili comunque). */
+  async dettaglioPubblicoPerId(id: string) {
+    const [b] = await db.select().from(bundle).where(and(eq(bundle.id, id), isNull(bundle.eliminatoIl))).limit(1);
+    if (!b) throw new NonTrovato('Bundle');
+    return bundleService.proiezionePubblica(b);
+  },
+  async proiezionePubblica(b: typeof bundle.$inferSelect) {
     const lista = await eventiDelBundle(b.id);
     const eventiVendibili = lista.filter((e) => e.vendibile && !e.eliminato);
     // "Acquistabile" per il cliente: in vendita E la composizione è

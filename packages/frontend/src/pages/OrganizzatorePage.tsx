@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { LogoOnWay } from '../features/LogoOnWay';
 import { Link } from 'react-router-dom';
 import '../styles/promoter.css';
-import { organizzatoriApi, type Organizzatore, type EventoAssegnato, type StatisticheGenerali, type StatisticaEvento } from '../api/organizzatori';
+import { organizzatoriApi, type Organizzatore, type EventoAssegnato, type StatisticheGenerali, type StatisticaEvento, type StatisticaBundle } from '../api/organizzatori';
 import { ErroreApi } from '../api/client';
 import { CookieBanner } from '../features/CookieBanner';
 
@@ -69,12 +69,14 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
   const [eventi, setEventi] = useState<EventoAssegnato[] | null>(null);
   const [generali, setGenerali] = useState<StatisticheGenerali | null>(null);
   const [perEvento, setPerEvento] = useState<StatisticaEvento[] | null>(null);
+  const [perBundle, setPerBundle] = useState<StatisticaBundle[]>([]);
 
   useEffect(() => {
     organizzatoriApi.me().then(setOrganizzatore).catch(onErroreSessione);
     organizzatoriApi.meEventi().then(setEventi);
     organizzatoriApi.meStatistiche().then(setGenerali);
     organizzatoriApi.meStatistichePerEvento().then(setPerEvento);
+    organizzatoriApi.meStatistichePerBundle().then(setPerBundle).catch(() => setPerBundle([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -101,6 +103,25 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
 
       {!eventiOrdinati.length && (
         <div className="empty-box">Non hai ancora nessun evento associato — contatta OnWay per farti assegnare i tuoi eventi.</div>
+      )}
+
+      {perBundle.length > 0 && (
+        <>
+          <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '18px 0 14px' }}>I tuoi bundle</h2>
+          {/* Una riga per bundle (totale già netto sconto). Gli stessi
+              acquisti contano anche sotto ogni evento qui sotto: questa
+              è una vista in più, non una somma a parte. */}
+          {perBundle.map((b) => (
+            <div className="evento-link-card" key={b.bundleId}>
+              <div>
+                <h3>{b.bundleNome} <span style={{ fontSize: 12, opacity: .7, fontWeight: 400 }}>bundle</span></h3>
+                <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 4 }}>
+                  {b.numeroOrdini} ordin{b.numeroOrdini === 1 ? 'e' : 'i'} · {b.viaggiatori} viaggiator{b.viaggiatori === 1 ? 'e' : 'i'} · €{b.fatturato.toFixed(2)} fatturato (sconto applicato €{b.scontoApplicato.toFixed(2)}) · tua quota €{b.quotaOrganizzatore.toFixed(2)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </>
       )}
 
       {eventiOrdinati.map((ev) => {

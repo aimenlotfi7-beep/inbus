@@ -869,7 +869,11 @@ export const organizzatoreEventi = pgTable('organizzatore_eventi', {
 export const whiteLabel = pgTable('white_label', {
   id: id(),
   organizzatoreId: text('organizzatore_id').notNull().references(() => organizzatori.id, { onDelete: 'cascade' }),
-  eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  // Una white label è per un EVENTO oppure per un BUNDLE (uno dei due,
+  // mai entrambi — vincolo nello schema Zod). eventoId era NOT NULL:
+  // reso nullable per fare posto al bundle.
+  eventoId: text('evento_id').references(() => eventi.id, { onDelete: 'cascade' }),
+  bundleId: text('bundle_id').references(() => bundle.id, { onDelete: 'cascade' }),
   // Identificativo pubblico, mai un ID interno sequenziale — è quello
   // che finisce nel codice embed sul sito dell'organizzatore, quindi
   // deve essere opaco e non indovinabile.
@@ -1376,6 +1380,7 @@ export const organizzatoreEventiRelations = relations(organizzatoreEventi, ({ on
 export const whiteLabelRelations = relations(whiteLabel, ({ one }) => ({
   organizzatore: one(organizzatori, { fields: [whiteLabel.organizzatoreId], references: [organizzatori.id] }),
   evento: one(eventi, { fields: [whiteLabel.eventoId], references: [eventi.id] }),
+  bundle: one(bundle, { fields: [whiteLabel.bundleId], references: [bundle.id] }),
 }));
 
 export const regoleCommissioneRelations = relations(regoleCommissione, ({ one }) => ({

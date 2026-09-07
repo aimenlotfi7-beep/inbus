@@ -301,7 +301,7 @@ export const prenotazioniService = {
    *  prenotazione a metà creata. Ogni articolo resta comunque una vera
    *  prenotazione a sé, con il suo PNR, il suo biglietto, la sua email
    *  — semplicemente in più raggruppate sotto lo stesso ordine. */
-  async creaOrdine(articoli: CreaPrenotazioneInput[], utenteId: string, bundleId?: string) {
+  async creaOrdine(articoli: CreaPrenotazioneInput[], utenteId: string, bundleId?: string, canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }) {
     if (articoli.length === 0) {
       throw new ErroreApplicativo('Il carrello è vuoto.', 400, 'CARRELLO_VUOTO');
     }
@@ -343,7 +343,7 @@ export const prenotazioniService = {
     const { ordine, righe } = await db.transaction(async (tx) => {
       const righeCreate = [];
       for (const [i, articolo] of articoli.entries()) {
-        righeCreate.push(await creaRigaInterna(tx, articolo, utenteId, undefined, scontiPerRiga?.[i]));
+        righeCreate.push(await creaRigaInterna(tx, articolo, utenteId, canaleVendita, scontiPerRiga?.[i]));
       }
       const totaleOrdine = righeCreate.reduce((somma, r) => somma + Number(r.totale), 0);
       const scontoBundleTotale = scontiPerRiga ? scontiPerRiga.reduce((a, b) => a + b, 0) : null;

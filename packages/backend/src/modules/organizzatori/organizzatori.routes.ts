@@ -1,11 +1,11 @@
 import { Router, type Request, type Response } from 'express';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, isNotNull } from 'drizzle-orm';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { organizzatori, organizzatoreEventi, eventi, prenotazioni, whiteLabel } from '../../db/schema.js';
+import { organizzatori, organizzatoreEventi, eventi, prenotazioni, whiteLabel, bundle } from '../../db/schema.js';
 import { NonTrovato, NonAutorizzato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { limiteAutenticazione } from '../../shared/rateLimit.js';
@@ -89,13 +89,67 @@ export const organizzatoriService = {
       .where(eq(whiteLabel.organizzatoreId, organizzatoreId))
       .groupBy(eventi.id, eventi.artista);
 
-    return righe.map((r) => ({
+    const perEvento = righe.map((r) => ({
       eventoId: r.eventoId,
       eventoArtista: r.eventoArtista,
       numeroPrenotazioni: Number(r.numeroPrenotazioni),
       viaggiatori: Number(r.viaggiatori),
       fatturato: Number(r.fatturato),
       quotaOrganizzatore: Number(r.quotaOrganizzatore),
+    }));
+
+    // Gli acquisti BUNDLE dal suo widget contano anche sotto ogni
+    // evento (ogni prenotazione ha il suo eventoId e il suo totale già
+    // netto sconto) — come deciso: riga bundle a parte E righe per
+    // evento. Si sommano alle righe sopra, o creano la riga se
+    // l'evento non ha una white label propria.
+    const daBundle = await db
+      .select({
+        eventoId: eventi.id,
+        eventoArtista: eventi.artista,
+        numeroPrenotazioni: sql<string>`count(distinct ${prenotazioni.id})`,
+        viaggiatori: sql<string>`coalesce(sum(${prenotazioni.passeggeri}), 0)`,
+        fatturato: sql<string>`coalesce(sum(${prenotazioni.totale}), 0)`,
+        quotaOrganizzatore: sql<string>`coalesce(sum(${prenotazioni.commissioneImportoSnapshot}), 0)`,
+      })
+      .from(prenotazioni)
+      .innerJoin(whiteLabel, eq(prenotazioni.whiteLabelId, whiteLabel.id))
+      .innerJoin(eventi, eq(prenotazioni.eventoId, eventi.id))
+      .where(and(eq(whiteLabel.organizzatoreId, organizzatoreId), isNotNull(whiteLabel.bundleId), eq(prenotazioni.stato, 'CONFERMATA')))
+      .groupBy(eventi.id, eventi.artista);
+    for (const r of daBundle) {
+      const esistente = perEvento.find((e) => e.eventoId === r.eventoId);
+      const agg = { numeroPrenotazioni: Number(r.numeroPrenotazioni), viaggiatori: Number(r.viaggiatori), fatturato: Number(r.fatturato), quotaOrganizzatore: Number(r.quotaOrganizzatore) };
+      if (esistente) { esistente.numeroPrenotazioni += agg.numeroPrenotazioni; esistente.viaggiatori += agg.viaggiatori; esistente.fatturato += agg.fatturato; esistente.quotaOrganizzatore += agg.quotaOrganizzatore; }
+      else perEvento.push({ eventoId: r.eventoId, eventoArtista: r.eventoArtista, ...agg });
+    }
+    return perEvento;
+  },
+
+  /** Una riga per ogni bundle con white label dell'organizzatore — il
+   *  totale è il netto sconto (i totali di riga lo sono già). È una
+   *  vista in più: i totali generali si calcolano dalle righe per
+   *  evento, che includono già questi acquisti (niente doppio conto). */
+  async statistichePerBundle(organizzatoreId: string) {
+    const righe = await db
+      .select({
+        bundleId: bundle.id,
+        bundleNome: bundle.nome,
+        numeroOrdini: sql<string>`count(distinct ${prenotazioni.ordineId})`,
+        viaggiatori: sql<string>`coalesce(sum(${prenotazioni.passeggeri}), 0)`,
+        fatturato: sql<string>`coalesce(sum(${prenotazioni.totale}), 0)`,
+        scontoApplicato: sql<string>`coalesce(sum(${prenotazioni.scontoBundle}), 0)`,
+        quotaOrganizzatore: sql<string>`coalesce(sum(${prenotazioni.commissioneImportoSnapshot}), 0)`,
+      })
+      .from(whiteLabel)
+      .innerJoin(bundle, eq(whiteLabel.bundleId, bundle.id))
+      .leftJoin(prenotazioni, and(eq(prenotazioni.whiteLabelId, whiteLabel.id), eq(prenotazioni.stato, 'CONFERMATA')))
+      .where(eq(whiteLabel.organizzatoreId, organizzatoreId))
+      .groupBy(bundle.id, bundle.nome);
+    return righe.map((r) => ({
+      bundleId: r.bundleId, bundleNome: r.bundleNome,
+      numeroOrdini: Number(r.numeroOrdini), viaggiatori: Number(r.viaggiatori),
+      fatturato: Number(r.fatturato), scontoApplicato: Number(r.scontoApplicato), quotaOrganizzatore: Number(r.quotaOrganizzatore),
     }));
   },
 
@@ -227,6 +281,9 @@ organizzatoriRouter.get('/me/statistiche', richiedeAuthOrganizzatore, asyncHandl
 organizzatoriRouter.get('/me/statistiche-per-evento', richiedeAuthOrganizzatore, asyncHandler(async (req: Request, res: Response) => {
   res.json(await organizzatoriService.statistichePerEvento((req as any).organizzatoreId));
 }));
+organizzatoriRouter.get('/me/statistiche-per-bundle', richiedeAuthOrganizzatore, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await organizzatoriService.statistichePerBundle((req as any).organizzatoreId));
+}));
 
 organizzatoriRouter.use(richiedeAuth);
 organizzatoriRouter.get('/', richiedePermesso('organizzatori.visualizza'), asyncHandler(async (_req: Request, res: Response) => res.json(await organizzatoriService.list())));
@@ -235,6 +292,7 @@ organizzatoriRouter.get('/:id/statistiche', richiedePermesso('organizzatori.visu
   res.json({
     generali: await organizzatoriService.statisticheGenerali(req.params.id),
     perEvento: await organizzatoriService.statistichePerEvento(req.params.id),
+    perBundle: await organizzatoriService.statistichePerBundle(req.params.id),
   });
 }));
 organizzatoriRouter.post('/', richiedePermesso('organizzatori.gestisci'), valida(creaOrganizzatoreSchema), asyncHandler(async (req: Request, res: Response) => {

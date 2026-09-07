@@ -1,4 +1,5 @@
 import { api, apiConToken } from './client';
+import type { BundlePubblicoDettaglio } from './bundle';
 import type { OpzionePartenza } from './types';
 
 const apiClienteConToken = apiConToken('inbus_cliente_token');
@@ -57,18 +58,21 @@ export interface WhiteLabelTheme {
 export interface WhiteLabel {
   id: string;
   organizzatoreId: string;
-  eventoId: string;
+  eventoId: string | null;
+  bundleId: string | null;
   publicWidgetId: string;
   attiva: boolean;
   dominiAutorizzati: string[];
   tema: WhiteLabelTheme;
   layoutBigliettoId: string | null;
   organizzatoreNome: string;
-  eventoArtista: string;
+  eventoArtista: string | null;
+  bundleNome: string | null;
 }
 export interface WhiteLabelInput {
   organizzatoreId: string;
-  eventoId: string;
+  eventoId?: string;
+  bundleId?: string;
   attiva?: boolean;
   dominiAutorizzati?: string[];
   tema?: Partial<WhiteLabelTheme>;
@@ -79,7 +83,8 @@ export interface WhiteLabelPubblica {
   attiva: boolean;
   tema: WhiteLabelTheme;
   dominiAutorizzati: string[];
-  evento: { id: string; slug: string; artista: string; data: string; luogo: string; citta: string; descrizione: string | null };
+  evento: { id: string; slug: string; artista: string; data: string; luogo: string; citta: string; descrizione: string | null } | null;
+  bundle: BundlePubblicoDettaglio | null;
 }
 
 export interface PrenotazioneCreata {
@@ -89,7 +94,10 @@ export interface PrenotazioneCreata {
 
 export const whiteLabelApi = {
   getPubblica: (publicWidgetId: string) => api.get<WhiteLabelPubblica>(`/api/public/widget/${publicWidgetId}`),
-  opzioniPartenza: (publicWidgetId: string) => api.get<OpzionePartenza[]>(`/api/public/widget/${publicWidgetId}/opzioni-partenza`),
+  opzioniPartenza: (publicWidgetId: string, eventoId?: string, servizioId?: string) =>
+    api.get<OpzionePartenza[]>(`/api/public/widget/${publicWidgetId}/opzioni-partenza${eventoId ? `?eventoId=${eventoId}${servizioId ? `&servizioId=${servizioId}` : ''}` : ''}`),
+  ordineBundle: (publicWidgetId: string, articoli: Record<string, unknown>[]) =>
+    apiClienteConToken.post<{ ordine: { id: string; totale: string }; prenotazioni: { pnr: string }[] }>(`/api/public/widget/${publicWidgetId}/ordine`, { articoli }),
   prenota: (publicWidgetId: string, input: Record<string, unknown>) =>
     apiClienteConToken.post<PrenotazioneCreata>(`/api/public/widget/${publicWidgetId}/prenota`, input),
   list: () => api.get<WhiteLabel[]>('/api/admin/white-label'),

@@ -4,7 +4,7 @@ import { whiteLabelService } from './white-label.service.js';
 import { asyncHandler } from '../../shared/http.js';
 import { db } from '../../db/client.js';
 import { prenotazioni } from '../../db/schema.js';
-import { creaPrenotazioneSchema } from '../prenotazioni/prenotazioni.dto.js';
+import { creaPrenotazioneSchema, creaOrdineSchema } from '../prenotazioni/prenotazioni.dto.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
 import { valida } from '../../shared/validate.js';
 import { richiedeAuthCliente } from '../cliente-auth/cliente-auth.middleware.js';
@@ -31,8 +31,40 @@ whiteLabelPubblicoRouter.get('/:publicWidgetId', asyncHandler(async (req: Reques
 whiteLabelPubblicoRouter.get('/:publicWidgetId/opzioni-partenza', asyncHandler(async (req: Request, res: Response) => {
   const wl = await whiteLabelService.getPubblicaConIdInterno(req.params.publicWidgetId);
   const { eventiService } = await import('../eventi/eventi.service.js');
+  // Widget di un bundle: le opzioni sono per UN evento del bundle alla
+  // volta (?eventoId=…&servizioId=…) — e solo per eventi che ne fanno parte.
+  if (wl.bundleId) {
+    const eventoId = String(req.query.eventoId ?? '');
+    const { bundleService } = await import('../bundle/bundle.service.js');
+    const b = await bundleService.perAcquisto(wl.bundleId).catch(async () => ({ eventiIds: (await bundleService.dettaglio(wl.bundleId!)).eventi.map((e) => e.id) }));
+    if (!b.eventiIds.includes(eventoId)) throw new ErroreApplicativo('Questo evento non fa parte del bundle.', 400, 'EVENT_NOT_AVAILABLE');
+    res.json(await eventiService.opzioniPartenza(eventoId, req.query.servizioId ? String(req.query.servizioId) : undefined));
+    return;
+  }
+  if (!wl.eventoId) throw new ErroreApplicativo('Widget non valido.', 400, 'WIDGET_NON_VALIDO');
   res.json(await eventiService.opzioniPartenza(wl.eventoId));
 }));
+
+/** Ordine BUNDLE dal widget — le righe passano dallo stesso creaOrdine
+ *  del sito (regole del bundle verificate lì, lato server), con il
+ *  canale WHITE_LABEL su ogni riga e lo snapshot della commissione per
+ *  riga (sul netto sconto, come deciso). */
+whiteLabelPubblicoRouter.post(
+  '/:publicWidgetId/ordine',
+  richiedeAuthCliente,
+  valida(creaOrdineSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const wl = await whiteLabelService.getPubblicaConIdInterno(req.params.publicWidgetId);
+    if (!wl.attiva) throw new WhiteLabelDisattivata();
+    if (!wl.bundleId) throw new ErroreApplicativo('Questo widget non vende un bundle.', 400, 'WIDGET_NON_BUNDLE');
+    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente!.sub, wl.bundleId, { canale: 'WHITE_LABEL', whiteLabelId: wl.id });
+    for (const riga of risultato.prenotazioni) {
+      const { percentuale, importo } = await commissioniService.calcolaSnapshot(wl.organizzatoreId, riga.totaleComplessivo);
+      await db.update(prenotazioni).set({ commissionePercentualeSnapshot: String(percentuale), commissioneImportoSnapshot: String(importo) }).where(eq(prenotazioni.id, riga.id));
+    }
+    res.status(201).json(risultato);
+  }),
+);
 
 /** Prenotazione vera dal widget — il cliente DEVE essere già
  *  autenticato con un vero account INBUS (richiedeAuthCliente, stesso
@@ -48,6 +80,7 @@ whiteLabelPubblicoRouter.post(
   asyncHandler(async (req: Request, res: Response) => {
     const wl = await whiteLabelService.getPubblicaConIdInterno(req.params.publicWidgetId);
     if (!wl.attiva) throw new WhiteLabelDisattivata();
+    if (wl.bundleId) throw new ErroreApplicativo('Questo widget vende un bundle: usa /ordine.', 400, 'WIDGET_BUNDLE');
     if (req.body.eventoId !== wl.eventoId) {
       throw new ErroreApplicativo('Questo widget può prenotare solo il proprio evento.', 400, 'EVENT_NOT_AVAILABLE');
     }

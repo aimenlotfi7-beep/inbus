@@ -1,7 +1,7 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { whiteLabel, organizzatoreEventi, organizzatori, eventi, prenotazioni } from '../../db/schema.js';
+import { whiteLabel, organizzatoreEventi, organizzatori, eventi, prenotazioni, bundle } from '../../db/schema.js';
 import { ConflittoDati } from '../../shared/errors.js';
 import { normalizzaTema, DEFAULT_WHITE_LABEL_THEME, type WhiteLabelTheme } from './white-label.theme.js';
 import { WhiteLabelNonTrovata, OrganizzatoreNonAutorizzato, AssociazioneGiaEsistente } from './white-label.errors.js';
@@ -40,35 +40,48 @@ export const whiteLabelService = {
         whiteLabel,
         organizzatoreNome: organizzatori.nome,
         eventoArtista: eventi.artista,
+        bundleNome: bundle.nome,
       })
       .from(whiteLabel)
       .innerJoin(organizzatori, eq(whiteLabel.organizzatoreId, organizzatori.id))
-      .innerJoin(eventi, eq(whiteLabel.eventoId, eventi.id));
-    return righe.map((r) => ({ ...r.whiteLabel, tema: normalizzaTema(r.whiteLabel.tema), organizzatoreNome: r.organizzatoreNome, eventoArtista: r.eventoArtista }));
+      .leftJoin(eventi, eq(whiteLabel.eventoId, eventi.id))
+      .leftJoin(bundle, eq(whiteLabel.bundleId, bundle.id));
+    return righe.map((r) => ({ ...r.whiteLabel, tema: normalizzaTema(r.whiteLabel.tema), organizzatoreNome: r.organizzatoreNome, eventoArtista: r.eventoArtista, bundleNome: r.bundleNome }));
   },
 
   getById: getRigaCompleta,
 
   async create(input: z.infer<typeof creaWhiteLabelSchema>) {
-    const [associazione] = await db
-      .select()
-      .from(organizzatoreEventi)
-      .where(and(eq(organizzatoreEventi.organizzatoreId, input.organizzatoreId), eq(organizzatoreEventi.eventoId, input.eventoId)))
-      .limit(1);
-    if (!associazione) throw new OrganizzatoreNonAutorizzato();
+    if (input.bundleId) {
+      // Bundle: l'associazione all'organizzatore è bundle.organizzatoreId
+      // (impostata nella scheda Bundle) — gli eventi dentro possono
+      // essere di chiunque, come deciso.
+      const [b] = await db.select().from(bundle).where(and(eq(bundle.id, input.bundleId), isNull(bundle.eliminatoIl))).limit(1);
+      if (!b || b.organizzatoreId !== input.organizzatoreId) throw new OrganizzatoreNonAutorizzato();
+      const [gia] = await db.select().from(whiteLabel).where(and(eq(whiteLabel.organizzatoreId, input.organizzatoreId), eq(whiteLabel.bundleId, input.bundleId))).limit(1);
+      if (gia) throw new AssociazioneGiaEsistente();
+    } else {
+      const [associazione] = await db
+        .select()
+        .from(organizzatoreEventi)
+        .where(and(eq(organizzatoreEventi.organizzatoreId, input.organizzatoreId), eq(organizzatoreEventi.eventoId, input.eventoId!)))
+        .limit(1);
+      if (!associazione) throw new OrganizzatoreNonAutorizzato();
 
-    const [giaEsistente] = await db
-      .select()
-      .from(whiteLabel)
-      .where(and(eq(whiteLabel.organizzatoreId, input.organizzatoreId), eq(whiteLabel.eventoId, input.eventoId)))
-      .limit(1);
-    if (giaEsistente) throw new AssociazioneGiaEsistente();
+      const [giaEsistente] = await db
+        .select()
+        .from(whiteLabel)
+        .where(and(eq(whiteLabel.organizzatoreId, input.organizzatoreId), eq(whiteLabel.eventoId, input.eventoId!)))
+        .limit(1);
+      if (giaEsistente) throw new AssociazioneGiaEsistente();
+    }
 
     const temaCompleto: WhiteLabelTheme = input.tema ? normalizzaTema(input.tema) : DEFAULT_WHITE_LABEL_THEME;
 
     const [nuova] = await db.insert(whiteLabel).values({
       organizzatoreId: input.organizzatoreId,
-      eventoId: input.eventoId,
+      eventoId: input.eventoId ?? null,
+      bundleId: input.bundleId ?? null,
       publicWidgetId: generaPublicWidgetId(),
       dominiAutorizzati: input.dominiAutorizzati,
       tema: temaCompleto,
@@ -114,15 +127,30 @@ export const whiteLabelService = {
     const [riga] = await db
       .select({ whiteLabel, evento: eventi })
       .from(whiteLabel)
-      .innerJoin(eventi, eq(whiteLabel.eventoId, eventi.id))
+      .leftJoin(eventi, eq(whiteLabel.eventoId, eventi.id))
       .where(eq(whiteLabel.publicWidgetId, publicWidgetId))
       .limit(1);
     if (!riga) throw new WhiteLabelNonTrovata();
+
+    // Widget di un BUNDLE: stessa busta (attiva/tema/domini), dentro
+    // il bundle invece dell'evento — il frontend sceglie il flusso.
+    if (riga.whiteLabel.bundleId) {
+      const { bundleService } = await import('../bundle/bundle.service.js');
+      return {
+        attiva: riga.whiteLabel.attiva,
+        tema: normalizzaTema(riga.whiteLabel.tema),
+        dominiAutorizzati: riga.whiteLabel.dominiAutorizzati as string[],
+        evento: null,
+        bundle: await bundleService.dettaglioPubblicoPerId(riga.whiteLabel.bundleId),
+      };
+    }
+    if (!riga.evento) throw new WhiteLabelNonTrovata();
 
     return {
       attiva: riga.whiteLabel.attiva,
       tema: normalizzaTema(riga.whiteLabel.tema),
       dominiAutorizzati: riga.whiteLabel.dominiAutorizzati as string[],
+      bundle: null,
       evento: {
         id: riga.evento.id,
         slug: riga.evento.slug,

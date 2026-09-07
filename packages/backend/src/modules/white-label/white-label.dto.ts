@@ -56,11 +56,13 @@ const dominioSchema = z.string().url().refine((u) => {
 
 export const creaWhiteLabelSchema = z.object({
   organizzatoreId: z.string().min(1),
-  eventoId: z.string().min(1),
+  // Uno dei due: white label di un evento, oppure di un bundle.
+  eventoId: z.string().min(1).optional(),
+  bundleId: z.string().min(1).optional(),
   dominiAutorizzati: z.array(dominioSchema).default([]),
   tema: temaSchema.optional(),
   layoutBigliettoId: z.string().nullable().optional(),
-});
+}).refine((d) => !!d.eventoId !== !!d.bundleId, { message: 'Indica un evento oppure un bundle (uno solo).', path: ['eventoId'] });
 
 export const aggiornaWhiteLabelSchema = z.object({
   attiva: z.boolean().optional(),

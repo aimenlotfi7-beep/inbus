@@ -19,6 +19,7 @@ export interface BundleInput {
 export interface BundleRiga {
   id: string; nome: string; slug: string; tipo: TipoBundle; stato: StatoBundle; numeroEventi: number;
   scontoPercentuale: string; inizioVendita: string | null; fineVendita: string | null; attivo: boolean; inEvidenzaHome: boolean;
+  organizzatoreId: string | null;
 }
 
 export interface EventoDelBundle {

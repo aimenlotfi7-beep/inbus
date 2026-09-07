@@ -41,6 +41,9 @@ export interface StatisticheGenerali {
   fatturato: number;
   quotaOrganizzatore: number;
 }
+export interface StatisticaBundle {
+  bundleId: string; bundleNome: string; numeroOrdini: number; viaggiatori: number; fatturato: number; scontoApplicato: number; quotaOrganizzatore: number;
+}
 export interface StatisticaEvento {
   eventoId: string;
   eventoArtista: string;
@@ -65,5 +68,6 @@ export const organizzatoriApi = {
   meEventi: () => apiOrganizzatore.get<EventoAssegnato[]>('/api/organizzatori/me/eventi'),
   meStatistiche: () => apiOrganizzatore.get<StatisticheGenerali>('/api/organizzatori/me/statistiche'),
   meStatistichePerEvento: () => apiOrganizzatore.get<StatisticaEvento[]>('/api/organizzatori/me/statistiche-per-evento'),
+  meStatistichePerBundle: () => apiOrganizzatore.get<StatisticaBundle[]>('/api/organizzatori/me/statistiche-per-bundle'),
   statistiche: (id: string) => api.get<{ generali: StatisticheGenerali; perEvento: StatisticaEvento[] }>(`/api/organizzatori/${id}/statistiche`),
 };

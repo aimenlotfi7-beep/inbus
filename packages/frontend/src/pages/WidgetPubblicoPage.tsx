@@ -8,8 +8,9 @@ import { WhiteLabelPreview } from '../features/white-label/WhiteLabelPreview';
 import { CheckoutForm } from '../features/checkout/CheckoutForm';
 import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
+import { BundleFlusso } from '../features/bundle/BundleFlusso';
 
-type Vista = 'caricamento' | 'errore' | 'vetrina' | 'auth' | 'login' | 'registrati' | 'registrati-fatto' | 'checkout';
+type Vista = 'caricamento' | 'errore' | 'vetrina' | 'auth' | 'login' | 'registrati' | 'registrati-fatto' | 'checkout' | 'bundle';
 
 export function WidgetPubblicoPage() {
   const { publicWidgetId } = useParams<{ publicWidgetId: string }>();
@@ -21,7 +22,10 @@ export function WidgetPubblicoPage() {
   useEffect(() => {
     if (!publicWidgetId) return;
     whiteLabelApi.getPubblica(publicWidgetId)
-      .then((d) => { setDati(d); setVista('vetrina'); })
+      // Widget di un bundle: il flusso è lungo (eventi, fermate, dati), quindi
+      // l'accesso si fa PRIMA, non in fondo — così niente si perde tra un
+      // passaggio e l'altro. Il widget evento resta com'era.
+      .then((d) => { setDati(d); setVista(d.bundle ? (clienteLoggato() ? 'bundle' : 'auth') : 'vetrina'); })
       .catch((e) => { setErroreVista(e instanceof ErroreApi ? e.message : 'Impossibile caricare questa pagina.'); setVista('errore'); });
   }, [publicWidgetId]);
 
@@ -32,6 +36,8 @@ export function WidgetPubblicoPage() {
 
   async function vaiAlCheckout() {
     if (!dati) return;
+    if (dati.bundle) { setVista('bundle'); return; }
+    if (!dati.evento) return;
     setVista('caricamento');
     try {
       const ev = await eventiApi.getBySlug(dati.evento.slug);
@@ -47,6 +53,35 @@ export function WidgetPubblicoPage() {
   if (vista === 'errore') return <Sfondo colore="#14121f"><p style={{ color: '#a99fc2' }}>{erroreVista}</p></Sfondo>;
   if (!dati || !publicWidgetId) return null;
 
+  if (vista === 'bundle' && dati.bundle && publicWidgetId) {
+    const b = dati.bundle;
+    return (
+      <div style={{ minHeight: '100vh', background: dati.tema.colori.sfondo, padding: '40px 20px', fontFamily: dati.tema.tipografia.font }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          {!dati.attiva ? (
+            <Riquadro tema={dati.tema}><p>Questa pagina non accetta più nuovi acquisti.</p></Riquadro>
+          ) : (
+            <BundleFlusso
+              bundle={b}
+              tema={{ superficie: dati.tema.colori.superficie, testo: dati.tema.colori.testoPrincipale, bordi: dati.tema.colori.bordi }}
+              caricaEvento={(ev) => eventiApi.getBySlug(ev.slug)}
+              caricaOpzioni={(eventoId, servizioId) => whiteLabelApi.opzioniPartenza(publicWidgetId, eventoId, servizioId)}
+              mostraSceltaAcconto
+              testoConferma="Conferma l'acquisto"
+              onConferma={async ({ righe, passeggeri, cliente, partecipanti, tipoPagamento }) => {
+                const risultato = await whiteLabelApi.ordineBundle(publicWidgetId, righe.map(({ evento, opzione }) => ({
+                  eventoId: evento.id, tragittoId: opzione.tragittoId, fermataId: opzione.fermataId, passeggeri,
+                  tipoPagamento, metodoPagamento: 'CARTA', cliente, partecipanti,
+                })));
+                return { pnr: risultato.prenotazioni.map((p) => p.pnr) };
+              }}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (vista === 'checkout' && eventoCompleto) {
     return (
       <div style={{ minHeight: '100vh', background: dati.tema.colori.sfondo, padding: '40px 20px' }}>
@@ -60,7 +95,7 @@ export function WidgetPubblicoPage() {
   return (
     <Sfondo colore={dati.tema.colori.sfondo}>
       {vista === 'vetrina' && (
-        <WhiteLabelPreview tema={dati.tema} evento={dati.evento} larghezza={400} onCtaClick={dati.attiva ? apriPrenotazione : undefined} />
+        dati.evento && <WhiteLabelPreview tema={dati.tema} evento={dati.evento} larghezza={400} onCtaClick={dati.attiva ? apriPrenotazione : undefined} />
       )}
       {vista === 'auth' && <SceltaAuth tema={dati.tema} onLogin={() => setVista('login')} onRegistrati={() => setVista('registrati')} />}
       {vista === 'login' && <FormLogin tema={dati.tema} onFatto={vaiAlCheckout} />}
