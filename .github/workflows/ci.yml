@@ -1,0 +1,39 @@
+# Controllo automatico a ogni push: typecheck backend + frontend, build
+# di produzione del frontend. Se una di queste fallisce, GitHub mostra
+# la X rossa sul commit e manda una mail — prima che Vercel/Railway
+# pubblichino qualcosa di rotto. Costa ~2 minuti a push, gratis sui
+# repository privati fino al limite mensile (ampiamente sufficiente).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: Backend — typecheck
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: packages/backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: packages/backend/package-lock.json }
+      - run: npm ci
+      - run: npx tsc --noEmit --noUnusedLocals --noUnusedParameters
+      - run: npm test
+
+  frontend:
+    name: Frontend — typecheck + build
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: packages/frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: packages/frontend/package-lock.json }
+      - run: npm ci
+      - run: npx tsc --noEmit --noUnusedLocals --noUnusedParameters
+      # Il prerender in fondo a "build" prova a contattare l'API e, se
+      # non ci riesce, salta con un avviso — non fallisce. Qui basta.
+      - run: npm run build

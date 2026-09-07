@@ -15,7 +15,8 @@
     "db:migra-permessi": "tsx src/db/migra-permessi.ts",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx src/db/seed.ts",
-    "reset-dati-test": "tsx src/db/reset-dati-test.ts"
+    "reset-dati-test": "tsx src/db/reset-dati-test.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",
@@ -47,6 +48,7 @@
     "@types/qrcode": "^1.5.6",
     "drizzle-kit": "^0.24.2",
     "tsx": "^4.19.1",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.9"
   }
 }

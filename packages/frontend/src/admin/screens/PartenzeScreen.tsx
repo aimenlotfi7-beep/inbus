@@ -8,7 +8,8 @@ import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
 import { useMappaTooltip } from '../shared/useMappaTooltip';
 
-export type TabPartenze = 'fermate' | 'preventivi' | 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate';
+import type { TabPartenze, AzionePartenze } from './partenze/tipi';
+export type { TabPartenze } from './partenze/tipi';
 type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
 
 const TITOLI: Record<TabPartenze, string> = {
@@ -46,7 +47,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   const mappaTooltip = useMappaTooltip();
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [partenze, setPartenze] = useState<Partenza[]>([]);
-  const [selezionato, setSelezionato] = useState<{ evento: Evento; tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi'; tabOrigine: TabPartenze } | null>(null);
+  const [selezionato, setSelezionato] = useState<{ evento: Evento; tragittiIds: string[]; azione: AzionePartenze; tabOrigine: TabPartenze } | null>(null);
   const [ricerca, setRicerca] = useState('');
   const [caricamento, setCaricamento] = useState(true);
 

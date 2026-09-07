@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ContestoPartenze } from './tipi';
 import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea, type VenditePerFermata } from '../../../api/eventi';
 import { GraficoLinee, type SerieGrafico } from '../../shared/GraficoLinee';
 import type { Evento } from '../../../api/types';
@@ -49,7 +50,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   // diversi) — quali tragitti sono rilevanti per QUESTO contesto
   // specifico (filtra i servizi mostrati a solo quelli coinvolti) e
   // quale azione eseguire subito sul primo di loro.
-  contestoPartenze?: { tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi'; tabOrigine: 'fermate' | 'preventivi' | 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate' } | null;
+  contestoPartenze?: ContestoPartenze | null;
   // Avvisa il componente che ha aperto questa scheda (risale fino a
   // PartenzeScreen) dopo OGNI salvataggio fatto qui dentro — altrimenti
   // la lista/cache lì fuori resta con dati vecchi: tornando indietro e
@@ -96,6 +97,19 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   const [formPreventivoMap, setFormPreventivoMap] = useState<Map<string, { costo?: number; postiBus?: number; fornitoreId?: string; file?: File }>>(new Map());
   const [fornitoriLista, setFornitoriLista] = useState<Fornitore[]>([]);
   useEffect(() => { fornitoriApi.list().then((f) => setFornitoriLista(f.filter((x) => x.stato === 'APPROVATO'))).catch(() => {}); }, []);
+  // Le risposte preventivo si caricano QUI, non dentro il render: un
+  // fetch avviato mentre si disegna (con setState al ritorno) è il
+  // pattern che prima o poi finisce in un ciclo di richieste. Carica
+  // per tutti i tragitti dell'evento la prima volta che si entra nella
+  // tab Preventivi (sono pochi per evento, non serve filtrare per
+  // quello aperto).
+  useEffect(() => {
+    if (contestoPartenze?.tabOrigine !== 'preventivi') return;
+    for (const t of calcolo) {
+      if (!risposteMap.has(t.tragittoId)) caricaRisposte(t.tragittoId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calcolo, contestoPartenze?.tabOrigine]);
   // I due numeri della formula prezzi, configurabili da Impostazioni —
   // caricati una volta sola all'apertura, con gli stessi default già
   // usati finora se non sono ancora stati impostati esplicitamente
@@ -408,11 +422,18 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
     caricaRisposte(tragittoId);
   }
 
-  function scaricaFileBase64(nome: string, base64: string) {
-    const link = document.createElement('a');
-    link.href = `data:application/octet-stream;base64,${base64}`;
-    link.download = nome;
-    link.click();
+  /** L'allegato non viaggia con la lista (peserebbe MB per riga): lo si
+   *  chiede al server solo al clic. */
+  async function scaricaFileRisposta(rispostaId: string, quale: 'originale' | 'firmato') {
+    try {
+      const { nome, contenuto } = await preventiviApi.scaricaFile(rispostaId, quale);
+      const link = document.createElement('a');
+      link.href = `data:application/octet-stream;base64,${contenuto}`;
+      link.download = nome;
+      link.click();
+    } catch (e) {
+      alert(e instanceof ErroreApi ? e.message : 'Download non riuscito.');
+    }
   }
 
   function apriPreventivo(tragittoId: string) {
@@ -733,7 +754,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
 
       <div className="partenze-layout">
       {mostraTabTragitti && (
-        <div className="mini-tabs partenze-tabs-colonna" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+        <div className="mini-tabs partenze-tabs-colonna" style={{ marginBottom: 16 }}>
           {calcoloVisibile.map((t) => {
             // Stesso criterio già usato nel contenuto della tappa
             // corrente (orario impostato / preventivo salvato) — così
@@ -1082,7 +1103,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
               const manualiSelezionati = manualiSelezionatiMap.get(tragitto.tragittoId) ?? new Set<string>();
               const caricandoCandidati = caricandoCandidatiSet.has(tragitto.tragittoId);
               const inviandoRichiesta = inviandoRichiestaSet.has(tragitto.tragittoId);
-              if (risposte === undefined) caricaRisposte(tragitto.tragittoId);
 
               // Colore in scala dal più economico (verde) al più caro
               // (rosso) tra le risposte ricevute — solo tra quelle con
@@ -1156,19 +1176,21 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                                 {tragittoVero?.fornitoreId === r.fornitore.id ? '✓ Accettato' : r.risposta ? 'Risposto' : 'In attesa'}
                               </td>
                               <td style={{ whiteSpace: 'nowrap' }}>
-                                {r.risposta?.fileContenuto && (
-                                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => scaricaFileBase64(r.risposta!.fileNome ?? 'preventivo.pdf', r.risposta!.fileContenuto!)}>Scarica file</button>
+                                {r.risposta?.haFile && (
+                                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => scaricaFileRisposta(r.risposta!.id, 'originale')}>Scarica file</button>
                                 )}
                                 {r.risposta && tragittoVero?.fornitoreId !== r.fornitore.id && (
                                   <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: 'var(--green)' }} onClick={() => accettaPreventivo(r.risposta!.id, tragitto.tragittoId)}>Accetta</button>
                                 )}
-                                {r.risposta && tragittoVero?.fornitoreId === r.fornitore.id && !r.risposta.fileFirmatoContenuto && (
+                                {r.risposta && tragittoVero?.fornitoreId === r.fornitore.id && !r.risposta.haFileFirmato && (
                                   <label className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px', cursor: 'pointer' }}>
                                     Carica firmato
                                     <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) caricaFileFirmatoPerRisposta(r.risposta!.id, tragitto.tragittoId, f); }} />
                                   </label>
                                 )}
-                                {r.risposta?.fileFirmatoContenuto && <span style={{ fontSize: 11, color: 'var(--green)' }}>✓ Firmato e inviato</span>}
+                                {r.risposta?.haFileFirmato && (
+                                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: 'var(--green)' }} onClick={() => scaricaFileRisposta(r.risposta!.id, 'firmato')}>✓ Firmato e inviato — scarica</button>
+                                )}
                               </td>
                             </tr>
                           ))}

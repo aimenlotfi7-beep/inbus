@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import type { ContestoPartenze } from '../partenze/tipi';
 import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
 import { InfoTooltip } from '../../shared/InfoTooltip';
 import { TOOLTIP_DEFAULT } from '../../tooltipDefaults';
@@ -42,6 +43,22 @@ const STEP_WIZARD = [
  * prezzo prima di poter salvare — solo l'ultima (l'arrivo) può non
  * averlo, perché nessuno parte da lì.
  */
+
+/** Un evento ha UNA sola città di arrivo: la stabilisce il primo
+ *  tragitto (in ordine, a prescindere dal servizio) che ne ha una
+ *  scritta. Torna indice e città di quel tragitto, o indice -1 se
+ *  nessuno l'ha ancora impostata. Usata in un solo posto invece che
+ *  ricalcolata a mano nel render, nel salvataggio e nelle due funzioni
+ *  che aggiungono un tragitto — così i quattro punti non possono mai
+ *  divergere. */
+function cittaArrivoEvento(tragitti: TragittoInput[] | undefined): { indice: number; citta: string | undefined } {
+  const indice = (tragitti ?? []).findIndex((t) => t.arrivoCitta?.trim());
+  return { indice, citta: indice >= 0 ? tragitti![indice].arrivoCitta!.trim() : undefined };
+}
+function stessaCitta(a: string | undefined | null, b: string | undefined | null): boolean {
+  return (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase();
+}
+
 export function SchedaEventoModale({
   evento, tabIniziale = 'dettagli', soloQuestaTab = false, contestoPartenze, onClose, onSalvato,
 }: {
@@ -54,7 +71,7 @@ export function SchedaEventoModale({
   soloQuestaTab?: boolean;
   // Arrivando da una card di Partenze — quale tragitto aprire subito,
   // e con quale azione (vedi PartenzeTab).
-  contestoPartenze?: { tragittiIds: string[]; azione: 'fermate' | 'preventivo' | 'linee' | 'espandi'; tabOrigine: 'fermate' | 'preventivi' | 'da-prezzare' | 'da-confermare' | 'confermato' | 'passate' } | null;
+  contestoPartenze?: ContestoPartenze | null;
   onClose: () => void;
   onSalvato: () => void;
 }) {
@@ -487,7 +504,15 @@ export function SchedaEventoModale({
     // (senza il primo tragitto appena aggiunto), perdendolo. Bug
     // trovato proprio così: "creo un evento a due servizi, non si
     // salva correttamente".
-    setForm((f) => ({ ...f, tragitti: [...(f.tragitti ?? []), nuovoTragitto] }));
+    // La città di arrivo dell'EVENTO (se già stabilita da un altro
+    // tragitto) prevale anche su quella del percorso applicato — un
+    // percorso salvato verso un'altra destinazione non può portare
+    // dentro una seconda città. Calcolata dentro l'aggiornamento
+    // funzionale, sullo stato più recente (vedi commento sotto).
+    setForm((f) => {
+      const bloccata = cittaArrivoEvento(f.tragitti).citta;
+      return { ...f, tragitti: [...(f.tragitti ?? []), bloccata ? { ...nuovoTragitto, arrivoCitta: bloccata } : nuovoTragitto] };
+    });
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
   }
 
@@ -500,10 +525,16 @@ export function SchedaEventoModale({
     // vuoto finché non si ritoccava qualcosa per farlo risincronizzare.
     const arrivoCondiviso = arrivoPerTuttiMap.get(servizioContesto);
     setTragittiAperti((prev) => new Set(prev).add((form.tragitti ?? []).length));
-    setForm((f) => ({ ...f, tragitti: [...(f.tragitti ?? []), {
-      nome: '', postiTotali: 50, prezzoExtra: 0, attivo: true, servizioId: servizioContesto, fermate: [{ citta: '', indirizzo: '' }],
-      ...(arrivoCondiviso?.attivo ? { arrivoCitta: arrivoCondiviso.citta, arrivoIndirizzo: arrivoCondiviso.indirizzo, arrivoOrario: arrivoCondiviso.orario } : {}),
-    }] }));
+    setForm((f) => {
+      const bloccata = cittaArrivoEvento(f.tragitti).citta;
+      return { ...f, tragitti: [...(f.tragitti ?? []), {
+        nome: '', postiTotali: 50, prezzoExtra: 0, attivo: true, servizioId: servizioContesto, fermate: [{ citta: '', indirizzo: '' }],
+        ...(arrivoCondiviso?.attivo ? { arrivoCitta: arrivoCondiviso.citta, arrivoIndirizzo: arrivoCondiviso.indirizzo, arrivoOrario: arrivoCondiviso.orario } : {}),
+        // La città dell'evento (se già stabilita) prevale anche su
+        // "arrivo per tutti" del servizio — un evento, una destinazione.
+        ...(bloccata ? { arrivoCitta: bloccata } : {}),
+      }] };
+    });
   }
 
 
@@ -655,8 +686,31 @@ export function SchedaEventoModale({
     // dati vecchi (prima che selezionaFermataAnagrafica lo
     // intercettasse) — altrimenti quella fermata resterebbe "rotta"
     // per sempre, anche dopo aver risalvato.
-    const tratteValide = (form.tragitti ?? []).map((l) => ({
+    // Stessa logica del blocco visivo sopra, applicata ai dati veri:
+    // il campo disabilitato mostra solo VISIVAMENTE la città bloccata,
+    // senza toccare form.tragitti finché non si salva — qui la
+    // scrivo davvero, altrimenti un tragitto aggiunto dopo il primo
+    // finirebbe salvato con la città di arrivo vuota.
+    const arrivoEvento = cittaArrivoEvento(form.tragitti);
+    // Il blocco sul campo (sopra, nel render) impedisce di scrivere a
+    // mano una città diversa — ma può arrivarci comunque per un'altra
+    // via (un percorso salvato con un'altra destinazione applicato
+    // prima che il blocco esistesse, o "arrivo per tutti" di un altro
+    // servizio). Se capita, avviso col nome del tragitto invece di
+    // correggere in silenzio. Confronto senza distinzione di
+    // maiuscole/spazi: "roma" e "Roma" sono la stessa città.
+    const tragittoDivergente = arrivoEvento.citta
+      ? (form.tragitti ?? []).find((t, idx) => idx !== arrivoEvento.indice && t.arrivoCitta?.trim() && !stessaCitta(t.arrivoCitta, arrivoEvento.citta))
+      : undefined;
+    if (tragittoDivergente) {
+      alert(`Tutti i tragitti di questo evento devono arrivare a "${arrivoEvento.citta}" (stabilito da "${form.tragitti![arrivoEvento.indice].nome.trim() || 'primo tragitto'}") — "${tragittoDivergente.nome.trim() || '(senza nome)'}" arriva invece a "${tragittoDivergente.arrivoCitta}". Correggilo prima di salvare.`);
+      setStep(2);
+      if (tragittoDivergente.servizioId) { setModalitaServizi('multiplo'); setServizioTabAttivo(tragittoDivergente.servizioId); }
+      return;
+    }
+    const tratteValide = (form.tragitti ?? []).map((l, idx) => ({
       ...l,
+      ...(arrivoEvento.citta && idx !== arrivoEvento.indice && { arrivoCitta: arrivoEvento.citta }),
       fermate: l.fermate.map((f) => f.fermataAnagraficaId === '__manuale__' ? { ...f, fermataAnagraficaId: null } : f),
     }));
     const payload = {
@@ -933,6 +987,14 @@ export function SchedaEventoModale({
         const etichettaContesto = modalitaServizi === 'multiplo' && servizioTabAttivo && servizioTabAttivo !== 'liberi'
           ? servizi.find((v) => v.key === servizioTabAttivo)?.nome ?? 'questo servizio'
           : 'questi tragitti';
+        // Se la città dell'evento è già stabilita da un tragitto FUORI
+        // da questo servizio, qui non si può sceglierne un'altra: il
+        // campo città si blocca su quella. Se invece il tragitto che
+        // la stabilisce è dentro questo servizio, resta modificabile
+        // (cambiarla qui cambia la città di tutto l'evento, com'è giusto).
+        const arrivoEvento = cittaArrivoEvento(form.tragitti);
+        const bloccataDaAltroServizio = arrivoEvento.indice >= 0 && (form.tragitti![arrivoEvento.indice].servizioId ?? null) !== contesto
+          ? arrivoEvento.citta : undefined;
 
         function aggiornaFlag(attivo: boolean) {
           setArrivoPerTuttiMap((prev) => new Map(prev).set(contesto, { ...arrivoPerTutti, attivo }));
@@ -942,11 +1004,14 @@ export function SchedaEventoModale({
           setArrivoPerTuttiMap((prev) => new Map(prev).set(contesto, nuovo));
           // Si applica SUBITO a ogni tragitto di questo stesso contesto,
           // ogni volta che si scrive — non serve un pulsante "applica"
-          // a parte.
+          // a parte. La città però non può scavalcare quella dell'evento
+          // se è stabilita altrove: prima, cambiando anche solo
+          // l'indirizzo, la città (magari vecchia/diversa) veniva
+          // riscritta insieme — bug corretto qui.
           setForm((f) => ({
             ...f,
             tragitti: (f.tragitti ?? []).map((t) => (t.servizioId ?? null) === contesto
-              ? { ...t, arrivoCitta: nuovo.citta, arrivoIndirizzo: nuovo.indirizzo, arrivoOrario: nuovo.orario }
+              ? { ...t, arrivoCitta: bloccataDaAltroServizio ?? nuovo.citta, arrivoIndirizzo: nuovo.indirizzo, arrivoOrario: nuovo.orario }
               : t),
           }));
         }
@@ -960,7 +1025,14 @@ export function SchedaEventoModale({
             {arrivoPerTutti.attivo && (
               <div className="form-grid" style={{ marginTop: 10 }}>
                 <label>Città di arrivo
-                  <input value={arrivoPerTutti.citta} onChange={(e) => aggiornaCampoCondiviso('citta', e.target.value)} placeholder="es. Roma" />
+                  <input
+                    value={bloccataDaAltroServizio ?? arrivoPerTutti.citta}
+                    disabled={!!bloccataDaAltroServizio}
+                    style={bloccataDaAltroServizio ? { opacity: .6, background: 'var(--night)', cursor: 'not-allowed' } : undefined}
+                    title={bloccataDaAltroServizio ? 'Città di arrivo di tutto l\'evento, stabilita da un tragitto di un altro servizio.' : undefined}
+                    onChange={(e) => aggiornaCampoCondiviso('citta', e.target.value)}
+                    placeholder="es. Roma"
+                  />
                 </label>
                 <label>Indirizzo di arrivo
                   <input value={arrivoPerTutti.indirizzo} onChange={(e) => aggiornaCampoCondiviso('indirizzo', e.target.value)} placeholder="es. Piazzale Clodio, Roma" />
@@ -1058,7 +1130,16 @@ export function SchedaEventoModale({
         );
       })()}
 
-      {(form.tragitti ?? []).map((tragitto, idxTragitto) => {
+      {(() => {
+        // Blocco vero (non solo un avviso, come richiesto): il PRIMO
+        // tragitto dell'evento (in ordine, a prescindere dal servizio)
+        // che ha una città di arrivo scritta stabilisce quella di
+        // TUTTO l'evento — tutti gli altri la ereditano e il campo
+        // diventa bloccato, non solo oscurato. Un evento non può avere
+        // due destinazioni diverse.
+        const arrivoEvento = cittaArrivoEvento(form.tragitti);
+        const nomeTragittoBloccante = arrivoEvento.indice >= 0 ? (form.tragitti![arrivoEvento.indice].nome.trim() || 'il tragitto senza nome') : '';
+        return (form.tragitti ?? []).map((tragitto, idxTragitto) => {
         // Mostra solo i tragitti del contesto giusto: in modalità
         // "1 servizio" solo quelli liberi, in "Più servizi" solo quelli
         // della tab scelta (o i liberi, se è quella la tab attiva).
@@ -1247,12 +1328,20 @@ export function SchedaEventoModale({
             // scriverci sopra senza dover prima disattivare il flag.
             const daArrivoPerTutti = arrivoPerTuttiMap.get(tragitto.servizioId ?? null)?.attivo ?? false;
             const stileOscurato = daArrivoPerTutti ? { opacity: .6, background: 'var(--night)' } : undefined;
+            // Blocco vero (non un avviso) — questo tragitto non è
+            // quello che ha stabilito l'arrivo dell'evento, il campo
+            // città diventa fisso su quel valore. L'indirizzo/orario
+            // restano modificabili (stesso punto di arrivo può avere
+            // un orario diverso per fermata/tragitto).
+            const cittaBloccataQui = arrivoEvento.indice >= 0 && idxTragitto !== arrivoEvento.indice ? arrivoEvento.citta : undefined;
             return (
           <div className="form-grid" style={{ marginBottom: 10, gridTemplateColumns: '1fr 1fr 110px' }}>
             <label>Città di arrivo
               <input
-                style={stileOscurato}
-                value={tragitto.arrivoCitta ?? ''}
+                style={cittaBloccataQui ? { opacity: .6, background: 'var(--night)', cursor: 'not-allowed' } : stileOscurato}
+                value={cittaBloccataQui ?? tragitto.arrivoCitta ?? ''}
+                disabled={!!cittaBloccataQui}
+                title={cittaBloccataQui ? `Stessa città di arrivo di tutto l'evento — per cambiarla ovunque, modificala su "${nomeTragittoBloccante}".` : undefined}
                 onChange={(e) => aggiornaTragitto(idxTragitto, 'arrivoCitta', e.target.value)}
                 placeholder="es. Roma"
               />
@@ -1286,7 +1375,8 @@ export function SchedaEventoModale({
           </>
           )}
         </div>
-      );})}
+      );});
+      })()}
       <button className="btn btn-ghost" style={{ marginBottom: 6 }} onClick={aggiungiTragittoManuale}>+ Aggiungi tragitto manuale (senza tragitto salvato)</button>
       </>
       )}

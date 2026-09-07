@@ -371,7 +371,9 @@ export const eventiService = {
       // scritta a mano dentro il where — più facile da verificare che
       // faccia davvero quello che deve.
       const righeConfermate = await db.selectDistinct({ eventoId: tragitti.eventoId }).from(tragitti)
-        .where(and(inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true)));
+        // isNull(eliminatoIl): un evento il cui unico tragitto prezzato è
+        // stato rimosso non deve restare in vendita sul sito.
+        .where(and(inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl)));
       const idEventiConfermati = righeConfermate.map((r) => r.eventoId);
       if (idEventiConfermati.length === 0) return []; // nessun evento ha nemmeno un tragitto confermato: lista vuota, senza nemmeno interrogare il resto
       condizioni.push(inArray(eventi.id, idEventiConfermati));
@@ -1494,7 +1496,7 @@ export const eventiService = {
       .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id })
       .from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.attivo, true), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
+      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
     if (righeTragitti.length === 0) return 0;
 
     const tragittiIds = righeTragitti.map((r) => r.tragittoId);
@@ -1515,7 +1517,7 @@ export const eventiService = {
       .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id, fornitoreId: tragitti.fornitoreId })
       .from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.attivo, true), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`, isNull(tragitti.fornitoreId)));
+      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`, isNull(tragitti.fornitoreId)));
     if (righeTragitti.length === 0) return 0;
 
     const tragittiIds = righeTragitti.map((r) => r.tragittoId);
@@ -1536,7 +1538,7 @@ export const eventiService = {
       .select({ eventoId: tragitti.eventoId })
       .from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.stato, 'DA_CONFERMARE'), eq(tragitti.attivo, true), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
+      .where(and(eq(tragitti.stato, 'DA_CONFERMARE'), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
     return new Set(righe.map((r) => r.eventoId)).size;
   },
 
@@ -1549,7 +1551,7 @@ export const eventiService = {
       .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id })
       .from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.stato, 'PREZZATO'), eq(tragitti.attivo, true), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
+      .where(and(eq(tragitti.stato, 'PREZZATO'), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
     if (righeTragitti.length === 0) return 0;
 
     const tragittiIds = righeTragitti.map((r) => r.tragittoId);
@@ -1637,7 +1639,11 @@ export const eventiService = {
     }).from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
       .leftJoin(servizi, eq(servizi.id, tragitti.servizioId))
-      .where(and(eq(tragitti.attivo, true), isNull(eventi.eliminatoIl)));
+      // isNull(tragitti.eliminatoIl): un tragitto rimosso dalla scheda
+      // evento resta attivo=true (il soft-delete tocca solo eliminatoIl)
+      // — senza questo filtro continuava a comparire in Partenze e a
+      // contare nei badge del menu. Stesso fix nei tre conteggi sopra.
+      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl)));
 
     if (righe.length === 0) return [];
 

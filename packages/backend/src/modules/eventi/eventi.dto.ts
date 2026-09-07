@@ -66,7 +66,7 @@ const servizioSchema = z.object({
   tragitti: z.array(tragittoSchema).default([]),
 });
 
-export const creaEventoSchema = z.object({
+const creaEventoBase = z.object({
   artista: z.string().min(1),
   // Indirizzo pubblico (es. "salmo-roma") — facoltativo: se non lo
   // scrivi, viene generato da solo dal nome dell'artista e dalla città.
@@ -97,9 +97,36 @@ export const creaEventoSchema = z.object({
   tragitti: z.array(tragittoSchema).default([]),
   servizi: z.array(servizioSchema).default([]),
 });
+
+/** Invariante di business, applicata QUI (lato server) e non solo nel
+ *  form: un evento ha UNA sola città di arrivo. Tutti i tragitti che ne
+ *  hanno una scritta — liberi o dentro un servizio — devono concordare
+ *  (senza distinzione di maiuscole/spazi). Il form blocca il campo, ma
+ *  il form è UX: la regola vera vive qui, così vale per qualunque
+ *  client e per qualunque bug futuro in un'altra schermata. */
+function verificaUnicaCittaArrivo(
+  dati: { tragitti?: z.infer<typeof tragittoSchema>[]; servizi?: z.infer<typeof servizioSchema>[] },
+  ctx: z.RefinementCtx,
+) {
+  const tutti = [...(dati.tragitti ?? []), ...(dati.servizi ?? []).flatMap((s) => s.tragitti)];
+  const conCitta = tutti.filter((t) => t.arrivoCitta?.trim());
+  if (conCitta.length < 2) return;
+  const norm = (c: string) => c.trim().toLowerCase();
+  const riferimento = conCitta[0];
+  const divergente = conCitta.find((t) => norm(t.arrivoCitta!) !== norm(riferimento.arrivoCitta!));
+  if (divergente) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Un evento ha una sola città di arrivo: "${riferimento.nome}" arriva a "${riferimento.arrivoCitta}", "${divergente.nome}" a "${divergente.arrivoCitta}".`,
+      path: ['tragitti'],
+    });
+  }
+}
+
+export const creaEventoSchema = creaEventoBase.superRefine(verificaUnicaCittaArrivo);
 export type CreaEventoInput = z.infer<typeof creaEventoSchema>;
 
-export const aggiornaEventoSchema = creaEventoSchema.partial();
+export const aggiornaEventoSchema = creaEventoBase.partial().superRefine(verificaUnicaCittaArrivo);
 export type AggiornaEventoInput = z.infer<typeof aggiornaEventoSchema>;
 
 export const listaEventiQuerySchema = z.object({
@@ -182,6 +209,7 @@ export const registraPreventivoSchema = z.object({
   fornitoreId: z.string().optional(),
   // Facoltativo — un file allegato anche per un inserimento manuale
   // (non solo per chi risponde tramite il link email), come richiesto.
-  fileNome: z.string().optional(),
-  fileContenuto: z.string().optional(), // base64
+  fileNome: z.string().max(200).optional(),
+  // Stesso limite per allegato del modulo preventivi (8MB).
+  fileContenuto: z.string().max(8 * 1024 * 1024 * 4 / 3, 'Il file supera gli 8MB consentiti.').optional(), // base64
 });

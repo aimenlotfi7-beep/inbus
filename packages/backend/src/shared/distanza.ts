@@ -1,17 +1,9 @@
-import { eq } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
+import { distanzaKm } from './haversine.js';
 import { db } from '../db/client.js';
 import { tragitti, fermate, fermateAnagrafica } from '../db/schema.js';
 
-/** Distanza in linea d'aria tra due punti (km) — stessa formula usata
- *  per il raggio dei fornitori (shared/geo lato frontend, replicata
- *  qui lato server perché serve senza passare da una chiamata HTTP). */
-export function distanzaKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+export { distanzaKm } from './haversine.js';
 
 /** Km APPROSSIMATI di un tragitto (linea d'aria, partenza + fermate
  *  intermedie collegate all'anagrafica, quindi con coordinate già
@@ -25,13 +17,14 @@ export async function calcolaKmApprossimati(tragittoId: string): Promise<number 
   const [t] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
   if (!t || t.partenzaLat == null || t.partenzaLng == null) return null;
 
-  const fermateAttive = await db.select().from(fermate).where(eq(fermate.tragittoId, tragittoId));
-  const conCoordinate: { lat: number; lng: number }[] = [];
-  for (const f of fermateAttive.filter((f) => f.attivo)) {
-    if (!f.fermataAnagraficaId) continue;
-    const [fa] = await db.select().from(fermateAnagrafica).where(eq(fermateAnagrafica.id, f.fermataAnagraficaId)).limit(1);
-    if (fa?.lat != null && fa?.lng != null) conCoordinate.push({ lat: fa.lat, lng: fa.lng });
-  }
+  // Una query sola (join con l'anagrafica), nell'ordine logico delle
+  // fermate — prima era una query per fermata e l'ordine del database.
+  const righe = await db.select({ lat: fermateAnagrafica.lat, lng: fermateAnagrafica.lng })
+    .from(fermate)
+    .innerJoin(fermateAnagrafica, eq(fermateAnagrafica.id, fermate.fermataAnagraficaId))
+    .where(and(eq(fermate.tragittoId, tragittoId), eq(fermate.attivo, true)))
+    .orderBy(asc(fermate.ordine));
+  const conCoordinate = righe.filter((r): r is { lat: number; lng: number } => r.lat != null && r.lng != null);
 
   let totale = 0;
   let precedente = { lat: t.partenzaLat, lng: t.partenzaLng };

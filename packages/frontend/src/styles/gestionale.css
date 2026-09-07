@@ -326,10 +326,15 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
    con molti tragitti) a colonna verticale a sinistra, col contenuto a
    destra. Solo da desktop: su mobile resta lo stack di sempre (righe
    troppo strette per stare fianco a fianco). */
+/* Su mobile (riga sopra il contenuto) le tab vanno a capo se sono
+   tante — era un inline style nel componente, spostato qui perché da
+   desktop va DISATTIVATO: flex-wrap:wrap + colonna + max-height farebbe
+   proseguire le tab in una seconda colonna invece di scorrere. */
+.partenze-tabs-colonna{ flex-wrap:wrap; }
 @media (min-width:900px){
   .partenze-layout{ display:flex; gap:24px; align-items:flex-start; }
   .partenze-layout .partenze-tabs-colonna{
-    flex-direction:column; flex-shrink:0; width:230px;
+    flex-direction:column; flex-wrap:nowrap; flex-shrink:0; width:230px;
     overflow-x:visible; overflow-y:auto; max-height:calc(100vh - 200px);
   }
   .partenze-layout .partenze-tabs-colonna .mini-tab{ width:100%; text-align:left; }

@@ -13,10 +13,12 @@ export interface RispostaPreventivo {
   richiestaId: string;
   prezzo: string;
   fileNome: string | null;
-  fileContenuto: string | null;
   fileFirmatoNome: string | null;
-  fileFirmatoContenuto: string | null;
   fileFirmatoInviatoIl: string | null;
+  // Solo "c'è o non c'è": il contenuto (base64, anche MB) si scarica a
+  // parte con scaricaFile() quando serve — non viaggia con la lista.
+  haFile: boolean;
+  haFileFirmato: boolean;
   inviataIl: string;
 }
 
@@ -45,11 +47,13 @@ export const preventiviApi = {
   statistichePerFornitore: (dataDa?: string) => api.get<{ fornitore: Fornitore; richiesteRicevute: number; risposteDate: number; volteScelto: number; prezzoMedio: number | null }[]>(`/api/preventivi/statistiche/fornitori${dataDa ? `?dataDa=${dataDa}` : ''}`),
   storicoPerTratta: (dataDa?: string) => api.get<{ partenza: string; arrivo: string; prezzo: number; km: number | null; data: string; nomeTragitto: string; artista: string }[]>(`/api/preventivi/statistiche/tratte${dataDa ? `?dataDa=${dataDa}` : ''}`),
   accetta: (rispostaId: string) => api.put<{ ok: boolean }>(`/api/preventivi/risposte/${rispostaId}/accetta`, {}),
+  scaricaFile: (rispostaId: string, quale: 'originale' | 'firmato') =>
+    api.get<{ nome: string; contenuto: string }>(`/api/preventivi/risposte/${rispostaId}/file?quale=${quale}`),
   caricaFileFirmato: (rispostaId: string, fileNome: string, fileContenuto: string) =>
     api.post<{ ok: boolean }>(`/api/preventivi/risposte/${rispostaId}/file-firmato`, { fileNome, fileContenuto }),
   // Pubbliche — nessun accesso da amministratore, usate dal form di
   // risposta del fornitore (fuori dall'area /admin).
   getPubblico: (token: string) => api.get<DatiPubbliciPreventivo>(`/api/preventivi/pubblico/${token}`),
   rispondiPubblico: (token: string, input: { prezzo: number; fileNome?: string; fileContenuto?: string }) =>
-    api.post<RispostaPreventivo>(`/api/preventivi/pubblico/${token}/rispondi`, input),
+    api.post<{ id: string; prezzo: string; fileNome: string | null }>(`/api/preventivi/pubblico/${token}/rispondi`, input),
 };

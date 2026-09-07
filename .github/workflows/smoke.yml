@@ -1,0 +1,36 @@
+# Controllo che il sito in produzione risponda DAVVERO — ogni 30 minuti
+# e a ogni push (5 minuti dopo, per dare tempo al deploy). Non basta
+# /api/health (dice solo che il processo è acceso): il giorno che le
+# migrazioni non erano partite, health rispondeva ok e gli eventi no.
+# Se fallisce, GitHub manda una mail al proprietario del repository:
+# è il "monitoraggio" a costo zero.
+name: Smoke test produzione
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  produzione:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Attendi il deploy (solo dopo un push)
+        if: github.event_name == 'push'
+        run: sleep 300
+      - name: Backend acceso
+        run: |
+          curl --fail --silent --show-error --max-time 20 \
+            https://inbus-production.up.railway.app/api/health
+      - name: Eventi pubblici rispondono (query vera sul database)
+        run: |
+          corpo=$(curl --fail --silent --show-error --max-time 30 \
+            "https://inbus-production.up.railway.app/api/eventi")
+          echo "$corpo" | head -c 300; echo
+          # Deve essere JSON valido (un array, anche vuoto) — non una
+          # pagina di errore che per caso risponde 200.
+          echo "$corpo" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);if(!Array.isArray(j)&&!Array.isArray(j.eventi))process.exit(1)})'
+      - name: Sito pubblico raggiungibile
+        run: curl --fail --silent --show-error --max-time 20 -o /dev/null https://inbus-eosin.vercel.app/
