@@ -2,9 +2,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { notifica } from '../../shared/notifiche';
 import type { ContestoPartenze } from '../partenze/tipi';
 import { TragittoCard } from './TragittoCard';
+import { StepInformazioni } from './StepInformazioni';
+import { StepImmagini } from './StepImmagini';
+import { ArrivoPerTutti } from './ArrivoPerTutti';
+import { infoCompleta, numeroImmagini, bigliettoPersonalizzato } from './completamento';
 import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
-import { InfoTooltip } from '../../shared/InfoTooltip';
-import { TOOLTIP_DEFAULT } from '../../tooltipDefaults';
 import { useMappaTooltip } from '../../shared/useMappaTooltip';
 import { eventiApi, type EventoInput, type TragittoInput, type FermataInput } from '../../../api/eventi';
 import { percorsiSalvatiApi, type PercorsoSalvato } from '../../../api/percorsiSalvati';
@@ -16,9 +18,6 @@ import { ErroreApi } from '../../../api/client';
 import type { Evento } from '../../../api/types';
 import { PaginaSezione } from '../../shared/PaginaSezione';
 import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
-import { CaricaFile } from '../../shared/CaricaFile';
-import { CampoNumero } from '../../shared/CampoNumero';
-import { OrarioInput } from '../../shared/OrarioInput';
 import { PartenzeTab } from '../partenze/PartenzeTab';
 import { ListaAttesaTab } from './ListaAttesaTab';
 import { ComunicazioniTab } from './ComunicazioniTab';
@@ -94,7 +93,6 @@ export function SchedaEventoModale({
   const [form, setForm] = useState<EventoInput>(VUOTO);
   const [tabAttiva, setTabAttiva] = useState<'dettagli' | 'partenze' | 'lista-attesa' | 'offerte' | 'comunicazioni'>(tabIniziale);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [subTabInfo, setSubTabInfo] = useState<'info' | 'descrizione'>('info');
   const [subTabImmagini, setSubTabImmagini] = useState<'immagini' | 'biglietto'>('immagini');
   // Tratte comprimibili come in Partenze — le nuove restano aperte per
   // poterle compilare subito, le altre si possono chiudere per non
@@ -188,7 +186,6 @@ export function SchedaEventoModale({
       return nuovo;
     });
   }
-  const [nuovaImmagine, setNuovaImmagine] = useState('');
   const [trascinata, setTrascinata] = useState<{ tragitto: number; fermata: number } | null>(null);
   // Indirizzo e città sulla stessa riga, sempre visibile su desktop.
   // Su mobile la riga è trascinabile (per riordinare le fermate) — una
@@ -537,17 +534,11 @@ export function SchedaEventoModale({
   }
 
 
-  function infoCompleta() {
-    return Boolean(form.artista && form.genere && form.luogo && form.citta && form.data);
-  }
 
   // Completamento VERO di ogni sezione/sotto-sezione — non "ci sono
   // passato sopra", ma "ho scritto qualcosa lì dentro". Usato solo per
   // il segno di spunta verde in creazione: non blocca mai il
   // salvataggio, tratte/immagini/descrizione restano facoltative.
-  const numeroImmagini = (form.immagini ?? []).length;
-  const bigliettoPersonalizzato = Boolean(form.ticketColoreAccento || form.ticketImmagineSfondoUrl || form.layoutBigliettoId);
-  const descrizioneCompilata = Boolean((form.descrizione ?? '').trim() || (form.descrizioneSeo ?? '').trim());
 
   // Auto-salvataggio nel BROWSER (non più sul server) — solo per un
   // evento NUOVO (non in modifica di uno esistente): tiene il form
@@ -591,18 +582,10 @@ export function SchedaEventoModale({
   }
 
 
-  function aggiungiImmagine() {
-    if (!nuovaImmagine.trim()) return;
-    setForm({ ...form, immagini: [...(form.immagini ?? []), nuovaImmagine.trim()] });
-    setNuovaImmagine('');
-  }
-  function rimuoviImmagine(idx: number) {
-    setForm({ ...form, immagini: (form.immagini ?? []).filter((_, i) => i !== idx) });
-  }
 
   async function salva() {
     if (salvando) return; // già in corso, ignora click ripetuti
-    if (!infoCompleta()) {
+    if (!infoCompleta(form)) {
       notifica('Compila almeno artista, genere, luogo, città e data.');
       return;
     }
@@ -657,7 +640,7 @@ export function SchedaEventoModale({
       setServizioTabAttivo(servizioVuoto.key);
       return;
     }
-    if (numeroImmagini === 0) {
+    if (numeroImmagini(form) === 0) {
       notifica('Carica almeno un\'immagine prima di salvare.');
       setStep(3);
       setSubTabImmagini('immagini');
@@ -760,104 +743,7 @@ export function SchedaEventoModale({
 
   // ---- Blocchi di campi condivisi tra wizard (creazione) e vista Dettagli (modifica) ----
 
-  const campiInfoEvento: ReactNode = (
-    <>
-      <div className="sub-tabs">
-        <button type="button" className={`sub-tab${subTabInfo === 'info' ? ' active' : (!evento && infoCompleta()) ? ' completato' : ''}`} onClick={() => setSubTabInfo('info')}>Informazioni</button>
-        <button type="button" className={`sub-tab${subTabInfo === 'descrizione' ? ' active' : (!evento && descrizioneCompilata) ? ' completato' : ''}`} onClick={() => setSubTabInfo('descrizione')}>Descrizione</button>
-      </div>
-
-      {subTabInfo === 'info' && (
-        <>
-          <div className="form-grid">
-            <label style={{ gridColumn: '1 / -1' }}>Artista <input value={form.artista} onChange={(e) => setForm({ ...form, artista: e.target.value })} /></label>
-            <label>Genere
-              <select value={form.genere} onChange={(e) => { if (e.target.value === '__nuovo__') { nuovoGenere(); return; } setForm({ ...form, genere: e.target.value }); }}>
-                <option value="" disabled>Scegli un genere...</option>
-                {categorie.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                {form.genere && !categorie.some((c) => c.nome === form.genere) && (
-                  <option value={form.genere}>{form.genere}</option>
-                )}
-                <option value="__nuovo__">+ Nuovo genere...</option>
-              </select>
-            </label>
-            <label>
-              <EtichettaTooltip testo="Categoria" chiave="categoria" mappaTooltip={mappaTooltip} />
-              <select
-                value={form.categoria ?? ''}
-                onChange={(e) => { if (e.target.value === '__nuova__') { nuovaCategoria(); return; } setForm({ ...form, categoria: e.target.value || null }); }}
-              >
-                <option value="">— Nessuna —</option>
-                {categorieEvento.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-                {form.categoria && !categorieEvento.some((c) => c.nome === form.categoria) && (
-                  <option value={form.categoria}>{form.categoria}</option>
-                )}
-                <option value="__nuova__">+ Nuova categoria...</option>
-              </select>
-            </label>
-            <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
-            <label>Città <input value={form.citta} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>
-            <label>Data <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
-            <label>
-              <EtichettaTooltip testo="URL" chiave="url" mappaTooltip={mappaTooltip} />
-              <input
-                value={form.slug ?? ''}
-                onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
-                placeholder={`es. ${(form.artista || 'nome-evento').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${(form.citta || 'citta').toLowerCase()}`}
-              />
-            </label>
-            <label>Acconto (€)
-              <CampoNumero valuta min={1} value={form.accontoEur} onChange={(v) => setForm({ ...form, accontoEur: v ?? 0 })} />
-            </label>
-            <label>
-              <EtichettaTooltip testo="Avviso disponibilità" chiave="avviso_disponibilita" mappaTooltip={mappaTooltip} />
-              <select
-                value={form.statoDisponibilita ?? ''}
-                onChange={(e) => setForm({ ...form, statoDisponibilita: (e.target.value || null) as typeof form.statoDisponibilita })}
-              >
-                <option value="">Automatico (calcolato dai posti veri)</option>
-                <option value="POCHI_POSTI">Pochi posti disponibili</option>
-                <option value="NUOVI_POSTI">Nuovi posti disponibili</option>
-                <option value="ESAURITO">Posti terminati</option>
-              </select>
-            </label>
-          </div>
-          <div className="campo">
-            <label><input type="checkbox" checked={form.inEvidenza ?? false} onChange={(e) => setForm({ ...form, inEvidenza: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> In evidenza in homepage</label>
-          </div>
-          <div className="campo">
-            <label>
-              <input type="checkbox" checked={form.visibileSito ?? true} onChange={(e) => setForm({ ...form, visibileSito: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} />
-              <EtichettaTooltip testo="Visibile sul sito" chiave="visibile_sito" mappaTooltip={mappaTooltip} />
-            </label>
-          </div>
-        </>
-      )}
-
-      {subTabInfo === 'descrizione' && (
-        <>
-          <div className="campo">
-            <label><EtichettaTooltip testo="Informazioni viaggio per i clienti" chiave="informazioni_viaggio" mappaTooltip={mappaTooltip} /></label>
-            <textarea
-              value={form.descrizione ?? ''}
-              onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
-              rows={5}
-              placeholder="Es. orario e punto di ritrovo, cosa portare, regole del bus, contatti in caso di emergenza..."
-            />
-          </div>
-          <div className="campo">
-            <label><EtichettaTooltip testo="Descrizione evento" chiave="descrizione_evento" mappaTooltip={mappaTooltip} /></label>
-            <textarea
-              value={form.descrizioneSeo ?? ''}
-              onChange={(e) => setForm({ ...form, descrizioneSeo: e.target.value })}
-              rows={4}
-              placeholder="Un testo descrittivo sull'evento/artista — se la lasci vuota, per Google viene generata automaticamente (artista, data, città, prezzo), ma sulla pagina non comparirà nessuna sezione."
-            />
-          </div>
-        </>
-      )}
-    </>
-  );
+  const campiInfoEvento: ReactNode = <StepInformazioni form={form} setForm={setForm} inCreazione={!evento} categorie={categorie} categorieEvento={categorieEvento} onNuovoGenere={nuovoGenere} onNuovaCategoria={nuovaCategoria} mappaTooltip={mappaTooltip} />;
 
   // In "Più servizi", vero solo se la tab scelta esiste ma non ha
   // ancora un nome — a quel punto la sezione di compilazione resta
@@ -1015,34 +901,7 @@ export function SchedaEventoModale({
           }));
         }
 
-        return (
-          <div className="section-card" style={{ marginBottom: 16 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-              <input type="checkbox" checked={arrivoPerTutti.attivo} onChange={(e) => aggiornaFlag(e.target.checked)} style={{ width: 'auto' }} />
-              Imposta lo stesso arrivo per tutti i tragitti di {etichettaContesto}
-            </label>
-            {arrivoPerTutti.attivo && (
-              <div className="form-grid" style={{ marginTop: 10 }}>
-                <label>Città di arrivo
-                  <input
-                    value={bloccataDaAltroServizio ?? arrivoPerTutti.citta}
-                    disabled={!!bloccataDaAltroServizio}
-                    style={bloccataDaAltroServizio ? { opacity: .6, background: 'var(--night)', cursor: 'not-allowed' } : undefined}
-                    title={bloccataDaAltroServizio ? 'Città di arrivo di tutto l\'evento, stabilita da un tragitto di un altro servizio.' : undefined}
-                    onChange={(e) => aggiornaCampoCondiviso('citta', e.target.value)}
-                    placeholder="es. Roma"
-                  />
-                </label>
-                <label>Indirizzo di arrivo
-                  <input value={arrivoPerTutti.indirizzo} onChange={(e) => aggiornaCampoCondiviso('indirizzo', e.target.value)} placeholder="es. Piazzale Clodio, Roma" />
-                </label>
-                <label>Orario di arrivo
-                  <OrarioInput value={arrivoPerTutti.orario} onChange={(v) => aggiornaCampoCondiviso('orario', v)} />
-                </label>
-              </div>
-            )}
-          </div>
-        );
+        return <ArrivoPerTutti valore={arrivoPerTutti} etichettaContesto={etichettaContesto} bloccataDaAltroServizio={bloccataDaAltroServizio} onFlag={aggiornaFlag} onCampo={aggiornaCampoCondiviso} />;
       })()}
       {percorsiSalvati.length > 0 && (() => {
         const contesto = servizioIdContestoAttuale();
@@ -1182,96 +1041,16 @@ export function SchedaEventoModale({
     </>
   );
 
-  const campiImmagini: ReactNode = (
-    <>
-      <div className="sub-tabs">
-        <button type="button" className={`sub-tab${subTabImmagini === 'immagini' ? ' active' : (!evento && numeroImmagini > 0) ? ' completato' : ''}`} onClick={() => setSubTabImmagini('immagini')}>Immagini</button>
-        <button type="button" className={`sub-tab${subTabImmagini === 'biglietto' ? ' active' : (!evento && bigliettoPersonalizzato) ? ' completato' : ''}`} onClick={() => setSubTabImmagini('biglietto')}>Biglietto</button>
-      </div>
-
-      {subTabImmagini === 'immagini' && (
-        <>
-          <p className="section-label" style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}>
-            Immagini
-            <InfoTooltip>{mappaTooltip.immagini_evento_intro ?? TOOLTIP_DEFAULT.immagini_evento_intro}</InfoTooltip>
-          </p>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
-            <input placeholder="https://..." value={nuovaImmagine} onChange={(e) => setNuovaImmagine(e.target.value)} style={{ flex: 1 }} />
-            <button type="button" className="btn btn-ghost" onClick={aggiungiImmagine}>+ Aggiungi link</button>
-            <CaricaFile onCaricato={(url) => setForm({ ...form, immagini: [...(form.immagini ?? []), url] })} etichetta="+ Carica file" />
-          </div>
-          {(form.immagini ?? []).map((url, idx) => (
-            <div key={idx} className="riga-cliccabile" style={{ cursor: 'default' }}>
-              <span className="riga-titolo" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 380 }}>{url}</span>
-              <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => rimuoviImmagine(idx)}>Rimuovi</button>
-            </div>
-          ))}
-          {(form.immagini ?? []).length === 0 && <p className="testo-intro" style={{ fontSize: 13 }}>Nessuna immagine ancora.</p>}
-        </>
-      )}
-
-      {subTabImmagini === 'biglietto' && (
-        <>
-          <p className="section-label" style={{ marginBottom: 14, display: 'flex', alignItems: 'center' }}>
-            Grafica del biglietto
-            <InfoTooltip>{mappaTooltip.biglietto_grafica_intro ?? TOOLTIP_DEFAULT.biglietto_grafica_intro}</InfoTooltip>
-          </p>
-          <div className="campo">
-            <label>Colore d'accento</label>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                type="color"
-                value={form.ticketColoreAccento || '#111111'}
-                onChange={(e) => setForm({ ...form, ticketColoreAccento: e.target.value })}
-                style={{ width: 44, height: 36, padding: 2, flexShrink: 0 }}
-              />
-              <input
-                placeholder="#dc2626"
-                value={form.ticketColoreAccento ?? ''}
-                onChange={(e) => setForm({ ...form, ticketColoreAccento: e.target.value || undefined })}
-              />
-            </div>
-          </div>
-          <div className="campo">
-            <label><EtichettaTooltip testo="Immagine di intestazione" chiave="immagine_intestazione" mappaTooltip={mappaTooltip} /></label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                placeholder="https://... (o carica un file)"
-                value={form.ticketImmagineSfondoUrl ?? ''}
-                onChange={(e) => setForm({ ...form, ticketImmagineSfondoUrl: e.target.value || undefined })}
-                style={{ flex: 1 }}
-              />
-              <CaricaFile onCaricato={(url) => setForm({ ...form, ticketImmagineSfondoUrl: url })} etichetta="Carica" />
-            </div>
-          </div>
-          <div className="campo">
-            <label><EtichettaTooltip testo="Layout del biglietto" chiave="layout_biglietto_campo" mappaTooltip={mappaTooltip} /></label>
-            <select
-              value={form.layoutBigliettoId ?? ''}
-              onChange={(e) => setForm({ ...form, layoutBigliettoId: e.target.value || null })}
-            >
-              <option value="">Predefinito {(() => {
-                const p = layoutDisponibili.find((l) => l.predefinito);
-                return p ? `(${p.nome})` : '';
-              })()}</option>
-              {layoutDisponibili.filter((l) => !l.predefinito).map((l) => (
-                <option key={l.id} value={l.id}>{l.nome}</option>
-              ))}
-            </select>
-          </div>
-        </>
-      )}
-    </>
-  );
+  const campiImmagini: ReactNode = <StepImmagini form={form} setForm={setForm} inCreazione={!evento} layoutDisponibili={layoutDisponibili} mappaTooltip={mappaTooltip} subTabImmagini={subTabImmagini} setSubTabImmagini={setSubTabImmagini} />;
 
   // "form.tragitti" contiene già sia i tragitti liberi sia quelli di
   // ogni servizio (vedi sopra dove si carica il form) — basta contare
   // qui, nessuna somma aggiuntiva necessaria.
   const numeroTragitti = (form.tragitti ?? []).filter((l) => l.nome.trim()).length;
   const stepCompleto: Record<1 | 2 | 3 | 4, boolean> = {
-    1: infoCompleta(),
+    1: infoCompleta(form),
     2: numeroTragitti > 0,
-    3: numeroImmagini > 0 || bigliettoPersonalizzato,
+    3: numeroImmagini(form) > 0 || bigliettoPersonalizzato(form),
     4: false, // il riepilogo non ha un vero "completato", è solo una vista
   };
 
@@ -1410,7 +1189,7 @@ export function SchedaEventoModale({
           <button
             className="btn btn-primary"
             onClick={() => {
-              if (step === 1 && !infoCompleta()) { notifica('Compila almeno artista, genere, luogo, città e data prima di proseguire.'); return; }
+              if (step === 1 && !infoCompleta(form)) { notifica('Compila almeno artista, genere, luogo, città e data prima di proseguire.'); return; }
               setStep((s) => (s + 1) as 2 | 3 | 4);
             }}
           >
