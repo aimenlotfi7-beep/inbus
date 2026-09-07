@@ -10,6 +10,10 @@ export const creaCouponSchema = z.object({
   attivo: z.boolean().default(true),
   // Vuoto/assente = valido su tutti gli eventi.
   eventoId: z.string().nullable().optional(),
+  // Se impostato, usare questo coupon attribuisce la vendita anche a
+  // questo promoter — sconto al cliente e commissione al promoter
+  // insieme, con un solo codice.
+  promoterId: z.string().nullable().optional(),
 });
 export type CreaCouponInput = z.infer<typeof creaCouponSchema>;
 export const aggiornaCouponSchema = creaCouponSchema.partial();

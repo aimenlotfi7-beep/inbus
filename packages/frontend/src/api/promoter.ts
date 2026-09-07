@@ -10,11 +10,13 @@ export interface Promoter {
   codice: string;
   commissionePercentuale: string;
   note: string | null;
-  eventiAbilitati: string[];
+  // Di default vende TUTTI gli eventi (inclusi quelli creati dopo):
+  // questa è la lista delle ECCEZIONI escluse, non degli abilitati.
+  eventiEsclusi: string[];
 }
 export interface PromoterInput {
   nome: string; email: string; telefono?: string; password?: string;
-  commissionePercentuale?: number; note?: string; eventiAbilitati?: string[];
+  commissionePercentuale?: number; note?: string; eventiEsclusi?: string[];
 }
 
 export const promoterApi = {

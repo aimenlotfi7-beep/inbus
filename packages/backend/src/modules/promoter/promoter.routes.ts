@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { promoter, promoterEventi, prenotazioni, eventi } from '../../db/schema.js';
+import { promoter, promoterEventi, prenotazioni } from '../../db/schema.js';
 import { NonTrovato, NonAutorizzato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { limiteAutenticazione } from '../../shared/rateLimit.js';
@@ -31,7 +31,10 @@ const creaPromoterSchema = z.object({
   password: z.string().min(6),
   commissionePercentuale: z.number().min(0).max(100).default(10),
   note: z.string().optional(),
-  eventiAbilitati: z.array(z.string()).default([]),
+  // Di default un promoter vende TUTTI gli eventi: questa è la lista
+  // delle ECCEZIONI, gli eventi che NON deve vendere — non un elenco
+  // da abilitare uno per uno.
+  eventiEsclusi: z.array(z.string()).default([]),
 });
 const aggiornaPromoterSchema = creaPromoterSchema.partial().omit({ password: true }).extend({
   password: z.string().min(6).optional(),
@@ -41,8 +44,8 @@ const loginPromoterSchema = z.object({ email: z.string().email(), password: z.st
 async function getById(id: string) {
   const [p] = await db.select().from(promoter).where(eq(promoter.id, id)).limit(1);
   if (!p) throw new NonTrovato('Promoter');
-  const eventiAbilitati = await db.select().from(promoterEventi).where(eq(promoterEventi.promoterId, id));
-  return { ...p, eventiAbilitati: eventiAbilitati.map((e) => e.eventoId) };
+  const eventiEsclusi = await db.select().from(promoterEventi).where(eq(promoterEventi.promoterId, id));
+  return { ...p, eventiEsclusi: eventiEsclusi.map((e) => e.eventoId) };
 }
 
 export const promoterService = {
@@ -58,16 +61,11 @@ export const promoterService = {
         commissionePercentuale: input.commissionePercentuale.toFixed(2),
         note: input.note,
       }).returning();
-      // Di default un nuovo promoter è abilitato a TUTTI gli eventi
-      // esistenti al momento — decide poi lui stesso, dalla sua area,
-      // se disattivarne qualcuno o abilitarsi anche a quelli nuovi che
-      // arriveranno dopo. Solo se l'amministratore ha scelto un elenco
-      // specifico in fase di censimento, si parte da quello invece.
-      const eventiDaAbilitare = input.eventiAbilitati.length > 0
-        ? input.eventiAbilitati
-        : (await tx.select({ id: eventi.id }).from(eventi)).map((e) => e.id);
-      if (eventiDaAbilitare.length) {
-        await tx.insert(promoterEventi).values(eventiDaAbilitare.map((eventoId) => ({ promoterId: nuovo.id, eventoId })));
+      // Di default un nuovo promoter vende TUTTI gli eventi, inclusi
+      // quelli creati dopo — nessuna riga da inserire finché
+      // l'amministratore non esclude esplicitamente qualcosa.
+      if (input.eventiEsclusi.length) {
+        await tx.insert(promoterEventi).values(input.eventiEsclusi.map((eventoId) => ({ promoterId: nuovo.id, eventoId })));
       }
       return nuovo.id;
     });
@@ -84,10 +82,10 @@ export const promoterService = {
         ...(input.commissionePercentuale !== undefined && { commissionePercentuale: input.commissionePercentuale.toFixed(2) }),
         ...(input.note !== undefined && { note: input.note }),
       }).where(eq(promoter.id, id));
-      if (input.eventiAbilitati) {
+      if (input.eventiEsclusi) {
         await tx.delete(promoterEventi).where(eq(promoterEventi.promoterId, id));
-        if (input.eventiAbilitati.length) {
-          await tx.insert(promoterEventi).values(input.eventiAbilitati.map((eventoId) => ({ promoterId: id, eventoId })));
+        if (input.eventiEsclusi.length) {
+          await tx.insert(promoterEventi).values(input.eventiEsclusi.map((eventoId) => ({ promoterId: id, eventoId })));
         }
       }
       return id;

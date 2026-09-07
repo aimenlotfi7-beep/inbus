@@ -824,6 +824,10 @@ export const promoter = pgTable('promoter', {
   tokenResetPasswordScadenza: timestamp('token_reset_password_scadenza'),
 });
 
+// Di default un promoter vende TUTTI gli eventi (nessuna riga qui =
+// nessuna esclusione) — è una lista di eventi ESCLUSI, non abilitati:
+// più comodo per il caso normale, si aggiunge un'eccezione solo per i
+// pochi eventi che quel promoter non deve vendere.
 export const promoterEventi = pgTable('promoter_eventi', {
   promoterId: text('promoter_id').notNull().references(() => promoter.id, { onDelete: 'cascade' }),
   eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
@@ -961,6 +965,11 @@ export const coupon = pgTable('coupon', {
   // Vuoto = valido su tutti gli eventi. Se impostato, il coupon
   // funziona solo su quello specifico.
   eventoId: text('evento_id').references(() => eventi.id, { onDelete: 'cascade' }),
+  // Se impostato, usare questo coupon attribuisce la vendita anche a
+  // questo promoter (sconto al cliente + commissione al promoter
+  // insieme, un solo codice) — in aggiunta al link ?promo= già
+  // esistente, che resta indipendente.
+  promoterId: text('promoter_id').references(() => promoter.id, { onDelete: 'set null' }),
 });
 
 // ---------------------------------------------------------------------

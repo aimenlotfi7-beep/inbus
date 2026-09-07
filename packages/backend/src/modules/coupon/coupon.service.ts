@@ -1,6 +1,6 @@
 import { eq, and, or, isNull, gt, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { coupon } from '../../db/schema.js';
+import { coupon, promoter } from '../../db/schema.js';
 import { NonTrovato, ErroreApplicativo, ConflittoDati } from '../../shared/errors.js';
 import type { CreaCouponInput, aggiornaCouponSchema } from './coupon.dto.js';
 import type { z } from 'zod';
@@ -93,5 +93,13 @@ export const couponService = {
 
     const sconto = c.tipo === 'PERCENTUALE' ? importo * (Number(c.valore) / 100) : Math.min(Number(c.valore), importo);
     return { sconto, coupon: aggiornato };
+  },
+
+  /** Il codice del promoter collegato a questo coupon, se c'è — per
+   *  attribuire la vendita insieme allo sconto (vedi verificaEIncrementaUtilizzo). */
+  async promoterDiCoupon(tx: Tx, promoterId: string | null | undefined): Promise<string | undefined> {
+    if (!promoterId) return undefined;
+    const [p] = await tx.select({ codice: promoter.codice }).from(promoter).where(eq(promoter.id, promoterId)).limit(1);
+    return p?.codice;
   },
 };

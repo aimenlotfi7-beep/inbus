@@ -9,9 +9,10 @@ export interface Coupon {
   usiAttuali: number;
   attivo: boolean;
   eventoId: string | null;
+  promoterId: string | null;
 }
 export interface CouponInput {
-  codice: string; tipo: 'PERCENTUALE' | 'FISSO'; valore: number; usiMax?: number; attivo?: boolean; eventoId?: string | null;
+  codice: string; tipo: 'PERCENTUALE' | 'FISSO'; valore: number; usiMax?: number; attivo?: boolean; eventoId?: string | null; promoterId?: string | null;
 }
 
 export const couponApi = {

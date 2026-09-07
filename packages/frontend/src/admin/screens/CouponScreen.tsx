@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { notifica } from '../shared/notifiche';
 import { couponApi, type Coupon, type CouponInput } from '../../api/coupon';
 import { eventiApi } from '../../api/eventi';
+import { promoterApi, type Promoter } from '../../api/promoter';
 import type { Evento } from '../../api/types';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
@@ -15,6 +16,7 @@ const VUOTO: CouponInput = { codice: '', tipo: 'PERCENTUALE', valore: 10, attivo
 export function CouponScreen() {
   const [coupon, setCoupon] = useState<Coupon[]>([]);
   const [eventi, setEventi] = useState<Evento[]>([]);
+  const [promoterLista, setPromoterLista] = useState<Promoter[]>([]);
   const [inModifica, setInModifica] = useState<Coupon | null>(null);
   const [form, setForm] = useState<CouponInput>(VUOTO);
   const [modaleAperta, setModaleAperta] = useState(false);
@@ -23,13 +25,14 @@ export function CouponScreen() {
   function ricarica() { couponApi.list().then(setCoupon); }
   useEffect(ricarica, []);
   useEffect(() => { eventiApi.list().then(setEventi); }, []);
+  useEffect(() => { promoterApi.list().then(setPromoterLista); }, []);
 
   const couponFiltrati = ricerca.trim()
     ? coupon.filter((c) => c.codice.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : coupon;
 
   function apriNuovo() { setInModifica(null); setForm(VUOTO); setModaleAperta(true); }
-  function apriModifica(c: Coupon) { setInModifica(c); setForm({ codice: c.codice, tipo: c.tipo, valore: Number(c.valore), usiMax: c.usiMax ?? undefined, attivo: c.attivo, eventoId: c.eventoId ?? null }); setModaleAperta(true); }
+  function apriModifica(c: Coupon) { setInModifica(c); setForm({ codice: c.codice, tipo: c.tipo, valore: Number(c.valore), usiMax: c.usiMax ?? undefined, attivo: c.attivo, eventoId: c.eventoId ?? null, promoterId: c.promoterId ?? null }); setModaleAperta(true); }
 
   const [salvando, setSalvando] = useState(false);
   async function salva() {
@@ -74,6 +77,14 @@ export function CouponScreen() {
           </select>
         </div>
         <div className="campo">
+          <label>Assegna a un promoter (facoltativo)</label>
+          <select value={form.promoterId ?? ''} onChange={(e) => setForm({ ...form, promoterId: e.target.value || null })}>
+            <option value="">— Nessuno —</option>
+            {promoterLista.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.codice})</option>)}
+          </select>
+          <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 4 }}>Chi usa questo coupon fa guadagnare la commissione a questo promoter, insieme allo sconto.</p>
+        </div>
+        <div className="campo">
           <label><input type="checkbox" checked={form.attivo ?? true} onChange={(e) => setForm({ ...form, attivo: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Attivo</label>
         </div>
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva coupon'}</button>
@@ -92,6 +103,7 @@ export function CouponScreen() {
           { etichetta: 'Sconto', render: (c) => <b>{c.tipo === 'PERCENTUALE' ? `${c.valore}%` : `€${c.valore}`}</b> },
           { etichetta: 'Usi', render: (c) => `${c.usiAttuali} / ${c.usiMax ?? '∞'}` },
           { etichetta: 'Valido per', render: (c) => c.eventoId ? (eventi.find((ev) => ev.id === c.eventoId)?.artista ?? 'Evento eliminato') : 'Tutti gli eventi' },
+          { etichetta: 'Promoter', render: (c) => c.promoterId ? (promoterLista.find((p) => p.id === c.promoterId)?.nome ?? '—') : '—' },
           { etichetta: 'Stato', render: (c) => c.attivo ? 'Attivo' : 'Disattivo' },
         ]}
         onModifica={apriModifica}

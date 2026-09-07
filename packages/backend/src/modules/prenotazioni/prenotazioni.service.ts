@@ -1,7 +1,7 @@
 import { and, eq, ne, sql, desc, inArray, isNull, gte } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, lineaFermate, busFisici } from '../../db/schema.js';
+import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, lineaFermate, busFisici, promoter, promoterEventi } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { bundleService } from '../bundle/bundle.service.js';
@@ -160,6 +160,28 @@ async function creaRigaInterna(
   const importoBase = prezzoEffettivo * input.passeggeri - (scontoBundle ?? 0);
   const { sconto, coupon: couponUsato } = await validaCoupon(tx, input.couponCodice, importoBase, input.eventoId, input.tipoPagamento);
 
+  // Il coupon collegato a un promoter attribuisce la vendita anche a
+  // lui — un solo codice per sconto e commissione insieme, in aggiunta
+  // (non alternativa) al link ?promo= già esistente: se il cliente
+  // arriva già da un link promoter E usa un coupon di UN ALTRO
+  // promoter, vince il coupon (è la scelta più deliberata, fatta nel
+  // form, non solo "da dove è arrivato").
+  const promoterDaCoupon = await couponService.promoterDiCoupon(tx, couponUsato?.promoterId);
+  const promoterCodiceEffettivo = promoterDaCoupon ?? input.promoterCodice;
+
+  // Un codice promoter (da link o da coupon) deve corrispondere a un
+  // promoter vero e non escluso da questo evento — controllo aggiunto
+  // qui, prima c'era solo un campo di testo salvato senza verifica.
+  if (promoterCodiceEffettivo) {
+    const [p] = await tx.select().from(promoter).where(eq(promoter.codice, promoterCodiceEffettivo)).limit(1);
+    if (p) {
+      const [escluso] = await tx.select().from(promoterEventi).where(and(eq(promoterEventi.promoterId, p.id), eq(promoterEventi.eventoId, input.eventoId))).limit(1);
+      if (escluso) throw new ErroreApplicativo('Questo codice non è valido per questo evento.', 400, 'PROMOTER_EVENTO_ESCLUSO');
+    }
+    // Codice non riconosciuto: si salva comunque com'è (compatibilità —
+    // potrebbe essere un vecchio codice o un typo, non blocca l'acquisto).
+  }
+
   const acconto = evento.accontoEur ? Number(evento.accontoEur) : env.ACCONTO_FISSO_EUR;
   const totale = importoBase - sconto;
   const saldoPagato = input.tipoPagamento === 'COMPLETO';
@@ -221,7 +243,7 @@ async function creaRigaInterna(
       scadenzaSaldo,
       metodoPagamento: input.metodoPagamento,
       utenteId: utente.id,
-      promoterCodice: input.promoterCodice,
+      promoterCodice: promoterCodiceEffettivo,
       ...(canaleVendita && { canaleVendita: canaleVendita.canale, whiteLabelId: canaleVendita.whiteLabelId }),
     })
     .returning();

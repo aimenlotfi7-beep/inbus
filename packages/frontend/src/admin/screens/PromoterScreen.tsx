@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SelettoreEventi } from '../shared/SelettoreEventi';
 import { notifica } from '../shared/notifiche';
 import { promoterApi, type Promoter, type PromoterInput } from '../../api/promoter';
 import { ErroreApi } from '../../api/client';
@@ -64,6 +65,17 @@ export function PromoterScreen() {
         <div className="campo"><label>Telefono</label><input value={form.telefono ?? ''} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></div>
         {!inModifica && <div className="campo"><label>Password iniziale</label><input type="password" value={form.password ?? ''} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>}
         <div className="campo"><label>Commissione %</label><CampoNumero value={form.commissionePercentuale ?? 10} onChange={(v) => setForm({ ...form, commissionePercentuale: v ?? 0 })} /></div>
+        {inModifica && (
+          <div className="campo">
+            <CampoCopiabile etichetta="Il suo link (sostituisci <slug-evento> con l'indirizzo della pagina)" valore={`${window.location.origin}/eventi/<slug-evento>?promo=${inModifica.codice}`} />
+            <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 4 }}>Il codice <b>{inModifica.codice}</b> resta lo stesso per tutti gli eventi che porta.</p>
+          </div>
+        )}
+        <div className="campo">
+          <label>Eventi esclusi (facoltativo)</label>
+          <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 6 }}>Di default vende tutti gli eventi, anche quelli creati dopo — scegli qui solo quelli che NON deve poter vendere.</p>
+          <SelettoreEventi selezionati={form.eventiEsclusi ?? []} onChange={(ids) => setForm({ ...form, eventiEsclusi: ids })} />
+        </div>
         {statistiche && (
           <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 14 }}>
             {statistiche.numeroPrenotazioni} prenotazioni portate · €{statistiche.fatturato.toFixed(2)} di fatturato generato
