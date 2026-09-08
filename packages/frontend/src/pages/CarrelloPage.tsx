@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCarrello } from '../features/carrello/CarrelloContext';
+import { tracciaAcquisto, leggiCookieMeta } from '../features/metaPixel';
+import { tracciaAcquistoGA4 } from '../features/googleAnalytics';
 import { clienteAuthApi, type DatiCliente } from '../api/clienteAuth';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { clienteLoggato } from '../features/clienteSessione';
@@ -39,6 +41,11 @@ export function CarrelloPage() {
     if (!cliente) return;
     setInviando(true);
     setErrore('');
+    // Un solo eventId per l'intero ordine (non uno per articolo) — la
+    // Conversions API lato server lo prende dal primo articolo che lo
+    // porta e manda UN evento Purchase con il totale, non uno per riga.
+    const metaEventId = crypto.randomUUID();
+    const { fbp, fbc } = leggiCookieMeta();
     try {
       const risultato = await prenotazioniApi.creaOrdine(
         articoli.map((a) => ({
@@ -58,10 +65,15 @@ export function CarrelloPage() {
           ...(bundle?.utmMedium && { utmMedium: bundle.utmMedium }),
           ...(bundle?.utmCampaign && { utmCampaign: bundle.utmCampaign }),
           ...(bundle?.utmContent && { utmContent: bundle.utmContent }),
+          metaEventId,
+          ...(fbp && { metaFbp: fbp }),
+          ...(fbc && { metaFbc: fbc }),
         })),
         bundle?.id,
       );
       setFatto(risultato.prenotazioni.map((p) => ({ pnr: p.pnr })));
+      tracciaAcquisto(totaleStimato - scontoBundleStimato, metaEventId);
+      tracciaAcquistoGA4(totaleStimato - scontoBundleStimato, metaEventId, bundle?.nome);
       svuota();
     } catch (e) {
       setErrore(e instanceof Error ? e.message : 'Acquisto non riuscito. Riprova.');

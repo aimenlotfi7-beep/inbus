@@ -5,13 +5,21 @@ import { clienteLoggato } from './features/clienteSessione';
 import { useCarrello } from './features/carrello/CarrelloContext';
 import { categorieEventoApi, type CategoriaEvento } from './api/categorieEvento';
 import { LogoOnWay } from './features/LogoOnWay';
+import { inizializzaMetaPixel } from './features/metaPixel';
+import { inizializzaGA4, tracciaPaginaGA4 } from './features/googleAnalytics';
 
 export function Layout({ children }: { children: ReactNode }) {
+  useEffect(() => { inizializzaMetaPixel(); inizializzaGA4(); }, []);
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
   const loggato = clienteLoggato();
   const { numeroArticoli } = useCarrello();
   const location = useLocation();
   const inHomepage = location.pathname === '/';
+  // Ogni cambio di pagina — gtag non lo fa da solo in una SPA (vedi
+  // googleAnalytics.ts). Il Pixel invece traccia PageView una volta
+  // sola all'avvio: e' cosi' che funziona il suo modello, non serve
+  // ripeterlo qui.
+  useEffect(() => { tracciaPaginaGA4(location.pathname + location.search, document.title); }, [location.pathname, location.search]);
   // La ricerca vive nell'URL (?q=...), non in uno stato locale — così
   // header (qui) e homepage possono leggerla e scriverla entrambe,
   // senza doverla far viaggiare come prop tra due componenti che

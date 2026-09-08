@@ -10,6 +10,7 @@ import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
 import { BundleFlusso } from '../features/bundle/BundleFlusso';
 import { inizializzaMetaPixelWidget } from '../features/metaPixel';
+import { inizializzaGA4Widget, tracciaPaginaGA4 } from '../features/googleAnalytics';
 
 type Vista = 'caricamento' | 'errore' | 'vetrina' | 'auth' | 'login' | 'registrati' | 'registrati-fatto' | 'checkout' | 'bundle';
 
@@ -32,6 +33,7 @@ export function WidgetPubblicoPage() {
         // Pixel di INBUS sempre + quello dell'organizzatore se presente
         // (vedi la nota nella funzione sul banner cookie mancante qui).
         inizializzaMetaPixelWidget(d.metaPixelId);
+        inizializzaGA4Widget().then(() => tracciaPaginaGA4(window.location.pathname, document.title));
       })
       .catch((e) => { setErroreVista(e instanceof ErroreApi ? e.message : 'Impossibile caricare questa pagina.'); setVista('errore'); });
   }, [publicWidgetId]);

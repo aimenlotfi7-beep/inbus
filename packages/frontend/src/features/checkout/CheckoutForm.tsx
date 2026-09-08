@@ -13,6 +13,7 @@ import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
 import { useCarrello } from '../carrello/CarrelloContext';
 import { SelettoreFermata } from './SelettoreFermata';
 import { tracciaInizioPrenotazione, tracciaAcquisto, leggiCookieMeta } from '../metaPixel';
+import { tracciaInizioCheckoutGA4, tracciaAcquistoGA4 } from '../googleAnalytics';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -241,6 +242,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
       if (metaEventId) {
         const valoreEuro = opzioneScelta.prezzoEffettivo * passeggeri; // stima lato client — il valore vero e' quello calcolato dal server per la Conversions API, questo serve solo al Pixel nel browser
         tracciaAcquisto(valoreEuro, metaEventId);
+        tracciaAcquistoGA4(valoreEuro, prenotazione.pnr, evento.artista);
       }
       setStato('confermato');
     } catch (e) {
@@ -416,7 +418,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 onSeleziona={(id) => {
                   setFermataId(id);
                   const scelta = opzioni.find((o) => o.fermataId === id);
-                  if (scelta) tracciaInizioPrenotazione(scelta.prezzoEffettivo * passeggeri);
+                  if (scelta) { tracciaInizioPrenotazione(scelta.prezzoEffettivo * passeggeri); tracciaInizioCheckoutGA4(scelta.prezzoEffettivo * passeggeri, evento.artista); }
                 }}
                 testoOpzione={(o) => {
                   const prezzoMostrato = offerta ? applicaScontoOfferta(o.prezzoEffettivo, offerta.scontoPercentuale) : o.prezzoEffettivo;

@@ -24,8 +24,20 @@ export interface CampagnaInput {
   attiva?: boolean;
 }
 
+export interface RigaReportFonte {
+  fonte: string;
+  tipo: 'promoter' | 'campagna' | 'utm_non_registrata' | 'diretto';
+  numeroPrenotazioni: number;
+  passeggeri: number;
+  fatturato: number;
+  scontoBundleApplicato: number;
+  commissione: number;
+  margineNetto: number;
+}
+
 export const campagneApi = {
   list: () => api.get<Campagna[]>('/api/campagne'),
+  report: (dataDa?: string) => api.get<RigaReportFonte[]>(`/api/campagne/report${dataDa ? `?dataDa=${dataDa}` : ''}`),
   create: (input: CampagnaInput) => api.post<Campagna>('/api/campagne', input),
   update: (id: string, input: Partial<CampagnaInput>) => api.put<Campagna>(`/api/campagne/${id}`, input),
   remove: (id: string) => api.delete<void>(`/api/campagne/${id}`),

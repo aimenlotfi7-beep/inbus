@@ -85,7 +85,50 @@ export async function leggiGiorniValiditaLinkPreventivo(): Promise<number> {
   return Number.isFinite(valore) && valore > 0 ? valore : DEFAULT_GIORNI_LINK_PREVENTIVO;
 }
 
+/** ID pubblico del Pixel di Meta — NON è segreto, compare comunque nel
+ *  codice sorgente di ogni pagina una volta caricato: leggibile anche
+ *  senza login (endpoint pubblico più sotto), a differenza del token
+ *  della Conversions API qui sotto. */
+export const CHIAVE_META_PIXEL_ID = 'meta_pixel_id';
+export async function leggiMetaPixelId(): Promise<string | null> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_META_PIXEL_ID)).limit(1);
+  return riga?.valore || null;
+}
+
+/** Token della Conversions API — QUESTO sì è segreto: mai esposto in
+ *  nessuna rotta pubblica, letto solo lato server per chiamare l'API
+ *  di Meta (shared/metaConversions.ts). Si genera in Meta Events
+ *  Manager → Impostazioni → Conversions API → Genera token di accesso. */
+export const CHIAVE_META_CAPI_TOKEN = 'meta_capi_token';
+export async function leggiMetaCapiToken(): Promise<string | null> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_META_CAPI_TOKEN)).limit(1);
+  return riga?.valore || null;
+}
+
+/** ID di misurazione GA4 ("G-XXXXXXXXXX") — non è segreto, come il
+ *  Pixel ID compare comunque nel codice sorgente di ogni pagina. */
+export const CHIAVE_GA4_MEASUREMENT_ID = 'ga4_measurement_id';
+export async function leggiGa4MeasurementId(): Promise<string | null> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_GA4_MEASUREMENT_ID)).limit(1);
+  return riga?.valore || null;
+}
+
 export const impostazioniRouter = Router();
+
+// Pubblica — PRIMA di richiedeAuth. Un'unica chiamata per tutti gli id
+// di tracciamento (nessuno dei due è segreto) — il sito li legge
+// insieme, un giro solo invece di due.
+impostazioniRouter.get('/pubblico/tracciamento', asyncHandler(async (_req: Request, res: Response) => {
+  const [pixelId, ga4Id] = await Promise.all([leggiMetaPixelId(), leggiGa4MeasurementId()]);
+  res.json({ pixelId, ga4Id });
+}));
+// Vecchia rotta mantenuta per compatibilità (nessuna versione vecchia
+// del frontend la chiama più dopo questo deploy, ma costa nulla
+// lasciarla finché non si è sicuri).
+impostazioniRouter.get('/pubblico/meta-pixel-id', asyncHandler(async (_req: Request, res: Response) => {
+  res.json({ pixelId: await leggiMetaPixelId() });
+}));
+
 impostazioniRouter.use(richiedeAuth);
 
 impostazioniRouter.get('/', richiedePermesso('impostazioni.gestisci'), asyncHandler(async (_req: Request, res: Response) => {

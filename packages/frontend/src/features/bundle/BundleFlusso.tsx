@@ -6,6 +6,8 @@ import { ErroreApi } from '../../api/client';
 import { clienteAuthApi } from '../../api/clienteAuth';
 import { clienteLoggato } from '../clienteSessione';
 import { SelettoreFermata } from '../checkout/SelettoreFermata';
+import { tracciaInizioPrenotazione } from '../metaPixel';
+import { tracciaInizioCheckoutGA4 } from '../googleAnalytics';
 
 type Passo = 'eventi' | 'configura' | 'dati';
 interface SceltaEvento { servizioId?: string; fermataId?: string }
@@ -218,7 +220,11 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                             ? <SelettoreFermata
                                 opzioni={lista.filter((o) => o.postiDisponibili >= passeggeri)}
                                 valore={sc.fermataId ?? ''}
-                                onSeleziona={(fermataId) => setScelte((p) => ({ ...p, [id]: { ...p[id], fermataId } }))}
+                                onSeleziona={(fermataId) => {
+                                  setScelte((p) => ({ ...p, [id]: { ...p[id], fermataId } }));
+                                  const scelta = lista.find((o) => o.fermataId === fermataId);
+                                  if (scelta) { tracciaInizioPrenotazione(scelta.prezzoEffettivo * passeggeri); tracciaInizioCheckoutGA4(scelta.prezzoEffettivo * passeggeri, bundle.nome); }
+                                }}
                                 testoOpzione={(o) => `${o.fermataCitta} (${o.fermataOrario || 'orario da definire'}) — €${o.prezzoEffettivo.toFixed(2)}`}
                               />
                             : <p style={{ fontSize: 13 }}>Carico le partenze...</p>)}

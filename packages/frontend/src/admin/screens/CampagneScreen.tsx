@@ -1,12 +1,73 @@
 import { useEffect, useState } from 'react';
 import { notifica } from '../shared/notifiche';
-import { campagneApi, type Campagna, type CampagnaInput } from '../../api/campagne';
+import { campagneApi, type Campagna, type CampagnaInput, type RigaReportFonte } from '../../api/campagne';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
 
 const VUOTO: CampagnaInput = { nome: '', piattaforma: '', tipo: '', utmSource: '', utmMedium: '', utmCampaign: '', utmContent: '', attiva: true };
+
+const ETICHETTA_PERIODO: { chiave: string; etichetta: string; giorni: number | null }[] = [
+  { chiave: '30', etichetta: 'Ultimi 30 giorni', giorni: 30 },
+  { chiave: '90', etichetta: 'Ultimi 90 giorni', giorni: 90 },
+  { chiave: 'tutto', etichetta: 'Da sempre', giorni: null },
+];
+
+/** Non "che campagne esistono" (l'anagrafica sotto) ma "quanto ha reso
+ *  ognuna" — fatturato reale con lo sconto bundle già scorporato e la
+ *  commissione promoter già sottratta (margine netto), non il lordo. */
+function ReportFatturato() {
+  const [periodo, setPeriodo] = useState('30');
+  const [righe, setRighe] = useState<RigaReportFonte[] | null>(null);
+
+  useEffect(() => {
+    const giorni = ETICHETTA_PERIODO.find((p) => p.chiave === periodo)?.giorni;
+    const dataDa = giorni ? new Date(Date.now() - giorni * 86400000).toISOString() : undefined;
+    setRighe(null);
+    campagneApi.report(dataDa).then(setRighe).catch(() => setRighe([]));
+  }, [periodo]);
+
+  const totaleFatturato = righe?.reduce((s, r) => s + r.fatturato, 0) ?? 0;
+  const totaleMargine = righe?.reduce((s, r) => s + r.margineNetto, 0) ?? 0;
+
+  return (
+    <div className="section-card" style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <p className="section-label" style={{ margin: 0 }}>Fatturato per fonte</p>
+        <div className="mini-tabs">
+          {ETICHETTA_PERIODO.map((p) => (
+            <button key={p.chiave} type="button" className={`mini-tab${periodo === p.chiave ? ' active' : ''}`} onClick={() => setPeriodo(p.chiave)}>{p.etichetta}</button>
+          ))}
+        </div>
+      </div>
+      {righe === null ? (
+        <p className="testo-intro">Caricamento...</p>
+      ) : righe.length === 0 ? (
+        <p className="testo-intro">Nessuna prenotazione confermata in questo periodo.</p>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 10, padding: '4px 0', fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .3, borderBottom: '1px solid var(--line)', marginBottom: 4 }}>
+            <span>Fonte</span><span>Prenotazioni</span><span>Passeggeri</span><span>Fatturato</span><span>Commissione</span><span>Margine netto</span>
+          </div>
+          {righe.map((r) => (
+            <div key={r.fonte} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
+              <span>{r.fonte}{r.scontoBundleApplicato > 0 && <span style={{ fontSize: 11, color: 'var(--mist)', display: 'block' }}>di cui €{r.scontoBundleApplicato.toFixed(2)} di sconto bundle</span>}</span>
+              <span>{r.numeroPrenotazioni}</span>
+              <span>{r.passeggeri}</span>
+              <span style={{ fontWeight: 600 }}>€{r.fatturato.toFixed(2)}</span>
+              <span style={{ color: r.commissione > 0 ? 'var(--pink)' : undefined }}>{r.commissione > 0 ? `− €${r.commissione.toFixed(2)}` : '—'}</span>
+              <span style={{ fontWeight: 700 }}>€{r.margineNetto.toFixed(2)}</span>
+            </div>
+          ))}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 10, padding: '10px 0 2px', fontSize: 13.5, fontWeight: 700 }}>
+            <span>Totale</span><span /><span /><span>€{totaleFatturato.toFixed(2)}</span><span /><span>€{totaleMargine.toFixed(2)}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 /** Le campagne servono a sapere da dove arriva un cliente (Meta, Google,
  *  newsletter...) — si collegano alle Offerte (sezione dentro ogni
@@ -75,6 +136,8 @@ export function CampagneScreen() {
   return (
     <div>
       <PanelHead titolo="Campagne" azione={<button className="btn btn-primary" onClick={apriNuova}>+ Nuova campagna</button>} info="Le campagne si collegano alle Offerte (dentro la scheda di ogni evento) per dare un prezzo dedicato e tracciare da dove arrivano le prenotazioni." />
+      <ReportFatturato />
+      <p className="section-label" style={{ marginBottom: 8 }}>Anagrafica campagne</p>
       <TabellaGenerica
         righe={campagne}
         colonne={[
