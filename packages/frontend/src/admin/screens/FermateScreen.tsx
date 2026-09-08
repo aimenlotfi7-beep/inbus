@@ -207,7 +207,18 @@ export function FermateScreen() {
                   <span>
                     <span className="riga-titolo">{f.nome}</span>
                     <span style={{ color: 'var(--mist)', fontSize: 12.5, marginLeft: 10 }}>{f.citta} · {f.indirizzo}</span>
-                    {f.link && <span style={{ color: 'var(--blue)', fontSize: 12, marginLeft: 10 }}>🔗</span>}
+                    {f.link && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        title={f.link}
+                        onClick={(e) => { e.stopPropagation(); window.open(f.link!, '_blank', 'noopener'); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); window.open(f.link!, '_blank', 'noopener'); } }}
+                        style={{ color: 'var(--blue)', fontSize: 12, marginLeft: 10, cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        🔗 apri link
+                      </span>
+                    )}
                   </span>
                   <span
                     role="button"
@@ -273,7 +284,10 @@ export function FermateScreen() {
           </div>
           <div className="campo">
             <label><EtichettaTooltip testo="Link" chiave="fermata_link_campo" mappaTooltip={mappaTooltip} /></label>
-            <input type="url" placeholder="https://..." value={form.link ?? ''} onChange={(e) => setForm({ ...form, link: e.target.value })} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="url" placeholder="https://..." value={form.link ?? ''} onChange={(e) => setForm({ ...form, link: e.target.value })} style={{ flex: 1 }} />
+              {form.link && <button type="button" className="btn btn-ghost" onClick={() => window.open(form.link!, '_blank', 'noopener')}>Apri</button>}
+            </div>
           </div>
           <div className="campo">
             <label>Note (facoltative)</label>
