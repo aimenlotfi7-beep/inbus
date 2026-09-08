@@ -28,6 +28,15 @@ export interface BundleNelCarrello {
   /** Letto da ?promo= quando il cliente atterra sulla pagina del bundle
    *  — stesso meccanismo già usato dal checkout dell'evento singolo. */
   promoterCodice?: string;
+  /** Letti da ?utm_source=&utm_medium=&utm_campaign=&utm_content= alla
+   *  stessa maniera — senza questo, un acquisto bundle arrivato da una
+   *  campagna a pagamento non veniva mai attribuito, perché il
+   *  checkout singolo li legge dall'URL AL MOMENTO dell'invio, ma il
+   *  bundle nel frattempo è passato per /carrello, un URL diverso. */
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
 }
 
 interface CarrelloContesto {

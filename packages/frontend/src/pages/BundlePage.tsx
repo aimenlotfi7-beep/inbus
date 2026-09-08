@@ -16,8 +16,13 @@ export function BundlePage() {
   const carrello = useCarrello();
   // Stesso meccanismo del checkout evento singolo (CheckoutForm) — letto
   // qui perché il carrello vive a un URL diverso (/carrello), dove il
-  // parametro si perderebbe.
+  // parametro si perderebbe. Stessa cosa per gli UTM subito sotto.
   const promoterCodice = new URLSearchParams(location.search).get('promo') || undefined;
+  const parametriUrl = new URLSearchParams(location.search);
+  const utmSource = parametriUrl.get('utm_source') || undefined;
+  const utmMedium = parametriUrl.get('utm_medium') || undefined;
+  const utmCampaign = parametriUrl.get('utm_campaign') || undefined;
+  const utmContent = parametriUrl.get('utm_content') || undefined;
   const [bundle, setBundle] = useState<BundlePubblicoDettaglio | null>(null);
   const [stato, setStato] = useState<'caricamento' | 'pronto' | 'non-trovato'>('caricamento');
 
@@ -46,7 +51,7 @@ export function BundlePage() {
             testoConferma="Vai al carrello"
             onConferma={async ({ righe, passeggeri, cliente, partecipanti }) => {
               carrello.impostaBundle(
-                { id: bundle.id, nome: bundle.nome, scontoPercentuale: Number(bundle.scontoPercentuale), ammetteOfferte: bundle.ammetteOfferte, ammetteCredito: bundle.ammetteCredito, ammettePromoter: bundle.ammettePromoter, ammetteAcconto: bundle.ammetteAcconto, ...(bundle.ammettePromoter && promoterCodice && { promoterCodice }) },
+                { id: bundle.id, nome: bundle.nome, scontoPercentuale: Number(bundle.scontoPercentuale), ammetteOfferte: bundle.ammetteOfferte, ammetteCredito: bundle.ammetteCredito, ammettePromoter: bundle.ammettePromoter, ammetteAcconto: bundle.ammetteAcconto, ...(bundle.ammettePromoter && promoterCodice && { promoterCodice }), ...(utmSource && { utmSource }), ...(utmMedium && { utmMedium }), ...(utmCampaign && { utmCampaign }), ...(utmContent && { utmContent }) },
                 righe.map(({ evento, opzione }) => ({
                   eventoId: evento.id, eventoArtista: evento.artista, eventoData: evento.data,
                   tragittoId: opzione.tragittoId, fermataId: opzione.fermataId, fermataCitta: opzione.fermataCitta, fermataOrario: opzione.fermataOrario,

@@ -54,6 +54,10 @@ export function CarrelloPage() {
           ...(usaCredito && tipoPagamento === 'COMPLETO' && { usaCredito: true }),
           ...(couponCodice.trim() && tipoPagamento === 'COMPLETO' && { couponCodice: couponCodice.trim() }),
           ...(bundle?.promoterCodice && { promoterCodice: bundle.promoterCodice }),
+          ...(bundle?.utmSource && { utmSource: bundle.utmSource }),
+          ...(bundle?.utmMedium && { utmMedium: bundle.utmMedium }),
+          ...(bundle?.utmCampaign && { utmCampaign: bundle.utmCampaign }),
+          ...(bundle?.utmContent && { utmContent: bundle.utmContent }),
         })),
         bundle?.id,
       );
