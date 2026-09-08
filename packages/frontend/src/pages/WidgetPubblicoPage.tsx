@@ -9,6 +9,7 @@ import { CheckoutForm } from '../features/checkout/CheckoutForm';
 import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
 import { BundleFlusso } from '../features/bundle/BundleFlusso';
+import { inizializzaMetaPixelWidget } from '../features/metaPixel';
 
 type Vista = 'caricamento' | 'errore' | 'vetrina' | 'auth' | 'login' | 'registrati' | 'registrati-fatto' | 'checkout' | 'bundle';
 
@@ -25,7 +26,13 @@ export function WidgetPubblicoPage() {
       // Widget di un bundle: il flusso è lungo (eventi, fermate, dati), quindi
       // l'accesso si fa PRIMA, non in fondo — così niente si perde tra un
       // passaggio e l'altro. Il widget evento resta com'era.
-      .then((d) => { setDati(d); setVista(d.bundle ? (clienteLoggato() ? 'bundle' : 'auth') : 'vetrina'); })
+      .then((d) => {
+        setDati(d);
+        setVista(d.bundle ? (clienteLoggato() ? 'bundle' : 'auth') : 'vetrina');
+        // Pixel di INBUS sempre + quello dell'organizzatore se presente
+        // (vedi la nota nella funzione sul banner cookie mancante qui).
+        inizializzaMetaPixelWidget(d.metaPixelId);
+      })
       .catch((e) => { setErroreVista(e instanceof ErroreApi ? e.message : 'Impossibile caricare questa pagina.'); setVista('errore'); });
   }, [publicWidgetId]);
 

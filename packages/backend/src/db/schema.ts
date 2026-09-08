@@ -902,6 +902,13 @@ export const whiteLabel = pgTable('white_label', {
   // mentre chi compra dal sito INBUS o da un'altra White Label per lo
   // stesso evento continua a vedere il layout che gli compete.
   layoutBigliettoId: text('layout_biglietto_id').references(() => layoutBiglietto.id, { onDelete: 'set null' }),
+  // Pixel di Meta DI QUESTO organizzatore (facoltativo) — le vendite
+  // dal suo widget mandano l'evento SIA al pixel di INBUS (sempre) SIA
+  // a questo (se impostato): due ad account diversi, stessa vendita.
+  // metaPixelId non è segreto (finisce comunque nell'HTML della
+  // pagina); metaCapiToken sì, mai esposto in nessuna rotta pubblica.
+  metaPixelId: text('meta_pixel_id'),
+  metaCapiToken: text('meta_capi_token'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
   aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 }, (t) => ({

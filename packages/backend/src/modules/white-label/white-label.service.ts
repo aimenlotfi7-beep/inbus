@@ -96,6 +96,8 @@ export const whiteLabelService = {
     if (input.attiva !== undefined) aggiornamenti.attiva = input.attiva;
     if (input.dominiAutorizzati !== undefined) aggiornamenti.dominiAutorizzati = input.dominiAutorizzati;
     if (input.layoutBigliettoId !== undefined) aggiornamenti.layoutBigliettoId = input.layoutBigliettoId;
+    if (input.metaPixelId !== undefined) aggiornamenti.metaPixelId = input.metaPixelId;
+    if (input.metaCapiToken !== undefined) aggiornamenti.metaCapiToken = input.metaCapiToken;
     if (input.tema !== undefined) {
       const attuale = await getRigaCompleta(id);
       aggiornamenti.tema = normalizzaTema({ ...attuale.tema, ...input.tema });
@@ -140,6 +142,7 @@ export const whiteLabelService = {
         attiva: riga.whiteLabel.attiva,
         tema: normalizzaTema(riga.whiteLabel.tema),
         dominiAutorizzati: riga.whiteLabel.dominiAutorizzati as string[],
+        metaPixelId: riga.whiteLabel.metaPixelId, // mai il token, solo l'id — vedi commento sulla colonna
         evento: null,
         bundle: await bundleService.dettaglioPubblicoPerId(riga.whiteLabel.bundleId),
       };
@@ -150,6 +153,7 @@ export const whiteLabelService = {
       attiva: riga.whiteLabel.attiva,
       tema: normalizzaTema(riga.whiteLabel.tema),
       dominiAutorizzati: riga.whiteLabel.dominiAutorizzati as string[],
+      metaPixelId: riga.whiteLabel.metaPixelId,
       bundle: null,
       evento: {
         id: riga.evento.id,

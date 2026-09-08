@@ -61,6 +61,8 @@ export interface WhiteLabel {
   eventoId: string | null;
   bundleId: string | null;
   publicWidgetId: string;
+  metaPixelId: string | null;
+  metaCapiToken: string | null;
   attiva: boolean;
   dominiAutorizzati: string[];
   tema: WhiteLabelTheme;
@@ -77,12 +79,16 @@ export interface WhiteLabelInput {
   dominiAutorizzati?: string[];
   tema?: Partial<WhiteLabelTheme>;
   layoutBigliettoId?: string | null;
+  metaPixelId?: string | null;
+  metaCapiToken?: string | null;
 }
 
 export interface WhiteLabelPubblica {
   attiva: boolean;
   tema: WhiteLabelTheme;
   dominiAutorizzati: string[];
+  /** Pixel di Meta DI QUESTO organizzatore, se lo ha impostato — mai il token. */
+  metaPixelId: string | null;
   evento: { id: string; slug: string; artista: string; data: string; luogo: string; citta: string; descrizione: string | null } | null;
   bundle: BundlePubblicoDettaglio | null;
 }

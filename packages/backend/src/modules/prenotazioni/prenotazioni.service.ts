@@ -1,10 +1,37 @@
 import { and, eq, ne, sql, desc, inArray, isNull, gte } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, lineaFermate, busFisici, promoter, promoterEventi } from '../../db/schema.js';
+import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, lineaFermate, busFisici, promoter, promoterEventi, whiteLabel } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { bundleService } from '../bundle/bundle.service.js';
+import { leggiMetaPixelId, leggiMetaCapiToken } from '../impostazioni/impostazioni.routes.js';
+import { inviaEventoMetaCapi } from '../../shared/metaConversions.js';
+
+/** Manda l'evento solo se Pixel ID e token sono entrambi configurati —
+ *  altrimenti (caso normale finché non si imposta il Pixel) non fa
+ *  nulla, silenziosamente. */
+async function inviaEventoMetaSeConfigurato(
+  dati: {
+    nomeEvento: 'Purchase' | 'InitiateCheckout'; eventId: string; valore?: number;
+    email?: string; telefono?: string; ipCliente?: string; userAgentCliente?: string; fbp?: string; fbc?: string;
+  },
+  /** Se la vendita viene da un widget White Label, manda l'evento
+   *  ANCHE al pixel DI QUELL'ORGANIZZATORE (se lo ha impostato) — oltre
+   *  a quello di INBUS, sempre mandato qui sotto. Due ad account
+   *  diversi, la stessa vendita. */
+  whiteLabelId?: string,
+) {
+  const [pixelId, token] = await Promise.all([leggiMetaPixelId(), leggiMetaCapiToken()]);
+  const chiamate: Promise<void>[] = [];
+  if (pixelId && token) chiamate.push(inviaEventoMetaCapi(pixelId, token, { ...dati, urlOrigine: 'https://onway.it', valuta: 'EUR' }));
+  if (whiteLabelId) {
+    const [wl] = await db.select({ metaPixelId: whiteLabel.metaPixelId, metaCapiToken: whiteLabel.metaCapiToken }).from(whiteLabel).where(eq(whiteLabel.id, whiteLabelId)).limit(1);
+    if (wl?.metaPixelId && wl.metaCapiToken) chiamate.push(inviaEventoMetaCapi(wl.metaPixelId, wl.metaCapiToken, { ...dati, urlOrigine: 'https://onway.it', valuta: 'EUR' }));
+  }
+  await Promise.all(chiamate);
+}
+
 import { verificaComposizione, ripartisciSconto } from '../bundle/bundle-regole.js';
 import { couponService } from '../coupon/coupon.service.js';
 import { env } from '../../config/env.js';
@@ -311,9 +338,19 @@ export const prenotazioniService = {
    * con un errore chiaro, invece di vendere due volte lo stesso posto
    * (il rischio concreto che c'era nel prototipo basato su localStorage).
    */
-  async crea(input: CreaPrenotazioneInput, utenteId: string, canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }) {
+  async crea(input: CreaPrenotazioneInput, utenteId: string, canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }, richiesta?: { ip?: string; userAgent?: string }) {
     const risultato = await db.transaction((tx) => creaRigaInterna(tx, input, utenteId, canaleVendita));
     await inviaConfermaPrenotazione(risultato);
+    // Meta Conversions API — best-effort, dopo che la prenotazione è già
+    // confermata: un problema con l'API di Meta non deve mai bloccare o
+    // ritardare la risposta al cliente.
+    if (input.metaEventId) {
+      inviaEventoMetaSeConfigurato({
+        nomeEvento: 'Purchase', eventId: input.metaEventId, valore: Number(risultato.totaleComplessivo),
+        email: input.cliente.email, telefono: input.cliente.telefono ?? undefined,
+        ipCliente: richiesta?.ip, userAgentCliente: richiesta?.userAgent, fbp: input.metaFbp, fbc: input.metaFbc,
+      }, canaleVendita?.canale === 'WHITE_LABEL' ? canaleVendita.whiteLabelId : undefined);
+    }
     return risultato;
   },
 
@@ -323,7 +360,7 @@ export const prenotazioniService = {
    *  prenotazione a metà creata. Ogni articolo resta comunque una vera
    *  prenotazione a sé, con il suo PNR, il suo biglietto, la sua email
    *  — semplicemente in più raggruppate sotto lo stesso ordine. */
-  async creaOrdine(articoli: CreaPrenotazioneInput[], utenteId: string, bundleId?: string, canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }) {
+  async creaOrdine(articoli: CreaPrenotazioneInput[], utenteId: string, bundleId?: string, canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }, richiesta?: { ip?: string; userAgent?: string }) {
     if (articoli.length === 0) {
       throw new ErroreApplicativo('Il carrello è vuoto.', 400, 'CARRELLO_VUOTO');
     }
@@ -401,6 +438,20 @@ export const prenotazioniService = {
       } catch (e) {
         console.error('[bundle] mail di riepilogo fallita:', e instanceof Error ? e.message : e);
       }
+    }
+
+    // Stesso evento Meta di "crea", ma UNA volta per ordine (valore
+    // totale, non per riga) — l'eventId lo prende dal primo articolo
+    // che lo porta (il frontend lo genera una volta per l'intero
+    // ordine, non per articolo).
+    const metaEventId = articoli.find((a) => a.metaEventId)?.metaEventId;
+    if (metaEventId) {
+      inviaEventoMetaSeConfigurato({
+        nomeEvento: 'Purchase', eventId: metaEventId, valore: Number(ordine.totale),
+        email: articoli[0]?.cliente.email, telefono: articoli[0]?.cliente.telefono ?? undefined,
+        ipCliente: richiesta?.ip, userAgentCliente: richiesta?.userAgent,
+        fbp: articoli.find((a) => a.metaFbp)?.metaFbp, fbc: articoli.find((a) => a.metaFbc)?.metaFbc,
+      }, canaleVendita?.canale === 'WHITE_LABEL' ? canaleVendita.whiteLabelId : undefined);
     }
 
     return { ordine, prenotazioni: righe.map((r) => ({ ...r, ordineId: ordine.id })) };

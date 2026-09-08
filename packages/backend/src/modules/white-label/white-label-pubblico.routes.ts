@@ -57,7 +57,7 @@ whiteLabelPubblicoRouter.post(
     const wl = await whiteLabelService.getPubblicaConIdInterno(req.params.publicWidgetId);
     if (!wl.attiva) throw new WhiteLabelDisattivata();
     if (!wl.bundleId) throw new ErroreApplicativo('Questo widget non vende un bundle.', 400, 'WIDGET_NON_BUNDLE');
-    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente!.sub, wl.bundleId, { canale: 'WHITE_LABEL', whiteLabelId: wl.id });
+    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente!.sub, wl.bundleId, { canale: 'WHITE_LABEL', whiteLabelId: wl.id }, { ip: req.ip, userAgent: req.headers['user-agent'] });
     for (const riga of risultato.prenotazioni) {
       const { percentuale, importo } = await commissioniService.calcolaSnapshot(wl.organizzatoreId, riga.totaleComplessivo);
       await db.update(prenotazioni).set({ commissionePercentualeSnapshot: String(percentuale), commissioneImportoSnapshot: String(importo) }).where(eq(prenotazioni.id, riga.id));
@@ -85,7 +85,7 @@ whiteLabelPubblicoRouter.post(
       throw new ErroreApplicativo('Questo widget può prenotare solo il proprio evento.', 400, 'EVENT_NOT_AVAILABLE');
     }
 
-    const nuova = await prenotazioniService.crea(req.body, req.cliente!.sub, { canale: 'WHITE_LABEL', whiteLabelId: wl.id });
+    const nuova = await prenotazioniService.crea(req.body, req.cliente!.sub, { canale: 'WHITE_LABEL', whiteLabelId: wl.id }, { ip: req.ip, userAgent: req.headers['user-agent'] });
 
     // Snapshot commissione — resta un passaggio separato dopo (a
     // differenza di canale/whiteLabelId, spostati sopra: la commissione

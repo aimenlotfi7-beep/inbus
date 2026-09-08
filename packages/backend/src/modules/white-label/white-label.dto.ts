@@ -62,6 +62,8 @@ export const creaWhiteLabelSchema = z.object({
   dominiAutorizzati: z.array(dominioSchema).default([]),
   tema: temaSchema.optional(),
   layoutBigliettoId: z.string().nullable().optional(),
+  metaPixelId: z.string().nullable().optional(),
+  metaCapiToken: z.string().nullable().optional(),
 }).refine((d) => !!d.eventoId !== !!d.bundleId, { message: 'Indica un evento oppure un bundle (uno solo).', path: ['eventoId'] });
 
 export const aggiornaWhiteLabelSchema = z.object({
@@ -69,4 +71,6 @@ export const aggiornaWhiteLabelSchema = z.object({
   dominiAutorizzati: z.array(dominioSchema).optional(),
   tema: temaSchema.optional(),
   layoutBigliettoId: z.string().nullable().optional(),
+  metaPixelId: z.string().nullable().optional(),
+  metaCapiToken: z.string().nullable().optional(),
 });

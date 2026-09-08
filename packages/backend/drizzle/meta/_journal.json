@@ -554,6 +554,13 @@
       "when": 1788818506184,
       "tag": "0078_ancient_red_shift",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1788879449021,
+      "tag": "0079_faulty_vindicator",
+      "breakpoints": true
     }
   ]
 }

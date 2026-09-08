@@ -5,6 +5,7 @@ import { organizzatoriApi, type Organizzatore } from '../../api/organizzatori';
 import { eventiApi } from '../../api/eventi';
 import type { Evento } from '../../api/types';
 import { ErroreApi } from '../../api/client';
+import { notifica } from '../shared/notifiche';
 import { PanelHead } from '../shared/PanelHead';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
@@ -50,6 +51,7 @@ export function WhiteLabelScreen() {
         {ev && (
           <>
             <SelettoreLayoutBiglietto whiteLabel={whiteLabelAttiva} onSalvato={(wl) => setWhiteLabelAttiva(wl)} />
+            <MetaPixelOrganizzatore whiteLabel={whiteLabelAttiva} onSalvato={(wl) => setWhiteLabelAttiva(wl)} />
             <WhiteLabelEditor
               whiteLabel={whiteLabelAttiva}
               evento={{ artista: ev.artista, data: ev.data, luogo: ev.luogo, citta: ev.citta, descrizione: ev.descrizione }}
@@ -160,6 +162,48 @@ function NuovaWhiteLabel({ organizzatori, onIndietro, onCreata }: { organizzator
  *  l'aspetto della pagina/vetrina online, questo è il documento vero)
  *  — per non far confondere all'amministratore i due layout diversi.
  *  Nessuna scelta = usa il layout dell'evento, come è sempre stato. */
+/** Il pixel di Meta DI QUESTO organizzatore (facoltativo) — le sue
+ *  vendite dal widget mandano l'evento SIA al pixel di INBUS (sempre)
+ *  SIA a questo, se lo imposta: due ad account, la stessa vendita.
+ *  Stesso schema di SelettoreLayoutBiglietto qui sopra: salvataggio
+ *  immediato al blur, non un form a parte. */
+function MetaPixelOrganizzatore({ whiteLabel, onSalvato }: { whiteLabel: WhiteLabel; onSalvato: (wl: WhiteLabel) => void }) {
+  const [pixelId, setPixelId] = useState(whiteLabel.metaPixelId ?? '');
+  const [token, setToken] = useState(whiteLabel.metaCapiToken ?? '');
+  const [salvando, setSalvando] = useState(false);
+
+  async function salva() {
+    setSalvando(true);
+    try {
+      const aggiornata = await whiteLabelApi.update(whiteLabel.id, { metaPixelId: pixelId || null, metaCapiToken: token || null });
+      onSalvato(aggiornata);
+      notifica('Pixel dell\'organizzatore salvato.', 'successo');
+    } catch (e) {
+      notifica(e instanceof ErroreApi ? e.message : 'Salvataggio non riuscito.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="section-card" style={{ maxWidth: 480, marginBottom: 20 }}>
+      <p className="section-label" style={{ marginBottom: 8 }}>Pixel di Meta dell'organizzatore (facoltativo)</p>
+      <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 10 }}>
+        Se questo organizzatore ha un suo account pubblicitario Meta, le vendite dal suo widget arriveranno anche al suo pixel — oltre che al nostro, sempre.
+      </p>
+      <div className="campo" style={{ marginBottom: 8 }}>
+        <label>ID Pixel</label>
+        <input value={pixelId} onChange={(e) => setPixelId(e.target.value)} placeholder="(non impostato)" />
+      </div>
+      <div className="campo" style={{ marginBottom: 10 }}>
+        <label>Token Conversions API</label>
+        <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="(non impostato)" />
+      </div>
+      <button className="btn btn-ghost" onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva'}</button>
+    </div>
+  );
+}
+
 function SelettoreLayoutBiglietto({ whiteLabel, onSalvato }: { whiteLabel: WhiteLabel; onSalvato: (wl: WhiteLabel) => void }) {
   const [layout, setLayout] = useState<LayoutBiglietto[]>([]);
   const [salvando, setSalvando] = useState(false);

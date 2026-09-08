@@ -12,6 +12,7 @@ import { clienteAuthApi } from '../../api/clienteAuth';
 import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
 import { useCarrello } from '../carrello/CarrelloContext';
 import { SelettoreFermata } from './SelettoreFermata';
+import { tracciaInizioPrenotazione, tracciaAcquisto, leggiCookieMeta } from '../metaPixel';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -201,6 +202,12 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
       const utmMedium = parametriUrl.get('utm_medium') || undefined;
       const utmCampaign = parametriUrl.get('utm_campaign') || undefined;
       const utmContent = parametriUrl.get('utm_content') || undefined;
+      // Il pixel di INBUS traccia SEMPRE (anche dal widget White
+      // Label) — in più, se l'organizzatore ha impostato il suo pixel
+      // (WidgetPubblicoPage lo inizializza insieme al nostro), lo
+      // stesso evento arriva anche a lui: due ad account, una vendita.
+      const metaEventId = crypto.randomUUID();
+      const { fbp, fbc } = leggiCookieMeta();
       const payloadPrenotazione = {
         eventoId: evento.id,
         tragittoId: opzioneScelta.tragittoId,
@@ -218,6 +225,9 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
         ...(utmMedium && { utmMedium }),
         ...(utmCampaign && { utmCampaign }),
         ...(utmContent && { utmContent }),
+        ...(metaEventId && { metaEventId }),
+        ...(fbp && { metaFbp: fbp }),
+        ...(fbc && { metaFbc: fbc }),
       };
       // Dentro il widget White Label la prenotazione passa da un
       // endpoint diverso (stessa identica logica lato server — stesso
@@ -228,6 +238,10 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
         ? await whiteLabelApi.prenota(publicWidgetId, payloadPrenotazione)
         : await prenotazioniApi.crea(payloadPrenotazione);
       setPnrConfermato(prenotazione.pnr);
+      if (metaEventId) {
+        const valoreEuro = opzioneScelta.prezzoEffettivo * passeggeri; // stima lato client — il valore vero e' quello calcolato dal server per la Conversions API, questo serve solo al Pixel nel browser
+        tracciaAcquisto(valoreEuro, metaEventId);
+      }
       setStato('confermato');
     } catch (e) {
       setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
@@ -399,7 +413,11 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
               <SelettoreFermata
                 opzioni={opzioni}
                 valore={fermataId}
-                onSeleziona={setFermataId}
+                onSeleziona={(id) => {
+                  setFermataId(id);
+                  const scelta = opzioni.find((o) => o.fermataId === id);
+                  if (scelta) tracciaInizioPrenotazione(scelta.prezzoEffettivo * passeggeri);
+                }}
                 testoOpzione={(o) => {
                   const prezzoMostrato = offerta ? applicaScontoOfferta(o.prezzoEffettivo, offerta.scontoPercentuale) : o.prezzoEffettivo;
                   return `${o.fermataCitta} (${o.fermataOrario || 'orario da definire'}) — €${prezzoMostrato.toFixed(2)}`
