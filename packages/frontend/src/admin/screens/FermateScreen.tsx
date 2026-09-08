@@ -69,8 +69,14 @@ export function FermateScreen() {
       // sparita dal punto giusto sulla cartina). Se la ricerca non
       // trova nulla, si salva comunque senza — meglio una fermata
       // senza coordinate che bloccare il salvataggio.
+      // Si ricalcola anche quando città/indirizzo sono CAMBIATI
+      // rispetto a prima, anche se lat/lng erano già presenti: altrimenti
+      // spostando una fermata da una regione all'altra e salvando, la
+      // regione (e le coordinate) restavano quelle vecchie — l'elenco
+      // raggruppato per regione non si sarebbe più aggiornato da solo.
+      const indirizzoCambiato = inModifica && (form.indirizzo !== inModifica.indirizzo || form.citta !== inModifica.citta);
       let formDaSalvare = form;
-      if (form.lat == null || form.lng == null) {
+      if (form.lat == null || form.lng == null || indirizzoCambiato) {
         const risultato = await geocodifica(`${form.indirizzo}, ${form.citta}`);
         if (risultato.coordinate) formDaSalvare = { ...form, lat: risultato.coordinate.lat, lng: risultato.coordinate.lng, regione: risultato.regione };
       }
