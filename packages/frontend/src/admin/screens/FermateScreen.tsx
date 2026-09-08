@@ -56,6 +56,23 @@ export function FermateScreen() {
     setModaleAperta(true);
   }
 
+  const [ricalcolando, setRicalcolando] = useState(false);
+  async function ricalcolaPosizione() {
+    if (!form.indirizzo.trim() || !form.citta.trim()) { notifica('Inserisci prima città e indirizzo.'); return; }
+    setRicalcolando(true);
+    try {
+      const risultato = await geocodifica(`${form.indirizzo}, ${form.citta}`);
+      if (risultato.coordinate) {
+        setForm((f) => ({ ...f, lat: risultato.coordinate!.lat, lng: risultato.coordinate!.lng, regione: risultato.regione }));
+        notifica(risultato.regione ? `Trovata: ${risultato.regione}.` : 'Posizione trovata, ma la regione non è stata riconosciuta.', 'successo');
+      } else {
+        notifica('Indirizzo non trovato — controlla città e indirizzo.');
+      }
+    } finally {
+      setRicalcolando(false);
+    }
+  }
+
   async function salva() {
     if (!form.nome.trim() || !form.citta.trim() || !form.indirizzo.trim()) {
       notifica('Nome, citta e indirizzo sono obbligatori.');
@@ -243,6 +260,16 @@ export function FermateScreen() {
                 placeholder="es. 9.1900"
               />
             </label>
+          </div>
+          {/* Ricalcola SEMPRE, anche se città/indirizzo sembrano
+              invariati — utile se la regione è rimasta quella vecchia
+              (es. dopo una modifica salvata prima di questo pulsante) o
+              se Nominatim aveva sbagliato la prima volta. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: -6, marginBottom: 12 }}>
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} disabled={ricalcolando} onClick={ricalcolaPosizione}>
+              {ricalcolando ? 'Cerco...' : '↻ Ricalcola posizione e regione'}
+            </button>
+            <span style={{ fontSize: 12, color: 'var(--mist)' }}>Regione attuale: <b>{form.regione ?? 'nessuna'}</b></span>
           </div>
           <div className="campo">
             <label><EtichettaTooltip testo="Link" chiave="fermata_link_campo" mappaTooltip={mappaTooltip} /></label>

@@ -88,7 +88,7 @@ export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }:
             return (
               <div key={o.fermataId}>
                 {nuovaRegione && (
-                  <p style={{ margin: 0, padding: '8px 14px 4px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .3, opacity: .55 }}>{regioneCorrente}</p>
+                  <p style={{ margin: 0, padding: '9px 14px 5px', fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .4, color: 'inherit', background: 'rgba(0,0,0,.04)' }}>{regioneCorrente}</p>
                 )}
                 <button
                   type="button"
