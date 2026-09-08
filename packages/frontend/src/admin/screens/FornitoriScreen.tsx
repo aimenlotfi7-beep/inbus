@@ -7,7 +7,7 @@ import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
-import { MappaPuntiFermate } from '../shared/MappaPuntiFermate';
+import { MappaPunti } from '../shared/MappaPunti';
 
 const VUOTO: Partial<FornitoreInput> = { nome: '', partitaIva: '', referente: '', telefono: '', email: '', indirizzo: '', note: '', invioAutomatico: false };
 
@@ -51,7 +51,7 @@ export function FornitoriScreen() {
 
   const [vistaCartina, setVistaCartina] = useState(false);
   const puntiCartina = fornitoriFiltrati.filter((f) => f.lat != null && f.lng != null).map((f) => ({
-    id: f.id, etichetta: f.nome, citta: f.regione ?? '', indirizzo: f.indirizzo ?? '', lat: f.lat, lng: f.lng, categoria: 'a-volte' as const,
+    id: f.id, etichetta: f.nome, sottotitolo: f.regione ?? undefined, citta: f.regione ?? '', indirizzo: f.indirizzo ?? '', lat: f.lat, lng: f.lng,
   }));
 
   const inAttesaCount = fornitori.filter((f) => f.stato === 'IN_ATTESA').length;
@@ -174,7 +174,7 @@ export function FornitoriScreen() {
       {vistaCartina ? (
         puntiCartina.length === 0
           ? <p className="testo-intro">Nessun fornitore con posizione nota da mostrare — la posizione si calcola quando salvi un indirizzo.</p>
-          : <MappaPuntiFermate punti={puntiCartina} />
+          : <MappaPunti punti={puntiCartina} />
       ) : (
         regioniOrdinate.map((regione) => (
           <div key={regione} style={{ marginBottom: 24 }}>
