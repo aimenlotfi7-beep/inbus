@@ -15,6 +15,8 @@
     "db:migra-permessi": "tsx src/db/migra-permessi.ts",
     "db:geocodifica-fornitori": "tsx src/db/geocodifica-fornitori-esistenti.ts",
     "db:geocodifica-fermate": "tsx src/db/geocodifica-fermate-esistenti.ts",
+    "db:geocodifica-tutto": "npm run db:geocodifica-fornitori && npm run db:geocodifica-fermate",
+    "db:esporta-fermate": "tsx src/db/esporta-fermate-con-mappa.ts",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx src/db/seed.ts",
     "reset-dati-test": "tsx src/db/reset-dati-test.ts",
