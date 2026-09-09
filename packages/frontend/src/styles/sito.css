@@ -360,7 +360,7 @@
   .price span{color:var(--mist); font-size:11px;}
   .card-cta{
     font-size:12.5px; font-weight:700; color:var(--night); background:var(--paper);
-    padding:11px 16px; border-radius:999px; border:none; cursor:pointer;
+    padding:11px 16px; border-radius:999px; border:2px solid var(--amber); cursor:pointer;
     transition:background .15s ease; min-height:38px;
   }
   .card-cta:hover{background:var(--pink); color:var(--night);}

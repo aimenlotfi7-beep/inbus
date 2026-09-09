@@ -70,7 +70,7 @@ export function TourPage() {
                       ) : (
                         <>
                           {d.prezzoMinimo !== null && <span style={{ display: 'block', fontWeight: 700 }}>da €{d.prezzoMinimo.toFixed(0)}</span>}
-                          <span className="card-cta" style={{ fontSize: 13 }}>Prenota →</span>
+                          <span className="card-cta" style={{ fontSize: 13 }}>Prenota</span>
                         </>
                       )}
                     </span>

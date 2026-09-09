@@ -56,7 +56,7 @@ export function EventoCard({ evento }: { evento: Evento }) {
             <div className="price">
               {prezzoMinimo !== null ? <>da €{prezzoMinimo.toFixed(0)}<span> /persona</span></> : <span>Prezzo da definire</span>}
             </div>
-            <span className="card-cta">Vedi le date →</span>
+            <span className="card-cta">Vedi le date</span>
           </div>
         </div>
       </Link>
@@ -116,7 +116,7 @@ export function EventoCard({ evento }: { evento: Evento }) {
             {prezzoMinimo !== null ? <>da €{prezzoMinimo.toFixed(0)}<span> /persona</span></> : <span>Prezzo da definire</span>}
           </div>
           <span className="card-cta">
-            {posti === 0 ? "Lista d'attesa" : 'Prenota'} →
+            {posti === 0 ? "Lista d'attesa" : 'Prenota'}
           </span>
         </div>
       </div>

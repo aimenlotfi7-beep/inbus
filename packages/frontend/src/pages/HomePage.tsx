@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { bundleApi, type BundlePubblico } from '../api/bundle';
 import { BundleCard } from '../features/bundle/BundleCard';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { eventiApi } from '../api/eventi';
 import { categorieEventoApi, type CategoriaEvento } from '../api/categorieEvento';
 import { ErroreApi } from '../api/client';
@@ -333,10 +333,9 @@ export function HomePage() {
         <section className="events-section" id="bundle">
           <div className="section-head">
             <div>
-              <h2 className="section-title">I <em>bundle</em></h2>
+              <h2 className="section-title"><em>Bundle</em></h2>
               <p className="section-sub">Più eventi insieme, con uno sconto dedicato.</p>
             </div>
-            <Link to="/bundle" className="btn btn-ghost" style={{ alignSelf: "center" }}>Vedi tutti</Link>
           </div>
           <div className="carosello-wrap">
             <div className="carosello carosello-compatto">

@@ -9,7 +9,7 @@ export function BundleListaPage() {
     <section className="events-section" style={{ paddingTop: 40 }}>
       <div className="section-head">
         <div>
-          <h2 className="section-title">I <em>bundle</em></h2>
+          <h2 className="section-title"><em>Bundle</em></h2>
           <p className="section-sub">Più eventi insieme, con uno sconto dedicato.</p>
         </div>
       </div>
