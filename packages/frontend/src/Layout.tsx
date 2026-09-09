@@ -73,6 +73,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <LogoOnWay />
           <nav className="links">
             <Link to="/#consigliati">Eventi Consigliati</Link>
+            <Link to="/bundle">Bundle</Link>
           </nav>
         </div>
 
@@ -142,6 +143,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <div className={`mobile-nav${menuMobileAperto ? ' open' : ''}`}>
         <Link to="/#consigliati" onClick={() => setMenuMobileAperto(false)}>Eventi Consigliati</Link>
+        <Link to="/bundle" onClick={() => setMenuMobileAperto(false)}>Bundle</Link>
         <Link className="btn btn-primary" to={loggato ? '/account' : '/accedi'} style={{ textAlign: 'center', marginTop: 10 }} onClick={() => setMenuMobileAperto(false)}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
       </div>
 
@@ -157,6 +159,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <h5>Naviga</h5>
             <ul>
               <li><Link to="/#eventi">Eventi</Link></li>
+              <li><Link to="/bundle">Bundle</Link></li>
               <li><Link to="/#come-funziona">Come funziona</Link></li>
               <li><Link to="/pagina/chisiamo">Chi siamo</Link></li>
               <li><Link to="/tour-leader">Lavora con noi</Link></li>
