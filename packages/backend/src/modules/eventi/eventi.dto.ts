@@ -154,6 +154,12 @@ export const listaEventiQuerySchema = z.object({
   // sempre tutto (comprese le tab "Eventi passati").
   soloFuturi: z.coerce.boolean().optional(),
   soloVisibili: z.coerce.boolean().optional(),
+  // Solo la home: toglie dall'elenco gli eventi che appartengono a un
+  // Tour attivo, e ci mette al loro posto una card sola per il Tour —
+  // MAI passato da nessun altro chiamante (gestionale, sitemap,
+  // prerender), che devono continuare a vedere ogni evento singolo
+  // esattamente come oggi.
+  escludiEventiInTour: z.coerce.boolean().optional(),
 });
 export type ListaEventiQuery = z.infer<typeof listaEventiQuerySchema>;
 

@@ -42,6 +42,11 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   { chiave: 'bundle.visualizza', etichetta: 'Visualizzare i bundle', modulo: 'Eventi', ereditaDa: 'eventi.visualizza' },
   { chiave: 'bundle.gestisci', etichetta: 'Creare/modificare bundle', modulo: 'Eventi', ereditaDa: 'eventi.crea' },
   { chiave: 'bundle.elimina', etichetta: 'Eliminare bundle', modulo: 'Eventi', ereditaDa: 'eventi.elimina' },
+  // Tour (piu' date dello stesso spettacolo) - ereditano dai permessi
+  // eventi al primo avvio, poi si regolano da Ruoli.
+  { chiave: 'tour.visualizza', etichetta: 'Visualizzare i tour', modulo: 'Eventi', ereditaDa: 'eventi.visualizza' },
+  { chiave: 'tour.gestisci', etichetta: 'Creare/modificare tour', modulo: 'Eventi', ereditaDa: 'eventi.crea' },
+  { chiave: 'tour.elimina', etichetta: 'Eliminare tour', modulo: 'Eventi', ereditaDa: 'eventi.elimina' },
   { chiave: 'preventivi.accetta', etichetta: 'Accettare un preventivo fornitore (impegno economico)', modulo: 'Eventi', ereditaDa: 'eventi.partenze' },
 
   // Prenotazioni

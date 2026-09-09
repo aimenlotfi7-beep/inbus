@@ -11,6 +11,7 @@ import { couponRouter } from './modules/coupon/coupon.routes.js';
 import { fornitoriRouter } from './modules/fornitori/fornitori.routes.js';
 import { preventiviRouter } from './modules/preventivi/preventivi.routes.js';
 import { bundleRouter } from './modules/bundle/bundle.routes.js';
+import { tourRouter } from './modules/tour/tour.routes.js';
 import { percorsiSalvatiRouter } from './modules/percorsi-salvati/percorsi-salvati.routes.js';
 import { promoterRouter } from './modules/promoter/promoter.routes.js';
 import { organizzatoriRouter } from './modules/organizzatori/organizzatori.routes.js';
@@ -74,6 +75,7 @@ export function creaApp() {
   app.use('/api/fornitori', fornitoriRouter);
   app.use('/api/preventivi', preventiviRouter);
   app.use('/api/bundle', bundleRouter);
+  app.use('/api/tour', tourRouter);
   app.use('/api/percorsi-salvati', percorsiSalvatiRouter);
   app.use('/api/promoter', promoterRouter);
   app.use('/api/organizzatori', organizzatoriRouter);

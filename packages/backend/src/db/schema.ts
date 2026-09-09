@@ -63,6 +63,34 @@ export const ruoloAdminEnum = pgEnum('ruolo_admin', ['AMMINISTRATORE', 'OPERATOR
 // ---------------------------------------------------------------------
 // EVENTI
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// TOUR — più date dello stesso spettacolo (es. "Vasco Rossi — Roma",
+// 10 concerti in giorni diversi, anche non consecutivi), raggruppate
+// SOLO per la presentazione sul sito. Ogni data resta un evento del
+// tutto indipendente: proprio tragitto, proprie fermate, proprio
+// prezzo, propria pagina raggiungibile con link diretto. Il Tour non
+// vende nulla di suo — è un contenitore visivo: sostituisce le sue
+// date nel carosello e nelle sezioni per categoria (una card sola al
+// posto di N), ma un link diretto a una singola data continua a
+// funzionare sempre, anche a Tour creato.
+// ---------------------------------------------------------------------
+export const tour = pgTable('tour', {
+  id: id(),
+  nome: text('nome').notNull(),
+  slug: text('slug').notNull().unique(),
+  copertinaUrl: text('copertina_url'),
+  eliminatoIl: timestamp('eliminato_il'),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+});
+
+export const tourEventi = pgTable('tour_eventi', {
+  tourId: text('tour_id').notNull().references(() => tour.id, { onDelete: 'cascade' }),
+  eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  ordine: integer('ordine').notNull().default(0),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.tourId, t.eventoId] }),
+}));
+
 export const eventi = pgTable('eventi', {
   id: id(),
   // Indirizzo pubblico leggibile (es. "salmo-roma") — ogni evento ha una

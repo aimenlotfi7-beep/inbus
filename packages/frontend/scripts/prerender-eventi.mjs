@@ -109,7 +109,34 @@ async function main() {
     writeFileSync(resolve(cartella, 'index.html'), costruisciHtmlBundle(template, b));
   }
 
-  console.log(`Pre-rendering completato: ${eventi.length} pagine evento e ${bundle.length} pagine bundle generate con meta tag propri.`);
+  // Tour: stessa cosa, stessi meta.
+  let tour = [];
+  try {
+    const r = await fetch(`${apiUrl}/api/tour/pubblico`);
+    if (r.ok) tour = await r.json();
+  } catch { /* vedi sopra */ }
+  for (const t of tour) {
+    if (!t.slug) continue;
+    const cartella = resolve(distDir, 'tour', t.slug);
+    mkdirSync(cartella, { recursive: true });
+    writeFileSync(resolve(cartella, 'index.html'), costruisciHtmlTour(template, t));
+  }
+
+  console.log(`Pre-rendering completato: ${eventi.length} pagine evento, ${bundle.length} pagine bundle e ${tour.length} pagine tour generate con meta tag propri.`);
+}
+
+function costruisciHtmlTour(template, t) {
+  const url = `${siteUrl}/tour/${t.slug}`;
+  const titolo = `${t.nome} — Tutte le date | INBUS`;
+  const descrizione = `${t.numeroEventi} date disponibili per ${t.nome}. Scegli la tua e prenota con INBUS.`;
+  const immagine = t.copertinaUrl;
+  let html = template;
+  html = html.replace(/<title>.*?<\/title>/s, `<title>${escapeHtml(titolo)}</title>`);
+  html = html.replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${escapeHtml(descrizione)}">`);
+  html = html.replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${escapeHtml(titolo)}">`);
+  html = html.replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${escapeHtml(descrizione)}">`);
+  html = html.replace(/<meta property="og:type"[^>]*>/, `<meta property="og:type" content="website">\n<meta property="og:url" content="${escapeHtml(url)}">${immagine ? `\n<meta property="og:image" content="${escapeHtml(immagine)}">` : ''}`);
+  return html;
 }
 
 function costruisciHtmlBundle(template, b) {

@@ -561,6 +561,13 @@
       "when": 1788879449021,
       "tag": "0079_faulty_vindicator",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1788950988001,
+      "tag": "0080_skinny_puck",
+      "breakpoints": true
     }
   ]
 }

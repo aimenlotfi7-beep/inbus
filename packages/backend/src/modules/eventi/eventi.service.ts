@@ -26,6 +26,7 @@ import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './e
 import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema } from './eventi.dto.js';
 import { rilevaVariazioni, generaComunicazioniVariazione } from '../variazioni/variazioni.service.js';
 import { calcolaKmApprossimati } from '../../shared/distanza.js';
+import { tourService } from '../tour/tour.service.js';
 import type { z } from 'zod';
 
 // Include standard riusato da list/getById: evento con tutte le sue
@@ -380,12 +381,24 @@ export const eventiService = {
       condizioni.push(inArray(eventi.id, idEventiConfermati));
     }
 
+    // Solo se richiesto esplicitamente (la home) — tolti gli eventi che
+    // appartengono a un Tour, e al loro posto (in fondo, poi si
+    // riordina tutto per data) una card sola per ciascun Tour.
+    let cardTour: Awaited<ReturnType<typeof tourService.cardVirtualiTour>> = [];
+    if (query.escludiEventiInTour) {
+      const idInTour = await tourService.eventiInTour();
+      if (idInTour.size > 0) condizioni.push(sql`${eventi.id} NOT IN (${sql.join([...idInTour].map((id) => sql`${id}`), sql`, `)})`);
+      cardTour = await tourService.cardVirtualiTour(!!query.soloFuturi, !!query.soloVisibili);
+    }
+
     const risultati = await db.query.eventi.findMany({
       where: and(...condizioni),
       with: includeCompleto,
       orderBy: (e, { asc }) => [asc(e.data)],
     });
-    return risultati.map(conStatoCalcolato);
+    const conStato = risultati.map(conStatoCalcolato);
+    if (cardTour.length === 0) return conStato;
+    return [...conStato, ...cardTour].sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
   },
 
   getById,

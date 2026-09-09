@@ -77,6 +77,10 @@ export interface Evento {
   servizi: Servizio[];
   immagini: { id: string; url: string; ordine: number }[];
   allegati: { id: string; nome: string; url: string }[];
+  /** Presente e vero SOLO sulle card "virtuali" dei Tour (più date
+   *  dello stesso spettacolo raggruppate) — il link porta a /tour/:slug
+   *  invece che /eventi/:slug. Assente su un evento vero. */
+  tour?: true;
 }
 
 export interface OpzionePartenza {

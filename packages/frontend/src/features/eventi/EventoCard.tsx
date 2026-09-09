@@ -34,6 +34,35 @@ const ETICHETTA_STATO: Record<NonNullable<Evento['statoDisponibilita']>, string>
 // condivisibile con un'anteprima propria — la stessa identica pagina sia
 // dentro l'area cliente sia fuori, coerente ovunque.
 export function EventoCard({ evento }: { evento: Evento }) {
+  // Card virtuale di un Tour (più date raggruppate) — niente posti/città
+  // di partenza da calcolare (tragitti/servizi sono vuoti apposta, la
+  // vendibilità vive nelle singole date), link alla pagina del Tour
+  // invece che a un evento, CTA diversa ("Vedi le date").
+  if (evento.tour) {
+    const copertina = evento.immagini[0]?.url;
+    const prezzoMinimo = prezzoMinimoEvento(evento);
+    return (
+      <Link to={`/tour/${evento.slug}`} className="card reveal in" style={{ display: 'block', color: 'inherit' }}>
+        <div className="card-visual">
+          {copertina ? (
+            <img src={copertina} alt={evento.artista} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : <div className="beam" />}
+          <span className="tag" style={{ position: 'relative', zIndex: 1 }}>{evento.genere}</span>
+        </div>
+        <div className="card-body">
+          <h3>{evento.artista}</h3>
+          <div className="card-meta"><span>{evento.luogo}</span><span>{evento.citta}</span></div>
+          <div className="card-foot">
+            <div className="price">
+              {prezzoMinimo !== null ? <>da €{prezzoMinimo.toFixed(0)}<span> /persona</span></> : <span>Prezzo da definire</span>}
+            </div>
+            <span className="card-cta">Vedi le date →</span>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
   // Il numero esatto di posti non si mostra mai al cliente: solo
   // un'etichetta impostata a mano dal gestionale (o nessuna). La
   // possibilità di prenotare/andare in lista d'attesa dipende invece dai

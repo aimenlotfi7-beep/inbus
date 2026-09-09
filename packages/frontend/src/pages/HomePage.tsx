@@ -121,7 +121,7 @@ export function HomePage() {
 
   useEffect(() => {
     bundleApi.listaPubblica().then((l) => setBundleEvidenza(l.filter((b) => b.inEvidenzaHome))).catch(() => {});
-    eventiApi.list({ soloFuturi: true, soloVisibili: true })
+    eventiApi.list({ soloFuturi: true, soloVisibili: true, escludiEventiInTour: true })
       .then((lista) => {
         setEventi(lista);
         // Se arrivo da un link con ?evento=ID (es. condiviso da un promoter

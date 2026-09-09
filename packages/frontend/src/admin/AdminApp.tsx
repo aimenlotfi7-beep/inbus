@@ -15,6 +15,7 @@ import { RimborsiScreen } from './screens/RimborsiScreen';
 import { VariazioniScreen } from './screens/VariazioniScreen';
 import { UtentiScreen } from './screens/UtentiScreen';
 import { BundleScreen } from './screens/bundle/BundleScreen';
+import { TourScreen } from './screens/TourScreen';
 import { FornitoriScreen } from './screens/FornitoriScreen';
 import { PercorsiSalvatiScreen } from './screens/PercorsiSalvatiScreen';
 import { FermateScreen } from './screens/FermateScreen';
@@ -50,6 +51,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   statistiche: StatisticheSenzaHeader,
   eventi: EventiScreen,
   bundle: BundleScreen,
+  tour: TourScreen,
   vetrina: VetrinaScreen,
   calendario: CalendarioScreen,
   cestino: CestinoScreen,
@@ -96,6 +98,7 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   statistiche: 'statistiche.visualizza',
   eventi: 'eventi.visualizza',
   bundle: 'bundle.visualizza',
+  tour: 'tour.visualizza',
   vetrina: 'eventi.vetrina',
   calendario: 'eventi.calendario',
   cestino: 'eventi.cestino',

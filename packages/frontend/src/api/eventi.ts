@@ -96,7 +96,7 @@ export interface VenditePerFermata {
 }
 
 export const eventiApi = {
-  list: (filtri?: { citta?: string; genere?: string; ricerca?: string; soloFuturi?: boolean; soloVisibili?: boolean }) => {
+  list: (filtri?: { citta?: string; genere?: string; ricerca?: string; soloFuturi?: boolean; soloVisibili?: boolean; escludiEventiInTour?: boolean }) => {
     const query = new URLSearchParams(filtri as Record<string, string>).toString();
     return api.get<Evento[]>(`/api/eventi${query ? `?${query}` : ''}`);
   },
