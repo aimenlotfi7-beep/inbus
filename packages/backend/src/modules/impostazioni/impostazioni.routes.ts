@@ -18,6 +18,17 @@ export async function leggiPostiPerBus(): Promise<number> {
   return Number.isFinite(valore) && valore > 0 ? valore : DEFAULT_POSTI_PER_BUS;
 }
 
+/** Percentuale di riempimento (sui posti presunti del preventivo) da
+ *  cui in poi un tragitto "si ripaga" — usata dal calcolo prezzi in
+ *  Prezzi e dal suggerimento automatico di Linea in Da Confermare. */
+export const CHIAVE_SOGLIA_OCCUPAZIONE_PAREGGIO = 'soglia_occupazione_pareggio';
+const DEFAULT_SOGLIA_OCCUPAZIONE_PAREGGIO = 50;
+export async function leggiSogliaOccupazionePareggio(): Promise<number> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_SOGLIA_OCCUPAZIONE_PAREGGIO)).limit(1);
+  const valore = riga ? Number(riga.valore) : NaN;
+  return Number.isFinite(valore) && valore > 0 && valore <= 100 ? valore : DEFAULT_SOGLIA_OCCUPAZIONE_PAREGGIO;
+}
+
 /** Credito fedeltà maturato per ogni passeggero, dopo che il suo
  *  viaggio è davvero avvenuto — modificabile dal gestionale, senza
  *  bisogno di ripubblicare il codice per cambiare importo. */

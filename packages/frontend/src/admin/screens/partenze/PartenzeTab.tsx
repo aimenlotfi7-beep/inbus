@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { notifica } from '../../shared/notifiche';
 import type { ContestoPartenze } from './tipi';
-import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea, type VenditePerFermata } from '../../../api/eventi';
+import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea, type VenditePerFermata, type SuggerimentoLinea } from '../../../api/eventi';
 import { GraficoLinee, type SerieGrafico } from '../../shared/GraficoLinee';
 import type { Evento } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
@@ -97,6 +97,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   // quando serve davvero (apertura effettiva della tab "Da
   // Confermare"), non per tutti i tragitti visibili in ogni istante.
   const [venditeMap, setVenditeMap] = useState<Map<string, VenditePerFermata>>(new Map());
+  const [suggerimentoMap, setSuggerimentoMap] = useState<Map<string, SuggerimentoLinea>>(new Map());
   // fermate ipotizzo di coprire con la Linea candidata, e quanto
   // costerebbe: entrambi per tragitto, dato che più tragitti possono
   // essere aperti ed espansi insieme nella stessa pagina.
@@ -128,6 +129,10 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   function caricaVenditeSeServe(tragittoId: string) {
     if (venditeMap.has(tragittoId)) return;
     eventiApi.venditePerFermata(tragittoId).then((v) => setVenditeMap((prev) => new Map(prev).set(tragittoId, v))).catch(() => {});
+  }
+  function caricaSuggerimentoSeServe(tragittoId: string) {
+    if (suggerimentoMap.has(tragittoId)) return;
+    eventiApi.suggerimentoLinea(tragittoId).then((s) => setSuggerimentoMap((prev) => new Map(prev).set(tragittoId, s))).catch(() => {});
   }
   // Se l'evento ha più servizi, questa sezione si comporta come se
   // ognuno fosse un evento a parte: una tab per servizio (più una per i
@@ -1013,7 +1018,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             }
             if (contestoPartenze?.tabOrigine === 'da-confermare') {
               caricaVenditeSeServe(tragitto.tragittoId);
+              caricaSuggerimentoSeServe(tragitto.tragittoId);
               const vendite = venditeMap.get(tragitto.tragittoId);
+              const suggerimento = suggerimentoMap.get(tragitto.tragittoId);
               const serieGrafico: SerieGrafico[] = [...new Set((vendite?.andamento ?? []).map((a) => a.citta))].map((citta) => ({
                 nome: citta,
                 punti: (vendite?.andamento ?? []).filter((a) => a.citta === citta).map((a) => ({ x: a.data, y: a.cumulativo })),
@@ -1021,6 +1028,35 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
 
               return (
                 <div style={{ marginTop: 14 }}>
+                  {/* Suggerimento automatico — appena le prenotazioni
+                      confermate raggiungono la soglia di pareggio, dice
+                      "puoi creare la Linea" con fornitore/costo/posti
+                      già presi dal preventivo accettato: nulla da
+                      indovinare, solo da controllare e confermare. */}
+                  {suggerimento?.pronta && (
+                    <div className="section-card" style={{ marginBottom: 14, borderColor: 'var(--green)' }}>
+                      <p style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>✓ Pronta da confermare</p>
+                      <p style={{ fontSize: 13.5, marginBottom: 8 }}>
+                        {suggerimento.totaleConfermati} passeggeri confermati (soglia di pareggio: {suggerimento.postiDiPareggio}) — puoi creare la Linea con {suggerimento.postiBus} posti a €{suggerimento.costo?.toFixed(2)}, gli stessi del preventivo accettato.
+                      </p>
+                      {!!suggerimento.fermateSenzaPrenotazioni?.length && (
+                        <p style={{ fontSize: 12.5, color: 'var(--amber)', marginBottom: 8 }}>
+                          ⚠ {suggerimento.fermateSenzaPrenotazioni.length} fermata/e senza nessuna prenotazione ({suggerimento.fermateSenzaPrenotazioni.map((f) => f.citta).join(', ')}) — se le disattivi in Linee per accorciare il tragitto, controlla il preventivo: potrebbe convenirti richiederne uno migliorativo (il banner "km cambiati" te lo segnala da solo).
+                        </p>
+                      )}
+                      <button type="button" className="btn btn-primary" onClick={() => apriPaginaLinee(tragitto.tragittoId)}>Conferma → apri Linee</button>
+                    </div>
+                  )}
+                  {suggerimento?.serveSecondoBus && (
+                    <div className="section-card" style={{ marginBottom: 14, borderColor: 'var(--pink)' }}>
+                      <p style={{ fontWeight: 700, color: 'var(--pink)', marginBottom: 6 }}>⚠ Serve un secondo bus</p>
+                      <p style={{ fontSize: 13.5, marginBottom: 8 }}>
+                        {suggerimento.totaleConfermati} passeggeri confermati, ma i bus già registrati coprono solo {suggerimento.capienzaReale} posti.
+                      </p>
+                      <button type="button" className="btn btn-primary" onClick={() => apriPaginaLinee(tragitto.tragittoId)}>Gestisci Linee →</button>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <p className="section-label" style={{ margin: 0 }}>Cruscotto Vendite</p>
                     {/* Prima si saltava qui in automatico appena aperto il

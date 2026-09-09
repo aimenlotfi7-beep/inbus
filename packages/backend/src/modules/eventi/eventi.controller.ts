@@ -114,6 +114,9 @@ export const eventiController = {
   async venditePerFermata(req: Request, res: Response) {
     res.json(await eventiService.venditePerFermata(req.params.tragittoId));
   },
+  async suggerimentoLinea(req: Request, res: Response) {
+    res.json(await eventiService.suggerimentoLinea(req.params.tragittoId));
+  },
 
   async allertePartenze(_req: Request, res: Response) {
     res.json({ conteggio: await eventiService.contaAllertePartenze() });
@@ -127,8 +130,8 @@ export const eventiController = {
   async eventiPreventiviDaRichiedere(_req: Request, res: Response) {
     res.json({ conteggio: await eventiService.contaEventiPreventiviDaRichiedere() });
   },
-  async eventiDaCostruireLinee(_req: Request, res: Response) {
-    res.json({ conteggio: await eventiService.contaEventiDaCostruireLinee() });
+  async lineeProntoDaConfermare(_req: Request, res: Response) {
+    res.json({ conteggio: await eventiService.contaLineeProntoDaConfermare() });
   },
   async allertePartenzePerEvento(_req: Request, res: Response) {
     res.json(await eventiService.allertePartenzePerEvento());

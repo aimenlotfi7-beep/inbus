@@ -119,7 +119,7 @@ export function AdminLayout({
   const [allertePartenze, setAllertePartenze] = useState(0);
   const [eventiDaCalcolareOrari, setEventiDaCalcolareOrari] = useState(0);
   const [eventiDaPrezzare, setEventiDaPrezzare] = useState(0);
-  const [eventiDaCostruireLinee, setEventiDaCostruireLinee] = useState(0);
+  const [lineeProntoDaConfermare, setLineeProntoDaConfermare] = useState(0);
   const [preventiviDaValutare, setPreventiviDaValutare] = useState(0);
   const [eventiPreventiviDaRichiedere, setEventiPreventiviDaRichiedere] = useState(0);
   const [inAttesa, setInAttesa] = useState(0);
@@ -139,7 +139,7 @@ export function AdminLayout({
     eventiApi.allertePartenze().then((r) => setAllertePartenze(r.conteggio)).catch(() => {});
     eventiApi.eventiDaCalcolareOrari().then((r) => setEventiDaCalcolareOrari(r.conteggio)).catch(() => {});
     eventiApi.eventiDaPrezzare().then((r) => setEventiDaPrezzare(r.conteggio)).catch(() => {});
-    eventiApi.eventiDaCostruireLinee().then((r) => setEventiDaCostruireLinee(r.conteggio)).catch(() => {});
+    eventiApi.lineeProntoDaConfermare().then((r) => setLineeProntoDaConfermare(r.conteggio)).catch(() => {});
     eventiApi.eventiPreventiviDaRichiedere().then((r) => setEventiPreventiviDaRichiedere(r.conteggio)).catch(() => {});
     preventiviApi.contaDaValutare().then((r) => setPreventiviDaValutare(r.conteggio)).catch(() => {});
     listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
@@ -174,7 +174,7 @@ export function AdminLayout({
   function notificaVoce(id: string): number {
     if (id === 'partenze-orari') return eventiDaCalcolareOrari;
     if (id === 'partenze-prezzi') return eventiDaPrezzare;
-    if (id === 'partenze-da-confermare') return eventiDaCostruireLinee;
+    if (id === 'partenze-da-confermare') return lineeProntoDaConfermare;
     if (id === 'partenze-preventivi') return preventiviDaValutare + eventiPreventiviDaRichiedere;
     if (id === 'partenze-confermato') return allertePartenze;
     if (id === 'lista-attesa') return inAttesa;
@@ -269,7 +269,7 @@ export function AdminLayout({
                         title={
                           voce.id === 'partenze-orari' ? `${eventiDaCalcolareOrari} evento/i senza ancora nessun orario impostato`
                             : voce.id === 'partenze-prezzi' ? `${eventiDaPrezzare} evento/i con almeno un tragitto non ancora prezzato`
-                            : voce.id === 'partenze-da-confermare' ? `${eventiDaCostruireLinee} evento/i con almeno un tragitto prezzato ma senza ancora una Linea`
+                            : voce.id === 'partenze-da-confermare' ? `${lineeProntoDaConfermare} evento/i con una Linea pronta da confermare (soglia di pareggio raggiunta)`
                             : voce.id === 'partenze-preventivi' ? `${eventiPreventiviDaRichiedere} evento/i pronto/i per una richiesta preventivo, ${preventiviDaValutare} con risposte da valutare`
                             : voce.id === 'partenze-confermato' ? `${allertePartenze} tratta/e con posti superati`
                             : voce.id === 'lista-attesa' ? `${inAttesa} iscrizione/i in attesa di promozione`

@@ -21,7 +21,7 @@ import {
 import crypto from 'node:crypto';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
-import { leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
+import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema } from './eventi.dto.js';
 import { rilevaVariazioni, generaComunicazioniVariazione } from '../variazioni/variazioni.service.js';
@@ -1462,6 +1462,64 @@ export const eventiService = {
     };
   },
 
+  /** Il cuore di "Da Confermare": appena le prenotazioni confermate
+   *  raggiungono la soglia di pareggio, suggerisce una Linea pronta da
+   *  confermare — fornitore, costo e posti presi dal preventivo già
+   *  accettato (nessuno da indovinare). Segnala anche le fermate SENZA
+   *  prenotazioni (candidate a disattivare: il banner "km cambiati" già
+   *  esistente in Linee scatta da solo appena l'admin le disattiva —
+   *  nessuna logica di confronto km duplicata qui) e, se una Linea vera
+   *  esiste già ma non basta più, che serve un secondo bus. */
+  async suggerimentoLinea(tragittoId: string) {
+    const [t] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!t) throw new NonTrovato('Tragitto');
+
+    const fermateDelTragitto = await db.select({ id: fermate.id, citta: fermate.citta })
+      .from(fermate).where(and(eq(fermate.tragittoId, tragittoId), eq(fermate.attivo, true)));
+
+    const righeConfermate = await db.select({ citta: prenotazioni.fermataCitta, passeggeri: prenotazioni.passeggeri })
+      .from(prenotazioni).where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA')));
+    const confermatiPerCitta = new Map<string, number>();
+    for (const r of righeConfermate) confermatiPerCitta.set(r.citta, (confermatiPerCitta.get(r.citta) ?? 0) + r.passeggeri);
+    const totaleConfermati = righeConfermate.reduce((s, r) => s + r.passeggeri, 0);
+
+    // Bus VERI già registrati su questo tragitto (non il tetto "quasi
+    // illimitato" — quello non conta come capienza reale).
+    const busReali = await db.select({ postiBus: busFisici.postiBus }).from(busFisici)
+      .innerJoin(linee, eq(linee.id, busFisici.lineaId)).where(eq(linee.tragittoId, tragittoId));
+    const capienzaReale = busReali.reduce((s, b) => s + (b.postiBus ?? 0), 0);
+    const lineaGiaConfermata = busReali.length > 0;
+
+    if (lineaGiaConfermata) {
+      return {
+        pronta: false, lineaGiaConfermata: true,
+        serveSecondoBus: totaleConfermati > capienzaReale,
+        totaleConfermati, capienzaReale,
+      } as const;
+    }
+
+    if (!t.preventivoCosto || !t.preventivoPostiBus) {
+      // Non dovrebbe capitare (i prezzi si calcolano solo da un
+      // preventivo già noto), ma se capita non c'è nulla da suggerire.
+      return { pronta: false, lineaGiaConfermata: false, serveSecondoBus: false, totaleConfermati, capienzaReale: 0 } as const;
+    }
+
+    const soglia = await leggiSogliaOccupazionePareggio();
+    const postiDiPareggio = Math.round(t.preventivoPostiBus * (soglia / 100));
+    if (totaleConfermati < postiDiPareggio) {
+      return { pronta: false, lineaGiaConfermata: false, serveSecondoBus: false, totaleConfermati, postiDiPareggio, capienzaReale: 0 } as const;
+    }
+
+    const fermateSenzaPrenotazioni = fermateDelTragitto.filter((f) => !(confermatiPerCitta.get(f.citta) ?? 0));
+
+    return {
+      pronta: true, lineaGiaConfermata: false, serveSecondoBus: false,
+      totaleConfermati, postiDiPareggio, capienzaReale: 0,
+      fornitoreId: t.fornitoreId, costo: t.preventivoCosto ? Number(t.preventivoCosto) : null, postiBus: t.preventivoPostiBus,
+      fermateSenzaPrenotazioni,
+    } as const;
+  },
+
   /** Conta quante tratte, in tutti gli eventi, NON sono coperte — cioè
    *  hanno passeggeri confermati ma i bus censiti su quella tratta non
    *  bastano a contenerli tutti. Usato per il pallino di notifica sulla
@@ -1549,6 +1607,43 @@ export const eventiService = {
    *  accettato — il segnale "c'è qualcosa da fare in Preventivi",
    *  distinto da "risposte arrivate da valutare" (contaDaValutare, nel
    *  modulo preventivi) che invece guarda le richieste già inviate. */
+  /** Quanti EVENTI hanno almeno un tragitto con una Linea pronta da
+   *  confermare (soglia di pareggio raggiunta, nessun bus vero ancora
+   *  registrato) — per il pallino di notifica su "Da Confermare" nel
+   *  menu, stesso schema degli altri badge di Partenze. Query mirata,
+   *  non un giro di suggerimentoLinea() per ogni tragitto uno per uno. */
+  async contaLineeProntoDaConfermare() {
+    const candidati = await db.select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id, preventivoPostiBus: tragitti.preventivoPostiBus })
+      .from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(and(
+        isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`,
+        inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), sql`${tragitti.preventivoPostiBus} IS NOT NULL`,
+      ));
+    if (candidati.length === 0) return 0;
+
+    // Fuori i tragitti che hanno GIÀ un bus vero — quelli non sono più
+    // "da suggerire", sono già confermati (o da ampliare, altro badge).
+    const conBusVero = await db.select({ tragittoId: linee.tragittoId }).from(linee)
+      .innerJoin(busFisici, eq(busFisici.lineaId, linee.id)).where(inArray(linee.tragittoId, candidati.map((c) => c.tragittoId)));
+    const idConBus = new Set(conBusVero.map((r) => r.tragittoId));
+    const daValutare = candidati.filter((c) => !idConBus.has(c.tragittoId));
+    if (daValutare.length === 0) return 0;
+
+    const somme = await db.select({ tragittoId: prenotazioni.tragittoId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
+      .from(prenotazioni).where(and(inArray(prenotazioni.tragittoId, daValutare.map((c) => c.tragittoId)), eq(prenotazioni.stato, 'CONFERMATA')))
+      .groupBy(prenotazioni.tragittoId);
+    const confermatiPerTragitto = new Map(somme.map((s) => [s.tragittoId, Number(s.totale)]));
+
+    const soglia = await leggiSogliaOccupazionePareggio();
+    const eventiPronti = new Set<string>();
+    for (const c of daValutare) {
+      const confermati = confermatiPerTragitto.get(c.tragittoId) ?? 0;
+      const postiDiPareggio = Math.round((c.preventivoPostiBus ?? 0) * (soglia / 100));
+      if (confermati >= postiDiPareggio && postiDiPareggio > 0) eventiPronti.add(c.eventoId);
+    }
+    return eventiPronti.size;
+  },
+
   async contaEventiPreventiviDaRichiedere() {
     const righeTragitti = await db
       .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id, fornitoreId: tragitti.fornitoreId })
@@ -1583,21 +1678,6 @@ export const eventiService = {
    *  nessuna Linea costruita — questo, e non lo stato interno
    *  "DA_CONFERMARE" (un nome simile ma un concetto diverso), è il
    *  conteggio giusto per la tappa di menu "Da Confermare". */
-  async contaEventiDaCostruireLinee() {
-    const righeTragitti = await db
-      .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id })
-      .from(tragitti)
-      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.stato, 'PREZZATO'), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
-    if (righeTragitti.length === 0) return 0;
-
-    const tragittiIds = righeTragitti.map((r) => r.tragittoId);
-    const lineeEsistenti = await db.select({ tragittoId: linee.tragittoId }).from(linee).where(inArray(linee.tragittoId, tragittiIds));
-    const conLinea = new Set(lineeEsistenti.map((l) => l.tragittoId));
-    const senzaLinea = righeTragitti.filter((r) => !conLinea.has(r.tragittoId));
-    return new Set(senzaLinea.map((r) => r.eventoId)).size;
-  },
-
   async contaAllertePartenze() {
     const righeTragitti = await db.select({ tragittoId: tragitti.id, postiTotali: tragitti.postiTotali }).from(tragitti);
     if (righeTragitti.length === 0) return 0;

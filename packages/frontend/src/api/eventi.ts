@@ -78,6 +78,18 @@ export interface Linea { id: string; nome: string; fermate: FermataLinea[]; bus:
 export interface PasseggeroBus { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string; }
 export interface RiepilogoEconomicoLinea { lineaId: string; lineaNome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; }
 export interface RiepilogoEconomicoTratta { tragittoId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; perLinea: RiepilogoEconomicoLinea[]; }
+export interface SuggerimentoLinea {
+  pronta: boolean;
+  lineaGiaConfermata: boolean;
+  serveSecondoBus: boolean;
+  totaleConfermati: number;
+  postiDiPareggio?: number;
+  capienzaReale: number;
+  fornitoreId?: string | null;
+  costo?: number | null;
+  postiBus?: number | null;
+  fermateSenzaPrenotazioni?: { id: string; citta: string }[];
+}
 export interface VenditePerFermata {
   perFermata: { citta: string; confermati: number }[];
   andamento: { data: string; citta: string; cumulativo: number }[];
@@ -122,11 +134,12 @@ export const eventiApi = {
   listaPasseggeriBus: (id: string, busId: string) => api.get<PasseggeroBus[]>(`/api/eventi/${id}/bus/${busId}/passeggeri`),
   riepilogoEconomico: (id: string) => api.get<RiepilogoEconomicoTratta[]>(`/api/eventi/${id}/riepilogo-economico`),
   venditePerFermata: (tragittoId: string) => api.get<VenditePerFermata>(`/api/eventi/tragitti/${tragittoId}/vendite`),
+  suggerimentoLinea: (tragittoId: string) => api.get<SuggerimentoLinea>(`/api/eventi/tragitti/${tragittoId}/suggerimento-linea`),
   allertePartenze: () => api.get<{ conteggio: number }>('/api/eventi/allerte-partenze'),
   eventiDaCalcolareOrari: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-calcolare-orari'),
   eventiDaPrezzare: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-prezzare'),
   eventiPreventiviDaRichiedere: () => api.get<{ conteggio: number }>('/api/eventi/eventi-preventivi-da-richiedere'),
-  eventiDaCostruireLinee: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-costruire-linee'),
+  lineeProntoDaConfermare: () => api.get<{ conteggio: number }>('/api/eventi/linee-pronto-da-confermare'),
   allertePartenzePerEvento: () => api.get<Record<string, number>>('/api/eventi/allerte-partenze-per-evento'),
   elencoPartenze: () => api.get<Array<{
     tragittoId: string; tragittoNome: string;
