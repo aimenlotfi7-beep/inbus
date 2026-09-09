@@ -365,8 +365,8 @@
        c'era un bordo a rivelarlo, con un bordo il testo sembrava tagliato. */
     display:inline-flex; align-items:center; justify-content:center;
     font-size:12.5px; font-weight:700; color:var(--night); background:var(--paper);
-    padding:10px 18px; border-radius:999px; border:1px solid var(--amber); cursor:pointer;
-    transition:background .15s ease; min-height:38px; white-space:nowrap;
+    padding:7px 18px; border-radius:6px; border:1px solid var(--amber); cursor:pointer;
+    transition:background .15s ease; min-height:28px; white-space:nowrap;
   }
   .card-cta:hover{background:var(--pink); color:var(--night);}
   .chat-cta{
