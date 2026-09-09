@@ -7,12 +7,20 @@ export interface Coupon {
   valore: string;
   usiMax: number | null;
   usiAttuali: number;
+  validoDal: string | null;
+  validoAl: string | null;
   attivo: boolean;
   eventoId: string | null;
   promoterId: string | null;
+  compensoTipo: 'PERCENTUALE' | 'FISSO' | null;
+  compensoValore: string | null;
+  compensoFissoPer: 'ACQUISTO' | 'PASSEGGERO' | null;
 }
 export interface CouponInput {
-  codice: string; tipo: 'PERCENTUALE' | 'FISSO'; valore: number; usiMax?: number; attivo?: boolean; eventoId?: string | null; promoterId?: string | null;
+  codice: string; tipo: 'PERCENTUALE' | 'FISSO'; valore: number; usiMax?: number;
+  validoDal?: string | null; validoAl?: string | null;
+  attivo?: boolean; eventoId?: string | null; promoterId?: string | null;
+  compensoTipo?: 'PERCENTUALE' | 'FISSO' | null; compensoValore?: number | null; compensoFissoPer?: 'ACQUISTO' | 'PASSEGGERO' | null;
 }
 
 export const couponApi = {

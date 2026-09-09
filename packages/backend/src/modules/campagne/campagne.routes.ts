@@ -3,6 +3,7 @@ import { eq, and, gte } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { campagne, prenotazioni, promoter } from '../../db/schema.js';
+import { calcolaCommissionePromoter } from '../../shared/commissionePromoter.js';
 import { NonTrovato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
@@ -56,42 +57,52 @@ async function reportFatturatoPerFonte(dataDa?: Date) {
     db.select({
       utmSource: prenotazioni.utmSource, utmMedium: prenotazioni.utmMedium, utmCampaign: prenotazioni.utmCampaign,
       promoterCodice: prenotazioni.promoterCodice, totale: prenotazioni.totale, scontoBundle: prenotazioni.scontoBundle,
-      passeggeri: prenotazioni.passeggeri,
+      passeggeri: prenotazioni.passeggeri, couponCodice: prenotazioni.couponCodice,
     }).from(prenotazioni).where(and(eq(prenotazioni.stato, 'CONFERMATA'), dataDa ? gte(prenotazioni.creataIl, dataDa) : undefined)),
     db.select().from(campagne),
     db.select().from(promoter),
   ]);
 
-  interface Gruppo { fonte: string; tipo: 'promoter' | 'campagna' | 'utm_non_registrata' | 'diretto'; numeroPrenotazioni: number; passeggeri: number; fatturato: number; scontoBundleApplicato: number; commissionePercentuale?: number; }
+  interface Gruppo {
+    fonte: string; tipo: 'promoter' | 'campagna' | 'utm_non_registrata' | 'diretto';
+    numeroPrenotazioni: number; passeggeri: number; fatturato: number; scontoBundleApplicato: number;
+    defaultPercentuale?: number; righeGruppo: { totale: number; passeggeri: number; couponCodice: string | null }[];
+  }
   const gruppi = new Map<string, Gruppo>();
 
   for (const r of righe) {
-    let chiave: string; let fonte: string; let tipo: Gruppo['tipo']; let commissionePercentuale: number | undefined;
+    let chiave: string; let fonte: string; let tipo: Gruppo['tipo']; let defaultPercentuale: number | undefined;
     const p = r.promoterCodice ? tuttiPromoter.find((x) => x.codice === r.promoterCodice) : undefined;
     if (r.promoterCodice) {
       chiave = `promoter:${r.promoterCodice}`; tipo = 'promoter';
       fonte = p ? `Promoter — ${p.nome}` : `Promoter — codice "${r.promoterCodice}" (non trovato)`;
-      commissionePercentuale = p ? Number(p.commissionePercentuale) : undefined;
+      defaultPercentuale = p ? Number(p.commissionePercentuale) : undefined;
     } else {
       const c = r.utmSource ? tutteCampagne.find((x) => x.utmSource === r.utmSource && (x.utmMedium ?? null) === (r.utmMedium ?? null) && (x.utmCampaign ?? null) === (r.utmCampaign ?? null)) : undefined;
       if (c) { chiave = `campagna:${c.id}`; tipo = 'campagna'; fonte = c.nome; }
       else if (r.utmSource) { chiave = `utm:${r.utmSource}/${r.utmMedium ?? ''}`; tipo = 'utm_non_registrata'; fonte = `${r.utmSource}${r.utmMedium ? ` / ${r.utmMedium}` : ''} (nessuna campagna registrata)`; }
       else { chiave = 'diretto'; tipo = 'diretto'; fonte = 'Diretto / organico (nessun dato di provenienza)'; }
     }
-    const g = gruppi.get(chiave) ?? { fonte, tipo, numeroPrenotazioni: 0, passeggeri: 0, fatturato: 0, scontoBundleApplicato: 0, commissionePercentuale };
+    const g = gruppi.get(chiave) ?? { fonte, tipo, numeroPrenotazioni: 0, passeggeri: 0, fatturato: 0, scontoBundleApplicato: 0, defaultPercentuale, righeGruppo: [] };
     g.numeroPrenotazioni += 1;
     g.passeggeri += r.passeggeri;
     g.fatturato += Number(r.totale);
     g.scontoBundleApplicato += Number(r.scontoBundle ?? 0);
+    g.righeGruppo.push({ totale: Number(r.totale), passeggeri: r.passeggeri, couponCodice: r.couponCodice });
     gruppi.set(chiave, g);
   }
 
-  return [...gruppi.values()]
-    .map((g) => {
-      const commissione = g.commissionePercentuale != null ? Math.round(g.fatturato * g.commissionePercentuale) / 100 : 0;
-      return { ...g, commissione, margineNetto: g.fatturato - commissione };
-    })
-    .sort((a, b) => b.fatturato - a.fatturato);
+  const risultati = await Promise.all([...gruppi.values()].map(async (g) => {
+    // La commissione non è più "fatturato × un'unica percentuale": un
+    // coupon può avere un compenso proprio (percentuale diversa, o un
+    // importo fisso), quindi si calcola riga per riga (vedi
+    // shared/commissionePromoter.ts, condivisa con le statistiche del
+    // promoter stesso — stessa logica, un solo posto dove viverla).
+    const commissione = g.defaultPercentuale != null ? await calcolaCommissionePromoter(g.righeGruppo, g.defaultPercentuale) : 0;
+    const { righeGruppo, defaultPercentuale, ...resto } = g;
+    return { ...resto, commissione, margineNetto: g.fatturato - commissione };
+  }));
+  return risultati.sort((a, b) => b.fatturato - a.fatturato);
 }
 
 export const campagneRouter = Router();

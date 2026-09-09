@@ -1,7 +1,7 @@
 import { and, eq, ne, sql, desc, inArray, isNull, gte } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, lineaFermate, busFisici, promoter, promoterEventi, whiteLabel } from '../../db/schema.js';
+import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, lineaFermate, busFisici, promoter, promoterEventi, promoterLink, whiteLabel } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { bundleService } from '../bundle/bundle.service.js';
@@ -199,11 +199,32 @@ async function creaRigaInterna(
   // Un codice promoter (da link o da coupon) deve corrispondere a un
   // promoter vero e non escluso da questo evento — controllo aggiunto
   // qui, prima c'era solo un campo di testo salvato senza verifica.
+  //
+  // Il codice che arriva può essere: il codice opaco di un LINK
+  // (promoter, evento) — mai il codice leggibile del promoter, non
+  // deve comparire nell'URL — oppure, per compatibilità, ancora il
+  // codice diretto del promoter (vecchi link già condivisi). In
+  // entrambi i casi, quello che si SALVA su prenotazioni.promoterCodice
+  // resta sempre il codice VERO del promoter (mai quello del link):
+  // tutte le statistiche/report esistenti si aspettano quello, non
+  // cambia nulla a valle.
+  let promoterCodiceDaSalvare = promoterCodiceEffettivo;
   if (promoterCodiceEffettivo) {
-    const [p] = await tx.select().from(promoter).where(eq(promoter.codice, promoterCodiceEffettivo)).limit(1);
+    const [link] = await tx.select().from(promoterLink).where(eq(promoterLink.codice, promoterCodiceEffettivo)).limit(1);
+    let p: typeof promoter.$inferSelect | undefined;
+    if (link) {
+      // Il codice link è ANCHE specifico dell'evento — se qualcuno lo
+      // riusa su un evento diverso da quello per cui è stato generato,
+      // il codice semplicemente non corrisponde a nulla di valido qui.
+      if (link.eventoId !== input.eventoId) throw new ErroreApplicativo('Questo codice non è valido per questo evento.', 400, 'PROMOTER_EVENTO_ESCLUSO');
+      [p] = await tx.select().from(promoter).where(eq(promoter.id, link.promoterId)).limit(1);
+    } else {
+      [p] = await tx.select().from(promoter).where(eq(promoter.codice, promoterCodiceEffettivo)).limit(1);
+    }
     if (p) {
       const [escluso] = await tx.select().from(promoterEventi).where(and(eq(promoterEventi.promoterId, p.id), eq(promoterEventi.eventoId, input.eventoId))).limit(1);
       if (escluso) throw new ErroreApplicativo('Questo codice non è valido per questo evento.', 400, 'PROMOTER_EVENTO_ESCLUSO');
+      promoterCodiceDaSalvare = p.codice;
     }
     // Codice non riconosciuto: si salva comunque com'è (compatibilità —
     // potrebbe essere un vecchio codice o un typo, non blocca l'acquisto).
@@ -270,7 +291,7 @@ async function creaRigaInterna(
       scadenzaSaldo,
       metodoPagamento: input.metodoPagamento,
       utenteId: utente.id,
-      promoterCodice: promoterCodiceEffettivo,
+      promoterCodice: promoterCodiceDaSalvare,
       ...(canaleVendita && { canaleVendita: canaleVendita.canale, whiteLabelId: canaleVendita.whiteLabelId }),
     })
     .returning();

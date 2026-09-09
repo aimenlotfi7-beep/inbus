@@ -14,6 +14,12 @@ export const creaCouponSchema = z.object({
   // questo promoter — sconto al cliente e commissione al promoter
   // insieme, con un solo codice.
   promoterId: z.string().nullable().optional(),
+  // Compenso PER QUESTO CODICE — se assente, si usa il tasso di
+  // default dell'account del promoter. Rilevante solo se promoterId è
+  // impostato; compensoFissoPer solo se compensoTipo è FISSO.
+  compensoTipo: z.enum(['PERCENTUALE', 'FISSO']).nullable().optional(),
+  compensoValore: z.number().positive().nullable().optional(),
+  compensoFissoPer: z.enum(['ACQUISTO', 'PASSEGGERO']).nullable().optional(),
 });
 export type CreaCouponInput = z.infer<typeof creaCouponSchema>;
 export const aggiornaCouponSchema = creaCouponSchema.partial();

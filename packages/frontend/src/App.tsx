@@ -17,6 +17,7 @@ import { FornitorePreventivoPage } from './pages/FornitorePreventivoPage';
 import { BundleListaPage } from './pages/BundleListaPage';
 import { BundlePage } from './pages/BundlePage';
 import { TourPage } from './pages/TourPage';
+import { PromoterRedirectPage } from './pages/PromoterRedirectPage';
 import { FinalizzaListaAttesaPage } from './pages/FinalizzaListaAttesaPage';
 import { VariazionePage } from './pages/VariazionePage';
 import { CompletaSaldoPage } from './pages/CompletaSaldoPage';
@@ -86,6 +87,7 @@ export function App() {
       <Route path="/bundle" element={<Layout><BundleListaPage /></Layout>} />
       <Route path="/bundle/:slug" element={<BundlePage key={location.pathname} />} />
       <Route path="/tour/:slug" element={<TourPage key={location.pathname} />} />
+      <Route path="/p/:codice" element={<PromoterRedirectPage />} />
       <Route path="/w/:publicWidgetId" element={<WidgetPubblicoPage />} />
       <Route path="/scansione/accedi" element={<TourLeaderLoginPage />} />
       <Route path="/scansione/password-dimenticata" element={<TourLeaderPasswordDimenticataPage />} />

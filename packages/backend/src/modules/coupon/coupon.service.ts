@@ -27,6 +27,10 @@ export const couponService = {
       validoAl: input.validoAl,
       attivo: input.attivo,
       eventoId: input.eventoId ?? null,
+      promoterId: input.promoterId ?? null,
+      compensoTipo: input.compensoTipo ?? null,
+      compensoValore: input.compensoValore != null ? input.compensoValore.toFixed(2) : null,
+      compensoFissoPer: input.compensoFissoPer ?? null,
     }).returning();
     return nuovo;
   },
@@ -42,6 +46,10 @@ export const couponService = {
       ...(input.validoAl !== undefined && { validoAl: input.validoAl }),
       ...(input.attivo !== undefined && { attivo: input.attivo }),
       ...(input.eventoId !== undefined && { eventoId: input.eventoId }),
+      ...(input.promoterId !== undefined && { promoterId: input.promoterId }),
+      ...(input.compensoTipo !== undefined && { compensoTipo: input.compensoTipo }),
+      ...(input.compensoValore !== undefined && { compensoValore: input.compensoValore != null ? input.compensoValore.toFixed(2) : null }),
+      ...(input.compensoFissoPer !== undefined && { compensoFissoPer: input.compensoFissoPer }),
     }).where(eq(coupon.id, id)).returning();
     return aggiornato;
   },

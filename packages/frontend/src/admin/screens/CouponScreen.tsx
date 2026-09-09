@@ -32,7 +32,16 @@ export function CouponScreen() {
     : coupon;
 
   function apriNuovo() { setInModifica(null); setForm(VUOTO); setModaleAperta(true); }
-  function apriModifica(c: Coupon) { setInModifica(c); setForm({ codice: c.codice, tipo: c.tipo, valore: Number(c.valore), usiMax: c.usiMax ?? undefined, attivo: c.attivo, eventoId: c.eventoId ?? null, promoterId: c.promoterId ?? null }); setModaleAperta(true); }
+  function apriModifica(c: Coupon) {
+    setInModifica(c);
+    setForm({
+      codice: c.codice, tipo: c.tipo, valore: Number(c.valore), usiMax: c.usiMax ?? undefined,
+      validoDal: c.validoDal ? c.validoDal.slice(0, 10) : null, validoAl: c.validoAl ? c.validoAl.slice(0, 10) : null,
+      attivo: c.attivo, eventoId: c.eventoId ?? null, promoterId: c.promoterId ?? null,
+      compensoTipo: c.compensoTipo, compensoValore: c.compensoValore != null ? Number(c.compensoValore) : null, compensoFissoPer: c.compensoFissoPer,
+    });
+    setModaleAperta(true);
+  }
 
   const [salvando, setSalvando] = useState(false);
   async function salva() {
@@ -83,6 +92,42 @@ export function CouponScreen() {
             {promoterLista.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.codice})</option>)}
           </select>
           <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 4 }}>Chi usa questo coupon fa guadagnare la commissione a questo promoter, insieme allo sconto.</p>
+        </div>
+        {form.promoterId && (
+          <div className="section-card" style={{ marginBottom: 14 }}>
+            <p className="section-label" style={{ marginBottom: 8 }}>Compenso per questo codice</p>
+            <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 10 }}>Se non imposti nulla, si usa il tasso di default dell'account del promoter.</p>
+            <div className="form-grid">
+              <label>Tipo
+                <select value={form.compensoTipo ?? ''} onChange={(e) => setForm({ ...form, compensoTipo: (e.target.value || null) as CouponInput['compensoTipo'] })}>
+                  <option value="">— Tasso di default dell'account —</option>
+                  <option value="PERCENTUALE">Percentuale</option>
+                  <option value="FISSO">Importo fisso</option>
+                </select>
+              </label>
+              {form.compensoTipo && (
+                <label>{form.compensoTipo === 'PERCENTUALE' ? 'Percentuale (%)' : 'Importo (€)'}
+                  <CampoNumero valuta={form.compensoTipo === 'FISSO'} value={form.compensoValore ?? undefined} onChange={(v) => setForm({ ...form, compensoValore: v ?? null })} />
+                </label>
+              )}
+              {form.compensoTipo === 'FISSO' && (
+                <label>Si applica
+                  <select value={form.compensoFissoPer ?? 'ACQUISTO'} onChange={(e) => setForm({ ...form, compensoFissoPer: e.target.value as CouponInput['compensoFissoPer'] })}>
+                    <option value="ACQUISTO">Una volta per acquisto</option>
+                    <option value="PASSEGGERO">Per ogni passeggero</option>
+                  </select>
+                </label>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="form-grid" style={{ marginBottom: 14 }}>
+          <label>Valido dal (facoltativo)
+            <input type="date" value={form.validoDal ?? ''} onChange={(e) => setForm({ ...form, validoDal: e.target.value || null })} />
+          </label>
+          <label>Valido al (facoltativo)
+            <input type="date" value={form.validoAl ?? ''} onChange={(e) => setForm({ ...form, validoAl: e.target.value || null })} />
+          </label>
         </div>
         <div className="campo">
           <label><input type="checkbox" checked={form.attivo ?? true} onChange={(e) => setForm({ ...form, attivo: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Attivo</label>

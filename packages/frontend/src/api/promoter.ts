@@ -19,6 +19,13 @@ export interface PromoterInput {
   commissionePercentuale?: number; note?: string; eventiEsclusi?: string[];
 }
 
+export interface CouponPromoter {
+  codice: string; scontoTipo: 'PERCENTUALE' | 'FISSO'; scontoValore: number;
+  usiAttuali: number; usiMax: number | null; validoDal: string | null; validoAl: string | null; attivo: boolean;
+  compensoTipo: 'PERCENTUALE' | 'FISSO' | null; compensoValore: number | null; compensoFissoPer: 'ACQUISTO' | 'PASSEGGERO' | null;
+  commissionePercentualeDefault: number;
+}
+
 export const promoterApi = {
   list: () => api.get<Promoter[]>('/api/promoter'),
   create: (input: PromoterInput) => api.post<Promoter>('/api/promoter', input),
@@ -34,6 +41,11 @@ export const promoterApi = {
 
   // Self-service: il promoter vede i propri dati col proprio token (salvato separatamente da quello admin)
   me: () => apiPromoter.get<Promoter>('/api/promoter/me'),
-  meStatistiche: () => apiPromoter.get<{ numeroPrenotazioni: number; fatturato: number }>('/api/promoter/me/statistiche'),
-  meStatistichePerEvento: () => apiPromoter.get<Record<string, { numeroPrenotazioni: number; fatturato: number }>>('/api/promoter/me/statistiche-per-evento'),
+  meStatistiche: () => apiPromoter.get<{ numeroPrenotazioni: number; fatturato: number; commissione: number }>('/api/promoter/me/statistiche'),
+  meStatistichePerEvento: () => apiPromoter.get<Record<string, { numeroPrenotazioni: number; fatturato: number; commissione: number }>>('/api/promoter/me/statistiche-per-evento'),
+  meCoupon: () => apiPromoter.get<CouponPromoter[]>('/api/promoter/me/coupon'),
+  meLink: (eventoId: string) => apiPromoter.get<{ codice: string; url: string }>(`/api/promoter/me/link/${eventoId}`),
+  linkAdmin: (promoterId: string, eventoId: string) => api.get<{ codice: string; url: string }>(`/api/promoter/${promoterId}/link/${eventoId}`),
+  // Pubblica — risolve il codice opaco di /p/:codice in "a quale evento porta".
+  risolviLink: (codice: string) => api.get<{ eventoSlug: string }>(`/api/promoter/link/${codice}`),
 };

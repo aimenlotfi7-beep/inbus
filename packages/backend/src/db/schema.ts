@@ -49,6 +49,8 @@ export const metodoPagamentoEnum = pgEnum('metodo_pagamento', ['CARTA', 'PAYPAL'
 export const statoTourLeaderEnum = pgEnum('stato_tour_leader', ['CANDIDATO', 'ATTIVO', 'ARCHIVIATO']);
 export const canaleVenditaEnum = pgEnum('canale_vendita', ['INBUS', 'WHITE_LABEL', 'DIRECT']);
 export const tipoCouponEnum = pgEnum('tipo_coupon', ['PERCENTUALE', 'FISSO']);
+export const compensoTipoEnum = pgEnum('compenso_tipo', ['PERCENTUALE', 'FISSO']);
+export const compensoFissoPerEnum = pgEnum('compenso_fisso_per', ['ACQUISTO', 'PASSEGGERO']);
 export const autoreMessaggioEnum = pgEnum('autore_messaggio', ['CLIENTE', 'ADMIN']);
 export const statoListaAttesaEnum = pgEnum('stato_lista_attesa', ['IN_ATTESA', 'PROMOSSA']);
 // Etichetta di scarsità/abbondanza mostrata ai clienti al posto del
@@ -871,6 +873,24 @@ export const promoterEventi = pgTable('promoter_eventi', {
   pk: primaryKey({ columns: [t.promoterId, t.eventoId] }),
 }));
 
+// Un codice OPACO per ogni coppia (promoter, evento) — mai il codice
+// leggibile del promoter nel link (es. "AIMENL614"), e il link porta
+// DIRETTAMENTE alla pagina di quell'evento (prima, nella pagina
+// personale del promoter, il parametro ?evento= nel link non veniva
+// letto da nessuna parte: il cliente atterrava sulla home generica,
+// non sull'evento — corretto insieme a questo). Generato la prima
+// volta che serve (gestionale o pagina promoter), poi riusato sempre
+// uguale per quella coppia.
+export const promoterLink = pgTable('promoter_link', {
+  id: id(),
+  promoterId: text('promoter_id').notNull().references(() => promoter.id, { onDelete: 'cascade' }),
+  eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  codice: text('codice').notNull().unique(),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+}, (t) => ({
+  unicoPerCoppia: unique('promoter_link_unico').on(t.promoterId, t.eventoId),
+}));
+
 // ---------------------------------------------------------------------
 // ORGANIZZATORI — concetto separato dai promoter: un promoter promuove
 // con un codice sconto, un organizzatore ha un proprio sito e (in
@@ -1013,6 +1033,14 @@ export const coupon = pgTable('coupon', {
   // insieme, un solo codice) — in aggiunta al link ?promo= già
   // esistente, che resta indipendente.
   promoterId: text('promoter_id').references(() => promoter.id, { onDelete: 'set null' }),
+  // Compenso PER QUESTO CODICE — se nullo, si usa il tasso di default
+  // dell'account del promoter (commissionePercentuale). Solo rilevante
+  // se promoterId è impostato.
+  compensoTipo: compensoTipoEnum('compenso_tipo'),
+  compensoValore: numeric('compenso_valore', { precision: 10, scale: 2 }),
+  // Solo se compensoTipo = FISSO: l'importo si applica una volta per
+  // acquisto, o si moltiplica per il numero di passeggeri.
+  compensoFissoPer: compensoFissoPerEnum('compenso_fisso_per'),
 });
 
 // ---------------------------------------------------------------------

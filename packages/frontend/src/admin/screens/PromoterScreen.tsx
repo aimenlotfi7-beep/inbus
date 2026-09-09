@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { eventiApi } from '../../api/eventi';
 import { SelettoreEventi } from '../shared/SelettoreEventi';
 import { notifica } from '../shared/notifiche';
 import { promoterApi, type Promoter, type PromoterInput } from '../../api/promoter';
@@ -67,8 +68,11 @@ export function PromoterScreen() {
         <div className="campo"><label>Commissione %</label><CampoNumero value={form.commissionePercentuale ?? 10} onChange={(v) => setForm({ ...form, commissionePercentuale: v ?? 0 })} /></div>
         {inModifica && (
           <div className="campo">
-            <CampoCopiabile etichetta="Il suo link (sostituisci <slug-evento> con l'indirizzo della pagina)" valore={`${window.location.origin}/eventi/<slug-evento>?promo=${inModifica.codice}`} />
-            <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 4 }}>Il codice <b>{inModifica.codice}</b> resta lo stesso per tutti gli eventi che porta.</p>
+            <label>Il suo link per un evento</label>
+            <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 6 }}>
+              Un codice diverso per ogni evento (mai il suo nome nel link) — scegli l'evento, il link si genera da solo.
+            </p>
+            <SelettoreLinkPromoter promoterId={inModifica.id} />
           </div>
         )}
         <div className="campo">
@@ -104,6 +108,36 @@ export function PromoterScreen() {
         onModifica={apriModifica}
         onElimina={elimina}
       />
+    </div>
+  );
+}
+
+/** Sceglie un evento tra quelli esistenti, poi mostra il link opaco
+ *  già pronto per quella coppia (promoter, evento) — generato lato
+ *  server la prima volta che viene chiesto, sempre lo stesso dopo. */
+function SelettoreLinkPromoter({ promoterId }: { promoterId: string }) {
+  const [eventi, setEventi] = useState<{ id: string; artista: string; data: string }[]>([]);
+  const [eventoId, setEventoId] = useState('');
+  const [link, setLink] = useState<string | null>(null);
+  const [caricando, setCaricando] = useState(false);
+
+  useEffect(() => {
+    eventiApi.list().then((lista) => setEventi(lista.map((e) => ({ id: e.id, artista: e.artista, data: e.data })).sort((a, b) => a.data < b.data ? 1 : -1)));
+  }, []);
+
+  useEffect(() => {
+    if (!eventoId) { setLink(null); return; }
+    setCaricando(true);
+    promoterApi.linkAdmin(promoterId, eventoId).then((r) => setLink(r.url)).catch(() => setLink(null)).finally(() => setCaricando(false));
+  }, [promoterId, eventoId]);
+
+  return (
+    <div>
+      <select value={eventoId} onChange={(e) => setEventoId(e.target.value)} style={{ marginBottom: 8 }}>
+        <option value="">— Scegli un evento —</option>
+        {eventi.map((ev) => <option key={ev.id} value={ev.id}>{ev.artista} — {new Date(ev.data).toLocaleDateString('it-IT')}</option>)}
+      </select>
+      {eventoId && (caricando ? <p style={{ fontSize: 13, color: 'var(--mist)' }}>Genero il link...</p> : link && <CampoCopiabile etichetta="" valore={link} />)}
     </div>
   );
 }
