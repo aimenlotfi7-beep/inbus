@@ -64,10 +64,21 @@ function generaPnr() {
 /** Il coupon vale solo per l'acquisto pieno, non per il solo acconto —
  *  chi prenota ad acconto potrà comunque usarlo al momento di saldare
  *  il resto (vedi saldaResto più sotto), non qui. */
-async function validaCoupon(tx: Tx, codice: string | undefined, importo: number, eventoId: string, tipoPagamento: 'COMPLETO' | 'ACCONTO', emailCliente?: string) {
+async function validaCoupon(tx: Tx, codice: string | undefined, importo: number, eventoId: string, tipoPagamento: 'COMPLETO' | 'ACCONTO', emailCliente?: string, incrementaUso: boolean = true) {
   if (!codice) return { sconto: 0, coupon: null as Awaited<ReturnType<typeof couponService.verificaEIncrementaUtilizzo>>['coupon'] | null };
   if (tipoPagamento !== 'COMPLETO') {
     throw new ErroreApplicativo('Il coupon si può usare solo con il pagamento completo — con l\'acconto potrai applicarlo quando salderai il resto.', 400, 'COUPON_NON_VALIDO');
+  }
+  // BUG CORRETTO: in un ordine con più eventi (bundle/carrello), lo
+  // stesso codice arriva su OGNI articolo — se ogni riga incrementasse
+  // "usiAttuali" per conto suo, un solo acquisto da N eventi contava
+  // come N usi (2 eventi comprati 2 volte = 4 usi registrati invece di
+  // 2). Ogni riga continua a validare il codice (serve per calcolare
+  // lo sconto e la commissione promoter di QUELLA riga, correttamente),
+  // ma solo LA PRIMA di un ordine incrementa il contatore davvero — le
+  // altre leggono soltanto (couponService.valida, mai incrementaUtilizzo).
+  if (!incrementaUso) {
+    return couponService.valida(codice, importo, eventoId, emailCliente);
   }
   return couponService.verificaEIncrementaUtilizzo(tx, codice, importo, eventoId, emailCliente);
 }
@@ -117,6 +128,12 @@ async function creaRigaInterna(
    *  togliere a QUESTA riga prima di coupon/acconto/credito. Assente nel
    *  flusso singolo: nessun cambio di comportamento. */
   scontoBundle?: number,
+  /** Se questa riga deve incrementare DAVVERO il contatore di utilizzo
+   *  del coupon (usiAttuali) — true di default (comportamento del
+   *  flusso singolo, invariato). creaOrdine la passa false per tutte le
+   *  righe tranne la prima di un ordine multi-evento, per non contare
+   *  un solo acquisto più volte (vedi commento su validaCoupon). */
+  incrementaCoupon: boolean = true,
 ) {
   const [utente] = await tx.select().from(utenti).where(eq(utenti.id, utenteId)).limit(1);
   if (!utente) throw new NonAutorizzato('Account non trovato — effettua di nuovo il login.');
@@ -185,7 +202,7 @@ async function creaRigaInterna(
   // così ogni calcolo a valle — e ogni report che legge
   // prenotazioni.totale — lo vede senza saperne nulla.
   const importoBase = prezzoEffettivo * input.passeggeri - (scontoBundle ?? 0);
-  const { sconto, coupon: couponUsato } = await validaCoupon(tx, input.couponCodice, importoBase, input.eventoId, input.tipoPagamento, input.cliente.email);
+  const { sconto, coupon: couponUsato } = await validaCoupon(tx, input.couponCodice, importoBase, input.eventoId, input.tipoPagamento, input.cliente.email, incrementaCoupon);
 
   // Il coupon collegato a un promoter attribuisce la vendita anche a
   // lui — un solo codice per sconto e commissione insieme, in aggiunta
@@ -423,7 +440,7 @@ export const prenotazioniService = {
     const { ordine, righe } = await db.transaction(async (tx) => {
       const righeCreate = [];
       for (const [i, articolo] of articoli.entries()) {
-        righeCreate.push(await creaRigaInterna(tx, articolo, utenteId, canaleVendita, scontiPerRiga?.[i]));
+        righeCreate.push(await creaRigaInterna(tx, articolo, utenteId, canaleVendita, scontiPerRiga?.[i], i === 0));
       }
       const totaleOrdine = righeCreate.reduce((somma, r) => somma + Number(r.totale), 0);
       const scontoBundleTotale = scontiPerRiga ? scontiPerRiga.reduce((a, b) => a + b, 0) : null;
