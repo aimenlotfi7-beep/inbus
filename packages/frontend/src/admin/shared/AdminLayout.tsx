@@ -11,7 +11,7 @@ import { chatApi } from '../../api/chat';
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'bundle' | 'tour' | 'vetrina' | 'calendario' | 'cestino'
   | 'partenze-orari' | 'partenze-preventivi' | 'partenze-prezzi' | 'partenze-da-confermare' | 'partenze-confermato' | 'partenze-passate'
-  | 'transazioni' | 'pagamenti' | 'coupon' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi' | 'variazioni'
+  | 'transazioni' | 'pagamenti' | 'coupon' | 'voucher' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi' | 'variazioni'
   | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
   | 'fornitori' | 'fermate' | 'tragitti'
   | 'chat' | 'contenuti' | 'comunicazioni'
@@ -48,6 +48,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   { titolo: 'Marketing', voci: [
     { id: 'campagne', label: 'Campagne', permesso: 'campagne.gestisci' },
     { id: 'tracciamento', label: 'Tracciamento', permesso: 'impostazioni.gestisci' },
+    { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
     { id: 'offerte', label: 'Offerte', permesso: 'offerte.gestisci' },
     { id: 'vetrina', label: 'Vetrina', permesso: 'eventi.vetrina' },
     { id: 'contenuti', label: 'Contenuti sito', permesso: 'pagine.gestisci' },
@@ -58,7 +59,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
     { id: 'rimborsi', label: 'Rimborsi', permesso: 'prenotazioni.pagamenti' },
     { id: 'utenti', label: 'Utenti', permesso: 'utenti.visualizza' },
-    { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
+    { id: 'voucher', label: 'Voucher', permesso: 'coupon.visualizza' },
     { id: 'chat', label: 'Chat', permesso: 'chat.visualizza' },
     { id: 'comunicazioni', label: 'Comunicazioni', permesso: 'eventi.crea' },
   ]},
