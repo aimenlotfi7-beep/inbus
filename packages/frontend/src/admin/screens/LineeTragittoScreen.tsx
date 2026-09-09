@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { notifica } from '../shared/notifiche';
-import { eventiApi, type Linea, type BusDiLineaInput, type CalcoloBusTragitto } from '../../api/eventi';
+import { eventiApi, type Linea, type BusDiLineaInput, type SuggerimentoLinea } from '../../api/eventi';
 import type { Evento, Fermata } from '../../api/types';
 import { fornitoriApi, type Fornitore } from '../../api/fornitori';
 import { preventiviApi } from '../../api/preventivi';
@@ -40,7 +40,6 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   const incorporata = !!props?.incorporata;
 
   const [evento, setEvento] = useState<Evento | null>(null);
-  const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
   const [linee, setLinee] = useState<Linea[]>([]);
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
   const [tourLeaders, setTourLeaders] = useState<TourLeader[]>([]);
@@ -48,7 +47,6 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   const [errore, setErrore] = useState('');
 
   const [tab, setTab] = useState<'fermate' | 'linee'>('linee');
-  const [gestisciFermateAperto, setGestisciFermateAperto] = useState(false);
   const [lineeEspanse, setLineeEspanse] = useState<Set<string>>(new Set());
   const [lineaAttivaId, setLineaAttivaId] = useState<string | null>(null);
 
@@ -57,6 +55,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   const [formBus, setFormBus] = useState<BusDiLineaInput & { postiBus?: number }>(BUS_VUOTO);
   const [fermateSelezionate, setFermateSelezionate] = useState<string[]>([]);
   const [verificaKm, setVerificaKm] = useState<{ kmAccettati: number | null; kmAttuali: number | null; cambiatoParecchio: boolean } | null>(null);
+  const [suggerimento, setSuggerimento] = useState<SuggerimentoLinea | null>(null);
   const [salvando, setSalvando] = useState(false);
 
   const [modificaBusId, setModificaBusId] = useState<string | null>(null);
@@ -70,16 +69,20 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     if (!eventoId || !tragittoId) return;
     setCaricamento(true);
     setErrore('');
-    Promise.all([eventiApi.getById(eventoId), eventiApi.calcolaBus(eventoId), eventiApi.listaLinee(tragittoId)])
-      .then(([ev, c, l]) => { setEvento(ev); setCalcolo(c); setLinee(l); })
+    Promise.all([eventiApi.getById(eventoId), eventiApi.listaLinee(tragittoId)])
+      .then(([ev, l]) => { setEvento(ev); setLinee(l); })
       .catch((e) => setErrore(e instanceof ErroreApi ? e.message : 'Impossibile caricare la pagina.'))
       .finally(() => setCaricamento(false));
+    // Anche il suggerimento — dopo aver creato/modificato una Linea, i
+    // suoi numeri (o "già confermata") potrebbero non valere più.
+    eventiApi.suggerimentoLinea(tragittoId).then(setSuggerimento).catch(() => {});
   }
   useEffect(() => {
     ricarica();
     fornitoriApi.list().then(setFornitori).catch(() => setFornitori([]));
     tourLeaderApi.list().then(setTourLeaders).catch(() => setTourLeaders([]));
     if (tragittoId) preventiviApi.verificaKm(tragittoId).then(setVerificaKm).catch(() => {});
+    if (tragittoId) eventiApi.suggerimentoLinea(tragittoId).then(setSuggerimento).catch(() => setSuggerimento(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventoId, tragittoId]);
 
@@ -118,8 +121,6 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     );
   }
   const fermateAttive = tragittoVero.fermate.filter((f: Fermata) => f.attivo);
-  const calcoloTragitto = calcolo.find((c) => c.tragittoId === tragittoId);
-  const partecipantiPerFermata = new Map(calcoloTragitto?.fermate.map((f) => [f.fermataId, f.passeggeri]) ?? []);
 
   function perOrario(a: Fermata, b: Fermata) {
     if (!a.orario && !b.orario) return 0;
@@ -148,15 +149,6 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     }
   }
 
-  function contatoriCitta(f: Fermata) {
-    const versati = linee.reduce((tot, l) => tot + (l.fermate.find((lf) => lf.citta === f.citta)?.versati ?? 0), 0);
-    const primaLineaConQuestaCitta = linee.find((l) => l.fermate.some((lf) => lf.citta === f.citta));
-    const inAttesa = primaLineaConQuestaCitta
-      ? primaLineaConQuestaCitta.fermate.find((lf) => lf.citta === f.citta)!.inAttesa
-      : partecipantiPerFermata.get(f.id) ?? 0;
-    return { inAttesa, versati };
-  }
-
   function prenotazioniLinea(l: Linea): number {
     return l.fermate.reduce((tot, f) => tot + f.inAttesa + f.versati, 0);
   }
@@ -164,6 +156,19 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   function apriPopupNuovaLinea() {
     setFormBus(BUS_VUOTO);
     setFermateSelezionate([]);
+    setStepPopup(1);
+    setPopupAperto(true);
+  }
+
+  /** Dal pannello "Pronta da confermare" — fornitore/posti/costo già
+   *  presi dal preventivo accettato (nulla da indovinare), e tutte le
+   *  fermate attive pre-selezionate (il caso comune: si conferma la
+   *  Linea così com'è). Riferimento del bus (targa) resta da compilare
+   *  — quello non lo sa nessun preventivo. */
+  function apriPopupDaSuggerimento() {
+    if (!suggerimento) return;
+    setFormBus({ riferimento: '', fornitoreId: suggerimento.fornitoreId ?? undefined, postiBus: suggerimento.postiBus ?? undefined, costo: suggerimento.costo ?? undefined });
+    setFermateSelezionate(fermateAttive.map((f) => f.id));
     setStepPopup(1);
     setPopupAperto(true);
   }
@@ -293,18 +298,17 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => tornaAPartenze()}>← Torna alle partenze</button>
       )}
 
-      <PanelHead
-        titolo={tragittoVero.nome}
-        azione={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-ghost" onClick={() => { setTab('fermate'); setGestisciFermateAperto(true); }}>Gestisci fermate</button>
-            <button className="btn btn-primary" onClick={apriPopupNuovaLinea}>+ Nuova linea</button>
-          </div>
-        }
-      />
-      <p className="testo-intro" style={{ marginTop: -8, marginBottom: 16 }}>
-        {evento.artista} · {fermateAttive.length} fermat{fermateAttive.length === 1 ? 'a' : 'e'} · {linee.length} line{linee.length === 1 ? 'a' : 'e'}
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <p className="testo-intro" style={{ margin: 0 }}>
+          {evento.artista} · {fermateAttive.length} fermat{fermateAttive.length === 1 ? 'a' : 'e'} · {linee.length} line{linee.length === 1 ? 'a' : 'e'}
+        </p>
+        <button className="btn btn-primary" style={{ fontSize: 12.5, padding: '6px 14px' }} onClick={apriPopupNuovaLinea}>+ Nuova linea</button>
+      </div>
+
+      <div className="mini-tabs" style={{ marginTop: 10, marginBottom: 16 }}>
+        <button type="button" className={`mini-tab${tab === 'fermate' ? ' active' : ''}`} style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setTab('fermate')}>Fermate ({fermateAttive.length})</button>
+        <button type="button" className={`mini-tab${tab === 'linee' ? ' active' : ''}`} style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setTab('linee')}>Linee ({linee.length})</button>
+      </div>
 
       {verificaKm?.cambiatoParecchio && (
         <div style={{ background: 'var(--dusk)', border: '1px solid var(--amber)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -313,61 +317,58 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         </div>
       )}
 
-      <div className="mini-tabs" style={{ marginBottom: 20 }}>
-        <button type="button" className={`mini-tab${tab === 'fermate' ? ' active' : ''}`} onClick={() => setTab('fermate')}>Fermate ({fermateAttive.length})</button>
-        <button type="button" className={`mini-tab${tab === 'linee' ? ' active' : ''}`} onClick={() => setTab('linee')}>Linee ({linee.length})</button>
-      </div>
+      {/* Suggerimento automatico — appena le prenotazioni confermate
+          raggiungono la soglia di pareggio, dice "puoi creare la Linea"
+          con fornitore/costo/posti già presi dal preventivo accettato:
+          nulla da indovinare, solo da controllare e confermare. */}
+      {suggerimento?.pronta && (
+        <div className="section-card" style={{ marginBottom: 16, borderColor: 'var(--green)' }}>
+          <p style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>✓ Pronta da confermare</p>
+          <p style={{ fontSize: 13.5, marginBottom: 8 }}>
+            {suggerimento.totaleConfermati} passeggeri confermati (soglia di pareggio: {suggerimento.postiDiPareggio}) — puoi creare la Linea con {suggerimento.postiBus} posti a €{suggerimento.costo?.toFixed(2)}, gli stessi del preventivo accettato.
+          </p>
+          {!!suggerimento.fermateSenzaPrenotazioni?.length && (
+            <p style={{ fontSize: 12.5, color: 'var(--amber)', marginBottom: 8 }}>
+              ⚠ {suggerimento.fermateSenzaPrenotazioni.length} fermata/e senza nessuna prenotazione ({suggerimento.fermateSenzaPrenotazioni.map((f) => f.citta).join(', ')}) — se vuoi accorciare il tragitto, deselezionale nel passo 2 qui sotto; controlla anche il preventivo, potrebbe convenirti richiederne uno migliorativo (il banner "km cambiati" te lo segnala da solo).
+            </p>
+          )}
+          <button type="button" className="btn btn-primary" onClick={apriPopupDaSuggerimento}>Conferma Linea →</button>
+        </div>
+      )}
+      {suggerimento?.serveSecondoBus && (
+        <div className="section-card" style={{ marginBottom: 16, borderColor: 'var(--pink)' }}>
+          <p style={{ fontWeight: 700, color: 'var(--pink)', marginBottom: 6 }}>⚠ Serve un secondo bus</p>
+          <p style={{ fontSize: 13.5, marginBottom: 8 }}>
+            {suggerimento.totaleConfermati} passeggeri confermati, ma i bus già registrati coprono solo {suggerimento.capienzaReale} posti.
+          </p>
+          <button type="button" className="btn btn-primary" onClick={() => setTab('linee')}>Vai a Linee ↓</button>
+        </div>
+      )}
 
       {tab === 'fermate' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <p className="section-label" style={{ marginBottom: 0 }}>Prenotazioni per fermata</p>
-            {!gestisciFermateAperto && (
-              <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => setGestisciFermateAperto(true)}>Gestisci fermate</button>
-            )}
-          </div>
-
-          {!gestisciFermateAperto ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
-              {fermateAttive.length === 0 && <p className="testo-intro">Nessuna fermata attiva su questo tragitto.</p>}
-              {fermateAttive.sort(perOrario).map((f) => {
-                const { inAttesa, versati } = contatoriCitta(f);
+        <div className="section-card">
+          <p className="testo-intro" style={{ marginTop: -4, marginBottom: 12 }}>
+            Escludi una fermata (es. per scarse adesioni) — resta nel tragitto, solo non più selezionabile per una nuova Linea. Le fermate già dentro una Linea non vengono toccate.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {tutteLeFermateOrdinate.map((f) => {
+              if (!f.attivo) {
                 return (
-                  <div key={f.id} className="section-card" style={{ padding: 14 }}>
-                    <p style={{ fontWeight: 700, marginBottom: 4 }}>{f.citta}</p>
-                    <p style={{ fontFamily: "'Space Mono',monospace", fontSize: 22, fontWeight: 700 }}>{inAttesa + versati}</p>
-                    {inAttesa > 0 && <p style={{ fontSize: 11.5, color: 'var(--pink)' }}>{inAttesa} in attesa di un bus</p>}
-                  </div>
+                  <span key={f.id} className="chip" style={{ opacity: 0.55 }}>
+                    <span style={{ textDecoration: 'line-through' }}>{f.citta}</span>
+                    <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Riattiva questa fermata" style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0, fontSize: 13 }}>↺</button>
+                  </span>
                 );
-              })}
-            </div>
-          ) : (
-            <div className="section-card">
-              <p className="testo-intro" style={{ marginTop: -4, marginBottom: 12 }}>
-                Escludi una fermata (es. per scarse adesioni) — resta nel tragitto, solo non più selezionabile per una nuova Linea. Le fermate già dentro una Linea non vengono toccate.
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-                {tutteLeFermateOrdinate.map((f) => {
-                  if (!f.attivo) {
-                    return (
-                      <span key={f.id} className="chip" style={{ opacity: 0.55 }}>
-                        <span style={{ textDecoration: 'line-through' }}>{f.citta}</span>
-                        <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Riattiva questa fermata" style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0, fontSize: 13 }}>↺</button>
-                      </span>
-                    );
-                  }
-                  return (
-                    <span key={f.id} className="chip">
-                      {f.citta}
-                      <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Escludi questa fermata" style={{ background: 'none', border: 'none', color: 'var(--mist)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
-                    </span>
-                  );
-                })}
-                {tutteLeFermateOrdinate.length === 0 && <span style={{ color: 'var(--mist)' }}>Nessuna fermata su questo tragitto.</span>}
-              </div>
-              <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => setGestisciFermateAperto(false)}>← Torna alla vista normale</button>
-            </div>
-          )}
+              }
+              return (
+                <span key={f.id} className="chip">
+                  {f.citta}
+                  <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Escludi questa fermata" style={{ background: 'none', border: 'none', color: 'var(--mist)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
+                </span>
+              );
+            })}
+            {tutteLeFermateOrdinate.length === 0 && <span style={{ color: 'var(--mist)' }}>Nessuna fermata su questo tragitto.</span>}
+          </div>
         </div>
       )}
 
