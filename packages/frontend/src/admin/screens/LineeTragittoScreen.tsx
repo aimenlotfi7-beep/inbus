@@ -16,11 +16,19 @@ const BUS_VUOTO: BusDiLineaInput = { riferimento: '' };
  *  (?sezione=linee&evento=...&tragitto=...), raggiunto dal pulsante
  *  "Gestisci Linee" in Partenze.
  *
+ *  Risponde a tre domande, e solo quelle (niente incassi/margini qui,
+ *  quelli vivono nelle sezioni economiche di Partenze):
+ *  1. Quante fermate ha questo tragitto?
+ *  2. Quante prenotazioni ci sono per ognuna?
+ *  3. Quali Linee lo percorrono, e quali bus sono censiti su ciascuna?
+ *
  *  Una "Linea" è un CONTENITORE: un percorso (quali fermate copre, in
  *  che ordine — cronologico, non di inserimento) che può avere UNO O
  *  PIÙ bus dentro — quando un primo bus non basta più per le stesse
  *  fermate, se ne aggiunge un secondo alla STESSA Linea invece di
- *  crearne una nuova. */
+ *  crearne una nuova. Linee diverse dello stesso tragitto NON devono
+ *  avere per forza le stesse fermate (già supportato dal modello dati
+ *  — linea_fermate collega una linea a un SUO sottoinsieme). */
 export function LineeTragittoScreen() {
   const navigaSezione = useNavigazione();
   const parametri = new URLSearchParams(window.location.search);
@@ -34,9 +42,12 @@ export function LineeTragittoScreen() {
   const [tourLeaders, setTourLeaders] = useState<TourLeader[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState('');
+
+  const [tab, setTab] = useState<'fermate' | 'linee'>('linee');
+  const [gestisciFermateAperto, setGestisciFermateAperto] = useState(false);
+  const [lineeEspanse, setLineeEspanse] = useState<Set<string>>(new Set());
   const [lineaAttivaId, setLineaAttivaId] = useState<string | null>(null);
 
-  // Popup "+ Aggiungi linea" — 2 step: anagrafica bus, poi percorso.
   const [popupAperto, setPopupAperto] = useState(false);
   const [stepPopup, setStepPopup] = useState<1 | 2>(1);
   const [formBus, setFormBus] = useState<BusDiLineaInput & { postiBus?: number }>(BUS_VUOTO);
@@ -44,7 +55,6 @@ export function LineeTragittoScreen() {
   const [verificaKm, setVerificaKm] = useState<{ kmAccettati: number | null; kmAttuali: number | null; cambiatoParecchio: boolean } | null>(null);
   const [salvando, setSalvando] = useState(false);
 
-  // Modifica di una Linea già esistente.
   const [modificaBusId, setModificaBusId] = useState<string | null>(null);
   const [modificaPercorsoAperta, setModificaPercorsoAperta] = useState(false);
   const [percorsoModificato, setPercorsoModificato] = useState<string[]>([]);
@@ -57,10 +67,7 @@ export function LineeTragittoScreen() {
     setCaricamento(true);
     setErrore('');
     Promise.all([eventiApi.getById(eventoId), eventiApi.calcolaBus(eventoId), eventiApi.listaLinee(tragittoId)])
-      .then(([ev, c, l]) => {
-        setEvento(ev); setCalcolo(c); setLinee(l);
-        setLineaAttivaId((prec) => prec && l.some((x) => x.id === prec) ? prec : (l[0]?.id ?? null));
-      })
+      .then(([ev, c, l]) => { setEvento(ev); setCalcolo(c); setLinee(l); })
       .catch((e) => setErrore(e instanceof ErroreApi ? e.message : 'Impossibile caricare la pagina.'))
       .finally(() => setCaricamento(false));
   }
@@ -73,13 +80,6 @@ export function LineeTragittoScreen() {
   }, [eventoId, tragittoId]);
 
   function tornaAPartenze(tabDestinazione?: 'fermate' | 'preventivi' | 'da-prezzare' | 'da-confermare') {
-    // Cambio di sezione interno — non più una navigazione vera del
-    // browser. "evento"/"tragitto" vanno tolti esplicitamente
-    // dall'indirizzo (prima un ricaricamento completo li avrebbe
-    // "ripuliti" da solo insieme a tutto il resto — qui no, restano se
-    // non li tolgo apposta). Le 5 tappe sono ora sezioni separate del
-    // menu — punto direttamente a quella giusta, non serve più un
-    // parametro extra per dire quale tab aprire.
     const sezione = tabDestinazione === 'fermate' ? 'partenze-orari'
       : tabDestinazione === 'preventivi' ? 'partenze-preventivi'
       : tabDestinazione === 'da-prezzare' ? 'partenze-prezzi'
@@ -90,9 +90,9 @@ export function LineeTragittoScreen() {
   if (!eventoId || !tragittoId) {
     return (
       <div>
-        <PanelHead titolo="Linee" />
+        <PanelHead titolo="Tragitto" />
         <p className="testo-intro" style={{ color: 'var(--pink)' }}>Manca il riferimento all'evento o al tragitto — torna a Partenze e riprova.</p>
-        <button className="btn btn-ghost" onClick={() => tornaAPartenze()}>← Torna a Partenze</button>
+        <button className="btn btn-ghost" onClick={() => tornaAPartenze()}>← Torna alle partenze</button>
       </div>
     );
   }
@@ -100,9 +100,6 @@ export function LineeTragittoScreen() {
   if (errore) return <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>;
   if (!evento) return null;
 
-  // Da qui in poi sono sicuramente valorizzati — TypeScript non lo
-  // deduce da solo dentro le funzioni più sotto (chiusure catturano il
-  // tipo originale, non ristretto).
   const idEvento = eventoId;
   const idTragitto = tragittoId;
 
@@ -110,9 +107,9 @@ export function LineeTragittoScreen() {
   if (!tragittoVero) {
     return (
       <div>
-        <PanelHead titolo="Linee" />
+        <PanelHead titolo="Tragitto" />
         <p className="testo-intro" style={{ color: 'var(--pink)' }}>Questo tragitto non esiste più, o è stato eliminato.</p>
-        <button className="btn btn-ghost" onClick={() => tornaAPartenze()}>← Torna a Partenze</button>
+        <button className="btn btn-ghost" onClick={() => tornaAPartenze()}>← Torna alle partenze</button>
       </div>
     );
   }
@@ -120,26 +117,14 @@ export function LineeTragittoScreen() {
   const calcoloTragitto = calcolo.find((c) => c.tragittoId === tragittoId);
   const partecipantiPerFermata = new Map(calcoloTragitto?.fermate.map((f) => [f.fermataId, f.passeggeri]) ?? []);
 
-  // Ordina per orario — usata sia per il riepilogo in alto sia per
-  // ordinare le fermate scelte nel popup (l'admin le clicca in
-  // qualsiasi ordine, l'ordine finale lo decide sempre l'orario).
   function perOrario(a: Fermata, b: Fermata) {
     if (!a.orario && !b.orario) return 0;
     if (!a.orario) return 1;
     if (!b.orario) return -1;
     return a.orario.localeCompare(b.orario);
   }
-  // Per il riepilogo in cima, a differenza di fermateAttive (che resta
-  // filtrata solo su quelle attive — le uniche selezionabili quando si
-  // costruisce una Linea, non toccare quella): qui servono TUTTE le
-  // fermate, comprese quelle già escluse, per poterle riattivare da
-  // qui se serve.
   const tutteLeFermateOrdinate = [...tragittoVero.fermate].sort(perOrario);
-  // Aggiorna solo il flag attivo di UNA fermata, lasciando tutte le
-  // altre invariate — stessa funzione già usata da Eventi per salvare
-  // le fermate operative di un tragitto (aggiornaTragittoOperativo),
-  // qui costruita per un solo campo alla volta invece di un modulo
-  // intero.
+
   async function alternaFermataAttiva(fermataId: string) {
     const t = tragittoVero;
     if (!t) return;
@@ -159,12 +144,6 @@ export function LineeTragittoScreen() {
     }
   }
 
-  // Riepilogo in cima — "in attesa" è lo stesso ovunque (è quante
-  // prenotazioni non hanno ancora nessun bus, non dipende da QUALE
-  // Linea guardi), "versate" invece è la SOMMA su tutte le Linee che
-  // coprono quella città (ognuna versa sui propri bus). Se nessuna
-  // Linea copre ancora quella città, tutto è "in attesa" — il totale
-  // grezzo di prima, che è comunque quello giusto in quel caso.
   function contatoriCitta(f: Fermata) {
     const versati = linee.reduce((tot, l) => tot + (l.fermate.find((lf) => lf.citta === f.citta)?.versati ?? 0), 0);
     const primaLineaConQuestaCitta = linee.find((l) => l.fermate.some((lf) => lf.citta === f.citta));
@@ -172,6 +151,10 @@ export function LineeTragittoScreen() {
       ? primaLineaConQuestaCitta.fermate.find((lf) => lf.citta === f.citta)!.inAttesa
       : partecipantiPerFermata.get(f.id) ?? 0;
     return { inAttesa, versati };
+  }
+
+  function prenotazioniLinea(l: Linea): number {
+    return l.fermate.reduce((tot, f) => tot + f.inAttesa + f.versati, 0);
   }
 
   function apriPopupNuovaLinea() {
@@ -204,14 +187,16 @@ export function LineeTragittoScreen() {
 
   const lineaAttiva = linee.find((l) => l.id === lineaAttivaId);
 
-  function apriModificaBus(busId: string) {
-    const bus = lineaAttiva?.bus.find((b) => b.id === busId);
+  function apriModificaBus(lineaId: string, busId: string) {
+    const linea = linee.find((l) => l.id === lineaId);
+    const bus = linea?.bus.find((b) => b.id === busId);
     if (!bus) return;
     setFormNuovoBus({
       riferimento: bus.riferimento, fornitoreId: bus.fornitoreId ?? undefined, autistaNome: bus.autistaNome ?? undefined,
       autistaTelefono: bus.autistaTelefono ?? undefined, tourLeaderId: bus.tourLeaderId, costo: bus.costo ? Number(bus.costo) : undefined,
       postiBus: bus.postiBus ?? undefined, note: bus.note ?? undefined,
     });
+    setLineaAttivaId(lineaId);
     setModificaBusId(busId);
   }
 
@@ -229,8 +214,9 @@ export function LineeTragittoScreen() {
     }
   }
 
-  function apriAggiungiBus() {
+  function apriAggiungiBus(lineaId: string) {
     setFormNuovoBus(BUS_VUOTO);
+    setLineaAttivaId(lineaId);
     setAggiungiBusAperto(true);
   }
   async function salvaBusAggiunto() {
@@ -250,14 +236,14 @@ export function LineeTragittoScreen() {
     }
   }
 
-  async function versa() {
-    if (!lineaAttivaId) return;
+  async function versa(lineaId: string) {
     setVersando(true);
     try {
-      const { versate, restanoInAttesa } = await eventiApi.versaLinea(lineaAttivaId);
+      const { versate, restanoInAttesa } = await eventiApi.versaLinea(lineaId);
       ricarica();
       if (versate === 0 && restanoInAttesa > 0) notifica('Nessun posto libero sui bus di questa Linea — aggiungine un altro, o aumenta i posti di quello che c\'è.');
       else if (restanoInAttesa > 0) notifica(`Versate ${versate} prenotazion${versate === 1 ? 'e' : 'i'} — ${restanoInAttesa} restano in attesa, non c'è più posto sui bus di questa Linea.`);
+      else notifica(`Versate ${versate} prenotazion${versate === 1 ? 'e' : 'i'}.`, 'successo');
     } catch (e) {
       notifica(e instanceof ErroreApi ? `Versamento non riuscito: ${e.message}` : 'Versamento non riuscito: errore di rete.');
     } finally {
@@ -265,9 +251,11 @@ export function LineeTragittoScreen() {
     }
   }
 
-  function apriModificaPercorso() {
-    if (!lineaAttiva) return;
-    setPercorsoModificato(lineaAttiva.fermate.map((f) => f.fermataId));
+  function apriModificaPercorso(lineaId: string) {
+    const linea = linee.find((l) => l.id === lineaId);
+    if (!linea) return;
+    setLineaAttivaId(lineaId);
+    setPercorsoModificato(linea.fermate.map((f) => f.fermataId));
     setModificaPercorsoAperta(true);
   }
   async function salvaModificaPercorso() {
@@ -287,107 +275,175 @@ export function LineeTragittoScreen() {
     }
   }
 
+  function alternaLineaEspansa(lineaId: string) {
+    setLineeEspanse((prev) => {
+      const nuovo = new Set(prev);
+      if (nuovo.has(lineaId)) nuovo.delete(lineaId); else nuovo.add(lineaId);
+      return nuovo;
+    });
+  }
+
   return (
     <div>
-      <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => tornaAPartenze()}>← Torna a Partenze</button>
+      <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => tornaAPartenze()}>← Torna alle partenze</button>
 
-      {/* 1. RIEPILOGO PARTENZA */}
-      <PanelHead titolo={tragittoVero.nome} info={evento.artista} />
+      <PanelHead
+        titolo={tragittoVero.nome}
+        azione={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={() => { setTab('fermate'); setGestisciFermateAperto(true); }}>Gestisci fermate</button>
+            <button className="btn btn-primary" onClick={apriPopupNuovaLinea}>+ Nuova linea</button>
+          </div>
+        }
+      />
+      <p className="testo-intro" style={{ marginTop: -8, marginBottom: 16 }}>
+        {evento.artista} · {fermateAttive.length} fermat{fermateAttive.length === 1 ? 'a' : 'e'} · {linee.length} line{linee.length === 1 ? 'a' : 'e'}
+      </p>
+
       {verificaKm?.cambiatoParecchio && (
         <div style={{ background: 'var(--dusk)', border: '1px solid var(--amber)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span><b style={{ color: 'var(--amber)' }}>⚠ Le fermate sono cambiate parecchio</b> da quando hai accettato il preventivo (~{Math.round(verificaKm.kmAccettati!)} km allora, ~{Math.round(verificaKm.kmAttuali!)} km ora) — potrebbe servire un nuovo preventivo.</span>
           <button type="button" className="btn btn-ghost" style={{ flexShrink: 0 }} onClick={() => tornaAPartenze('preventivi')}>Vai a Preventivi →</button>
         </div>
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-        {tutteLeFermateOrdinate.map((f) => {
-          // Una fermata esclusa (es. per scarse adesioni) non ha senso
-          // mostrarla coi contatori prenotazioni — non è più
-          // selezionabile per nessuna Linea, resta solo un promemoria
-          // sfumato con un modo per riattivarla se serve.
-          if (!f.attivo) {
-            return (
-              <span key={f.id} className="chip" style={{ opacity: 0.55 }}>
-                <span style={{ textDecoration: 'line-through' }}>{f.citta}</span>
-                <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Riattiva questa fermata" style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0, fontSize: 13 }}>↺</button>
-              </span>
-            );
-          }
-          const { inAttesa, versati } = contatoriCitta(f);
-          return (
-            <span key={f.id} className="chip">
-              {f.citta}
-              <span style={{ color: 'var(--pink)', fontFamily: "'Space Mono',monospace" }}>{inAttesa}</span>
-              <span style={{ color: 'var(--mist)' }}>/</span>
-              <span style={{ color: 'var(--green)', fontFamily: "'Space Mono',monospace" }}>{versati}</span>
-              <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Escludi questa fermata (es. per scarse adesioni) — resta nel tragitto, solo non più selezionabile per una Linea" style={{ background: 'none', border: 'none', color: 'var(--mist)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
-            </span>
-          );
-        })}
-        {tutteLeFermateOrdinate.length === 0 && <span style={{ color: 'var(--mist)' }}>Nessuna fermata su questo tragitto.</span>}
+
+      <div className="mini-tabs" style={{ marginBottom: 20 }}>
+        <button type="button" className={`mini-tab${tab === 'fermate' ? ' active' : ''}`} onClick={() => setTab('fermate')}>Fermate ({fermateAttive.length})</button>
+        <button type="button" className={`mini-tab${tab === 'linee' ? ' active' : ''}`} onClick={() => setTab('linee')}>Linee ({linee.length})</button>
       </div>
 
-      {/* 2. LINEE / BUS */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <p className="section-label" style={{ marginBottom: 0 }}>Linee</p>
-        <button className="btn btn-primary" style={{ fontSize: 12.5, padding: '6px 14px' }} onClick={apriPopupNuovaLinea}>+ Aggiungi linea</button>
-      </div>
-
-      {linee.length === 0 ? (
-        <p className="testo-intro">Nessuna Linea ancora per questo tragitto.</p>
-      ) : (
-        <>
-          {/* Tab orizzontali, una per Linea */}
-          <div className="mini-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-            {linee.map((l) => (
-              <button key={l.id} type="button" className={`mini-tab${lineaAttivaId === l.id ? ' active' : ''}`} onClick={() => setLineaAttivaId(l.id)}>
-                {l.nome}
-              </button>
-            ))}
+      {tab === 'fermate' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <p className="section-label" style={{ marginBottom: 0 }}>Prenotazioni per fermata</p>
+            {!gestisciFermateAperto && (
+              <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => setGestisciFermateAperto(true)}>Gestisci fermate</button>
+            )}
           </div>
 
-          {lineaAttiva && (
+          {!gestisciFermateAperto ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+              {fermateAttive.length === 0 && <p className="testo-intro">Nessuna fermata attiva su questo tragitto.</p>}
+              {fermateAttive.sort(perOrario).map((f) => {
+                const { inAttesa, versati } = contatoriCitta(f);
+                return (
+                  <div key={f.id} className="section-card" style={{ padding: 14 }}>
+                    <p style={{ fontWeight: 700, marginBottom: 4 }}>{f.citta}</p>
+                    <p style={{ fontFamily: "'Space Mono',monospace", fontSize: 22, fontWeight: 700 }}>{inAttesa + versati}</p>
+                    {inAttesa > 0 && <p style={{ fontSize: 11.5, color: 'var(--pink)' }}>{inAttesa} in attesa di un bus</p>}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
             <div className="section-card">
-              {/* Riepilogo immediato della Linea selezionata */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                {lineaAttiva.fermate.map((f) => (
-                  <span key={f.fermataId} className="chip">
-                    {f.citta}{f.orario && <span style={{ color: 'var(--mist)', fontSize: 11.5 }}>({f.orario})</span>}
-                    <span style={{ color: 'var(--pink)', fontFamily: "'Space Mono',monospace" }}>{f.inAttesa}</span>
-                    <span style={{ color: 'var(--mist)' }}>/</span>
-                    <span style={{ color: 'var(--green)', fontFamily: "'Space Mono',monospace" }}>{f.versati}</span>
-                  </span>
-                ))}
-              </div>
-              <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 16 }}>
-                {lineaAttiva.bus.length} bus associat{lineaAttiva.bus.length === 1 ? 'o' : 'i'} a questa Linea
+              <p className="testo-intro" style={{ marginTop: -4, marginBottom: 12 }}>
+                Escludi una fermata (es. per scarse adesioni) — resta nel tragitto, solo non più selezionabile per una nuova Linea. Le fermate già dentro una Linea non vengono toccate.
               </p>
-
-              <button className="btn btn-primary" style={{ fontSize: 12.5, marginBottom: 12 }} onClick={versa} disabled={versando}>
-                {versando ? 'Verso...' : '↓ Versa le prenotazioni in attesa su questa Linea'}
-              </button>
-              <button className="btn btn-ghost" style={{ fontSize: 12, marginBottom: 12, marginLeft: 8 }} onClick={apriModificaPercorso}>Modifica percorso</button>
-
-              {lineaAttiva.bus.map((b) => (
-                <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
-                  <span className="riga-titolo">
-                    {b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}
-                    {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>Tour leader: {b.tourLeaderNome}</span></>}
-                    <br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{b.postiBus ?? '—'} posti</span>
-                  </span>
-                  <span className="riga-meta">
-                    <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => apriModificaBus(b.id)}>Modifica</button>
-                  </span>
-                </div>
-              ))}
-
-              <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 12 }} onClick={apriAggiungiBus}>+ Aggiungi un altro bus a questa Linea</button>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                {tutteLeFermateOrdinate.map((f) => {
+                  if (!f.attivo) {
+                    return (
+                      <span key={f.id} className="chip" style={{ opacity: 0.55 }}>
+                        <span style={{ textDecoration: 'line-through' }}>{f.citta}</span>
+                        <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Riattiva questa fermata" style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0, fontSize: 13 }}>↺</button>
+                      </span>
+                    );
+                  }
+                  return (
+                    <span key={f.id} className="chip">
+                      {f.citta}
+                      <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Escludi questa fermata" style={{ background: 'none', border: 'none', color: 'var(--mist)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
+                    </span>
+                  );
+                })}
+                {tutteLeFermateOrdinate.length === 0 && <span style={{ color: 'var(--mist)' }}>Nessuna fermata su questo tragitto.</span>}
+              </div>
+              <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => setGestisciFermateAperto(false)}>← Torna alla vista normale</button>
             </div>
           )}
-        </>
+        </div>
       )}
 
-      {/* Popup nuova Linea, a 2 step */}
+      {tab === 'linee' && (
+        <div>
+          <p className="section-label" style={{ marginBottom: 12 }}>Linee su questo tragitto</p>
+
+          {linee.length === 0 ? (
+            <p className="testo-intro">Nessuna Linea ancora per questo tragitto — crea la prima con "+ Nuova linea" qui sopra.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {linee.map((l) => {
+                const espansa = lineeEspanse.has(l.id);
+                const percorso = l.fermate.map((f) => f.citta).join(' → ');
+                return (
+                  <div key={l.id} className="section-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }} onClick={() => alternaLineaEspansa(l.id)}>
+                      <div>
+                        <p style={{ fontWeight: 700, marginBottom: 4 }}>{l.nome}</p>
+                        <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 8 }}>{percorso || 'Nessuna fermata'}</p>
+                        <p style={{ fontSize: 12.5 }}>
+                          Prenotazioni: <b>{prenotazioniLinea(l)}</b>
+                          <span style={{ color: 'var(--mist)' }}> · </span>
+                          Bus censiti: <b>{l.bus.length}</b>
+                        </p>
+                      </div>
+                      <span style={{ color: 'var(--mist)', fontSize: 18, flexShrink: 0 }}>{espansa ? '▲' : '▼'}</span>
+                    </div>
+
+                    {espansa && (
+                      <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--line)' }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                          {l.fermate.map((f) => (
+                            <span key={f.fermataId} className="chip">
+                              {f.citta}{f.orario && <span style={{ color: 'var(--mist)', fontSize: 11.5 }}>({f.orario})</span>}
+                              <span style={{ color: 'var(--pink)', fontFamily: "'Space Mono',monospace" }}>{f.inAttesa}</span>
+                              <span style={{ color: 'var(--mist)' }}>/</span>
+                              <span style={{ color: 'var(--green)', fontFamily: "'Space Mono',monospace" }}>{f.versati}</span>
+                            </span>
+                          ))}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                          <button className="btn btn-primary" style={{ fontSize: 12.5 }} onClick={() => versa(l.id)} disabled={versando}>
+                            {versando && lineaAttivaId === l.id ? 'Verso...' : '↓ Versa le prenotazioni in attesa'}
+                          </button>
+                          <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => apriModificaPercorso(l.id)}>Modifica percorso</button>
+                        </div>
+
+                        <p className="section-label" style={{ fontSize: 12, marginBottom: 8 }}>Bus su questa linea</p>
+                        {l.bus.length === 0 ? (
+                          <div>
+                            <p className="testo-intro" style={{ marginBottom: 10 }}>Nessun bus censito.</p>
+                            <button className="btn btn-primary" style={{ fontSize: 12.5 }} onClick={() => apriAggiungiBus(l.id)}>+ Censisci bus</button>
+                          </div>
+                        ) : (
+                          <>
+                            {l.bus.map((b) => (
+                              <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
+                                <span className="riga-titolo">
+                                  {b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}
+                                  {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>Tour leader: {b.tourLeaderNome}</span></>}
+                                  <br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{b.postiBus ?? '—'} posti</span>
+                                </span>
+                                <span className="riga-meta">
+                                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => apriModificaBus(l.id, b.id)}>Modifica</button>
+                                </span>
+                              </div>
+                            ))}
+                            <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 12 }} onClick={() => apriAggiungiBus(l.id)}>+ Aggiungi un altro bus a questa Linea</button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {popupAperto && (
         <div className="section-card" style={{ marginTop: 20 }}>
           <p className="section-label" style={{ marginBottom: 12 }}>Nuova Linea — passo {stepPopup} di 2</p>
@@ -460,7 +516,6 @@ export function LineeTragittoScreen() {
         </div>
       )}
 
-      {/* Modifica di un bus già dentro la Linea */}
       {modificaBusId && (
         <div className="section-card" style={{ marginTop: 20 }}>
           <p className="section-label" style={{ marginBottom: 12 }}>Modifica bus</p>
@@ -491,7 +546,6 @@ export function LineeTragittoScreen() {
         </div>
       )}
 
-      {/* Aggiungi un altro bus alla Linea attiva */}
       {aggiungiBusAperto && (
         <div className="section-card" style={{ marginTop: 20 }}>
           <p className="section-label" style={{ marginBottom: 12 }}>Aggiungi bus a "{lineaAttiva?.nome}"</p>
@@ -514,7 +568,6 @@ export function LineeTragittoScreen() {
         </div>
       )}
 
-      {/* Modifica del percorso della Linea attiva */}
       {modificaPercorsoAperta && (
         <div className="section-card" style={{ marginTop: 20 }}>
           <p className="section-label" style={{ marginBottom: 12 }}>Modifica percorso — cambia per tutti i bus di questa Linea</p>
