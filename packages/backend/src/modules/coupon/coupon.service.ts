@@ -1,7 +1,8 @@
 import { eq, and, or, isNull, gt, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { coupon, promoter } from '../../db/schema.js';
+import { coupon, promoter, utenti } from '../../db/schema.js';
 import { NonTrovato, ErroreApplicativo, ConflittoDati } from '../../shared/errors.js';
+import { inviaEmail } from '../../shared/email.service.js';
 import type { CreaCouponInput, aggiornaCouponSchema } from './coupon.dto.js';
 import type { z } from 'zod';
 
@@ -31,6 +32,7 @@ export const couponService = {
       compensoTipo: input.compensoTipo ?? null,
       compensoValore: input.compensoValore != null ? input.compensoValore.toFixed(2) : null,
       compensoFissoPer: input.compensoFissoPer ?? null,
+      utenteId: input.utenteId ?? null,
     }).returning();
     return nuovo;
   },
@@ -50,6 +52,7 @@ export const couponService = {
       ...(input.compensoTipo !== undefined && { compensoTipo: input.compensoTipo }),
       ...(input.compensoValore !== undefined && { compensoValore: input.compensoValore != null ? input.compensoValore.toFixed(2) : null }),
       ...(input.compensoFissoPer !== undefined && { compensoFissoPer: input.compensoFissoPer }),
+      ...(input.utenteId !== undefined && { utenteId: input.utenteId }),
     }).where(eq(coupon.id, id)).returning();
     return aggiornato;
   },
@@ -61,7 +64,7 @@ export const couponService = {
 
   /** Logica di validazione condivisa: usata qui per l'anteprima admin e
    *  da prenotazioni.service.ts al momento del vero acquisto. */
-  async valida(codice: string, importo: number, eventoId?: string) {
+  async valida(codice: string, importo: number, eventoId?: string, emailCliente?: string) {
     const [c] = await db.select().from(coupon).where(eq(coupon.codice, codice.toUpperCase())).limit(1);
     if (!c || !c.attivo) throw new ErroreApplicativo('Coupon non valido', 400, 'COUPON_NON_VALIDO');
     const oggi = new Date();
@@ -69,6 +72,12 @@ export const couponService = {
     if (c.validoAl && oggi > c.validoAl) throw new ErroreApplicativo('Coupon scaduto', 400, 'COUPON_NON_VALIDO');
     if (c.usiMax !== null && c.usiAttuali >= c.usiMax) throw new ErroreApplicativo('Coupon esaurito', 400, 'COUPON_NON_VALIDO');
     if (c.eventoId && eventoId && c.eventoId !== eventoId) throw new ErroreApplicativo('Questo coupon non è valido per questo evento', 400, 'COUPON_NON_VALIDO');
+    if (c.utenteId) {
+      const [proprietario] = await db.select({ email: utenti.email }).from(utenti).where(eq(utenti.id, c.utenteId)).limit(1);
+      if (!proprietario || proprietario.email.toLowerCase() !== emailCliente?.toLowerCase()) {
+        throw new ErroreApplicativo('Questo voucher è personale, non è associato a questa email', 400, 'COUPON_NON_VALIDO');
+      }
+    }
 
     const sconto = c.tipo === 'PERCENTUALE' ? importo * (Number(c.valore) / 100) : Math.min(Number(c.valore), importo);
     return { sconto, coupon: c };
@@ -82,13 +91,19 @@ export const couponService = {
    *  delle due riceve una riga da RETURNING, l'altra vede l'elenco
    *  vuoto e capisce che il coupon è stato appena esaurito da qualcun
    *  altro — impossibile che entrambe passino. */
-  async verificaEIncrementaUtilizzo(tx: Tx, codice: string, importo: number, eventoId?: string) {
+  async verificaEIncrementaUtilizzo(tx: Tx, codice: string, importo: number, eventoId?: string, emailCliente?: string) {
     const [c] = await tx.select().from(coupon).where(eq(coupon.codice, codice.toUpperCase())).limit(1);
     if (!c || !c.attivo) throw new ErroreApplicativo('Coupon non valido', 400, 'COUPON_NON_VALIDO');
     const oggi = new Date();
     if (c.validoDal && oggi < c.validoDal) throw new ErroreApplicativo('Coupon non ancora attivo', 400, 'COUPON_NON_VALIDO');
     if (c.validoAl && oggi > c.validoAl) throw new ErroreApplicativo('Coupon scaduto', 400, 'COUPON_NON_VALIDO');
     if (c.eventoId && eventoId && c.eventoId !== eventoId) throw new ErroreApplicativo('Questo coupon non è valido per questo evento', 400, 'COUPON_NON_VALIDO');
+    if (c.utenteId) {
+      const [proprietario] = await tx.select({ email: utenti.email }).from(utenti).where(eq(utenti.id, c.utenteId)).limit(1);
+      if (!proprietario || proprietario.email.toLowerCase() !== emailCliente?.toLowerCase()) {
+        throw new ErroreApplicativo('Questo voucher è personale, non è associato a questa email', 400, 'COUPON_NON_VALIDO');
+      }
+    }
 
     const [aggiornato] = await tx.update(coupon)
       .set({ usiAttuali: sql`${coupon.usiAttuali} + 1` })
@@ -109,5 +124,39 @@ export const couponService = {
     if (!promoterId) return undefined;
     const [p] = await tx.select({ codice: promoter.codice }).from(promoter).where(eq(promoter.id, promoterId)).limit(1);
     return p?.codice;
+  },
+
+  /** Manda il voucher via email al cliente a cui è assegnato — deve
+   *  averne uno (utenteId impostato), altrimenti non si sa a chi
+   *  mandarla. Usata dal pulsante "Invia via email" in Voucher. */
+  async inviaViaEmail(id: string) {
+    const c = await getById(id);
+    if (!c.utenteId) throw new ErroreApplicativo('Questo codice non è assegnato a nessun cliente — assegnalo prima di inviarlo.', 400, 'VOUCHER_SENZA_CLIENTE');
+    const [u] = await db.select({ email: utenti.email, nome: utenti.nome }).from(utenti).where(eq(utenti.id, c.utenteId)).limit(1);
+    if (!u) throw new NonTrovato('Cliente');
+
+    const scontoTesto = c.tipo === 'PERCENTUALE' ? `${Number(c.valore)}%` : `€${Number(c.valore).toFixed(2)}`;
+    const scadenzaTesto = c.validoAl ? `Valido fino al ${c.validoAl.toLocaleDateString('it-IT')}.` : '';
+    const html = `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+        <p>Ciao${u.nome ? ` ${u.nome}` : ''},</p>
+        <p>Ti abbiamo riservato un voucher personale — usalo alla tua prossima prenotazione.</p>
+        <div style="background:#f6f1e7; border-radius:10px; padding:20px; text-align:center; margin:20px 0;">
+          <p style="font-size:12px; color:#888; margin:0 0 6px; text-transform:uppercase; letter-spacing:1px;">Il tuo codice</p>
+          <p style="font-family:monospace; font-size:24px; font-weight:700; margin:0; letter-spacing:2px;">${c.codice}</p>
+        </div>
+        <p><b>Sconto:</b> ${scontoTesto}</p>
+        ${scadenzaTesto ? `<p>${scadenzaTesto}</p>` : ''}
+        <p style="color:#888; font-size:13px;">Questo voucher è personale, associato alla tua email — non condividerlo, non sarebbe valido per nessun altro.</p>
+      </div>
+    `;
+    const { inviata } = await inviaEmail({ a: u.email, oggetto: `Il tuo voucher ${c.codice}`, html });
+    if (inviata) await db.update(coupon).set({ inviatoIl: new Date() }).where(eq(coupon.id, id));
+    return { inviata, email: u.email };
+  },
+
+  /** I voucher assegnati a un cliente — per la sua sezione account. */
+  async vaucherDiUtente(utenteId: string) {
+    return db.select().from(coupon).where(eq(coupon.utenteId, utenteId));
   },
 };

@@ -64,12 +64,12 @@ function generaPnr() {
 /** Il coupon vale solo per l'acquisto pieno, non per il solo acconto —
  *  chi prenota ad acconto potrà comunque usarlo al momento di saldare
  *  il resto (vedi saldaResto più sotto), non qui. */
-async function validaCoupon(tx: Tx, codice: string | undefined, importo: number, eventoId: string, tipoPagamento: 'COMPLETO' | 'ACCONTO') {
+async function validaCoupon(tx: Tx, codice: string | undefined, importo: number, eventoId: string, tipoPagamento: 'COMPLETO' | 'ACCONTO', emailCliente?: string) {
   if (!codice) return { sconto: 0, coupon: null as Awaited<ReturnType<typeof couponService.verificaEIncrementaUtilizzo>>['coupon'] | null };
   if (tipoPagamento !== 'COMPLETO') {
     throw new ErroreApplicativo('Il coupon si può usare solo con il pagamento completo — con l\'acconto potrai applicarlo quando salderai il resto.', 400, 'COUPON_NON_VALIDO');
   }
-  return couponService.verificaEIncrementaUtilizzo(tx, codice, importo, eventoId);
+  return couponService.verificaEIncrementaUtilizzo(tx, codice, importo, eventoId, emailCliente);
 }
 
 /** Ricalcola il totale "vero" di una prenotazione (prezzo pieno, non
@@ -185,7 +185,7 @@ async function creaRigaInterna(
   // così ogni calcolo a valle — e ogni report che legge
   // prenotazioni.totale — lo vede senza saperne nulla.
   const importoBase = prezzoEffettivo * input.passeggeri - (scontoBundle ?? 0);
-  const { sconto, coupon: couponUsato } = await validaCoupon(tx, input.couponCodice, importoBase, input.eventoId, input.tipoPagamento);
+  const { sconto, coupon: couponUsato } = await validaCoupon(tx, input.couponCodice, importoBase, input.eventoId, input.tipoPagamento, input.cliente.email);
 
   // Il coupon collegato a un promoter attribuisce la vendita anche a
   // lui — un solo codice per sconto e commissione insieme, in aggiunta
@@ -674,7 +674,7 @@ export const prenotazioniService = {
       let totaleReale = await calcolaTotaleReale(p);
       let couponUsato: Awaited<ReturnType<typeof couponService.verificaEIncrementaUtilizzo>>['coupon'] | null = null;
       if (couponCodice) {
-        const { sconto, coupon: c } = await couponService.verificaEIncrementaUtilizzo(tx, couponCodice, totaleReale, p.eventoId);
+        const { sconto, coupon: c } = await couponService.verificaEIncrementaUtilizzo(tx, couponCodice, totaleReale, p.eventoId, email);
         totaleReale = Math.max(0, totaleReale - sconto);
         couponUsato = c;
       }

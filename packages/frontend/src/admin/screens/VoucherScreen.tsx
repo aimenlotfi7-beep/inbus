@@ -9,6 +9,9 @@ import { CampoNumero } from '../shared/CampoNumero';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
+import { SelettoreCliente } from '../shared/SelettoreCliente';
+import { EtichettaTooltip } from '../shared/EtichettaTooltip';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 const VUOTO: CouponInput = { codice: '', tipo: 'PERCENTUALE', valore: 10, attivo: true };
 
@@ -19,6 +22,7 @@ const VUOTO: CouponInput = { codice: '', tipo: 'PERCENTUALE', valore: 10, attivo
  *  L'elenco mostra solo i codici SENZA promoter collegato — quelli con
  *  un promoter restano di competenza della schermata Coupon. */
 export function VoucherScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [coupon, setCoupon] = useState<Coupon[]>([]);
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [inModifica, setInModifica] = useState<Coupon | null>(null);
@@ -40,12 +44,27 @@ export function VoucherScreen() {
     setForm({
       codice: c.codice, tipo: c.tipo, valore: Number(c.valore), usiMax: c.usiMax ?? undefined,
       validoDal: c.validoDal ? c.validoDal.slice(0, 10) : null, validoAl: c.validoAl ? c.validoAl.slice(0, 10) : null,
-      attivo: c.attivo, eventoId: c.eventoId ?? null,
+      attivo: c.attivo, eventoId: c.eventoId ?? null, utenteId: c.utenteId ?? null,
       // Niente promoterId qui — un voucher non è mai collegato a un
       // promoter, per definizione (se lo diventasse, la modifica
       // andrebbe fatta dalla schermata Coupon, non da questa).
     });
     setModaleAperta(true);
+  }
+
+  const [inviando, setInviando] = useState(false);
+  async function inviaEmail() {
+    if (!inModifica) return;
+    setInviando(true);
+    try {
+      const r = await couponApi.inviaEmail(inModifica.id);
+      notifica(r.inviata ? `Voucher inviato a ${r.email}.` : 'Invio non riuscito — controlla che la posta sia configurata.', r.inviata ? 'successo' : undefined);
+      ricarica();
+    } catch (e) {
+      notifica(e instanceof ErroreApi ? e.message : 'Invio non riuscito.');
+    } finally {
+      setInviando(false);
+    }
   }
 
   const [salvando, setSalvando] = useState(false);
@@ -90,6 +109,17 @@ export function VoucherScreen() {
             {eventi.map((ev) => <option key={ev.id} value={ev.id}>{ev.artista} — {ev.citta}</option>)}
           </select>
         </div>
+        <div className="campo">
+          <label><EtichettaTooltip testo="Assegna a un cliente (facoltativo)" chiave="voucher_cliente_campo" mappaTooltip={mappaTooltip} /></label>
+          <SelettoreCliente utenteId={form.utenteId ?? null} onChange={(id) => setForm({ ...form, utenteId: id })} />
+        </div>
+        {inModifica && form.utenteId && (
+          <div className="campo">
+            <button type="button" className="btn btn-ghost" onClick={inviaEmail} disabled={inviando}>
+              {inviando ? 'Invio...' : inModifica.inviatoIl ? `↻ Rinvia via email (inviato il ${new Date(inModifica.inviatoIl).toLocaleDateString('it-IT')})` : '✉ Invia via email'}
+            </button>
+          </div>
+        )}
         <div className="form-grid" style={{ marginBottom: 14 }}>
           <label>Valido dal (facoltativo)
             <input type="date" value={form.validoDal ?? ''} onChange={(e) => setForm({ ...form, validoDal: e.target.value || null })} />

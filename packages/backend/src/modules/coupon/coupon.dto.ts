@@ -20,6 +20,8 @@ export const creaCouponSchema = z.object({
   compensoTipo: z.enum(['PERCENTUALE', 'FISSO']).nullable().optional(),
   compensoValore: z.number().positive().nullable().optional(),
   compensoFissoPer: z.enum(['ACQUISTO', 'PASSEGGERO']).nullable().optional(),
+  // Voucher personale — assegnato a questo cliente, mai un codice pubblico.
+  utenteId: z.string().nullable().optional(),
 });
 export type CreaCouponInput = z.infer<typeof creaCouponSchema>;
 export const aggiornaCouponSchema = creaCouponSchema.partial();

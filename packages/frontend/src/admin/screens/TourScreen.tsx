@@ -8,6 +8,8 @@ import { PaginaSezione } from '../shared/PaginaSezione';
 import { CaricaFile } from '../shared/CaricaFile';
 import { SelettoreEventi } from '../shared/SelettoreEventi';
 import { TourCardCompatta } from '../shared/TourCardCompatta';
+import { EtichettaTooltip } from '../shared/EtichettaTooltip';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 const VUOTO: TourInput = { nome: '', copertinaUrl: null, descrizione: '', descrizioneSeo: '', eventiIds: [] };
 
@@ -54,6 +56,7 @@ export function TourScreen() {
 }
 
 function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () => void }) {
+  const mappaTooltip = useMappaTooltip();
   const [form, setForm] = useState<TourInput>(VUOTO);
   const [eventiEliminati, setEventiEliminati] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
@@ -123,7 +126,7 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
       <div className="section-card" style={{ marginBottom: 16, maxWidth: 520 }}>
         <p className="section-label">Descrizione</p>
         <div className="campo">
-          <label>Descrizione del tour (visibile sulla pagina pubblica)</label>
+          <label><EtichettaTooltip testo="Descrizione del tour" chiave="tour_descrizione_campo" mappaTooltip={mappaTooltip} /></label>
           <textarea
             value={form.descrizione ?? ''}
             onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
@@ -132,7 +135,7 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
           />
         </div>
         <div className="campo">
-          <label>Descrizione per i motori di ricerca e social (facoltativa)</label>
+          <label><EtichettaTooltip testo="Descrizione per i motori di ricerca e social (facoltativa)" chiave="tour_descrizione_seo_campo" mappaTooltip={mappaTooltip} /></label>
           <textarea
             value={form.descrizioneSeo ?? ''}
             onChange={(e) => setForm({ ...form, descrizioneSeo: e.target.value })}
@@ -143,7 +146,7 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
       </div>
       )}
       <div className="section-card" style={{ marginBottom: 16 }}>
-        <p className="section-label">Date da raggruppare</p>
+        <p className="section-label"><EtichettaTooltip testo="Date da raggruppare" chiave="tour_date_campo" mappaTooltip={mappaTooltip} /></p>
         <p className="testo-intro" style={{ marginBottom: 10 }}>Scegli tra gli eventi già esistenti — non servono consecutivi, né lo stesso mese.</p>
         <SelettoreEventi selezionati={form.eventiIds} onChange={(ids) => setForm({ ...form, eventiIds: ids })} />
       </div>

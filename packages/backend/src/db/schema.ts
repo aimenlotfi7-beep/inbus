@@ -1041,6 +1041,13 @@ export const coupon = pgTable('coupon', {
   // Solo se compensoTipo = FISSO: l'importo si applica una volta per
   // acquisto, o si moltiplica per il numero di passeggeri.
   compensoFissoPer: compensoFissoPerEnum('compenso_fisso_per'),
+  // Un VOUCHER personale — assegnato a un cliente specifico invece di
+  // essere un codice pubblico condiviso. Se impostato, solo quel
+  // cliente (stessa email) può usarlo, e compare nel suo account.
+  utenteId: text('utente_id').references(() => utenti.id, { onDelete: 'set null' }),
+  // Quando è stato mandato via email l'ultima volta — null se mai
+  // inviato. Solo per mostrare "già inviato il..." nel gestionale.
+  inviatoIl: timestamp('inviato_il'),
 });
 
 // ---------------------------------------------------------------------

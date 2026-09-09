@@ -10,10 +10,13 @@ import { CampoNumero } from '../shared/CampoNumero';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
+import { EtichettaTooltip } from '../shared/EtichettaTooltip';
+import { useMappaTooltip } from '../shared/useMappaTooltip';
 
 const VUOTO: CouponInput = { codice: '', tipo: 'PERCENTUALE', valore: 10, attivo: true };
 
 export function CouponScreen() {
+  const mappaTooltip = useMappaTooltip();
   const [coupon, setCoupon] = useState<Coupon[]>([]);
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [promoterLista, setPromoterLista] = useState<Promoter[]>([]);
@@ -86,17 +89,15 @@ export function CouponScreen() {
           </select>
         </div>
         <div className="campo">
-          <label>Assegna a un promoter (facoltativo)</label>
+          <label><EtichettaTooltip testo="Assegna a un promoter (facoltativo)" chiave="coupon_promoter_campo" mappaTooltip={mappaTooltip} /></label>
           <select value={form.promoterId ?? ''} onChange={(e) => setForm({ ...form, promoterId: e.target.value || null })}>
             <option value="">— Nessuno —</option>
             {promoterLista.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.codice})</option>)}
           </select>
-          <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 4 }}>Chi usa questo coupon fa guadagnare la commissione a questo promoter, insieme allo sconto.</p>
         </div>
         {form.promoterId && (
           <div className="section-card" style={{ marginBottom: 14 }}>
-            <p className="section-label" style={{ marginBottom: 8 }}>Compenso per questo codice</p>
-            <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 10 }}>Se non imposti nulla, si usa il tasso di default dell'account del promoter.</p>
+            <p className="section-label" style={{ marginBottom: 8 }}><EtichettaTooltip testo="Compenso per questo codice" chiave="coupon_compenso_campo" mappaTooltip={mappaTooltip} /></p>
             <div className="form-grid">
               <label>Tipo
                 <select value={form.compensoTipo ?? ''} onChange={(e) => setForm({ ...form, compensoTipo: (e.target.value || null) as CouponInput['compensoTipo'] })}>

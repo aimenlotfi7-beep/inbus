@@ -179,7 +179,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
       const r = await fetch(`${API_URL}/api/coupon/valida`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codice: couponCodice.trim(), importo: totale, eventoId: evento.id }),
+        body: JSON.stringify({ codice: couponCodice.trim(), importo: totale, eventoId: evento.id, ...(email && { emailCliente: email }) }),
       });
       const dati = await r.json();
       if (!r.ok) throw new Error(dati.errore ?? 'Coupon non valido.');

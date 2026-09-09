@@ -38,6 +38,13 @@ export const TOOLTIP_DEFAULT: Record<string, string> = {
   fermata_nome_campo: 'es. "Milano Lambrate", non solo "Milano".',
   fermata_link_campo: 'Facoltativo — es. Google Maps, punto di ritrovo.',
   fermate_orario_intro: 'Posti, prezzi e orari delle fermate si impostano da Partenze, una volta che questo tragitto è confermato lì con un bus vero — usano l\'arrivo indicato qui sopra come riferimento per calcolarli.',
+  coupon_promoter_campo: 'Chi usa questo coupon fa guadagnare la commissione a questo promoter, insieme allo sconto per il cliente — un solo codice per entrambe le cose.',
+  coupon_compenso_campo: 'Il compenso per QUESTO codice specifico — se non imposti nulla, si usa il tasso di default dell\'account del promoter (impostato nella sua scheda).',
+  voucher_cliente_campo: 'Se assegni un voucher a un cliente, solo lui (stessa email) potrà usarlo — nessun altro, anche conoscendo il codice. Potrai anche mandarglielo via email, e lui lo vedrà nel suo account.',
+  voucher_invia_email_campo: 'Manda il codice via email al cliente assegnato, con lo sconto e la scadenza — puoi rimandarla quante volte vuoi.',
+  tour_descrizione_campo: 'Visibile ai clienti sulla pagina del tour, sotto il sottotitolo — una presentazione dello spettacolo, valida per tutte le date insieme.',
+  tour_descrizione_seo_campo: 'Usata per Google/social al posto della descrizione automatica. Se la lasci vuota, si genera da sola.',
+  tour_date_campo: 'Non serve che siano consecutive, né nello stesso mese — scegli tra gli eventi già esistenti.',
 };
 
 /** Etichette leggibili per la schermata di modifica in Sistema — non
@@ -72,4 +79,11 @@ export const TOOLTIP_ETICHETTA: Record<string, string> = {
   fermata_nome_campo: 'Nome (sezione Fermate)',
   fermata_link_campo: 'Link (sezione Fermate)',
   fermate_orario_intro: 'Introduzione (elenco fermate, scheda evento)',
+  coupon_promoter_campo: 'Assegna a un promoter (sezione Coupon)',
+  coupon_compenso_campo: 'Compenso per il codice (sezione Coupon)',
+  voucher_cliente_campo: 'Assegna a un cliente (sezione Voucher)',
+  voucher_invia_email_campo: 'Invia via email (sezione Voucher)',
+  tour_descrizione_campo: 'Descrizione (sezione Tour)',
+  tour_descrizione_seo_campo: 'Descrizione SEO (sezione Tour)',
+  tour_date_campo: 'Date da raggruppare (sezione Tour)',
 };
