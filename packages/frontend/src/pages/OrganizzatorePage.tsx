@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { LogoOnWay } from '../features/LogoOnWay';
 import { Link } from 'react-router-dom';
+import { AccountShell, type VoceMenuAccount } from '../features/AccountShell';
 import '../styles/promoter.css';
 import { organizzatoriApi, type Organizzatore, type EventoAssegnato, type StatisticheGenerali, type StatisticaEvento, type StatisticaBundle } from '../api/organizzatori';
 import { ErroreApi } from '../api/client';
@@ -33,12 +34,13 @@ export function OrganizzatorePage() {
     setLoggato(false);
   }
 
+  if (loggato) return <AreaOrganizzatore onErroreSessione={esci} />;
+
   return (
     <div className="pagina-partner">
       <header>
         <div className="logo"><LogoOnWay come="testo" /><small>organizzatore</small></div>
         <Link className="back-link" to="/">← Torna al sito</Link>
-        <button className={`btn btn-ghost${!loggato ? ' hidden' : ''}`} onClick={esci}>Esci</button>
       </header>
 
       <main>
@@ -56,8 +58,6 @@ export function OrganizzatorePage() {
             <p style={{ marginTop: 10 }}><Link to="/organizzatore/password-dimenticata" style={{ fontSize: 12.5 }}>Password dimenticata?</Link></p>
           </div>
         )}
-
-        {loggato && <AreaOrganizzatore onErroreSessione={esci} />}
       </main>
       <CookieBanner />
     </div>
@@ -70,6 +70,7 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
   const [generali, setGenerali] = useState<StatisticheGenerali | null>(null);
   const [perEvento, setPerEvento] = useState<StatisticaEvento[] | null>(null);
   const [perBundle, setPerBundle] = useState<StatisticaBundle[]>([]);
+  const [voce, setVoce] = useState<'panoramica' | 'eventi' | 'bundle'>('panoramica');
 
   useEffect(() => {
     organizzatoriApi.me().then(setOrganizzatore).catch(onErroreSessione);
@@ -80,6 +81,11 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function esci() {
+    localStorage.removeItem(CHIAVE_TOKEN);
+    onErroreSessione();
+  }
+
   if (!organizzatore || !eventi) return <p style={{ color: 'var(--mist)' }}>Carico...</p>;
 
   const eventiOrdinati = eventi.slice().sort((a, b) => a.data.localeCompare(b.data));
@@ -88,29 +94,62 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
     return perEvento?.find((s) => s.eventoId === eventoId) ?? null;
   }
 
+  const voci: VoceMenuAccount[] = [{ id: 'panoramica', label: 'Panoramica' }, { id: 'eventi', label: 'I tuoi eventi' }];
+  if (perBundle.length > 0) voci.push({ id: 'bundle', label: 'I tuoi bundle' });
+
   return (
-    <>
-      {generali && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 22 }}>
-          <div className="stat-box"><b>{generali.eventiAttivi}</b><span>Eventi attivi</span></div>
-          <div className="stat-box"><b>{generali.viaggiatori}</b><span>Viaggiatori</span></div>
-          <div className="stat-box"><b>€{generali.fatturato.toFixed(2)}</b><span>Fatturato</span></div>
-          <div className="stat-box"><b>€{generali.quotaOrganizzatore.toFixed(2)}</b><span>Tua quota</span></div>
-        </div>
-      )}
-
-      <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '4px 0 14px' }}>I tuoi eventi</h2>
-
-      {!eventiOrdinati.length && (
-        <div className="empty-box">Non hai ancora nessun evento associato — contatta OnWay per farti assegnare i tuoi eventi.</div>
-      )}
-
-      {perBundle.length > 0 && (
+    <AccountShell
+      etichettaTipo="organizzatore" nomeUtente={organizzatore.nome} onLogout={esci}
+      voci={voci} voceAttiva={voce} onCambiaVoce={(v) => setVoce(v as typeof voce)}
+    >
+      {voce === 'panoramica' && (
         <>
-          <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '18px 0 14px' }}>I tuoi bundle</h2>
-          {/* Una riga per bundle (totale già netto sconto). Gli stessi
-              acquisti contano anche sotto ogni evento qui sotto: questa
-              è una vista in più, non una somma a parte. */}
+          <h1 className="page-title" style={{ marginBottom: 20 }}>Panoramica</h1>
+          {generali && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 22 }}>
+              <div className="stat-box"><b>{generali.eventiAttivi}</b><span>Eventi attivi</span></div>
+              <div className="stat-box"><b>{generali.viaggiatori}</b><span>Viaggiatori</span></div>
+              <div className="stat-box"><b>€{generali.fatturato.toFixed(2)}</b><span>Fatturato</span></div>
+              <div className="stat-box"><b>€{generali.quotaOrganizzatore.toFixed(2)}</b><span>Tua quota</span></div>
+            </div>
+          )}
+          {!eventiOrdinati.length && (
+            <div className="empty-box">Non hai ancora nessun evento associato — contatta OnWay per farti assegnare i tuoi eventi.</div>
+          )}
+        </>
+      )}
+
+      {voce === 'eventi' && (
+        <>
+          <h1 className="page-title" style={{ marginBottom: 20 }}>I tuoi eventi</h1>
+          {!eventiOrdinati.length && (
+            <div className="empty-box">Non hai ancora nessun evento associato — contatta OnWay per farti assegnare i tuoi eventi.</div>
+          )}
+          {eventiOrdinati.map((ev) => {
+            const s = statoPerEvento(ev.id);
+            return (
+              <div className="evento-link-card" key={ev.id}>
+                <div>
+                  <h3>{ev.artista}</h3>
+                  <p>{ev.luogo}, {ev.citta} · {fmtDataBreve(ev.data)}</p>
+                  {s && (
+                    <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 4 }}>
+                      {s.viaggiatori} viaggiator{s.viaggiatori === 1 ? 'e' : 'i'} · €{s.fatturato.toFixed(2)} fatturato · tua quota €{s.quotaOrganizzatore.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {voce === 'bundle' && perBundle.length > 0 && (
+        <>
+          <h1 className="page-title" style={{ marginBottom: 6 }}>I tuoi bundle</h1>
+          <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 20 }}>
+            Gli stessi acquisti contano anche sotto ogni evento — questa è una vista in più, non una somma a parte.
+          </p>
           {perBundle.map((b) => (
             <div className="evento-link-card" key={b.bundleId}>
               <div>
@@ -124,23 +163,7 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
         </>
       )}
 
-      {eventiOrdinati.map((ev) => {
-        const s = statoPerEvento(ev.id);
-        return (
-          <div className="evento-link-card" key={ev.id}>
-            <div>
-              <h3>{ev.artista}</h3>
-              <p>{ev.luogo}, {ev.citta} · {fmtDataBreve(ev.data)}</p>
-              {s && (
-                <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 4 }}>
-                  {s.viaggiatori} viaggiator{s.viaggiatori === 1 ? 'e' : 'i'} · €{s.fatturato.toFixed(2)} fatturato · tua quota €{s.quotaOrganizzatore.toFixed(2)}
-                </p>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </>
-
+      <CookieBanner />
+    </AccountShell>
   );
 }

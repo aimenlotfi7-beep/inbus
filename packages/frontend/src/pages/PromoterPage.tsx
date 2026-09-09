@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { LogoOnWay } from '../features/LogoOnWay';
 import { Link } from 'react-router-dom';
+import { AccountShell } from '../features/AccountShell';
 import '../styles/promoter.css';
 import { promoterApi, type Promoter, type CouponPromoter } from '../api/promoter';
 import { eventiApi } from '../api/eventi';
@@ -35,12 +36,17 @@ export function PromoterPage() {
     setLoggato(false);
   }
 
+  // Una volta autenticato, AreaPromoter porta il proprio layout intero
+  // (AccountShell — menu laterale, gestisce già mobile) — la vecchia
+  // intestazione qui sotto vale solo PRIMA di accedere (login), dove
+  // un menu non avrebbe senso (non c'è ancora nulla da navigare).
+  if (loggato) return <AreaPromoter onErroreSessione={esci} />;
+
   return (
     <div className="pagina-partner">
       <header>
         <div className="logo"><LogoOnWay come="testo" /><small>promoter</small></div>
         <Link className="back-link" to="/">← Torna al sito</Link>
-        <button className={`btn btn-ghost${!loggato ? ' hidden' : ''}`} onClick={esci}>Esci</button>
       </header>
 
       <main>
@@ -58,8 +64,6 @@ export function PromoterPage() {
             <p style={{ marginTop: 10 }}><Link to="/promoter/password-dimenticata" style={{ fontSize: 12.5 }}>Password dimenticata?</Link></p>
           </div>
         )}
-
-        {loggato && <AreaPromoter onErroreSessione={esci} />}
       </main>
     </div>
   );
@@ -72,6 +76,7 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [eventoRevenue, setEventoRevenue] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  const [voce, setVoce] = useState<'panoramica' | 'link' | 'coupon'>('panoramica');
 
   useEffect(() => {
     promoterApi.me().then(setPromoter).catch(onErroreSessione);
@@ -89,6 +94,11 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
     setTimeout(() => setToast(''), 2600);
   }
 
+  function esci() {
+    localStorage.removeItem(CHIAVE_TOKEN);
+    onErroreSessione();
+  }
+
   if (!promoter || !stats) return <p style={{ color: 'var(--mist)' }}>Carico...</p>;
 
   // Calcolata dal server (shared/commissionePromoter.ts): non e' piu'
@@ -100,50 +110,72 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
   const statoEventoRevenue = eventoRevenue ? statsPerEvento[eventoRevenue] : null;
 
   return (
-    <>
-      <div className="stats-row">
-        <div className="stat-box"><b>{stats.numeroPrenotazioni}</b><span>Vendite generate</span></div>
-        <div className="stat-box"><b>€{stats.fatturato.toFixed(2)}</b><span>Fatturato generato</span></div>
-        <div className="stat-box"><b>€{commissione.toFixed(2)}</b><span>Commissione maturata ({promoter.commissionePercentuale}%)</span></div>
-      </div>
+    <AccountShell
+      etichettaTipo="promoter" nomeUtente={promoter.nome} onLogout={esci}
+      voci={[
+        { id: 'panoramica', label: 'Panoramica' },
+        { id: 'link', label: 'I tuoi link' },
+        { id: 'coupon', label: 'Codici sconto' },
+      ]}
+      voceAttiva={voce} onCambiaVoce={(v) => setVoce(v as typeof voce)}
+    >
+      {voce === 'panoramica' && (
+        <>
+          <h1 className="page-title" style={{ marginBottom: 20 }}>Panoramica</h1>
+          <div className="stats-row">
+            <div className="stat-box"><b>{stats.numeroPrenotazioni}</b><span>Vendite generate</span></div>
+            <div className="stat-box"><b>€{stats.fatturato.toFixed(2)}</b><span>Fatturato generato</span></div>
+            <div className="stat-box"><b>€{commissione.toFixed(2)}</b><span>Commissione maturata ({promoter.commissionePercentuale}%)</span></div>
+          </div>
 
-      <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '24px 0 14px' }}>Revenue per evento</h2>
-      <div className="mini-tabs" style={{ flexWrap: 'wrap', marginBottom: 14 }}>
-        {eventiOrdinati.filter((ev) => statsPerEvento[ev.id]).map((ev) => (
-          <button key={ev.id} type="button" className={`mini-tab${eventoRevenue === ev.id ? ' active' : ''}`} onClick={() => setEventoRevenue(ev.id)}>
-            {ev.artista}
-          </button>
-        ))}
-        {!eventiOrdinati.some((ev) => statsPerEvento[ev.id]) && (
-          <p style={{ color: 'var(--mist)', fontSize: 13 }}>Nessuna vendita ancora — appena arriva la prima, comparirà qui divisa per evento.</p>
-        )}
-      </div>
-      {statoEventoRevenue && (
-        <div className="stats-row" style={{ marginBottom: 24 }}>
-          <div className="stat-box"><b>{statoEventoRevenue.numeroPrenotazioni}</b><span>Vendite su questo evento</span></div>
-          <div className="stat-box"><b>€{statoEventoRevenue.fatturato.toFixed(2)}</b><span>Fatturato su questo evento</span></div>
-          <div className="stat-box"><b>€{statoEventoRevenue.commissione.toFixed(2)}</b><span>Tua commissione su questo evento</span></div>
-        </div>
+          <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '24px 0 14px' }}>Revenue per evento</h2>
+          <div className="mini-tabs" style={{ flexWrap: 'wrap', marginBottom: 14 }}>
+            {eventiOrdinati.filter((ev) => statsPerEvento[ev.id]).map((ev) => (
+              <button key={ev.id} type="button" className={`mini-tab${eventoRevenue === ev.id ? ' active' : ''}`} onClick={() => setEventoRevenue(ev.id)}>
+                {ev.artista}
+              </button>
+            ))}
+            {!eventiOrdinati.some((ev) => statsPerEvento[ev.id]) && (
+              <p style={{ color: 'var(--mist)', fontSize: 13 }}>Nessuna vendita ancora — appena arriva la prima, comparirà qui divisa per evento.</p>
+            )}
+          </div>
+          {statoEventoRevenue && (
+            <div className="stats-row" style={{ marginBottom: 24 }}>
+              <div className="stat-box"><b>{statoEventoRevenue.numeroPrenotazioni}</b><span>Vendite su questo evento</span></div>
+              <div className="stat-box"><b>€{statoEventoRevenue.fatturato.toFixed(2)}</b><span>Fatturato su questo evento</span></div>
+              <div className="stat-box"><b>€{statoEventoRevenue.commissione.toFixed(2)}</b><span>Tua commissione su questo evento</span></div>
+            </div>
+          )}
+        </>
       )}
 
-      <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '24px 0 14px' }}>I tuoi link</h2>
-      <p style={{ color: 'var(--mist)', fontSize: 13, marginTop: -8, marginBottom: 16 }}>
-        Un link per ogni evento — copialo e condividilo dove vuoi. Decidi tu quali pubblicizzare.
-      </p>
+      {voce === 'link' && (
+        <>
+          <h1 className="page-title" style={{ marginBottom: 6 }}>I tuoi link</h1>
+          <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 20 }}>
+            Un link per ogni evento — copialo e condividilo dove vuoi. Decidi tu quali pubblicizzare.
+          </p>
 
-      {!eventiOrdinati.length && (
-        <div className="empty-box">Non ci sono eventi ancora.</div>
+          {!eventiOrdinati.length && (
+            <div className="empty-box">Non ci sono eventi ancora.</div>
+          )}
+
+          {eventiOrdinati.map((ev) => <CardLinkPromoter key={ev.id} evento={ev} onCopia={copiaLink} />)}
+        </>
       )}
 
-      {eventiOrdinati.map((ev) => <CardLinkPromoter key={ev.id} evento={ev} onCopia={copiaLink} />)}
-
-      <SezioneCodiciSconto />
+      {voce === 'coupon' && (
+        <>
+          <h1 className="page-title" style={{ marginBottom: 20 }}>Codici sconto</h1>
+          <SezioneCodiciSconto />
+        </>
+      )}
 
       <div className="toast" style={{ position: 'fixed', bottom: 26, left: '50%', transform: 'translateX(-50%)', background: 'var(--paper)', color: 'var(--ink)', padding: '12px 20px', borderRadius: 10, fontSize: 13.5, fontWeight: 600, opacity: toast ? 1 : 0, pointerEvents: 'none', transition: 'opacity .25s ease', zIndex: 999 }}>
         {toast}
       </div>
       <CookieBanner />
-    </>
+    </AccountShell>
   );
 }
 
