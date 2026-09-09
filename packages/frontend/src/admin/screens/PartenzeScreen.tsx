@@ -152,17 +152,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   // Sempre un fetch fresco dal server, non l'oggetto già in memoria —
   // quella lista potrebbe non riflettere l'ultimo stato vero.
   async function apriGruppo(gruppo: Partenza[]) {
-    // "Da Confermare" salta DIRETTAMENTE alla pagina Linee, prima
-    // ancora di aprire il modale — niente stato intermedio da gestire
-    // dentro il modale stesso (era lì che si è rotto: il redirect
-    // partiva DA DENTRO al modale appena aperto, un giro in più che
-    // ha lasciato l'utente bloccato senza un vero "indietro" quando
-    // qualcosa andava storto in quel passaggio).
-    if (tab === 'da-confermare') {
-      naviga('linee' as never, { evento: gruppo[0].evento.id, tragitto: gruppo[0].tragittoId });
-      return;
-    }
-    const azione: 'fermate' | 'preventivo' | 'linee' | 'espandi' =
+    const azione: 'fermate' | 'preventivo' | 'espandi' =
       tab === 'fermate' ? 'fermate' : tab === 'da-prezzare' ? 'preventivo' : 'espandi';
     const tragittiIds = gruppo.map((p) => p.tragittoId);
     const eventoId = gruppo[0].evento.id;

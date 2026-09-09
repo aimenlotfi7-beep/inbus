@@ -666,7 +666,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         return (
         <div key={tragitto.tragittoId} className="section-card" style={stato.classe === 'non-coperta' ? { borderColor: 'var(--pink)' } : undefined}>
           <div
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: contestoPartenze ? 'default' : 'pointer' }}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: (contestoPartenze && contestoPartenze.tabOrigine !== 'da-confermare') ? 'default' : 'pointer' }}
             // Comprimere/espandere ha senso solo nell'elenco generale
             // (più tragitti impilati insieme, serve un modo per non
             // vederli tutti aperti) — arrivando da una card/tappa
@@ -675,7 +675,16 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             // "!espansa"), quindi cliccare qui non faceva nclient
             // nulla di visibile: solo la freccia cambiava, un controllo
             // finto. Tolto in quel caso, come segnalato.
-            onClick={contestoPartenze ? undefined : () => toggleApertura(tragitto.tragittoId)}
+            // "Da Confermare" fa eccezione: qui il click DEVE fare
+            // qualcosa anche con contestoPartenze impostato — salta
+            // alla pagina del tragitto invece di espandere/comprimere
+            // (non ha più senso comprimere un contenuto che, per
+            // questa tab, è solo un riepilogo verso quella pagina).
+            onClick={
+              contestoPartenze?.tabOrigine === 'da-confermare' ? () => apriPaginaLinee(tragitto.tragittoId)
+              : contestoPartenze ? undefined
+              : () => toggleApertura(tragitto.tragittoId)
+            }
           >
             <div>
               <h3>{!contestoPartenze && (espansa ? '▾ ' : '▸ ')}{tragitto.nome}</h3>
