@@ -15,7 +15,7 @@ export type SezioneGestionale =
   | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
   | 'fornitori' | 'fermate' | 'tragitti'
   | 'chat' | 'contenuti' | 'comunicazioni'
-  | 'amministratori' | 'ruoli' | 'impostazioni' | 'template-email' | 'layout-biglietto' | 'testi-tooltip'
+  | 'amministratori' | 'ruoli' | 'impostazioni' | 'tracciamento' | 'template-email' | 'layout-biglietto' | 'testi-tooltip'
   | 'beta-tragitti-vicini'
   // "linee" non compare in nessun GRUPPI qui sotto: non è una voce di
   // menu, si raggiunge solo dal pulsante "Gestisci Linee" dentro un
@@ -46,6 +46,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   ]},
   { titolo: 'Marketing', voci: [
     { id: 'campagne', label: 'Campagne', permesso: 'campagne.gestisci' },
+    { id: 'tracciamento', label: 'Tracciamento', permesso: 'impostazioni.gestisci' },
     { id: 'offerte', label: 'Offerte', permesso: 'offerte.gestisci' },
     { id: 'vetrina', label: 'Vetrina', permesso: 'eventi.vetrina' },
     { id: 'contenuti', label: 'Contenuti sito', permesso: 'pagine.gestisci' },

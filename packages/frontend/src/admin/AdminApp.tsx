@@ -35,6 +35,7 @@ import { LineeTragittoScreen } from './screens/LineeTragittoScreen';
 import { ListaAttesaScreen } from './screens/ListaAttesaScreen';
 import { OfferteScreen } from './screens/OfferteScreen';
 import { ImpostazioniScreen } from './screens/ImpostazioniScreen';
+import { TracciamentoScreen } from './screens/TracciamentoScreen';
 import { TemplateEmailScreen } from './screens/TemplateEmailScreen';
 import { LayoutBigliettoScreen } from './screens/LayoutBigliettoScreen';
 import { AnalisiPercorsiScreen } from './screens/beta/AnalisiPercorsiScreen';
@@ -82,6 +83,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   'partenze-passate': PartenzePassateScreen,
   linee: LineeTragittoScreen,
   impostazioni: ImpostazioniScreen,
+  tracciamento: TracciamentoScreen,
   'template-email': TemplateEmailScreen,
   'layout-biglietto': LayoutBigliettoScreen,
   'beta-tragitti-vicini': AnalisiPercorsiScreen,
@@ -127,6 +129,7 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   'partenze-passate': 'eventi.partenze',
   linee: 'eventi.crea',
   impostazioni: 'impostazioni.gestisci',
+  tracciamento: 'impostazioni.gestisci',
   'template-email': 'template-email.gestisci',
   'layout-biglietto': 'layout-biglietto.gestisci',
   'beta-tragitti-vicini': 'eventi.partenze',

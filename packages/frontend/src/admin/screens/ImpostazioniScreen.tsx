@@ -8,24 +8,15 @@ import { PanelHead } from '../shared/PanelHead';
 // riscrivere la schermata — prima ogni impostazione aggiunta nel
 // backend restava "nascosta" (mai esposta qui), trovate 3 così mentre
 // se ne aggiungeva una nuova (posti_per_bus era l'unica visibile).
-const IMPOSTAZIONI: { chiave: string; etichetta: string; default: string; suffisso?: string; tipo?: 'numero' | 'testo' | 'segreto'; nota?: string }[] = [
+// Solo numeriche ora — Pixel/GA4 (testo/segreto) si sono spostati in
+// Marketing → Tracciamento, una sezione dedicata invece di stare
+// mescolati qui in mezzo a soglie senza nessun legame con loro.
+const IMPOSTAZIONI: { chiave: string; etichetta: string; default: string; suffisso?: string }[] = [
   { chiave: 'posti_per_bus', etichetta: 'Posti per bus (usato per "Calcola bus necessari" in Partenze)', default: '50' },
   { chiave: 'credito_per_passeggero', etichetta: 'Credito fedeltà per passeggero (€)', default: '0.5' },
   { chiave: 'soglia_posticipo_variazione_minuti', etichetta: 'Soglia posticipo per notifica variazione (minuti — l\'anticipo e il cambio città/indirizzo notificano sempre, senza soglia; 0 o vuoto = avvisa sempre anche per il posticipo)', default: '0' },
   { chiave: 'giorni_validita_link_preventivo', etichetta: 'Giorni di validità del link inviato ai fornitori per rispondere a una richiesta preventivo (dopo, il link risulta scaduto; chi ha già risposto continua a vedere la sua risposta)', default: '60' },
   { chiave: 'raggio_km_preventivo', etichetta: 'Raggio (km, linea d\'aria) per cercare fornitori vicini a una richiesta preventivo — modificabile comunque per singola richiesta', default: '40' },
-  {
-    chiave: 'meta_pixel_id', etichetta: 'Meta Pixel — ID (Events Manager → Origini dati → il tuo Pixel)', default: '', tipo: 'testo',
-    nota: 'Parte solo per i clienti che accettano i cookie di marketing nel banner del sito. Traccia automaticamente le visite; "inizio prenotazione" e "acquisto" sono già collegati nel codice.',
-  },
-  {
-    chiave: 'meta_capi_token', etichetta: 'Meta Pixel — Token Conversions API (Events Manager → Impostazioni → Conversions API → Genera token di accesso)', default: '', tipo: 'segreto',
-    nota: 'Manda gli stessi eventi anche dal server, come backup — recupera quelli persi dal browser (Safari, ad-blocker). Senza questo token, il Pixel funziona comunque, solo senza il backup lato server.',
-  },
-  {
-    chiave: 'ga4_measurement_id', etichetta: 'Google Analytics 4 — ID di misurazione (Amministrazione → Origini dati → Web, formato "G-XXXXXXXXXX")', default: '', tipo: 'testo',
-    nota: 'Comportamento dei visitatori (da dove arrivano, quanto restano, dove abbandonano) — diverso dal Pixel, che serve a ottimizzare le campagne Meta. Parte con lo stesso consenso cookie del Pixel.',
-  },
 ];
 
 // Chiave della formula prezzi (sezione dedicata più sotto, separata
@@ -121,13 +112,10 @@ export function ImpostazioniScreen() {
               <div className="campo" style={{ marginBottom: 10 }}>
                 <label>{i.etichetta}</label>
                 <input
-                  type={i.tipo === 'segreto' ? 'password' : i.tipo === 'testo' ? 'text' : 'number'}
-                  {...(!i.tipo || i.tipo === 'numero' ? { min: 0, step: '0.01' } : {})}
-                  placeholder={i.tipo === 'testo' || i.tipo === 'segreto' ? '(non impostato)' : undefined}
+                  type="number" min={0} step="0.01"
                   value={valori[i.chiave] ?? i.default}
                   onChange={(e) => setValori((v) => ({ ...v, [i.chiave]: e.target.value }))}
                 />
-                {i.nota && <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 6 }}>{i.nota}</p>}
               </div>
               <button className="btn btn-ghost" onClick={() => salva(i.chiave)} disabled={salvataggio === i.chiave}>
                 {salvataggio === i.chiave ? 'Salvataggio...' : 'Salva'}
