@@ -22,7 +22,7 @@ function sha256(testo: string): string {
 }
 
 interface DatiEventoMeta {
-  nomeEvento: 'Purchase' | 'InitiateCheckout';
+  nomeEvento: 'Purchase' | 'InitiateCheckout' | 'Refund';
   /** Generato dal frontend, condiviso con l'eventuale chiamata Pixel
    *  gemella nel browser — è la chiave di deduplica. */
   eventId: string;

@@ -4,6 +4,7 @@ import { richiesteRimborso, prenotazioni, utenti, eventi, ordini } from '../../d
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
 import { creditoService } from '../credito/credito.service.js';
+import { inviaEventoMetaSeConfigurato } from '../prenotazioni/prenotazioni.service.js';
 
 export const richiesteRimborsoService = {
   /** Solo il numero, non l'elenco completo — usata per il pallino di
@@ -104,6 +105,18 @@ export const richiesteRimborsoService = {
     if (p) {
       await prenotazioniService.cancella(p.pnr);
       await creditoService.revocaCreditoSePresente(p.id);
+      // Meta continuerebbe altrimenti a considerare valido per sempre
+      // un acquisto ormai rimborsato — le sue campagne ottimizzerebbero
+      // (e i tuoi numeri di ritorno pubblicitario risulterebbero)
+      // gonfiati rispetto alla realtà. Best-effort, come ogni chiamata
+      // a Meta: un problema qui non deve mai bloccare un rimborso già
+      // deciso.
+      const [u] = await db.select({ email: utenti.email }).from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+      if (u) {
+        inviaEventoMetaSeConfigurato({
+          nomeEvento: 'Refund', eventId: `refund-${p.id}`, valore: Number(p.totale), email: u.email,
+        }, p.canaleVendita === 'WHITE_LABEL' ? p.whiteLabelId ?? undefined : undefined).catch(() => {});
+      }
     }
 
     await db.update(richiesteRimborso).set({ stato: 'APPROVATA', noteAdmin, gestitaIl: new Date() }).where(eq(richiesteRimborso.id, id));

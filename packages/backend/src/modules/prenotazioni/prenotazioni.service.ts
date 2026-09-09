@@ -11,9 +11,9 @@ import { inviaEventoMetaCapi } from '../../shared/metaConversions.js';
 /** Manda l'evento solo se Pixel ID e token sono entrambi configurati —
  *  altrimenti (caso normale finché non si imposta il Pixel) non fa
  *  nulla, silenziosamente. */
-async function inviaEventoMetaSeConfigurato(
+export async function inviaEventoMetaSeConfigurato(
   dati: {
-    nomeEvento: 'Purchase' | 'InitiateCheckout'; eventId: string; valore?: number;
+    nomeEvento: 'Purchase' | 'InitiateCheckout' | 'Refund'; eventId: string; valore?: number;
     email?: string; telefono?: string; ipCliente?: string; userAgentCliente?: string; fbp?: string; fbc?: string;
   },
   /** Se la vendita viene da un widget White Label, manda l'evento
