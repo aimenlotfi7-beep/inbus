@@ -84,7 +84,7 @@ export function LineeTragittoScreen() {
       : tabDestinazione === 'preventivi' ? 'partenze-preventivi'
       : tabDestinazione === 'da-prezzare' ? 'partenze-prezzi'
       : 'partenze-da-confermare';
-    navigaSezione(sezione, { evento: null, tragitto: null });
+    navigaSezione(sezione, { evento: null, tragitto: null, eventoId: null, tragittiIds: null });
   }
 
   if (!eventoId || !tragittoId) {

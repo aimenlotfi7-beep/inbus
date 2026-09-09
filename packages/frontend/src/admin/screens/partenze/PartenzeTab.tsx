@@ -224,11 +224,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         if (calcoloTragitto) apriModificaOperativa(calcoloTragitto);
       }
     }
-    // "Da Confermare": prima si apriva il Cruscotto Vendite qui dentro
-    // (numeri, "Gestisci Linee →") — un passaggio in più prima di
-    // arrivare dove serve davvero. Ora si salta dritti alla pagina
-    // Linee, sullo stesso tragitto — un click solo, non due.
-    if (contestoPartenze.azione === 'linee') apriPaginaLinee(primoTragittoId);
   }, [contestoPartenze, eventoCompleto, calcolo]);
 
   function toggleApertura(tragittoId: string) {
@@ -1042,13 +1037,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                   onAccettato={ricarica}
                 />
               );
-            }
-            // Se sto per essere reindirizzato alla pagina Linee (vedi
-            // l'useEffect più sopra), non mostro nemmeno per un istante
-            // il vecchio Cruscotto Vendite — solo un breve messaggio,
-            // poi si passa alla pagina vera.
-            if (contestoPartenze?.tabOrigine === 'da-confermare' && contestoPartenze.azione === 'linee') {
-              return <p className="testo-intro" style={{ marginTop: 14 }}>Apro la pagina del tragitto...</p>;
             }
             if (contestoPartenze?.tabOrigine === 'da-confermare') {
               caricaVenditeSeServe(tragitto.tragittoId);
