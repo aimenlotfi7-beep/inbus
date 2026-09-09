@@ -68,7 +68,7 @@ export function FornitorePreventivoPage() {
       <main>
         <h1>Richiesta preventivo</h1>
 
-        {caricando && <p className="sub">Caricamento...</p>}
+        {caricando && <p className="sub">Carico...</p>}
         {erroreCaricamento && <p className="errore">{erroreCaricamento}</p>}
 
         {dati && (

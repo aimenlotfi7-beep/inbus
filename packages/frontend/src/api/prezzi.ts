@@ -19,6 +19,26 @@ export function prezzoMinimoEvento(evento: Evento): number | null {
   return evento.prezzo ? Number(evento.prezzo) : null;
 }
 
+/** Minimo E massimo insieme (un solo giro sui tragitti, non due) — per
+ *  mostrare un intervallo ("da €35 a €90") invece del solo minimo:
+ *  più onesto quando le fermate hanno prezzi molto diversi tra loro,
+ *  il cliente non scopre la cifra vera solo dopo aver scelto la sua
+ *  fermata. Torna null se non c'è nessun prezzo impostato (stesso
+ *  criterio di prezzoMinimoEvento). */
+export function intervalloPrezzoEvento(evento: Evento): { min: number; max: number } | null {
+  const prezzi: number[] = [];
+  const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((v) => v.tragitti)];
+  for (const tragitto of tuttiITragitti) {
+    const extra = Number(tragitto.prezzoExtra ?? 0);
+    for (const f of tragitto.fermate) {
+      if (f.prezzo) prezzi.push(Number(f.prezzo) + extra);
+    }
+  }
+  if (prezzi.length > 0) return { min: Math.min(...prezzi), max: Math.max(...prezzi) };
+  if (evento.prezzo) { const p = Number(evento.prezzo); return { min: p, max: p }; }
+  return null;
+}
+
 /** Applica lo sconto percentuale di un'offerta a un prezzo normale — solo
  *  per MOSTRARLO al cliente: il calcolo che decide davvero quanto viene
  *  addebitato resta sul server (mai fidarsi di un prezzo calcolato nel

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { Evento } from '../../api/types';
+import { intervalloPrezzoEvento } from '../../api/prezzi';
 
 function postiTotaliDisponibili(evento: Evento) {
   const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((v) => v.tragitti)];
@@ -29,6 +30,18 @@ const ETICHETTA_STATO: Record<NonNullable<Evento['statoDisponibilita']>, string>
   ESAURITO: 'Posti terminati',
 };
 
+/** "da €35" se tutte le fermate costano uguale, "da €35 a €90" se
+ *  variano — più onesto del solo minimo quando lo scarto è ampio (il
+ *  cliente non scopre la cifra vera solo dopo aver scelto la sua
+ *  fermata). */
+function testoPrezzo(evento: Evento): string | null {
+  const intervallo = intervalloPrezzoEvento(evento);
+  if (!intervallo) return null;
+  return intervallo.min === intervallo.max
+    ? `da €${intervallo.min.toFixed(0)}`
+    : `da €${intervallo.min.toFixed(0)} a €${intervallo.max.toFixed(0)}`;
+}
+
 // La card porta sempre alla pagina dedicata dell'evento (/eventi/:slug):
 // così ogni evento ha un suo indirizzo indicizzabile da Google e
 // condivisibile con un'anteprima propria — la stessa identica pagina sia
@@ -40,6 +53,7 @@ export function EventoCard({ evento }: { evento: Evento }) {
   // invece che a un evento, CTA diversa ("Vedi le date").
   if (evento.tour) {
     const copertina = evento.immagini[0]?.url;
+    const prezzo = testoPrezzo(evento);
     return (
       <Link to={`/tour/${evento.slug}`} className="card reveal in" style={{ display: 'block', color: 'inherit' }}>
         <div className="card-visual">
@@ -51,7 +65,8 @@ export function EventoCard({ evento }: { evento: Evento }) {
         <div className="card-body">
           <h3>{evento.artista}</h3>
           <div className="card-meta"><span>{evento.luogo}</span><span>{evento.citta}</span></div>
-          <div className="card-foot" style={{ justifyContent: 'flex-end' }}>
+          <div className="card-foot">
+            {prezzo && <span style={{ fontSize: 13, fontWeight: 700 }}>{prezzo}</span>}
             <span className="card-cta">Vedi le date</span>
           </div>
         </div>
@@ -66,6 +81,7 @@ export function EventoCard({ evento }: { evento: Evento }) {
   const posti = postiTotaliDisponibili(evento);
   const copertina = evento.immagini[0]?.url;
   const cittaPartenza = cittaPartenzaEvento(evento);
+  const prezzo = testoPrezzo(evento);
   // L'etichetta mostrata: quella scelta a mano dal gestionale ha
   // sempre la priorità; se non c'è nessuna etichetta ma i posti veri
   // sono davvero zero, mostriamo comunque "Esaurito" — il cliente non
@@ -107,7 +123,8 @@ export function EventoCard({ evento }: { evento: Evento }) {
             </span>
           </div>
         )}
-        <div className="card-foot" style={{ justifyContent: 'flex-end' }}>
+        <div className="card-foot">
+          {prezzo && posti !== 0 && <span style={{ fontSize: 13, fontWeight: 700 }}>{prezzo}</span>}
           <span className="card-cta">
             {posti === 0 ? "Lista d'attesa" : 'Prenota'}
           </span>

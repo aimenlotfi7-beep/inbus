@@ -292,6 +292,15 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .btn-ghost.active{border-color:var(--blue); color:var(--blue); background:rgba(37,99,235,.1);}
 .btn-ghost:hover{border-color:var(--mist);}
 
+/* Due taglie fisse in più, per pulsanti più piccoli dentro card/righe
+   (trovate 15 combinazioni diverse di padding scritte a mano per
+   questo stesso scopo, in giro per il gestionale — da qui in avanti
+   una di queste due invece di sceglierne una nuova ogni volta). Il
+   codice esistente non è stato toccato (nessun rischio di rompere
+   layout già a posto), sono in aggiunta per il nuovo lavoro. */
+.btn-piccolo{padding:5px 12px; font-size:12px;}
+.btn-piccolissimo{padding:3px 9px; font-size:11px;}
+
 /* ---------- DASHBOARD ---------- */
 .dash-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:28px;}
 .dash-card{

@@ -201,7 +201,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
 
       {caricamento ? (
-        <p style={{ color: 'var(--mist)' }}>Caricamento...</p>
+        <p style={{ color: 'var(--mist)' }}>Carico...</p>
       ) : (
         <div className="cards-list">
           {cardsFiltrate.map((gruppo) => {

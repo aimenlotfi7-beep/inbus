@@ -669,18 +669,23 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                   >
                     {azioneInCorso === 'acquista' ? 'Invio...' : 'Acquista'}
                   </button>
+                  <p style={{ fontSize: 11, opacity: .6, marginTop: 4, textAlign: 'center' }}>Pagamento completo, subito</p>
 
                   <button
                     className="search-cta-secondaria"
-                    style={{ opacity: stato === 'invio' ? .5 : 1 }}
+                    style={{ marginTop: 12, opacity: stato === 'invio' ? .5 : 1 }}
                     disabled={stato === 'invio'}
                     onClick={() => confermaPrenotazione('ACCONTO')}
                   >
                     {azioneInCorso === 'prenota' ? 'Invio...' : 'Prenota'}
                   </button>
+                  {/* Prima questa spiegazione stava sotto ENTRAMBI i
+                      pulsanti, non chiaramente legata a "Prenota" — chi
+                      legge veloce poteva pensare non impegnasse a nulla.
+                      Ora è la prima cosa sotto il pulsante giusto. */}
                   <p style={{ fontSize: 11, opacity: .65, marginTop: 6, textAlign: 'center' }}>
-                    Con "Prenota" versi un acconto di €{Number(evento.accontoEur ?? 10).toFixed(2)} a passeggero
-                    ({(Number(evento.accontoEur ?? 10) * passeggeri).toFixed(2)}€ totali ora) e salderai il resto entro
+                    Acconto di €{Number(evento.accontoEur ?? 10).toFixed(2)} a passeggero
+                    ({(Number(evento.accontoEur ?? 10) * passeggeri).toFixed(2)}€ totali ora) — salderai il resto entro
                     15 giorni prima della partenza.
                   </p>
                   <p style={{ fontSize: 11, opacity: .6, marginTop: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>

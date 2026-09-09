@@ -42,7 +42,7 @@ function ReportFatturato() {
         </div>
       </div>
       {righe === null ? (
-        <p className="testo-intro">Caricamento...</p>
+        <p className="testo-intro">Carico...</p>
       ) : righe.length === 0 ? (
         <p className="testo-intro">Nessuna prenotazione confermata in questo periodo.</p>
       ) : (

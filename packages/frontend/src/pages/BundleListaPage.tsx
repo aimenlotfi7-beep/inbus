@@ -13,7 +13,7 @@ export function BundleListaPage() {
           <p className="section-sub">Più eventi insieme, con uno sconto dedicato.</p>
         </div>
       </div>
-      {lista === null ? <p className="section-sub">Caricamento...</p>
+      {lista === null ? <p className="section-sub">Carico...</p>
         : lista.length === 0 ? <p className="section-sub">Nessun bundle disponibile al momento.</p>
         : <div className="carosello-wrap"><div className="carosello carosello-compatto">{lista.map((b) => <BundleCard key={b.id} bundle={b} />)}</div></div>}
     </section>

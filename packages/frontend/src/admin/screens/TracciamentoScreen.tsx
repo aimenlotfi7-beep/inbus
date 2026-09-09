@@ -62,7 +62,7 @@ export function TracciamentoScreen() {
       <PanelHead titolo="Tracciamento" />
       <p className="testo-intro" style={{ marginBottom: 16 }}>Meta Pixel e Google Analytics 4 — da dove arrivano le visite, dove abbandonano, cosa comprano. Il pixel di un singolo organizzatore si imposta invece nella sua scheda White Label.</p>
       {caricamento ? (
-        <p style={{ color: 'var(--mist)' }}>Caricamento...</p>
+        <p style={{ color: 'var(--mist)' }}>Carico...</p>
       ) : (
         <div style={{ maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 18 }}>
           {CAMPI.map((c) => (

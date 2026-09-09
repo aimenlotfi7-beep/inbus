@@ -104,7 +104,7 @@ export function ImpostazioniScreen() {
     <div>
       <PanelHead titolo="Impostazioni" />
       {caricamento ? (
-        <p style={{ color: 'var(--mist)' }}>Caricamento...</p>
+        <p style={{ color: 'var(--mist)' }}>Carico...</p>
       ) : (
         <div style={{ maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 18 }}>
           {IMPOSTAZIONI.map((i) => (

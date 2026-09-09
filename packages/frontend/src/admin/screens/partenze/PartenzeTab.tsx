@@ -549,7 +549,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
     navigaSezione('linee', { evento: eventoId, tragitto: tragittoIdContesto });
   }
 
-  if (caricamento) return <p className="testo-intro">Caricamento...</p>;
+  if (caricamento) return <p className="testo-intro">Carico...</p>;
   if (errore) return <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>;
 
   // Se ci sono servizi, questa sezione si comporta come se ognuno fosse

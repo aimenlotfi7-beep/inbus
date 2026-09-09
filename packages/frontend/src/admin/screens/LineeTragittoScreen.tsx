@@ -104,7 +104,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       </div>
     );
   }
-  if (caricamento) return <p className="testo-intro">Caricamento...</p>;
+  if (caricamento) return <p className="testo-intro">Carico...</p>;
   if (errore) return <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>;
   if (!evento) return null;
 
