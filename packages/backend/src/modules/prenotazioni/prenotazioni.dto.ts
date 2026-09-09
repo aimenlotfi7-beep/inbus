@@ -33,6 +33,12 @@ export const creaPrenotazioneSchema = z.object({
   utmMedium: z.string().optional(),
   utmCampaign: z.string().optional(),
   utmContent: z.string().optional(),
+  // Meta Pixel / Conversions API: eventId condiviso tra il Pixel nel
+  // browser e la chiamata server-side, per la deduplica; fbp/fbc sono
+  // i cookie che il Pixel imposta da solo, per il "match quality".
+  metaEventId: z.string().optional(),
+  metaFbp: z.string().optional(),
+  metaFbc: z.string().optional(),
   cliente: clienteCheckoutSchema,
   // Un modulo nome+cognome per ogni passeggero OLTRE al richiedente
   // (che è già coperto da "cliente" qui sopra) — quindi deve essere

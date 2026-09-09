@@ -20,7 +20,7 @@ export const prenotazioniController = {
   },
   async crea(req: Request, res: Response) {
     if (!req.cliente) throw new NonAutorizzato();
-    const prenotazione = await prenotazioniService.crea(req.body, req.cliente.sub);
+    const prenotazione = await prenotazioniService.crea(req.body, req.cliente.sub, undefined, { ip: req.ip, userAgent: req.headers['user-agent'] });
     res.status(201).json(prenotazione);
   },
   /** Il carrello — più articoli insieme, un'unica conferma/pagamento.
@@ -30,7 +30,7 @@ export const prenotazioniController = {
    *  server lo ricalcola sempre da zero sommando ogni articolo. */
   async creaOrdine(req: Request, res: Response) {
     if (!req.cliente) throw new NonAutorizzato();
-    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente.sub, req.body.bundleId);
+    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente.sub, req.body.bundleId, undefined, { ip: req.ip, userAgent: req.headers['user-agent'] });
     res.status(201).json(risultato);
   },
   async dettaglioPerCliente(req: Request, res: Response) {
