@@ -664,7 +664,16 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         // cosa rilevante mentre si sta prezzando.
         const prezzato = !!tragittoVeroPerOrari?.preventivoCosto;
         return (
-        <div key={tragitto.tragittoId} className="section-card" style={stato.classe === 'non-coperta' ? { borderColor: 'var(--pink)' } : undefined}>
+        <div
+          key={tragitto.tragittoId} className="section-card"
+          style={stato.classe === 'non-coperta' ? { borderColor: 'var(--pink)' } : undefined}
+          // "Da Confermare": tutta la card è cliccabile (non solo la
+          // piccola intestazione) — il Cruscotto Vendite sotto occupa
+          // molto più spazio visivo, cliccarci sopra deve funzionare
+          // lo stesso, non solo sul nome in alto (segnalato: cliccando
+          // il tragitto sembrava non succedere nulla).
+          onClick={contestoPartenze?.tabOrigine === 'da-confermare' ? () => apriPaginaLinee(tragitto.tragittoId) : undefined}
+        >
           <div
             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: (contestoPartenze && contestoPartenze.tabOrigine !== 'da-confermare') ? 'default' : 'pointer' }}
             // Comprimere/espandere ha senso solo nell'elenco generale
@@ -687,7 +696,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             }
           >
             <div>
-              <h3>{!contestoPartenze && (espansa ? '▾ ' : '▸ ')}{tragitto.nome}</h3>
+              <h3>{!contestoPartenze && (espansa ? '▾ ' : '▸ ')}{tragitto.nome}{contestoPartenze?.tabOrigine === 'da-confermare' && <span style={{ fontSize: 12.5, fontWeight: 400, color: 'var(--mist)' }}> — clicca per gestire fermate e linee →</span>}</h3>
               {contestoPartenze?.tabOrigine !== 'fermate' && contestoPartenze?.tabOrigine !== 'da-prezzare' && (() => {
                 // Al posto della vecchia frase generica ("posti
                 // illimitati (nessun bus ancora)", gergo tecnico interno
