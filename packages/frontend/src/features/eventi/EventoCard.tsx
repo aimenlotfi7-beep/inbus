@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import type { Evento } from '../../api/types';
-import { prezzoMinimoEvento } from '../../api/prezzi';
 
 function postiTotaliDisponibili(evento: Evento) {
   const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((v) => v.tragitti)];
@@ -41,7 +40,6 @@ export function EventoCard({ evento }: { evento: Evento }) {
   // invece che a un evento, CTA diversa ("Vedi le date").
   if (evento.tour) {
     const copertina = evento.immagini[0]?.url;
-    const prezzoMinimo = prezzoMinimoEvento(evento);
     return (
       <Link to={`/tour/${evento.slug}`} className="card reveal in" style={{ display: 'block', color: 'inherit' }}>
         <div className="card-visual">
@@ -53,10 +51,7 @@ export function EventoCard({ evento }: { evento: Evento }) {
         <div className="card-body">
           <h3>{evento.artista}</h3>
           <div className="card-meta"><span>{evento.luogo}</span><span>{evento.citta}</span></div>
-          <div className="card-foot">
-            <div className="price">
-              {prezzoMinimo !== null ? <>da €{prezzoMinimo.toFixed(0)}<span> /persona</span></> : <span>Prezzo da definire</span>}
-            </div>
+          <div className="card-foot" style={{ justifyContent: 'flex-end' }}>
             <span className="card-cta">Vedi le date</span>
           </div>
         </div>
@@ -70,7 +65,6 @@ export function EventoCard({ evento }: { evento: Evento }) {
   // posti reali, indipendentemente dall'etichetta mostrata.
   const posti = postiTotaliDisponibili(evento);
   const copertina = evento.immagini[0]?.url;
-  const prezzoMinimo = prezzoMinimoEvento(evento);
   const cittaPartenza = cittaPartenzaEvento(evento);
   // L'etichetta mostrata: quella scelta a mano dal gestionale ha
   // sempre la priorità; se non c'è nessuna etichetta ma i posti veri
@@ -113,10 +107,7 @@ export function EventoCard({ evento }: { evento: Evento }) {
             </span>
           </div>
         )}
-        <div className="card-foot">
-          <div className="price">
-            {prezzoMinimo !== null ? <>da €{prezzoMinimo.toFixed(0)}<span> /persona</span></> : <span>Prezzo da definire</span>}
-          </div>
+        <div className="card-foot" style={{ justifyContent: 'flex-end' }}>
           <span className="card-cta">
             {posti === 0 ? "Lista d'attesa" : 'Prenota'}
           </span>
