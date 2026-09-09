@@ -62,6 +62,14 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
   const [form, setForm] = useState<TourInput>(VUOTO);
   const [eventiEliminati, setEventiEliminati] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
+  // Copertina anche da link diretto, oltre al caricamento file — stesso
+  // schema già usato per il Bundle.
+  const [linkCopertina, setLinkCopertina] = useState('');
+  function aggiungiDaLink() {
+    if (!linkCopertina.trim()) return;
+    setForm((f) => ({ ...f, copertinaUrl: linkCopertina.trim() }));
+    setLinkCopertina('');
+  }
 
   useEffect(() => {
     if (!tourId) return;
@@ -99,6 +107,10 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
         <div className="campo">
           <label>Copertina (propria del tour, non di una singola data)</label>
           {form.copertinaUrl && <img src={form.copertinaUrl} alt="" style={{ maxWidth: 240, borderRadius: 8, display: 'block', marginBottom: 8 }} />}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input placeholder="https://... (o carica un file)" value={linkCopertina} onChange={(e) => setLinkCopertina(e.target.value)} style={{ flex: 1 }} />
+            <button type="button" className="btn btn-ghost" onClick={aggiungiDaLink}>+ Aggiungi</button>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <CaricaFile onCaricato={(url) => setForm({ ...form, copertinaUrl: url })} etichetta="+ Carica copertina" />
             {form.copertinaUrl && <button type="button" className="btn btn-ghost" onClick={() => setForm({ ...form, copertinaUrl: null })}>Rimuovi</button>}
