@@ -79,6 +79,8 @@ export const tour = pgTable('tour', {
   nome: text('nome').notNull(),
   slug: text('slug').notNull().unique(),
   copertinaUrl: text('copertina_url'),
+  descrizione: text('descrizione'),
+  descrizioneSeo: text('descrizione_seo'),
   eliminatoIl: timestamp('eliminato_il'),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
 });

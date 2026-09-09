@@ -4,10 +4,10 @@ export interface TourRiga {
   id: string; nome: string; slug: string; copertinaUrl: string | null; numeroEventi: number;
 }
 export interface TourInput {
-  nome: string; slug?: string; copertinaUrl?: string | null; eventiIds: string[];
+  nome: string; slug?: string; copertinaUrl?: string | null; descrizione?: string | null; descrizioneSeo?: string | null; eventiIds: string[];
 }
 export interface TourDettaglio {
-  id: string; nome: string; slug: string; copertinaUrl: string | null;
+  id: string; nome: string; slug: string; copertinaUrl: string | null; descrizione: string | null; descrizioneSeo: string | null;
   eventi: { id: string; artista: string; data: string; citta: string; luogo: string; slug: string; eliminato: boolean }[];
 }
 export interface DataDelTour {
@@ -15,7 +15,7 @@ export interface DataDelTour {
   immagineUrl: string | null; prezzoMinimo: number | null; vendibile: boolean;
 }
 export interface TourPubblico {
-  nome: string; slug: string; copertinaUrl: string | null; eventi: DataDelTour[];
+  nome: string; slug: string; copertinaUrl: string | null; descrizione: string | null; eventi: DataDelTour[];
 }
 
 export const tourApi = {

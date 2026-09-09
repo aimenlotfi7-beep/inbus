@@ -7,7 +7,7 @@ import { PaginaSezione } from '../shared/PaginaSezione';
 import { CaricaFile } from '../shared/CaricaFile';
 import { SelettoreEventi } from '../shared/SelettoreEventi';
 
-const VUOTO: TourInput = { nome: '', copertinaUrl: null, eventiIds: [] };
+const VUOTO: TourInput = { nome: '', copertinaUrl: null, descrizione: '', descrizioneSeo: '', eventiIds: [] };
 
 /** Più date dello stesso spettacolo, raggruppate solo per come
  *  compaiono sul sito (vedi tour.service.ts sul backend per il
@@ -70,11 +70,12 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
     setForm((f) => ({ ...f, copertinaUrl: linkCopertina.trim() }));
     setLinkCopertina('');
   }
+  const [subTab, setSubTab] = useState<'informazioni' | 'descrizione'>('informazioni');
 
   useEffect(() => {
     if (!tourId) return;
     tourApi.dettaglio(tourId).then((t) => {
-      setForm({ nome: t.nome, slug: t.slug, copertinaUrl: t.copertinaUrl, eventiIds: t.eventi.map((e) => e.id) });
+      setForm({ nome: t.nome, slug: t.slug, copertinaUrl: t.copertinaUrl, descrizione: t.descrizione ?? '', descrizioneSeo: t.descrizioneSeo ?? '', eventiIds: t.eventi.map((e) => e.id) });
       setEventiEliminati(t.eventi.filter((e) => e.eliminato).map((e) => e.artista));
     }).catch(() => notifica('Tour non trovato.'));
   }, [tourId]);
@@ -101,6 +102,11 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
           ⚠ {eventiEliminati.length} evento/i in questo tour {eventiEliminati.length === 1 ? 'è stato eliminato' : 'sono stati eliminati'} ({eventiEliminati.join(', ')}) — salvando, {eventiEliminati.length === 1 ? 'esce' : 'escono'} automaticamente dal tour.
         </p>
       )}
+      <div className="sub-tabs">
+        <button type="button" className={`sub-tab${subTab === 'informazioni' ? ' active' : ''}`} onClick={() => setSubTab('informazioni')}>Informazioni</button>
+        <button type="button" className={`sub-tab${subTab === 'descrizione' ? ' active' : ''}`} onClick={() => setSubTab('descrizione')}>Descrizione</button>
+      </div>
+      {subTab === 'informazioni' && (
       <div className="section-card" style={{ marginBottom: 16, maxWidth: 520 }}>
         <p className="section-label">Informazioni</p>
         <div className="campo"><label>Nome</label><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="es. Vasco Rossi — Roma" /></div>
@@ -117,6 +123,30 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
           </div>
         </div>
       </div>
+      )}
+      {subTab === 'descrizione' && (
+      <div className="section-card" style={{ marginBottom: 16, maxWidth: 520 }}>
+        <p className="section-label">Descrizione</p>
+        <div className="campo">
+          <label>Descrizione del tour (visibile sulla pagina pubblica)</label>
+          <textarea
+            value={form.descrizione ?? ''}
+            onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
+            rows={5}
+            placeholder="Es. presentazione dello spettacolo, cosa aspettarsi, note comuni a tutte le date..."
+          />
+        </div>
+        <div className="campo">
+          <label>Descrizione per i motori di ricerca e social (facoltativa)</label>
+          <textarea
+            value={form.descrizioneSeo ?? ''}
+            onChange={(e) => setForm({ ...form, descrizioneSeo: e.target.value })}
+            rows={3}
+            placeholder='Se vuota, viene generata automaticamente (es. 12 date disponibili per...)'
+          />
+        </div>
+      </div>
+      )}
       <div className="section-card" style={{ marginBottom: 16 }}>
         <p className="section-label">Date da raggruppare</p>
         <p className="testo-intro" style={{ marginBottom: 10 }}>Scegli tra gli eventi già esistenti — non servono consecutivi, né lo stesso mese.</p>

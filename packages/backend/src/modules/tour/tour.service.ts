@@ -70,7 +70,7 @@ export const tourService = {
   async create(input: TourInput) {
     const slug = await slugUnivoco(slugDa(input.slug?.trim() || input.nome));
     return db.transaction(async (tx) => {
-      const [nuovo] = await tx.insert(tour).values({ nome: input.nome, slug, copertinaUrl: input.copertinaUrl ?? null }).returning();
+      const [nuovo] = await tx.insert(tour).values({ nome: input.nome, slug, copertinaUrl: input.copertinaUrl ?? null, descrizione: input.descrizione ?? null, descrizioneSeo: input.descrizioneSeo ?? null }).returning();
       await tx.insert(tourEventi).values(input.eventiIds.map((eventoId, ordine) => ({ tourId: nuovo.id, eventoId, ordine })));
       return nuovo;
     });
@@ -81,7 +81,7 @@ export const tourService = {
     if (!esistente) throw new NonTrovato('Tour');
     const slug = input.slug?.trim() && input.slug.trim() !== esistente.slug ? await slugUnivoco(slugDa(input.slug), id) : esistente.slug;
     return db.transaction(async (tx) => {
-      const [agg] = await tx.update(tour).set({ nome: input.nome, slug, copertinaUrl: input.copertinaUrl ?? null }).where(eq(tour.id, id)).returning();
+      const [agg] = await tx.update(tour).set({ nome: input.nome, slug, copertinaUrl: input.copertinaUrl ?? null, descrizione: input.descrizione ?? null, descrizioneSeo: input.descrizioneSeo ?? null }).where(eq(tour.id, id)).returning();
       await tx.delete(tourEventi).where(eq(tourEventi.tourId, id));
       await tx.insert(tourEventi).values(input.eventiIds.map((eventoId, ordine) => ({ tourId: id, eventoId, ordine })));
       return agg;
@@ -103,7 +103,7 @@ export const tourService = {
     const conteggi = await db.select({ tourId: tourEventi.tourId, n: sql<number>`count(*)::int` }).from(tourEventi)
       .where(inArray(tourEventi.tourId, righe.map((t) => t.id))).groupBy(tourEventi.tourId);
     const nPerTour = new Map(conteggi.map((c) => [c.tourId, c.n]));
-    return righe.filter((t) => (nPerTour.get(t.id) ?? 0) > 0).map((t) => ({ nome: t.nome, slug: t.slug, copertinaUrl: t.copertinaUrl, numeroEventi: nPerTour.get(t.id) ?? 0 }));
+    return righe.filter((t) => (nPerTour.get(t.id) ?? 0) > 0).map((t) => ({ nome: t.nome, slug: t.slug, copertinaUrl: t.copertinaUrl, descrizioneSeo: t.descrizioneSeo, numeroEventi: nPerTour.get(t.id) ?? 0 }));
   },
 
   /** Per la pagina pubblica /tour/:slug — elenco date a scorrimento. */
@@ -123,7 +123,7 @@ export const tourService = {
     const primaImmagine = new Map<string, string>();
     for (const i of [...immagini].sort((a, b) => a.ordine - b.ordine)) if (!primaImmagine.has(i.eventoId)) primaImmagine.set(i.eventoId, i.url);
     return {
-      nome: t.nome, slug: t.slug, copertinaUrl: t.copertinaUrl,
+      nome: t.nome, slug: t.slug, copertinaUrl: t.copertinaUrl, descrizione: t.descrizione,
       eventi: membri.map((m) => ({
         id: m.e.id, slug: m.e.slug, artista: m.e.artista, data: m.e.data, citta: m.e.citta, luogo: m.e.luogo,
         immagineUrl: primaImmagine.get(m.e.id) ?? null, prezzoMinimo: prezzi.get(m.e.id) ?? null, vendibile: vendibili.get(m.e.id) ?? false,

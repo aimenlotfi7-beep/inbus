@@ -22,7 +22,7 @@ export function TourPage() {
 
   useSeoTags({
     title: tour ? `${tour.nome} — OnWay` : 'Tour — OnWay',
-    description: tour ? `${tour.eventi.length} date disponibili per ${tour.nome}.` : 'Più date, un solo spettacolo.',
+    description: tour ? (tour.descrizione?.trim() || `${tour.eventi.length} date disponibili per ${tour.nome}.`) : 'Più date, un solo spettacolo.',
     image: tour?.copertinaUrl ?? undefined,
     url: window.location.href,
   });
@@ -43,6 +43,7 @@ export function TourPage() {
               </div>
               <h1>{tour.nome}</h1>
               <p className="meta-riga">Scegli la data che preferisci — la prenotazione funziona come per un evento normale.</p>
+              {tour.descrizione && <p style={{ marginTop: 14, whiteSpace: 'pre-line' }}>{tour.descrizione}</p>}
             </div>
 
             <div className="evento-pagina-checkout aperta-mobile">

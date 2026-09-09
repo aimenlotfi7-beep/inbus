@@ -128,7 +128,7 @@ async function main() {
 function costruisciHtmlTour(template, t) {
   const url = `${siteUrl}/tour/${t.slug}`;
   const titolo = `${t.nome} — Tutte le date | INBUS`;
-  const descrizione = `${t.numeroEventi} date disponibili per ${t.nome}. Scegli la tua e prenota con INBUS.`;
+  const descrizione = (t.descrizioneSeo && String(t.descrizioneSeo).trim()) || `${t.numeroEventi} date disponibili per ${t.nome}. Scegli la tua e prenota con INBUS.`;
   const immagine = t.copertinaUrl;
   let html = template;
   html = html.replace(/<title>.*?<\/title>/s, `<title>${escapeHtml(titolo)}</title>`);
