@@ -102,6 +102,7 @@ export const eventiApi = {
   },
   getById: (id: string) => api.get<Evento>(`/api/eventi/${id}`),
   getBySlug: (slug: string) => api.get<Evento>(`/api/eventi/slug/${slug}`),
+  conteggioPrenotazioni: (id: string) => api.get<{ conteggio: number }>(`/api/eventi/${id}/conteggio-prenotazioni`),
   opzioniPartenza: (id: string, servizioId?: string) =>
     api.get<OpzionePartenza[]>(`/api/eventi/${id}/opzioni-partenza${servizioId ? `?servizioId=${servizioId}` : ''}`),
   create: (input: EventoInput) => api.post<Evento>('/api/eventi', input),

@@ -403,6 +403,18 @@ export const eventiService = {
 
   getById,
 
+  /** Quante persone hanno già confermato per questo evento (somma dei
+   *  passeggeri sulle prenotazioni CONFERMATE, su tutti i suoi
+   *  tragitti/fermate insieme) — per la prova sociale sulla pagina
+   *  pubblica ("127 persone hanno già prenotato"). Un numero solo,
+   *  una query leggera, pubblica (nessun dato personale, solo un
+   *  conteggio). */
+  async conteggioPrenotazioniConfermate(eventoId: string): Promise<number> {
+    const [riga] = await db.select({ totale: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)::int` })
+      .from(prenotazioni).where(and(eq(prenotazioni.eventoId, eventoId), eq(prenotazioni.stato, 'CONFERMATA')));
+    return riga?.totale ?? 0;
+  },
+
   /** Recupera un evento dal suo slug pubblico (per la pagina dedicata
    *  /eventi/:slug) — visibile solo se non è già passato e non è stato
    *  nascosto manualmente, stessa regola della home. */

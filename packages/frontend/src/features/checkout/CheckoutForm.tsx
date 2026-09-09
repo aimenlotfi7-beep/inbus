@@ -301,6 +301,21 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
     <div className="checkout-form" style={styleTema}>
       <h3>Prenota</h3>
 
+      {/* Indicatore di avanzamento — puramente visivo, non blocca né
+          salta nulla (il modulo resta tutto scorrevole come prima):
+          solo un modo per sapere a colpo d'occhio "quanto manca".
+          Legge stato già calcolato altrove (opzioneScelta,
+          partecipantiCompleti, moduloRichiedenteCompleto) — nessuna
+          nuova logica di validazione da mantenere doppia. */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+        {[!!opzioneScelta, partecipantiCompleti, moduloRichiedenteCompleto].map((fatto, i) => (
+          <span key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: fatto ? 'var(--ink)' : 'var(--line)', transition: 'background .2s ease' }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, opacity: .6, marginBottom: 16 }}>
+        <span>Fermata</span><span>Passeggeri</span><span>I tuoi dati</span>
+      </div>
+
       {offerta && (
         <p style={{ background: '#e8f7ea', border: '1px solid #b6e3bb', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
           🎉 Offerta "{offerta.nome}": -{offerta.scontoPercentuale.toFixed(0)}% su tutte le fermate.

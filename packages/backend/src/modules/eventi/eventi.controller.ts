@@ -16,6 +16,9 @@ export const eventiController = {
     const evento = await eventiService.getBySlug(req.params.slug);
     res.json(evento);
   },
+  async conteggioPrenotazioniConfermate(req: Request, res: Response) {
+    res.json({ conteggio: await eventiService.conteggioPrenotazioniConfermate(req.params.id) });
+  },
 
   async create(req: Request, res: Response) {
     const id = await eventiService.create(req.body as CreaEventoInput);

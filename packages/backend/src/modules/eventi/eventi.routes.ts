@@ -28,6 +28,7 @@ eventiRouter.post('/cestino/tratte/:id/ripristina', richiedeAuth, richiedePermes
 // Stesso motivo: va prima di GET '/:id' per non essere interpretata come
 // una richiesta per un evento con id "slug".
 eventiRouter.get('/slug/:slug', asyncHandler(eventiController.getBySlug));
+eventiRouter.get('/:id/conteggio-prenotazioni', asyncHandler(eventiController.conteggioPrenotazioniConfermate));
 eventiRouter.get('/:id', asyncHandler(eventiController.getById));
 eventiRouter.get('/:id/opzioni-partenza', asyncHandler(eventiController.opzioniPartenza));
 

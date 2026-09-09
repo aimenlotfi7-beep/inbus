@@ -52,6 +52,16 @@ export function EventoPage() {
       .catch((e) => setStato(e instanceof ErroreApi && e.status === 404 ? 'non-trovato' : 'errore'));
   }, [slug]);
 
+  // Prova sociale — quante persone hanno già confermato. Caricata a
+  // parte (non blocca la pagina vera), e mostrata solo sopra una
+  // soglia: "2 persone hanno prenotato" sembra scarso invece che
+  // rassicurante, meglio non dire nulla in quel caso.
+  const [prenotazioniConfermate, setPrenotazioniConfermate] = useState<number | null>(null);
+  useEffect(() => {
+    if (!evento) return;
+    eventiApi.conteggioPrenotazioni(evento.id).then((r) => setPrenotazioniConfermate(r.conteggio)).catch(() => {});
+  }, [evento?.id]);
+
   const prezzoMinimo = evento ? prezzoMinimoEvento(evento) : null;
   const copertina = evento?.immagini[0]?.url;
 
@@ -116,6 +126,9 @@ export function EventoPage() {
 
               {prezzoMinimo !== null && (
                 <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, marginTop: 14 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
+              )}
+              {prenotazioniConfermate !== null && prenotazioniConfermate >= 10 && (
+                <p style={{ fontSize: 13, opacity: .75, marginTop: 4 }}>{prenotazioniConfermate} persone hanno già prenotato per questo evento</p>
               )}
 
               <SezioniAccordion evento={evento} />
