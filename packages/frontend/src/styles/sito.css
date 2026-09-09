@@ -359,9 +359,14 @@
   .price{font-family:'Space Mono',monospace; font-size:15px; color:var(--paper);}
   .price span{color:var(--mist); font-size:11px;}
   .card-cta{
+    /* inline-flex, non il default inline dello <span> che lo contiene:
+       senza, padding/border-radius/min-height su un elemento "in linea"
+       non si comportano come un vero pulsante — invisibile finché non
+       c'era un bordo a rivelarlo, con un bordo il testo sembrava tagliato. */
+    display:inline-flex; align-items:center; justify-content:center;
     font-size:12.5px; font-weight:700; color:var(--night); background:var(--paper);
-    padding:11px 16px; border-radius:999px; border:2px solid var(--amber); cursor:pointer;
-    transition:background .15s ease; min-height:38px;
+    padding:10px 18px; border-radius:999px; border:1px solid var(--amber); cursor:pointer;
+    transition:background .15s ease; min-height:38px; white-space:nowrap;
   }
   .card-cta:hover{background:var(--pink); color:var(--night);}
   .chat-cta{
