@@ -20,6 +20,14 @@ const CAMPI: { chiave: string; etichetta: string; tipo: 'testo' | 'segreto'; not
     chiave: 'ga4_measurement_id', etichetta: 'Google Analytics 4 — ID di misurazione (Amministrazione → Origini dati → Web, formato "G-XXXXXXXXXX")', tipo: 'testo',
     nota: 'Comportamento dei visitatori (da dove arrivano, quanto restano, dove abbandonano) — diverso dal Pixel, che serve a ottimizzare le campagne Meta. Parte con lo stesso consenso cookie del Pixel.',
   },
+  {
+    chiave: 'google_ads_conversion_id', etichetta: 'Google Ads — ID conversione (Strumenti → Conversioni → l\'azione "Acquisto" → Configurazione del tag, formato "AW-XXXXXXXXX")', tipo: 'testo',
+    nota: 'Usa lo stesso script di GA4 (nessun altro codice da caricare) — dice a Google Ads quali visite dai tuoi annunci si sono trasformate in vendite, per ottimizzare le campagne sulle vendite vere, non solo sui clic.',
+  },
+  {
+    chiave: 'google_ads_conversion_label', etichetta: 'Google Ads — Etichetta della conversione "Acquisto" (stessa pagina di sopra, la parte dopo la barra nel tag)', tipo: 'testo',
+    nota: 'Serve insieme all\'ID qui sopra — senza uno dei due, le conversioni Google Ads non partono (GA4 e Meta continuano a funzionare comunque).',
+  },
 ];
 
 export function TracciamentoScreen() {

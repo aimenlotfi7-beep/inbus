@@ -22,39 +22,48 @@ declare global {
   }
 }
 
-let ga4IdCache: string | null | undefined; // undefined = non ancora chiesto al server
+let tracciamentoCache: { ga4Id: string | null; googleAdsId: string | null; googleAdsLabel: string | null } | undefined; // undefined = non ancora chiesto al server
 let caricato = false;
 
-function caricaScript(id: string) {
+/** googleAdsId — Google Ads usa LO STESSO script gtag.js di GA4 (un
+ *  secondo gtag('config', ...) con un ID diverso, "AW-..."), non un
+ *  secondo script da caricare: se manca, si continua solo con GA4. */
+function caricaScript(ga4Id: string | null, googleAdsId: string | null) {
   if (caricato || window.gtag) return;
   caricato = true;
   window.dataLayer = window.dataLayer || [];
   window.gtag = function gtag() { window.dataLayer!.push(arguments); };
   window.gtag('js', new Date());
-  // send_page_view: false — vedi nota SPA sopra, tracciamo noi ogni pagina a mano.
-  window.gtag('config', id, { send_page_view: false });
+  const idPerLoScript = ga4Id ?? googleAdsId!; // uno dei due carica lo script, serve solo per l'URL
+  if (ga4Id) window.gtag('config', ga4Id, { send_page_view: false }); // vedi nota SPA sopra, tracciamo noi ogni pagina a mano
+  if (googleAdsId) window.gtag('config', googleAdsId);
 
   const script = document.createElement('script');
   script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${id}`;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${idPerLoScript}`;
   document.head.appendChild(script);
+}
+
+async function assicuraTracciamentoCache() {
+  if (tracciamentoCache === undefined) {
+    try {
+      const { ga4Id, googleAdsId, googleAdsLabel } = await impostazioniApi.tracciamentoPubblico();
+      tracciamentoCache = { ga4Id, googleAdsId, googleAdsLabel };
+    } catch {
+      tracciamentoCache = { ga4Id: null, googleAdsId: null, googleAdsLabel: null };
+    }
+  }
+  return tracciamentoCache;
 }
 
 /** Da chiamare una volta, in Layout — stesso meccanismo del Pixel:
  *  prova a caricare se il consenso c'è già, resta in ascolto per
- *  quando arriva dopo. */
+ *  quando arriva dopo. Carica GA4 e Google Ads insieme (stesso script). */
 export function inizializzaGA4() {
   async function provaACaricare() {
     if (!haConsensoPer('marketing')) return;
-    if (ga4IdCache === undefined) {
-      try {
-        const { ga4Id } = await impostazioniApi.tracciamentoPubblico();
-        ga4IdCache = ga4Id;
-      } catch {
-        ga4IdCache = null;
-      }
-    }
-    if (ga4IdCache) caricaScript(ga4IdCache);
+    const { ga4Id, googleAdsId } = await assicuraTracciamentoCache();
+    if (ga4Id || googleAdsId) caricaScript(ga4Id, googleAdsId);
   }
   provaACaricare();
   window.addEventListener('inbus-consenso-cookie-cambiato', provaACaricare);
@@ -64,15 +73,8 @@ export function inizializzaGA4() {
  *  (vedi inizializzaMetaPixelWidget in metaPixel.ts): nessun banner
  *  cookie lì, quindi qui NON si controlla haConsensoPer(). */
 export async function inizializzaGA4Widget() {
-  if (ga4IdCache === undefined) {
-    try {
-      const { ga4Id } = await impostazioniApi.tracciamentoPubblico();
-      ga4IdCache = ga4Id;
-    } catch {
-      ga4IdCache = null;
-    }
-  }
-  if (ga4IdCache) caricaScript(ga4IdCache);
+  const { ga4Id, googleAdsId } = await assicuraTracciamentoCache();
+  if (ga4Id || googleAdsId) caricaScript(ga4Id, googleAdsId);
 }
 
 /** Una pagina vista — chiamala a ogni cambio di rotta (vedi Layout,
@@ -101,5 +103,18 @@ export function tracciaAcquistoGA4(valore: number, transactionId: string, nomeEv
   window.gtag('event', 'purchase', {
     transaction_id: transactionId, currency: 'EUR', value: valore,
     ...(nomeEvento && { items: [{ item_name: nomeEvento }] }),
+  });
+}
+
+/** Conversione per Google Ads — evento SEPARATO da GA4 (send_to
+ *  specifico), anche se arriva dallo stesso gtag: senza questo, Google
+ *  Ads non sa quali visite dai TUOI annunci si sono trasformate in
+ *  vendite, e non può ottimizzare le campagne sulle vendite vere. Non
+ *  fa nulla se non è configurato un ID+etichetta Google Ads. */
+export function tracciaAcquistoGoogleAds(valore: number, transactionId: string) {
+  if (!window.gtag || !tracciamentoCache?.googleAdsId || !tracciamentoCache?.googleAdsLabel) return;
+  window.gtag('event', 'conversion', {
+    send_to: `${tracciamentoCache.googleAdsId}/${tracciamentoCache.googleAdsLabel}`,
+    value: valore, currency: 'EUR', transaction_id: transactionId,
   });
 }

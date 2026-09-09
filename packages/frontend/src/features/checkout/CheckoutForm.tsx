@@ -13,7 +13,7 @@ import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
 import { useCarrello } from '../carrello/CarrelloContext';
 import { SelettoreFermata } from './SelettoreFermata';
 import { tracciaInizioPrenotazione, tracciaAcquisto, leggiCookieMeta } from '../metaPixel';
-import { tracciaInizioCheckoutGA4, tracciaAcquistoGA4 } from '../googleAnalytics';
+import { tracciaInizioCheckoutGA4, tracciaAcquistoGA4, tracciaAcquistoGoogleAds } from '../googleAnalytics';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -243,6 +243,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
         const valoreEuro = opzioneScelta.prezzoEffettivo * passeggeri; // stima lato client — il valore vero e' quello calcolato dal server per la Conversions API, questo serve solo al Pixel nel browser
         tracciaAcquisto(valoreEuro, metaEventId);
         tracciaAcquistoGA4(valoreEuro, prenotazione.pnr, evento.artista);
+        tracciaAcquistoGoogleAds(valoreEuro, prenotazione.pnr);
       }
       setStato('confermato');
     } catch (e) {

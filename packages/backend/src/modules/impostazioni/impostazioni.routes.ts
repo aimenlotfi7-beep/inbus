@@ -113,14 +113,31 @@ export async function leggiGa4MeasurementId(): Promise<string | null> {
   return riga?.valore || null;
 }
 
+/** Google Ads — ID conversione ("AW-XXXXXXXXX") ed etichetta della
+ *  specifica azione "Acquisto" (Google Ads → Strumenti → Conversioni →
+ *  l'azione → "Configurazione del tag" → "Usa direttamente il tag
+ *  Google"). Nessuno dei due è segreto — stesso motivo del Pixel/GA4. */
+export const CHIAVE_GOOGLE_ADS_CONVERSION_ID = 'google_ads_conversion_id';
+export async function leggiGoogleAdsConversionId(): Promise<string | null> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_GOOGLE_ADS_CONVERSION_ID)).limit(1);
+  return riga?.valore || null;
+}
+export const CHIAVE_GOOGLE_ADS_CONVERSION_LABEL = 'google_ads_conversion_label';
+export async function leggiGoogleAdsConversionLabel(): Promise<string | null> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_GOOGLE_ADS_CONVERSION_LABEL)).limit(1);
+  return riga?.valore || null;
+}
+
 export const impostazioniRouter = Router();
 
 // Pubblica — PRIMA di richiedeAuth. Un'unica chiamata per tutti gli id
 // di tracciamento (nessuno dei due è segreto) — il sito li legge
 // insieme, un giro solo invece di due.
 impostazioniRouter.get('/pubblico/tracciamento', asyncHandler(async (_req: Request, res: Response) => {
-  const [pixelId, ga4Id] = await Promise.all([leggiMetaPixelId(), leggiGa4MeasurementId()]);
-  res.json({ pixelId, ga4Id });
+  const [pixelId, ga4Id, googleAdsId, googleAdsLabel] = await Promise.all([
+    leggiMetaPixelId(), leggiGa4MeasurementId(), leggiGoogleAdsConversionId(), leggiGoogleAdsConversionLabel(),
+  ]);
+  res.json({ pixelId, ga4Id, googleAdsId, googleAdsLabel });
 }));
 // Vecchia rotta mantenuta per compatibilità (nessuna versione vecchia
 // del frontend la chiama più dopo questo deploy, ma costa nulla

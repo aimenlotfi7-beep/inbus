@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCarrello } from '../features/carrello/CarrelloContext';
 import { tracciaAcquisto, leggiCookieMeta } from '../features/metaPixel';
-import { tracciaAcquistoGA4 } from '../features/googleAnalytics';
+import { tracciaAcquistoGA4, tracciaAcquistoGoogleAds } from '../features/googleAnalytics';
 import { clienteAuthApi, type DatiCliente } from '../api/clienteAuth';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { clienteLoggato } from '../features/clienteSessione';
@@ -74,6 +74,7 @@ export function CarrelloPage() {
       setFatto(risultato.prenotazioni.map((p) => ({ pnr: p.pnr })));
       tracciaAcquisto(totaleStimato - scontoBundleStimato, metaEventId);
       tracciaAcquistoGA4(totaleStimato - scontoBundleStimato, metaEventId, bundle?.nome);
+      tracciaAcquistoGoogleAds(totaleStimato - scontoBundleStimato, metaEventId);
       svuota();
     } catch (e) {
       setErrore(e instanceof Error ? e.message : 'Acquisto non riuscito. Riprova.');
