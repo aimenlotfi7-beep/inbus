@@ -3,9 +3,11 @@ import { tourApi, type TourRiga, type TourInput } from '../../api/tour';
 import { notifica } from '../shared/notifiche';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
+import { RicercaSezione } from '../shared/RicercaSezione';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { CaricaFile } from '../shared/CaricaFile';
 import { SelettoreEventi } from '../shared/SelettoreEventi';
+import { TourCardCompatta } from '../shared/TourCardCompatta';
 
 const VUOTO: TourInput = { nome: '', copertinaUrl: null, descrizione: '', descrizioneSeo: '', eventiIds: [] };
 
@@ -15,10 +17,13 @@ const VUOTO: TourInput = { nome: '', copertinaUrl: null, descrizione: '', descri
  *  — qui si sceglie solo quali raggruppare sotto una card unica. */
 export function TourScreen() {
   const [lista, setLista] = useState<TourRiga[]>([]);
+  const [ricerca, setRicerca] = useState('');
   const [aperto, setAperto] = useState<{ id: string | null } | null>(null);
 
   function ricarica() { tourApi.list().then(setLista).catch(() => setLista([])); }
   useEffect(ricarica, []);
+
+  const filtrati = ricerca.trim() ? lista.filter((t) => t.nome.toLowerCase().includes(ricerca.trim().toLowerCase())) : lista;
 
   async function elimina(t: TourRiga) {
     if (!confirm(`Eliminare il tour "${t.nome}"? Gli eventi che raggruppa NON vengono toccati — tornano semplicemente a comparire come eventi singoli sul sito.`)) return;
@@ -31,26 +36,16 @@ export function TourScreen() {
   return (
     <div>
       <PanelHead titolo="Tour" azione={<button className="btn btn-primary" onClick={() => setAperto({ id: null })}>+ Nuovo tour</button>} />
-      <p className="testo-intro" style={{ marginBottom: 16 }}>
+      <p className="testo-intro" style={{ marginBottom: 12 }}>
         Più date dello stesso spettacolo (es. 10 concerti in giorni diversi) raggruppate sotto una card sola sul sito. Ogni data resta un evento indipendente — crealo prima normalmente in Eventi, poi selezionalo qui.
       </p>
-      {lista.length === 0 ? (
-        <p className="testo-intro">Nessun tour creato ancora.</p>
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome..." />
+      {filtrati.length === 0 ? (
+        <p className="testo-intro">{ricerca ? 'Nessun tour trovato.' : 'Nessun tour creato ancora.'}</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {lista.map((t) => (
-            <div key={t.id} className="section-card" style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }} onClick={() => setAperto({ id: t.id })}>
-              {t.copertinaUrl ? (
-                <img src={t.copertinaUrl} alt="" style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
-              ) : (
-                <div style={{ width: 64, height: 64, borderRadius: 8, background: 'var(--dusk-2)', flexShrink: 0 }} />
-              )}
-              <div style={{ flex: 1 }}>
-                <b>{t.nome}</b>
-                <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 2 }}>{t.numeroEventi} data/e</p>
-              </div>
-              <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(t); }}>Elimina</button>
-            </div>
+        <div className="cards-list">
+          {filtrati.map((t) => (
+            <TourCardCompatta key={t.id} tour={t} onClick={() => setAperto({ id: t.id })} onElimina={() => elimina(t)} />
           ))}
         </div>
       )}
@@ -95,7 +90,7 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
   }
 
   return (
-    <PaginaSezione titolo={tourId ? 'Modifica tour' : 'Nuovo tour'} onIndietro={onChiudi}
+    <PaginaSezione titolo={tourId ? 'Modifica tour' : 'Nuovo tour'} onIndietro={onChiudi} larga
       azioni={<button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva tour'}</button>}>
       {eventiEliminati.length > 0 && (
         <p style={{ background: 'var(--dusk)', border: '1px solid var(--pink)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 14 }}>
