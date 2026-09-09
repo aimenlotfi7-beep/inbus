@@ -20,7 +20,8 @@ function cittaPartenzaEvento(evento: Evento): string[] {
 
 function fmtData(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+  // Per esteso, su richiesta — non più "15 giu" ma "15 giugno 2027".
+  return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 const ETICHETTA_STATO: Record<NonNullable<Evento['statoDisponibilita']>, string> = {
@@ -96,7 +97,8 @@ export function EventoCard({ evento }: { evento: Evento }) {
       </div>
       <div className="card-body">
         <h3>{evento.artista}</h3>
-        <div className="card-meta"><span>{evento.luogo}, {evento.citta}</span><span>{fmtData(evento.data)}</span></div>
+        <div className="card-meta"><span>{evento.luogo}, {evento.citta}</span></div>
+        <div className="card-meta"><span>{fmtData(evento.data)}</span></div>
         {!!cittaPartenza.length && (
           <div className="card-meta">
             <span style={{ opacity: .75 }}>
