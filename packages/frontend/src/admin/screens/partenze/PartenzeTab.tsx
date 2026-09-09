@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { notifica } from '../../shared/notifiche';
 import type { ContestoPartenze } from './tipi';
-import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea, type VenditePerFermata, type SuggerimentoLinea } from '../../../api/eventi';
-import { GraficoLinee, type SerieGrafico } from '../../shared/GraficoLinee';
+import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea, type VenditePerFermata } from '../../../api/eventi';
 import type { Evento } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { impostazioniApi } from '../../../api/impostazioni';
 import { PreventiviTragitto } from './PreventiviTragitto';
+import { LineeTragittoScreen } from '../LineeTragittoScreen';
 import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import { ErroreApi } from '../../../api/client';
 import { OrarioInput } from '../../shared/OrarioInput';
@@ -97,7 +97,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   // quando serve davvero (apertura effettiva della tab "Da
   // Confermare"), non per tutti i tragitti visibili in ogni istante.
   const [venditeMap, setVenditeMap] = useState<Map<string, VenditePerFermata>>(new Map());
-  const [suggerimentoMap, setSuggerimentoMap] = useState<Map<string, SuggerimentoLinea>>(new Map());
   // fermate ipotizzo di coprire con la Linea candidata, e quanto
   // costerebbe: entrambi per tragitto, dato che più tragitti possono
   // essere aperti ed espansi insieme nella stessa pagina.
@@ -129,10 +128,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
   function caricaVenditeSeServe(tragittoId: string) {
     if (venditeMap.has(tragittoId)) return;
     eventiApi.venditePerFermata(tragittoId).then((v) => setVenditeMap((prev) => new Map(prev).set(tragittoId, v))).catch(() => {});
-  }
-  function caricaSuggerimentoSeServe(tragittoId: string) {
-    if (suggerimentoMap.has(tragittoId)) return;
-    eventiApi.suggerimentoLinea(tragittoId).then((s) => setSuggerimentoMap((prev) => new Map(prev).set(tragittoId, s))).catch(() => {});
   }
   // Se l'evento ha più servizi, questa sezione si comporta come se
   // ognuno fosse un evento a parte: una tab per servizio (più una per i
@@ -667,15 +662,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         <div
           key={tragitto.tragittoId} className="section-card"
           style={stato.classe === 'non-coperta' ? { borderColor: 'var(--pink)' } : undefined}
-          // "Da Confermare": tutta la card è cliccabile (non solo la
-          // piccola intestazione) — il Cruscotto Vendite sotto occupa
-          // molto più spazio visivo, cliccarci sopra deve funzionare
-          // lo stesso, non solo sul nome in alto (segnalato: cliccando
-          // il tragitto sembrava non succedere nulla).
-          onClick={contestoPartenze?.tabOrigine === 'da-confermare' ? () => apriPaginaLinee(tragitto.tragittoId) : undefined}
         >
           <div
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: (contestoPartenze && contestoPartenze.tabOrigine !== 'da-confermare') ? 'default' : 'pointer' }}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: contestoPartenze ? 'default' : 'pointer' }}
             // Comprimere/espandere ha senso solo nell'elenco generale
             // (più tragitti impilati insieme, serve un modo per non
             // vederli tutti aperti) — arrivando da una card/tappa
@@ -683,21 +672,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             // per intero (early return più sotto, prima di arrivare a
             // "!espansa"), quindi cliccare qui non faceva nclient
             // nulla di visibile: solo la freccia cambiava, un controllo
-            // finto. Tolto in quel caso, come segnalato.
-            // "Da Confermare" fa eccezione: qui il click DEVE fare
-            // qualcosa anche con contestoPartenze impostato — salta
-            // alla pagina del tragitto invece di espandere/comprimere
-            // (non ha più senso comprimere un contenuto che, per
-            // questa tab, è solo un riepilogo verso quella pagina).
-            onClick={
-              contestoPartenze?.tabOrigine === 'da-confermare' ? () => apriPaginaLinee(tragitto.tragittoId)
-              : contestoPartenze ? undefined
-              : () => toggleApertura(tragitto.tragittoId)
-            }
+            // finto. Tolto in quel caso, come segnalato. "Da Confermare"
+            // non ha più bisogno di un click speciale: la pagina del
+            // tragitto è già mostrata subito, incorporata, sotto.
+            onClick={contestoPartenze ? undefined : () => toggleApertura(tragitto.tragittoId)}
           >
             <div>
-              <h3>{!contestoPartenze && (espansa ? '▾ ' : '▸ ')}{tragitto.nome}{contestoPartenze?.tabOrigine === 'da-confermare' && <span style={{ fontSize: 12.5, fontWeight: 400, color: 'var(--mist)' }}> — clicca per gestire fermate e linee →</span>}</h3>
-              {contestoPartenze?.tabOrigine !== 'fermate' && contestoPartenze?.tabOrigine !== 'da-prezzare' && (() => {
+              <h3>{!contestoPartenze && (espansa ? '▾ ' : '▸ ')}{tragitto.nome}</h3>
+              {contestoPartenze?.tabOrigine !== 'fermate' && contestoPartenze?.tabOrigine !== 'da-prezzare' && contestoPartenze?.tabOrigine !== 'da-confermare' && (() => {
                 // Al posto della vecchia frase generica ("posti
                 // illimitati (nessun bus ancora)", gergo tecnico interno
                 // poco chiaro) — i numeri veri, per fermata: quante
@@ -1057,80 +1039,15 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
               );
             }
             if (contestoPartenze?.tabOrigine === 'da-confermare') {
-              caricaVenditeSeServe(tragitto.tragittoId);
-              caricaSuggerimentoSeServe(tragitto.tragittoId);
-              const vendite = venditeMap.get(tragitto.tragittoId);
-              const suggerimento = suggerimentoMap.get(tragitto.tragittoId);
-              const serieGrafico: SerieGrafico[] = [...new Set((vendite?.andamento ?? []).map((a) => a.citta))].map((citta) => ({
-                nome: citta,
-                punti: (vendite?.andamento ?? []).filter((a) => a.citta === citta).map((a) => ({ x: a.data, y: a.cumulativo })),
-              }));
-
-              return (
-                <div style={{ marginTop: 14 }}>
-                  {/* Suggerimento automatico — appena le prenotazioni
-                      confermate raggiungono la soglia di pareggio, dice
-                      "puoi creare la Linea" con fornitore/costo/posti
-                      già presi dal preventivo accettato: nulla da
-                      indovinare, solo da controllare e confermare. */}
-                  {suggerimento?.pronta && (
-                    <div className="section-card" style={{ marginBottom: 14, borderColor: 'var(--green)' }}>
-                      <p style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>✓ Pronta da confermare</p>
-                      <p style={{ fontSize: 13.5, marginBottom: 8 }}>
-                        {suggerimento.totaleConfermati} passeggeri confermati (soglia di pareggio: {suggerimento.postiDiPareggio}) — puoi creare la Linea con {suggerimento.postiBus} posti a €{suggerimento.costo?.toFixed(2)}, gli stessi del preventivo accettato.
-                      </p>
-                      {!!suggerimento.fermateSenzaPrenotazioni?.length && (
-                        <p style={{ fontSize: 12.5, color: 'var(--amber)', marginBottom: 8 }}>
-                          ⚠ {suggerimento.fermateSenzaPrenotazioni.length} fermata/e senza nessuna prenotazione ({suggerimento.fermateSenzaPrenotazioni.map((f) => f.citta).join(', ')}) — se le disattivi in Linee per accorciare il tragitto, controlla il preventivo: potrebbe convenirti richiederne uno migliorativo (il banner "km cambiati" te lo segnala da solo).
-                        </p>
-                      )}
-                      <button type="button" className="btn btn-primary" onClick={() => apriPaginaLinee(tragitto.tragittoId)}>Conferma → apri Linee</button>
-                    </div>
-                  )}
-                  {suggerimento?.serveSecondoBus && (
-                    <div className="section-card" style={{ marginBottom: 14, borderColor: 'var(--pink)' }}>
-                      <p style={{ fontWeight: 700, color: 'var(--pink)', marginBottom: 6 }}>⚠ Serve un secondo bus</p>
-                      <p style={{ fontSize: 13.5, marginBottom: 8 }}>
-                        {suggerimento.totaleConfermati} passeggeri confermati, ma i bus già registrati coprono solo {suggerimento.capienzaReale} posti.
-                      </p>
-                      <button type="button" className="btn btn-primary" onClick={() => apriPaginaLinee(tragitto.tragittoId)}>Gestisci Linee →</button>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <p className="section-label" style={{ margin: 0 }}>Cruscotto Vendite</p>
-                    {/* Prima si saltava qui in automatico appena aperto il
-                        tragitto — tolto insieme al Cruscotto, ma senza
-                        lasciare un modo per raggiungere comunque la
-                        pagina vera dove si aggiungono i bus. Corretto. */}
-                    <button type="button" className="btn btn-primary" style={{ fontSize: 13, padding: '7px 16px' }} onClick={() => apriPaginaLinee(tragitto.tragittoId)}>
-                      Gestisci Linee →
-                    </button>
-                  </div>
-                  {!vendite ? (
-                    <p style={{ color: 'var(--mist)' }}>Carico le prenotazioni...</p>
-                  ) : (
-                    <>
-                      <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 6 }}>Prenotazioni confermate per fermata</p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginBottom: 14 }}>
-                        {vendite.perFermata.length === 0
-                          ? <p className="testo-intro">Nessuna prenotazione confermata ancora.</p>
-                          : vendite.perFermata.map((v) => (
-                            <span key={v.citta} style={{ fontSize: 13 }}>{v.citta}: <strong>{v.confermati}</strong></span>
-                          ))}
-                      </div>
-
-                      {vendite.andamento.length > 0 && (
-                        <div style={{ marginBottom: 18 }}>
-                          <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 6 }}>Andamento nel tempo (cumulativo, per capire il ritmo)</p>
-                          <GraficoLinee serie={serieGrafico} />
-                        </div>
-                      )}
-
-                    </>
-                  )}
-                </div>
-              );
+              // Prima qui viveva il Cruscotto Vendite (numeri per
+              // fermata, grafico andamento) con un pulsante "Gestisci
+              // Linee →" per uscire verso la pagina vera — tolto del
+              // tutto, come richiesto: la pagina del tragitto compare
+              // DIRETTAMENTE qui, incorporata, senza nessun click in
+              // più. La barra laterale di Partenze sceglie già QUALE
+              // tragitto — questo componente ne mostra subito fermate
+              // e linee.
+              return <LineeTragittoScreen eventoIdProp={eventoId} tragittoIdProp={tragitto.tragittoId} incorporata />;
             }
 
             // Il riepilogo a righe (Fermate/Preventivo/Linee/Costo) resta

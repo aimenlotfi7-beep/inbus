@@ -12,9 +12,12 @@ import { useNavigazione } from '../shared/NavigazioneContext';
 
 const BUS_VUOTO: BusDiLineaInput = { riferimento: '' };
 
-/** Pagina dedicata a UN tragitto — un vero indirizzo a sé
- *  (?sezione=linee&evento=...&tragitto=...), raggiunto dal pulsante
- *  "Gestisci Linee" in Partenze.
+/** Pagina dedicata a UN tragitto — sia come pagina a sé
+ *  (?sezione=linee&evento=...&tragitto=..., raggiunta dal menu) sia
+ *  INCORPORATA direttamente dentro "Da Confermare" (props espliciti,
+ *  niente lettura di URL, niente pulsante "torna indietro" — è già
+ *  dentro la pagina giusta, la barra laterale di Partenze sceglie il
+ *  tragitto, questo componente ne mostra subito il contenuto).
  *
  *  Risponde a tre domande, e solo quelle (niente incassi/margini qui,
  *  quelli vivono nelle sezioni economiche di Partenze):
@@ -29,11 +32,12 @@ const BUS_VUOTO: BusDiLineaInput = { riferimento: '' };
  *  crearne una nuova. Linee diverse dello stesso tragitto NON devono
  *  avere per forza le stesse fermate (già supportato dal modello dati
  *  — linea_fermate collega una linea a un SUO sottoinsieme). */
-export function LineeTragittoScreen() {
+export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdProp?: string; incorporata?: boolean }) {
   const navigaSezione = useNavigazione();
   const parametri = new URLSearchParams(window.location.search);
-  const eventoId = parametri.get('evento');
-  const tragittoId = parametri.get('tragitto');
+  const eventoId = props?.eventoIdProp ?? parametri.get('evento');
+  const tragittoId = props?.tragittoIdProp ?? parametri.get('tragitto');
+  const incorporata = !!props?.incorporata;
 
   const [evento, setEvento] = useState<Evento | null>(null);
   const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
@@ -285,7 +289,9 @@ export function LineeTragittoScreen() {
 
   return (
     <div>
-      <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => tornaAPartenze()}>← Torna alle partenze</button>
+      {!incorporata && (
+        <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => tornaAPartenze()}>← Torna alle partenze</button>
+      )}
 
       <PanelHead
         titolo={tragittoVero.nome}
