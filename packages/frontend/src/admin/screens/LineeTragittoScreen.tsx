@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { notifica } from '../shared/notifiche';
-import { eventiApi, type Linea, type BusDiLineaInput, type SuggerimentoLinea } from '../../api/eventi';
+import { eventiApi, type Linea, type BusDiLineaInput, type SuggerimentoLinea, type CalcoloBusTragitto } from '../../api/eventi';
 import type { Evento, Fermata } from '../../api/types';
 import { fornitoriApi, type Fornitore } from '../../api/fornitori';
 import { preventiviApi } from '../../api/preventivi';
@@ -46,7 +46,8 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState('');
 
-  const [tab, setTab] = useState<'fermate' | 'linee'>('linee');
+  const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
+  const [gestisciFermateAperto, setGestisciFermateAperto] = useState(false);
   const [lineeEspanse, setLineeEspanse] = useState<Set<string>>(new Set());
   const [lineaAttivaId, setLineaAttivaId] = useState<string | null>(null);
 
@@ -69,8 +70,8 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     if (!eventoId || !tragittoId) return;
     setCaricamento(true);
     setErrore('');
-    Promise.all([eventiApi.getById(eventoId), eventiApi.listaLinee(tragittoId)])
-      .then(([ev, l]) => { setEvento(ev); setLinee(l); })
+    Promise.all([eventiApi.getById(eventoId), eventiApi.calcolaBus(eventoId), eventiApi.listaLinee(tragittoId)])
+      .then(([ev, c, l]) => { setEvento(ev); setCalcolo(c); setLinee(l); })
       .catch((e) => setErrore(e instanceof ErroreApi ? e.message : 'Impossibile caricare la pagina.'))
       .finally(() => setCaricamento(false));
     // Anche il suggerimento — dopo aver creato/modificato una Linea, i
@@ -129,6 +130,21 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     return a.orario.localeCompare(b.orario);
   }
   const tutteLeFermateOrdinate = [...tragittoVero.fermate].sort(perOrario);
+  const calcoloTragitto = calcolo.find((c) => c.tragittoId === idTragitto);
+  const partecipantiPerFermata = new Map(calcoloTragitto?.fermate.map((f) => [f.fermataId, f.passeggeri]) ?? []);
+
+  /** Prenotazioni per fermata (a livello di TRAGITTO) — la somma di
+   *  in-attesa+versati su tutte le Linee che coprono quella città; se
+   *  nessuna Linea la copre ancora, il totale grezzo delle prenotazioni
+   *  arrivate su quella fermata. */
+  function prenotazioniFermata(f: Fermata): number {
+    const primaLineaConQuestaCitta = linee.find((l) => l.fermate.some((lf) => lf.citta === f.citta));
+    if (primaLineaConQuestaCitta) {
+      const lf = primaLineaConQuestaCitta.fermate.find((x) => x.citta === f.citta)!;
+      return linee.reduce((tot, l) => tot + (l.fermate.find((x) => x.citta === f.citta)?.versati ?? 0), 0) + lf.inAttesa;
+    }
+    return partecipantiPerFermata.get(f.id) ?? 0;
+  }
 
   async function alternaFermataAttiva(fermataId: string) {
     const t = tragittoVero;
@@ -298,17 +314,46 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => tornaAPartenze()}>← Torna alle partenze</button>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
         <p className="testo-intro" style={{ margin: 0 }}>
-          {evento.artista} · {fermateAttive.length} fermat{fermateAttive.length === 1 ? 'a' : 'e'} · {linee.length} line{linee.length === 1 ? 'a' : 'e'}
+          {evento.artista}
+          {fermateAttive.length > 0 && <> · {fermateAttive.map((f) => `${f.citta}: ${prenotazioniFermata(f)}`).join(' · ')}</>}
+          {' · '}{linee.reduce((tot, l) => tot + l.bus.length, 0)} bus censit{linee.reduce((tot, l) => tot + l.bus.length, 0) === 1 ? 'o' : 'i'}
         </p>
-        <button className="btn btn-primary" style={{ fontSize: 12.5, padding: '6px 14px' }} onClick={apriPopupNuovaLinea}>+ Nuova linea</button>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => setGestisciFermateAperto((v) => !v)}>
+            {gestisciFermateAperto ? 'Chiudi fermate' : 'Gestisci fermate'}
+          </button>
+          <button className="btn btn-primary" style={{ fontSize: 12.5, padding: '6px 14px' }} onClick={apriPopupNuovaLinea}>+ Nuova linea</button>
+        </div>
       </div>
 
-      <div className="mini-tabs" style={{ marginTop: 10, marginBottom: 16 }}>
-        <button type="button" className={`mini-tab${tab === 'fermate' ? ' active' : ''}`} style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setTab('fermate')}>Fermate ({fermateAttive.length})</button>
-        <button type="button" className={`mini-tab${tab === 'linee' ? ' active' : ''}`} style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setTab('linee')}>Linee ({linee.length})</button>
-      </div>
+      {gestisciFermateAperto && (
+        <div className="section-card" style={{ marginBottom: 16 }}>
+          <p className="testo-intro" style={{ marginTop: -4, marginBottom: 12 }}>
+            Escludi una fermata (es. per scarse adesioni) — resta nel tragitto, solo non più selezionabile per una nuova Linea. Le fermate già dentro una Linea non vengono toccate.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {tutteLeFermateOrdinate.map((f) => {
+              if (!f.attivo) {
+                return (
+                  <span key={f.id} className="chip" style={{ opacity: 0.55 }}>
+                    <span style={{ textDecoration: 'line-through' }}>{f.citta}</span>
+                    <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Riattiva questa fermata" style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0, fontSize: 13 }}>↺</button>
+                  </span>
+                );
+              }
+              return (
+                <span key={f.id} className="chip">
+                  {f.citta}
+                  <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Escludi questa fermata" style={{ background: 'none', border: 'none', color: 'var(--mist)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
+                </span>
+              );
+            })}
+            {tutteLeFermateOrdinate.length === 0 && <span style={{ color: 'var(--mist)' }}>Nessuna fermata su questo tragitto.</span>}
+          </div>
+        </div>
+      )}
 
       {verificaKm?.cambiatoParecchio && (
         <div style={{ background: 'var(--dusk)', border: '1px solid var(--amber)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -341,47 +386,18 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
           <p style={{ fontSize: 13.5, marginBottom: 8 }}>
             {suggerimento.totaleConfermati} passeggeri confermati, ma i bus già registrati coprono solo {suggerimento.capienzaReale} posti.
           </p>
-          <button type="button" className="btn btn-primary" onClick={() => setTab('linee')}>Vai a Linee ↓</button>
         </div>
       )}
 
-      {tab === 'fermate' && (
-        <div className="section-card">
-          <p className="testo-intro" style={{ marginTop: -4, marginBottom: 12 }}>
-            Escludi una fermata (es. per scarse adesioni) — resta nel tragitto, solo non più selezionabile per una nuova Linea. Le fermate già dentro una Linea non vengono toccate.
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {tutteLeFermateOrdinate.map((f) => {
-              if (!f.attivo) {
-                return (
-                  <span key={f.id} className="chip" style={{ opacity: 0.55 }}>
-                    <span style={{ textDecoration: 'line-through' }}>{f.citta}</span>
-                    <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Riattiva questa fermata" style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0, fontSize: 13 }}>↺</button>
-                  </span>
-                );
-              }
-              return (
-                <span key={f.id} className="chip">
-                  {f.citta}
-                  <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Escludi questa fermata" style={{ background: 'none', border: 'none', color: 'var(--mist)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
-                </span>
-              );
-            })}
-            {tutteLeFermateOrdinate.length === 0 && <span style={{ color: 'var(--mist)' }}>Nessuna fermata su questo tragitto.</span>}
-          </div>
-        </div>
-      )}
+      <div>
+        <p className="section-label" style={{ marginBottom: 12 }}>Linee su questo tragitto</p>
 
-      {tab === 'linee' && (
-        <div>
-          <p className="section-label" style={{ marginBottom: 12 }}>Linee su questo tragitto</p>
-
-          {linee.length === 0 ? (
-            <p className="testo-intro">Nessuna Linea ancora per questo tragitto — crea la prima con "+ Nuova linea" qui sopra.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {linee.map((l) => {
-                const espansa = lineeEspanse.has(l.id);
+        {linee.length === 0 ? (
+          <p className="testo-intro">Nessuna Linea ancora per questo tragitto — crea la prima con "+ Nuova linea" qui sopra.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {linee.map((l) => {
+              const espansa = lineeEspanse.has(l.id);
                 const percorso = l.fermate.map((f) => f.citta).join(' → ');
                 return (
                   <div key={l.id} className="section-card">
@@ -449,8 +465,6 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
             </div>
           )}
         </div>
-      )}
-
       {popupAperto && (
         <div className="section-card" style={{ marginTop: 20 }}>
           <p className="section-label" style={{ marginBottom: 12 }}>Nuova Linea — passo {stepPopup} di 2</p>
