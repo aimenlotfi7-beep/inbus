@@ -679,9 +679,22 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
           >
             <div>
               <h3>{!contestoPartenze && (espansa ? '▾ ' : '▸ ')}{tragitto.nome}</h3>
-              {contestoPartenze?.tabOrigine !== 'fermate' && contestoPartenze?.tabOrigine !== 'da-prezzare' && (
+              {contestoPartenze?.tabOrigine !== 'fermate' && contestoPartenze?.tabOrigine !== 'da-prezzare' && (() => {
+                // Al posto della vecchia frase generica ("posti
+                // illimitati (nessun bus ancora)", gergo tecnico interno
+                // poco chiaro) — i numeri veri, per fermata: quante
+                // persone hanno confermato su ognuna. Stessi dati già
+                // usati nel Cruscotto Vendite, qui solo riassunti.
+                caricaVenditeSeServe(tragitto.tragittoId);
+                const vendite = venditeMap.get(tragitto.tragittoId);
+                return (
                 <p className="section-sub">
-                  {tragitto.totalePasseggeri} passeggeri confermati su {tragitto.postiTotali >= 999999 ? 'posti illimitati (nessun bus ancora)' : `${tragitto.postiTotali} posti previsti`} · {busTragitto.length} bus censit{busTragitto.length === 1 ? 'o' : 'i'}
+                  {!vendite ? 'Carico le prenotazioni...' : vendite.perFermata.length === 0 ? 'Nessuna prenotazione confermata ancora' : (
+                    vendite.perFermata.map((v, i) => (
+                      <span key={v.citta}>{i > 0 && ' · '}{v.citta}: <strong>{v.confermati}</strong></span>
+                    ))
+                  )}
+                  {' · '}{busTragitto.length} bus censit{busTragitto.length === 1 ? 'o' : 'i'}
                 {vedeEconomia && (() => {
                   const dati = economia.find((e) => e.tragittoId === tragitto.tragittoId);
                   if (!dati) return null;
@@ -696,7 +709,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                   );
                 })()}
               </p>
-              )}
+                );
+              })()}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
               {contestoPartenze?.tabOrigine === 'fermate' ? (
