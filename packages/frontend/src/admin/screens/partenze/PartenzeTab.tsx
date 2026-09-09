@@ -687,10 +687,18 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 // usati nel Cruscotto Vendite, qui solo riassunti.
                 caricaVenditeSeServe(tragitto.tragittoId);
                 const vendite = venditeMap.get(tragitto.tragittoId);
+                // Sempre TUTTE le fermate attive del tragitto, anche
+                // quelle senza nessuna prenotazione (0) — prima
+                // comparivano solo le città con almeno un confermato,
+                // e una fermata a zero spariva del tutto invece di
+                // dire chiaramente "zero".
+                const fermateAttive = tragittoVeroPerOrari?.fermate.filter((f) => f.attivo !== false) ?? [];
+                const confermatiPerCitta = new Map((vendite?.perFermata ?? []).map((v) => [v.citta, v.confermati]));
+                const elencoCompleto = fermateAttive.map((f) => ({ citta: f.citta, confermati: confermatiPerCitta.get(f.citta) ?? 0 }));
                 return (
                 <p className="section-sub">
-                  {!vendite ? 'Carico le prenotazioni...' : vendite.perFermata.length === 0 ? 'Nessuna prenotazione confermata ancora' : (
-                    vendite.perFermata.map((v, i) => (
+                  {!vendite ? 'Carico le prenotazioni...' : elencoCompleto.length === 0 ? 'Nessuna fermata attiva' : (
+                    elencoCompleto.map((v, i) => (
                       <span key={v.citta}>{i > 0 && ' · '}{v.citta}: <strong>{v.confermati}</strong></span>
                     ))
                   )}
