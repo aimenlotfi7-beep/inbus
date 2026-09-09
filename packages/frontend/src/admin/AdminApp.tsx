@@ -133,7 +133,7 @@ const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   'partenze-da-confermare': 'eventi.partenze',
   'partenze-confermato': 'eventi.partenze',
   'partenze-passate': 'eventi.partenze',
-  linee: 'eventi.crea',
+  linee: 'eventi.partenze',
   impostazioni: 'impostazioni.gestisci',
   tracciamento: 'impostazioni.gestisci',
   'template-email': 'template-email.gestisci',
