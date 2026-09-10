@@ -16,7 +16,7 @@ import { calcolaStatoPrenotazione } from '../features/statoPrenotazione';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
-type Sezione = 'dashboard' | 'profilo' | 'viaggi' | 'lista-attesa' | 'credito' | 'privacy' | 'chat';
+type Sezione = 'dashboard' | 'profilo' | 'viaggi' | 'lista-attesa' | 'credito' | 'invita' | 'privacy' | 'chat';
 
 interface MovimentoCredito {
   id: string;
@@ -35,7 +35,7 @@ export function AccountPage() {
   // usa avanti/indietro del browser) resta dove si trovava, invece di
   // tornare sempre alla prima sezione.
   const [searchParams, setSearchParams] = useSearchParams();
-  const sezioniValide: Sezione[] = ['dashboard', 'profilo', 'viaggi', 'lista-attesa', 'credito', 'privacy', 'chat'];
+  const sezioniValide: Sezione[] = ['dashboard', 'profilo', 'viaggi', 'lista-attesa', 'credito', 'invita', 'privacy', 'chat'];
   const sezioneUrl = searchParams.get('sezione') as Sezione | null;
   const sezione: Sezione = sezioneUrl && sezioniValide.includes(sezioneUrl) ? sezioneUrl : 'dashboard';
   function setSezione(nuova: Sezione) {
@@ -90,6 +90,7 @@ export function AccountPage() {
     { id: 'viaggi', label: 'I miei viaggi' },
     { id: 'lista-attesa', label: 'Lista d\'attesa' },
     { id: 'credito', label: 'Credito fedeltà' },
+    { id: 'invita', label: 'Invita un amico' },
     { id: 'chat', label: 'Messaggi' },
     { id: 'profilo', label: 'Il mio profilo' },
     { id: 'privacy', label: 'Preferenze Privacy' },
@@ -109,6 +110,7 @@ export function AccountPage() {
           {sezione === 'viaggi' && <SezioneViaggi email={email} viaggi={viaggi} eventiPerId={eventiPerId} onAprireViaggio={setPnrAperto} />}
           {sezione === 'lista-attesa' && <SezioneListaAttesa email={email} />}
           {sezione === 'credito' && <SezioneCredito email={email} />}
+          {sezione === 'invita' && <SezioneInvitaAmico />}
           {sezione === 'privacy' && <SezionePrivacy email={email} />}
           {sezione === 'chat' && <SezioneChat email={email} />}
         </div>
@@ -222,6 +224,88 @@ function SezioneCredito({ email }: { email: string }) {
       )}
 
       {movimenti?.length === 0 && <p className="testo-intro">Nessun movimento ancora — matura dopo il tuo primo viaggio pagato per intero.</p>}
+    </section>
+  );
+}
+
+function SezioneInvitaAmico() {
+  const [dati, setDati] = useState<{ codice: string; invitati: { nome: string; completato: boolean }[] } | null>(null);
+  const [copiato, setCopiato] = useState(false);
+
+  useEffect(() => {
+    clienteAuthApi.meReferral().then(setDati).catch(() => {});
+  }, []);
+
+  const link = dati ? `${window.location.origin}/registrati?ref=${dati.codice}` : '';
+
+  function copia() {
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiato(true);
+      setTimeout(() => setCopiato(false), 2200);
+    });
+  }
+
+  const inSospeso = dati?.invitati.filter((i) => !i.completato) ?? [];
+  const completati = dati?.invitati.filter((i) => i.completato) ?? [];
+
+  return (
+    <section className="acc-sezione">
+      <h1>Invita un amico</h1>
+      <p className="testo-intro" style={{ marginBottom: 18 }}>
+        Condividi il tuo link — quando un amico si registra e completa la sua prima prenotazione, un bonus finisce sul credito fedeltà di entrambi.
+      </p>
+
+      {!dati && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
+
+      {dati && (
+        <>
+          <div className="panel-box">
+            <h2>Il tuo link</h2>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+              <input type="text" readOnly value={link} onClick={(e) => (e.target as HTMLInputElement).select()} style={{ flex: '1 1 260px', fontSize: 13 }} />
+              <button type="button" className="btn btn-primary" onClick={copia} style={{ flexShrink: 0 }}>{copiato ? '✓ Copiato' : 'Copia link'}</button>
+            </div>
+            <p style={{ color: 'var(--mist)', fontSize: 12.5, marginTop: 10 }}>
+              Oppure condividi solo il codice: <b style={{ letterSpacing: 1 }}>{dati.codice}</b>
+            </p>
+          </div>
+
+          <div className="stats-row" style={{ margin: '18px 0' }}>
+            <div className="stat-box"><b>{inSospeso.length}</b><span>Inviti in sospeso</span></div>
+            <div className="stat-box"><b style={{ color: 'var(--green)' }}>{completati.length}</b><span>Inviti completati</span></div>
+          </div>
+
+          {inSospeso.length > 0 && (
+            <>
+              <p className="section-label" style={{ marginTop: 18 }}>In sospeso</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {inSospeso.map((i, idx) => (
+                  <div key={idx} className="viaggio-card" style={{ padding: '10px 14px' }}>
+                    <div className="viaggio-main"><p style={{ margin: 0, fontSize: 13.5 }}>{i.nome}</p></div>
+                    <span style={{ fontSize: 12, color: 'var(--mist)' }}>Registrato, non ha ancora prenotato</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {completati.length > 0 && (
+            <>
+              <p className="section-label" style={{ marginTop: 18 }}>Completati</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {completati.map((i, idx) => (
+                  <div key={idx} className="viaggio-card" style={{ padding: '10px 14px' }}>
+                    <div className="viaggio-main"><p style={{ margin: 0, fontSize: 13.5 }}>{i.nome}</p></div>
+                    <b style={{ color: 'var(--green)' }}>✓ Bonus ricevuto</b>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {dati.invitati.length === 0 && <p className="testo-intro">Nessun invito ancora — condividi il tuo link per iniziare.</p>}
+        </>
+      )}
     </section>
   );
 }

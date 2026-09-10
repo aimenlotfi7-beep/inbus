@@ -618,6 +618,20 @@ export const utenti = pgTable('utenti', {
   // questo campo è solo il saldo attuale, per non dover sommare la
   // tabella intera ogni volta che serve mostrarlo.
   creditoDisponibile: numeric('credito_disponibile', { precision: 10, scale: 2 }).notNull().default('0'),
+  // "Invita un amico" — il codice personale (generato la prima volta
+  // che serve, non a tutti subito: chi non lo usa mai non ne ha
+  // bisogno) e chi ha invitato QUESTO utente (impostato una volta
+  // sola, alla registrazione — mai più modificabile dopo, altrimenti
+  // si potrebbe "agganciare" un invito a posteriori per il bonus).
+  codiceReferral: text('codice_referral').unique(),
+  invitatoDaUtenteId: text('invitato_da_utente_id').references((): AnyPgColumn => utenti.id, { onDelete: 'set null' }),
+  // Il bonus di chi invita matura solo quando l'amico invitato fa la
+  // SUA prima prenotazione vera (non solo iscrivendosi) - una volta
+  // erogato, non deve ripetersi se l'amico ne fa altre. Il bonus
+  // dell'amico invece è immediato alla registrazione (deciso così),
+  // non serve un flag per quello: capita una volta sola per natura,
+  // nello stesso momento in cui invitatoDaUtenteId viene impostato.
+  bonusReferralInvitanteErogato: boolean('bonus_referral_invitante_erogato').notNull().default(false),
   // Consensi privacy — ognuno con la propria data: il GDPR richiede di
   // poter DIMOSTRARE quando è stato dato un consenso, non solo che c'è.
   // Nullo = non ancora scelto (mai mostrare come "acconsentito" di

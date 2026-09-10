@@ -30,6 +30,7 @@ clienteAuthRouter.post(
     // (che possono avere età diverse — un genitore con figli minorenni,
     // ad esempio) — il gruppo segue sempre l'età di chi ha prenotato.
     dataNascita: z.coerce.date().refine((d) => d < new Date(), 'La data di nascita non può essere nel futuro.'),
+    codiceReferral: z.string().optional(),
   })),
   asyncHandler(async (req: Request, res: Response) => {
     await clienteAuthService.registrati(req.body);
@@ -90,4 +91,21 @@ clienteAuthRouter.get('/me', richiedeAuthCliente, asyncHandler(async (req: Reque
   if (!u) throw new NonAutorizzato();
   const { passwordHash, tokenVerificaEmail, ...datiPubblici } = u;
   res.json(datiPubblici);
+}));
+
+/** "Invita un amico" — codice personale (generato al primo utilizzo)
+ *  e lo storico di chi è stato invitato: "in sospeso" (registrato, non
+ *  ha ancora prenotato) o "completato" (ha prenotato, il bonus è
+ *  scattato). Niente email/dati sensibili dell'amico, solo nome e
+ *  stato — a chi invita basta sapere "a che punto è", non altro. */
+clienteAuthRouter.get('/me/referral', richiedeAuthCliente, asyncHandler(async (req: Request, res: Response) => {
+  if (!req.cliente) throw new NonAutorizzato();
+  const { creditoService } = await import('../credito/credito.service.js');
+  const codice = await creditoService.trovaOCreaCodiceReferral(req.cliente.sub);
+  const invitati = await db.select({ nome: utenti.nome, cognome: utenti.cognome, completato: utenti.bonusReferralInvitanteErogato })
+    .from(utenti).where(eq(utenti.invitatoDaUtenteId, req.cliente.sub));
+  res.json({
+    codice,
+    invitati: invitati.map((i) => ({ nome: [i.nome, i.cognome].filter(Boolean).join(' ') || 'Un amico', completato: i.completato })),
+  });
 }));

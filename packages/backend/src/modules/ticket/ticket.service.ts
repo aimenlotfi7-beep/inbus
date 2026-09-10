@@ -103,6 +103,7 @@ export const ticketService = {
     try {
       const { creditoService } = await import('../credito/credito.service.js');
       await creditoService.maturaCreditoSubito(p.id);
+      await creditoService.maturaBonusReferralInvitanteSeAmicoNuovo(p.id);
     } catch (err) {
       console.error(`Maturazione credito fallita per PNR ${p.pnr} (biglietto comunque emesso):`, err);
     }

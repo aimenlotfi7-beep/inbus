@@ -27,7 +27,7 @@ export function RegistratiPage() {
 
     setCaricamento(true);
     try {
-      await clienteAuthApi.registrati({ nome, cognome, email, telefono: telefono || undefined, citta: citta || undefined, password, dataNascita });
+      await clienteAuthApi.registrati({ nome, cognome, email, telefono: telefono || undefined, citta: citta || undefined, password, dataNascita, codiceReferral: searchParams.get('ref') || undefined });
       setInviata(true);
     } catch (err) {
       setErrore(err instanceof ErroreClienteAuth ? err.message : 'Registrazione non riuscita.');
@@ -58,6 +58,11 @@ export function RegistratiPage() {
       <form onSubmit={registrati} className="box-auth">
         <h1>Crea il tuo account</h1>
         <p className="sottotitolo-auth">Serve per prenotare, vedere i tuoi viaggi e il tuo credito fedeltà.</p>
+        {searchParams.get('ref') && (
+          <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 4 }}>
+            Sei stato invitato da un amico — completa la registrazione e ti aspetta un piccolo bonus di benvenuto sul tuo credito fedeltà.
+          </p>
+        )}
 
         <div className="due-colonne-auth">
           <div>

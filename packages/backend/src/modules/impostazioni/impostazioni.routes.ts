@@ -41,6 +41,25 @@ export async function leggiCreditoPerPasseggero(): Promise<number> {
   return Number.isFinite(valore) && valore >= 0 ? valore : DEFAULT_CREDITO_PER_PASSEGGERO;
 }
 
+/** "Invita un amico" — due importi separati (non uno solo): chi invita
+ *  e l'amico invitato possono avere un bonus diverso, l'admin decide.
+ *  Zero = funzione spenta (nessun bonus, ma il codice/link restano
+ *  visibili — un conto è "non premiare ora", un altro è nascondere la
+ *  sezione, scelte diverse non da confondere in una sola). */
+export const CHIAVE_CREDITO_REFERRAL_INVITANTE = 'credito_referral_invitante';
+export const CHIAVE_CREDITO_REFERRAL_AMICO = 'credito_referral_amico';
+
+export async function leggiCreditoReferralInvitante(): Promise<number> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_CREDITO_REFERRAL_INVITANTE)).limit(1);
+  const valore = riga ? Number(riga.valore) : NaN;
+  return Number.isFinite(valore) && valore >= 0 ? valore : 0;
+}
+export async function leggiCreditoReferralAmico(): Promise<number> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_CREDITO_REFERRAL_AMICO)).limit(1);
+  const valore = riga ? Number(riga.valore) : NaN;
+  return Number.isFinite(valore) && valore >= 0 ? valore : 0;
+}
+
 /** Un posticipo dell'orario di una fermata sotto questa soglia non fa
  *  scattare la comunicazione ai clienti — troppi piccoli aggiustamenti
  *  manderebbero email inutili. L'anticipo (qualunque entità) e il

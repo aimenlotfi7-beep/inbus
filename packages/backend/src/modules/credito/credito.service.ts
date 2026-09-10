@@ -1,7 +1,7 @@
 import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { prenotazioni, eventi, utenti, movimentiCredito, partecipantiPrenotazione } from '../../db/schema.js';
-import { leggiCreditoPerPasseggero } from '../impostazioni/impostazioni.routes.js';
+import { leggiCreditoPerPasseggero, leggiCreditoReferralInvitante, leggiCreditoReferralAmico } from '../impostazioni/impostazioni.routes.js';
 import { ConflittoDati } from '../../shared/errors.js';
 
 export const creditoService = {
@@ -140,5 +140,80 @@ export const creditoService = {
       prenotazioneId,
     });
     await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} - ${importo.toFixed(2)}` }).where(eq(utenti.id, utenteId));
+  },
+
+  /** "Invita un amico" — il codice personale si genera solo la prima
+   *  volta che serve (non a tutti alla registrazione: chi non apre mai
+   *  quella sezione non ne ha bisogno). Riprova finché non trova un
+   *  codice libero — estremamente improbabile che serva più di un
+   *  tentativo, con 6 caratteri alfanumerici casuali. */
+  async trovaOCreaCodiceReferral(utenteId: string): Promise<string> {
+    const [esistente] = await db.select({ codice: utenti.codiceReferral }).from(utenti).where(eq(utenti.id, utenteId)).limit(1);
+    if (esistente?.codice) return esistente.codice;
+
+    const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // niente 0/O/1/I, si confondono leggendoli a voce
+    for (let tentativo = 0; tentativo < 10; tentativo++) {
+      const codice = Array.from({ length: 6 }, () => ALFABETO[Math.floor(Math.random() * ALFABETO.length)]).join('');
+      try {
+        await db.update(utenti).set({ codiceReferral: codice }).where(eq(utenti.id, utenteId));
+        return codice;
+      } catch {
+        // Collisione (rarissima) — riprova con un altro.
+      }
+    }
+    throw new Error('Impossibile generare un codice referral univoco.');
+  },
+
+  /** Il bonus dell'AMICO invitato — subito alla registrazione (deciso
+   *  così: un vero benvenuto, non un'attesa). Chiamata una volta sola,
+   *  nello stesso momento in cui invitatoDaUtenteId viene impostato —
+   *  per natura non può ripetersi (un utente si registra una volta
+   *  sola), non serve nessun controllo di doppio invio qui. */
+  async erogaBonusReferralAmico(utenteId: string, nomeInvitante: string | null) {
+    const importo = await leggiCreditoReferralAmico();
+    if (importo <= 0) return;
+    await db.transaction(async (tx) => {
+      await tx.insert(movimentiCredito).values({
+        utenteId,
+        importo: importo.toFixed(2),
+        motivo: `Benvenuto — invitato${nomeInvitante ? ` da ${nomeInvitante}` : ''}`,
+      });
+      await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} + ${importo.toFixed(2)}` }).where(eq(utenti.id, utenteId));
+    });
+  },
+
+  /** Il bonus di CHI INVITA — solo quando l'amico invitato conferma
+   *  davvero la SUA prima prenotazione (non basta essersi iscritto),
+   *  stesso principio di "nessun bonus per un invito finto mai usato
+   *  per viaggiare davvero". Chiamata nello stesso punto in cui matura
+   *  il credito normale (biglietto emesso) — se questa non è la prima
+   *  prenotazione confermata dell'amico, o il bonus è già stato dato
+   *  per lui, non fa nulla (bonusReferralInvitanteErogato lo impedisce
+   *  anche in caso di doppia chiamata). */
+  async maturaBonusReferralInvitanteSeAmicoNuovo(prenotazioneId: string) {
+    const [p] = await db.select({ utenteId: prenotazioni.utenteId }).from(prenotazioni).where(eq(prenotazioni.id, prenotazioneId)).limit(1);
+    if (!p) return;
+    const [amico] = await db.select({ invitatoDa: utenti.invitatoDaUtenteId, bonusGiaDato: utenti.bonusReferralInvitanteErogato, nome: utenti.nome })
+      .from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+    if (!amico?.invitatoDa || amico.bonusGiaDato) return;
+
+    // "Prima prenotazione vera" = nessun'altra prenotazione CONFERMATA
+    // con biglietto già emesso, a parte questa.
+    const [{ numeroAltre }] = await db.select({ numeroAltre: sql<number>`count(*)::int` }).from(prenotazioni)
+      .where(and(eq(prenotazioni.utenteId, p.utenteId), eq(prenotazioni.stato, 'CONFERMATA'), eq(prenotazioni.ticketStato, 'EMESSO'), sql`${prenotazioni.id} != ${prenotazioneId}`));
+    if (numeroAltre > 0) return;
+
+    const importo = await leggiCreditoReferralInvitante();
+    if (importo <= 0) return;
+
+    await db.transaction(async (tx) => {
+      await tx.insert(movimentiCredito).values({
+        utenteId: amico.invitatoDa!,
+        importo: importo.toFixed(2),
+        motivo: `Amico invitato${amico.nome ? ` (${amico.nome})` : ''} — prima prenotazione confermata`,
+      });
+      await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} + ${importo.toFixed(2)}` }).where(eq(utenti.id, amico.invitatoDa!));
+      await tx.update(utenti).set({ bonusReferralInvitanteErogato: true }).where(eq(utenti.id, p.utenteId));
+    });
   },
 };

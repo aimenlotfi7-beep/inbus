@@ -36,15 +36,29 @@ export const clienteAuthService = {
    *  cliente "vecchio", da prima che servisse un account), la fa
    *  diventare un account vero invece di rifiutarla: altrimenti chi ha
    *  già prenotato in passato resterebbe bloccato fuori per sempre. */
-  async registrati(input: { email: string; password: string; nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: Date }) {
+  async registrati(input: { email: string; password: string; nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: Date; codiceReferral?: string }) {
     const email = input.email.toLowerCase();
     const [esistente] = await db.select().from(utenti).where(eq(utenti.email, email)).limit(1);
     if (esistente?.passwordHash) throw new ConflittoDati('Esiste già un account con questa email — prova ad accedere, o recupera la password.');
+
+    // "Invita un amico" — solo se questo utente non ha GIÀ un invitante
+    // (un utente "fantasma" creato da una prenotazione precedente come
+    // ospite potrebbe già averne uno se in futuro si aggiungesse quella
+    // via; per ora comunque non può succedere, ma il controllo costa
+    // nulla ed evita di "rubare" un invito già assegnato). Il codice
+    // sbagliato/inesistente non blocca la registrazione — si ignora e
+    // basta, non è un errore da mostrare a chi si registra.
+    let invitanteId: string | null = null;
+    if (input.codiceReferral && !esistente?.invitatoDaUtenteId) {
+      const [invitante] = await db.select({ id: utenti.id }).from(utenti).where(eq(utenti.codiceReferral, input.codiceReferral.toUpperCase())).limit(1);
+      if (invitante) invitanteId = invitante.id;
+    }
 
     const passwordHash = await bcrypt.hash(input.password, 10);
     const token = generaToken();
     const scadenza = new Date(Date.now() + ORE_VALIDITA_TOKEN_VERIFICA * 60 * 60 * 1000);
 
+    let idUtente: string;
     if (esistente) {
       await db.update(utenti).set({
         passwordHash, nome: input.nome, cognome: input.cognome,
@@ -52,13 +66,23 @@ export const clienteAuthService = {
         citta: input.citta ?? esistente.citta,
         dataNascita: input.dataNascita,
         emailVerificata: false, tokenVerificaEmail: token, tokenVerificaScadenza: scadenza,
+        ...(invitanteId && { invitatoDaUtenteId: invitanteId }),
       }).where(eq(utenti.id, esistente.id));
+      idUtente = esistente.id;
     } else {
-      await db.insert(utenti).values({
+      const [nuovo] = await db.insert(utenti).values({
         email, passwordHash, nome: input.nome, cognome: input.cognome, telefono: input.telefono, citta: input.citta,
         dataNascita: input.dataNascita,
         tokenVerificaEmail: token, tokenVerificaScadenza: scadenza,
-      });
+        invitatoDaUtenteId: invitanteId,
+      }).returning({ id: utenti.id });
+      idUtente = nuovo.id;
+    }
+
+    if (invitanteId) {
+      const [invitante] = await db.select({ nome: utenti.nome }).from(utenti).where(eq(utenti.id, invitanteId)).limit(1);
+      const { creditoService } = await import('../credito/credito.service.js');
+      await creditoService.erogaBonusReferralAmico(idUtente, invitante?.nome ?? null).catch(() => {});
     }
 
     await inviaEmailVerifica(email, input.nome, token);

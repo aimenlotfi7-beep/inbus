@@ -28,7 +28,7 @@ export interface DatiCliente {
 }
 
 export const clienteAuthApi = {
-  registrati: (input: { email: string; password: string; nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: string }) =>
+  registrati: (input: { email: string; password: string; nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: string; codiceReferral?: string }) =>
     chiamata<{ ok: true }>('/api/cliente-auth/registrati', { method: 'POST', body: JSON.stringify(input) }),
 
   login: (email: string, password: string) =>
@@ -46,4 +46,5 @@ export const clienteAuthApi = {
     chiamata<{ ok: true }>('/api/cliente-auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
 
   me: () => chiamata<DatiCliente>('/api/cliente-auth/me', {}, true),
+  meReferral: () => chiamata<{ codice: string; invitati: { nome: string; completato: boolean }[] }>('/api/cliente-auth/me/referral', {}, true),
 };

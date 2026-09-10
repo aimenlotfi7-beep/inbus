@@ -14,6 +14,8 @@ import { PanelHead } from '../shared/PanelHead';
 const IMPOSTAZIONI: { chiave: string; etichetta: string; default: string; suffisso?: string }[] = [
   { chiave: 'posti_per_bus', etichetta: 'Posti per bus (usato per "Calcola bus necessari" in Partenze)', default: '50' },
   { chiave: 'credito_per_passeggero', etichetta: 'Credito fedeltà per passeggero (€)', default: '0.5' },
+  { chiave: 'credito_referral_invitante', etichetta: 'Invita un amico — credito a chi invita, quando l\'amico conferma la sua prima prenotazione (€, 0 = disattivato)', default: '0' },
+  { chiave: 'credito_referral_amico', etichetta: 'Invita un amico — credito all\'amico invitato, subito alla registrazione (€, 0 = disattivato)', default: '0' },
   { chiave: 'soglia_posticipo_variazione_minuti', etichetta: 'Soglia posticipo per notifica variazione (minuti — l\'anticipo e il cambio città/indirizzo notificano sempre, senza soglia; 0 o vuoto = avvisa sempre anche per il posticipo)', default: '0' },
   { chiave: 'giorni_validita_link_preventivo', etichetta: 'Giorni di validità del link inviato ai fornitori per rispondere a una richiesta preventivo (dopo, il link risulta scaduto; chi ha già risposto continua a vedere la sua risposta)', default: '60' },
   { chiave: 'raggio_km_preventivo', etichetta: 'Raggio (km, linea d\'aria) per cercare fornitori vicini a una richiesta preventivo — modificabile comunque per singola richiesta', default: '40' },
