@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import '../styles/account.css';
-import { LogoOnWay } from '../features/LogoOnWay';
+import { AccountShell } from '../features/AccountShell';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { utentiApi, type PreferenzePrivacy } from '../api/utenti';
 import { eventiApi } from '../api/eventi';
@@ -41,7 +41,6 @@ export function AccountPage() {
   function setSezione(nuova: Sezione) {
     setSearchParams(nuova === 'dashboard' ? {} : { sezione: nuova });
   }
-  const [menuAperto, setMenuAperto] = useState(false);
   // Quale prenotazione mostrare nella "travel card" — condiviso tra
   // dashboard e l'elenco viaggi, così un click apre la stessa cosa da
   // qualsiasi punto ci si trovi.
@@ -101,23 +100,11 @@ export function AccountPage() {
 
   return (
     <>
-      <header>
-        <LogoOnWay />
-        <div className="header-right">
-          <div className={`my-inbus-wrap${menuAperto ? ' open' : ''}`}>
-            <button className="my-inbus-btn" onClick={() => setMenuAperto(!menuAperto)}>My OnWay <span className="caret">▾</span></button>
-            <div className={`my-inbus-dropdown${menuAperto ? '' : ' hidden'}`}>
-              <div className="dropdown-chi">Accesso come<b>{email}</b></div>
-              {vociMenu.map((v) => (
-                <button key={v.id} className="acc-nav-btn" onClick={() => { setSezione(v.id); setMenuAperto(false); }}>{v.label}</button>
-              ))}
-            </div>
-          </div>
-          <button className="btn btn-ghost" onClick={esci}>Esci</button>
-        </div>
-      </header>
-
-      <div id="accountShell">
+      <AccountShell
+        etichettaTipo="il mio account" nomeUtente={email} onLogout={esci}
+        voci={vociMenu} voceAttiva={sezione} onCambiaVoce={(v) => setSezione(v as Sezione)}
+        contenutoLarghezzaPiena={sezione === 'eventi'}
+      >
         {sezione !== 'eventi' && (
           <div className="account-content">
             {sezione === 'dashboard' && <SezioneDashboard email={email} viaggi={viaggi} eventiPerId={eventiPerId} onNavigare={setSezione} onAprireViaggio={setPnrAperto} />}
@@ -134,7 +121,7 @@ export function AccountPage() {
             <HomePage />
           </section>
         )}
-      </div>
+      </AccountShell>
 
       {pnrAperto && (
         <DettaglioViaggioModale

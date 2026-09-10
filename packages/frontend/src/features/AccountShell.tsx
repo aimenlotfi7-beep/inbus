@@ -15,7 +15,7 @@ export interface VoceMenuAccount {
  *  imprevedibile). Un solo componente invece di tre copie quasi
  *  identiche — un cambio di stile/comportamento vale per tutti. */
 export function AccountShell({
-  etichettaTipo, voci, voceAttiva, onCambiaVoce, nomeUtente, onLogout, children,
+  etichettaTipo, voci, voceAttiva, onCambiaVoce, nomeUtente, onLogout, children, contenutoLarghezzaPiena,
 }: {
   etichettaTipo: string;
   voci: VoceMenuAccount[];
@@ -24,6 +24,11 @@ export function AccountShell({
   nomeUtente?: string | null;
   onLogout: () => void;
   children: ReactNode;
+  /** Per una voce che incorpora un'intera pagina a sé (es. "Scopri
+   *  eventi" nell'account cliente, che mostra la home del sito per
+   *  intero) — niente padding/contenitore attorno, quella pagina
+   *  gestisce già da sola il proprio spazio. */
+  contenutoLarghezzaPiena?: boolean;
 }) {
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
 
@@ -63,7 +68,7 @@ export function AccountShell({
         </div>
       </aside>
 
-      <main className="account-main">{children}</main>
+      <main className="account-main" style={contenutoLarghezzaPiena ? { padding: 0, maxWidth: 'none' } : undefined}>{children}</main>
     </div>
   );
 }

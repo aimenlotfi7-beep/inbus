@@ -828,3 +828,62 @@
   font-size:13px; color:var(--ink); cursor:pointer; opacity:.75;
 }
 .mini-tab.active{background:var(--pink); border-color:var(--pink); color:#fff; opacity:1; font-weight:600;}
+
+/* ---------------------------------------------------------------
+   MENU LATERALE ACCOUNT CLIENTE — stesse classi (e stesso
+   componente React, AccountShell) già usate per promoter/
+   organizzatore/tour leader, ma quei fogli di stile hanno un tema
+   CHIARO incompatibile con quello scuro del sito: stesse regole,
+   riscritte qui con le variabili di questo file, invece di
+   importare promoter.css (avrebbe scontrato .btn/header/ecc, che
+   lì sono definiti diversi).
+   ------------------------------------------------------------- */
+.account-shell{display:flex; min-height:100vh; background:var(--night);}
+.account-sidebar{
+  width:220px; flex-shrink:0; background:var(--dusk);
+  display:flex; flex-direction:column; padding:20px 14px;
+  position:sticky; top:0; height:100vh;
+}
+.account-sidebar-riga-alto{display:contents;}
+.account-sidebar .logo{margin-bottom:22px; padding-left:6px; order:1;}
+.account-hamburger{display:none;}
+.account-nav{display:flex; flex-direction:column; gap:3px; flex:1; order:2;}
+.account-nav-voce{
+  padding:11px 14px; border-radius:8px; font-size:13.5px; font-weight:500;
+  color:var(--mist); text-decoration:none; cursor:pointer; border:none;
+  background:none; text-align:left; font-family:'Poppins',sans-serif; width:100%;
+}
+.account-nav-voce:hover{color:var(--paper);}
+.account-nav-voce.active{background:var(--pink-dim); color:var(--paper); font-weight:600;}
+.account-nav-intestazione-mobile{display:none;}
+.account-piede{order:3; padding-top:14px; margin-top:10px; border-top:1px solid var(--line);}
+.account-piede .nome{font-size:12px; color:var(--mist); margin:0 0 10px; word-break:break-word;}
+.account-piede a, .account-piede button{display:block; width:100%; margin-bottom:6px; text-align:center;}
+.account-main{flex:1; min-width:0; padding:clamp(20px,5vw,44px) clamp(18px,5vw,32px) 80px; color:var(--paper);}
+
+@media (max-width:860px){
+  .account-shell{flex-direction:column;}
+  .account-sidebar{width:100%; height:auto; position:relative; display:block; padding:14px 16px;}
+  .account-sidebar-riga-alto{display:flex; align-items:center; gap:10px;}
+  .account-sidebar .logo{margin:0; flex:1; min-width:0; order:0;}
+  .account-hamburger{
+    display:block; order:0; flex-shrink:0;
+    background:none; border:1px solid var(--line); border-radius:8px;
+    color:var(--paper); font-size:18px; padding:6px 12px; cursor:pointer;
+  }
+  .account-nav{display:none;}
+  .account-nav.aperto{
+    display:flex; flex-direction:column; gap:4px;
+    position:fixed; inset:0; z-index:30; background:var(--dusk);
+    padding:max(20px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    overflow-y:auto;
+  }
+  .account-nav-intestazione-mobile{
+    display:flex; align-items:center; justify-content:space-between;
+    padding-bottom:12px; margin-bottom:8px; border-bottom:1px solid var(--line);
+    font-weight:700; color:var(--paper); font-size:15px;
+  }
+  .account-nav-intestazione-mobile button{background:none; border:none; color:var(--paper); font-size:18px; cursor:pointer; padding:4px 8px;}
+  .account-nav-voce{font-size:15px; padding:13px 14px;}
+  .account-piede{order:0; flex-shrink:0; margin:0; padding:0; border:none;}
+}
