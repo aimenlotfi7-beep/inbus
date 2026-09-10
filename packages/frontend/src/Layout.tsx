@@ -154,8 +154,12 @@ export function Layout({ children }: { children: ReactNode }) {
       )}
 
       <div className={`mobile-nav${menuMobileAperto ? ' open' : ''}`}>
-        <Link to="/#consigliati" onClick={() => setMenuMobileAperto(false)}>Eventi Consigliati</Link>
-        <Link to="/bundle" onClick={() => setMenuMobileAperto(false)}>Bundle</Link>
+        {!loggato && (
+          <>
+            <Link to="/#consigliati" onClick={() => setMenuMobileAperto(false)}>Eventi Consigliati</Link>
+            <Link to="/bundle" onClick={() => setMenuMobileAperto(false)}>Bundle</Link>
+          </>
+        )}
         <Link className="btn btn-primary" to={loggato ? '/account' : '/accedi'} style={{ textAlign: 'center', marginTop: 10 }} onClick={() => setMenuMobileAperto(false)}>{etichettaAccount}</Link>
       </div>
 
