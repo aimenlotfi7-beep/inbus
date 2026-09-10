@@ -93,6 +93,39 @@ clienteAuthRouter.get('/me', richiedeAuthCliente, asyncHandler(async (req: Reque
   res.json(datiPubblici);
 }));
 
+/** Modifica dei propri dati — email esclusa di proposito (non è nello
+ *  schema qui sotto, quindi anche se arrivasse nel corpo della
+ *  richiesta verrebbe scartata prima di arrivare al service). */
+clienteAuthRouter.patch(
+  '/me',
+  richiedeAuthCliente,
+  valida(z.object({
+    nome: z.string().min(1),
+    cognome: z.string().min(1),
+    telefono: z.string().optional(),
+    citta: z.string().optional(),
+    dataNascita: z.coerce.date().refine((d) => d < new Date(), 'La data di nascita non può essere nel futuro.'),
+  })),
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.cliente) throw new NonAutorizzato();
+    await clienteAuthService.aggiornaProfilo(req.cliente.sub, req.body);
+    res.json({ ok: true });
+  }),
+);
+
+/** Cancellazione dell'account, richiesta dal cliente stesso — la
+ *  password nel corpo della richiesta è la conferma (vedi service). */
+clienteAuthRouter.post(
+  '/me/elimina',
+  richiedeAuthCliente,
+  valida(z.object({ password: z.string().min(1) })),
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.cliente) throw new NonAutorizzato();
+    await clienteAuthService.eliminaAccount(req.cliente.sub, req.body.password);
+    res.json({ ok: true });
+  }),
+);
+
 /** "Invita un amico" — codice personale (generato al primo utilizzo)
  *  e lo storico di chi è stato invitato: "in sospeso" (registrato, non
  *  ha ancora prenotato) o "completato" (ha prenotato, il bonus è

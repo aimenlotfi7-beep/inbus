@@ -23,6 +23,8 @@ export interface DatiCliente {
   cognome: string | null;
   email: string;
   telefono: string | null;
+  citta: string | null;
+  dataNascita: string | null;
   creditoDisponibile: string;
   emailVerificata: boolean;
 }
@@ -47,4 +49,8 @@ export const clienteAuthApi = {
 
   me: () => chiamata<DatiCliente>('/api/cliente-auth/me', {}, true),
   meReferral: () => chiamata<{ codice: string; invitati: { nome: string; completato: boolean }[] }>('/api/cliente-auth/me/referral', {}, true),
+  aggiornaProfilo: (input: { nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: string }) =>
+    chiamata<{ ok: true }>('/api/cliente-auth/me', { method: 'PATCH', body: JSON.stringify(input) }, true),
+  eliminaAccount: (password: string) =>
+    chiamata<{ ok: true }>('/api/cliente-auth/me/elimina', { method: 'POST', body: JSON.stringify({ password }) }, true),
 };

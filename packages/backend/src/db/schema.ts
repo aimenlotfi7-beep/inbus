@@ -632,6 +632,15 @@ export const utenti = pgTable('utenti', {
   // non serve un flag per quello: capita una volta sola per natura,
   // nello stesso momento in cui invitatoDaUtenteId viene impostato.
   bonusReferralInvitanteErogato: boolean('bonus_referral_invitante_erogato').notNull().default(false),
+  // Cancellazione "morbida" richiesta dal cliente stesso: non si può
+  // eliminare la riga per davvero (le sue prenotazioni la referenziano
+  // — servono per la contabilità, restano) - si anonimizzano nome/
+  // cognome/telefono/città, si toglie la password (non può più
+  // accedere), e questa data resta come prova di quando è successo.
+  // Email e data di nascita restano (l'email è l'ancora usata dallo
+  // storico prenotazioni/PNR; senza, "traccia la tua prenotazione"
+  // smetterebbe di funzionare anche per un viaggio già fatto).
+  eliminatoIl: timestamp('eliminato_il'),
   // Consensi privacy — ognuno con la propria data: il GDPR richiede di
   // poter DIMOSTRARE quando è stato dato un consenso, non solo che c'è.
   // Nullo = non ancora scelto (mai mostrare come "acconsentito" di

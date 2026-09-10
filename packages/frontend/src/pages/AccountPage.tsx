@@ -9,7 +9,8 @@ import { chatApi, type ConversazioneConMessaggi } from '../api/chat';
 import type { Prenotazione, Evento } from '../api/types';
 import { CookieBanner, LinkPreferenzeCookie } from '../features/CookieBanner';
 import { clienteLoggato, logoutCliente } from '../features/clienteSessione';
-import { clienteAuthApi } from '../api/clienteAuth';
+import { clienteAuthApi, type DatiCliente } from '../api/clienteAuth';
+import { ErroreApi } from '../api/client';
 import { listaAttesaApi, type MiaIscrizione } from '../api/listaAttesa';
 import { DettaglioViaggioModale } from '../features/DettaglioViaggioModale';
 import { calcolaStatoPrenotazione } from '../features/statoPrenotazione';
@@ -130,16 +131,126 @@ export function AccountPage() {
 }
 
 function SezioneProfilo({ email }: { email: string }) {
+  const navigate = useNavigate();
+  const [dati, setDati] = useState<DatiCliente | null>(null);
+  const [nome, setNome] = useState('');
+  const [cognome, setCognome] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [citta, setCitta] = useState('');
+  const [dataNascita, setDataNascita] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [messaggio, setMessaggio] = useState('');
+  const [erroreSalva, setErroreSalva] = useState('');
+
+  const [zonaEliminaAperta, setZonaEliminaAperta] = useState(false);
+  const [passwordElimina, setPasswordElimina] = useState('');
+  const [eliminando, setEliminando] = useState(false);
+  const [erroreElimina, setErroreElimina] = useState('');
+
+  useEffect(() => {
+    clienteAuthApi.me().then((d) => {
+      setDati(d);
+      setNome(d.nome ?? ''); setCognome(d.cognome ?? ''); setTelefono(d.telefono ?? ''); setCitta(d.citta ?? '');
+      setDataNascita(d.dataNascita ? d.dataNascita.slice(0, 10) : '');
+    });
+  }, []);
+
+  async function salva(e: React.FormEvent) {
+    e.preventDefault();
+    setErroreSalva(''); setMessaggio(''); setSalvando(true);
+    try {
+      await clienteAuthApi.aggiornaProfilo({ nome, cognome, telefono: telefono || undefined, citta: citta || undefined, dataNascita });
+      setMessaggio('Dati salvati.');
+      setTimeout(() => setMessaggio(''), 3000);
+    } catch (err) {
+      setErroreSalva(err instanceof ErroreApi ? err.message : 'Errore di rete — riprova.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function eliminaAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setErroreElimina(''); setEliminando(true);
+    try {
+      await clienteAuthApi.eliminaAccount(passwordElimina);
+      logoutCliente();
+      navigate('/');
+    } catch (err) {
+      setErroreElimina(err instanceof ErroreApi ? err.message : 'Errore di rete — riprova.');
+      setEliminando(false);
+    }
+  }
+
+  if (!dati) return <section className="acc-sezione"><h1>Il mio profilo</h1><p style={{ color: 'var(--mist)' }}>Carico...</p></section>;
+
   return (
     <section className="acc-sezione">
       <h1>Il mio profilo</h1>
 
-      <div className="panel-box">
+      <form onSubmit={salva} className="panel-box">
         <h2>I miei dati</h2>
-        <p style={{ color: 'var(--mist)', fontSize: 13.5 }}>
-          Sei collegato con l'indirizzo <b style={{ color: 'var(--paper)' }}>{email}</b>. I tuoi dati (nome,
-          telefono, indirizzo...) vengono salvati automaticamente ogni volta che completi una prenotazione.
+        <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 14 }}>
+          Sei collegato con l'indirizzo <b style={{ color: 'var(--paper)' }}>{email}</b> — non modificabile da qui.
         </p>
+
+        <div className="due-colonne-auth">
+          <div>
+            <label className="field-label">Nome</label>
+            <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} required />
+          </div>
+          <div>
+            <label className="field-label">Cognome</label>
+            <input type="text" value={cognome} onChange={(e) => setCognome(e.target.value)} required />
+          </div>
+        </div>
+        <div className="due-colonne-auth">
+          <div>
+            <label className="field-label">Telefono</label>
+            <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">Città</label>
+            <input type="text" value={citta} onChange={(e) => setCitta(e.target.value)} />
+          </div>
+        </div>
+        <label className="field-label">Data di nascita</label>
+        <input type="date" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} required style={{ maxWidth: 200 }} />
+
+        {erroreSalva && <p className="errore">{erroreSalva}</p>}
+        {messaggio && <p style={{ color: 'var(--green)', fontSize: 13, marginTop: 8 }}>{messaggio}</p>}
+        <button type="submit" className="btn btn-primary" style={{ marginTop: 14, width: 'auto' }} disabled={salvando}>
+          {salvando ? 'Salvo...' : 'Salva le modifiche'}
+        </button>
+      </form>
+
+      <div className="panel-box" style={{ marginTop: 22, borderColor: '#c0392b' }}>
+        <h2 style={{ color: '#e74c3c' }}>Elimina il mio account</h2>
+        <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 14 }}>
+          I tuoi dati personali (nome, telefono, città) vengono rimossi e non potrai più accedere. Le prenotazioni
+          già fatte restano nello storico per motivi contabili, ma non saranno più collegate a un account attivo.
+          <b style={{ color: 'var(--paper)' }}> Questa azione non si può annullare.</b>
+        </p>
+
+        {!zonaEliminaAperta ? (
+          <button type="button" className="btn btn-ghost" style={{ borderColor: '#c0392b', color: '#e74c3c' }} onClick={() => setZonaEliminaAperta(true)}>
+            Elimina il mio account
+          </button>
+        ) : (
+          <form onSubmit={eliminaAccount}>
+            <label className="field-label">Conferma la tua password per procedere</label>
+            <input type="password" value={passwordElimina} onChange={(e) => setPasswordElimina(e.target.value)} required autoFocus />
+            {erroreElimina && <p className="errore">{erroreElimina}</p>}
+            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+              <button type="submit" className="btn" style={{ width: 'auto', background: '#c0392b', color: '#fff' }} disabled={eliminando}>
+                {eliminando ? 'Elimino...' : 'Conferma eliminazione'}
+              </button>
+              <button type="button" className="btn btn-ghost" style={{ width: 'auto' }} onClick={() => { setZonaEliminaAperta(false); setPasswordElimina(''); setErroreElimina(''); }}>
+                Annulla
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </section>
   );

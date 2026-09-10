@@ -112,6 +112,40 @@ export const clienteAuthService = {
     return this.emettiToken(u.id, u.email);
   },
 
+  /** Modifica i propri dati — MAI l'email (è l'identità dell'account,
+   *  cambiarla da qui aprirebbe la porta a errori seri: username
+   *  diverso, email di verifica al posto sbagliato). Per cambiare
+   *  email serve un flusso a sé, con una nuova verifica dedicata — non
+   *  costruito qui, non richiesto. */
+  async aggiornaProfilo(utenteId: string, input: { nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: Date }) {
+    await db.update(utenti).set({
+      nome: input.nome, cognome: input.cognome,
+      telefono: input.telefono || null, citta: input.citta || null,
+      dataNascita: input.dataNascita,
+    }).where(eq(utenti.id, utenteId));
+  },
+
+  /** Cancellazione "morbida", richiesta dal cliente stesso — richiede
+   *  la password corrente (non basta avere una sessione aperta: un
+   *  dispositivo condiviso o dimenticato loggato non deve poter
+   *  cancellare l'account di qualcun altro). Non si tocca la riga
+   *  utenti (le sue prenotazioni la referenziano, servono per la
+   *  contabilità) - si anonimizzano i dati personali modificabili e si
+   *  toglie la password, non potrà più accedere. */
+  async eliminaAccount(utenteId: string, password: string) {
+    const [u] = await db.select().from(utenti).where(eq(utenti.id, utenteId)).limit(1);
+    if (!u || !u.passwordHash) throw new NonAutorizzato();
+    const passwordOk = await bcrypt.compare(password, u.passwordHash);
+    if (!passwordOk) throw new NonAutorizzato('Password non corretta.');
+
+    await db.update(utenti).set({
+      nome: 'Utente', cognome: 'eliminato', telefono: null, citta: null,
+      passwordHash: null, eliminatoIl: new Date(),
+      tokenVerificaEmail: null, tokenVerificaScadenza: null,
+      tokenResetPassword: null, tokenResetPasswordScadenza: null,
+    }).where(eq(utenti.id, utenteId));
+  },
+
   /** Rimanda l'email di verifica — utile se il cliente non la trova più
    *  o il link è scaduto. Non conferma né smentisce se l'email esiste
    *  già in modo diverso da questo (stesso messaggio sempre), per non

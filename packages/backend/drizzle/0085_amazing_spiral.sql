@@ -1,0 +1,1 @@
+ALTER TABLE "utenti" ADD COLUMN "eliminato_il" timestamp;
