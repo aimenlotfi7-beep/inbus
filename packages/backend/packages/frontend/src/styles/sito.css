@@ -133,36 +133,6 @@
   }
   @media (max-width:980px){ .hero-grid{grid-template-columns:1fr;} }
 
-  /* La ricerca dell'hero — deve "non poter essere mancata" (posizione,
-     stile, dimensione: i tre fattori che la ricerca di settore indica
-     come decisivi). Sfondo pieno e bordo ambra per staccare nettamente
-     dal resto scuro dell'hero, niente che la faccia sembrare "un altro
-     campo tra tanti" come nell'header. */
-  .hero-ricerca{
-    display:flex; gap:10px; margin:26px 0 30px; padding:8px;
-    background:var(--paper); border-radius:14px; box-shadow:0 10px 40px rgba(0,0,0,.35);
-  }
-  .hero-ricerca input{
-    flex:1; min-width:0; border:none; outline:none; background:transparent;
-    font-family:'Poppins',sans-serif; font-size:15px; font-weight:500; color:var(--ink); padding:12px 14px;
-  }
-  .hero-ricerca input::placeholder{color:#8a8272;}
-  .hero-ricerca select{
-    flex-shrink:0; max-width:160px; border:none; outline:none; background:#f3efe4;
-    font-family:'Poppins',sans-serif; font-size:13.5px; color:var(--ink); border-radius:8px; padding:0 10px; cursor:pointer;
-  }
-  .hero-ricerca button{
-    flex-shrink:0; background:var(--pink); color:#fff; border:none; border-radius:8px;
-    font-family:'Poppins',sans-serif; font-weight:700; font-size:14px; padding:0 22px; cursor:pointer;
-  }
-  .hero-ricerca button:hover{background:var(--night);}
-  @media (max-width:640px){
-    .hero-ricerca{flex-wrap:wrap;}
-    .hero-ricerca input{width:100%; flex-basis:100%;}
-    .hero-ricerca select{flex:1;}
-    .hero-ricerca button{flex:1;}
-  }
-
   /* Ricerca + categorie — fascia propria sotto l'header (non più
      incastrata dentro la riga del menu, dove sopra i 1100px spariva
      del tutto): larghezza piena, sempre visibile su ogni schermo,
