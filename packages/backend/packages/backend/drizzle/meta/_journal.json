@@ -1,0 +1,615 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786525191296,
+      "tag": "0000_premium_cargill",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786713196444,
+      "tag": "0001_aggiungi_ruoli_permessi_dinamici",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786716341723,
+      "tag": "0002_completa_migrazione_ruoli",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786724060906,
+      "tag": "0003_aggiungi_partenze_bus_eccezioni_permessi",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786747537644,
+      "tag": "0004_aggiungi_acconto_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786870732911,
+      "tag": "0005_correggi_eliminazione_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786874339276,
+      "tag": "0006_aggiungi_partecipanti_e_prezzo_opzionale",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786889501971,
+      "tag": "0007_lista_attesa_completa_stato_disponibilita_promemoria",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786891687966,
+      "tag": "0008_fix_cancellazione_tratte_con_prenotazioni",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786893529290,
+      "tag": "0009_assegna_tour_leader_a_bus",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786915044492,
+      "tag": "0011_arrivo_su_evento_non_tratta",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786915489932,
+      "tag": "0012_aggiungi_visibile_sito_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786916121488,
+      "tag": "0013_campagne_e_offerte_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786954758644,
+      "tag": "0014_sconto_percentuale_offerte",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1786977786657,
+      "tag": "0015_aggiungi_slug_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1787046973650,
+      "tag": "0016_aggiungi_descrizione_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1787065283872,
+      "tag": "0017_posti_max_per_fermata",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787069513419,
+      "tag": "0018_aggiungi_costo_bus",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787152576504,
+      "tag": "0019_consensi_privacy_utenti",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1787214625043,
+      "tag": "0020_posti_bus_censito",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787233571684,
+      "tag": "0021_biglietto_digitale",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787237736276,
+      "tag": "0022_personalizzazione_biglietto_e_template_email",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1787305468905,
+      "tag": "0023_data_saldo_pagato",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787307172191,
+      "tag": "0024_descrizione_seo_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1787307592668,
+      "tag": "0025_layout_biglietto",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787386168858,
+      "tag": "0026_campo_bozza_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1787395866709,
+      "tag": "0027_accesso_tour_leader_e_qr_per_passeggero",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1787425101458,
+      "tag": "0028_credito_fedelta",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1787438361149,
+      "tag": "0029_richieste_rimborso",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1787441493077,
+      "tag": "0030_account_cliente_vero",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1787445894923,
+      "tag": "0031_cestino_eventi_tratte",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787478010856,
+      "tag": "0032_conversazioni_chat",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1787495889113,
+      "tag": "0033_coupon_per_evento",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1787498164719,
+      "tag": "0034_prodotti",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1787514516830,
+      "tag": "0035_reset_password",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1787516419083,
+      "tag": "0036_rename_prodotti_viaggi",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1787516827895,
+      "tag": "0037_rename_tragitti_percorsi_salvati",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1787549768779,
+      "tag": "0038_rename_linee_bus_tragitti",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1787568431954,
+      "tag": "0039_rename_viaggi_servizi",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1787608462614,
+      "tag": "0040_arrivo_per_servizio",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1787608487603,
+      "tag": "0040_arrivo_per_servizio",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1787636855193,
+      "tag": "0041_organizzatori",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1787638692182,
+      "tag": "0042_white_label",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1787640005674,
+      "tag": "0043_canale_vendita_commissione",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1787656528421,
+      "tag": "0044_regole_commissione",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1787691908131,
+      "tag": "0045_comunicazioni",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1787780752649,
+      "tag": "0046_ordini_layout_whitelabel",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1787811267969,
+      "tag": "0047_eventi_categoria",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1787811911477,
+      "tag": "0048_categorie_evento_dinamiche",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1787917207774,
+      "tag": "0049_fermate_anagrafica",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1787939008911,
+      "tag": "0050_fermate_link",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1787944593457,
+      "tag": "0051_tragitto_attivo",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1788004198887,
+      "tag": "0052_tragitto_stato_conferma",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1788007145674,
+      "tag": "0053_variazioni_tragitto",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1788011653338,
+      "tag": "0054_percorso_salvato_anagrafica",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1788017061561,
+      "tag": "0055_fix_ondelete_set_null",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1788044249588,
+      "tag": "0056_seed_template_email",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1788045370044,
+      "tag": "0057_posti_da_bus_registrati",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1788050337636,
+      "tag": "0058_stato_prezzato_e_tipo_fermata",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1788052181463,
+      "tag": "0059_bus_fermate",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1788084257245,
+      "tag": "0060_eta_riordino_bus_biglietto",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1788090337047,
+      "tag": "0061_partenza_su_percorsi_salvati",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1788093529983,
+      "tag": "0062_linee_contenitore",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1788093541270,
+      "tag": "0063_migra_bus_esistenti_in_linee",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1788099882261,
+      "tag": "0064_arrivo_su_tragitto",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1788099889838,
+      "tag": "0065_svuota_vecchio_arrivo",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1788209021261,
+      "tag": "0066_arrivo_partenza_invertibili",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1788244793847,
+      "tag": "0067_testa_doppia_percorsi",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1788282003955,
+      "tag": "0068_rimuovi_margine_percorsi_salvati",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1788343999380,
+      "tag": "0069_rimuovi_tipo_fermata",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1788384630632,
+      "tag": "0070_aggiungi_vincolo_una_richiesta_rimborso_in_attesa",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1788416732261,
+      "tag": "0071_aggiungi_indici_prestazioni",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1788695503069,
+      "tag": "0072_public_sunfire",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1788696302935,
+      "tag": "0073_cynical_shaman",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1788698992929,
+      "tag": "0074_safe_the_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1788784189652,
+      "tag": "0075_gifted_joshua_kane",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1788799845982,
+      "tag": "0076_oval_sharon_carter",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1788800950031,
+      "tag": "0077_orange_fabian_cortez",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1788818506184,
+      "tag": "0078_ancient_red_shift",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1788879449021,
+      "tag": "0079_faulty_vindicator",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1788950988001,
+      "tag": "0080_skinny_puck",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1788967803839,
+      "tag": "0081_new_prima",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1788968818148,
+      "tag": "0082_shocking_james_howlett",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1788970875725,
+      "tag": "0083_colossal_the_call",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1789052185458,
+      "tag": "0084_legal_bloodscream",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1789055777750,
+      "tag": "0085_amazing_spiral",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1789063588580,
+      "tag": "0086_organic_mister_sinister",
+      "breakpoints": true
+    }
+  ]
+}
