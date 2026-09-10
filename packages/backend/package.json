@@ -18,6 +18,7 @@
     "db:geocodifica-tutto": "npm run db:geocodifica-fornitori && npm run db:geocodifica-fermate",
     "db:esporta-fermate": "tsx src/db/esporta-fermate-con-mappa.ts",
     "db:correggi-usi-coupon": "tsx src/db/correggi-usi-coupon.ts",
+    "db:azzera-prenotazioni-test": "tsx src/db/azzera-prenotazioni-test.ts",
     "db:popola-link-fermate": "tsx src/db/popola-link-maps-fermate.ts",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx src/db/seed.ts",
