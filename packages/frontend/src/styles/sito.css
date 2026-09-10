@@ -871,6 +871,28 @@
 .account-piede button{display:block; width:100%; text-align:center;}
 .account-main{flex:1; min-width:0; padding:clamp(20px,5vw,44px) clamp(18px,5vw,32px) 80px; color:var(--paper);}
 
+/* Priorità esplicita ai pulsanti dentro l'account cliente (SOLO
+   quello — :not(.pagina-partner) esclude promoter/organizzatore/tour
+   leader, che hanno apposta il loro stile diverso da promoter.css) —
+   quel foglio di stile (caricato nello stesso bundle, per gli altri
+   tre account) definisce .btn/.btn-ghost/.btn-primary con una FORMA
+   diversa (rettangolo arrotondato, non pillola) sulle stesse classi:
+   quale dei due vince altrimenti dipende dall'ordine con cui Vite
+   impacchetta i fogli di stile, non affidabile. Uno scope più
+   specifico vince sempre per specificità, indipendentemente da quello. */
+.account-shell:not(.pagina-partner) .btn{
+  font-family:'Poppins',sans-serif; font-weight:600; font-size:13.5px;
+  padding:11px 20px; border-radius:999px; border:1px solid transparent;
+  cursor:pointer; display:inline-flex; align-items:center; gap:8px;
+  transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+  white-space:nowrap;
+}
+.account-shell:not(.pagina-partner) .btn-primary{background:var(--pink); color:var(--night);}
+.account-shell:not(.pagina-partner) .btn-primary:hover{transform:translateY(-2px); box-shadow:0 10px 24px var(--pink-dim);}
+.account-shell:not(.pagina-partner) .btn-ghost{border-color:var(--line); color:var(--paper); background:transparent;}
+.account-shell:not(.pagina-partner) .btn-ghost:hover{border-color:var(--mist);}
+.account-shell:not(.pagina-partner) .stat-box{background:var(--dusk); border:1px solid var(--line); border-radius:12px; padding:16px 20px; flex:1; min-width:150px; box-shadow:none;}
+
 @media (max-width:860px){
   .account-corpo{flex-direction:column;}
   .account-sidebar{width:100%; height:auto; position:relative; padding:10px 16px;}
