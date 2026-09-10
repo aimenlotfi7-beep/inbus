@@ -288,36 +288,6 @@ export function HomePage() {
             <div className="eyebrow">{t('hero_eyebrow', 'Bus per concerti in tutta Italia')}</div>
             <h1 className="hero-title"><span>{t('hero_titolo_riga1', 'Sali sul bus.')}</span><span className="line2">{t('hero_titolo_riga2', 'Vivi il concerto.')}</span></h1>
             <p className="hero-sub">{t('hero_sottotitolo', 'Andata e ritorno in giornata, direttamente dalla tua città al palco del tuo artista preferito. Un solo biglietto, zero pensieri.')}</p>
-
-            {/* Ricerca prominente nell'hero — prima era solo un campo
-                piccolo nell'header (max 320px, in mezzo a menu e
-                carrello). La ricerca su siti di questo tipo è quello
-                che quasi tutti cercano per primo appena arrivano (la
-                ricerca UX di settore lo conferma): qui è il contenuto
-                principale, non un dettaglio. Stesso stato di searchParams
-                dell'header e dei filtri sotto — scrivere qui aggiorna
-                anche quelli, sono la stessa ricerca, non una copia. */}
-            <form
-              className="hero-ricerca"
-              onSubmit={(e) => { e.preventDefault(); document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' }); }}
-            >
-              <input
-                type="text"
-                placeholder="Cerca artista, evento o città..."
-                value={ricercaTesto}
-                onChange={(e) => {
-                  const nuovi = new URLSearchParams(searchParams);
-                  if (e.target.value) nuovi.set('q', e.target.value); else nuovi.delete('q');
-                  setSearchParams(nuovi, { replace: true });
-                }}
-              />
-              <select value={partenzaAttiva} onChange={(e) => impostaFiltro('partenza', e.target.value)} aria-label="Parti da">
-                <option value="">Parti da...</option>
-                {cittaPartenza.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <button type="submit">Cerca</button>
-            </form>
-
             <div className="hero-stats">
               <div className="stat"><b>{numeroPartenze}</b><span>{t('hero_statistica1_etichetta', 'Partenze attive')}</span></div>
               <div className="stat"><b>{cittaPartenza.length}</b><span>{t('hero_statistica2_etichetta', 'Città di partenza')}</span></div>
