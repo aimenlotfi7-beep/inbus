@@ -16,7 +16,7 @@ export function RegistratiPage() {
   const [errore, setErrore] = useState('');
   const [caricamento, setCaricamento] = useState(false);
   const [inviata, setInviata] = useState(false);
-  const dopo = searchParams.get('dopo') || '/account';
+  const dopo = searchParams.get('dopo') || '/'; // stessa scelta di AccediPage.tsx — dopo la registrazione, torna al sito normale
 
   async function registrati(e: React.FormEvent) {
     e.preventDefault();

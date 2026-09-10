@@ -5,6 +5,7 @@ import { clienteLoggato } from './features/clienteSessione';
 import { useCarrello } from './features/carrello/CarrelloContext';
 import { categorieEventoApi, type CategoriaEvento } from './api/categorieEvento';
 import { LogoOnWay } from './features/LogoOnWay';
+import { clienteAuthApi } from './api/clienteAuth';
 import { inizializzaMetaPixel } from './features/metaPixel';
 import { inizializzaGA4, tracciaPaginaGA4 } from './features/googleAnalytics';
 
@@ -12,6 +13,17 @@ export function Layout({ children }: { children: ReactNode }) {
   useEffect(() => { inizializzaMetaPixel(); inizializzaGA4(); }, []);
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
   const loggato = clienteLoggato();
+  // Solo il nome (o "Il mio account" finché non è ancora arrivato, o
+  // se manca) — cliccandolo si va comunque sempre in /account, cambia
+  // solo l'etichetta. Un'unica chiamata leggera, non su ogni pagina
+  // sotto /account (Layout non viene mai renderizzato lì).
+  const [nomeCliente, setNomeCliente] = useState<string | null>(null);
+  useEffect(() => {
+    if (!loggato) { setNomeCliente(null); return; }
+    clienteAuthApi.me().then((c) => setNomeCliente(c.nome)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggato]);
+  const etichettaAccount = loggato ? (nomeCliente || 'Il mio account') : 'Accedi';
   const { numeroArticoli } = useCarrello();
   const location = useLocation();
   const inHomepage = location.pathname === '/';
@@ -120,7 +132,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </svg>
             {numeroArticoli > 0 && <span className="carrello-badge">{numeroArticoli}</span>}
           </Link>
-          <Link className="btn btn-ghost desktop-only" to={loggato ? '/account' : '/accedi'}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
+          <Link className="btn btn-ghost desktop-only" to={loggato ? '/account' : '/accedi'}>{etichettaAccount}</Link>
           <button className="burger" onClick={() => setMenuMobileAperto(!menuMobileAperto)}>☰</button>
         </div>
       </header>
@@ -144,7 +156,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className={`mobile-nav${menuMobileAperto ? ' open' : ''}`}>
         <Link to="/#consigliati" onClick={() => setMenuMobileAperto(false)}>Eventi Consigliati</Link>
         <Link to="/bundle" onClick={() => setMenuMobileAperto(false)}>Bundle</Link>
-        <Link className="btn btn-primary" to={loggato ? '/account' : '/accedi'} style={{ textAlign: 'center', marginTop: 10 }} onClick={() => setMenuMobileAperto(false)}>{loggato ? 'Il mio account' : 'Accedi'}</Link>
+        <Link className="btn btn-primary" to={loggato ? '/account' : '/accedi'} style={{ textAlign: 'center', marginTop: 10 }} onClick={() => setMenuMobileAperto(false)}>{etichettaAccount}</Link>
       </div>
 
       {children}

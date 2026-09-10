@@ -12,7 +12,12 @@ export function AccediPage() {
   const [caricamento, setCaricamento] = useState(false);
   const [inviandoVerifica, setInviandoVerifica] = useState(false);
   const navigate = useNavigate();
-  const dopo = searchParams.get('dopo') || '/account';
+  // Login "normale" (non da un checkout/altro flusso che chiede di
+  // accedere per continuare) riporta alla home, non dentro l'account —
+  // chi ha appena cliccato "Accedi" dall'intestazione vuole tornare a
+  // navigare il sito come chiunque altro, non finire dritto nella
+  // sezione account (ci arriva cliccando il proprio nome, quando vuole).
+  const dopo = searchParams.get('dopo') || '/';
 
   async function accedi(e: React.FormEvent) {
     e.preventDefault();
