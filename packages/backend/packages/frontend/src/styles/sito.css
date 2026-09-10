@@ -111,7 +111,15 @@
   .mobile-nav{
     display:none; flex-direction:column; gap:2px; padding:8px 20px 20px;
     background:rgba(16,14,28,.97); backdrop-filter:blur(10px);
-    border-bottom:1px solid var(--line); position:sticky; top:63px; z-index:499;
+    border-bottom:1px solid var(--line); position:sticky; top:63px;
+    /* Più alto della barra fissa "Acquista ora" (z-index:600, più in
+       basso in questo stesso file) — trovato un vero conflitto: con
+       entrambi visibili insieme (pagina evento, mobile, scorsa in
+       basso, menu aperto), la barra d'acquisto finiva SOPRA il menu
+       invece che sotto, rischiando di coprire le voci più in basso.
+       Quando il menu è aperto, chi l'ha aperto vuole navigare via —
+       ha sempre la priorità su un pulsante d'acquisto sotto. */
+    z-index:650;
   }
   .mobile-nav.open{display:flex;}
   .mobile-nav a{padding:13px 10px; border-radius:8px; font-size:15.5px; color:var(--paper);}
