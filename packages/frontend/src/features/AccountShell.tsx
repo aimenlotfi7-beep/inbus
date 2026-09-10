@@ -15,7 +15,7 @@ export interface VoceMenuAccount {
  *  imprevedibile). Un solo componente invece di tre copie quasi
  *  identiche — un cambio di stile/comportamento vale per tutti. */
 export function AccountShell({
-  etichettaTipo, voci, voceAttiva, onCambiaVoce, nomeUtente, onLogout, children, contenutoLarghezzaPiena,
+  etichettaTipo, voci, voceAttiva, onCambiaVoce, nomeUtente, onLogout, children, contenutoLarghezzaPiena, temaChiaro,
 }: {
   etichettaTipo: string;
   voci: VoceMenuAccount[];
@@ -29,6 +29,14 @@ export function AccountShell({
    *  intero) — niente padding/contenitore attorno, quella pagina
    *  gestisce già da sola il proprio spazio. */
   contenutoLarghezzaPiena?: boolean;
+  /** Promoter/organizzatore/tour leader usano un tema chiaro dedicato
+   *  (promoter.css, classe "pagina-partner") — SOLO loro: quella
+   *  classe ridefinisce --paper in un colore scuro (pensato per testo
+   *  su sfondo chiaro), e applicata anche all'account cliente (che
+   *  invece eredita i colori scuri del sito) rendeva il testo scuro
+   *  su sfondo scuro, illeggibile. Di default false: il cliente non
+   *  la passa, resta sui colori del sito. */
+  temaChiaro?: boolean;
 }) {
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
 
@@ -38,7 +46,7 @@ export function AccountShell({
   }
 
   return (
-    <div className="pagina-partner account-shell">
+    <div className={`account-shell${temaChiaro ? ' pagina-partner' : ''}`}>
       {/* Barra in alto, a tutta larghezza — il nome sempre a sinistra,
           il logo del sito (cliccabile, torna a navigare) sempre a
           destra. Separata dalla sidebar sotto: quella resta solo per

@@ -111,7 +111,7 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
 
   return (
     <AccountShell
-      etichettaTipo="promoter" nomeUtente={promoter.nome} onLogout={esci}
+      etichettaTipo="promoter" nomeUtente={promoter.nome} onLogout={esci} temaChiaro
       voci={[
         { id: 'panoramica', label: 'Panoramica' },
         { id: 'link', label: 'I tuoi link' },

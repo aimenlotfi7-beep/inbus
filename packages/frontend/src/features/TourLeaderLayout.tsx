@@ -22,7 +22,7 @@ export function TourLeaderLayout({ vocedAttiva, children }: { vocedAttiva: 'cerc
 
   return (
     <AccountShell
-      etichettaTipo="tour leader" nomeUtente={nomeTourLeader()} onLogout={esci}
+      etichettaTipo="tour leader" nomeUtente={nomeTourLeader()} onLogout={esci} temaChiaro
       voci={[{ id: 'cerca', label: 'Cerca' }, { id: 'eventi', label: 'Eventi' }]}
       voceAttiva={vocedAttiva}
       onCambiaVoce={(v) => navigate(ROTTA_PER_VOCE[v])}

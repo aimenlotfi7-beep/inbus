@@ -99,7 +99,7 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
 
   return (
     <AccountShell
-      etichettaTipo="organizzatore" nomeUtente={organizzatore.nome} onLogout={esci}
+      etichettaTipo="organizzatore" nomeUtente={organizzatore.nome} onLogout={esci} temaChiaro
       voci={voci} voceAttiva={voce} onCambiaVoce={(v) => setVoce(v as typeof voce)}
     >
       {voce === 'panoramica' && (
