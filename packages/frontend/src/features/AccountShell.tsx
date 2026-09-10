@@ -39,36 +39,42 @@ export function AccountShell({
 
   return (
     <div className="pagina-partner account-shell">
-      <aside className="account-sidebar">
-        <div className="account-sidebar-riga-alto">
-          <div className="logo"><LogoOnWay come="testo" /><small>{etichettaTipo}</small></div>
-          <button type="button" className="account-hamburger" aria-label="Apri il menu" onClick={() => setMenuMobileAperto(true)}>☰</button>
-        </div>
+      {/* Barra in alto, a tutta larghezza — il nome sempre a sinistra,
+          il logo del sito (cliccabile, torna a navigare) sempre a
+          destra. Separata dalla sidebar sotto: quella resta solo per
+          le voci del menu. */}
+      <div className="account-topbar">
+        <span className="account-topbar-nome">{nomeUtente ?? etichettaTipo}</span>
+        <Link to="/" className="account-topbar-logo" aria-label="Torna al sito"><LogoOnWay come="testo" /></Link>
+      </div>
 
-        <nav className={`account-nav${menuMobileAperto ? ' aperto' : ''}`}>
-          <div className="account-nav-intestazione-mobile">
-            <span>Menu</span>
-            <button type="button" aria-label="Chiudi il menu" onClick={() => setMenuMobileAperto(false)}>✕</button>
+      <div className="account-corpo">
+        <aside className="account-sidebar">
+          <button type="button" className="account-hamburger" aria-label="Apri il menu" onClick={() => setMenuMobileAperto(true)}>☰ Menu</button>
+
+          <nav className={`account-nav${menuMobileAperto ? ' aperto' : ''}`}>
+            <div className="account-nav-intestazione-mobile">
+              <span>Menu</span>
+              <button type="button" aria-label="Chiudi il menu" onClick={() => setMenuMobileAperto(false)}>✕</button>
+            </div>
+            {voci.map((v) => (
+              <button
+                key={v.id} type="button"
+                className={`account-nav-voce${voceAttiva === v.id ? ' active' : ''}`}
+                onClick={() => scegli(v.id)}
+              >
+                {v.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="account-piede">
+            <button type="button" className="btn btn-ghost" onClick={onLogout}>Esci</button>
           </div>
-          {voci.map((v) => (
-            <button
-              key={v.id} type="button"
-              className={`account-nav-voce${voceAttiva === v.id ? ' active' : ''}`}
-              onClick={() => scegli(v.id)}
-            >
-              {v.label}
-            </button>
-          ))}
-        </nav>
+        </aside>
 
-        <div className="account-piede">
-          {nomeUtente && <p className="nome" title={nomeUtente}>{nomeUtente}</p>}
-          <Link to="/" className="btn btn-ghost">← Torna al sito</Link>
-          <button type="button" className="btn btn-ghost" onClick={onLogout}>Esci</button>
-        </div>
-      </aside>
-
-      <main className="account-main" style={contenutoLarghezzaPiena ? { padding: 0, maxWidth: 'none' } : undefined}>{children}</main>
+        <main className="account-main" style={contenutoLarghezzaPiena ? { padding: 0, maxWidth: 'none' } : undefined}>{children}</main>
+      </div>
     </div>
   );
 }

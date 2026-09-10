@@ -830,24 +830,35 @@
 .mini-tab.active{background:var(--pink); border-color:var(--pink); color:#fff; opacity:1; font-weight:600;}
 
 /* ---------------------------------------------------------------
-   MENU LATERALE ACCOUNT CLIENTE — stesse classi (e stesso
-   componente React, AccountShell) già usate per promoter/
-   organizzatore/tour leader, ma quei fogli di stile hanno un tema
-   CHIARO incompatibile con quello scuro del sito: stesse regole,
-   riscritte qui con le variabili di questo file, invece di
-   importare promoter.css (avrebbe scontrato .btn/header/ecc, che
-   lì sono definiti diversi).
+   MENU ACCOUNT CLIENTE — stesse classi (e stesso componente React,
+   AccountShell) già usate per promoter/organizzatore/tour leader, ma
+   quei fogli di stile hanno un tema CHIARO incompatibile con quello
+   scuro del sito: stesse regole, riscritte qui con le variabili di
+   questo file, invece di importare promoter.css (avrebbe scontrato
+   .btn/header/ecc, che lì sono definiti diversi).
+
+   Struttura in due righe: una barra in alto a tutta larghezza (nome
+   sempre a sinistra, logo del sito sempre a destra — cliccandolo si
+   torna a navigare), sotto il corpo vero con la sidebar del menu e il
+   contenuto della sezione scelta.
    ------------------------------------------------------------- */
-.account-shell{display:flex; min-height:100vh; background:var(--night);}
-.account-sidebar{
-  width:220px; flex-shrink:0; background:var(--dusk);
-  display:flex; flex-direction:column; padding:20px 14px;
-  position:sticky; top:0; height:100vh;
+.account-shell{display:flex; flex-direction:column; min-height:100vh; background:var(--night);}
+.account-topbar{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:14px clamp(16px,4vw,28px); border-bottom:1px solid var(--line);
+  position:sticky; top:0; z-index:10; background:rgba(16,14,28,.92); backdrop-filter:blur(10px);
 }
-.account-sidebar-riga-alto{display:contents;}
-.account-sidebar .logo{margin-bottom:22px; padding-left:6px; order:1;}
+.account-topbar-nome{font-family:'Poppins',sans-serif; font-weight:600; font-size:14px; color:var(--paper);}
+.account-topbar-logo{display:flex; align-items:center; flex-shrink:0;}
+
+.account-corpo{display:flex; flex:1; min-height:0;}
+.account-sidebar{
+  width:220px; flex-shrink:0; background:var(--night);
+  display:flex; flex-direction:column; padding:20px 14px;
+  position:sticky; top:57px; height:calc(100vh - 57px);
+}
 .account-hamburger{display:none;}
-.account-nav{display:flex; flex-direction:column; gap:3px; flex:1; order:2;}
+.account-nav{display:flex; flex-direction:column; gap:3px; flex:1;}
 .account-nav-voce{
   padding:11px 14px; border-radius:8px; font-size:13.5px; font-weight:600;
   color:var(--mist); text-decoration:none; cursor:pointer; border:none;
@@ -856,25 +867,23 @@
 .account-nav-voce:hover{background:rgba(255,212,0,.1); color:var(--paper);}
 .account-nav-voce.active{background:rgba(255,212,0,.1); color:var(--pink);}
 .account-nav-intestazione-mobile{display:none;}
-.account-piede{order:3; padding-top:14px; margin-top:10px; border-top:1px solid var(--line);}
-.account-piede .nome{font-size:12px; color:var(--mist); margin:0 0 10px; word-break:break-word;}
-.account-piede a, .account-piede button{display:block; width:100%; margin-bottom:6px; text-align:center;}
+.account-piede{padding-top:14px; margin-top:10px; border-top:1px solid var(--line);}
+.account-piede button{display:block; width:100%; text-align:center;}
 .account-main{flex:1; min-width:0; padding:clamp(20px,5vw,44px) clamp(18px,5vw,32px) 80px; color:var(--paper);}
 
 @media (max-width:860px){
-  .account-shell{flex-direction:column;}
-  .account-sidebar{width:100%; height:auto; position:relative; display:block; padding:14px 16px;}
-  .account-sidebar-riga-alto{display:flex; align-items:center; gap:10px;}
-  .account-sidebar .logo{margin:0; flex:1; min-width:0; order:0;}
+  .account-corpo{flex-direction:column;}
+  .account-sidebar{width:100%; height:auto; position:relative; padding:10px 16px;}
   .account-hamburger{
-    display:block; order:0; flex-shrink:0;
+    display:block; width:100%; text-align:left;
     background:none; border:1px solid var(--line); border-radius:8px;
-    color:var(--paper); font-size:18px; padding:6px 12px; cursor:pointer;
+    color:var(--paper); font-size:14px; font-weight:600; padding:10px 12px; cursor:pointer;
+    font-family:'Poppins',sans-serif;
   }
   .account-nav{display:none;}
   .account-nav.aperto{
     display:flex; flex-direction:column; gap:4px;
-    position:fixed; inset:0; z-index:30; background:var(--dusk);
+    position:fixed; inset:0; z-index:30; background:var(--night);
     padding:max(20px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
     overflow-y:auto;
   }
@@ -885,5 +894,6 @@
   }
   .account-nav-intestazione-mobile button{background:none; border:none; color:var(--paper); font-size:18px; cursor:pointer; padding:4px 8px;}
   .account-nav-voce{font-size:15px; padding:13px 14px;}
-  .account-piede{order:0; flex-shrink:0; margin:0; padding:0; border:none;}
+  .account-piede{margin-top:10px;}
+  .account-topbar-nome{font-size:13px;}
 }
