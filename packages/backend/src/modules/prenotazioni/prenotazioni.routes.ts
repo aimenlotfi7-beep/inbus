@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { prenotazioniService } from './prenotazioni.service.js';
-import { creaPrenotazioneSchema, creaOrdineSchema } from './prenotazioni.dto.js';
+import { creaPrenotazioneSchema, creaOrdineSchema, creaOrdineOspiteSchema } from './prenotazioni.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
@@ -31,6 +31,32 @@ export const prenotazioniController = {
   async creaOrdine(req: Request, res: Response) {
     if (!req.cliente) throw new NonAutorizzato();
     const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente.sub, req.body.bundleId, undefined, { ip: req.ip, userAgent: req.headers['user-agent'] });
+    res.status(201).json(risultato);
+  },
+  /** D1(b) — stesso ordine di creaOrdine sopra, ma per chi acquista
+   *  SENZA essere loggato: risolve/crea l'utente "implicito" da
+   *  email+dati forniti nel corpo, poi riusa esattamente la stessa
+   *  prenotazioniService.creaOrdine() di sopra (stessa validazione
+   *  prezzo/posti, stesso percorso — un solo posto dove quella logica
+   *  vive, non una copia parallela). Dopo il successo, se l'account
+   *  era nuovo (mai esistito prima), invita a impostare una password —
+   *  ma un fallimento lì non deve mai far sparire un ordine già andato
+   *  a buon fine, per questo è isolato nel proprio try/catch. */
+  async creaOrdineOspite(req: Request, res: Response) {
+    const { clienteAuthService } = await import('../cliente-auth/cliente-auth.service.js');
+    const { email, nome, cognome, telefono, citta, dataNascita, articoli, bundleId } = req.body;
+    const { utenteId, nuovo } = await clienteAuthService.trovaOCreaUtenteOspite({ email, nome, cognome, telefono, citta, dataNascita });
+
+    const risultato = await prenotazioniService.creaOrdine(articoli, utenteId, bundleId, undefined, { ip: req.ip, userAgent: req.headers['user-agent'] });
+
+    if (nuovo) {
+      try {
+        await clienteAuthService.invitaAImpostarePassword(utenteId);
+      } catch (err) {
+        console.error(`Invito a impostare password fallito per ${email} (ordine comunque creato):`, err);
+      }
+    }
+
     res.status(201).json(risultato);
   },
   async dettaglioPerCliente(req: Request, res: Response) {
@@ -76,6 +102,7 @@ prenotazioniRouter.get('/eventi', richiedeAuth, richiedePermesso('prenotazioni.v
 // Pubbliche: il checkout del sito e l'area cliente non richiedono login admin
 prenotazioniRouter.post('/', richiedeAuthCliente, valida(creaPrenotazioneSchema), asyncHandler(prenotazioniController.crea));
 prenotazioniRouter.post('/ordine', richiedeAuthCliente, valida(creaOrdineSchema), asyncHandler(prenotazioniController.creaOrdine));
+prenotazioniRouter.post('/ordine-ospite', limitePnr, valida(creaOrdineOspiteSchema), asyncHandler(prenotazioniController.creaOrdineOspite));
 prenotazioniRouter.get('/by-email', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.listByEmail));
 prenotazioniRouter.get('/:pnr/dettaglio-cliente', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.dettaglioPerCliente));
 prenotazioniRouter.get('/:pnr/saldo', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.differenzaSaldo));

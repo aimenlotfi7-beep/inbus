@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useCarrello } from '../features/carrello/CarrelloContext';
 import { tracciaAcquisto, leggiCookieMeta } from '../features/metaPixel';
 import { tracciaAcquistoGA4, tracciaAcquistoGoogleAds } from '../features/googleAnalytics';
 import { clienteAuthApi, type DatiCliente } from '../api/clienteAuth';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { clienteLoggato } from '../features/clienteSessione';
+import { ErroreApi } from '../api/client';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -26,7 +27,6 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
  *  specifici (carta, o la conferma per Apple/Google Pay). */
 export function CarrelloPage() {
   const { articoli, rimuovi, svuota, totaleStimato, bundle, scontoBundleStimato } = useCarrello();
-  const navigate = useNavigate();
   const [cliente, setCliente] = useState<DatiCliente | null>(null);
   const [inviando, setInviando] = useState(false);
   const [errore, setErrore] = useState('');
@@ -83,11 +83,12 @@ export function CarrelloPage() {
   }
 
   async function completaAcquisto() {
-    if (!clienteLoggato()) {
-      navigate('/accedi?dopo=/carrello');
+    // Da ospite l'identità viene dal primo articolo (raccolta già nel
+    // checkout, step "I tuoi dati") — non dall'account, che non c'è.
+    if (!clienteLoggato() && (!articoli[0]?.cliente.dataNascita)) {
+      setErrore('Mancano dei dati per completare l\'ordine — torna indietro e ricontrolla il passo "I tuoi dati".');
       return;
     }
-    if (!cliente) return;
     setInviando(true);
     setErrore('');
     // Un solo eventId per l'intero ordine (non uno per articolo) — la
@@ -95,38 +96,55 @@ export function CarrelloPage() {
     // porta e manda UN evento Purchase con il totale, non uno per riga.
     const metaEventId = crypto.randomUUID();
     const { fbp, fbc } = leggiCookieMeta();
+    const righe = articoli.map((a) => ({
+      eventoId: a.eventoId,
+      tragittoId: a.tragittoId,
+      fermataId: a.fermataId,
+      passeggeri: a.passeggeri,
+      tipoPagamento,
+      metodoPagamento: 'CARTA' as const,
+      cliente: a.cliente,
+      partecipanti: a.partecipanti,
+      offertaId: a.offertaId,
+      ...(usaCredito && tipoPagamento === 'COMPLETO' && { usaCredito: true }),
+      ...(couponCodice.trim() && tipoPagamento === 'COMPLETO' && { couponCodice: couponCodice.trim() }),
+      ...(bundle?.promoterCodice && { promoterCodice: bundle.promoterCodice }),
+      ...(bundle?.utmSource && { utmSource: bundle.utmSource }),
+      ...(bundle?.utmMedium && { utmMedium: bundle.utmMedium }),
+      ...(bundle?.utmCampaign && { utmCampaign: bundle.utmCampaign }),
+      ...(bundle?.utmContent && { utmContent: bundle.utmContent }),
+      metaEventId,
+      ...(fbp && { metaFbp: fbp }),
+      ...(fbc && { metaFbc: fbc }),
+    }));
     try {
-      const risultato = await prenotazioniApi.creaOrdine(
-        articoli.map((a) => ({
-          eventoId: a.eventoId,
-          tragittoId: a.tragittoId,
-          fermataId: a.fermataId,
-          passeggeri: a.passeggeri,
-          tipoPagamento,
-          metodoPagamento: 'CARTA' as const,
-          cliente: a.cliente,
-          partecipanti: a.partecipanti,
-          offertaId: a.offertaId,
-          ...(usaCredito && tipoPagamento === 'COMPLETO' && { usaCredito: true }),
-          ...(couponCodice.trim() && tipoPagamento === 'COMPLETO' && { couponCodice: couponCodice.trim() }),
-          ...(bundle?.promoterCodice && { promoterCodice: bundle.promoterCodice }),
-          ...(bundle?.utmSource && { utmSource: bundle.utmSource }),
-          ...(bundle?.utmMedium && { utmMedium: bundle.utmMedium }),
-          ...(bundle?.utmCampaign && { utmCampaign: bundle.utmCampaign }),
-          ...(bundle?.utmContent && { utmContent: bundle.utmContent }),
-          metaEventId,
-          ...(fbp && { metaFbp: fbp }),
-          ...(fbc && { metaFbc: fbc }),
-        })),
-        bundle?.id,
-      );
+      const risultato = clienteLoggato()
+        ? await prenotazioniApi.creaOrdine(righe, bundle?.id)
+        : await prenotazioniApi.creaOrdineOspite({
+            email: articoli[0].cliente.email,
+            nome: articoli[0].cliente.nome,
+            cognome: articoli[0].cliente.cognome,
+            telefono: articoli[0].cliente.telefono || undefined,
+            citta: articoli[0].cliente.citta,
+            dataNascita: articoli[0].cliente.dataNascita!,
+            articoli: righe,
+            bundleId: bundle?.id,
+          });
       setFatto(risultato.prenotazioni.map((p) => ({ pnr: p.pnr })));
       tracciaAcquisto(totaleStimato - scontoBundleStimato, metaEventId);
       tracciaAcquistoGA4(totaleStimato - scontoBundleStimato, metaEventId, bundle?.nome);
       tracciaAcquistoGoogleAds(totaleStimato - scontoBundleStimato, metaEventId);
       svuota();
     } catch (e) {
-      setErrore(e instanceof Error ? e.message : 'Acquisto non riuscito. Riprova.');
+      // Caso specifico: l'email inserita da ospite appartiene già a un
+      // account vero — non si può procedere "a nome" di qualcun altro
+      // solo conoscendone l'email. Messaggio chiaro invece del generico,
+      // con la strada giusta da seguire (accedere, non riprovare).
+      if (e instanceof ErroreApi && e.status === 409) {
+        setErrore(e.message + ' Torna al passo precedente per modificare l\'email, oppure accedi con quella email.');
+      } else {
+        setErrore(e instanceof Error ? e.message : 'Acquisto non riuscito. Riprova.');
+      }
     } finally {
       setInviando(false);
     }
@@ -217,11 +235,7 @@ export function CarrelloPage() {
               </p>
             </div>
 
-            {!clienteLoggato() ? (
-              <div className="checkout-summary">
-                <Link to="/accedi?dopo=/carrello" style={{ textDecoration: 'underline', color: 'var(--ink)' }}>Accedi o registrati</Link> per completare l'acquisto.
-              </div>
-            ) : step === 'riepilogo' ? (
+            {step === 'riepilogo' ? (
               <>
                 {creditoDisponibile > 0 && (!bundle || bundle.ammetteCredito) && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '14px 0 10px', cursor: tipoPagamento === 'COMPLETO' ? 'pointer' : 'default', opacity: tipoPagamento === 'COMPLETO' ? 1 : .5 }}>

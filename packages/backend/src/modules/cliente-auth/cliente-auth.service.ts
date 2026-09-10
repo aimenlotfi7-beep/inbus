@@ -146,6 +146,69 @@ export const clienteAuthService = {
     }).where(eq(utenti.id, utenteId));
   },
 
+  /** D1(b) — checkout ospite con "account implicito". Risolve o crea
+   *  l'utente per un acquisto senza login: se l'email non esiste
+   *  ancora, ne crea uno nuovo SENZA password (un "fantasma" — può
+   *  navigare/comprare, non può ancora accedere). Se esiste già ma
+   *  senza password (un fantasma di un acquisto precedente), lo
+   *  aggiorna con i dati freschi appena forniti e lo riusa. Se invece
+   *  l'email appartiene GIÀ a un account con password, NON prosegue in
+   *  silenzio (sarebbe comprare "a nome" di qualcun altro solo
+   *  conoscendone l'email) — lancia un errore dedicato che il
+   *  frontend intercetta per proporre l'accesso invece di procedere. */
+  async trovaOCreaUtenteOspite(input: { email: string; nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: Date }): Promise<{ utenteId: string; nuovo: boolean }> {
+    const email = input.email.toLowerCase();
+    const [esistente] = await db.select().from(utenti).where(eq(utenti.email, email)).limit(1);
+
+    if (esistente?.passwordHash) {
+      throw new ConflittoDati('Questa email ha già un account — accedi per continuare con questo acquisto.');
+    }
+    if (esistente) {
+      await db.update(utenti).set({
+        nome: input.nome, cognome: input.cognome,
+        telefono: input.telefono || esistente.telefono, citta: input.citta || esistente.citta,
+        dataNascita: input.dataNascita,
+      }).where(eq(utenti.id, esistente.id));
+      return { utenteId: esistente.id, nuovo: false };
+    }
+
+    const [nuovo] = await db.insert(utenti).values({
+      email, nome: input.nome, cognome: input.cognome, telefono: input.telefono, citta: input.citta,
+      dataNascita: input.dataNascita,
+      // Niente password, niente emailVerificata — un fantasma non ha
+      // ancora un vero account. emailVerificata resta false di
+      // default (colonna già così), corretto: non ha ancora
+      // dimostrato di controllare quella casella.
+    }).returning({ id: utenti.id });
+    return { utenteId: nuovo.id, nuovo: true };
+  },
+
+  /** Dopo un acquisto da ospite andato a buon fine, invita a
+   *  impostare una password — così l'account "implicito" appena creato
+   *  diventa un account vero, con accesso al credito fedeltà, alla
+   *  lista d'attesa, allo storico viaggi. Riusa lo STESSO meccanismo a
+   *  token del reset password (stesso campo, stessa pagina di
+   *  conferma) — a differenza di richiediResetPassword() qui NON si
+   *  richiede che una password esistesse già (è proprio il contrario:
+   *  serve solo quando ancora non c'è). Se il cliente non imposta mai
+   *  la password, i suoi ordini restano comunque intatti e raggiungibili
+   *  con "traccia la tua prenotazione" — non è un passaggio bloccante. */
+  async invitaAImpostarePassword(utenteId: string) {
+    const [u] = await db.select().from(utenti).where(eq(utenti.id, utenteId)).limit(1);
+    if (!u) return;
+
+    const token = generaToken();
+    const scadenza = new Date(Date.now() + ORE_VALIDITA_TOKEN_VERIFICA * 60 * 60 * 1000);
+    await db.update(utenti).set({ tokenResetPassword: token, tokenResetPasswordScadenza: scadenza }).where(eq(utenti.id, u.id));
+
+    const link = urlSito(`/reimposta-password/${token}`);
+    const { templateEmailService } = await import('../template-email/template-email.service.js');
+    const { oggetto, html } = await templateEmailService.renderizza('benvenuto_ospite', {
+      nome: u.nome ?? '', link, ore_validita: String(ORE_VALIDITA_TOKEN_VERIFICA),
+    });
+    await inviaEmail({ a: u.email, oggetto, html });
+  },
+
   /** Rimanda l'email di verifica — utile se il cliente non la trova più
    *  o il link è scaduto. Non conferma né smentisce se l'email esiste
    *  già in modo diverso da questo (stesso messaggio sempre), per non

@@ -61,6 +61,23 @@ export const creaOrdineSchema = z.object({
   bundleId: z.string().optional(),
 });
 
+/** D1(b) — stesso ordine di sopra, più l'identità di chi acquista SENZA
+ *  essere loggato (altrimenti presa dalla sessione). Stessi vincoli
+ *  della registrazione normale (vedi cliente-auth.routes.ts) — la data
+ *  di nascita resta obbligatoria anche qui: serve al riordino
+ *  automatico per fasce d'età nei bus, non è un dettaglio rimandabile
+ *  solo perché si compra da ospiti. */
+export const creaOrdineOspiteSchema = z.object({
+  articoli: z.array(creaPrenotazioneSchema).min(1, 'Il carrello è vuoto.').max(20, 'Troppi articoli in un unico ordine.'),
+  bundleId: z.string().optional(),
+  email: z.string().email(),
+  nome: z.string().min(1),
+  cognome: z.string().min(1),
+  telefono: z.string().optional(),
+  citta: z.string().optional(),
+  dataNascita: z.coerce.date().refine((d) => d < new Date(), 'La data di nascita non può essere nel futuro.'),
+});
+
 export const richiediRimborsoSchema = z.object({
   motivo: z.string().optional(),
 });

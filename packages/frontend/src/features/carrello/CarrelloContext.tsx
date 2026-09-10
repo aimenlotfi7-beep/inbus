@@ -13,8 +13,10 @@ export interface ArticoloCarrello {
   passeggeri: number;
   offertaId?: string;
   // Raccolti nella tab di prenotazione (step "I tuoi dati") — arrivano
-  // già completi al carrello, non si richiedono di nuovo lì.
-  cliente: { email: string; nome: string; cognome: string; telefono: string };
+  // già completi al carrello, non si richiedono di nuovo lì. Città e
+  // data di nascita servono solo per chi acquista da ospite (D1b) — chi
+  // è già loggato le ha già sul proprio account, non le ripete qui.
+  cliente: { email: string; nome: string; cognome: string; telefono: string; citta?: string; dataNascita?: string };
   partecipanti: { nome: string; cognome: string }[];
 }
 

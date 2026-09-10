@@ -36,6 +36,20 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
     segnaposto: ['nome', 'link', 'ore_validita'],
   },
   {
+    chiave: 'benvenuto_ospite',
+    nome: 'Benvenuto (acquisto da ospite, senza account)',
+    oggetto: 'Il tuo ordine è confermato — imposta una password per gestirlo',
+    corpo: `
+      <p>Ciao {{nome}},</p>
+      <p>Il tuo ordine su OnWay è confermato! Hai acquistato senza creare un account — se vuoi, puoi impostare
+      una password per accedere quando vuoi ai tuoi biglietti, al credito fedeltà e alla lista d'attesa.</p>
+      <p><a href="{{link}}">Imposta la tua password</a></p>
+      <p>Il link resta valido per {{ore_validita}} ore. Nessun obbligo: i tuoi biglietti restano comunque
+      raggiungibili in qualsiasi momento con "Traccia la tua prenotazione", usando questa email.</p>
+    `,
+    segnaposto: ['nome', 'link', 'ore_validita'],
+  },
+  {
     chiave: 'conferma_acconto',
     nome: 'Conferma prenotazione (solo acconto pagato)',
     oggetto: 'Prenotazione confermata — {{evento}}',

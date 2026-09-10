@@ -47,6 +47,12 @@ export const prenotazioniApi = {
    *  server la ricalcola e la valida esattamente allo stesso modo). */
   creaOrdine: (articoli: CreaPrenotazionePayload[], bundleId?: string) =>
     apiConToken('inbus_cliente_token').post<{ ordine: { id: string; totale: string }; prenotazioni: Prenotazione[] }>('/api/prenotazioni/ordine', { articoli, ...(bundleId && { bundleId }) }),
+  /** D1(b) — stesso ordine di creaOrdine sopra, ma senza sessione: chi
+   *  acquista fornisce la propria identità nel corpo della richiesta
+   *  invece che nel token. Il server crea/riusa l'account "implicito"
+   *  da solo. */
+  creaOrdineOspite: (input: { email: string; nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: string; articoli: CreaPrenotazionePayload[]; bundleId?: string }) =>
+    api.post<{ ordine: { id: string; totale: string }; prenotazioni: Prenotazione[] }>('/api/prenotazioni/ordine-ospite', input),
   getSaldo: (pnr: string, email: string) => api.get<DifferenzaSaldo>(`/api/prenotazioni/${pnr}/saldo?email=${encodeURIComponent(email)}`),
   saldaResto: (pnr: string, email: string, couponCodice?: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`, { email, ...(couponCodice && { couponCodice }) }),
   listByEmail: (email: string) => api.get<Prenotazione[]>(`/api/prenotazioni/by-email?email=${encodeURIComponent(email)}`),

@@ -80,6 +80,11 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   const [nome, setNome] = useState('');
   const [cognome, setCognome] = useState('');
   const [telefono, setTelefono] = useState('');
+  // Solo per chi acquista senza account (D1b) — chi è già loggato le
+  // ha già sul proprio profilo, non le ripete qui (vedi useEffect
+  // sotto: restano vuote finché non servono davvero).
+  const [citta, setCitta] = useState('');
+  const [dataNascita, setDataNascita] = useState('');
   const [creditoDisponibile, setCreditoDisponibile] = useState(0);
   const [usaCredito, setUsaCredito] = useState(false);
   const [couponCodice, setCouponCodice] = useState('');
@@ -167,7 +172,12 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   // di questo calcolo lato cliente per l'importo vero addebitato).
   const creditoApplicato = usaCredito ? Math.min(creditoDisponibile, totale) : 0;
   const totaleConCredito = totale - creditoApplicato;
-  const moduloRichiedenteCompleto = Boolean(email && nome && cognome && telefono);
+  // Da ospite serve anche città e data di nascita (mai richieste finora
+  // qui: chi era loggato le aveva già sull'account) — chi è loggato non
+  // deve ripeterle, città è comunque facoltativa anche da ospite.
+  const moduloRichiedenteCompleto = Boolean(
+    email && nome && cognome && telefono && (clienteLoggato() || dataNascita)
+  );
   const partecipantiCompleti = partecipanti.every((p) => p.nome.trim() && p.cognome.trim());
 
   async function verificaCoupon() {
@@ -466,7 +476,13 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
 
           {step === 2 && (
             <>
-              {!clienteLoggato() ? (
+              {publicWidgetId && !clienteLoggato() ? (
+                // Il widget White Label paga qui dentro, allo step 3,
+                // con l'endpoint autenticato di sempre — per quello
+                // resta necessario un account vero, il modulo ospite
+                // (sotto) è pensato solo per il sito principale, dove
+                // il pagamento avviene invece nel carrello con il
+                // nuovo endpoint ospite.
                 <div style={{ textAlign: 'center', padding: '20px 10px' }}>
                   <p className="field-label" style={{ marginBottom: 10 }}>Serve un account per prenotare</p>
                   <p style={{ fontSize: 13, opacity: .75, marginBottom: 18 }}>
@@ -482,12 +498,43 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 </div>
               ) : (
                 <>
+                  {!clienteLoggato() && (
+                    <p style={{ fontSize: 12.5, textAlign: 'right', marginTop: -4, marginBottom: 10 }}>
+                      Hai già un account? <a href={`/accedi?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`}>Accedi</a>
+                    </p>
+                  )}
+
                   <label className="field-label" htmlFor="checkout-email">Email</label>
-                  <input id="checkout-email" type="email" value={email} disabled style={{ opacity: .6 }} />
+                  <input
+                    id="checkout-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                    disabled={clienteLoggato()} style={clienteLoggato() ? { opacity: .6 } : undefined}
+                  />
                   <p className="hint">I biglietti verranno inviati a questa email.</p>
 
                   <label className="field-label" htmlFor="checkout-telefono">Telefono</label>
-                  <input id="checkout-telefono" type="tel" value={telefono} disabled style={{ opacity: .6 }} />
+                  <input
+                    id="checkout-telefono" type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)}
+                    disabled={clienteLoggato()} style={clienteLoggato() ? { opacity: .6 } : undefined}
+                  />
+
+                  {/* Città e data di nascita — solo da ospite: chi è già
+                      loggato le ha già sul proprio account, non ha senso
+                      ripeterle qui. La data di nascita resta obbligatoria
+                      anche da ospite: serve al riordino per fasce d'età
+                      nei bus, non è rimandabile solo perché non si è fatto
+                      un account vero. */}
+                  {!clienteLoggato() && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <div>
+                        <label className="field-label" htmlFor="checkout-citta">Città (facoltativa)</label>
+                        <input id="checkout-citta" type="text" autoComplete="address-level2" value={citta} onChange={(e) => setCitta(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="field-label" htmlFor="checkout-data-nascita">Data di nascita</label>
+                        <input id="checkout-data-nascita" type="date" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} required />
+                      </div>
+                    </div>
+                  )}
 
                   <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>Lista passeggeri</p>
                   <div className="checkout-passeggeri-scorrevole">
@@ -534,7 +581,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                             prezzoStimato: opzioneScelta.prezzoEffettivo,
                             passeggeri,
                             offertaId: offerta?.id,
-                            cliente: { email, nome, cognome, telefono },
+                            cliente: { email, nome, cognome, telefono, citta: citta || undefined, dataNascita: dataNascita || undefined },
                             partecipanti,
                           });
                           navigate('/carrello');
