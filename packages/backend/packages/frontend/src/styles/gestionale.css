@@ -1,0 +1,683 @@
+:root{
+  /* Palette del gestionale: sfondo pagina grigio chiarissimo, carte
+     bianche, testo grigio scuro — solo la sidebar resta scura, con la
+     sua palette dedicata qui sotto (non condivide queste variabili,
+     altrimenti sfondo pagina e sidebar diventerebbero uguali). Pochi
+     colori d'accento, ognuno con UN solo significato:
+     blu = azione principale, verde = confermato/positivo,
+     arancione = attenzione, rosso = errore/azione distruttiva. */
+  --night:#f3f4f6;      /* sfondo pagina (nome storico, ora chiaro) */
+  --dusk:#ffffff;        /* sfondo carte (nome storico, ora bianco) */
+  --dusk-2:#eef0f3;      /* superficie secondaria/hover, leggermente più scura del bianco */
+  --paper:#1f2430;       /* testo principale (nome storico, ora scuro) */
+  --ink:#ffffff;         /* testo su sfondi colorati (bottoni, badge pieni) */
+  --mist:#6b7280;        /* testo secondario/etichette */
+  --line: #e3e5ea;       /* bordi, ora grigio chiaro invece che bianco trasparente */
+  --pink:#dc2626;        /* ora ROSSO: errori, eliminazioni, stati critici */
+  --pink-dim:#dc262633;
+  --amber:#f59e0b;       /* ARANCIONE: avvisi/attenzione */
+  --blue:#2563eb;        /* BLU: azione principale, stati attivi/informativi */
+  --blue-dim:#2563eb33;
+  --green:#16a34a;       /* VERDE: confermato/positivo/completato */
+  --green-dim:#16a34a26;
+  /* Sidebar: unica zona scura del gestionale, palette a sé */
+  --sidebar-bg:#14121f;
+  --sidebar-text:#e7e5f0;
+  --sidebar-mist:#a99fc2;
+  --sidebar-line: rgba(255,255,255,0.1);
+  --sidebar-hover: rgba(37,99,235,0.18);
+  --sidebar-accent:#5b8dff;
+  --radius:12px;
+  /* Forma condivisa di TUTTI gli input/select del gestionale — un
+     solo valore, cambiarlo qui li aggiorna ovunque insieme, invece di
+     inseguire lo stesso numero sparso in una decina di regole diverse. */
+  --input-radius:14px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--night); color:var(--paper);
+  font-family:'Poppins',sans-serif;
+}
+.hidden{display:none !important;}
+a{color:inherit;}
+
+/* Base minima per ogni input/select del gestionale: senza questa, gli
+   input in una griglia stretta (es. riga fermata) possono imporre una
+   larghezza minima maggiore delle colonne e far sbordare il contenitore. */
+/* Stile visivo di base per QUALUNQUE input/textarea del gestionale,
+   anche quelli senza contenitore .campo/.form-grid intorno (es. i
+   campi orario/prezzo/posti dentro la riga di una fermata) — prima
+   quei campi restavano bianchi, col bordo di default del browser,
+   perché non ricadevano in nessuna delle regole più specifiche.
+   .campo/.form-grid restano comunque liberi di override per la loro
+   densità (padding/font-size), qui c'è solo la base condivisa. */
+input, textarea{
+  min-width:0; box-sizing:border-box;
+  font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 14px;
+}
+/* Tipi che renderebbero male con lo stile sopra (color/range hanno un
+   proprio aspetto nativo, checkbox/radio pure) — specificità di
+   [type="…"] (0,1,1) più alta della bare "input" (0,0,1) qui sopra,
+   vince sempre lei senza bisogno di accumulare tanti :not() nella
+   regola base (quell'accumulo aveva reso la base PIÙ specifica di
+   classi come .home-search-box, rompendo per errore le sezioni cerca
+   "vere" — corretto qui). */
+input[type="checkbox"], input[type="radio"], input[type="color"], input[type="range"]{ min-width:0; box-sizing:border-box; }
+/* Due campi "Cerca" (SelettoreEventi, ListaAttesaTab) restavano senza
+   nessuno stile dedicato anche prima di oggi — presi per errore dalla
+   nuova regola universale qui sopra. Ripristinati esattamente com'erano:
+   nessun bordo/sfondo/raggio impostato da qui, solo il minimo indispensabile. */
+.campo-cerca-originale{
+  background:initial; border:initial; border-radius:0; padding:initial;
+}
+/* Rete di sicurezza: qualunque select nel gestionale che non rientri
+   in una classe più specifica (.campo, .form-grid, ecc) prende almeno
+   questo aspetto di base — mai il menu a tendina bianco nativo del
+   browser, stonato col resto scuro dell'interfaccia. */
+select{
+  min-width:0; box-sizing:border-box;
+  font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
+  background:var(--dusk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+  border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 36px 11px 14px; cursor:pointer;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
+}
+
+.logo{font-family:'Poppins',sans-serif; font-weight:800; font-size:22px; display:flex; align-items:baseline; gap:6px;}
+.logo small{font-family:'Space Mono',monospace; font-size:11px; color:var(--mist); letter-spacing:1px; text-transform:uppercase;}
+/* Dimensionamento della W disegnata (SVG) del logo OnWay — regole
+   minime copiate da onway-theme.css, SOLO quelle di misura, non i
+   colori: qui nel gestionale quel foglio non si importa apposta (le
+   sue variabili --pink/--blue hanno significati diversi, es. "errore"
+   invece di "brand"). Senza queste due righe l'SVG non ha altezza
+   impostata da nessuna parte e il browser gli assegna una dimensione
+   predefinita enorme (spesso 300x150px). */
+.logo-svg{ display:block; height:1.05em; width:auto; }
+/* Solo la sidebar ha sfondo scuro (--sidebar-bg) — lì il logo va
+   bianco per essere visibile (eredita currentColor). Login/dashboard/
+   home hanno sfondo chiaro: .logo senza questa regola eredita già il
+   testo scuro di base (body{color:var(--paper)}), corretto lì. */
+/* La sidebar ha già una sua regola più specifica per il colore del
+   logo (.sidebar .logo{color:var(--sidebar-text)} più sotto, quasi
+   bianco) — vince lei per specificità CSS, non serve impostarlo qui
+   di nuovo (un tentativo precedente in tal senso non aveva alcun
+   effetto reale, solo per coincidenza sembrava funzionare visto che
+   --sidebar-text è già chiarissimo). */
+
+/* ---------- LOGIN ---------- */
+.login-screen{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse 70% 55% at 18% -10%, #3a2160 0%, transparent 60%), var(--sidebar-bg);
+}
+.login-box{
+  background:var(--dusk); border:1px solid var(--line); border-radius:16px;
+  padding:36px; width:320px; text-align:center;
+}
+.login-box p{color:var(--mist); font-size:14px; margin:14px 0 18px;}
+.login-box input{
+  width:100%; padding:13px 16px; border-radius:var(--input-radius); border:1px solid var(--line);
+  background:var(--dusk-2); color:var(--paper); font-size:14px; margin-bottom:14px;
+}
+.error-msg{color:var(--pink); font-size:13px; min-height:16px;}
+
+/* ---------- LAYOUT A SIDEBAR ---------- */
+.app-shell{display:flex; min-height:100vh;}
+.sidebar{
+  width:230px; flex-shrink:0; background:var(--sidebar-bg); border-right:1px solid var(--sidebar-line);
+  display:flex; flex-direction:column; padding:22px 16px; position:sticky; top:0; height:100vh;
+}
+/* .sidebar-riga-alto raggruppa logo + hamburger (solo mobile) + Esci
+   nello stesso contenitore, per poterli disporre in riga su mobile —
+   ma su desktop deve comportarsi come se non esistesse (i tre elementi
+   dentro devono restare esattamente dove stavano prima: logo in alto,
+   poi lo spazio del menu, "Esci" in fondo). display:contents fa
+   sparire il contenitore dal layout senza toccare i figli, poi order
+   rimette ciascun figlio al suo posto originale, come diretti figli
+   della sidebar (che è già flex-direction:column). */
+.sidebar-riga-alto{display:contents;}
+.sidebar .logo{margin-bottom:22px; padding-left:6px; color:var(--sidebar-text); order:1;}
+/* Era per il vecchio markup IN<span>BUS</span> ("BUS" in accento) —
+   stesso problema già corretto sul .logo span generale: "span" come
+   selettore intercetta anche gli span interni del nuovo logo
+   (.logo-on/.logo-ay), dipingendoli di blu (--sidebar-accent) invece
+   di lasciarli bianchi come il resto. Rimossa, nessun markup vecchio
+   rimasto che ne avesse bisogno (verificato). */
+.sidebar-logo{cursor:pointer;}
+.side-hamburger{display:none;} /* visibile solo su mobile — vedi dentro la media query più sotto */
+.side-utente-riga{order:3;}
+.side-nav{
+  display:flex; flex-direction:column; gap:14px; flex:1; overflow-y:auto; order:2;
+  scrollbar-width:thin; scrollbar-color:var(--sidebar-line) transparent;
+}
+.side-nav::-webkit-scrollbar{width:6px;}
+.side-nav::-webkit-scrollbar-track{background:transparent;}
+.side-nav::-webkit-scrollbar-thumb{background-color:var(--sidebar-line); border-radius:999px;}
+.side-nav::-webkit-scrollbar-thumb:hover{background-color:var(--sidebar-accent);}
+.side-nav-intestazione-mobile{display:none;} /* solo mobile, dentro il pannello a schermo intero */
+
+.side-group + .side-group{
+  border-top:1px solid var(--sidebar-line); margin-top:6px; padding-top:14px;
+}
+
+.side-group-header{
+  width:100%; display:flex; align-items:center; justify-content:space-between;
+  background:transparent; border:none; color:var(--sidebar-text); cursor:pointer;
+  font-family:'Poppins',sans-serif; font-size:13px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.8px;
+  padding:4px 12px 8px;
+}
+.side-group-header:hover{color:var(--sidebar-accent);}
+.side-group-header .group-caret{font-size:9px; transition:transform .15s ease;}
+.side-group.collassato .group-caret{transform:rotate(-90deg);}
+.side-group-items{display:flex; flex-direction:column; gap:4px; overflow:hidden;}
+.side-group.collassato .side-group-items{display:none;}
+
+.side-btn{
+  display:flex; align-items:center; gap:10px; text-align:left;
+  font-family:'Poppins',sans-serif; font-size:14px; font-weight:400;
+  padding:9px 12px; border-radius:10px; border:none; background:transparent; color:var(--sidebar-mist); cursor:pointer;
+}
+.side-btn .ico{font-size:15px; width:18px; text-align:center;}
+.side-btn.active, .side-btn:hover{background:var(--sidebar-hover); color:var(--sidebar-text);}
+.side-btn.active{color:var(--sidebar-accent);}
+.side-badge{
+  margin-left:auto; background:var(--pink); color:#fff; font-size:10px; font-weight:700;
+  border-radius:999px; padding:1px 7px;
+}
+.side-badge-gruppo{margin-left:0;} /* già dentro un contenitore dedicato insieme al caret, non serve spingerlo con auto */
+.side-utente-riga{
+  margin-top:12px; padding-top:12px; border-top:1px solid var(--line);
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.side-utente-nome{font-size:13px; color:var(--mist); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.btn-ghost.side-logout{background:var(--pink); border-color:var(--pink); color:#fff; flex-shrink:0; font-size:11px; padding:5px 11px;}
+.btn-ghost.side-logout:hover{background:#e0295f; border-color:#e0295f;}
+.main-wrap{flex:1; min-width:0;}
+main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
+.tab-panel{width:100%;}
+.panel-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:12px;}
+.panel-head h2{font-family:'Poppins',sans-serif; font-weight:800; text-transform:uppercase; margin:0;}
+
+/* ---------- HOME (ricerca centrale, schermata di ingresso) ---------- */
+#tab-home{min-height:calc(100vh - 56px); display:flex; align-items:flex-start; justify-content:center; padding-top:12vh;}
+.home-search-center{width:100%; max-width:640px; text-align:center; margin:0 auto;}
+.home-logo{font-size:34px; justify-content:center; margin-bottom:10px;}
+.home-search-sub{color:var(--mist); font-size:14px; margin:0 0 26px;}
+.home-search-box{position:relative;}
+.home-search-box input{
+  width:100%; background:transparent; border:none; border-bottom:1px solid var(--line);
+  padding:14px 8px; color:var(--paper); font-family:'Poppins',sans-serif; font-size:20px; text-align:center;
+  border-radius:0;
+}
+.home-search-box input:focus{outline:none; border-bottom-color:var(--blue);}
+.home-search-box input::placeholder{color:var(--mist);}
+.home-search-box .global-search-results{
+  left:0; right:0; width:100%; max-width:none; text-align:left;
+  background:var(--dusk); margin-top:4px;
+}
+.home-search-hint{color:var(--mist); font-size:11px; margin-top:10px;}
+
+/* ---------- RISULTATI COMPLETI (dopo Invio) ---------- */
+.home-risultati{margin-top:36px; text-align:left;}
+.home-risultati .global-search-item{
+  background:var(--dusk); border:1px solid var(--line); border-radius:10px; margin-bottom:6px; padding:12px 16px;
+}
+.home-risultati .global-search-item:hover{border-color:var(--blue-dim);}
+
+@media (max-width:860px){
+  .app-shell{flex-direction:column;}
+  .sidebar{
+    width:100%; height:auto; position:relative;
+    display:block; padding:14px 16px;
+  }
+  /* La riga in alto (logo, hamburger, Esci) è un contenitore SEMPLICE
+     in riga orizzontale — niente scorrimento, niente calcoli di
+     larghezza automatici, solo flexbox normale con pochi elementi. */
+  .sidebar-riga-alto{
+    display:flex; align-items:center; gap:10px;
+  }
+  .sidebar .logo{margin:0; flex:1; min-width:0; order:0;}
+  .side-hamburger{
+    display:block; order:0; flex-shrink:0;
+    background:none; border:1px solid var(--sidebar-line); border-radius:8px;
+    color:var(--sidebar-text); font-size:18px; padding:6px 12px; cursor:pointer;
+  }
+  .side-utente-riga{
+    order:0; flex-shrink:0; margin:0; padding:0; border:none;
+    display:flex; align-items:center; gap:8px;
+  }
+  .side-utente-nome{display:none;} /* poco spazio in mobile — il nome resta visibile solo su desktop, "Esci" da solo basta e avanza */
+
+  /* Il pannello di navigazione è NASCOSTO di default su mobile — non
+     più una fila orizzontale sempre visibile (quella è la fonte di
+     tutti i bug avuti finora: larghezze automatiche che collassavano,
+     pannelli che finivano sotto il contenuto). Si apre SOLO quando
+     serve, a schermo intero, con un elenco VERTICALE semplice —
+     esattamente lo stesso layout che già funziona bene su desktop,
+     solo dentro un overlay invece che in una colonna fissa a lato. */
+  .side-nav{display:none;}
+  .side-nav.side-nav-mobile-aperto{
+    display:flex; flex-direction:column; gap:14px;
+    position:fixed; inset:0; z-index:30;
+    background:var(--sidebar-bg);
+    padding:max(20px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    overflow-y:auto;
+  }
+  .side-nav-intestazione-mobile{
+    display:flex; align-items:center; justify-content:space-between;
+    padding-bottom:12px; margin-bottom:4px; border-bottom:1px solid var(--sidebar-line);
+    font-weight:700; color:var(--sidebar-text); font-size:15px;
+  }
+  .side-group-chiudi{
+    background:none; border:none; color:var(--sidebar-text); font-size:22px;
+    line-height:1; padding:6px; cursor:pointer; opacity:.7;
+  }
+  .side-group-chiudi:hover{opacity:1;}
+  /* Ogni gruppo, dentro il pannello verticale, si comporta come un
+     accordion normale — stessa identica struttura già usata su
+     desktop (side-group-header + side-group-items), nessuna variante
+     speciale per mobile: se funziona su desktop, funziona anche qui,
+     perché è lo stesso identico markup e la stessa identica logica di
+     apertura/chiusura, solo dentro un contenitore diverso. */
+  .side-group-items .side-btn{padding:12px 14px; font-size:14.5px;} /* tocco più comodo */
+}
+
+.btn{
+  font-family:'Poppins',sans-serif; font-weight:600; font-size:13px;
+  padding:10px 18px; border-radius:999px; border:1px solid transparent; cursor:pointer;
+}
+.btn-primary{background:var(--blue); color:var(--ink);}
+.btn-ghost{border-color:var(--line); color:var(--paper); background:transparent;}
+.btn-ghost.active{border-color:var(--blue); color:var(--blue); background:rgba(37,99,235,.1);}
+.btn-ghost:hover{border-color:var(--mist);}
+
+/* Due taglie fisse in più, per pulsanti più piccoli dentro card/righe
+   (trovate 15 combinazioni diverse di padding scritte a mano per
+   questo stesso scopo, in giro per il gestionale — da qui in avanti
+   una di queste due invece di sceglierne una nuova ogni volta). Il
+   codice esistente non è stato toccato (nessun rischio di rompere
+   layout già a posto), sono in aggiunta per il nuovo lavoro. */
+.btn-piccolo{padding:5px 12px; font-size:13px;}
+.btn-piccolissimo{padding:3px 9px; font-size:11px;}
+
+/* ---------- DASHBOARD ---------- */
+.dash-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:28px;}
+.dash-card{
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); padding:18px;
+}
+.dash-card .num{font-family:'Poppins',sans-serif; font-weight:800; font-size:28px; color:var(--blue);}
+.dash-card .lbl{font-size:13px; color:var(--mist); margin-top:4px;}
+@media (max-width:760px){ .dash-columns{grid-template-columns:1fr;} }
+
+/* ---------- STATISTICHE ---------- */
+
+/* ---------- CHAT ---------- */
+@media (max-width:760px){ .chat-layout{grid-template-columns:1fr; height:auto;} }
+
+/* ---------- PAGINE CMS ---------- */
+
+/* ---------- MINI-TAB (sotto-sezioni: Eventi/Categorie, Dettagli/Partenze, Confermate/Cancellate) ---------- */
+.mini-tabs{
+  display:flex; gap:8px; margin-bottom:18px; border-bottom:none; padding-bottom:0;
+  overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+}
+.mini-tabs::-webkit-scrollbar{display:none;}
+.mini-tab{
+  flex-shrink:0;
+  font-family:'Poppins',sans-serif; font-size:14px; font-weight:600; padding:9px 16px; border-radius:8px;
+  border:1px solid var(--line); color:var(--mist); background:var(--dusk); cursor:pointer;
+}
+.mini-tab:hover{color:var(--paper); border-color:var(--blue-dim);}
+
+/* Solo dentro Partenze (dettaglio di un evento con più tragitti) — le
+   tab dei tragitti passano da riga orizzontale (sopra, che va a capo
+   con molti tragitti) a colonna verticale a sinistra, col contenuto a
+   destra. Solo da desktop: su mobile resta lo stack di sempre (righe
+   troppo strette per stare fianco a fianco). */
+/* Su mobile (riga sopra il contenuto) le tab vanno a capo se sono
+   tante — era un inline style nel componente, spostato qui perché da
+   desktop va DISATTIVATO: flex-wrap:wrap + colonna + max-height farebbe
+   proseguire le tab in una seconda colonna invece di scorrere. */
+.partenze-tabs-colonna{ flex-wrap:wrap; }
+@media (min-width:900px){
+  .partenze-layout{ display:flex; gap:24px; align-items:flex-start; }
+  .partenze-layout .partenze-tabs-colonna{
+    flex-direction:column; flex-wrap:nowrap; flex-shrink:0; width:230px;
+    overflow-x:visible; overflow-y:auto; max-height:calc(100vh - 200px);
+  }
+  .partenze-layout .partenze-tabs-colonna .mini-tab{ width:100%; text-align:left; }
+  .partenze-layout .partenze-contenuto{ flex:1; min-width:0; }
+}
+.mini-tab:focus, .mini-tab:focus-visible{outline:none; box-shadow:none;}
+.mini-tab.active{border-color:var(--blue); color:var(--paper); background:rgba(37,99,235,.1);}
+.mini-tab.completato{background:var(--green); border-color:var(--green); color:#fff;}
+.mini-tab.attenzione{background:var(--pink); border-color:var(--pink); color:#fff;}
+
+/* Sotto-tab (dentro una sezione, es. Info/Descrizione dentro "Info
+   evento") — più piccole e discrete delle tab principali, per capire a
+   colpo d'occhio che sono un livello sotto, non un'altra sezione della
+   scheda. */
+.sub-tabs{display:flex; gap:6px; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--line);}
+.sub-tab{
+  font-family:'Poppins',sans-serif; font-size:13px; font-weight:600; padding:5px 12px; border-radius:999px;
+  border:1px solid transparent; color:var(--mist); background:transparent; cursor:pointer;
+}
+.sub-tab:hover{color:var(--paper);}
+.sub-tab.active{background:var(--dusk-2); color:var(--paper); border-color:var(--line);}
+.sub-tab.completato{color:var(--green);}
+
+/* ---------- CATEGORIE EVENTI ---------- */
+
+/* ---------- MAPPA FORNITORI (Leaflet) ---------- */
+#fornitoriMappa{background:var(--dusk);}
+.leaflet-popup-content-wrapper{background:var(--dusk); color:var(--paper); border-radius:10px;}
+.leaflet-popup-tip{background:var(--dusk);}
+.leaflet-popup-content b{color:var(--paper);}
+.leaflet-popup-content a{color:var(--blue);}
+
+/* ---------- UPLOAD FILE (immagini/allegati) ---------- */
+
+/* ---------- AUTOCOMPLETAMENTO INDIRIZZO ---------- */
+
+/* ---------- GENERATORE LINK (Tour Leader / candidature) ---------- */
+
+/* ---------- LOG / STORICO ---------- */
+
+/* ---------- MODAL WIDE (partecipanti) ---------- */
+.modal-wide{max-width:920px;}
+#partecipantiCerca, #pagamentiCerca, #pagamentiFiltroEvento{
+  background:var(--night); border:1px solid var(--line); border-radius:8px; padding:9px 12px; color:var(--paper); font-size:13px; min-width:220px;
+}
+
+/* ---------- CODICE + AZIONE (promoter/coupon link) ---------- */
+
+
+/* ---------- STATO PAGAMENTO BADGE ---------- */
+.badge.pagato{background:rgba(72,214,140,.15); color:var(--green);}
+.badge.acconto_versato{background:rgba(255,179,71,.15); color:var(--amber);}
+.badge.scaduto{background:rgba(245,158,11,.2); color:var(--amber);}
+
+/* ---------- RICERCA GLOBALE ---------- */
+.global-search-item{
+  display:block; padding:10px 16px; border-bottom:1px solid var(--line); cursor:pointer; font-size:13px;
+}
+.global-search-item:last-child{border-bottom:none;}
+.global-search-item:hover{background:var(--blue-dim);}
+.global-search-item small{display:block; color:var(--mist); font-size:11px; margin-top:2px;}
+
+/* ---------- MODALE DI CONFERMA PERSONALIZZATO ---------- */
+
+/* ---------- CARDS EVENTI ---------- */
+.cards-list{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px;}
+.evento-card{
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
+  padding:18px; cursor:pointer; transition:border-color .15s ease;
+}
+.evento-card:hover{border-color:var(--blue-dim);}
+
+/* Card evento compatta — condivisa da Eventi, Prenotazioni, Partenze,
+   Lista d'attesa, Vetrina, Comunicazioni (vedi EventoCardCompatta.tsx).
+   Più piccola della vecchia .evento-card: copertina più bassa (4/5
+   invece di 1080/1350, quasi un quadrato), meno margini, testo ridotto. */
+.evento-card-compatta{
+  background:var(--dusk); border:1px solid var(--line); border-radius:9px;
+  padding:0; cursor:pointer; transition:border-color .15s ease; overflow:hidden;
+}
+.evento-card-compatta:hover{border-color:var(--blue-dim);}
+.evento-card-compatta-copertina{position:relative; width:100%; aspect-ratio:4/5; background:var(--night);}
+.evento-card-compatta-copertina img{width:100%; height:100%; object-fit:cover; display:block;}
+.evento-card-compatta-badge{
+  position:absolute; top:5px; right:5px; background:var(--badge-colore, var(--pink)); color:#fff; font-size:9px; font-weight:700;
+  padding:2px 6px; border-radius:999px; line-height:1.3;
+}
+.evento-card-compatta-link-pubblico{
+  position:absolute; top:5px; left:5px; width:20px; height:20px; border-radius:50%;
+  background:rgba(16,14,28,.72); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,.2);
+  color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px; padding:0;
+}
+.evento-card-compatta-corpo{padding:8px 9px 9px;}
+.evento-card-compatta-corpo .evento-card-compatta-genere{font-size:8px; text-transform:uppercase; letter-spacing:.5px; color:var(--amber);}
+.evento-card-compatta-corpo h4{font-size:13px; margin:3px 0 1px; line-height:1.2;}
+.evento-card-compatta-corpo p{color:var(--mist); font-size:10px; margin:0; line-height:1.3;}
+
+/* La card "richiede intervento" — bordo rosso ben visibile, pensato
+   apposta per quando ci sono tanti eventi in elenco e il piccolo badge
+   da solo rischia di passare inosservato scorrendo la griglia. */
+.evento-card-compatta.richiede-intervento{border:1px solid var(--pink); box-shadow:0 0 14px 1px rgba(255,61,122,.45);}
+.evento-card-compatta.parziale{border:1px solid #f0b429; box-shadow:0 0 14px 1px rgba(240,180,41,.4);}
+.evento-card-compatta.completata{border:1px solid var(--green); box-shadow:0 0 14px 1px rgba(22,163,74,.4);}
+.evento-card-compatta.selezionata{border-color:var(--pink);}
+
+@media (max-width:700px){ .vetrina-row{flex-wrap:wrap;} }
+
+/* ---------- CALENDARIO EVENTI ---------- */
+
+/* ---------- AZIONI MULTIPLE (bulk) ---------- */
+.evento-card .tag{
+  font-family:'Space Mono',monospace; font-size:11px; text-transform:uppercase; color:var(--amber); letter-spacing:1px;
+}
+.evento-card h3{margin:8px 0 4px; font-family:'Poppins',sans-serif; font-weight:400; font-size:20px;}
+.evento-card p{margin:0; color:var(--mist); font-size:13px;}
+.evento-card .meta-row{display:flex; justify-content:space-between; margin-top:12px; font-size:13px;}
+.evento-card .posti-basso{color:var(--amber);}
+
+/* ---------- FORM ---------- */
+.form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px;}
+.form-grid label{
+  display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--mist); font-weight:700;
+  text-transform:uppercase; letter-spacing:.5px; grid-column:span 1;
+}
+.form-grid label.full{grid-column:1 / -1;}
+.form-grid input, .form-grid textarea{
+  font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 14px;
+}
+.form-grid select{
+  font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
+  background:var(--dusk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+  border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 36px 11px 14px;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none; cursor:pointer;
+}
+.form-grid textarea{min-height:70px; resize:vertical;}
+@media (max-width:700px){ .form-grid{grid-template-columns:1fr;} }
+
+/* ---------- IMMAGINI EVENTO (galleria) ---------- */
+
+/* ---------- LINEE BUS (dentro modale evento) ---------- */
+
+
+/* ---------- FERMATE TRAGITTO: etichette Partenza/Arrivo/intermedia + drag&drop ---------- */
+
+/* ---------- TABELLA PRENOTAZIONI ---------- */
+.table-scroll{width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;}
+.data-table{width:100%; min-width:640px; border-collapse:collapse; font-size:14px;}
+.data-table th{
+  text-align:left; font-family:'Space Mono',monospace; font-size:11px; text-transform:uppercase;
+  color:var(--mist); padding:10px 12px; border-bottom:1px solid var(--line);
+}
+.data-table td{padding:10px 12px; border-bottom:1px solid var(--line);}
+.badge{padding:3px 10px; border-radius:999px; font-size:11px; text-transform:uppercase; letter-spacing:.5px;}
+/* Varianti a sfondo pieno (testo sempre bianco) per le etichette di
+   stato dentro Partenze — verde/arancio/rosso, non il pattern
+   "sfondo tenue + testo colorato" usato dalle altre .badge.X qui
+   sotto (quelle restano come sono, usate in altre schermate). */
+.badge-stato-verde{background:var(--green); color:#fff;}
+.badge-stato-arancio{background:var(--amber); color:#fff;}
+.badge-stato-rosso{background:var(--pink); color:#fff;}
+.badge.confermata{background:rgba(255,179,71,.15); color:var(--amber);}
+.badge.cancellata{background:rgba(255,61,122,.15); color:var(--pink);}
+
+/* ---------- MODALE ---------- */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.6); display:none;
+  align-items:center; justify-content:center; z-index:200; padding:20px;
+}
+.modal-overlay.show{display:flex;}
+.modal{
+  background:var(--dusk); border-radius:16px; padding:28px; width:100%; max-width:720px;
+  max-height:90vh; overflow-y:auto; position:relative;
+}
+.modal h3{font-family:'Poppins',sans-serif; font-weight:800; text-transform:uppercase; margin-top:0;}
+.modal h4{font-size:13px; text-transform:uppercase; letter-spacing:1px; color:var(--mist); margin:18px 0 10px;}
+.modal-close{
+  position:absolute; top:18px; right:18px; background:none; border:none; color:var(--paper);
+  font-size:18px; cursor:pointer;
+}
+
+/* ---------- WIZARD A STEP (creazione/modifica evento) ---------- */
+.wizard-nav{display:flex; justify-content:space-between; align-items:center; margin-top:22px;}
+.evento-riepilogo-box{background:var(--night); border:1px solid var(--line); border-radius:10px; padding:6px 18px;}
+.riepilogo-riga-evento{
+  display:flex; justify-content:space-between; gap:12px; padding:11px 0; border-bottom:1px solid var(--line); font-size:13px;
+}
+.riepilogo-riga-evento:last-child{border-bottom:none;}
+.riepilogo-riga-evento span{color:var(--mist);}
+.riepilogo-riga-evento b{color:var(--paper); text-align:right;}
+
+/* ---------- TOAST ---------- */
+
+/* ---------- RIFINITURE SMARTPHONE (gestionale) ---------- */
+@media (max-width:700px){
+  .modal{padding:20px; max-height:94vh; border-radius:12px;}
+  .modal-overlay{padding:10px; align-items:flex-start; padding-top:20px;}
+  .wizard-stepper{gap:2px;}
+  .wizard-dot{font-size:10px;}
+  .wizard-dot span{width:18px; height:18px; font-size:10px;}
+  .wizard-nav{flex-direction:column-reverse; align-items:stretch; gap:10px;}
+  .wizard-nav .btn{width:100%; text-align:center;}
+  #ricercaGlobaleHome, .home-search-sub{padding-left:8px; padding-right:8px;}
+  .home-logo{font-size:26px;}
+  #tab-home{padding-top:8vh;}
+  main{padding:20px 14px;}
+  .panel-head{flex-direction:column; align-items:stretch;}
+  .panel-head .btn{width:100%; text-align:center;}
+}
+@media (max-width:480px){
+  .sidebar .logo{font-size:18px;}
+  .dash-grid{grid-template-columns:1fr 1fr;}
+  .evento-card{padding:14px;}
+}
+
+/* ---------- COMPATIBILITÀ v2: classe .campo per i form fuori da .form-grid ---------- */
+.campo{display:flex; flex-direction:column; gap:6px; margin-bottom:14px;}
+.campo > label{
+  font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mist); font-weight:700;
+}
+.campo input:not([type="checkbox"]):not([type="radio"]), .campo textarea{
+  font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 14px;
+  min-width:0; box-sizing:border-box; width:100%;
+}
+.campo select{
+  font-family:'Poppins',sans-serif; font-size:14px; color:var(--paper);
+  background:var(--dusk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+  border:1px solid var(--line); border-radius:var(--input-radius); padding:11px 36px 11px 14px;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none; cursor:pointer;
+  min-width:0; box-sizing:border-box; width:100%;
+}
+.campo textarea{min-height:70px; resize:vertical;}
+
+/* ---------- PAGINA SEZIONE (sostituisce la modale per le schede di
+   modifica/dettaglio: occupa tutta l'area invece di comparire come popup) ---------- */
+.pagina-sezione-head{
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--line);
+}
+.pagina-sezione-indietro{flex-shrink:0;}
+.pagina-sezione-head h2{
+  font-family:'Poppins',sans-serif; font-weight:800; text-transform:uppercase; font-size:22px; margin:0; flex:1;
+}
+.pagina-sezione-azioni{display:flex; gap:8px; flex-shrink:0;}
+.pagina-sezione-corpo{max-width:760px;}
+.pagina-sezione-corpo.larga{max-width:1100px;}
+
+/* ---------- CARD SEZIONE (contenitori tipo "Tratta X", "Bus Y") ---------- */
+.section-card{
+  background:var(--dusk); border:1px solid var(--line); border-radius:12px;
+  padding:16px 18px; margin-bottom:14px;
+}
+.section-card + .section-card{margin-top:0;}
+.section-card h3{font-family:'Poppins',sans-serif; font-size:16px; font-weight:700; margin:0;}
+.section-card .section-sub{color:var(--mist); font-size:13px; margin:4px 0 0; line-height:1.5;}
+.section-card .section-divider{border-top:1px solid var(--line); padding-top:12px; margin-top:12px;}
+.section-label{
+  font-family:'Space Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:1px;
+  color:var(--mist); margin:0 0 8px;
+}
+
+/* ---------- CHIP (es. passeggeri per fermata) ---------- */
+.chip{
+  display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:600;
+  background:var(--night); border:1px solid var(--line); border-radius:999px; padding:5px 11px;
+}
+
+/* ---------- BADGE: stati aggiuntivi (copertura tratte, permessi) ---------- */
+.badge.coperta{background:rgba(72,214,140,.15); color:var(--green);}
+.badge.attenzione{background:rgba(255,179,71,.15); color:var(--amber);}
+.badge.neutro{background:rgba(255,255,255,.06); color:var(--mist);}
+.badge.non-coperta{background:rgba(255,61,122,.15); color:var(--pink);}
+.badge.dal-ruolo{background:rgba(169,159,194,.15); color:var(--mist);}
+.badge.concesso-extra{background:rgba(72,214,140,.15); color:var(--green);}
+.badge.negato{background:rgba(255,61,122,.15); color:var(--pink);}
+.badge.non-attivo{background:rgba(169,159,194,.08); color:var(--mist);}
+.badge.saldata{background:var(--blue-dim); color:var(--blue);}
+
+/* ---------- RIGA CLICCABILE (es. permesso in editor eccezioni, bus in Partenze) ---------- */
+.riga-cliccabile{
+  display:flex; justify-content:space-between; align-items:center; width:100%;
+  padding:9px 4px; font-size:14px; background:transparent; border:none; cursor:pointer;
+  border-bottom:1px solid var(--line); text-align:left; color:var(--paper);
+}
+.riga-cliccabile:last-child{border-bottom:none;}
+.riga-cliccabile:hover{background:var(--dusk-2);}
+.riga-cliccabile .riga-titolo{font-size:14px; font-weight:600;}
+.riga-cliccabile .riga-meta{font-size:13px; color:var(--mist); display:flex; align-items:center; gap:8px;}
+
+/* ---------- Leggibilità generale sezioni informative ---------- */
+.testo-intro{color:var(--mist); font-size:14px; line-height:1.6; margin-bottom:16px;}
+.gruppo-modulo{margin-bottom:20px;}
+.gruppo-modulo:last-child{margin-bottom:0;}
+
+/* ---------- Indirizzo fermata: sulla stessa riga della città, sempre
+   visibile su desktop. Su mobile la riga è trascinabile (riordino
+   fermate) — una pressione prolungata sulla città confliggerebbe col
+   gesto di trascinamento, quindi lì resta chiuso di default e si apre
+   con un tap normale sul pulsantino 📍 (mai un tocco lungo). ---------- */
+.apri-indirizzo-mobile{display:none;}
+@media (max-width:760px){
+  .indirizzo-fermata-riga{display:none;}
+  .indirizzo-fermata-riga.espansa{display:block; width:100%;}
+  .apri-indirizzo-mobile{
+    display:block; width:100%; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    font-size:11px; padding:6px 8px; background:transparent; border:1px dashed var(--line); border-radius:8px; color:var(--mist);
+  }
+  /* Quando il campo è aperto (.espansa), il pulsante che lo apre non
+     serve più — è il fratello successivo nel markup, "~" lo trova. */
+  .indirizzo-fermata-riga.espansa ~ .apri-indirizzo-mobile{display:none;}
+}
+
+/* ---------- Riga fermata (Creazione Evento): il <select> della
+   città può forzare una larghezza minima basata sul testo più lungo
+   delle sue opzioni, ignorando i vincoli della griglia — su schermi
+   stretti la riga intera si allunga oltre lo schermo invece di
+   restringersi. min-width:0 lascia che si adatti davvero; il testo
+   "Attiva/Esclusa" (resta comunque leggibile al tocco/hover tramite
+   il tooltip "title") si nasconde per lasciare spazio. ---------- */
+.riga-fermata select, .riga-fermata input{min-width:0;}
+@media (max-width:760px){
+  .riga-fermata{grid-template-columns:16px 1fr 56px 56px auto auto !important;}
+  .riga-fermata{gap:3px;}
+  .riga-fermata select, .riga-fermata input{font-size:13px; text-overflow:ellipsis; padding-left:6px; padding-right:6px;}
+  .etichetta-attiva-fermata{display:none;}
+}
+
+/* Notifiche (al posto di alert()) — vedi shared/notifiche.ts */
+.toaster{ position:fixed; right:18px; bottom:18px; z-index:9999; display:flex; flex-direction:column; gap:8px; max-width:min(420px, calc(100vw - 36px)); }
+.toast{ display:flex; gap:10px; align-items:flex-start; padding:11px 14px; border-radius:10px; font-size:14px; line-height:1.4; cursor:pointer; color:var(--paper); background:var(--dusk); border:1px solid var(--line); border-left:4px solid var(--line); box-shadow:0 8px 24px rgba(0,0,0,.18); animation:toast-in .18s ease-out; }
+.toast-icona{ flex-shrink:0; width:20px; height:20px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; }
+.toast-errore{ border-left-color:var(--pink); } .toast-errore .toast-icona{ background:var(--pink); }
+.toast-successo{ border-left-color:var(--green); } .toast-successo .toast-icona{ background:var(--green); }
+.toast-info{ border-left-color:var(--amber); } .toast-info .toast-icona{ background:var(--amber); }
+@keyframes toast-in{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+@media (max-width:600px){ .toaster{ left:12px; right:12px; bottom:12px; max-width:none; } }
