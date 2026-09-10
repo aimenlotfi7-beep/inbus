@@ -305,6 +305,30 @@
   }
   .chip.active, .chip:hover{border-color:var(--pink); color:var(--paper); background:rgba(255,61,122,.08);}
 
+  /* I tre filtri in più (partenza, date, prezzo) — stessa "temperatura"
+     visiva dei chip sopra (bordo sottile, sfondo trasparente), ma sono
+     select/input, non pulsanti: niente arrotondamento a pillola (999px
+     su un select con la freccia nativa del browser sembra strano),
+     un raggio normale come il resto dei campi del sito. */
+  .filtri-extra{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:14px 0 24px;}
+  .filtri-extra select{
+    font-family:'Poppins',sans-serif; font-size:13px; color:var(--paper);
+    background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:9px 12px; cursor:pointer;
+  }
+  .filtro-data{
+    display:flex; align-items:center; gap:7px; font-size:12px; color:var(--mist);
+    background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:6px 10px;
+  }
+  .filtro-data input{
+    font-family:'Poppins',sans-serif; font-size:13px; color:var(--paper);
+    background:transparent; border:none; padding:2px 0; color-scheme:dark;
+  }
+  .filtri-extra-reset{
+    font-family:'Poppins',sans-serif; font-size:12.5px; color:var(--mist);
+    background:none; border:none; cursor:pointer; text-decoration:underline; padding:6px 4px;
+  }
+  .filtri-extra-reset:hover{color:var(--paper);}
+
   .grid{
     display:grid; grid-template-columns:repeat(auto-fill, minmax(270px,1fr)); gap:22px;
   }

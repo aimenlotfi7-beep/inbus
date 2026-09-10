@@ -9,6 +9,7 @@ import type { Evento } from '../api/types';
 import { EventoCard } from '../features/eventi/EventoCard';
 import { CheckoutModal } from '../features/checkout/CheckoutModal';
 import { pagineApi } from '../api/pagine';
+import { intervalloPrezzoEvento } from '../api/prezzi';
 
 // Quante card clonare a inizio/fine del carosello hero, per l'effetto
 // circolare — abbastanza da coprire anche uno schermo largo (mai più
@@ -195,6 +196,18 @@ export function HomePage() {
   // nella pagina). Parametro separato apposta, così i due filtri non
   // si accavallano mai per coincidenza.
   const categoriaAttiva = searchParams.get('categoria');
+  // I tre filtri nuovi — stesso schema degli altri (vivono nell'URL,
+  // non in uno stato "invisibile" che sparisce ricaricando la pagina
+  // o condividendo il link).
+  const partenzaAttiva = searchParams.get('partenza') ?? '';
+  const dataDa = searchParams.get('dataDa') ?? '';
+  const dataA = searchParams.get('dataA') ?? '';
+  const prezzoMax = searchParams.get('prezzoMax') ?? '';
+  function impostaFiltro(chiave: string, valore: string) {
+    const nuovi = new URLSearchParams(searchParams);
+    if (valore) nuovi.set(chiave, valore); else nuovi.delete(chiave);
+    setSearchParams(nuovi, { replace: true });
+  }
   // Le categorie servono qui — non solo nell'header — per il primo
   // livello della cascata sotto: Tutti → Categorie → Generi.
   const [categorie, setCategorie] = useState<CategoriaEvento[]>([]);
@@ -217,6 +230,23 @@ export function HomePage() {
   const eventiFiltrati = useMemo(() => {
     let lista = genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => e.genere === genereAttivo);
     if (categoriaAttiva) lista = lista.filter((e) => e.categoria === categoriaAttiva);
+    // I tre filtri aggiuntivi — partenza, intervallo date, prezzo
+    // massimo — pensati apposta per un servizio bus: "da dove parto"
+    // è la domanda più importante di tutte (la ricerca UX sui siti di
+    // tour lo conferma), più utile persino del genere musicale.
+    if (partenzaAttiva) {
+      lista = lista.filter((e) =>
+        [...e.tragitti, ...e.servizi.flatMap((v) => v.tragitti)].some((t) => t.fermate.some((f) => f.citta === partenzaAttiva)));
+    }
+    if (dataDa) lista = lista.filter((e) => e.data >= dataDa);
+    if (dataA) lista = lista.filter((e) => e.data <= dataA);
+    if (prezzoMax) {
+      const soglia = Number(prezzoMax);
+      lista = lista.filter((e) => {
+        const intervallo = intervalloPrezzoEvento(e);
+        return intervallo !== null && intervallo.min <= soglia;
+      });
+    }
     // Normalizza per il confronto: minuscolo + senza accenti (così
     // "citta" trova anche "città") — usata sia sul testo cercato sia
     // sui campi dell'evento.
@@ -239,7 +269,7 @@ export function HomePage() {
     // Ordine cronologico sempre garantito qui, esplicitamente — non ci
     // si affida al solo ordine con cui arrivano dal server.
     return [...lista].sort((a, b) => a.data.localeCompare(b.data));
-  }, [eventi, genereAttivo, categoriaAttiva, ricercaTesto]);
+  }, [eventi, genereAttivo, categoriaAttiva, ricercaTesto, partenzaAttiva, dataDa, dataA, prezzoMax]);
 
   // Numeri veri, calcolati dai dati reali — non inventati: quante
   // tratte attive, quante città di partenza distinte tra tutte.
@@ -400,6 +430,51 @@ export function HomePage() {
                 {g === 'Tutti' ? <b>{categoriaAttiva}</b> : g}
               </button>
             ))
+          )}
+        </div>
+
+        {/* Tre filtri in più, pensati apposta per un servizio bus —
+            "da dove parto" prima di tutto, poi quando e quanto si
+            vuole spendere. Select semplici invece di un componente
+            nuovo da costruire: stesso principio dei filtri sopra, un
+            controllo per ciascuno, tutti nell'URL. */}
+        <div className="filtri-extra">
+          <select value={partenzaAttiva} onChange={(e) => impostaFiltro('partenza', e.target.value)} aria-label="Filtra per città di partenza">
+            <option value="">Parti da — tutte le città</option>
+            {cittaPartenza.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <label className="filtro-data">
+            Dal
+            <input type="date" value={dataDa} onChange={(e) => impostaFiltro('dataDa', e.target.value)} />
+          </label>
+          <label className="filtro-data">
+            Al
+            <input type="date" value={dataA} onChange={(e) => impostaFiltro('dataA', e.target.value)} />
+          </label>
+          <select value={prezzoMax} onChange={(e) => impostaFiltro('prezzoMax', e.target.value)} aria-label="Filtra per prezzo massimo">
+            <option value="">Prezzo — qualsiasi</option>
+            <option value="30">Fino a €30</option>
+            <option value="60">Fino a €60</option>
+            <option value="100">Fino a €100</option>
+          </select>
+          {(partenzaAttiva || dataDa || dataA || prezzoMax) && (
+            <button
+              type="button"
+              className="filtri-extra-reset"
+              onClick={() => {
+                // Le quattro chiavi insieme, in un solo aggiornamento —
+                // chiamare impostaFiltro() quattro volte di fila avrebbe
+                // letto ogni volta lo stesso searchParams "vecchio" (la
+                // chiusura di ognuna non vede gli effetti delle altre
+                // nello stesso giro), risultando in un solo filtro
+                // azzerato invece di tutti e quattro.
+                const nuovi = new URLSearchParams(searchParams);
+                ['partenza', 'dataDa', 'dataA', 'prezzoMax'].forEach((k) => nuovi.delete(k));
+                setSearchParams(nuovi, { replace: true });
+              }}
+            >
+              Azzera filtri ✕
+            </button>
           )}
         </div>
 
