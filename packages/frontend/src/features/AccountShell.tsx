@@ -44,8 +44,8 @@ export function AccountShell({
           destra. Separata dalla sidebar sotto: quella resta solo per
           le voci del menu. */}
       <div className="account-topbar">
-        <span className="account-topbar-nome">{nomeUtente ?? etichettaTipo}</span>
         <Link to="/" className="account-topbar-logo" aria-label="Torna al sito"><LogoOnWay come="testo" /></Link>
+        <span className="account-topbar-nome">{nomeUtente ?? etichettaTipo}</span>
       </div>
 
       <div className="account-corpo">

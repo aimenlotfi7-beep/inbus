@@ -27,6 +27,7 @@ interface MovimentoCredito {
 
 export function AccountPage() {
   const [email, setEmail] = useState('');
+  const [nomeCliente, setNomeCliente] = useState('');
   const [caricandoSessione, setCaricandoSessione] = useState(true);
   const navigate = useNavigate();
   // La sezione attiva vive nell'indirizzo (?sezione=profilo), non solo
@@ -73,7 +74,7 @@ export function AccountPage() {
       return;
     }
     clienteAuthApi.me()
-      .then((dati) => setEmail(dati.email))
+      .then((dati) => { setEmail(dati.email); setNomeCliente([dati.nome, dati.cognome].filter(Boolean).join(' ')); })
       .catch(() => { logoutCliente(); navigate('/accedi?dopo=' + encodeURIComponent('/account')); })
       .finally(() => setCaricandoSessione(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,7 +100,7 @@ export function AccountPage() {
   return (
     <>
       <AccountShell
-        etichettaTipo="il mio account" nomeUtente={email} onLogout={esci}
+        etichettaTipo="il mio account" nomeUtente={nomeCliente || email} onLogout={esci}
         voci={vociMenu} voceAttiva={sezione} onCambiaVoce={(v) => setSezione(v as Sezione)}
       >
         <div className="account-content">
