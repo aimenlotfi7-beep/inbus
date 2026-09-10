@@ -128,6 +128,15 @@ export const eventi = pgTable('eventi', {
   // cambia a ogni evento anche riusando lo stesso tragitto di fermate.
   arrivoIndirizzo: text('arrivo_indirizzo'),
   arrivoOrario: text('arrivo_orario'),
+  // Le due voci che mancavano dal confronto con la ricerca UX di
+  // settore (Baymard, tour/esperienze) — "cosa è incluso" e requisiti/
+  // restrizioni sono tra le informazioni che gli utenti cercano sempre
+  // prima di prenotare un'esperienza, non solo un trasporto puro. Testo
+  // libero, non obbligatorio (renderlo obbligatorio bloccherebbe la
+  // modifica di ogni evento già esistente finché non compilato) — ma
+  // mostrato in un riquadro dedicato, sempre presente, in pagina.
+  cosaIncluso: text('cosa_incluso'),
+  requisitiNote: text('requisiti_note'),
   // Controllo manuale indipendente dalla data: se falso, l'evento non
   // compare mai sul sito pubblico, nemmeno se è nel futuro. Se vero
   // (default), vale comunque la regola "non visibile dopo la data

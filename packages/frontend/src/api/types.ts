@@ -69,6 +69,8 @@ export interface Evento {
   bozza: boolean;
   descrizione: string | null;
   descrizioneSeo: string | null;
+  cosaIncluso: string | null;
+  requisitiNote: string | null;
   ticketColoreAccento: string | null;
   ticketImmagineSfondoUrl: string | null;
   layoutBigliettoId: string | null;

@@ -116,6 +116,24 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
             placeholder="Un testo descrittivo sull'evento/artista — se la lasci vuota, per Google viene generata automaticamente (artista, data, città, prezzo), ma sulla pagina non comparirà nessuna sezione."
           />
         </div>
+        <div className="campo">
+          <label><EtichettaTooltip testo="Cosa è incluso" chiave="cosa_incluso" mappaTooltip={mappaTooltip} /></label>
+          <textarea
+            value={form.cosaIncluso ?? ''}
+            onChange={(e) => setForm({ ...form, cosaIncluso: e.target.value })}
+            rows={3}
+            placeholder="Es. Viaggio A/R in bus, posto assegnato, assistenza tour leader. Il biglietto d'ingresso all'evento NON è incluso."
+          />
+        </div>
+        <div className="campo">
+          <label><EtichettaTooltip testo="Requisiti e restrizioni" chiave="requisiti_evento" mappaTooltip={mappaTooltip} /></label>
+          <textarea
+            value={form.requisitiNote ?? ''}
+            onChange={(e) => setForm({ ...form, requisitiNote: e.target.value })}
+            rows={3}
+            placeholder="Es. Non adatto a minori di 12 anni non accompagnati. Posti limitati per persone a mobilità ridotta, contattare l'assistenza prima di prenotare."
+          />
+        </div>
       </>
     )}
   </>

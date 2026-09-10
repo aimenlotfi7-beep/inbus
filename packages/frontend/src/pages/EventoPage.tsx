@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { eventiApi } from '../api/eventi';
 import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
@@ -130,6 +130,41 @@ export function EventoPage() {
               {prenotazioniConfermate !== null && prenotazioniConfermate >= 10 && (
                 <p style={{ fontSize: 13, opacity: .75, marginTop: 4 }}>{prenotazioniConfermate} persone hanno già prenotato per questo evento</p>
               )}
+
+              {/* "Informazioni pratiche" — SEMPRE visibile, non dentro un
+                  accordion da aprire: la ricerca UX di settore (Baymard,
+                  tour ed esperienze) trova che punto di arrivo, cosa è
+                  incluso e requisiti sono tra le informazioni che, se
+                  difficili da trovare, fanno abbandonare la prenotazione
+                  — non vanno nascoste dietro un click. Il punto di arrivo
+                  vive sul tragitto (può cambiare da fermata a fermata),
+                  si prende dal primo tragitto attivo che lo ha compilato:
+                  un'approssimazione onesta finché resta un solo punto di
+                  arrivo per evento nella pratica comune. */}
+              {(() => {
+                const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((v) => v.tragitti)];
+                const arrivo = tuttiITragitti.find((t) => t.attivo && t.arrivoIndirizzo);
+                if (!arrivo && !evento.cosaIncluso && !evento.requisitiNote) return null;
+                return (
+                  <div className="panel-box" style={{ marginTop: 18 }}>
+                    <h2 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 16, margin: '0 0 10px' }}>Informazioni pratiche</h2>
+                    {arrivo && (
+                      <p style={{ fontSize: 13.5, marginBottom: 8 }}>
+                        📍 <b>Punto di arrivo:</b> {arrivo.arrivoIndirizzo}{arrivo.arrivoOrario ? ` — ore ${arrivo.arrivoOrario}` : ''}
+                      </p>
+                    )}
+                    {evento.cosaIncluso && (
+                      <p style={{ fontSize: 13.5, marginBottom: 8, whiteSpace: 'pre-line' }}>✓ <b>Cosa include:</b> {evento.cosaIncluso}</p>
+                    )}
+                    {evento.requisitiNote && (
+                      <p style={{ fontSize: 13.5, marginBottom: 8, whiteSpace: 'pre-line' }}>⚠️ {evento.requisitiNote}</p>
+                    )}
+                    <p style={{ fontSize: 12, opacity: .7, marginTop: 10, marginBottom: 0 }}>
+                      <Link to="/pagina/termini">Politica di cancellazione e termini</Link>
+                    </p>
+                  </div>
+                );
+              })()}
 
               <SezioniAccordion evento={evento} />
 

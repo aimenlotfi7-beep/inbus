@@ -89,6 +89,8 @@ const creaEventoBase = z.object({
   bozza: z.boolean().optional(),
   descrizione: z.string().optional(),
   descrizioneSeo: z.string().optional(),
+  cosaIncluso: z.string().optional(),
+  requisitiNote: z.string().optional(),
   ticketColoreAccento: z.string().optional(),
   ticketImmagineSfondoUrl: z.string().optional(),
   layoutBigliettoId: z.string().nullable().optional(),

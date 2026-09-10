@@ -25,6 +25,8 @@ export interface EventoInput {
   bozza?: boolean;
   descrizione?: string;
   descrizioneSeo?: string;
+  cosaIncluso?: string;
+  requisitiNote?: string;
   ticketColoreAccento?: string;
   ticketImmagineSfondoUrl?: string;
   layoutBigliettoId?: string | null;
