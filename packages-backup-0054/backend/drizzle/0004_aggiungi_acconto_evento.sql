@@ -1,1 +1,0 @@
-ALTER TABLE "eventi" ADD COLUMN "acconto_eur" numeric(10, 2);

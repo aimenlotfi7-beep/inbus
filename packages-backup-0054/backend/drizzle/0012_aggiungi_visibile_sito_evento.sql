@@ -1,1 +1,0 @@
-ALTER TABLE "eventi" ADD COLUMN "visibile_sito" boolean DEFAULT true NOT NULL;
