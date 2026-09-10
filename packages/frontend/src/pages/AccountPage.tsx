@@ -7,7 +7,6 @@ import { utentiApi, type PreferenzePrivacy } from '../api/utenti';
 import { eventiApi } from '../api/eventi';
 import { chatApi, type ConversazioneConMessaggi } from '../api/chat';
 import type { Prenotazione, Evento } from '../api/types';
-import { HomePage } from './HomePage';
 import { CookieBanner, LinkPreferenzeCookie } from '../features/CookieBanner';
 import { clienteLoggato, logoutCliente } from '../features/clienteSessione';
 import { clienteAuthApi } from '../api/clienteAuth';
@@ -17,7 +16,7 @@ import { calcolaStatoPrenotazione } from '../features/statoPrenotazione';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
-type Sezione = 'dashboard' | 'eventi' | 'profilo' | 'viaggi' | 'lista-attesa' | 'credito' | 'privacy' | 'chat';
+type Sezione = 'dashboard' | 'profilo' | 'viaggi' | 'lista-attesa' | 'credito' | 'privacy' | 'chat';
 
 interface MovimentoCredito {
   id: string;
@@ -35,7 +34,7 @@ export function AccountPage() {
   // usa avanti/indietro del browser) resta dove si trovava, invece di
   // tornare sempre alla prima sezione.
   const [searchParams, setSearchParams] = useSearchParams();
-  const sezioniValide: Sezione[] = ['dashboard', 'eventi', 'profilo', 'viaggi', 'lista-attesa', 'credito', 'privacy', 'chat'];
+  const sezioniValide: Sezione[] = ['dashboard', 'profilo', 'viaggi', 'lista-attesa', 'credito', 'privacy', 'chat'];
   const sezioneUrl = searchParams.get('sezione') as Sezione | null;
   const sezione: Sezione = sezioneUrl && sezioniValide.includes(sezioneUrl) ? sezioneUrl : 'dashboard';
   function setSezione(nuova: Sezione) {
@@ -87,7 +86,6 @@ export function AccountPage() {
 
   const vociMenu: { id: Sezione; label: string }[] = [
     { id: 'dashboard', label: 'Il mio centro' },
-    { id: 'eventi', label: 'Scopri eventi' },
     { id: 'viaggi', label: 'I miei viaggi' },
     { id: 'lista-attesa', label: 'Lista d\'attesa' },
     { id: 'credito', label: 'Credito fedeltà' },
@@ -103,24 +101,16 @@ export function AccountPage() {
       <AccountShell
         etichettaTipo="il mio account" nomeUtente={email} onLogout={esci}
         voci={vociMenu} voceAttiva={sezione} onCambiaVoce={(v) => setSezione(v as Sezione)}
-        contenutoLarghezzaPiena={sezione === 'eventi'}
       >
-        {sezione !== 'eventi' && (
-          <div className="account-content">
-            {sezione === 'dashboard' && <SezioneDashboard email={email} viaggi={viaggi} eventiPerId={eventiPerId} onNavigare={setSezione} onAprireViaggio={setPnrAperto} />}
-            {sezione === 'profilo' && <SezioneProfilo email={email} />}
-            {sezione === 'viaggi' && <SezioneViaggi email={email} viaggi={viaggi} eventiPerId={eventiPerId} onAprireViaggio={setPnrAperto} />}
-            {sezione === 'lista-attesa' && <SezioneListaAttesa email={email} />}
-            {sezione === 'credito' && <SezioneCredito email={email} />}
-            {sezione === 'privacy' && <SezionePrivacy email={email} />}
-            {sezione === 'chat' && <SezioneChat email={email} />}
-          </div>
-        )}
-        {sezione === 'eventi' && (
-          <section className="acc-sezione-sito">
-            <HomePage />
-          </section>
-        )}
+        <div className="account-content">
+          {sezione === 'dashboard' && <SezioneDashboard email={email} viaggi={viaggi} eventiPerId={eventiPerId} onNavigare={setSezione} onAprireViaggio={setPnrAperto} />}
+          {sezione === 'profilo' && <SezioneProfilo email={email} />}
+          {sezione === 'viaggi' && <SezioneViaggi email={email} viaggi={viaggi} eventiPerId={eventiPerId} onAprireViaggio={setPnrAperto} />}
+          {sezione === 'lista-attesa' && <SezioneListaAttesa email={email} />}
+          {sezione === 'credito' && <SezioneCredito email={email} />}
+          {sezione === 'privacy' && <SezionePrivacy email={email} />}
+          {sezione === 'chat' && <SezioneChat email={email} />}
+        </div>
       </AccountShell>
 
       {pnrAperto && (
@@ -446,7 +436,7 @@ function SezioneDashboard({ email, viaggi, eventiPerId, onNavigare, onAprireViag
       {viaggi !== null && !eventoProssimo && (
         <div className="panel-box">
           <p style={{ margin: '0 0 12px' }}>Non hai ancora un viaggio in programma.</p>
-          <button className="btn btn-primary" onClick={() => onNavigare('eventi')}>Scopri gli eventi</button>
+          <Link className="btn btn-primary" to="/">Scopri gli eventi</Link>
         </div>
       )}
 
