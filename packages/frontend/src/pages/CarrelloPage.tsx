@@ -7,13 +7,23 @@ import { clienteAuthApi, type DatiCliente } from '../api/clienteAuth';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { clienteLoggato } from '../features/clienteSessione';
 
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+
 /** Il carrello — stessa identica veste grafica del checkout esistente
  *  (.checkout-form per etichette/campi, .checkout-summary per i box di
  *  riepilogo: niente stile nuovo inventato, niente ".ticket" che è
  *  pensato per un contesto diverso e qui stonava). Elenco articoli già
  *  compilati nella tab di prenotazione, e in fondo solo l'ultimo pezzo
  *  che prima stava nello step 3 del checkout: credito, coupon, metodo
- *  di pagamento. */
+ *  di pagamento.
+ *
+ *  Due passi (non più tutto insieme, come richiesto): 1) riepilogo con
+ *  codici sconto e credito — il totale sta SEMPRE sotto gli articoli e
+ *  si aggiorna subito quando si spunta il credito o si applica un
+ *  coupon (prima non succedeva affatto: il coupon veniva solo salvato
+ *  come testo, mai controllato finché non si completava l'ordine
+ *  davvero); 2) solo dopo, la scelta del metodo di pagamento e i dati
+ *  specifici (carta, o la conferma per Apple/Google Pay). */
 export function CarrelloPage() {
   const { articoli, rimuovi, svuota, totaleStimato, bundle, scontoBundleStimato } = useCarrello();
   const navigate = useNavigate();
@@ -21,10 +31,14 @@ export function CarrelloPage() {
   const [inviando, setInviando] = useState(false);
   const [errore, setErrore] = useState('');
   const [fatto, setFatto] = useState<{ pnr: string }[] | null>(null);
+  const [step, setStep] = useState<'riepilogo' | 'pagamento'>('riepilogo');
 
   const [tipoPagamento, setTipoPagamento] = useState<'COMPLETO' | 'ACCONTO'>('COMPLETO');
   const [usaCredito, setUsaCredito] = useState(false);
   const [couponCodice, setCouponCodice] = useState('');
+  const [couponVerificato, setCouponVerificato] = useState<{ sconto: number } | null>(null);
+  const [verificandoCoupon, setVerificandoCoupon] = useState(false);
+  const [couponErrore, setCouponErrore] = useState('');
   const [metodoPagamento, setMetodoPagamento] = useState<'carta' | 'apple' | 'google'>('carta');
 
   useEffect(() => {
@@ -32,6 +46,41 @@ export function CarrelloPage() {
   }, []);
 
   const creditoDisponibile = cliente ? Number(cliente.creditoDisponibile) : 0;
+  const totaleDopoBundle = totaleStimato - scontoBundleStimato;
+
+  // Coupon e credito valgono solo pagando tutto subito (già così prima,
+  // solo dichiarato in un testo — ora il totale lo rispetta DAVVERO
+  // invece di restare fermo). L'ordine conta: prima il coupon, poi il
+  // credito sul resto — mai sotto zero.
+  const scontoCoupon = tipoPagamento === 'COMPLETO' ? (couponVerificato?.sconto ?? 0) : 0;
+  const dopoCoupon = Math.max(0, totaleDopoBundle - scontoCoupon);
+  const creditoApplicato = tipoPagamento === 'COMPLETO' && usaCredito ? Math.min(creditoDisponibile, dopoCoupon) : 0;
+  const totaleFinale = Math.max(0, dopoCoupon - creditoApplicato);
+
+  async function verificaCoupon() {
+    if (!couponCodice.trim() || articoli.length === 0) return;
+    setVerificandoCoupon(true);
+    setCouponErrore('');
+    setCouponVerificato(null);
+    try {
+      const r = await fetch(`${API_URL}/api/coupon/valida`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Approssimazione dichiarata (vedi nota sotto il totale): un
+        // carrello può avere eventi diversi, ma la verifica VERA,
+        // riga per riga, avviene comunque lato server al momento di
+        // completare l'ordine — questa è solo un'anteprima.
+        body: JSON.stringify({ codice: couponCodice.trim(), importo: totaleDopoBundle, eventoId: articoli[0]?.eventoId, ...(cliente?.email && { emailCliente: cliente.email }) }),
+      });
+      const dati = await r.json();
+      if (!r.ok) throw new Error(dati.errore ?? 'Coupon non valido.');
+      setCouponVerificato(dati);
+    } catch (e) {
+      setCouponErrore(e instanceof Error ? e.message : 'Coupon non valido.');
+    } finally {
+      setVerificandoCoupon(false);
+    }
+  }
 
   async function completaAcquisto() {
     if (!clienteLoggato()) {
@@ -126,21 +175,56 @@ export function CarrelloPage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
                   <b>€{(a.prezzoStimato * a.passeggeri).toFixed(2)}</b>
-                  <button type="button" className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '4px 10px', fontSize: 11, color: '#c0392b' }} onClick={() => rimuovi(a.id)}>
-                    Rimuovi
-                  </button>
+                  {step === 'riepilogo' && (
+                    <button type="button" className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '4px 10px', fontSize: 11, color: '#c0392b' }} onClick={() => rimuovi(a.id)}>
+                      Rimuovi
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
+
+            {/* Il totale sta SEMPRE qui, subito sotto gli articoli, in
+                ENTRAMBI i passi — non più solo alla fine dopo aver
+                scorso tutto. Si aggiorna DAVVERO quando si spunta il
+                credito o si applica un coupon (prima il coupon veniva
+                solo salvato come testo, senza che il totale mostrato
+                cambiasse mai — solo una nota diceva "verrà ricalcolato
+                dal server", ora lo fa già qui, in anteprima). */}
+            <div className="checkout-summary" style={{ marginTop: 14 }}>
+              {bundle && (
+                <>
+                  <b>Bundle: {bundle.nome}</b>
+                  <p style={{ fontSize: 12, opacity: .7, margin: '4px 0 10px' }}>Il bundle si acquista tutto insieme: togliendo o aggiungendo un evento, lo sconto non si applica più.</p>
+                  {bundle.promoterCodice && <p style={{ fontSize: 12, opacity: .7, margin: '0 0 8px' }}>Codice promoter applicato: <b>{bundle.promoterCodice}</b></p>}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span>Subtotale</span><span>€{totaleStimato.toFixed(2)}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span>Sconto bundle (−{bundle.scontoPercentuale}%)</span><span>− €{scontoBundleStimato.toFixed(2)}</span></div>
+                </>
+              )}
+              {scontoCoupon > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: 'var(--verde, #2e7d32)' }}><span>Coupon "{couponCodice}"</span><span>− €{scontoCoupon.toFixed(2)}</span></div>
+              )}
+              {creditoApplicato > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: 'var(--verde, #2e7d32)' }}><span>Credito fedeltà</span><span>− €{creditoApplicato.toFixed(2)}</span></div>
+              )}
+              <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, margin: '10px 0 4px' }}>
+                {tipoPagamento === 'ACCONTO' ? 'Totale stimato' : 'Totale'}: €{(tipoPagamento === 'COMPLETO' ? totaleFinale : totaleDopoBundle).toFixed(2)}
+              </p>
+              <p style={{ fontSize: 11, opacity: .65 }}>
+                {tipoPagamento === 'ACCONTO'
+                  ? 'Con l\'acconto verserai solo una parte ora per ciascun articolo, non questo totale — coupon e credito non si applicano in questa modalità.'
+                  : 'Il totale definitivo viene comunque verificato di nuovo dal server al momento di completare l\'ordine.'}
+              </p>
+            </div>
 
             {!clienteLoggato() ? (
               <div className="checkout-summary">
                 <Link to="/accedi?dopo=/carrello" style={{ textDecoration: 'underline', color: 'var(--ink)' }}>Accedi o registrati</Link> per completare l'acquisto.
               </div>
-            ) : (
+            ) : step === 'riepilogo' ? (
               <>
                 {creditoDisponibile > 0 && (!bundle || bundle.ammetteCredito) && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '10px 0', cursor: tipoPagamento === 'COMPLETO' ? 'pointer' : 'default', opacity: tipoPagamento === 'COMPLETO' ? 1 : .5 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '14px 0 10px', cursor: tipoPagamento === 'COMPLETO' ? 'pointer' : 'default', opacity: tipoPagamento === 'COMPLETO' ? 1 : .5 }}>
                     <input type="checkbox" checked={usaCredito} onChange={(e) => setUsaCredito(e.target.checked)} style={{ width: 'auto' }} disabled={tipoPagamento !== 'COMPLETO'} />
                     Usa il tuo credito fedeltà (€{creditoDisponibile.toFixed(2)} disponibili)
                   </label>
@@ -148,14 +232,21 @@ export function CarrelloPage() {
 
                 {(!bundle || bundle.ammetteOfferte) && (<>
                 <label className="field-label">Hai un codice coupon?</label>
-                <input
-                  type="text"
-                  value={couponCodice}
-                  onChange={(e) => setCouponCodice(e.target.value.toUpperCase())}
-                  placeholder="Facoltativo"
-                  style={{ textTransform: 'uppercase', opacity: tipoPagamento === 'COMPLETO' ? 1 : .5 }}
-                  disabled={tipoPagamento !== 'COMPLETO'}
-                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    value={couponCodice}
+                    onChange={(e) => { setCouponCodice(e.target.value.toUpperCase()); setCouponVerificato(null); setCouponErrore(''); }}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), verificaCoupon())}
+                    placeholder="Facoltativo"
+                    style={{ textTransform: 'uppercase', flex: 1, opacity: tipoPagamento === 'COMPLETO' ? 1 : .5 }}
+                    disabled={tipoPagamento !== 'COMPLETO' || !!couponVerificato}
+                  />
+                  <button type="button" className="btn btn-ghost" style={{ whiteSpace: 'nowrap' }} onClick={verificaCoupon} disabled={tipoPagamento !== 'COMPLETO' || !couponCodice.trim() || verificandoCoupon || !!couponVerificato}>
+                    {verificandoCoupon ? '...' : couponVerificato ? '✓ Applicato' : 'Applica'}
+                  </button>
+                </div>
+                {couponErrore && <p style={{ color: '#c0392b', fontSize: 12, marginTop: 6 }}>{couponErrore}</p>}
                 <p style={{ fontSize: 11.5, opacity: .65, marginTop: 6 }}>
                   Coupon e credito si applicano solo pagando tutto subito — con l'acconto potrai usarli quando salderai il resto.
                 </p>
@@ -172,12 +263,22 @@ export function CarrelloPage() {
                   </p>
                 )}
 
-                <p className="section-label" style={{ marginTop: 18 }}>Metodo di pagamento</p>
+                <button className="search-cta" style={{ marginTop: 16 }} onClick={() => setStep('pagamento')}>
+                  Avanti →
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="search-cta-secondaria" style={{ marginTop: 14, marginBottom: 14 }} onClick={() => setStep('riepilogo')}>← Indietro</button>
+
+                <p className="section-label">Metodo di pagamento</p>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                   <button type="button" className={`mini-tab${metodoPagamento === 'carta' ? ' active' : ''}`} onClick={() => setMetodoPagamento('carta')}>💳 Carta</button>
                   <button type="button" className={`mini-tab${metodoPagamento === 'apple' ? ' active' : ''}`} onClick={() => setMetodoPagamento('apple')}> Apple Pay</button>
                   <button type="button" className={`mini-tab${metodoPagamento === 'google' ? ' active' : ''}`} onClick={() => setMetodoPagamento('google')}>G Pay</button>
                 </div>
+                {/* I campi giusti compaiono solo DOPO aver scelto il
+                    metodo, come richiesto — non tutti insieme prima. */}
                 {metodoPagamento === 'carta' && (
                   <div style={{ marginBottom: 4 }}>
                     <label className="field-label">Numero carta</label>
@@ -199,33 +300,22 @@ export function CarrelloPage() {
                     Al momento di completare l'ordine ti verrà mostrata la richiesta di conferma di {metodoPagamento === 'apple' ? 'Apple Pay' : 'Google Pay'}.
                   </p>
                 )}
+
+                {errore && <p className="errore">{errore}</p>}
+
+                <button className="search-cta" style={{ marginTop: 14, opacity: inviando ? .5 : 1 }} disabled={inviando} onClick={completaAcquisto}>
+                  {inviando ? 'Invio...' : 'Completa l\'acquisto'}
+                </button>
+                {/* La nota sulla privacy sta PRIMA di essere già stato
+                    scritto "fatto" — un segnale di fiducia funziona
+                    prima della decisione, non dopo (era sotto il
+                    pulsante, chi confermava in fretta non la vedeva
+                    mai prima di cliccare). */}
+                <p style={{ fontSize: 11, opacity: .6, marginTop: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                  🔒 I tuoi dati sono trattati in modo riservato, secondo la nostra informativa privacy.
+                </p>
               </>
             )}
-
-            {bundle && (
-              <div className="checkout-summary" style={{ marginTop: 14 }}>
-                <b>Bundle: {bundle.nome}</b>
-                <p style={{ fontSize: 12, opacity: .7, margin: '4px 0 0' }}>Il bundle si acquista tutto insieme: togliendo o aggiungendo un evento, lo sconto non si applica più.</p>
-                {bundle.promoterCodice && <p style={{ fontSize: 12, opacity: .7, margin: '4px 0 0' }}>Codice promoter applicato: <b>{bundle.promoterCodice}</b></p>}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 13.5 }}><span>Totale originale</span><span>€{totaleStimato.toFixed(2)}</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span>Sconto bundle (−{bundle.scontoPercentuale}%)</span><span>− €{scontoBundleStimato.toFixed(2)}</span></div>
-              </div>
-            )}
-            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, margin: '18px 0 6px' }}>
-              Totale stimato: €{(totaleStimato - scontoBundleStimato).toFixed(2)}
-            </p>
-            <p style={{ fontSize: 11, opacity: .65, marginTop: -4 }}>
-              Il totale definitivo (con coupon/credito applicati) viene sempre ricalcolato dal server al momento di completare l'ordine.
-            </p>
-
-            {errore && <p className="errore">{errore}</p>}
-
-            <button className="search-cta" style={{ marginTop: 10, opacity: inviando ? .5 : 1 }} disabled={inviando} onClick={completaAcquisto}>
-              {inviando ? 'Invio...' : !clienteLoggato() ? 'Accedi per continuare' : 'Completa l\'acquisto'}
-            </button>
-            <p style={{ fontSize: 11, opacity: .6, marginTop: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-              🔒 I tuoi dati sono trattati in modo riservato, secondo la nostra informativa privacy.
-            </p>
           </>
         )}
       </div>
