@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { templateEmail } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
+import { escapaHtml } from '../../shared/formato.js';
 
 /** Modelli di base — usati per popolare la tabella al primo avvio (solo
  *  se una chiave non esiste ancora: non sovrascrivono mai una modifica
@@ -116,11 +117,24 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
   {
     chiave: 'preventivo_non_scelto',
     nome: 'Avviso al fornitore non scelto (dopo aver accettato un altro preventivo)',
-    oggetto: 'Aggiornamento sulla richiesta preventivo',
+    oggetto: 'Aggiornamento sulla richiesta preventivo — {{evento}} ({{tragitto}})',
     corpo: `
-      <p>Grazie per il preventivo inviato — per questo tragitto abbiamo scelto un altro fornitore. Ci teniamo comunque a ringraziarla per la disponibilità, e restiamo a disposizione per le prossime richieste.</p>
+      <p>Buongiorno,</p>
+      <p>Grazie per il preventivo inviato per il tragitto <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}} — per questo viaggio abbiamo scelto un altro fornitore.</p>
+      <p>Ci teniamo comunque a ringraziarla per la disponibilità, e restiamo a disposizione per le prossime richieste.</p>
     `,
-    segnaposto: [],
+    segnaposto: ['evento', 'tragitto', 'data'],
+  },
+  {
+    chiave: 'preventivo_scelto',
+    nome: 'Avviso al fornitore scelto (preventivo accettato)',
+    oggetto: 'Preventivo accettato — {{evento}} ({{tragitto}})',
+    corpo: `
+      <p>Buongiorno,</p>
+      <p>Le comunichiamo che abbiamo scelto il Suo preventivo di <b>{{prezzo}}</b> per il tragitto <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}}.</p>
+      <p>Seguirà a parte il preventivo confermato e firmato per accettazione. Per qualsiasi necessità restiamo a Sua disposizione.</p>
+    `,
+    segnaposto: ['evento', 'tragitto', 'data', 'prezzo'],
   },
   {
     chiave: 'bundle_conferma',
@@ -143,6 +157,87 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
     `,
     segnaposto: [],
   },
+  {
+    // Stesso testo che prima era scritto fisso in generaComunicazioniVariazione.
+    chiave: 'variazione_viaggio',
+    nome: 'Variazione al viaggio (fermata, orario, data o luogo cambiati)',
+    oggetto: 'Una variazione al tuo viaggio — {{evento}}',
+    corpo: `
+      <p>Ciao {{nome}},</p>
+      <p>C'è una variazione al tuo viaggio per <strong>{{evento}}</strong> (PNR {{pnr}}):</p>
+      <p>{{descrizione}}</p>
+      <p>Se va bene così, non devi fare nulla — la tua prenotazione resta confermata automaticamente.
+      Se invece preferisci il rimborso, puoi richiederlo qui:</p>
+      <p><a href="{{link}}">{{link}}</a></p>
+    `,
+    segnaposto: ['nome', 'evento', 'pnr', 'descrizione', 'link'],
+  },
+  {
+    chiave: 'partenza_confermata',
+    nome: 'Partenza confermata (primo bus organizzato per il tragitto)',
+    oggetto: 'La tua partenza è confermata — {{evento}}',
+    corpo: `
+      <p>Ciao {{nome}},</p>
+      <p>Buone notizie: la partenza del tuo viaggio per <b>{{evento}}</b> del {{data}} è confermata, il bus è organizzato.</p>
+      <ul>
+        <li><b>PNR:</b> {{pnr}}</li>
+        <li><b>Tragitto:</b> {{tragitto}}</li>
+        <li><b>Partenza da:</b> {{fermata}}</li>
+        <li><b>Orario di partenza:</b> {{orario}}</li>
+      </ul>
+      <p>Non devi fare nulla: se dovesse cambiare qualcosa ti scriveremo. A presto!</p>
+    `,
+    segnaposto: ['nome', 'evento', 'data', 'tragitto', 'fermata', 'orario', 'pnr'],
+  },
+  {
+    chiave: 'tour_leader_assegnato',
+    nome: 'Tour leader assegnato a un bus',
+    oggetto: 'Sei il tour leader di un bus — {{evento}}',
+    corpo: `
+      <p>Ciao {{nome}},</p>
+      <p>Ti abbiamo assegnato come tour leader del bus <b>{{bus}}</b>, tragitto <b>{{tragitto}}</b>, per <b>{{evento}}</b> del {{data}}.</p>
+      <p>Il giorno della partenza controllerai i biglietti dei passeggeri dall'app di scansione:</p>
+      <p><a href="{{link}}">{{link}}</a></p>
+      <p>Se non hai ancora le credenziali di accesso, chiedile all'organizzazione.</p>
+    `,
+    segnaposto: ['nome', 'evento', 'data', 'tragitto', 'bus', 'link'],
+  },
+  {
+    chiave: 'prenotazione_cancellata',
+    nome: "Prenotazione cancellata dall'organizzazione",
+    oggetto: 'La tua prenotazione è stata cancellata — {{evento}}',
+    corpo: `
+      <p>Ciao {{nome}},</p>
+      <p>Ti informiamo che la tua prenotazione <b>{{pnr}}</b> per <b>{{evento}}</b> è stata cancellata.</p>
+      <p>Motivo: {{motivo}}</p>
+      <p>Se hai domande, contattaci: siamo a disposizione.</p>
+    `,
+    segnaposto: ['nome', 'evento', 'pnr', 'motivo'],
+  },
+  {
+    chiave: 'rimborso_approvato',
+    nome: 'Richiesta di rimborso approvata',
+    oggetto: 'Rimborso approvato — {{evento}}',
+    corpo: `
+      <p>Ciao {{nome}},</p>
+      <p>La tua richiesta di rimborso per la prenotazione <b>{{pnr}}</b> (<b>{{evento}}</b>) è stata approvata: la prenotazione è cancellata.</p>
+      <p>Importo del rimborso: <b>{{importo}}</b>.</p>
+      <p>Grazie per la pazienza.</p>
+    `,
+    segnaposto: ['nome', 'evento', 'pnr', 'importo'],
+  },
+  {
+    chiave: 'rimborso_rifiutato',
+    nome: 'Richiesta di rimborso non approvata',
+    oggetto: 'La tua richiesta di rimborso — {{evento}}',
+    corpo: `
+      <p>Ciao {{nome}},</p>
+      <p>Abbiamo valutato la tua richiesta di rimborso per la prenotazione <b>{{pnr}}</b> (<b>{{evento}}</b>): purtroppo non possiamo approvarla.</p>
+      <p>Motivo: {{motivo}}</p>
+      <p>La tua prenotazione resta confermata. Se hai domande, contattaci: siamo a disposizione.</p>
+    `,
+    segnaposto: ['nome', 'evento', 'pnr', 'motivo'],
+  },
 ];
 
 /** Vecchio testo del modello "conferma_acconto" (prima del link corretto
@@ -161,21 +256,41 @@ const VECCHIO_CORPO_CONFERMA_ACCONTO = `
       <p>A presto!</p>
     `;
 
+/** Vecchio testo di "preventivo_non_scelto" (senza evento/tragitto/data). */
+const VECCHIO_OGGETTO_PREVENTIVO_NON_SCELTO = 'Aggiornamento sulla richiesta preventivo';
+const VECCHIO_CORPO_PREVENTIVO_NON_SCELTO = `
+      <p>Grazie per il preventivo inviato — per questo tragitto abbiamo scelto un altro fornitore. Ci teniamo comunque a ringraziarla per la disponibilità, e restiamo a disposizione per le prossime richieste.</p>
+    `;
+
+/** Testi di base cambiati nel tempo: si portano al testo nuovo SOLO se
+ *  la riga salvata è ancora esattamente il vecchio testo di base (mai
+ *  toccata dal gestionale). Una modifica vera resta sempre com'è. */
+const AGGIORNAMENTI_TESTO_BASE: { chiave: string; vecchioOggetto?: string; vecchioCorpo: string }[] = [
+  { chiave: 'conferma_acconto', vecchioCorpo: VECCHIO_CORPO_CONFERMA_ACCONTO },
+  { chiave: 'preventivo_non_scelto', vecchioOggetto: VECCHIO_OGGETTO_PREVENTIVO_NON_SCELTO, vecchioCorpo: VECCHIO_CORPO_PREVENTIVO_NON_SCELTO },
+];
+
 /** Da chiamare una volta all'avvio del server (come già si fa per i
  *  permessi): crea le righe mancanti con il testo di base, non tocca
  *  mai quelle già esistenti — così un riavvio non cancella mai le
- *  modifiche fatte dal gestionale. Un'eccezione, una tantum: se il
- *  testo di "conferma_acconto" è ancora ESATTAMENTE quello vecchio (col
- *  link sbagliato), lo aggiorna al testo nuovo — ma solo in quel caso
- *  preciso, per non rischiare di cancellare per sbaglio una modifica
- *  vera fatta dal gestionale nel frattempo. */
+ *  modifiche fatte dal gestionale. Eccezione, una tantum: i modelli in
+ *  AGGIORNAMENTI_TESTO_BASE ancora ESATTAMENTE col vecchio testo di base
+ *  passano al testo nuovo — solo in quel caso preciso, per non rischiare
+ *  di cancellare una modifica vera fatta dal gestionale nel frattempo. */
 export async function sincronizzaTemplateEmail() {
   for (const modello of MODELLI_BASE) {
     const [esistente] = await db.select().from(templateEmail).where(eq(templateEmail.chiave, modello.chiave)).limit(1);
     if (!esistente) {
       await db.insert(templateEmail).values({ chiave: modello.chiave, nome: modello.nome, oggetto: modello.oggetto, corpo: modello.corpo });
-    } else if (modello.chiave === 'conferma_acconto' && esistente.corpo === VECCHIO_CORPO_CONFERMA_ACCONTO) {
-      await db.update(templateEmail).set({ corpo: modello.corpo, aggiornatoIl: new Date() }).where(eq(templateEmail.chiave, modello.chiave));
+      continue;
+    }
+    const aggiornamento = AGGIORNAMENTI_TESTO_BASE.find((a) => a.chiave === modello.chiave);
+    if (aggiornamento && esistente.corpo === aggiornamento.vecchioCorpo) {
+      await db.update(templateEmail).set({
+        corpo: modello.corpo,
+        ...(aggiornamento.vecchioOggetto !== undefined && esistente.oggetto === aggiornamento.vecchioOggetto && { oggetto: modello.oggetto }),
+        aggiornatoIl: new Date(),
+      }).where(eq(templateEmail.chiave, modello.chiave));
     }
   }
 }
@@ -219,12 +334,31 @@ export const templateEmailService = {
    *  pronti da passare a inviaEmail(). Usata da tutti i punti del
    *  codice che mandano email automatiche — così il testo vero vive in
    *  un solo posto (il database, modificabile dal gestionale) invece
-   *  che ripetuto/scritto fisso in ogni singolo file. */
-  async renderizza(chiave: string, variabili: Record<string, string>): Promise<{ oggetto: string; html: string }> {
-    const modello = await this.getByChiave(chiave);
+   *  che ripetuto/scritto fisso in ogni singolo file.
+   *
+   *  opzioni.escapaHtml: i segnaposto il cui valore arriva da persone
+   *  (nomi, indirizzi, descrizioni, motivi) — nel corpo HTML vengono
+   *  resi innocui; nell'oggetto (testo semplice) restano come sono. Mai
+   *  metterci i link.
+   *
+   *  Se la riga non è ancora sul database (sincronizzazione all'avvio
+   *  non ancora passata) si usa il testo di base, invece di perdere
+   *  l'email. */
+  async renderizza(
+    chiave: string,
+    variabili: Record<string, string>,
+    opzioni: { escapaHtml?: string[] } = {},
+  ): Promise<{ oggetto: string; html: string }> {
+    const [riga] = await db.select().from(templateEmail).where(eq(templateEmail.chiave, chiave)).limit(1);
+    const modello = riga ?? MODELLI_BASE.find((m) => m.chiave === chiave);
+    if (!modello) throw new NonTrovato('Modello email');
+    const daEscapare = new Set(opzioni.escapaHtml ?? []);
+    const variabiliHtml = Object.fromEntries(
+      Object.entries(variabili).map(([k, v]) => [k, daEscapare.has(k) ? escapaHtml(v) : v]),
+    );
     return {
       oggetto: sostituisciSegnaposto(modello.oggetto, variabili),
-      html: sostituisciSegnaposto(modello.corpo, variabili),
+      html: sostituisciSegnaposto(modello.corpo, variabiliHtml),
     };
   },
 };

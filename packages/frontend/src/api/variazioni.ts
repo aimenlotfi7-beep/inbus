@@ -15,10 +15,15 @@ export const variazioniApi = {
 export interface Variazione {
   id: string;
   tragittoId: string;
+  // Città della fermata toccata; '' = variazione di tutto il viaggio
+  // (data/ora o luogo dell'evento cambiati).
   fermataDescrizione: string;
   descrizione: string;
   stato: 'IN_CORSO' | 'GESTITA';
   creataIl: string;
+  eventoArtista: string;
+  eventoData: string; // ISO
+  tragittoNome: string;
   totaleClienti: number;
   rispostoAccettato: number;
   rispostoRimborso: number;

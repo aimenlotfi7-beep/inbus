@@ -1,112 +1,131 @@
 import { useEffect, useState } from 'react';
 import { notifica } from '../shared/notifiche';
+import { conferma } from '../shared/conferma';
+import { motivoErrore } from '../shared/errori';
 import { eventiApi, type Linea, type BusDiLineaInput, type SuggerimentoLinea, type CalcoloBusTragitto } from '../../api/eventi';
 import type { Evento, Fermata } from '../../api/types';
 import { fornitoriApi, type Fornitore } from '../../api/fornitori';
 import { preventiviApi } from '../../api/preventivi';
 import { tourLeaderApi, type TourLeader } from '../../api/tourleader';
-import { ErroreApi } from '../../api/client';
 import { CampoNumero } from '../shared/CampoNumero';
 import { PanelHead } from '../shared/PanelHead';
 import { useNavigazione } from '../shared/NavigazioneContext';
-import { formattaEuro } from '../../shared/formato';
+import { formattaEuro, plurale } from '../../shared/formato';
+import { confermaAvvisiClienti, notificaEsitoAvvisi } from '../shared/avvisiClienti';
+import { SEZIONE_PARTENZE, type TabPartenze } from './partenze/tipi';
 
 const BUS_VUOTO: BusDiLineaInput = { riferimento: '' };
 
+/** Un pannello di modifica alla volta: prima "Modifica percorso" della
+ *  Linea 1 e "Modifica" di un bus della Linea 2 potevano restare aperti
+ *  insieme, condividendo la stessa linea attiva — e il percorso finiva
+ *  salvato sulla linea sbagliata. */
+type Pannello = 'nuova-linea' | 'modifica-bus' | 'aggiungi-bus' | 'modifica-percorso';
+
 /** Pagina dedicata a UN tragitto — sia come pagina a sé
- *  (?sezione=linee&evento=...&tragitto=..., raggiunta dal menu) sia
- *  INCORPORATA direttamente dentro "Da Confermare" (props espliciti,
- *  niente lettura di URL, niente pulsante "torna indietro" — è già
- *  dentro la pagina giusta, la barra laterale di Partenze sceglie il
- *  tragitto, questo componente ne mostra subito il contenuto).
+ *  (?sezione=linee&evento=...&tragitto=...&da=..., aperta da
+ *  Confermate/Passate) sia INCORPORATA direttamente dentro "Da
+ *  confermare" (props espliciti, niente lettura di URL, niente pulsante
+ *  "torna indietro" — è già dentro la pagina giusta).
  *
  *  Risponde a tre domande, e solo quelle (niente incassi/margini qui,
  *  quelli vivono nelle sezioni economiche di Partenze):
  *  1. Quante fermate ha questo tragitto?
  *  2. Quante prenotazioni ci sono per ognuna?
- *  3. Quali Linee lo percorrono, e quali bus sono censiti su ciascuna?
+ *  3. Quali linee lo percorrono, e quali bus sono assegnati a ciascuna?
  *
- *  Una "Linea" è un CONTENITORE: un percorso (quali fermate copre, in
+ *  Una "linea" è un CONTENITORE: un percorso (quali fermate copre, in
  *  che ordine — cronologico, non di inserimento) che può avere UNO O
  *  PIÙ bus dentro — quando un primo bus non basta più per le stesse
- *  fermate, se ne aggiunge un secondo alla STESSA Linea invece di
+ *  fermate, se ne aggiunge un secondo alla STESSA linea invece di
  *  crearne una nuova. Linee diverse dello stesso tragitto NON devono
  *  avere per forza le stesse fermate (già supportato dal modello dati
  *  — linea_fermate collega una linea a un SUO sottoinsieme). */
-export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdProp?: string; incorporata?: boolean }) {
+export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdProp?: string; incorporata?: boolean; onModificato?: () => void }) {
   const navigaSezione = useNavigazione();
   const parametri = new URLSearchParams(window.location.search);
   const eventoId = props?.eventoIdProp ?? parametri.get('evento');
   const tragittoId = props?.tragittoIdProp ?? parametri.get('tragitto');
+  // Da quale voce di Partenze si è arrivati: "← Torna" deve riportare lì,
+  // non sempre a "Da confermare".
+  const origine = parametri.get('da') as TabPartenze | null;
   const incorporata = !!props?.incorporata;
+  const onModificato = props?.onModificato;
 
   const [evento, setEvento] = useState<Evento | null>(null);
   const [linee, setLinee] = useState<Linea[]>([]);
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
   const [tourLeaders, setTourLeaders] = useState<TourLeader[]>([]);
+  const [erroreElenchi, setErroreElenchi] = useState('');
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState('');
 
   const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
   const [gestisciFermateAperto, setGestisciFermateAperto] = useState(false);
+  const [fermataInSalvataggio, setFermataInSalvataggio] = useState<string | null>(null);
   const [lineeEspanse, setLineeEspanse] = useState<Set<string>>(new Set());
-  const [lineaAttivaId, setLineaAttivaId] = useState<string | null>(null);
 
-  const [popupAperto, setPopupAperto] = useState(false);
-  const [stepPopup, setStepPopup] = useState<1 | 2>(1);
+  const [pannello, setPannello] = useState<Pannello | null>(null);
+  const [lineaAttivaId, setLineaAttivaId] = useState<string | null>(null);
+  const [busInModificaId, setBusInModificaId] = useState<string | null>(null);
+  const [stepNuovaLinea, setStepNuovaLinea] = useState<1 | 2>(1);
   const [formBus, setFormBus] = useState<BusDiLineaInput & { postiBus?: number }>(BUS_VUOTO);
   const [fermateSelezionate, setFermateSelezionate] = useState<string[]>([]);
+  const [percorsoModificato, setPercorsoModificato] = useState<string[]>([]);
   const [verificaKm, setVerificaKm] = useState<{ kmAccettati: number | null; kmAttuali: number | null; cambiatoParecchio: boolean } | null>(null);
   const [suggerimento, setSuggerimento] = useState<SuggerimentoLinea | null>(null);
   const [salvando, setSalvando] = useState(false);
-
-  const [modificaBusId, setModificaBusId] = useState<string | null>(null);
-  const [modificaPercorsoAperta, setModificaPercorsoAperta] = useState(false);
-  const [percorsoModificato, setPercorsoModificato] = useState<string[]>([]);
-  const [aggiungiBusAperto, setAggiungiBusAperto] = useState(false);
-  const [versando, setVersando] = useState(false);
-  const [formNuovoBus, setFormNuovoBus] = useState<BusDiLineaInput & { postiBus?: number }>(BUS_VUOTO);
+  const [versandoLineaId, setVersandoLineaId] = useState<string | null>(null);
 
   function ricarica() {
     if (!eventoId || !tragittoId) return;
-    setCaricamento(true);
     setErrore('');
     Promise.all([eventiApi.getById(eventoId), eventiApi.calcolaBus(eventoId), eventiApi.listaLinee(tragittoId)])
       .then(([ev, c, l]) => { setEvento(ev); setCalcolo(c); setLinee(l); })
-      .catch((e) => setErrore(e instanceof ErroreApi ? e.message : 'Impossibile caricare la pagina.'))
+      .catch((e) => setErrore(`Impossibile caricare le linee: ${motivoErrore(e)}`))
       .finally(() => setCaricamento(false));
-    // Anche il suggerimento — dopo aver creato/modificato una Linea, i
+    // Anche il suggerimento — dopo aver creato/modificato una linea, i
     // suoi numeri (o "già confermata") potrebbero non valere più.
-    eventiApi.suggerimentoLinea(tragittoId).then(setSuggerimento).catch(() => {});
+    eventiApi.suggerimentoLinea(tragittoId).then(setSuggerimento).catch(() => setSuggerimento(null));
+  }
+  /** Dopo ogni modifica: dati di questa pagina, e (se incorporata) la
+   *  pagina che la contiene, così intestazione e card non restano indietro. */
+  function aggiornaDopoModifica() {
+    ricarica();
+    onModificato?.();
   }
   useEffect(() => {
     ricarica();
-    fornitoriApi.list().then(setFornitori).catch(() => setFornitori([]));
-    tourLeaderApi.list().then(setTourLeaders).catch(() => setTourLeaders([]));
+    // Un elenco che non si carica non deve sembrare vuoto: con "— Nessuno —"
+    // al posto del fornitore già assegnato si rischia di salvarlo cancellato.
+    fornitoriApi.list().then(setFornitori).catch((e) => setErroreElenchi(`Elenco fornitori non disponibile: ${motivoErrore(e)}`));
+    tourLeaderApi.list().then(setTourLeaders).catch((e) => setErroreElenchi(`Elenco tour leader non disponibile: ${motivoErrore(e)}`));
     if (tragittoId) preventiviApi.verificaKm(tragittoId).then(setVerificaKm).catch(() => {});
-    if (tragittoId) eventiApi.suggerimentoLinea(tragittoId).then(setSuggerimento).catch(() => setSuggerimento(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventoId, tragittoId]);
 
-  function tornaAPartenze(tabDestinazione?: 'fermate' | 'preventivi' | 'da-prezzare' | 'da-confermare') {
-    const sezione = tabDestinazione === 'fermate' ? 'partenze-orari'
-      : tabDestinazione === 'preventivi' ? 'partenze-preventivi'
-      : tabDestinazione === 'da-prezzare' ? 'partenze-prezzi'
-      : 'partenze-da-confermare';
-    navigaSezione(sezione, { evento: null, tragitto: null, eventoId: null, tragittiIds: null });
+  function tornaAPartenze(tabDestinazione?: TabPartenze) {
+    navigaSezione(SEZIONE_PARTENZE[tabDestinazione ?? origine ?? 'da-confermare'] as never, { evento: null, tragitto: null, da: null, eventoId: null, tragittiIds: null });
   }
 
   if (!eventoId || !tragittoId) {
     return (
       <div>
-        <PanelHead titolo="Tragitto" />
-        <p className="testo-intro" style={{ color: 'var(--pink)' }}>Manca il riferimento all'evento o al tragitto — torna a Partenze e riprova.</p>
-        <button className="btn btn-ghost" onClick={() => tornaAPartenze()}>← Torna alle partenze</button>
+        <PanelHead titolo="Linee del tragitto" />
+        <p className="testo-intro" style={{ color: 'var(--pink)' }}>Manca il riferimento all'evento o al tragitto: torna a Partenze e riprova.</p>
+        <button type="button" className="btn btn-ghost" onClick={() => tornaAPartenze()}>← Torna a Partenze</button>
       </div>
     );
   }
-  if (caricamento) return <p className="testo-intro">Carico...</p>;
-  if (errore) return <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>;
+  if (caricamento) return <p className="testo-intro">Carico…</p>;
+  if (errore && !evento) {
+    return (
+      <div>
+        <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>
+        <button type="button" className="btn btn-ghost" onClick={ricarica}>Riprova</button>
+      </div>
+    );
+  }
   if (!evento) return null;
 
   const idEvento = eventoId;
@@ -116,9 +135,9 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   if (!tragittoVero) {
     return (
       <div>
-        <PanelHead titolo="Tragitto" />
+        <PanelHead titolo="Linee del tragitto" />
         <p className="testo-intro" style={{ color: 'var(--pink)' }}>Questo tragitto non esiste più, o è stato eliminato.</p>
-        <button className="btn btn-ghost" onClick={() => tornaAPartenze()}>← Torna alle partenze</button>
+        <button type="button" className="btn btn-ghost" onClick={() => tornaAPartenze()}>← Torna a Partenze</button>
       </div>
     );
   }
@@ -133,10 +152,11 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   const tutteLeFermateOrdinate = [...tragittoVero.fermate].sort(perOrario);
   const calcoloTragitto = calcolo.find((c) => c.tragittoId === idTragitto);
   const partecipantiPerFermata = new Map(calcoloTragitto?.fermate.map((f) => [f.fermataId, f.passeggeri]) ?? []);
+  const totaleBus = linee.reduce((tot, l) => tot + l.bus.length, 0);
 
   /** Prenotazioni per fermata (a livello di TRAGITTO) — la somma di
-   *  in-attesa+versati su tutte le Linee che coprono quella città; se
-   *  nessuna Linea la copre ancora, il totale grezzo delle prenotazioni
+   *  in-attesa+assegnati su tutte le linee che coprono quella città; se
+   *  nessuna linea la copre ancora, il totale grezzo delle prenotazioni
    *  arrivate su quella fermata. */
   function prenotazioniFermata(f: Fermata): number {
     const primaLineaConQuestaCitta = linee.find((l) => l.fermate.some((lf) => lf.citta === f.citta));
@@ -147,22 +167,57 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     return partecipantiPerFermata.get(f.id) ?? 0;
   }
 
-  async function alternaFermataAttiva(fermataId: string) {
+  // Chi viene avvisato quando si esclude una fermata lo calcola il server
+  // (anteprima): chi ha prenotato su una fermata che nessuna linea copre
+  // riceve l'email di variazione; le fermate già dentro una linea restano
+  // servite, e lì non si avvisa nessuno.
+  async function alternaFermataAttiva(f: Fermata) {
     const t = tragittoVero;
-    if (!t) return;
-    const fermateAggiornate = t.fermate.map((f) => ({
-      fermataAnagraficaId: f.fermataAnagraficaId, citta: f.citta, indirizzo: f.indirizzo ?? undefined,
-      orario: f.orario ?? undefined, orarioRitorno: f.orarioRitorno ?? undefined, indirizzoRitorno: f.indirizzoRitorno ?? undefined,
-      prezzo: f.prezzo ? Number(f.prezzo) : undefined, postiMax: f.postiMax ?? undefined,
-      sogliaMinima: f.sogliaMinima ?? undefined,
-      attivo: f.id === fermataId ? !f.attivo : f.attivo,
-    }));
+    if (!t || fermataInSalvataggio) return;
+    const escludi = f.attivo;
+    const input = {
+      // Il prezzo extra del tragitto va rimandato così com'è: senza, il
+      // server lo azzerava a ogni esclusione o riattivazione di una fermata.
+      prezzoExtra: Number(t.prezzoExtra),
+      fermate: t.fermate.map((x) => ({
+        fermataAnagraficaId: x.fermataAnagraficaId, citta: x.citta, indirizzo: x.indirizzo ?? undefined,
+        orario: x.orario ?? undefined, orarioRitorno: x.orarioRitorno ?? undefined, indirizzoRitorno: x.indirizzoRitorno ?? undefined,
+        prezzo: x.prezzo ? Number(x.prezzo) : undefined, postiMax: x.postiMax ?? undefined,
+        sogliaMinima: x.sogliaMinima ?? undefined,
+        attivo: x.id === f.id ? !x.attivo : x.attivo,
+      })),
+    };
+    setFermataInSalvataggio(f.id);
     try {
-      await eventiApi.aggiornaTragittoOperativo(idTragitto, { fermate: fermateAggiornate });
-      ricarica();
+      if (escludi) {
+        let anteprima: Awaited<ReturnType<typeof eventiApi.anteprimaTragittoOperativo>>;
+        try {
+          anteprima = await eventiApi.anteprimaTragittoOperativo(idTragitto, input);
+        } catch (e) {
+          notifica(`Impossibile controllare quali clienti verrebbero avvisati: ${motivoErrore(e)}`, 'errore');
+          return;
+        }
+        const prenotazioni = prenotazioniFermata(f);
+        const giaInUnaLinea = linee.some((l) => l.fermate.some((lf) => lf.citta === f.citta));
+        if (anteprima.clientiTotali > 0) {
+          if (!(await confermaAvvisiClienti(anteprima, 'Escludi e avvisa i clienti'))) return;
+        } else if (prenotazioni > 0 && giaInUnaLinea) {
+          const ok = await conferma({
+            titolo: `Escludere la fermata di ${f.citta}?`,
+            testo: <>La fermata resta nelle linee già create, quindi {prenotazioni === 1 ? 'la prenotazione' : `le ${prenotazioni} prenotazioni`} di questa fermata non {prenotazioni === 1 ? 'cambia' : 'cambiano'}. Non si potrà più scegliere per una nuova linea.</>,
+            conferma: 'Escludi la fermata',
+          });
+          if (!ok) return;
+        }
+      }
+      const esito = await eventiApi.aggiornaTragittoOperativo(idTragitto, input);
+      notificaEsitoAvvisi(escludi ? `Fermata di ${f.citta} esclusa` : `Fermata di ${f.citta} riattivata`, esito);
+      aggiornaDopoModifica();
       preventiviApi.verificaKm(idTragitto).then(setVerificaKm).catch(() => {});
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: errore di rete.');
+      notifica(`Modifica della fermata non riuscita: ${motivoErrore(e)}`, 'errore');
+    } finally {
+      setFermataInSalvataggio(null);
     }
   }
 
@@ -170,42 +225,59 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     return l.fermate.reduce((tot, f) => tot + f.inAttesa + f.versati, 0);
   }
 
-  function apriPopupNuovaLinea() {
+  function apriPannello(tipo: Pannello, lineaId: string | null = null) {
+    setPannello(tipo);
+    setLineaAttivaId(lineaId);
+    setBusInModificaId(null);
+  }
+  function chiudiPannello() {
+    setPannello(null);
+    setLineaAttivaId(null);
+    setBusInModificaId(null);
+  }
+
+  function apriNuovaLinea() {
     setFormBus(BUS_VUOTO);
     setFermateSelezionate([]);
-    setStepPopup(1);
-    setPopupAperto(true);
+    setStepNuovaLinea(1);
+    apriPannello('nuova-linea');
   }
 
   /** Dal pannello "Pronta da confermare" — fornitore/posti/costo già
    *  presi dal preventivo accettato (nulla da indovinare), e tutte le
    *  fermate attive pre-selezionate (il caso comune: si conferma la
-   *  Linea così com'è). Riferimento del bus (targa) resta da compilare
+   *  linea così com'è). Riferimento del bus (targa) resta da compilare
    *  — quello non lo sa nessun preventivo. */
-  function apriPopupDaSuggerimento() {
+  function apriNuovaLineaDaSuggerimento() {
     if (!suggerimento) return;
     setFormBus({ riferimento: '', fornitoreId: suggerimento.fornitoreId ?? undefined, postiBus: suggerimento.postiBus ?? undefined, costo: suggerimento.costo ?? undefined });
     setFermateSelezionate(fermateAttive.map((f) => f.id));
-    setStepPopup(1);
-    setPopupAperto(true);
+    setStepNuovaLinea(1);
+    apriPannello('nuova-linea');
   }
 
   async function salvaNuovaLinea() {
-    if (!formBus.riferimento || !formBus.postiBus) {
-      notifica('Indica un riferimento per il bus e quanti posti ha.');
+    if (!formBus.riferimento?.trim() || !formBus.postiBus) {
+      notifica('Indica un riferimento per il bus e quanti posti ha.', 'errore');
+      setStepNuovaLinea(1);
       return;
     }
     if (fermateSelezionate.length === 0) {
-      notifica('Seleziona almeno una fermata per la Linea.');
+      notifica('Seleziona almeno una fermata per la linea.', 'errore');
       return;
     }
     setSalvando(true);
     try {
-      await eventiApi.creaLinea(idEvento, { ...formBus, postiBus: formBus.postiBus, fermateIds: fermateSelezionate });
-      setPopupAperto(false);
-      ricarica();
+      const esito = await eventiApi.creaLinea(idEvento, { ...formBus, postiBus: formBus.postiBus, fermateIds: fermateSelezionate });
+      chiudiPannello();
+      // Con la prima linea la partenza diventa confermata e chi ha
+      // prenotato riceve l'email: il messaggio dice com'è andata.
+      if (esito.partenzaConfermata) notificaEsitoAvvisi('Linea creata e partenza confermata', esito);
+      else notifica('Linea creata.', 'successo');
+      if (esito.tourLeaderAvvisato !== null) notifica(esito.tourLeaderAvvisato ? 'Il tour leader è stato avvisato via email.' : "L'email al tour leader non è partita: avvisalo tu.", esito.tourLeaderAvvisato ? 'successo' : 'errore');
+      aggiornaDopoModifica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -217,85 +289,105 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     const linea = linee.find((l) => l.id === lineaId);
     const bus = linea?.bus.find((b) => b.id === busId);
     if (!bus) return;
-    setFormNuovoBus({
+    setFormBus({
       riferimento: bus.riferimento, fornitoreId: bus.fornitoreId ?? undefined, autistaNome: bus.autistaNome ?? undefined,
       autistaTelefono: bus.autistaTelefono ?? undefined, tourLeaderId: bus.tourLeaderId, costo: bus.costo ? Number(bus.costo) : undefined,
       postiBus: bus.postiBus ?? undefined, note: bus.note ?? undefined,
     });
-    setLineaAttivaId(lineaId);
-    setModificaBusId(busId);
+    apriPannello('modifica-bus', lineaId);
+    setBusInModificaId(busId);
   }
 
   async function salvaModificaBus() {
-    if (!modificaBusId) return;
+    if (!busInModificaId) return;
+    if (!formBus.riferimento?.trim() || !formBus.postiBus) {
+      notifica('Indica un riferimento per il bus e quanti posti ha.', 'errore');
+      return;
+    }
     setSalvando(true);
     try {
-      await eventiApi.aggiornaBusDiLinea(modificaBusId, formNuovoBus);
-      setModificaBusId(null);
-      ricarica();
+      const esito = await eventiApi.aggiornaBusDiLinea(busInModificaId, formBus);
+      chiudiPannello();
+      if (esito.tourLeaderAvvisato === false) notifica("Bus aggiornato, ma l'email al tour leader non è partita: avvisalo tu.", 'errore');
+      else notifica(esito.tourLeaderAvvisato ? 'Bus aggiornato: il tour leader è stato avvisato via email.' : 'Bus aggiornato.', 'successo');
+      aggiornaDopoModifica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
   }
 
   function apriAggiungiBus(lineaId: string) {
-    setFormNuovoBus(BUS_VUOTO);
-    setLineaAttivaId(lineaId);
-    setAggiungiBusAperto(true);
+    setFormBus(BUS_VUOTO);
+    apriPannello('aggiungi-bus', lineaId);
   }
   async function salvaBusAggiunto() {
-    if (!lineaAttivaId || !formNuovoBus.riferimento || !formNuovoBus.postiBus) {
-      notifica('Indica un riferimento e quanti posti ha il bus.');
+    if (!lineaAttivaId) return;
+    if (!formBus.riferimento?.trim() || !formBus.postiBus) {
+      notifica('Indica un riferimento per il bus e quanti posti ha.', 'errore');
       return;
     }
     setSalvando(true);
     try {
-      await eventiApi.aggiungiBusALinea(lineaAttivaId, { ...formNuovoBus, postiBus: formNuovoBus.postiBus });
-      setAggiungiBusAperto(false);
-      ricarica();
+      const esito = await eventiApi.aggiungiBusALinea(lineaAttivaId, { ...formBus, postiBus: formBus.postiBus });
+      chiudiPannello();
+      if (esito.tourLeaderAvvisato === false) notifica("Bus aggiunto alla linea, ma l'email al tour leader non è partita: avvisalo tu.", 'errore');
+      else notifica(esito.tourLeaderAvvisato ? 'Bus aggiunto alla linea: il tour leader è stato avvisato via email.' : 'Bus aggiunto alla linea.', 'successo');
+      aggiornaDopoModifica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
   }
 
-  async function versa(lineaId: string) {
-    setVersando(true);
+  async function assegnaPrenotazioni(linea: Linea) {
+    const inAttesa = linea.fermate.reduce((tot, f) => tot + f.inAttesa, 0);
+    if (inAttesa === 0) {
+      notifica(`Nessuna prenotazione in attesa su ${linea.nome}.`, 'info');
+      return;
+    }
+    const ok = await conferma({
+      titolo: 'Assegnare ai bus le prenotazioni in attesa?',
+      testo: <>{plurale(inAttesa, 'prenotazione in attesa', 'prenotazioni in attesa')} di <b>{linea.nome}</b> {inAttesa === 1 ? 'verrà assegnata' : 'verranno assegnate'} ai posti liberi dei bus. Da qui non si può annullare.</>,
+      conferma: 'Assegna ai bus',
+    });
+    if (!ok) return;
+    setVersandoLineaId(linea.id);
     try {
-      const { versate, restanoInAttesa } = await eventiApi.versaLinea(lineaId);
-      ricarica();
-      if (versate === 0 && restanoInAttesa > 0) notifica('Nessun posto libero sui bus di questa Linea — aggiungine un altro, o aumenta i posti di quello che c\'è.');
-      else if (restanoInAttesa > 0) notifica(`Versate ${versate} prenotazion${versate === 1 ? 'e' : 'i'} — ${restanoInAttesa} restano in attesa, non c'è più posto sui bus di questa Linea.`);
-      else notifica(`Versate ${versate} prenotazion${versate === 1 ? 'e' : 'i'}.`, 'successo');
+      const { versate, restanoInAttesa } = await eventiApi.versaLinea(linea.id);
+      aggiornaDopoModifica();
+      if (versate === 0 && restanoInAttesa > 0) notifica('Nessun posto libero sui bus di questa linea: aggiungi un bus, o aumenta i posti di quello che c\'è.', 'errore');
+      else if (restanoInAttesa > 0) notifica(`${plurale(versate, 'prenotazione assegnata', 'prenotazioni assegnate')} ai bus; ${restanoInAttesa} ${restanoInAttesa === 1 ? 'resta' : 'restano'} in attesa perché i posti sono finiti.`, 'info');
+      else notifica(`${plurale(versate, 'prenotazione assegnata', 'prenotazioni assegnate')} ai bus.`, 'successo');
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Versamento non riuscito: ${e.message}` : 'Versamento non riuscito: errore di rete.');
+      notifica(`Assegnazione non riuscita: ${motivoErrore(e)}`, 'errore');
     } finally {
-      setVersando(false);
+      setVersandoLineaId(null);
     }
   }
 
   function apriModificaPercorso(lineaId: string) {
     const linea = linee.find((l) => l.id === lineaId);
     if (!linea) return;
-    setLineaAttivaId(lineaId);
     setPercorsoModificato(linea.fermate.map((f) => f.fermataId));
-    setModificaPercorsoAperta(true);
+    apriPannello('modifica-percorso', lineaId);
   }
   async function salvaModificaPercorso() {
-    if (!lineaAttivaId || percorsoModificato.length === 0) {
-      notifica('Seleziona almeno una fermata.');
+    if (!lineaAttivaId) return;
+    if (percorsoModificato.length === 0) {
+      notifica('Seleziona almeno una fermata.', 'errore');
       return;
     }
     setSalvando(true);
     try {
       await eventiApi.aggiornaPercorsoLinea(idEvento, lineaAttivaId, percorsoModificato);
-      setModificaPercorsoAperta(false);
-      ricarica();
+      chiudiPannello();
+      notifica('Percorso della linea aggiornato.', 'successo');
+      aggiornaDopoModifica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -309,45 +401,84 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     });
   }
 
+  /** Solo fornitori approvati (come in Preventivi), più quello già
+   *  assegnato a questo bus se nel frattempo è stato disattivato: senza,
+   *  il menu mostrerebbe "— Nessuno —" e salvando lo si cancellerebbe. */
+  function fornitoriScegliibili(attuale: string | undefined | null) {
+    return fornitori.filter((f) => f.stato === 'APPROVATO' || f.id === attuale);
+  }
+
+  const campiBus = (conTourLeader: boolean) => (
+    <>
+      <div className="campo"><label>Riferimento (es. targa, o codice dell'agenzia)</label><input value={formBus.riferimento} onChange={(e) => setFormBus({ ...formBus, riferimento: e.target.value })} /></div>
+      <div className="campo">
+        <label>Fornitore</label>
+        <select value={formBus.fornitoreId ?? ''} onChange={(e) => setFormBus({ ...formBus, fornitoreId: e.target.value || undefined })}>
+          <option value="">— Nessuno —</option>
+          {fornitoriScegliibili(formBus.fornitoreId).map((f) => <option key={f.id} value={f.id}>{f.nome}{f.stato !== 'APPROVATO' ? ' (non attivo)' : ''}</option>)}
+        </select>
+      </div>
+      <div className="campo"><label>Autista (facoltativo)</label><input value={formBus.autistaNome ?? ''} onChange={(e) => setFormBus({ ...formBus, autistaNome: e.target.value })} /></div>
+      <div className="campo"><label>Telefono autista (facoltativo)</label><input type="tel" value={formBus.autistaTelefono ?? ''} onChange={(e) => setFormBus({ ...formBus, autistaTelefono: e.target.value })} /></div>
+      {conTourLeader && (
+        <div className="campo">
+          <label>Tour leader (facoltativo)</label>
+          <select value={formBus.tourLeaderId ?? ''} onChange={(e) => setFormBus({ ...formBus, tourLeaderId: e.target.value || null })}>
+            <option value="">— Nessuno —</option>
+            {tourLeaders.map((t) => <option key={t.id} value={t.id}>{t.nome} {t.cognome}</option>)}
+          </select>
+        </div>
+      )}
+      <div className="campo"><label>Posti del bus</label><CampoNumero min={0} value={formBus.postiBus} onChange={(v) => setFormBus({ ...formBus, postiBus: v })} /></div>
+      <div className="campo"><label>Costo del bus (facoltativo)</label><CampoNumero valuta min={0} value={formBus.costo} onChange={(v) => setFormBus({ ...formBus, costo: v })} /></div>
+      <div className="campo"><label>Note (facoltative)</label><input value={formBus.note ?? ''} onChange={(e) => setFormBus({ ...formBus, note: e.target.value })} /></div>
+      {erroreElenchi && <p style={{ color: 'var(--pink)', fontSize: 'var(--testo-sm)', marginTop: -6 }}>{erroreElenchi}</p>}
+    </>
+  );
+
   return (
     <div>
       {!incorporata && (
-        <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => tornaAPartenze()}>← Torna alle partenze</button>
+        <>
+          <button type="button" className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => tornaAPartenze()}>← Torna a Partenze</button>
+          <PanelHead titolo={`Linee — ${tragittoVero.nome}`} />
+        </>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
         <p className="testo-intro" style={{ margin: 0 }}>
-          {evento.artista}
-          {fermateAttive.length > 0 && <> · {fermateAttive.map((f) => `${f.citta}: ${prenotazioniFermata(f)}`).join(' · ')}</>}
-          {' · '}{linee.reduce((tot, l) => tot + l.bus.length, 0)} bus censit{linee.reduce((tot, l) => tot + l.bus.length, 0) === 1 ? 'o' : 'i'}
+          {!incorporata && <>{evento.artista} · </>}
+          {fermateAttive.length > 0 && <>Passeggeri: {fermateAttive.map((f) => `${f.citta} ${prenotazioniFermata(f)}`).join(' · ')} · </>}
+          {plurale(totaleBus, 'bus assegnato', 'bus assegnati')}
         </p>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 10px' }} onClick={() => setGestisciFermateAperto((v) => !v)}>
+          <button type="button" className="btn btn-ghost btn-piccolo" onClick={() => setGestisciFermateAperto((v) => !v)}>
             {gestisciFermateAperto ? 'Chiudi fermate' : 'Gestisci fermate'}
           </button>
-          <button className="btn btn-primary" style={{ fontSize: 'var(--testo-md)', padding: '6px 14px' }} onClick={apriPopupNuovaLinea}>+ Nuova linea</button>
+          <button type="button" className="btn btn-primary btn-piccolo" onClick={apriNuovaLinea}>+ Nuova linea</button>
         </div>
       </div>
 
       {gestisciFermateAperto && (
         <div className="section-card" style={{ marginBottom: 16 }}>
           <p className="testo-intro" style={{ marginTop: -4, marginBottom: 12 }}>
-            Escludi una fermata (es. per scarse adesioni) — resta nel tragitto, solo non più selezionabile per una nuova Linea. Le fermate già dentro una Linea non vengono toccate.
+            Escludi una fermata (es. per scarse adesioni): resta nel tragitto, ma non si potrà più scegliere per una nuova linea. Le fermate già dentro una linea non vengono toccate.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {tutteLeFermateOrdinate.map((f) => {
+              const inSalvataggio = fermataInSalvataggio === f.id;
               if (!f.attivo) {
                 return (
                   <span key={f.id} className="chip" style={{ opacity: 0.55 }}>
                     <span style={{ textDecoration: 'line-through' }}>{f.citta}</span>
-                    <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Riattiva questa fermata" style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0, fontSize: 'var(--testo-md)' }}>↺</button>
+                    <button type="button" disabled={!!fermataInSalvataggio} onClick={() => alternaFermataAttiva(f)} title="Riattiva questa fermata" aria-label={`Riattiva la fermata di ${f.citta}`} style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0, fontSize: 'var(--testo-md)' }}>{inSalvataggio ? '…' : '↺'}</button>
                   </span>
                 );
               }
               return (
                 <span key={f.id} className="chip">
                   {f.citta}
-                  <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Escludi questa fermata" style={{ background: 'none', border: 'none', color: 'var(--mist)', cursor: 'pointer', padding: 0, fontSize: 'var(--testo-md)' }}>✕</button>
+                  <button type="button" disabled={!!fermataInSalvataggio} onClick={() => alternaFermataAttiva(f)} title="Escludi questa fermata" aria-label={`Escludi la fermata di ${f.citta}`} style={{ background: 'none', border: 'none', color: 'var(--mist)', cursor: 'pointer', padding: 0, fontSize: 'var(--testo-md)' }}>{inSalvataggio ? '…' : '✕'}</button>
                 </span>
               );
             })}
@@ -358,34 +489,34 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
 
       {verificaKm?.cambiatoParecchio && (
         <div style={{ background: 'var(--dusk)', border: '1px solid var(--amber)', borderRadius: 8, padding: '10px 14px', fontSize: 'var(--testo-md)', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span><b style={{ color: 'var(--amber)' }}>⚠ Le fermate sono cambiate parecchio</b> da quando hai accettato il preventivo (~{Math.round(verificaKm.kmAccettati!)} km allora, ~{Math.round(verificaKm.kmAttuali!)} km ora) — potrebbe servire un nuovo preventivo.</span>
+          <span><b style={{ color: 'var(--amber)' }}>⚠ Le fermate sono cambiate parecchio</b> da quando hai accettato il preventivo (circa {Math.round(verificaKm.kmAccettati!)} km allora, {Math.round(verificaKm.kmAttuali!)} km ora): potrebbe servire un nuovo preventivo.</span>
           <button type="button" className="btn btn-ghost" style={{ flexShrink: 0 }} onClick={() => tornaAPartenze('preventivi')}>Vai a Preventivi →</button>
         </div>
       )}
 
       {/* Suggerimento automatico — appena le prenotazioni confermate
-          raggiungono la soglia di pareggio, dice "puoi creare la Linea"
+          raggiungono la soglia di pareggio, dice "puoi creare la linea"
           con fornitore/costo/posti già presi dal preventivo accettato:
           nulla da indovinare, solo da controllare e confermare. */}
       {suggerimento?.pronta && (
         <div className="section-card" style={{ marginBottom: 16, borderColor: 'var(--green)' }}>
-          <p style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>✓ Pronta da confermare</p>
+          <p style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>Pronta da confermare</p>
           <p style={{ fontSize: 'var(--testo-base)', marginBottom: 8 }}>
-            {suggerimento.totaleConfermati} passeggeri confermati (soglia di pareggio: {suggerimento.postiDiPareggio}) — puoi creare la Linea con {suggerimento.postiBus} posti a {formattaEuro(suggerimento.costo)}, gli stessi del preventivo accettato.
+            {plurale(suggerimento.totaleConfermati, 'passeggero confermato', 'passeggeri confermati')} (soglia di pareggio: {suggerimento.postiDiPareggio}): puoi creare la linea con {suggerimento.postiBus ?? '—'} posti{suggerimento.costo != null ? ` a ${formattaEuro(suggerimento.costo)}` : ''}, come nel preventivo accettato.
           </p>
           {!!suggerimento.fermateSenzaPrenotazioni?.length && (
             <p style={{ fontSize: 'var(--testo-md)', color: 'var(--amber)', marginBottom: 8 }}>
-              ⚠ {suggerimento.fermateSenzaPrenotazioni.length} fermata/e senza nessuna prenotazione ({suggerimento.fermateSenzaPrenotazioni.map((f) => f.citta).join(', ')}) — se vuoi accorciare il tragitto, deselezionale nel passo 2 qui sotto; controlla anche il preventivo, potrebbe convenirti richiederne uno migliorativo (il banner "km cambiati" te lo segnala da solo).
+              ⚠ {suggerimento.fermateSenzaPrenotazioni.length === 1 ? '1 fermata senza prenotazioni' : `${suggerimento.fermateSenzaPrenotazioni.length} fermate senza prenotazioni`} ({suggerimento.fermateSenzaPrenotazioni.map((f) => f.citta).join(', ')}): se vuoi accorciare il tragitto, deselezionale nel passo 2. Potrebbe convenire anche chiedere un preventivo nuovo.
             </p>
           )}
-          <button type="button" className="btn btn-primary" onClick={apriPopupDaSuggerimento}>Conferma Linea →</button>
+          <button type="button" className="btn btn-primary" onClick={apriNuovaLineaDaSuggerimento}>Conferma linea →</button>
         </div>
       )}
       {suggerimento?.serveSecondoBus && (
         <div className="section-card" style={{ marginBottom: 16, borderColor: 'var(--pink)' }}>
           <p style={{ fontWeight: 700, color: 'var(--pink)', marginBottom: 6 }}>⚠ Serve un secondo bus</p>
           <p style={{ fontSize: 'var(--testo-base)', marginBottom: 8 }}>
-            {suggerimento.totaleConfermati} passeggeri confermati, ma i bus già registrati coprono solo {suggerimento.capienzaReale} posti.
+            {plurale(suggerimento.totaleConfermati, 'passeggero confermato', 'passeggeri confermati')}, ma i bus assegnati coprono solo {suggerimento.capienzaReale} posti.
           </p>
         </div>
       )}
@@ -394,124 +525,114 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         <p className="section-label" style={{ marginBottom: 12 }}>Linee su questo tragitto</p>
 
         {linee.length === 0 ? (
-          <p className="testo-intro">Nessuna Linea ancora per questo tragitto — crea la prima con "+ Nuova linea" qui sopra.</p>
+          <p className="testo-intro">Nessuna linea ancora per questo tragitto: crea la prima con "+ Nuova linea" qui sopra.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {linee.map((l) => {
               const espansa = lineeEspanse.has(l.id);
-                const percorso = l.fermate.map((f) => f.citta).join(' → ');
-                return (
-                  <div key={l.id} className="section-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }} onClick={() => alternaLineaEspansa(l.id)}>
-                      <div>
-                        <p style={{ fontWeight: 700, marginBottom: 4 }}>{l.nome}</p>
-                        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 8 }}>{percorso || 'Nessuna fermata'}</p>
-                        <p style={{ fontSize: 'var(--testo-md)' }}>
-                          Prenotazioni: <b>{prenotazioniLinea(l)}</b>
-                          <span style={{ color: 'var(--mist)' }}> · </span>
-                          Bus censiti: <b>{l.bus.length}</b>
-                        </p>
-                      </div>
-                      <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-2xl)', flexShrink: 0 }}>{espansa ? '▲' : '▼'}</span>
+              const percorso = l.fermate.map((f) => f.citta).join(' → ');
+              return (
+                <div key={l.id} className="section-card">
+                  <div
+                    role="button" tabIndex={0} aria-expanded={espansa}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}
+                    onClick={() => alternaLineaEspansa(l.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternaLineaEspansa(l.id); } }}
+                  >
+                    <div>
+                      <p style={{ fontWeight: 700, marginBottom: 4 }}>{l.nome}</p>
+                      <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 8 }}>{percorso || 'Nessuna fermata'}</p>
+                      <p style={{ fontSize: 'var(--testo-md)' }}>
+                        Prenotazioni: <b>{prenotazioniLinea(l)}</b>
+                        <span style={{ color: 'var(--mist)' }}> · </span>
+                        Bus: <b>{l.bus.length}</b>
+                      </p>
                     </div>
-
-                    {espansa && (
-                      <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--line)' }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-                          {l.fermate.map((f) => (
-                            <span key={f.fermataId} className="chip">
-                              {f.citta}{f.orario && <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>({f.orario})</span>}
-                              <span style={{ color: 'var(--pink)', fontFamily: "'Space Mono',monospace" }}>{f.inAttesa}</span>
-                              <span style={{ color: 'var(--mist)' }}>/</span>
-                              <span style={{ color: 'var(--green)', fontFamily: "'Space Mono',monospace" }}>{f.versati}</span>
-                            </span>
-                          ))}
-                        </div>
-
-                        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                          <button className="btn btn-primary" style={{ fontSize: 'var(--testo-md)' }} onClick={() => versa(l.id)} disabled={versando}>
-                            {versando && lineaAttivaId === l.id ? 'Verso...' : '↓ Versa le prenotazioni in attesa'}
-                          </button>
-                          <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} onClick={() => apriModificaPercorso(l.id)}>Modifica percorso</button>
-                        </div>
-
-                        <p className="section-label" style={{ fontSize: 'var(--testo-sm)', marginBottom: 8 }}>Bus su questa linea</p>
-                        {l.bus.length === 0 ? (
-                          <div>
-                            <p className="testo-intro" style={{ marginBottom: 10 }}>Nessun bus censito.</p>
-                            <button className="btn btn-primary" style={{ fontSize: 'var(--testo-md)' }} onClick={() => apriAggiungiBus(l.id)}>+ Censisci bus</button>
-                          </div>
-                        ) : (
-                          <>
-                            {l.bus.map((b) => (
-                              <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
-                                <span className="riga-titolo">
-                                  {b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}
-                                  {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>Tour leader: {b.tourLeaderNome}</span></>}
-                                  <br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{b.postiBus ?? '—'} posti</span>
-                                </span>
-                                <span className="riga-meta">
-                                  <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px' }} onClick={() => apriModificaBus(l.id, b.id)}>Modifica</button>
-                                </span>
-                              </div>
-                            ))}
-                            <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', marginTop: 12 }} onClick={() => apriAggiungiBus(l.id)}>+ Aggiungi un altro bus a questa Linea</button>
-                          </>
-                        )}
-                      </div>
-                    )}
+                    <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-lg)', flexShrink: 0 }}>{espansa ? '▾' : '▸'}</span>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      {popupAperto && (
-        <div className="section-card" style={{ marginTop: 20 }}>
-          <p className="section-label" style={{ marginBottom: 12 }}>Nuova Linea — passo {stepPopup} di 2</p>
 
-          {stepPopup === 1 && (
+                  {espansa && (
+                    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
+                        {l.fermate.map((f) => (
+                          <span key={f.fermataId} className="chip" title={`${f.citta}: ${f.inAttesa} in attesa, ${f.versati} assegnati ai bus`}>
+                            {f.citta}{f.orario && <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>({f.orario})</span>}
+                            <span style={{ color: 'var(--pink)', fontFamily: "'Space Mono',monospace" }}>{f.inAttesa}</span>
+                            <span style={{ color: 'var(--mist)' }}>/</span>
+                            <span style={{ color: 'var(--green)', fontFamily: "'Space Mono',monospace" }}>{f.versati}</span>
+                          </span>
+                        ))}
+                      </div>
+                      <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginBottom: 14 }}>
+                        Per ogni fermata: <span style={{ color: 'var(--pink)' }}>in attesa</span> / <span style={{ color: 'var(--green)' }}>assegnati ai bus</span>
+                      </p>
+
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                        <button type="button" className="btn btn-primary" style={{ fontSize: 'var(--testo-md)' }} onClick={() => assegnaPrenotazioni(l)} disabled={!!versandoLineaId}>
+                          {versandoLineaId === l.id ? 'Assegno…' : 'Assegna ai bus le prenotazioni in attesa'}
+                        </button>
+                        <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} onClick={() => apriModificaPercorso(l.id)}>Modifica percorso</button>
+                      </div>
+
+                      <p className="section-label" style={{ fontSize: 'var(--testo-sm)', marginBottom: 8 }}>Bus su questa linea</p>
+                      {l.bus.length === 0 ? (
+                        <div>
+                          <p className="testo-intro" style={{ marginBottom: 10 }}>Nessun bus su questa linea.</p>
+                          <button type="button" className="btn btn-primary" style={{ fontSize: 'var(--testo-md)' }} onClick={() => apriAggiungiBus(l.id)}>+ Aggiungi bus</button>
+                        </div>
+                      ) : (
+                        <>
+                          {l.bus.map((b) => (
+                            <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
+                              <span className="riga-titolo">
+                                {b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}
+                                {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>Tour leader: {b.tourLeaderNome}</span></>}
+                                <br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{b.postiBus != null ? plurale(b.postiBus, 'posto', 'posti') : 'Posti non indicati'}</span>
+                              </span>
+                              <span className="riga-meta">
+                                <button type="button" className="btn btn-ghost btn-piccolo" onClick={() => apriModificaBus(l.id, b.id)}>Modifica</button>
+                              </span>
+                            </div>
+                          ))}
+                          <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', marginTop: 12 }} onClick={() => apriAggiungiBus(l.id)}>+ Aggiungi un altro bus a questa linea</button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {pannello === 'nuova-linea' && (
+        <div className="section-card" style={{ marginTop: 20 }}>
+          <p className="section-label" style={{ marginBottom: 12 }}>Nuova linea — passo {stepNuovaLinea} di 2</p>
+
+          {stepNuovaLinea === 1 && (
             <>
-              <p className="testo-intro" style={{ marginTop: -4 }}>Anagrafica bus</p>
-              <div className="campo"><label>Riferimento (es. targa, o codice dell'agenzia)</label><input value={formBus.riferimento} onChange={(e) => setFormBus({ ...formBus, riferimento: e.target.value })} /></div>
-              <div className="campo">
-                <label>Fornitore</label>
-                <select value={formBus.fornitoreId ?? ''} onChange={(e) => setFormBus({ ...formBus, fornitoreId: e.target.value || undefined })}>
-                  <option value="">— Nessuno —</option>
-                  {fornitori.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-                </select>
-              </div>
-              <div className="campo"><label>Autista (facoltativo)</label><input value={formBus.autistaNome ?? ''} onChange={(e) => setFormBus({ ...formBus, autistaNome: e.target.value })} /></div>
-              <div className="campo"><label>Telefono autista (facoltativo)</label><input value={formBus.autistaTelefono ?? ''} onChange={(e) => setFormBus({ ...formBus, autistaTelefono: e.target.value })} /></div>
-              <div className="campo">
-                <label>Tour leader assegnato</label>
-                <select value={formBus.tourLeaderId ?? ''} onChange={(e) => setFormBus({ ...formBus, tourLeaderId: e.target.value || null })}>
-                  <option value="">— Nessuno —</option>
-                  {tourLeaders.map((t) => <option key={t.id} value={t.id}>{t.nome} {t.cognome}</option>)}
-                </select>
-              </div>
-              <div className="campo"><label>Posti del bus</label><CampoNumero min={0} value={formBus.postiBus} onChange={(v) => setFormBus({ ...formBus, postiBus: v })} /></div>
-              <div className="campo"><label>Costo del bus (facoltativo)</label><CampoNumero valuta min={0} value={formBus.costo} onChange={(v) => setFormBus({ ...formBus, costo: v })} /></div>
-              <div className="campo"><label>Note</label><input value={formBus.note ?? ''} onChange={(e) => setFormBus({ ...formBus, note: e.target.value })} /></div>
+              <p className="testo-intro" style={{ marginTop: -4 }}>Dati del bus</p>
+              {campiBus(true)}
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                 <button
-                  className="btn btn-primary" style={{ flex: 1 }}
+                  type="button" className="btn btn-primary" style={{ flex: 1 }}
                   onClick={() => {
-                    if (!formBus.riferimento || !formBus.postiBus) { notifica('Indica un riferimento e i posti del bus.'); return; }
-                    setStepPopup(2);
+                    if (!formBus.riferimento?.trim() || !formBus.postiBus) { notifica('Indica un riferimento per il bus e quanti posti ha.', 'errore'); return; }
+                    setStepNuovaLinea(2);
                   }}
                 >
-                  Avanti — scegli le fermate
+                  Avanti: scegli le fermate
                 </button>
-                <button className="btn btn-ghost" onClick={() => setPopupAperto(false)}>Annulla</button>
+                <button type="button" className="btn btn-ghost" onClick={chiudiPannello}>Annulla</button>
               </div>
             </>
           )}
 
-          {stepPopup === 2 && (
+          {stepNuovaLinea === 2 && (
             <>
               <p className="testo-intro" style={{ marginTop: -4 }}>
-                Scegli le fermate — in QUALSIASI ordine (l'ordine finale lo decide da solo l'orario di ciascuna).
+                Scegli le fermate in qualsiasi ordine: l'ordine finale lo decide l'orario di ciascuna.
               </p>
               {fermateAttive.map((f) => (
                 <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 'var(--testo-base)' }}>
@@ -529,70 +650,41 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
                 </p>
               )}
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                <button className="btn btn-ghost" onClick={() => setStepPopup(1)}>← Indietro</button>
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={salvaNuovaLinea} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva Linea'}</button>
-                <button className="btn btn-ghost" onClick={() => setPopupAperto(false)}>Annulla</button>
+                <button type="button" className="btn btn-ghost" onClick={() => setStepNuovaLinea(1)}>← Dati del bus</button>
+                <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={salvaNuovaLinea} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva linea'}</button>
+                <button type="button" className="btn btn-ghost" onClick={chiudiPannello}>Annulla</button>
               </div>
             </>
           )}
         </div>
       )}
 
-      {modificaBusId && (
+      {pannello === 'modifica-bus' && (
         <div className="section-card" style={{ marginTop: 20 }}>
-          <p className="section-label" style={{ marginBottom: 12 }}>Modifica bus</p>
-          <div className="campo"><label>Riferimento</label><input value={formNuovoBus.riferimento} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, riferimento: e.target.value })} /></div>
-          <div className="campo">
-            <label>Fornitore</label>
-            <select value={formNuovoBus.fornitoreId ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, fornitoreId: e.target.value || undefined })}>
-              <option value="">— Nessuno —</option>
-              {fornitori.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-            </select>
-          </div>
-          <div className="campo"><label>Autista</label><input value={formNuovoBus.autistaNome ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, autistaNome: e.target.value })} /></div>
-          <div className="campo"><label>Telefono autista</label><input value={formNuovoBus.autistaTelefono ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, autistaTelefono: e.target.value })} /></div>
-          <div className="campo">
-            <label>Tour leader</label>
-            <select value={formNuovoBus.tourLeaderId ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, tourLeaderId: e.target.value || null })}>
-              <option value="">— Nessuno —</option>
-              {tourLeaders.map((t) => <option key={t.id} value={t.id}>{t.nome} {t.cognome}</option>)}
-            </select>
-          </div>
-          <div className="campo"><label>Posti del bus</label><CampoNumero min={0} value={formNuovoBus.postiBus} onChange={(v) => setFormNuovoBus({ ...formNuovoBus, postiBus: v })} /></div>
-          <div className="campo"><label>Costo del bus</label><CampoNumero valuta min={0} value={formNuovoBus.costo} onChange={(v) => setFormNuovoBus({ ...formNuovoBus, costo: v })} /></div>
-          <div className="campo"><label>Note</label><input value={formNuovoBus.note ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, note: e.target.value })} /></div>
+          <p className="section-label" style={{ marginBottom: 12 }}>Modifica bus{lineaAttiva ? ` — ${lineaAttiva.nome}` : ''}</p>
+          {campiBus(true)}
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={salvaModificaBus} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva'}</button>
-            <button className="btn btn-ghost" onClick={() => setModificaBusId(null)}>Annulla</button>
+            <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={salvaModificaBus} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva bus'}</button>
+            <button type="button" className="btn btn-ghost" onClick={chiudiPannello}>Annulla</button>
           </div>
         </div>
       )}
 
-      {aggiungiBusAperto && (
+      {pannello === 'aggiungi-bus' && (
         <div className="section-card" style={{ marginTop: 20 }}>
-          <p className="section-label" style={{ marginBottom: 12 }}>Aggiungi bus a "{lineaAttiva?.nome}"</p>
-          <p className="testo-intro" style={{ marginTop: -6 }}>Stesse fermate della Linea — non si ridefiniscono qui.</p>
-          <div className="campo"><label>Riferimento</label><input value={formNuovoBus.riferimento} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, riferimento: e.target.value })} /></div>
-          <div className="campo">
-            <label>Fornitore</label>
-            <select value={formNuovoBus.fornitoreId ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, fornitoreId: e.target.value || undefined })}>
-              <option value="">— Nessuno —</option>
-              {fornitori.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-            </select>
-          </div>
-          <div className="campo"><label>Autista</label><input value={formNuovoBus.autistaNome ?? ''} onChange={(e) => setFormNuovoBus({ ...formNuovoBus, autistaNome: e.target.value })} /></div>
-          <div className="campo"><label>Posti del bus</label><CampoNumero min={0} value={formNuovoBus.postiBus} onChange={(v) => setFormNuovoBus({ ...formNuovoBus, postiBus: v })} /></div>
-          <div className="campo"><label>Costo del bus</label><CampoNumero valuta min={0} value={formNuovoBus.costo} onChange={(v) => setFormNuovoBus({ ...formNuovoBus, costo: v })} /></div>
+          <p className="section-label" style={{ marginBottom: 12 }}>Aggiungi bus{lineaAttiva ? ` — ${lineaAttiva.nome}` : ''}</p>
+          <p className="testo-intro" style={{ marginTop: -6 }}>Stesse fermate della linea: non si scelgono qui.</p>
+          {campiBus(true)}
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={salvaBusAggiunto} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva'}</button>
-            <button className="btn btn-ghost" onClick={() => setAggiungiBusAperto(false)}>Annulla</button>
+            <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={salvaBusAggiunto} disabled={salvando}>{salvando ? 'Salvo…' : 'Aggiungi bus'}</button>
+            <button type="button" className="btn btn-ghost" onClick={chiudiPannello}>Annulla</button>
           </div>
         </div>
       )}
 
-      {modificaPercorsoAperta && (
+      {pannello === 'modifica-percorso' && (
         <div className="section-card" style={{ marginTop: 20 }}>
-          <p className="section-label" style={{ marginBottom: 12 }}>Modifica percorso — cambia per tutti i bus di questa Linea</p>
+          <p className="section-label" style={{ marginBottom: 12 }}>Modifica percorso{lineaAttiva ? ` — ${lineaAttiva.nome}` : ''} (vale per tutti i bus della linea)</p>
           {fermateAttive.map((f) => (
             <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 'var(--testo-base)' }}>
               <input
@@ -604,8 +696,8 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
             </label>
           ))}
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={salvaModificaPercorso} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva'}</button>
-            <button className="btn btn-ghost" onClick={() => setModificaPercorsoAperta(false)}>Annulla</button>
+            <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={salvaModificaPercorso} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva percorso'}</button>
+            <button type="button" className="btn btn-ghost" onClick={chiudiPannello}>Annulla</button>
           </div>
         </div>
       )}

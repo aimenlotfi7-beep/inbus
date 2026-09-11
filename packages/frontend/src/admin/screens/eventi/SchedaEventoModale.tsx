@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { notifica } from '../../shared/notifiche';
 import { formattaEuro } from '../../../shared/formato';
-import type { ContestoPartenze } from '../partenze/tipi';
+import { TITOLI_PARTENZE, type ContestoPartenze } from '../partenze/tipi';
 import { TragittoCard } from './TragittoCard';
 import { StepInformazioni } from './StepInformazioni';
 import { StepImmagini } from './StepImmagini';
@@ -19,6 +19,8 @@ import { ErroreApi } from '../../../api/client';
 import type { Evento } from '../../../api/types';
 import { PaginaSezione } from '../../shared/PaginaSezione';
 import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
+import { confermaAvvisiClienti, notificaEsitoAvvisi } from '../../shared/avvisiClienti';
+import { motivoErrore } from '../../shared/errori';
 import { PartenzeTab } from '../partenze/PartenzeTab';
 import { ListaAttesaTab } from './ListaAttesaTab';
 import { ComunicazioniTab } from './ComunicazioniTab';
@@ -710,15 +712,31 @@ export function SchedaEventoModale({
     setSalvando(true);
     try {
       if (evento) {
-        await eventiApi.update(evento.id, payload);
+        // Se il cambio tocca clienti che hanno già prenotato (data, luogo,
+        // fermate, orari), prima si vede quanti riceveranno l'email e si
+        // decide: prima questi salvataggi non avvisavano nessuno.
+        let anteprima: Awaited<ReturnType<typeof eventiApi.anteprimaVariazioni>>;
+        try {
+          anteprima = await eventiApi.anteprimaVariazioni(evento.id, payload);
+        } catch (e) {
+          notifica(`Impossibile controllare quali clienti verrebbero avvisati: ${motivoErrore(e)}`, 'errore');
+          return;
+        }
+        if (!(await confermaAvvisiClienti(anteprima))) return;
+        const esito = await eventiApi.update(evento.id, payload);
+        localStorage.removeItem('inbus_bozza_form_evento');
+        localStorage.removeItem('inbus_creazione_evento_in_corso');
+        onSalvato();
+        onClose();
+        notificaEsitoAvvisi('Evento salvato', esito);
       } else {
         await eventiApi.create(payload);
+        localStorage.removeItem('inbus_bozza_form_evento');
+        localStorage.removeItem('inbus_creazione_evento_in_corso');
+        onSalvato();
+        onClose();
+        notifica('Evento creato.', 'successo');
       }
-      localStorage.removeItem('inbus_bozza_form_evento');
-      localStorage.removeItem('inbus_creazione_evento_in_corso');
-      onSalvato();
-      onClose();
-      notifica(evento ? 'Evento salvato.' : 'Evento creato.');
     } catch (e) {
       notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server. Controlla che il backend sia acceso.');
       // Il salvataggio è fallito — sul server non è cambiato nulla,
@@ -741,7 +759,10 @@ export function SchedaEventoModale({
   }
 
   const modificato = formIniziale !== '' && JSON.stringify(form) !== formIniziale;
-  const chiediConferma = useAvvisoModificheNonSalvate(modificato);
+  // Anche gli editor dentro Partenze (orari, prezzi) contano come
+  // modifiche non salvate: prima "← Indietro" le buttava via senza chiedere.
+  const [partenzeInModifica, setPartenzeInModifica] = useState(false);
+  const chiediConferma = useAvvisoModificheNonSalvate(modificato || partenzeInModifica);
 
   // ---- Blocchi di campi condivisi tra wizard (creazione) e vista Dettagli (modifica) ----
 
@@ -1059,8 +1080,12 @@ export function SchedaEventoModale({
   // ---- Vista MODIFICA (evento esistente): tab Dettagli/Partenze ----
 
   if (evento) {
+    // Arrivando da una voce di Partenze il titolo dice quale (Orari,
+    // Prezzi…), non un "Partenze" uguale per tutte le voci.
     const titoloTab = soloQuestaTab
-      ? { dettagli: 'Modifica evento', partenze: 'Partenze', 'lista-attesa': "Lista d'attesa", offerte: 'Offerte', comunicazioni: 'Comunicazioni' }[tabIniziale]
+      ? (tabIniziale === 'partenze' && contestoPartenze
+        ? TITOLI_PARTENZE[contestoPartenze.tabOrigine]
+        : { dettagli: 'Modifica evento', partenze: 'Partenze', 'lista-attesa': "Lista d'attesa", offerte: 'Offerte', comunicazioni: 'Comunicazioni' }[tabIniziale])
       : 'Modifica evento';
     return (
       <PaginaSezione titolo={`${titoloTab} — ${evento.artista}`} onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)} larga={tabAttiva === 'partenze'}>
@@ -1074,7 +1099,7 @@ export function SchedaEventoModale({
           </div>
         )}
 
-        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} servizi={servizi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} contestoPartenze={contestoPartenze} onSalvato={onSalvato} />}
+        {tabAttiva === 'partenze' && <PartenzeTab eventoId={evento.id} servizi={servizi.map((v) => ({ key: v.id ?? v.key, nome: v.nome }))} contestoPartenze={contestoPartenze} onSalvato={onSalvato} onModificheInCorso={setPartenzeInModifica} />}
         {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} servizi={(evento.servizi ?? []).map((s) => ({ key: s.id, nome: s.nome }))} />}
         {tabAttiva === 'comunicazioni' && evento && <ComunicazioniTab evento={evento} />}
         {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}

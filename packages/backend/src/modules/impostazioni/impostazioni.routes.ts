@@ -178,6 +178,13 @@ impostazioniRouter.get('/pubblico/meta-pixel-id', asyncHandler(async (_req: Requ
 
 impostazioniRouter.use(richiedeAuth);
 
+// Solo lettura dei parametri del calcolo prezzi, per chi lavora in
+// Partenze — non serve (e non deve servire) il permesso di gestire le
+// impostazioni. Il permesso è per singola rotta, qui come sotto.
+impostazioniRouter.get('/calcolo-prezzi', richiedePermesso('eventi.partenze'), asyncHandler(async (_req: Request, res: Response) => {
+  res.json({ sogliaOccupazionePareggio: await leggiSogliaOccupazionePareggio() });
+}));
+
 impostazioniRouter.get('/', richiedePermesso('impostazioni.gestisci'), asyncHandler(async (_req: Request, res: Response) => {
   const tutte = await db.select().from(impostazioni);
   res.json(tutte);

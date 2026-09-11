@@ -1,39 +1,61 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { variazioni, variazioniRisposte, prenotazioni, richiesteRimborso, eventi, tragitti, utenti, fermate } from '../../db/schema.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
 import { leggiSogliaPosticipoMinuti } from '../impostazioni/impostazioni.routes.js';
+import { templateEmailService } from '../template-email/template-email.service.js';
 import { NonTrovato } from '../../shared/errors.js';
 
-type FermataConfronto = { citta: string; indirizzo: string; orario?: string | null };
+export type FermataConfronto = { citta: string; indirizzo?: string | null; orario?: string | null; attivo?: boolean | null };
+
+/** Una variazione da comunicare. Con fermataVecchia valorizzata tocca
+ *  chi ha prenotato su QUELLA fermata (città); con fermataVecchia null
+ *  tocca tutte le prenotazioni confermate del tragitto (data o luogo
+ *  dell'evento cambiati). */
+export type VariazioneRilevata = { fermataVecchia: FermataConfronto | null; descrizione: string };
+
+export type EsitoComunicazioni = { clientiAvvisati: number; emailNonInviate: number };
+
+/** Orario come lo scrive il salvataggio e come lo si confronta: "8:00",
+ *  "08:00" e "08:00:00" sono lo stesso orario; vuoto e assente sono la
+ *  stessa cosa (nessun orario) — così un valore rimasto uguale non fa
+ *  mai partire una variazione per sbaglio. */
+export function normalizzaOrario(orario: string | null | undefined): string | null {
+  const t = (orario ?? '').trim();
+  if (!t) return null;
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(t);
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : t;
+}
+
+/** Testo libero (indirizzo, luogo): null, vuoto e spazi ai lati contano uguale. */
+export function normalizzaTesto(valore: string | null | undefined): string {
+  return (valore ?? '').trim();
+}
 
 function minutiDa(orario: string): number | null {
-  const parti = orario.split(':');
-  if (parti.length !== 2) return null;
-  const h = Number(parti[0]);
-  const m = Number(parti[1]);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-  return h * 60 + m;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(orario);
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
 }
 
 /** Confronta le fermate di un tragitto prima/dopo una modifica, e
- *  decide quali richiedono una comunicazione ai clienti — abbinate per
- *  POSIZIONE nell'elenco (stesso ordine, non si aggiungono/tolgono
- *  fermate da qui, solo si modificano valori) — vedi
- *  aggiornaTragittoOperativo, che chiama questa funzione PRIMA di
- *  sostituire le fermate nel database, quando "vecchie" sono ancora
- *  quelle vere.
+ *  decide quali richiedono una comunicazione ai clienti — vedi
+ *  aggiornaTragittoOperativo e l'aggiornamento dell'evento, che chiamano
+ *  questa funzione PRIMA di sostituire le fermate nel database, quando
+ *  "vecchie" sono ancora quelle vere.
  *
- *  Regole (decise): cambio città o indirizzo → sempre; anticipo
- *  dell'orario (qualunque entità) → sempre; posticipo → solo oltre la
- *  soglia impostata (leggiSogliaPosticipoMinuti, default 20 minuti). */
+ *  Regole (decise): fermata tolta o disattivata → sempre; cambio
+ *  indirizzo → sempre; anticipo dell'orario (qualunque entità) →
+ *  sempre; posticipo → solo oltre la soglia impostata
+ *  (leggiSogliaPosticipoMinuti, default 0 = qualunque posticipo, vedi
+ *  impostazioni.routes.ts). Riattivare una fermata non genera nulla. */
 export async function rilevaVariazioni(
   vecchie: FermataConfronto[],
   nuove: FermataConfronto[]
-): Promise<{ fermataVecchia: FermataConfronto; descrizione: string }[]> {
+): Promise<VariazioneRilevata[]> {
   const soglia = await leggiSogliaPosticipoMinuti();
-  const risultato: { fermataVecchia: FermataConfronto; descrizione: string }[] = [];
+  const risultato: VariazioneRilevata[] = [];
 
   // Abbinate per CITTÀ (l'identità vera di una fermata — è quella che
   // le prenotazioni referenziano, fermataCitta), non per posizione
@@ -42,10 +64,15 @@ export async function rilevaVariazioni(
   // che semplicemente si sono spostate di posto senza essere
   // cambiate per davvero.
   for (const v of vecchie) {
+    // Già disattivata prima di questo salvataggio: chi aveva prenotato lì
+    // è stato avvisato quando è stata spenta, e riattivarla (anche con
+    // valori diversi) non genera una variazione.
+    if (v.attivo === false) continue;
+
     const n = nuove.find((f) => f.citta === v.citta);
 
-    if (!n) {
-      // La fermata non c'è più nel nuovo elenco — un cambiamento
+    if (!n || n.attivo === false) {
+      // La fermata non c'è più (o non è più attiva) — un cambiamento
       // ancora più grande di un semplice spostamento, va comunicato
       // comunque a chi aveva già prenotato lì.
       risultato.push({
@@ -55,24 +82,28 @@ export async function rilevaVariazioni(
       continue;
     }
 
-    if (v.indirizzo !== n.indirizzo) {
+    const indirizzoVecchio = normalizzaTesto(v.indirizzo);
+    const indirizzoNuovo = normalizzaTesto(n.indirizzo);
+    if (indirizzoVecchio !== indirizzoNuovo) {
       risultato.push({
         fermataVecchia: v,
-        descrizione: `Il punto di ritrovo di "${v.citta}" è cambiato: ora è ${n.indirizzo} (prima era ${v.indirizzo}).`,
+        descrizione: `Il punto di ritrovo di "${v.citta}" è cambiato: ora è ${indirizzoNuovo} (prima era ${indirizzoVecchio}).`,
       });
       continue; // un solo motivo di variazione per fermata, non due insieme se anche l'orario è cambiato nello stesso salvataggio
     }
 
-    if (v.orario && n.orario && v.orario !== n.orario) {
-      const mVecchio = minutiDa(v.orario);
-      const mNuovo = minutiDa(n.orario);
+    const orarioVecchio = normalizzaOrario(v.orario);
+    const orarioNuovo = normalizzaOrario(n.orario);
+    if (orarioVecchio && orarioNuovo && orarioVecchio !== orarioNuovo) {
+      const mVecchio = minutiDa(orarioVecchio);
+      const mNuovo = minutiDa(orarioNuovo);
       if (mVecchio !== null && mNuovo !== null) {
         const delta = mNuovo - mVecchio;
         const eAnticipo = delta < 0;
         if (eAnticipo || Math.abs(delta) >= soglia) {
           risultato.push({
             fermataVecchia: v,
-            descrizione: `L'orario di "${v.citta}" è ${eAnticipo ? 'anticipato' : 'posticipato'}: da ${v.orario} a ${n.orario}.`,
+            descrizione: `L'orario di "${v.citta}" è ${eAnticipo ? 'anticipato' : 'posticipato'}: da ${orarioVecchio} a ${orarioNuovo}.`,
           });
         }
       }
@@ -81,72 +112,128 @@ export async function rilevaVariazioni(
   return risultato;
 }
 
-/** Per ogni fermata variata, trova le prenotazioni confermate che la
- *  toccano (matching per città, come già fa tutto il resto dell'app —
- *  le prenotazioni salvano la città come testo, non un riferimento),
- *  crea la variazione e una riga di risposta per ognuna (col link
- *  univoco), e manda la comunicazione. Va chiamata DOPO che la
- *  transazione di aggiornaTragittoOperativo è confermata (le email non
- *  devono partire per un salvataggio poi andato storto). */
-export async function generaComunicazioniVariazione(
+/** Le prenotazioni toccate da una variazione: confermate, del tragitto,
+ *  sulla città della fermata (matching per città, come già fa tutto il
+ *  resto dell'app — le prenotazioni salvano la città come testo, non un
+ *  riferimento) oppure tutte quelle del tragitto se citta è null. Una
+ *  sola definizione, usata sia per l'invio vero sia per l'anteprima. */
+function condizioniPrenotazioniToccate(tragittoId: string, citta: string | null): SQL[] {
+  const condizioni: SQL[] = [eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA')];
+  if (citta !== null) condizioni.push(eq(prenotazioni.fermataCitta, citta));
+  return condizioni;
+}
+
+/** Anteprima (nessuna scrittura): per ogni variazione, quante email
+ *  partirebbero. */
+export async function anteprimaComunicazioni(
   tragittoId: string,
-  variazioniRilevate: { fermataVecchia: FermataConfronto; descrizione: string }[]
-) {
-  if (variazioniRilevate.length === 0) return;
-
-  const [tragitto] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
-  if (!tragitto) return;
-  const [evento] = await db.select().from(eventi).where(eq(eventi.id, tragitto.eventoId)).limit(1);
-  if (!evento) return;
-
+  variazioniRilevate: VariazioneRilevata[]
+): Promise<{ fermata: string; descrizione: string; clienti: number }[]> {
+  const righe: { fermata: string; descrizione: string; clienti: number }[] = [];
   for (const v of variazioniRilevate) {
-    const prenotazioniToccate = await db
-      .select({ prenotazione: prenotazioni, clienteEmail: utenti.email, clienteNome: utenti.nome })
+    const citta = v.fermataVecchia?.citta ?? null;
+    const [conteggio] = await db.select({ n: sql<number>`count(*)::int` })
       .from(prenotazioni)
       .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
-      .where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.fermataCitta, v.fermataVecchia.citta), eq(prenotazioni.stato, 'CONFERMATA')));
-    if (prenotazioniToccate.length === 0) continue; // nessuno ha ancora prenotato su questa fermata, nessuna comunicazione da mandare
-
-    const [nuovaVariazione] = await db.insert(variazioni).values({
-      tragittoId, fermataDescrizione: v.fermataVecchia.citta, descrizione: v.descrizione,
-    }).returning();
-
-    for (const { prenotazione: p, clienteEmail, clienteNome } of prenotazioniToccate) {
-      const token = randomUUID();
-      await db.insert(variazioniRisposte).values({ variazioneId: nuovaVariazione.id, prenotazioneId: p.id, token });
-      const link = urlSito(`/variazione/${token}`);
-      await inviaEmail({
-        a: clienteEmail,
-        oggetto: `Una variazione al tuo viaggio — ${evento.artista}`,
-        html: `
-          <p>Ciao ${clienteNome ?? ''},</p>
-          <p>C'è una variazione al tuo viaggio per <strong>${evento.artista}</strong> (PNR ${p.pnr}):</p>
-          <p>${v.descrizione}</p>
-          <p>Se va bene così, non devi fare nulla — la tua prenotazione resta confermata automaticamente.
-          Se invece preferisci il rimborso, puoi richiederlo qui:</p>
-          <p><a href="${link}">${link}</a></p>
-        `,
-      });
-    }
+      .where(and(...condizioniPrenotazioniToccate(tragittoId, citta)));
+    righe.push({ fermata: citta ?? '', descrizione: v.descrizione, clienti: Number(conteggio?.n ?? 0) });
   }
+  return righe;
+}
+
+/** Per ogni variazione, trova le prenotazioni confermate toccate, crea
+ *  la variazione e una riga di risposta per ognuna (col link univoco),
+ *  e manda la comunicazione. Va chiamata DOPO che la transazione del
+ *  salvataggio è confermata (le email non devono partire per un
+ *  salvataggio poi andato storto). Non lancia mai: il salvataggio è già
+ *  avvenuto, un problema qui si registra nei log e si conta. Il
+ *  fallimento verso un cliente non ferma gli altri. */
+export async function generaComunicazioniVariazione(
+  tragittoId: string,
+  variazioniRilevate: VariazioneRilevata[]
+): Promise<EsitoComunicazioni> {
+  const esito: EsitoComunicazioni = { clientiAvvisati: 0, emailNonInviate: 0 };
+  if (variazioniRilevate.length === 0) return esito;
+
+  try {
+    const [tragitto] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!tragitto) return esito;
+    const [evento] = await db.select().from(eventi).where(eq(eventi.id, tragitto.eventoId)).limit(1);
+    if (!evento) return esito;
+
+    for (const v of variazioniRilevate) {
+      try {
+        const citta = v.fermataVecchia?.citta ?? null;
+        const prenotazioniToccate = await db
+          .select({ prenotazione: prenotazioni, clienteEmail: utenti.email, clienteNome: utenti.nome })
+          .from(prenotazioni)
+          .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
+          .where(and(...condizioniPrenotazioniToccate(tragittoId, citta)));
+        if (prenotazioniToccate.length === 0) continue; // nessuno ha ancora prenotato, nessuna comunicazione da mandare
+
+        const [nuovaVariazione] = await db.insert(variazioni).values({
+          tragittoId, fermataDescrizione: citta ?? '', descrizione: v.descrizione,
+        }).returning();
+
+        for (const { prenotazione: p, clienteEmail, clienteNome } of prenotazioniToccate) {
+          esito.clientiAvvisati++;
+          try {
+            const token = randomUUID();
+            await db.insert(variazioniRisposte).values({ variazioneId: nuovaVariazione.id, prenotazioneId: p.id, token });
+            const link = urlSito(`/variazione/${token}`);
+            const { oggetto, html } = await templateEmailService.renderizza('variazione_viaggio', {
+              nome: clienteNome ?? '',
+              evento: evento.artista,
+              pnr: p.pnr,
+              descrizione: v.descrizione,
+              link,
+            }, { escapaHtml: ['nome', 'evento', 'pnr', 'descrizione'] });
+            const { inviata } = await inviaEmail({ a: clienteEmail, oggetto, html });
+            if (!inviata) esito.emailNonInviate++;
+          } catch (err) {
+            esito.emailNonInviate++;
+            console.error(`[variazioni] avviso al cliente ${clienteEmail} (PNR ${p.pnr}) non riuscito:`, err);
+          }
+        }
+      } catch (err) {
+        console.error(`[variazioni] comunicazione della variazione "${v.descrizione}" (tragitto ${tragittoId}) non riuscita:`, err);
+      }
+    }
+  } catch (err) {
+    console.error(`[variazioni] comunicazioni per il tragitto ${tragittoId} non riuscite:`, err);
+  }
+  return esito;
 }
 
 /** Elenco variazioni per il gestionale — con quante risposte mancano
- *  ancora, per decidere se è "in corso" o "gestita" a colpo d'occhio. */
+ *  ancora, per decidere se è "in corso" o "gestita" a colpo d'occhio, e
+ *  a quale evento/tragitto si riferisce. */
 export async function listaVariazioni() {
-  const tutte = await db.select().from(variazioni).orderBy(variazioni.creataIl);
-  const risultato = [];
-  for (const v of tutte) {
-    const risposte = await db.select().from(variazioniRisposte).where(eq(variazioniRisposte.variazioneId, v.id));
-    risultato.push({
+  const righe = await db
+    .select({ variazione: variazioni, tragittoNome: tragitti.nome, eventoArtista: eventi.artista, eventoData: eventi.data })
+    .from(variazioni)
+    .innerJoin(tragitti, eq(tragitti.id, variazioni.tragittoId))
+    .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+    .orderBy(desc(variazioni.creataIl)); // le più recenti prima
+  if (righe.length === 0) return [];
+
+  const risposte = await db.select({ variazioneId: variazioniRisposte.variazioneId, risposta: variazioniRisposte.risposta })
+    .from(variazioniRisposte)
+    .where(inArray(variazioniRisposte.variazioneId, righe.map((r) => r.variazione.id)));
+
+  return righe.map(({ variazione: v, tragittoNome, eventoArtista, eventoData }) => {
+    const sue = risposte.filter((r) => r.variazioneId === v.id);
+    return {
       ...v,
-      totaleClienti: risposte.length,
-      rispostoAccettato: risposte.filter((r) => r.risposta === 'ACCETTATA').length,
-      rispostoRimborso: risposte.filter((r) => r.risposta === 'RIMBORSO_RICHIESTO').length,
-      inAttesa: risposte.filter((r) => !r.risposta).length,
-    });
-  }
-  return risultato.reverse(); // le più recenti prima
+      eventoArtista,
+      eventoData: new Date(eventoData).toISOString(),
+      tragittoNome,
+      totaleClienti: sue.length,
+      rispostoAccettato: sue.filter((r) => r.risposta === 'ACCETTATA').length,
+      rispostoRimborso: sue.filter((r) => r.risposta === 'RIMBORSO_RICHIESTO').length,
+      inAttesa: sue.filter((r) => !r.risposta).length,
+    };
+  });
 }
 
 /** Info pubbliche per la pagina "/variazione/:token" — solo il minimo
@@ -237,20 +324,26 @@ export async function disattivaFermateSottoSoglia() {
     partenzaVera.setHours(ore, minuti, 0, 0);
     if (partenzaVera > tra24Ore) continue; // non ancora nelle prossime 24 ore, troppo presto per decidere
 
-    // Garantita non-nulla dal filtro isNotNull qui sopra — non c'è più
-    // un valore di riserva generale a cui ricadere se manca.
-    const soglia = f.sogliaMinima!;
-    const [conteggio] = await db.select({ tot: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)` }).from(prenotazioni)
-      .where(and(eq(prenotazioni.tragittoId, f.tragittoId), eq(prenotazioni.fermataCitta, f.citta), eq(prenotazioni.stato, 'CONFERMATA')));
-    const partecipantiAttuali = Number(conteggio?.tot ?? 0);
-    if (partecipantiAttuali >= soglia) continue; // soglia raggiunta, tutto bene, nessuna azione
+    // Una fermata che va storta non deve fermare il controllo delle altre.
+    try {
+      // Garantita non-nulla dal filtro isNotNull qui sopra — non c'è più
+      // un valore di riserva generale a cui ricadere se manca.
+      const soglia = f.sogliaMinima!;
+      const [conteggio] = await db.select({ tot: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)` }).from(prenotazioni)
+        .where(and(eq(prenotazioni.tragittoId, f.tragittoId), eq(prenotazioni.fermataCitta, f.citta), eq(prenotazioni.stato, 'CONFERMATA')));
+      const partecipantiAttuali = Number(conteggio?.tot ?? 0);
+      if (partecipantiAttuali >= soglia) continue; // soglia raggiunta, tutto bene, nessuna azione
 
-    await db.update(fermate).set({ attivo: false }).where(eq(fermate.id, f.fermataId));
-    await generaComunicazioniVariazione(f.tragittoId, [{
-      fermataVecchia: { citta: f.citta, indirizzo: f.indirizzo, orario: f.orario },
-      descrizione: `La fermata di "${f.citta}" non ha raggiunto il numero minimo di partecipanti necessario (${partecipantiAttuali} su ${soglia} richiesti) — non è più prevista per questa partenza.`,
-    }]);
-    disattivate++;
+      await db.update(fermate).set({ attivo: false }).where(eq(fermate.id, f.fermataId));
+      disattivate++;
+      // Non lancia mai, e un cliente non raggiunto non ferma gli altri.
+      await generaComunicazioniVariazione(f.tragittoId, [{
+        fermataVecchia: { citta: f.citta, indirizzo: f.indirizzo, orario: f.orario },
+        descrizione: `La fermata di "${f.citta}" non ha raggiunto il numero minimo di partecipanti necessario (${partecipantiAttuali} su ${soglia} richiesti) — non è più prevista per questa partenza.`,
+      }]);
+    } catch (err) {
+      console.error(`[variazioni] controllo soglia della fermata ${f.fermataId} (${f.citta}) non riuscito:`, err);
+    }
   }
   return { disattivate };
 }

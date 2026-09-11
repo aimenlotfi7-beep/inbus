@@ -35,7 +35,13 @@ export const prenotazioniAdminApi = {
     return api.get<PrenotazioneRiga[]>(`/api/prenotazioni${query ? `?${query}` : ''}`);
   },
   eventiConPrenotazioni: () => api.get<EventoConPrenotazioni[]>('/api/prenotazioni/eventi'),
-  cancella: (pnr: string) => api.post<void>(`/api/prenotazioni/${pnr}/cancella`),
+  // motivo facoltativo: resta scritto sulla prenotazione e arriva al
+  // cliente nell'email di cancellazione (se assente: "Cancellata
+  // dall'organizzazione"). clienteAvvisato null = era già cancellata.
+  cancella: (pnr: string, motivo?: string) =>
+    api.post<{ pnr: string; stato: 'CONFERMATA' | 'CANCELLATA'; motivoCancellazione: string | null; clienteAvvisato: boolean | null }>(
+      `/api/prenotazioni/${pnr}/cancella`, motivo ? { motivo } : undefined,
+    ),
   eliminaDefinitivamente: (pnr: string) => api.delete<void>(`/api/prenotazioni/${pnr}`),
   inviaSollecito: (pnr: string) => api.post<{ inviata: boolean }>(`/api/prenotazioni/${pnr}/sollecito`),
   rigeneraBiglietto: (pnr: string) => api.post<{ ok: true }>(`/api/prenotazioni/${pnr}/rigenera-biglietto`),

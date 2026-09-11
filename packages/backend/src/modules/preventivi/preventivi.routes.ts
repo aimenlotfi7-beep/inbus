@@ -13,11 +13,14 @@ import { templateEmailService } from '../template-email/template-email.service.j
 import { leggiRaggioKmPreventivo, leggiNotificaNonScelti, leggiGiorniValiditaLinkPreventivo } from '../impostazioni/impostazioni.routes.js';
 import { limitePnr } from '../../shared/rateLimit.js';
 import { distanzaKm, calcolaKmApprossimati } from '../../shared/distanza.js';
+import { formattaData, formattaEuro } from '../../shared/formato.js';
 import { classificaCandidato, destinatariRichiesta } from './classifica-candidato.js';
 
 function generaToken() {
   return crypto.randomBytes(24).toString('hex');
 }
+
+const MESSAGGIO_GIA_ASSEGNATO = 'Il preventivo per questo viaggio è già stato assegnato.';
 
 const richiediSchema = z.object({
   // Coordinate della partenza — geocodificate nel browser (vedi
@@ -49,23 +52,44 @@ const rispondiSchema = z.object({
  *  se una fallisce (indirizzo sbagliato, provider giù, quota finita)
  *  l'azione — che sul database è già avvenuta — deve rispondere "ok"
  *  lo stesso, non 500 con uno stato a metà. Qui si registra e si va
- *  avanti; torna false per lasciare al chiamante la scelta di contarlo. */
+ *  avanti; torna l'esito VERO (inviata sì/no) per lasciare al chiamante
+ *  la scelta di contarlo. */
 async function inviaEmailBestEffort(...args: Parameters<typeof inviaEmail>): Promise<boolean> {
   try {
-    await inviaEmail(...args);
-    return true;
+    const { inviata } = await inviaEmail(...args);
+    return inviata;
   } catch (e) {
     console.error(`[preventivi] invio email a ${args[0].a} fallito:`, e instanceof Error ? e.message : e);
     return false;
   }
 }
 
+/** Prepara un modello e lo invia a un fornitore — mai un'eccezione
+ *  (neanche se il modello manca): false se l'email non è partita. */
+async function inviaEmailModello(
+  a: string,
+  chiave: string,
+  variabili: Record<string, string>,
+  allegati?: Parameters<typeof inviaEmail>[0]['allegati'],
+): Promise<boolean> {
+  try {
+    const { oggetto, html } = await templateEmailService.renderizza(chiave, variabili, { escapaHtml: ['evento', 'tragitto'] });
+    return await inviaEmailBestEffort({ a, oggetto, html, allegati });
+  } catch (e) {
+    console.error(`[preventivi] email "${chiave}" a ${a} non preparata:`, e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
+function scadutoDopoGiorni(creataIl: Date, giorni: number): boolean {
+  return Date.now() - new Date(creataIl).getTime() > giorni * 24 * 60 * 60 * 1000;
+}
+
 /** Il link è scaduto se la richiesta è più vecchia dei giorni impostati
  *  E non ha ancora una risposta (chi ha risposto rivede sempre la sua). */
 async function linkScaduto(richiesta: { creataIl: Date }, giaRisposto: boolean): Promise<boolean> {
   if (giaRisposto) return false;
-  const giorni = await leggiGiorniValiditaLinkPreventivo();
-  return Date.now() - new Date(richiesta.creataIl).getTime() > giorni * 24 * 60 * 60 * 1000;
+  return scadutoDopoGiorni(richiesta.creataIl, await leggiGiorniValiditaLinkPreventivo());
 }
 
 async function tragittoConEvento(tragittoId: string) {
@@ -73,6 +97,15 @@ async function tragittoConEvento(tragittoId: string) {
   if (!t) throw new NonTrovato('Tragitto');
   const [e] = await db.select().from(eventi).where(eq(eventi.id, t.eventoId)).limit(1);
   return { tragitto: t, evento: e };
+}
+
+/** I segnaposto comuni a tutte le email ai fornitori su un tragitto. */
+function variabiliTragitto(tragitto: typeof tragitti.$inferSelect, evento: typeof eventi.$inferSelect | undefined) {
+  return {
+    evento: evento?.artista ?? 'evento',
+    tragitto: tragitto.nome,
+    data: evento?.data ? formattaData(evento.data) : '',
+  };
 }
 
 /** Ogni fornitore APPROVATO nel raggio, con lo stato che determina
@@ -95,23 +128,30 @@ async function candidatiPerTragitto(tragittoId: string, lat: number, lng: number
   })).sort((a, b) => a.distanzaKm - b.distanzaKm);
 }
 
-async function inviaRichiestaSingola(tragittoId: string, fornitore: typeof fornitori.$inferSelect, tipoInvio: 'AUTOMATICO' | 'MANUALE') {
+type EsitoRichiesta = 'inviata' | 'non_inviata' | 'senza_email';
+
+async function inviaRichiestaSingola(tragittoId: string, fornitore: typeof fornitori.$inferSelect, tipoInvio: 'AUTOMATICO' | 'MANUALE'): Promise<EsitoRichiesta> {
   const { tragitto, evento } = await tragittoConEvento(tragittoId);
   const token = generaToken();
   await db.insert(preventiviRichieste).values({ tragittoId, fornitoreId: fornitore.id, token, tipoInvio });
-  if (!fornitore.email) return; // fornitore senza email: registrato ma non contattabile, resta in lista come tentativo fallito silenzioso
+  if (!fornitore.email) return 'senza_email'; // registrato ma non contattabile: la richiesta resta in lista
   const link = urlSito(`/fornitore/preventivo/${token}`);
-  const { oggetto, html } = await templateEmailService.renderizza('preventivo_richiesta', {
-    evento: evento?.artista ?? 'evento',
-    tragitto: tragitto.nome,
-    data: evento?.data ? new Date(evento.data).toLocaleDateString('it-IT') : '',
-    link,
-  });
-  await inviaEmailBestEffort({ a: fornitore.email, oggetto, html });
+  const inviata = await inviaEmailModello(fornitore.email, 'preventivo_richiesta', { ...variabiliTragitto(tragitto, evento), link });
+  return inviata ? 'inviata' : 'non_inviata';
+}
+
+/** Manda il file firmato al fornitore (allegato PDF). */
+function inviaFileFirmato(email: string, fileNome: string, fileContenuto: string): Promise<boolean> {
+  return inviaEmailModello(email, 'preventivo_firmato', {}, [
+    { nomeFile: fileNome, contenuto: Buffer.from(fileContenuto, 'base64'), tipo: 'application/pdf' },
+  ]);
 }
 
 export const preventiviService = {
   candidatiPerTragitto,
+  /** Conteggi veri: inviate* = email davvero partite; nonInviate =
+   *  tentate ma non partite; senzaEmail = fornitori senza indirizzo (la
+   *  loro richiesta resta comunque registrata). */
   richiedi: async (tragittoId: string, input: z.infer<typeof richiediSchema>) => {
     const { tragitto } = await tragittoConEvento(tragittoId);
     let lat = tragitto.partenzaLat, lng = tragitto.partenzaLng;
@@ -128,10 +168,37 @@ export const preventiviService = {
 
     const { automatici: daInviareAuto, manuali: daInviareManuale } = destinatariRichiesta(candidati, new Set(input.fornitoriManualiIds));
 
-    for (const f of daInviareAuto) await inviaRichiestaSingola(tragittoId, f, 'AUTOMATICO');
-    for (const f of daInviareManuale) await inviaRichiestaSingola(tragittoId, f, 'MANUALE');
+    const esito = { inviateAutomatiche: 0, inviateManuali: 0, nonInviate: 0, senzaEmail: 0 };
+    const conta = (r: EsitoRichiesta, campoInviate: 'inviateAutomatiche' | 'inviateManuali') => {
+      if (r === 'inviata') esito[campoInviate]++;
+      else if (r === 'non_inviata') esito.nonInviate++;
+      else esito.senzaEmail++;
+    };
+    for (const f of daInviareAuto) conta(await inviaRichiestaSingola(tragittoId, f, 'AUTOMATICO'), 'inviateAutomatiche');
+    for (const f of daInviareManuale) conta(await inviaRichiestaSingola(tragittoId, f, 'MANUALE'), 'inviateManuali');
 
-    return { inviateAutomatiche: daInviareAuto.length, inviateManuali: daInviareManuale.length };
+    return esito;
+  },
+  /** Rimanda la stessa richiesta (stesso token, stesso link) a un
+   *  fornitore che non ha ancora risposto. Se il link era scaduto,
+   *  riparte il conteggio dei giorni da adesso, così torna valido. */
+  reinviaRichiesta: async (richiestaId: string) => {
+    const [richiesta] = await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.id, richiestaId)).limit(1);
+    if (!richiesta) throw new NonTrovato('Richiesta preventivo');
+    const [risposta] = await db.select({ id: preventiviRisposte.id }).from(preventiviRisposte).where(eq(preventiviRisposte.richiestaId, richiesta.id)).limit(1);
+    if (risposta) throw new ConflittoDati('Questo fornitore ha già risposto alla richiesta: non serve reinviarla.');
+    const [fornitore] = await db.select().from(fornitori).where(eq(fornitori.id, richiesta.fornitoreId)).limit(1);
+    if (!fornitore?.email) throw new ConflittoDati('Questo fornitore non ha un indirizzo email: aggiungilo nella sua scheda prima di reinviare la richiesta.');
+    const { tragitto, evento } = await tragittoConEvento(richiesta.tragittoId);
+    // Il suo preventivo verrebbe comunque rifiutato (vedi rispondi).
+    if (tragitto.fornitoreId) throw new ConflittoDati(MESSAGGIO_GIA_ASSEGNATO);
+
+    if (await linkScaduto(richiesta, false)) {
+      await db.update(preventiviRichieste).set({ creataIl: new Date() }).where(eq(preventiviRichieste.id, richiesta.id));
+    }
+    const link = urlSito(`/fornitore/preventivo/${richiesta.token}`);
+    const inviata = await inviaEmailModello(fornitore.email, 'preventivo_richiesta', { ...variabiliTragitto(tragitto, evento), link });
+    return { inviata };
   },
   // Tre query in tutto (non una per riga), e delle risposte SOLO i
   // metadati: gli allegati (base64, anche MB l'uno) si scaricano a
@@ -149,9 +216,24 @@ export const preventiviService = {
       haFile: sql<boolean>`${preventiviRisposte.fileContenuto} IS NOT NULL`,
       haFileFirmato: sql<boolean>`${preventiviRisposte.fileFirmatoContenuto} IS NOT NULL`,
     }).from(preventiviRisposte).where(inArray(preventiviRisposte.richiestaId, richieste.map((r) => r.id)));
+    const giorniValidita = await leggiGiorniValiditaLinkPreventivo();
     const fornitorePerId = new Map(fornitoriRighe.map((f) => [f.id, f]));
     const rispostaPerRichiesta = new Map(risposte.map((r) => [r.richiestaId, r]));
-    return richieste.map((r) => ({ richiesta: r, fornitore: fornitorePerId.get(r.fornitoreId), risposta: rispostaPerRichiesta.get(r.id) ?? null }));
+    return richieste.map((r) => {
+      const fornitore = fornitorePerId.get(r.fornitoreId);
+      const risposta = rispostaPerRichiesta.get(r.id) ?? null;
+      return {
+        // Campi piatti per ogni richiesta, con o senza risposta.
+        richiestaId: r.id,
+        fornitoreNome: fornitore?.nome ?? '',
+        creataIl: r.creataIl,
+        haRisposta: !!risposta,
+        linkScaduto: !risposta && scadutoDopoGiorni(r.creataIl, giorniValidita),
+        richiesta: r,
+        fornitore,
+        risposta,
+      };
+    });
   },
   /** Solo l'allegato, quando serve davvero (clic su "Scarica"). */
   fileRisposta: async (rispostaId: string, quale: 'originale' | 'firmato') => {
@@ -176,6 +258,9 @@ export const preventiviService = {
       // pubblico mostra sola lettura invece dei campi da compilare.
       giaRisposto: !!risposta,
       scaduto: await linkScaduto(richiesta, !!risposta),
+      // Un preventivo è già stato accettato per questo viaggio: nuove
+      // risposte vengono rifiutate (vedi rispondi).
+      giaAssegnato: tragitto.fornitoreId != null,
       risposta: risposta ? { prezzo: risposta.prezzo, fileNome: risposta.fileNome } : null,
     };
   },
@@ -184,6 +269,10 @@ export const preventiviService = {
     if (!richiesta) throw new NonTrovato('Richiesta preventivo');
     const [esistente] = await db.select().from(preventiviRisposte).where(eq(preventiviRisposte.richiestaId, richiesta.id)).limit(1);
     if (esistente) throw new ConflittoDati('Hai già inviato una risposta per questa richiesta — per modificarla, contatta direttamente chi ti ha scritto.');
+    // "Accettato" = il tragitto ha un fornitore scelto (stesso segnale
+    // usato dal gestionale per mostrare "Accettato").
+    const { tragitto } = await tragittoConEvento(richiesta.tragittoId);
+    if (tragitto.fornitoreId) throw new ConflittoDati(MESSAGGIO_GIA_ASSEGNATO);
     if (await linkScaduto(richiesta, false)) throw new ConflittoDati('Questo link è scaduto — se vuole ancora inviare un preventivo, contatti direttamente chi le ha scritto.');
     try {
       const [nuova] = await db.insert(preventiviRisposte).values({
@@ -208,45 +297,90 @@ export const preventiviService = {
     if (!risposta) throw new NonTrovato('Risposta preventivo');
     const [richiesta] = await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.id, risposta.richiestaId)).limit(1);
     if (!richiesta) throw new NonTrovato('Richiesta preventivo');
+    const { tragitto, evento } = await tragittoConEvento(richiesta.tragittoId);
+    const nessunAvviso = { ok: true as const, fornitoreAvvisato: false, nonSceltiAvvisati: 0 };
+
+    // Idempotente: riaccettare la risposta già accettata (doppio click,
+    // pagina non aggiornata) non riscrive nulla e non manda email.
+    const precedenteFornitoreId = tragitto.fornitoreId;
+    const giaAccettata = precedenteFornitoreId === richiesta.fornitoreId
+      && tragitto.preventivoCosto != null && Number(tragitto.preventivoCosto) === Number(risposta.prezzo);
+    if (giaAccettata) return nessunAvviso;
+
     // Scrive esattamente negli stessi campi già usati per l'inserimento
     // a mano in Prezzi — un preventivo accettato non è concettualmente
     // diverso da uno scritto a mano con fornitore indicato.
     const kmAccettati = await calcolaKmApprossimati(richiesta.tragittoId);
     await db.update(tragitti).set({ preventivoCosto: risposta.prezzo, fornitoreId: richiesta.fornitoreId, ...(kmAccettati != null && { kmAccettati }) }).where(eq(tragitti.id, richiesta.tragittoId));
 
-    // Avviso agli altri fornitori che avevano risposto per lo stesso
-    // tragitto (non a chi non ha ancora risposto — non ha senso
-    // avvisare chi non sapeva nemmeno se sarebbe stato considerato) —
-    // impostazione fissa, non a ogni accettazione, come deciso.
+    // Stesso fornitore già scelto, con un'altra sua risposta: sa già di
+    // essere stato scelto e gli altri sono già stati avvisati — cambia
+    // solo il costo.
+    if (precedenteFornitoreId === richiesta.fornitoreId) return nessunAvviso;
+
+    const variabili = variabiliTragitto(tragitto, evento);
+
+    const [fornitoreScelto] = await db.select().from(fornitori).where(eq(fornitori.id, richiesta.fornitoreId)).limit(1);
+    const fornitoreAvvisato = fornitoreScelto?.email
+      ? await inviaEmailModello(fornitoreScelto.email, 'preventivo_scelto', { ...variabili, prezzo: formattaEuro(risposta.prezzo) })
+      : false;
+
+    // "Non scelto" solo a chi ha risposto per questo tragitto e non è
+    // ancora stato avvisato: alla prima accettazione tutti gli altri; se
+    // si cambia scelta, gli altri lo sanno già dalla prima volta — resta
+    // da avvisare solo il fornitore scelto in precedenza. Impostazione
+    // fissa, non a ogni accettazione, come deciso.
+    let nonSceltiAvvisati = 0;
     if (await leggiNotificaNonScelti()) {
-      const altreRichieste = await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.tragittoId, richiesta.tragittoId));
-      for (const altra of altreRichieste) {
-        if (altra.id === richiesta.id) continue;
-        const [altraRisposta] = await db.select().from(preventiviRisposte).where(eq(preventiviRisposte.richiestaId, altra.id)).limit(1);
-        if (!altraRisposta) continue; // non aveva risposto — niente da avvisare
-        const [altroFornitore] = await db.select().from(fornitori).where(eq(fornitori.id, altra.fornitoreId)).limit(1);
-        if (!altroFornitore?.email) continue;
-        const { oggetto, html } = await templateEmailService.renderizza('preventivo_non_scelto', {});
-        await inviaEmailBestEffort({ a: altroFornitore.email, oggetto, html });
+      const risposteDelTragitto = await db.select({ fornitoreId: preventiviRichieste.fornitoreId })
+        .from(preventiviRisposte)
+        .innerJoin(preventiviRichieste, eq(preventiviRichieste.id, preventiviRisposte.richiestaId))
+        .where(eq(preventiviRichieste.tragittoId, richiesta.tragittoId));
+      const hannoRisposto = new Set(risposteDelTragitto.map((r) => r.fornitoreId));
+      hannoRisposto.delete(richiesta.fornitoreId);
+      const cambioDiScelta = precedenteFornitoreId != null && hannoRisposto.has(precedenteFornitoreId);
+      const destinatariIds = cambioDiScelta ? [precedenteFornitoreId!] : [...hannoRisposto];
+      if (destinatariIds.length > 0) {
+        const destinatari = await db.select().from(fornitori).where(inArray(fornitori.id, destinatariIds));
+        for (const f of destinatari) {
+          if (!f.email) continue;
+          if (await inviaEmailModello(f.email, 'preventivo_non_scelto', variabili)) nonSceltiAvvisati++;
+        }
       }
     }
-    return { ok: true };
+    return { ok: true as const, fornitoreAvvisato, nonSceltiAvvisati };
   },
+  /** Salva il file firmato e lo manda al fornitore; la data di invio si
+   *  scrive SOLO se l'email è partita davvero (un file nuovo azzera
+   *  quella del file precedente). */
   caricaFileFirmato: async (rispostaId: string, fileNome: string, fileContenuto: string) => {
-    const [risposta] = await db.select().from(preventiviRisposte).where(eq(preventiviRisposte.id, rispostaId)).limit(1);
+    const [risposta] = await db.select({ id: preventiviRisposte.id, richiestaId: preventiviRisposte.richiestaId }).from(preventiviRisposte).where(eq(preventiviRisposte.id, rispostaId)).limit(1);
     if (!risposta) throw new NonTrovato('Risposta preventivo');
     const [richiesta] = await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.id, risposta.richiestaId)).limit(1);
     const [fornitore] = richiesta ? await db.select().from(fornitori).where(eq(fornitori.id, richiesta.fornitoreId)).limit(1) : [];
-    await db.update(preventiviRisposte).set({ fileFirmatoNome: fileNome, fileFirmatoContenuto: fileContenuto, fileFirmatoInviatoIl: new Date() }).where(eq(preventiviRisposte.id, rispostaId));
-    if (fornitore?.email) {
-      const { oggetto, html } = await templateEmailService.renderizza('preventivo_firmato', {});
-      await inviaEmailBestEffort({
-        a: fornitore.email,
-        oggetto, html,
-        allegati: [{ nomeFile: fileNome, contenuto: Buffer.from(fileContenuto, 'base64'), tipo: 'application/pdf' }],
-      });
+    await db.update(preventiviRisposte).set({ fileFirmatoNome: fileNome, fileFirmatoContenuto: fileContenuto, fileFirmatoInviatoIl: null }).where(eq(preventiviRisposte.id, rispostaId));
+    const inviata = fornitore?.email ? await inviaFileFirmato(fornitore.email, fileNome, fileContenuto) : false;
+    if (inviata) {
+      await db.update(preventiviRisposte).set({ fileFirmatoInviatoIl: new Date() }).where(eq(preventiviRisposte.id, rispostaId));
     }
-    return { ok: true };
+    return { ok: true as const, inviata };
+  },
+  /** Rimanda il file firmato già salvato (es. il primo invio non era partito). */
+  reinviaFileFirmato: async (rispostaId: string) => {
+    const [risposta] = await db.select({
+      id: preventiviRisposte.id, richiestaId: preventiviRisposte.richiestaId,
+      fileFirmatoNome: preventiviRisposte.fileFirmatoNome, fileFirmatoContenuto: preventiviRisposte.fileFirmatoContenuto,
+    }).from(preventiviRisposte).where(eq(preventiviRisposte.id, rispostaId)).limit(1);
+    if (!risposta) throw new NonTrovato('Risposta preventivo');
+    if (!risposta.fileFirmatoContenuto) throw new ConflittoDati('Non c\'è ancora un preventivo firmato da reinviare: caricalo prima.');
+    const [richiesta] = await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.id, risposta.richiestaId)).limit(1);
+    const [fornitore] = richiesta ? await db.select().from(fornitori).where(eq(fornitori.id, richiesta.fornitoreId)).limit(1) : [];
+    if (!fornitore?.email) throw new ConflittoDati('Questo fornitore non ha un indirizzo email: aggiungilo nella sua scheda prima di reinviare il file.');
+    const inviata = await inviaFileFirmato(fornitore.email, risposta.fileFirmatoNome ?? 'preventivo-firmato.pdf', risposta.fileFirmatoContenuto);
+    if (inviata) {
+      await db.update(preventiviRisposte).set({ fileFirmatoInviatoIl: new Date() }).where(eq(preventiviRisposte.id, rispostaId));
+    }
+    return { inviata };
   },
   // Per il badge nel menu — una risposta "da valutare" è una risposta
   // arrivata per un tragitto che NON ha ancora un fornitore accettato
@@ -370,6 +504,9 @@ preventiviRouter.get('/candidati/:tragittoId', richiedePermesso('eventi.partenze
 preventiviRouter.post('/richiedi/:tragittoId', richiedePermesso('eventi.partenze'), valida(richiediSchema), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.richiedi(req.params.tragittoId, req.body));
 }));
+preventiviRouter.post('/richieste/:richiestaId/reinvia', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
+  res.json(await preventiviService.reinviaRichiesta(req.params.richiestaId));
+}));
 preventiviRouter.get('/tragitto/:tragittoId', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.listaPerTragitto(req.params.tragittoId));
 }));
@@ -395,4 +532,7 @@ preventiviRouter.get('/risposte/:id/file', richiedePermesso('eventi.partenze'), 
 }));
 preventiviRouter.post('/risposte/:id/file-firmato', richiedePermesso('eventi.partenze'), valida(z.object({ fileNome: z.string().max(200), fileContenuto: fileBase64Schema })), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.caricaFileFirmato(req.params.id, req.body.fileNome, req.body.fileContenuto));
+}));
+preventiviRouter.post('/risposte/:id/reinvia-firmato', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
+  res.json(await preventiviService.reinviaFileFirmato(req.params.id));
 }));

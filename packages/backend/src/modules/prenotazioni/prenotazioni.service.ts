@@ -624,12 +624,47 @@ export const prenotazioniService = {
     ));
   },
 
-  /** Cancella e restituisce i posti al bus, in un'unica transazione. */
-  async cancella(pnr: string) {
+  /** Cancella dal gestionale: come cancella() qui sotto, più l'avviso al
+   *  cliente — solo se l'ha cancellata davvero QUESTA chiamata (mai due
+   *  email per un doppio click). L'email parte dopo la transazione, best
+   *  effort: una cancellazione già avvenuta non diventa mai un errore per
+   *  colpa di un'email. clienteAvvisato null = era già cancellata. */
+  async cancellaDaAdmin(pnr: string, motivo?: string): Promise<typeof prenotazioni.$inferSelect & { clienteAvvisato: boolean | null }> {
+    const motivoFinale = motivo?.trim() || "Cancellata dall'organizzazione";
+    const { appenaCancellata, ...prenotazione } = await prenotazioniService.cancella(pnr, motivoFinale);
+    if (!appenaCancellata) return { ...prenotazione, clienteAvvisato: null };
+
+    let clienteAvvisato = false;
+    try {
+      const [dati] = await db.select({ email: utenti.email, nome: utenti.nome, artista: eventi.artista })
+        .from(prenotazioni)
+        .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
+        .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
+        .where(eq(prenotazioni.id, prenotazione.id)).limit(1);
+      if (dati?.email) {
+        const { inviaEmail } = await import('../../shared/email.service.js');
+        const { templateEmailService } = await import('../template-email/template-email.service.js');
+        const { oggetto, html } = await templateEmailService.renderizza('prenotazione_cancellata', {
+          nome: dati.nome ?? '', evento: dati.artista, pnr: prenotazione.pnr, motivo: motivoFinale,
+        }, { escapaHtml: ['nome', 'evento', 'pnr', 'motivo'] });
+        clienteAvvisato = (await inviaEmail({ a: dati.email, oggetto, html })).inviata;
+      }
+    } catch (err) {
+      console.error(`[prenotazioni] avviso di cancellazione al cliente (PNR ${pnr}) non riuscito:`, err);
+    }
+    return { ...prenotazione, clienteAvvisato };
+  },
+
+  /** Cancella e restituisce i posti al bus, in un'unica transazione.
+   *  "motivo" è quello che resta scritto sulla prenotazione — chi l'ha
+   *  cancellata e perché (prima era sempre "Cancellata dal cliente",
+   *  anche quando cancellava l'organizzazione). appenaCancellata dice se
+   *  l'ha cancellata questa chiamata (false = lo era già). */
+  async cancella(pnr: string, motivo: string): Promise<typeof prenotazioni.$inferSelect & { appenaCancellata: boolean }> {
     return db.transaction(async (tx) => {
       const [p] = await tx.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
       if (!p) throw new NonTrovato('Prenotazione');
-      if (p.stato === 'CANCELLATA') return p;
+      if (p.stato === 'CANCELLATA') return { ...p, appenaCancellata: false };
 
       // Atomico: la transizione di stato stessa fa da lucchetto — due
       // cancellazioni quasi simultanee sullo stesso PNR, solo una vince
@@ -640,10 +675,10 @@ export const prenotazioniService = {
       // arrivavano due richieste quasi insieme.
       const [aggiornata] = await tx
         .update(prenotazioni)
-        .set({ stato: 'CANCELLATA', motivoCancellazione: 'Cancellata dal cliente' })
+        .set({ stato: 'CANCELLATA', motivoCancellazione: motivo })
         .where(and(eq(prenotazioni.pnr, pnr), ne(prenotazioni.stato, 'CANCELLATA')))
         .returning();
-      if (!aggiornata) return p; // già cancellata un istante fa da un'altra richiesta, nessun altro effetto da rifare
+      if (!aggiornata) return { ...p, appenaCancellata: false }; // già cancellata un istante fa da un'altra richiesta, nessun altro effetto da rifare
 
       await tx
         .update(tragitti)
@@ -660,7 +695,7 @@ export const prenotazioniService = {
         .set({ postiPrenotati: sql`GREATEST(0, ${fermate.postiPrenotati} - ${p.passeggeri})` })
         .where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.tragittoId, p.tragittoId), sql`${fermate.postiMax} IS NOT NULL`));
 
-      return aggiornata;
+      return { ...aggiornata, appenaCancellata: true };
     });
   },
 

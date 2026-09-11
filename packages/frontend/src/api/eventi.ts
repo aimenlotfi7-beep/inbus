@@ -37,6 +37,24 @@ export interface EventoInput {
   servizi?: { id?: string; nome: string; tragitti: TragittoInput[] }[];
 }
 
+/** Email mandate ai clienti dopo un salvataggio: clientiAvvisati = email
+ *  tentate, emailNonInviate = quante di quelle non sono partite. */
+export interface EsitoAvvisiClienti { clientiAvvisati: number; emailNonInviate: number; }
+
+/** Anteprima (nessuna scrittura) di PUT /tragitti/:id/operativo: clienti
+ *  = email che partirebbero per quella variazione (0 = cambio rilevato
+ *  ma nessuno prenotato su quella fermata). */
+export interface AnteprimaVariazioniTragitto {
+  clientiTotali: number;
+  variazioni: { fermata: string; descrizione: string; clienti: number }[];
+}
+/** Anteprima (nessuna scrittura) di PUT /eventi/:id. fermata = '' per i
+ *  cambi che toccano tutto il viaggio (data/ora o luogo dell'evento). */
+export interface AnteprimaVariazioniEvento {
+  clientiTotali: number;
+  variazioni: { tragitto: string; fermata: string; descrizione: string; clienti: number }[];
+}
+
 export interface FermataConPasseggeri { fermataId: string; citta: string; passeggeri: number; }
 export interface CalcoloBusTragitto {
   tragittoId: string;
@@ -71,6 +89,16 @@ export interface LineaInput {
 // Aggiungere un bus a una Linea esistente, o modificare un bus già
 // dentro — mai le fermate, quelle sono della Linea intera.
 export type BusDiLineaInput = Omit<LineaInput, 'fermateIds'>;
+/** tourLeaderAvvisato: esito dell'email al tour leader appena assegnato
+ *  (o cambiato); null = nessun tour leader nuovo, nessuna email. */
+export interface EsitoCreaLinea extends EsitoAvvisiClienti {
+  lineaId: string;
+  busId: string;
+  // true = era la prima Linea: il tragitto è appena diventato CONFERMATO
+  // e i clienti con prenotazione confermata sono stati avvisati.
+  partenzaConfermata: boolean;
+  tourLeaderAvvisato: boolean | null;
+}
 export interface FermataLinea { fermataId: string; citta: string; orario: string | null; inAttesa: number; versati: number; }
 export interface BusDiLinea {
   id: string; fornitoreId: string | null; riferimento: string; autistaNome: string | null; autistaTelefono: string | null;
@@ -108,24 +136,35 @@ export const eventiApi = {
   opzioniPartenza: (id: string, servizioId?: string) =>
     api.get<OpzionePartenza[]>(`/api/eventi/${id}/opzioni-partenza${servizioId ? `?servizioId=${servizioId}` : ''}`),
   create: (input: EventoInput) => api.post<Evento>('/api/eventi', input),
-  update: (id: string, input: Partial<EventoInput>) => api.put<Evento>(`/api/eventi/${id}`, input),
+  // L'evento aggiornato, più l'esito degli avvisi ai clienti per le
+  // variazioni (fermate, data, luogo) che il salvataggio ha generato.
+  update: (id: string, input: Partial<EventoInput>) => api.put<Evento & EsitoAvvisiClienti>(`/api/eventi/${id}`, input),
+  // Stesso corpo di update, nessuna scrittura: cosa verrebbe comunicato.
+  anteprimaVariazioni: (id: string, input: Partial<EventoInput>) =>
+    api.post<AnteprimaVariazioniEvento>(`/api/eventi/${id}/anteprima-variazioni`, input),
   remove: (id: string) => api.delete<void>(`/api/eventi/${id}`),
 
   calcolaBus: (id: string) => api.get<CalcoloBusTragitto[]>(`/api/eventi/${id}/calcola-bus`),
   listaBus: (id: string) => api.get<BusFisico[]>(`/api/eventi/${id}/bus`),
 
-  creaLinea: (id: string, input: LineaInput) => api.post<{ lineaId: string; busId: string }>(`/api/eventi/${id}/linee`, input),
-  aggiungiBusALinea: (lineaId: string, input: BusDiLineaInput) => api.post<{ id: string }>(`/api/eventi/linee/${lineaId}/bus`, input),
+  creaLinea: (id: string, input: LineaInput) => api.post<EsitoCreaLinea>(`/api/eventi/${id}/linee`, input),
+  aggiungiBusALinea: (lineaId: string, input: BusDiLineaInput) =>
+    api.post<{ id: string; tourLeaderAvvisato: boolean | null }>(`/api/eventi/linee/${lineaId}/bus`, input),
   aggiornaPercorsoLinea: (eventoId: string, lineaId: string, fermateIds: string[]) => api.put<{ ok: true }>(`/api/eventi/${eventoId}/linee/${lineaId}/percorso`, { fermateIds }),
-  aggiornaBusDiLinea: (busId: string, input: Partial<BusDiLineaInput>) => api.put<{ ok: true }>(`/api/eventi/linee/bus/${busId}`, input),
+  aggiornaBusDiLinea: (busId: string, input: Partial<BusDiLineaInput>) =>
+    api.put<{ ok: true; tourLeaderAvvisato: boolean | null }>(`/api/eventi/linee/bus/${busId}`, input),
   listaLinee: (tragittoId: string) => api.get<Linea[]>(`/api/eventi/tragitti/${tragittoId}/linee`),
   versaLinea: (lineaId: string) => api.post<{ versate: number; restanoInAttesa: number }>(`/api/eventi/linee/${lineaId}/versa`, {}),
   // Fase 2 — orario/prezzo/posti si modificano da Partenze, non più da
   // Eventi. aggiornaServizio esisteva già lato backend (mai usata dal
   // frontend finora) — qui il client mancante.
 
+  // prezzoExtra facoltativo: se non lo mandi resta quello salvato.
   aggiornaTragittoOperativo: (tragittoId: string, input: { prezzoExtra?: number; fermate: FermataInput[] }) =>
-    api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/operativo`, input),
+    api.put<{ ok: true } & EsitoAvvisiClienti>(`/api/eventi/tragitti/${tragittoId}/operativo`, input),
+  // Stesso corpo, nessuna scrittura: quali variazioni e quanti clienti.
+  anteprimaTragittoOperativo: (tragittoId: string, input: { prezzoExtra?: number; fermate: FermataInput[] }) =>
+    api.post<AnteprimaVariazioniTragitto>(`/api/eventi/tragitti/${tragittoId}/operativo/anteprima`, input),
   // Sezione PREVENTIVI: registra il costo (fornitore+file facoltativi) —
   // non tocca i prezzi di vendita.
   registraPreventivoManuale: (tragittoId: string, input: { preventivoCosto: number; preventivoPostiBus: number; fornitoreId?: string; fileNome?: string; fileContenuto?: string }) =>

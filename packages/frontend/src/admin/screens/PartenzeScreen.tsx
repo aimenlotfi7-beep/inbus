@@ -8,36 +8,51 @@ import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
 import { useNavigazione } from '../shared/NavigazioneContext';
 import { useMappaTooltip } from '../shared/useMappaTooltip';
+import { notifica } from '../shared/notifiche';
+import { motivoErrore } from '../shared/errori';
+import { plurale } from '../../shared/formato';
 
-import type { TabPartenze, AzionePartenze } from './partenze/tipi';
+import { TITOLI_PARTENZE, SEZIONE_PARTENZE, POSTI_SENZA_BUS, type TabPartenze, type AzionePartenze } from './partenze/tipi';
 export type { TabPartenze } from './partenze/tipi';
 type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
 
-const TITOLI: Record<TabPartenze, string> = {
-  fermate: 'Orari', preventivi: 'Preventivi', 'da-prezzare': 'Prezzi', 'da-confermare': 'Da Confermare', confermato: 'Confermato', passate: 'Passate',
+const CHIAVE_TOOLTIP: Record<TabPartenze, string> = {
+  fermate: 'partenze_orari_intro', preventivi: 'partenze_preventivi_intro', 'da-prezzare': 'partenze_prezzi_intro',
+  'da-confermare': 'partenze_da_confermare_intro', confermato: 'partenze_confermate_intro', passate: 'partenze_passate_intro',
 };
 
+const MESSAGGIO_VUOTO: Record<TabPartenze, string> = {
+  fermate: 'Nessun evento con tragitti in programma, al momento.',
+  preventivi: 'Nessun evento pronto per un preventivo: prima vanno calcolati gli orari.',
+  'da-prezzare': 'Nessun evento da prezzare: prima serve un preventivo registrato.',
+  'da-confermare': 'Nessun evento in attesa di bus, al momento.',
+  confermato: 'Nessun evento confermato, al momento.',
+  passate: 'Nessun evento passato ancora.',
+};
+
+/** "Manca 1 posto" / "Mancano 3 posti". */
+function postiMancanti(n: number) {
+  return n === 1 ? 'Manca 1 posto' : `Mancano ${n} posti`;
+}
+
 /**
- * Le cinque tappe del flusso Orari → Prezzi → Da Confermare →
- * Confermato | Passate — prima divise su due schermate (Preventivi e
- * Partenze) con tab interne, ora CINQUE voci separate nel menu a
- * sinistra (sotto "Partenze"), come richiesto: si vedono distinte,
- * niente più barra di tab da cliccare dentro la pagina.
+ * Le sei tappe del flusso Orari → Preventivi → Prezzi → Da confermare →
+ * Confermate | Passate, ognuna una voce separata nel menu a sinistra
+ * (sotto "Partenze"): si vedono distinte, niente barra di tab da
+ * cliccare dentro la pagina.
  *
  * Un tragitto qui vive SEMPRE finché l'evento non è passato — un
  * compito fatto in una tappa non lo fa sparire dalle altre, resta
- * sempre raggiungibile per rivederlo. Le Card degli eventi restano
+ * sempre raggiungibile per rivederlo. Le card degli eventi restano
  * sempre visibili mentre ci si lavora, contorno rosso se manca ancora
- * qualcosa in QUESTA tappa, verde se è già a posto qui — stessa logica
- * di sempre, solo spostata su 5 schermate invece di 2.
+ * qualcosa in QUESTA tappa, verde se è già a posto qui.
  *
  * - "Orari": si calcolano gli orari di ogni fermata e si esporta
- *   l'elenco da mandare al fornitore per farsi fare il preventivo.
- * - "Prezzi": si registra il costo tornato dal fornitore e si decide
- *   il prezzo di vendita per ogni fermata.
- * - "Da Confermare": preventivo fatto, già in vendita — qui si
- *   aggiungono le Linee (bus veri).
- * - "Confermato": un insieme A PARTE — ci entra SOLO chi ha avuto
+ *   l'elenco da mandare ai fornitori.
+ * - "Preventivi": si chiede o si registra il costo del fornitore.
+ * - "Prezzi": dal costo si decide il prezzo di vendita per ogni fermata.
+ * - "Da confermare": già in vendita — qui si aggiungono le linee (bus veri).
+ * - "Confermate": un insieme A PARTE — ci entra SOLO chi ha avuto
  *   almeno una volta un bus vero registrato (stato interno che una
  *   volta raggiunto non torna mai indietro da solo).
  * - "Passate": l'evento è già passato, qualunque fosse lo stato —
@@ -50,26 +65,23 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   const [partenze, setPartenze] = useState<Partenza[]>([]);
   const [selezionato, setSelezionato] = useState<{ evento: Evento; tragittiIds: string[]; azione: AzionePartenze; tabOrigine: TabPartenze } | null>(null);
 
-  // La sezione (URL) corrispondente a questa tab — stessa mappa degli
-  // export in fondo al file — serve per scrivere/leggere ?eventoId= e
-  // ?tragittiIds= nell'URL di QUESTA tab specifica.
-  const sezioneUrl: Record<TabPartenze, string> = {
-    fermate: 'partenze-orari', preventivi: 'partenze-preventivi', 'da-prezzare': 'partenze-prezzi',
-    'da-confermare': 'partenze-da-confermare', confermato: 'partenze-confermato', passate: 'partenze-passate',
-  };
   const naviga = useNavigazione();
   const [ricerca, setRicerca] = useState('');
   const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState('');
 
+  // "Carico…" solo al primo caricamento: i ricaricamenti successivi
+  // (cambio tappa, ritorno sulla finestra, salvataggi) aggiornano le card
+  // già visibili invece di farle sparire e ricomparire ogni volta.
   function ricarica() {
-    setCaricamento(true);
     Promise.all([eventiApi.list(), eventiApi.elencoPartenze()])
-      .then(([e, p]) => { setEventi(e); setPartenze(p); })
+      .then(([e, p]) => { setEventi(e); setPartenze(p); setErrore(''); })
+      .catch((e) => setErrore(`Impossibile caricare le partenze: ${motivoErrore(e)}`))
       .finally(() => setCaricamento(false));
   }
   // Ricarico anche cambiando tappa (arrivando da un'altra voce di
-  // menu) — ognuna è ora una sezione a sé, non un semplice cambio di
-  // stato dentro la stessa schermata già montata.
+  // menu) — ognuna è una sezione a sé, non un semplice cambio di stato
+  // dentro la stessa schermata già montata.
   useEffect(ricarica, [tab]);
   // Se elimini/modifichi un evento da un'altra scheda o finestra del
   // browser, questa lista non se ne accorgerebbe da sola finché non la
@@ -89,7 +101,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   }
   // A quali tappe appartiene questo tragitto, TUTTE insieme (un
   // tragitto compare in più tappe insieme man mano che avanza — es. in
-  // "Da Confermare" e "Confermato" contemporaneamente).
+  // "Da confermare" e "Confermate" contemporaneamente).
   function tabsDi(p: Partenza): TabPartenze[] {
     if (passata(p)) return ['passate'];
     // Preventivi: compare solo quando ci sono orari da mostrare al
@@ -101,7 +113,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
     const conPrezzi: TabPartenze[] = p.preventivoCosto ? ['da-prezzare'] : [];
     if (p.stato === 'DA_CONFERMARE') return ['fermate', ...conPreventivi, ...conPrezzi];
     const risultato: TabPartenze[] = ['fermate', ...conPreventivi, ...conPrezzi, 'da-confermare'];
-    if (p.stato !== 'PREZZATO') risultato.push('confermato'); // "Confermato" resta un insieme a parte
+    if (p.stato !== 'PREZZATO') risultato.push('confermato'); // "Confermate" resta un insieme a parte
     return risultato;
   }
   function fattoInTab(p: Partenza, tabAttuale: TabPartenze): boolean {
@@ -115,24 +127,27 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
     if (tabAttuale === 'confermato') return !scoperta(p); // qui dentro lo stato è già sempre CONFERMATO, per costruzione
     return false; // Passate: mai un contorno
   }
+  // Stesse parole della pagina del tragitto (PartenzeTab): prima la card
+  // diceva "Fatto" e dentro "Prezzato", per la stessa identica cosa.
+  // Niente simboli: il colore del bollino dice già lo stato.
   function etichettaStato(p: Partenza, tabAttuale: TabPartenze): { fatto: boolean; testo: string } {
-    if (tabAttuale === 'fermate') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: '✓ Fatto' } : { fatto: false, testo: '◔ Da calcolare/esportare' };
+    if (tabAttuale === 'fermate') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'Orari impostati' } : { fatto: false, testo: 'Orari da impostare' };
     if (tabAttuale === 'preventivi') {
-      if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: p.fornitoreId ? '✓ Accettato' : '✓ Registrato' };
+      if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: p.fornitoreId ? 'Accettato' : 'Registrato' };
       // Prima servono gli orari (la richiesta al fornitore mostra
       // fermate/orari) — senza, non ha ancora senso segnalarlo come
       // "da fare" qui, resta solo un'attesa neutra.
       if (!p.fermateCompilate) return { fatto: true, testo: '' };
-      return { fatto: false, testo: '◔ Da richiedere' };
+      return { fatto: false, testo: 'Da richiedere' };
     }
-    if (tabAttuale === 'da-prezzare') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: '✓ Fatto' } : { fatto: false, testo: '◔ Da prezzare' };
+    if (tabAttuale === 'da-prezzare') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'In vendita' } : { fatto: false, testo: 'Da prezzare' };
     if (tabAttuale === 'da-confermare') {
-      if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: '✓ Confermata' };
-      if (scoperta(p)) return { fatto: false, testo: `⚠ ${p.totalePasseggeri - p.postiTotali} posti mancanti` };
-      return { fatto: false, testo: '◔ Serve una Linea' };
+      if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: 'Confermata' };
+      if (scoperta(p)) return { fatto: false, testo: postiMancanti(p.totalePasseggeri - p.postiTotali) };
+      return { fatto: false, testo: 'Serve una linea' };
     }
     if (tabAttuale === 'confermato') {
-      if (scoperta(p)) return { fatto: false, testo: `⚠ ${p.totalePasseggeri - p.postiTotali} posti mancanti` };
+      if (scoperta(p)) return { fatto: false, testo: postiMancanti(p.totalePasseggeri - p.postiTotali) };
       return { fatto: true, testo: '' };
     }
     return { fatto: true, testo: '' }; // Passate: nessuna etichetta di stato, mai contorno
@@ -160,13 +175,15 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
     const tragittiIds = gruppo.map((p) => p.tragittoId);
     const eventoId = gruppo[0].evento.id;
     const eventoInMemoria = eventi.find((ev) => ev.id === eventoId);
-    naviga(sezioneUrl[tab] as never, { eventoId, tragittiIds: tragittiIds.join(',') });
+    naviga(SEZIONE_PARTENZE[tab] as never, { eventoId, tragittiIds: tragittiIds.join(',') });
     if (eventoInMemoria) setSelezionato({ evento: eventoInMemoria, tragittiIds, azione, tabOrigine: tab }); // subito, non far vedere niente mentre carica
     try {
       const fresco = await eventiApi.getById(eventoId);
       setSelezionato({ evento: fresco, tragittiIds, azione, tabOrigine: tab });
-    } catch {
-      // Se il fetch fallisce, resta la versione già in memoria (se c'era).
+    } catch (e) {
+      // Se c'era già in memoria resta quella versione; se no, niente da
+      // aprire: meglio dirlo che non reagire al clic.
+      if (!eventoInMemoria) notifica(`Apertura dell'evento non riuscita: ${motivoErrore(e)}`, 'errore');
     }
   }
 
@@ -192,7 +209,10 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
         tabIniziale="partenze"
         soloQuestaTab
         contestoPartenze={{ tragittiIds: selezionato.tragittiIds, azione: selezionato.azione, tabOrigine: selezionato.tabOrigine }}
-        onClose={() => { setSelezionato(null); naviga(sezioneUrl[tab] as never, { eventoId: null, tragittiIds: null }); }}
+        // Tornando all'elenco le card devono già mostrare quello che si è
+        // appena fatto dentro (prima restavano "Da richiedere" o "Serve
+        // una linea" finché la finestra non perdeva e riprendeva il focus).
+        onClose={() => { setSelezionato(null); naviga(SEZIONE_PARTENZE[tab] as never, { eventoId: null, tragittiIds: null }); ricarica(); }}
         onSalvato={ricarica}
       />
     );
@@ -200,11 +220,16 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
 
   return (
     <div>
-      <PanelHead titolo={TITOLI[tab]} info={(tab === 'fermate' || tab === 'da-prezzare') ? (mappaTooltip.preventivi_intro ?? TOOLTIP_DEFAULT.preventivi_intro) : (mappaTooltip.partenze_intro ?? TOOLTIP_DEFAULT.partenze_intro)} />
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
+      <PanelHead titolo={TITOLI_PARTENZE[tab]} info={mappaTooltip[CHIAVE_TOOLTIP[tab]] ?? TOOLTIP_DEFAULT[CHIAVE_TOOLTIP[tab]]} />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo…" />
 
       {caricamento ? (
-        <p style={{ color: 'var(--mist)' }}>Carico...</p>
+        <p className="testo-intro">Carico…</p>
+      ) : errore && partenze.length === 0 ? (
+        <div>
+          <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>
+          <button type="button" className="btn btn-ghost" onClick={ricarica}>Riprova</button>
+        </div>
       ) : (
         <div className="cards-list">
           {cardsFiltrate.map((gruppo) => {
@@ -223,12 +248,21 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
             // quale delle due mostrare.
             const daFare = stati.filter((s) => !s.fatto);
             const etichetteDaFareUniche = [...new Set(daFare.map((s) => s.testo))];
+            const etichetteFatteUniche = [...new Set(stati.filter((s) => s.fatto && s.testo).map((s) => s.testo))];
             const nienteDaMostrare = stati.every((s) => !s.testo);
             const testoBadge = nienteDaMostrare ? undefined
-              : tuttoFatto ? '✓ Fatto'
-              : parziale ? `✓ ${stati.length - daFare.length}/${stati.length} pronti`
+              : tuttoFatto ? (etichetteFatteUniche.length === 1 ? etichetteFatteUniche[0] : 'Fatto')
+              : parziale ? `${stati.length - daFare.length}/${stati.length} pronti`
               : etichetteDaFareUniche.length === 1 ? etichetteDaFareUniche[0]
-              : `${daFare.length} da lavorare`;
+              : `${daFare.length} da completare`;
+            // Senza bus il server segna i posti come illimitati: si
+            // contano i passeggeri, mai "2/999999 posti".
+            const passeggeri = gruppo.reduce((s, p) => s + p.totalePasseggeri, 0);
+            const senzaBus = gruppo.filter((p) => p.postiTotali >= POSTI_SENZA_BUS).length;
+            const posti = gruppo.reduce((s, p) => s + (p.postiTotali >= POSTI_SENZA_BUS ? 0 : p.postiTotali), 0);
+            const testoPosti = senzaBus === gruppo.length
+              ? `${plurale(passeggeri, 'passeggero', 'passeggeri')} · nessun bus`
+              : `${passeggeri}/${posti} posti${senzaBus > 0 ? ` · ${senzaBus} senza bus` : ''}`;
             return (
               <EventoCardCompatta
                 key={gruppo[0].evento.id}
@@ -238,26 +272,18 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
                 parziale={tab !== 'passate' && parziale}
                 completata={tab !== 'passate' && tuttoFatto}
                 badge={testoBadge}
-                badgeColore={tuttoFatto ? 'var(--green)' : parziale ? '#f0b429' : 'var(--pink)'}
+                badgeColore={tuttoFatto ? 'var(--green)' : parziale ? 'var(--amber)' : 'var(--pink)'}
                 extra={
                   <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 2 }}>
-                    {gruppo.length} tragitt{gruppo.length === 1 ? 'o' : 'i'}
-                    {(tab === 'da-confermare' || tab === 'confermato') && ` · ${gruppo.reduce((s, p) => s + p.totalePasseggeri, 0)}/${gruppo.reduce((s, p) => s + p.postiTotali, 0)} posti`}
+                    {plurale(gruppo.length, 'tragitto', 'tragitti')}
+                    {(tab === 'da-confermare' || tab === 'confermato') && ` · ${testoPosti}`}
                   </p>
                 }
               />
             );
           })}
           {!cardsFiltrate.length && (
-            <p style={{ color: 'var(--mist)' }}>
-              {ricerca ? 'Nessuna partenza trovata.'
-                : tab === 'fermate' ? 'Nessuna partenza da lavorare per gli orari, al momento.'
-                : tab === 'preventivi' ? 'Nessuna partenza da richiedere per un preventivo al momento.'
-                : tab === 'da-prezzare' ? 'Nessuna partenza da prezzare al momento.'
-                : tab === 'da-confermare' ? 'Nessuna Linea Bus da costruire al momento.'
-                : tab === 'confermato' ? 'Nessuna partenza confermata al momento.'
-                : 'Nessun evento passato ancora.'}
-            </p>
+            <p className="testo-intro">{ricerca.trim() ? 'Nessun evento trovato.' : MESSAGGIO_VUOTO[tab]}</p>
           )}
         </div>
       )}
@@ -268,7 +294,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
 // Esportate già "pronte" con la tappa fissata, così AdminApp.tsx può
 // collegare ciascuna voce di menu a un componente senza props — la
 // stessa identica schermata sopra, solo con davanti già scelto quale
-// delle 5 tappe mostrare.
+// delle sei tappe mostrare.
 export const PartenzeOrariScreen = () => <PartenzeScreen tab="fermate" />;
 export const PartenzePreventiviScreen = () => <PartenzeScreen tab="preventivi" />;
 export const PartenzePrezziScreen = () => <PartenzeScreen tab="da-prezzare" />;

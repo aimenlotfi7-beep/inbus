@@ -5,6 +5,35 @@ import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
 import { creditoService } from '../credito/credito.service.js';
 import { inviaEventoMetaSeConfigurato } from '../prenotazioni/prenotazioni.service.js';
+import { inviaEmail } from '../../shared/email.service.js';
+import { templateEmailService } from '../template-email/template-email.service.js';
+import { formattaEuro } from '../../shared/formato.js';
+
+/** Avvisa il cliente dell'esito della sua richiesta di rimborso. Parte
+ *  dopo che la decisione è già salvata, best effort: un'email non
+ *  riuscita si registra nei log, non annulla né blocca la decisione. */
+async function avvisaCliente(
+  prenotazioneId: string,
+  esito: { tipo: 'approvato' } | { tipo: 'rifiutato'; motivo?: string },
+): Promise<boolean> {
+  try {
+    const [dati] = await db.select({ pnr: prenotazioni.pnr, totale: prenotazioni.totale, email: utenti.email, nome: utenti.nome, artista: eventi.artista })
+      .from(prenotazioni)
+      .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
+      .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
+      .where(eq(prenotazioni.id, prenotazioneId)).limit(1);
+    if (!dati?.email) return false;
+    const base = { nome: dati.nome ?? '', evento: dati.artista, pnr: dati.pnr };
+    const { oggetto, html } = esito.tipo === 'approvato'
+      ? await templateEmailService.renderizza('rimborso_approvato', { ...base, importo: formattaEuro(dati.totale) }, { escapaHtml: ['nome', 'evento', 'pnr'] })
+      : await templateEmailService.renderizza('rimborso_rifiutato', { ...base, motivo: esito.motivo?.trim() || 'non indicato' }, { escapaHtml: ['nome', 'evento', 'pnr', 'motivo'] });
+    const { inviata } = await inviaEmail({ a: dati.email, oggetto, html });
+    return inviata;
+  } catch (err) {
+    console.error(`[rimborsi] avviso al cliente (prenotazione ${prenotazioneId}) non riuscito:`, err);
+    return false;
+  }
+}
 
 export const richiesteRimborsoService = {
   /** Solo il numero, non l'elenco completo — usata per il pallino di
@@ -95,15 +124,19 @@ export const richiesteRimborsoService = {
   },
 
   /** Approva: cancella per davvero la prenotazione (posti restituiti) e
-   *  toglie l'eventuale credito fedeltà già maturato da quel viaggio. */
-  async approva(id: string, noteAdmin?: string) {
+   *  toglie l'eventuale credito fedeltà già maturato da quel viaggio.
+   *  Poi avvisa il cliente (best effort). */
+  async approva(id: string, noteAdmin?: string): Promise<{ clienteAvvisato: boolean }> {
     const [r] = await db.select().from(richiesteRimborso).where(eq(richiesteRimborso.id, id)).limit(1);
     if (!r) throw new NonTrovato('Richiesta');
     if (r.stato !== 'IN_ATTESA') throw new ConflittoDati('Questa richiesta è già stata gestita.');
 
     const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, r.prenotazioneId)).limit(1);
     if (p) {
-      await prenotazioniService.cancella(p.pnr);
+      const motivo = r.origine === 'VARIAZIONE'
+        ? 'Rimborso approvato dopo una variazione del viaggio'
+        : 'Rimborso approvato su richiesta del cliente';
+      await prenotazioniService.cancella(p.pnr, motivo);
       await creditoService.revocaCreditoSePresente(p.id);
       // Meta continuerebbe altrimenti a considerare valido per sempre
       // un acquisto ormai rimborsato — le sue campagne ottimizzerebbero
@@ -120,13 +153,19 @@ export const richiesteRimborsoService = {
     }
 
     await db.update(richiesteRimborso).set({ stato: 'APPROVATA', noteAdmin, gestitaIl: new Date() }).where(eq(richiesteRimborso.id, id));
+    const clienteAvvisato = p ? await avvisaCliente(p.id, { tipo: 'approvato' }) : false;
+    return { clienteAvvisato };
   },
 
-  async rifiuta(id: string, noteAdmin?: string) {
+  /** Rifiuta e avvisa il cliente: la nota dell'admin è il motivo che il
+   *  cliente legge nell'email. */
+  async rifiuta(id: string, noteAdmin?: string): Promise<{ clienteAvvisato: boolean }> {
     const [r] = await db.select().from(richiesteRimborso).where(eq(richiesteRimborso.id, id)).limit(1);
     if (!r) throw new NonTrovato('Richiesta');
     if (r.stato !== 'IN_ATTESA') throw new ConflittoDati('Questa richiesta è già stata gestita.');
 
     await db.update(richiesteRimborso).set({ stato: 'RIFIUTATA', noteAdmin, gestitaIl: new Date() }).where(eq(richiesteRimborso.id, id));
+    const clienteAvvisato = await avvisaCliente(r.prenotazioneId, { tipo: 'rifiutato', motivo: noteAdmin });
+    return { clienteAvvisato };
   },
 };

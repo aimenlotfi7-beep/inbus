@@ -43,6 +43,7 @@ import { LayoutBigliettoScreen } from './screens/LayoutBigliettoScreen';
 import { AnalisiPercorsiScreen } from './screens/beta/AnalisiPercorsiScreen';
 import { authApi, haPermesso, type SessioneAdmin } from '../api/auth';
 import { Toaster } from './shared/Toaster';
+import { ConfermeHost } from './shared/conferma';
 
 function StatisticheSenzaHeader() {
   return <AdminDashboard onLogout={() => {}} soloContenuto />;
@@ -221,6 +222,7 @@ export function AdminApp() {
           {sezione === 'home' ? <AdminHome onVaiA={cambiaSezione} /> : (() => { const Schermata = SCHERMATE[sezione]; return <Schermata />; })()}
         </AdminLayout>
         <Toaster />
+        <ConfermeHost />
       </NavigazioneContext.Provider>
     </SessioneContext.Provider>
   );

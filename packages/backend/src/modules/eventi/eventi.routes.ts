@@ -47,6 +47,16 @@ eventiRouter.put(
   valida(aggiornaEventoSchema),
   asyncHandler(eventiController.update)
 );
+// Anteprima di cosa cambierebbe per i clienti già prenotati (fermate,
+// data, luogo) salvando questo corpo — stesso permesso e stessa
+// validazione del PUT qui sopra, nessuna scrittura.
+eventiRouter.post(
+  '/:id/anteprima-variazioni',
+  richiedeAuth,
+  richiedePermesso('eventi.crea'),
+  valida(aggiornaEventoSchema),
+  asyncHandler(eventiController.anteprimaVariazioniEvento)
+);
 eventiRouter.delete(
   '/:id',
   richiedeAuth,
@@ -67,6 +77,9 @@ eventiRouter.get('/tragitti/:tragittoId/vendite', richiedeAuth, richiedePermesso
 eventiRouter.get('/tragitti/:tragittoId/suggerimento-linea', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.suggerimentoLinea));
 eventiRouter.post('/linee/:lineaId/versa', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.versaLinea));
 eventiRouter.put('/tragitti/:tragittoId/operativo', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaTragittoOperativoSchema), asyncHandler(eventiController.aggiornaTragittoOperativo));
+// Anteprima delle variazioni (e di quanti clienti verrebbero avvisati)
+// per lo stesso corpo del PUT qui sopra — nessuna scrittura.
+eventiRouter.post('/tragitti/:tragittoId/operativo/anteprima', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaTragittoOperativoSchema), asyncHandler(eventiController.anteprimaTragittoOperativo));
 eventiRouter.put('/tragitti/:tragittoId/preventivo', richiedeAuth, richiedePermesso('eventi.crea'), valida(registraPreventivoManualeSchema), asyncHandler(eventiController.registraPreventivoManuale));
 eventiRouter.put('/tragitti/:tragittoId/prezzi-vendita', richiedeAuth, richiedePermesso('eventi.crea'), valida(calcolaPrezziVenditaSchema), asyncHandler(eventiController.calcolaPrezziVendita));
 eventiRouter.delete('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.rimuoviBus));

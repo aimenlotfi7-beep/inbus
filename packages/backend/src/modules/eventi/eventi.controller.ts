@@ -27,9 +27,12 @@ export const eventiController = {
   },
 
   async update(req: Request, res: Response) {
-    const id = await eventiService.update(req.params.id, req.body as AggiornaEventoInput);
+    const { id, clientiAvvisati, emailNonInviate } = await eventiService.update(req.params.id, req.body as AggiornaEventoInput);
     const evento = await eventiService.getById(id);
-    res.json(evento);
+    res.json({ ...evento, clientiAvvisati, emailNonInviate });
+  },
+  async anteprimaVariazioniEvento(req: Request, res: Response) {
+    res.json(await eventiService.anteprimaVariazioniEvento(req.params.id, req.body as AggiornaEventoInput));
   },
 
   async remove(req: Request, res: Response) {
@@ -70,16 +73,16 @@ export const eventiController = {
     res.status(201).json(risultato);
   },
   async aggiungiBusALinea(req: Request, res: Response) {
-    const busId = await eventiService.aggiungiBusALinea(req.params.lineaId, req.body);
-    res.status(201).json({ id: busId });
+    const { busId, tourLeaderAvvisato } = await eventiService.aggiungiBusALinea(req.params.lineaId, req.body);
+    res.status(201).json({ id: busId, tourLeaderAvvisato });
   },
   async aggiornaPercorsoLinea(req: Request, res: Response) {
     await eventiService.aggiornaPercorsoLinea(req.params.id, req.params.lineaId, req.body.fermateIds);
     res.json({ ok: true });
   },
   async aggiornaBusDiLinea(req: Request, res: Response) {
-    await eventiService.aggiornaBusDiLinea(req.params.busId, req.body);
-    res.json({ ok: true });
+    const { tourLeaderAvvisato } = await eventiService.aggiornaBusDiLinea(req.params.busId, req.body);
+    res.json({ ok: true, tourLeaderAvvisato });
   },
   async listaLinee(req: Request, res: Response) {
     res.json(await eventiService.listaLinee(req.params.tragittoId));
@@ -89,8 +92,11 @@ export const eventiController = {
   },
 
   async aggiornaTragittoOperativo(req: Request, res: Response) {
-    await eventiService.aggiornaTragittoOperativo(req.params.tragittoId, req.body);
-    res.json({ ok: true });
+    const { clientiAvvisati, emailNonInviate } = await eventiService.aggiornaTragittoOperativo(req.params.tragittoId, req.body);
+    res.json({ ok: true, clientiAvvisati, emailNonInviate });
+  },
+  async anteprimaTragittoOperativo(req: Request, res: Response) {
+    res.json(await eventiService.anteprimaTragittoOperativo(req.params.tragittoId, req.body));
   },
   async registraPreventivoManuale(req: Request, res: Response) {
     await eventiService.registraPreventivoManuale(req.params.tragittoId, req.body);

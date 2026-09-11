@@ -24,10 +24,213 @@ import { prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema } from './eventi.dto.js';
-import { rilevaVariazioni, generaComunicazioniVariazione } from '../variazioni/variazioni.service.js';
+import {
+  rilevaVariazioni, generaComunicazioniVariazione, anteprimaComunicazioni, normalizzaOrario, normalizzaTesto,
+  type FermataConfronto, type VariazioneRilevata, type EsitoComunicazioni,
+} from '../variazioni/variazioni.service.js';
 import { calcolaKmApprossimati } from '../../shared/distanza.js';
 import { tourService } from '../tour/tour.service.js';
+import { templateEmailService } from '../template-email/template-email.service.js';
+import { inviaEmail, urlSito } from '../../shared/email.service.js';
+import { formattaData, formattaDataOra } from '../../shared/formato.js';
 import type { z } from 'zod';
+
+type TragittoInput = z.infer<typeof tragittoSchema>;
+type VariazioniDiTragitto = { tragittoId: string; tragittoNome: string; variazioni: VariazioneRilevata[] };
+
+/** Le fermate in arrivo dal form, negli stessi campi che rilevaVariazioni
+ *  confronta con quelle salvate (vedi fermateSalvatePerConfronto). */
+function fermateInputPerConfronto(lista: { citta: string; indirizzo: string; orario?: string; attivo: boolean }[]): FermataConfronto[] {
+  return lista.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario ?? null, attivo: f.attivo }));
+}
+
+/** Le fermate oggi salvate, per tragitto — i "vecchi" valori veri, da
+ *  leggere PRIMA di qualunque salvataggio. */
+async function fermateSalvatePerConfronto(tragittiIds: string[]): Promise<Map<string, FermataConfronto[]>> {
+  const mappa = new Map<string, FermataConfronto[]>();
+  if (tragittiIds.length === 0) return mappa;
+  const righe = await db.select({ tragittoId: fermate.tragittoId, citta: fermate.citta, indirizzo: fermate.indirizzo, orario: fermate.orario, attivo: fermate.attivo })
+    .from(fermate).where(inArray(fermate.tragittoId, tragittiIds)).orderBy(asc(fermate.ordine));
+  for (const r of righe) {
+    const lista = mappa.get(r.tragittoId) ?? [];
+    lista.push({ citta: r.citta, indirizzo: r.indirizzo, orario: r.orario, attivo: r.attivo });
+    mappa.set(r.tragittoId, lista);
+  }
+  return mappa;
+}
+
+/** Una fermata disattivata ma ancora dentro una linea resta servita dai
+ *  bus di quella linea (vedi "Gestisci fermate" in Partenze): chi ha
+ *  prenotato lì non va avvisato che "non è più prevista". Restano solo le
+ *  fermate tolte davvero, o disattivate senza nessuna linea che le copra. */
+async function senzaFermateCoperteDaLinee(
+  tragittoId: string,
+  nuove: { citta: string; attivo?: boolean | null }[],
+  rilevate: VariazioneRilevata[],
+): Promise<VariazioneRilevata[]> {
+  const disattivate = new Set(nuove.filter((f) => f.attivo === false).map((f) => f.citta));
+  if (disattivate.size === 0 || rilevate.length === 0) return rilevate;
+  const coperte = await db.selectDistinct({ citta: fermate.citta }).from(lineaFermate)
+    .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
+    .where(eq(fermate.tragittoId, tragittoId));
+  const cittaCoperte = new Set(coperte.map((c) => c.citta));
+  return rilevate.filter((v) => !(v.fermataVecchia && disattivate.has(v.fermataVecchia.citta) && cittaCoperte.has(v.fermataVecchia.citta)));
+}
+
+/** Cosa cambia per i clienti già prenotati se si salva questo
+ *  aggiornamento dell'evento (PUT /eventi/:id): le fermate dei tragitti
+ *  esistenti (lo stesso elenco che sincronizzaTuttiITragitti riscrive) e,
+ *  per tutte le prenotazioni confermate dell'evento, data/ora e luogo.
+ *  Nessuna scrittura: la usano sia il salvataggio vero (PRIMA della
+ *  transazione, quando i dati vecchi sono ancora quelli veri) sia
+ *  l'anteprima. */
+async function rilevaVariazioniEvento(eventoId: string, input: AggiornaEventoInput): Promise<VariazioniDiTragitto[]> {
+  const [evento] = await db.select().from(eventi).where(eq(eventi.id, eventoId)).limit(1);
+  if (!evento) throw new NonTrovato('Evento');
+
+  const perTragitto = new Map<string, VariazioniDiTragitto>();
+  function aggiungi(tragittoId: string, tragittoNome: string, rilevate: VariazioneRilevata[]) {
+    if (rilevate.length === 0) return;
+    const voce = perTragitto.get(tragittoId) ?? { tragittoId, tragittoNome, variazioni: [] };
+    voce.variazioni.push(...rilevate);
+    perTragitto.set(tragittoId, voce);
+  }
+
+  // Stessi bersagli e stesso ordine di update(): i liberi (senza
+  // servizioId) poi quelli di ogni servizio — se un id compare due
+  // volte vince l'ultimo, come nella sincronizzazione.
+  const tragittiInPayload = new Map<string, TragittoInput>();
+  if (input.tragitti || input.servizi) {
+    for (const t of (input.tragitti ?? []).filter((l) => !l.servizioId)) if (t.id) tragittiInPayload.set(t.id, t);
+    for (const s of input.servizi ?? []) for (const t of s.tragitti) if (t.id) tragittiInPayload.set(t.id, t);
+  }
+  if (tragittiInPayload.size > 0) {
+    const esistenti = await db.select({ id: tragitti.id }).from(tragitti)
+      .where(and(eq(tragitti.eventoId, eventoId), isNull(tragitti.eliminatoIl), inArray(tragitti.id, [...tragittiInPayload.keys()])));
+    const vecchiePerTragitto = await fermateSalvatePerConfronto(esistenti.map((t) => t.id));
+    for (const { id } of esistenti) {
+      const nuovo = tragittiInPayload.get(id)!;
+      aggiungi(id, nuovo.nome, await senzaFermateCoperteDaLinee(id, nuovo.fermate, await rilevaVariazioni(vecchiePerTragitto.get(id) ?? [], fermateInputPerConfronto(nuovo.fermate))));
+    }
+  }
+
+  // Cambi dell'evento stesso: toccano tutte le prenotazioni confermate.
+  const cambiEvento: string[] = [];
+  if (input.data !== undefined) {
+    const prima = new Date(evento.data);
+    const dopo = new Date(input.data);
+    // Stesso istante (o differenza invisibile al minuto) = nessun cambio.
+    if (prima.getTime() !== dopo.getTime() && formattaDataOra(prima) !== formattaDataOra(dopo)) {
+      cambiEvento.push(`La data del viaggio è cambiata: da ${formattaDataOra(prima)} a ${formattaDataOra(dopo)}.`);
+    }
+  }
+  const luogoPrima = normalizzaTesto(evento.luogo);
+  const cittaPrima = normalizzaTesto(evento.citta);
+  const luogoDopo = normalizzaTesto(input.luogo ?? evento.luogo);
+  const cittaDopo = normalizzaTesto(input.citta ?? evento.citta);
+  if (luogoDopo !== luogoPrima || cittaDopo !== cittaPrima) {
+    cambiEvento.push(`Il luogo dell'evento è cambiato: ora è ${luogoDopo}, ${cittaDopo} (prima era ${luogoPrima}, ${cittaPrima}).`);
+  }
+  if (cambiEvento.length > 0) {
+    const coinvolti = await db.selectDistinct({ tragittoId: tragitti.id, nome: tragitti.nome })
+      .from(prenotazioni)
+      .innerJoin(tragitti, eq(tragitti.id, prenotazioni.tragittoId))
+      .where(and(eq(prenotazioni.eventoId, eventoId), eq(prenotazioni.stato, 'CONFERMATA')));
+    for (const t of coinvolti) {
+      aggiungi(t.tragittoId, tragittiInPayload.get(t.tragittoId)?.nome ?? t.nome, cambiEvento.map((descrizione) => ({ fermataVecchia: null, descrizione })));
+    }
+  }
+
+  return [...perTragitto.values()];
+}
+
+/** Invia le comunicazioni di più tragitti e somma i conteggi. Non lancia
+ *  mai (vedi generaComunicazioniVariazione). */
+async function comunicaVariazioni(lista: VariazioniDiTragitto[]): Promise<EsitoComunicazioni> {
+  const esito: EsitoComunicazioni = { clientiAvvisati: 0, emailNonInviate: 0 };
+  for (const t of lista) {
+    const r = await generaComunicazioniVariazione(t.tragittoId, t.variazioni);
+    esito.clientiAvvisati += r.clientiAvvisati;
+    esito.emailNonInviate += r.emailNonInviate;
+  }
+  return esito;
+}
+
+/** Il tragitto è appena diventato CONFERMATO (prima Linea creata):
+ *  avviso a ogni prenotazione confermata. Dopo il commit, best effort —
+ *  non lancia mai, un cliente non raggiunto non ferma gli altri. */
+async function avvisaPartenzaConfermata(tragittoId: string): Promise<EsitoComunicazioni> {
+  const esito: EsitoComunicazioni = { clientiAvvisati: 0, emailNonInviate: 0 };
+  try {
+    const [riga] = await db.select({ tragittoNome: tragitti.nome, artista: eventi.artista, data: eventi.data })
+      .from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!riga) return esito;
+    // L'orario ATTUALE della fermata prenotata (può essere cambiato dopo
+    // la prenotazione); quello salvato sulla prenotazione solo di riserva.
+    const orariFermate = await db.select({ citta: fermate.citta, orario: fermate.orario }).from(fermate).where(eq(fermate.tragittoId, tragittoId));
+    const orarioPerCitta = new Map(orariFermate.map((f) => [f.citta, f.orario]));
+    const destinatari = await db.select({
+      pnr: prenotazioni.pnr, fermataCitta: prenotazioni.fermataCitta, fermataOrario: prenotazioni.fermataOrario,
+      email: utenti.email, nome: utenti.nome,
+    }).from(prenotazioni)
+      .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
+      .where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA')));
+
+    for (const d of destinatari) {
+      esito.clientiAvvisati++;
+      try {
+        const { oggetto, html } = await templateEmailService.renderizza('partenza_confermata', {
+          nome: d.nome ?? '',
+          evento: riga.artista,
+          data: formattaData(riga.data),
+          tragitto: riga.tragittoNome,
+          fermata: d.fermataCitta,
+          orario: normalizzaOrario(orarioPerCitta.get(d.fermataCitta) ?? d.fermataOrario) ?? 'da definire',
+          pnr: d.pnr,
+        }, { escapaHtml: ['nome', 'evento', 'tragitto', 'fermata', 'orario', 'pnr'] });
+        const { inviata } = await inviaEmail({ a: d.email, oggetto, html });
+        if (!inviata) esito.emailNonInviate++;
+      } catch (err) {
+        esito.emailNonInviate++;
+        console.error(`[partenze] avviso "partenza confermata" a ${d.email} (PNR ${d.pnr}) non riuscito:`, err);
+      }
+    }
+  } catch (err) {
+    console.error(`[partenze] avvisi "partenza confermata" per il tragitto ${tragittoId} non riusciti:`, err);
+  }
+  return esito;
+}
+
+/** Avvisa il tour leader appena assegnato a un bus. Dopo il commit, best
+ *  effort: torna false se l'email non parte, non lancia mai. */
+async function avvisaTourLeader(busId: string): Promise<boolean> {
+  try {
+    const [riga] = await db.select({
+      riferimento: busFisici.riferimento, lineaNome: linee.nome, tragittoNome: tragitti.nome,
+      artista: eventi.artista, data: eventi.data, nome: tourLeader.nome, email: tourLeader.email,
+    }).from(busFisici)
+      .innerJoin(tourLeader, eq(tourLeader.id, busFisici.tourLeaderId))
+      .innerJoin(linee, eq(linee.id, busFisici.lineaId))
+      .innerJoin(tragitti, eq(tragitti.id, linee.tragittoId))
+      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(eq(busFisici.id, busId)).limit(1);
+    if (!riga?.email) return false;
+    const { oggetto, html } = await templateEmailService.renderizza('tour_leader_assegnato', {
+      nome: riga.nome,
+      evento: riga.artista,
+      data: formattaData(riga.data),
+      tragitto: riga.tragittoNome,
+      bus: `${riga.lineaNome} · ${riga.riferimento}`,
+      link: urlSito('/scansione/accedi'),
+    }, { escapaHtml: ['nome', 'evento', 'tragitto', 'bus'] });
+    const { inviata } = await inviaEmail({ a: riga.email, oggetto, html });
+    return inviata;
+  } catch (err) {
+    console.error(`[partenze] avviso al tour leader del bus ${busId} non riuscito:`, err);
+    return false;
+  }
+}
 
 // Include standard riusato da list/getById: evento con tutte le sue
 // relazioni annidate, così il frontend riceve un unico oggetto completo
@@ -508,11 +711,16 @@ export const eventiService = {
     });
   },
 
-  async update(id: string, input: AggiornaEventoInput) {
+  /** Le variazioni che toccano clienti già prenotati (fermate dei
+   *  tragitti esistenti, data/ora, luogo) si rilevano PRIMA della
+   *  transazione, quando i dati vecchi sono ancora quelli veri, e si
+   *  comunicano DOPO il commit, best effort (vedi comunicaVariazioni). */
+  async update(id: string, input: AggiornaEventoInput): Promise<{ id: string } & EsitoComunicazioni> {
     await getById(id); // lancia NonTrovato se non esiste
     const nuovoSlug = input.slug?.trim() ? await generaSlugUnivoco(input.slug.trim(), id) : undefined;
+    const variazioniDaComunicare = await rilevaVariazioniEvento(id, input);
 
-    return db.transaction(async (tx) => {
+    await db.transaction(async (tx) => {
       await tx
         .update(eventi)
         .set({
@@ -613,9 +821,25 @@ export const eventiService = {
       if (input.tragitti || input.servizi) {
         await sincronizzaTuttiITragitti(tx, id, bersagli);
       }
-
-      return id;
     });
+
+    // Solo a salvataggio confermato — non lancia mai.
+    const esito = await comunicaVariazioni(variazioniDaComunicare);
+    return { id, ...esito };
+  },
+
+  /** Anteprima di update() con lo stesso corpo: quali variazioni e
+   *  quante email partirebbero. Nessuna scrittura. fermata = '' per i
+   *  cambi di tutto il viaggio (data/ora, luogo). */
+  async anteprimaVariazioniEvento(id: string, input: AggiornaEventoInput) {
+    const perTragitto = await rilevaVariazioniEvento(id, input);
+    const variazioni: { tragitto: string; fermata: string; descrizione: string; clienti: number }[] = [];
+    for (const t of perTragitto) {
+      for (const r of await anteprimaComunicazioni(t.tragittoId, t.variazioni)) {
+        variazioni.push({ tragitto: t.tragittoNome, fermata: r.fermata, descrizione: r.descrizione, clienti: r.clienti });
+      }
+    }
+    return { clientiTotali: variazioni.reduce((s, v) => s + v.clienti, 0), variazioni };
   },
 
   /** "Elimina" un evento — non lo cancella per davvero (le prenotazioni
@@ -905,25 +1129,25 @@ export const eventiService = {
    *  testo, non un riferimento), quindi aggiungere/togliere una
    *  fermata solo per questa specifica partenza funziona già così
    *  com'è: basta mandare l'elenco nuovo. */
-  async aggiornaTragittoOperativo(tragittoId: string, input: z.infer<typeof aggiornaTragittoOperativoSchema>) {
+  async aggiornaTragittoOperativo(tragittoId: string, input: z.infer<typeof aggiornaTragittoOperativoSchema>): Promise<EsitoComunicazioni> {
     const [esiste] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
     if (!esiste) throw new NonTrovato('Tragitto');
 
     // Rilevo le variazioni PRIMA di toccare il database — servono le
     // fermate vecchie vere per il confronto (vedi rilevaVariazioni).
-    const fermateVecchie = await db.select().from(fermate).where(eq(fermate.tragittoId, tragittoId)).orderBy(fermate.ordine);
-    const variazioniRilevate = await rilevaVariazioni(
-      fermateVecchie.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario })),
-      input.fermate.map((f) => ({ citta: f.citta, indirizzo: f.indirizzo, orario: f.orario }))
-    );
+    const vecchie = await fermateSalvatePerConfronto([tragittoId]);
+    const variazioniRilevate = await senzaFermateCoperteDaLinee(tragittoId, input.fermate, await rilevaVariazioni(vecchie.get(tragittoId) ?? [], fermateInputPerConfronto(input.fermate)));
 
     await db.transaction(async (tx) => {
       // I posti non si toccano più qui — restano quelli calcolati dai
       // bus registrati (vedi ricalcolaPostiTragitto, chiamata dai
       // punti che toccano davvero i bus: creaBus/aggiornaBus/rimuoviBus).
-      await tx.update(tragitti).set({
-        prezzoExtra: input.prezzoExtra.toFixed(2),
-      }).where(eq(tragitti.id, tragittoId));
+      // prezzoExtra solo se arriva: se manca resta quello già salvato.
+      if (input.prezzoExtra !== undefined) {
+        await tx.update(tragitti).set({
+          prezzoExtra: input.prezzoExtra.toFixed(2),
+        }).where(eq(tragitti.id, tragittoId));
+      }
 
       // Stessa preservazione già fatta in salvaTragitti qui sopra —
       // le Linee (linea_fermate → fermate.id, cancellazione a
@@ -963,7 +1187,19 @@ export const eventiService = {
 
     // Le comunicazioni partono SOLO dopo che il salvataggio è andato a
     // buon fine — non devono partire per un salvataggio poi fallito.
-    await generaComunicazioniVariazione(tragittoId, variazioniRilevate);
+    // Non lancia mai: un problema qui si registra, non diventa un 500.
+    return generaComunicazioniVariazione(tragittoId, variazioniRilevate);
+  },
+
+  /** Anteprima di aggiornaTragittoOperativo con lo stesso corpo: quali
+   *  variazioni e quante email partirebbero. Nessuna scrittura. */
+  async anteprimaTragittoOperativo(tragittoId: string, input: z.infer<typeof aggiornaTragittoOperativoSchema>) {
+    const [esiste] = await db.select({ id: tragitti.id }).from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!esiste) throw new NonTrovato('Tragitto');
+    const vecchie = await fermateSalvatePerConfronto([tragittoId]);
+    const rilevate = await senzaFermateCoperteDaLinee(tragittoId, input.fermate, await rilevaVariazioni(vecchie.get(tragittoId) ?? [], fermateInputPerConfronto(input.fermate)));
+    const variazioni = await anteprimaComunicazioni(tragittoId, rilevate);
+    return { clientiTotali: variazioni.reduce((s, v) => s + v.clienti, 0), variazioni };
   },
 
   /** Registra il preventivo (stima dal fornitore, sullo scenario più
@@ -1073,7 +1309,8 @@ export const eventiService = {
       return a.orario.localeCompare(b.orario);
     });
 
-    return db.transaction(async (tx) => {
+    const tourLeaderId = input.tourLeaderId || undefined;
+    const creata = await db.transaction(async (tx) => {
       const lineeEsistenti = await tx.select().from(linee).where(eq(linee.tragittoId, tragittoDelleFermate.id));
       const [nuovaLinea] = await tx.insert(linee).values({
         tragittoId: tragittoDelleFermate.id,
@@ -1088,33 +1325,49 @@ export const eventiService = {
         riferimento: input.riferimento,
         autistaNome: input.autistaNome,
         autistaTelefono: input.autistaTelefono,
-        tourLeaderId: input.tourLeaderId,
+        tourLeaderId,
         costo: input.costo?.toFixed(2),
         postiBus: input.postiBus,
         note: input.note,
       }).returning();
 
-      await tx.update(tragitti).set({ stato: 'CONFERMATO' }).where(and(eq(tragitti.id, tragittoDelleFermate.id), inArray(tragitti.stato, ['DA_CONFERMARE', 'PREZZATO'])));
+      const passatiAConfermato = await tx.update(tragitti).set({ stato: 'CONFERMATO' })
+        .where(and(eq(tragitti.id, tragittoDelleFermate.id), inArray(tragitti.stato, ['DA_CONFERMARE', 'PREZZATO'])))
+        .returning({ id: tragitti.id });
       await ricalcolaPostiTragitto(tx, tragittoDelleFermate.id);
-      return { lineaId: nuovaLinea.id, busId: nuovoBus.id };
+      return {
+        lineaId: nuovaLinea.id,
+        busId: nuovoBus.id,
+        // Prima Linea del tragitto E passaggio vero a CONFERMATO: è il
+        // momento in cui la partenza diventa certa per chi ha prenotato.
+        partenzaConfermata: lineeEsistenti.length === 0 && passatiAConfermato.length > 0,
+      };
     });
+
+    // Avvisi solo a transazione confermata, best effort (non lanciano mai).
+    const avvisiClienti = creata.partenzaConfermata
+      ? await avvisaPartenzaConfermata(tragittoDelleFermate.id)
+      : { clientiAvvisati: 0, emailNonInviate: 0 };
+    const tourLeaderAvvisato = tourLeaderId ? await avvisaTourLeader(creata.busId) : null;
+    return { ...creata, ...avvisiClienti, tourLeaderAvvisato };
   },
 
   /** Aggiunge un ULTERIORE bus a una Linea già esistente — stesse
    *  fermate della Linea (non si ridefiniscono), solo un bus in più
    *  per assorbire più prenotazioni sulle stesse fermate. */
-  async aggiungiBusALinea(lineaId: string, input: { riferimento: string; fornitoreId?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus: number; note?: string }) {
+  async aggiungiBusALinea(lineaId: string, input: { riferimento: string; fornitoreId?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus: number; note?: string }): Promise<{ busId: string; tourLeaderAvvisato: boolean | null }> {
     const [lineaEsiste] = await db.select().from(linee).where(eq(linee.id, lineaId)).limit(1);
     if (!lineaEsiste) throw new NonTrovato('Linea');
+    const tourLeaderId = input.tourLeaderId || undefined;
 
-    return db.transaction(async (tx) => {
+    const busId = await db.transaction(async (tx) => {
       const [nuovoBus] = await tx.insert(busFisici).values({
         lineaId,
         fornitoreId: input.fornitoreId,
         riferimento: input.riferimento,
         autistaNome: input.autistaNome,
         autistaTelefono: input.autistaTelefono,
-        tourLeaderId: input.tourLeaderId,
+        tourLeaderId,
         costo: input.costo?.toFixed(2),
         postiBus: input.postiBus,
         note: input.note,
@@ -1122,6 +1375,8 @@ export const eventiService = {
       await ricalcolaPostiTragitto(tx, lineaEsiste.tragittoId);
       return nuovoBus.id;
     });
+    const tourLeaderAvvisato = tourLeaderId ? await avvisaTourLeader(busId) : null;
+    return { busId, tourLeaderAvvisato };
   },
 
   /** Modifica il percorso (le fermate) di una Linea intera — cambia
@@ -1153,16 +1408,20 @@ export const eventiService = {
   /** Modifica i dati di UN singolo bus dentro una Linea (autista,
    *  posti, costo...) — non tocca il percorso, che è della Linea
    *  intera, non del singolo bus. */
-  async aggiornaBusDiLinea(busId: string, input: { riferimento?: string; fornitoreId?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string }) {
+  async aggiornaBusDiLinea(busId: string, input: { riferimento?: string; fornitoreId?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string }): Promise<{ tourLeaderAvvisato: boolean | null }> {
     const [bus] = await db.select().from(busFisici).where(eq(busFisici.id, busId)).limit(1);
     if (!bus) throw new NonTrovato('Bus');
-    return db.transaction(async (tx) => {
+    // "" dal form = nessun tour leader (null), non un id inesistente.
+    const tourLeaderNuovo = input.tourLeaderId !== undefined ? (input.tourLeaderId || null) : undefined;
+    // Email solo per un tour leader assegnato ORA (nuovo o diverso da prima).
+    const tourLeaderCambiato = tourLeaderNuovo != null && tourLeaderNuovo !== bus.tourLeaderId;
+    await db.transaction(async (tx) => {
       await tx.update(busFisici).set({
         ...(input.riferimento !== undefined && { riferimento: input.riferimento }),
         ...(input.fornitoreId !== undefined && { fornitoreId: input.fornitoreId }),
         ...(input.autistaNome !== undefined && { autistaNome: input.autistaNome }),
         ...(input.autistaTelefono !== undefined && { autistaTelefono: input.autistaTelefono }),
-        ...(input.tourLeaderId !== undefined && { tourLeaderId: input.tourLeaderId }),
+        ...(tourLeaderNuovo !== undefined && { tourLeaderId: tourLeaderNuovo }),
         ...(input.costo !== undefined && { costo: input.costo.toFixed(2) }),
         ...(input.postiBus !== undefined && { postiBus: input.postiBus }),
         ...(input.note !== undefined && { note: input.note }),
@@ -1172,6 +1431,8 @@ export const eventiService = {
         if (lineaVera) await ricalcolaPostiTragitto(tx, lineaVera.tragittoId);
       }
     });
+    const tourLeaderAvvisato = tourLeaderCambiato ? await avvisaTourLeader(busId) : null;
+    return { tourLeaderAvvisato };
   },
 
   /** Tutte le Linee di un tragitto, ognuna coi suoi bus e le sue

@@ -68,8 +68,9 @@ export const prenotazioniController = {
   async eventiConPrenotazioni(_req: Request, res: Response) {
     res.json(await prenotazioniService.eventiConPrenotazioni());
   },
+  /** Solo dal gestionale (vedi la rotta): avvisa anche il cliente. */
   async cancella(req: Request, res: Response) {
-    res.json(await prenotazioniService.cancella(req.params.pnr));
+    res.json(await prenotazioniService.cancellaDaAdmin(req.params.pnr, req.body?.motivo));
   },
   async eliminaDefinitivamente(req: Request, res: Response) {
     await prenotazioniService.eliminaDefinitivamente(req.params.pnr);
@@ -111,7 +112,9 @@ prenotazioniRouter.post('/:pnr/salda', limitePnr, valida(z.object({ email: z.str
 // Amministrazione: cancellazione vera di una prenotazione — protetta
 // (era rimasta pubblica per errore: il cliente non può più cancellare
 // da solo, deve passare da una richiesta di rimborso approvata).
-prenotazioniRouter.post('/:pnr/cancella', richiedeAuth, richiedePermesso('prenotazioni.cancella'), asyncHandler(prenotazioniController.cancella));
+// "motivo" facoltativo: resta scritto sulla prenotazione e finisce
+// nell'email al cliente (se assente: "Cancellata dall'organizzazione").
+prenotazioniRouter.post('/:pnr/cancella', richiedeAuth, richiedePermesso('prenotazioni.cancella'), valida(z.object({ motivo: z.string().max(500).optional() })), asyncHandler(prenotazioniController.cancella));
 
 // Amministrazione: elimina DEFINITIVAMENTE una prenotazione già cancellata
 // (per ripulire dati di test o duplicati) — non tocca quelle confermate.

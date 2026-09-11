@@ -8,6 +8,8 @@ import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { Modale } from '../shared/Modale';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { formattaEuro } from '../../shared/formato';
+import { confermaConTesto } from '../shared/conferma';
+import { motivoErrore } from '../shared/errori';
 
 type SottoTab = 'CONFERMATA' | 'CANCELLATA';
 
@@ -80,12 +82,23 @@ export function PrenotazioniScreen() {
   }, [ricercaPrenotazioni]);
 
   async function cancella(r: PrenotazioneRiga) {
-    if (!confirm(`Cancellare la prenotazione ${r.pnr}? I posti torneranno disponibili. Resterà nello storico (tab "Cancellate").`)) return;
+    // Il cliente riceve un'email di cancellazione: va detto prima, e il
+    // motivo (facoltativo) è quello che leggerà.
+    const motivo = await confermaConTesto({
+      titolo: `Cancellare la prenotazione ${r.pnr}?`,
+      testo: <>I posti tornano disponibili e la prenotazione resta nello storico (tab "Cancellate"). Il cliente riceve un'email di cancellazione.</>,
+      conferma: 'Cancella prenotazione',
+      pericolosa: true,
+      campoTesto: { etichetta: "Motivo (facoltativo): lo legge il cliente nell'email", placeholder: "es. evento annullato dall'organizzatore" },
+    });
+    if (motivo === null) return;
     try {
-      await prenotazioniAdminApi.cancella(r.pnr);
+      const esito = await prenotazioniAdminApi.cancella(r.pnr, motivo.trim() || undefined);
       ricaricaPrenotazioni();
+      if (esito.clienteAvvisato === false) notifica("Prenotazione cancellata, ma l'email al cliente non è partita: avvisalo tu.", 'errore');
+      else notifica(esito.clienteAvvisato ? 'Prenotazione cancellata: il cliente è stato avvisato via email.' : 'Prenotazione cancellata.', 'successo');
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Cancellazione non riuscita: ${e.message}` : 'Cancellazione non riuscita: impossibile contattare il server.');
+      notifica(`Cancellazione non riuscita: ${motivoErrore(e)}`, 'errore');
     }
   }
   async function eliminaDefinitivamente(r: PrenotazioneRiga) {

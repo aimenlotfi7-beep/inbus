@@ -41,8 +41,8 @@ richiesteRimborsoRouter.post(
   richiedePermesso('prenotazioni.pagamenti'),
   valida(z.object({ noteAdmin: z.string().optional() })),
   asyncHandler(async (req: Request, res: Response) => {
-    await richiesteRimborsoService.approva(req.params.id, req.body.noteAdmin);
-    res.json({ ok: true });
+    const { clienteAvvisato } = await richiesteRimborsoService.approva(req.params.id, req.body.noteAdmin);
+    res.json({ ok: true, clienteAvvisato });
   }),
 );
 
@@ -52,7 +52,7 @@ richiesteRimborsoRouter.post(
   richiedePermesso('prenotazioni.pagamenti'),
   valida(z.object({ noteAdmin: z.string().optional() })),
   asyncHandler(async (req: Request, res: Response) => {
-    await richiesteRimborsoService.rifiuta(req.params.id, req.body.noteAdmin);
-    res.json({ ok: true });
+    const { clienteAvvisato } = await richiesteRimborsoService.rifiuta(req.params.id, req.body.noteAdmin);
+    res.json({ ok: true, clienteAvvisato });
   }),
 );

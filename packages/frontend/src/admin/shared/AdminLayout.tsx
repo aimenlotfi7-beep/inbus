@@ -7,6 +7,7 @@ import { richiesteRimborsoApi } from '../../api/richiesteRimborso';
 import { fornitoriApi } from '../../api/fornitori';
 import { preventiviApi } from '../../api/preventivi';
 import { chatApi } from '../../api/chat';
+import { plurale } from '../../shared/formato';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'bundle' | 'tour' | 'vetrina' | 'calendario' | 'cestino'
@@ -36,8 +37,8 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'partenze-orari', label: 'Orari', permesso: 'eventi.partenze' },
     { id: 'partenze-preventivi', label: 'Preventivi', permesso: 'eventi.partenze' },
     { id: 'partenze-prezzi', label: 'Prezzi', permesso: 'eventi.partenze' },
-    { id: 'partenze-da-confermare', label: 'Da Confermare', permesso: 'eventi.partenze' },
-    { id: 'partenze-confermato', label: 'Confermato', permesso: 'eventi.partenze' },
+    { id: 'partenze-da-confermare', label: 'Da confermare', permesso: 'eventi.partenze' },
+    { id: 'partenze-confermato', label: 'Confermate', permesso: 'eventi.partenze' },
     { id: 'partenze-passate', label: 'Passate', permesso: 'eventi.partenze' },
     { id: 'variazioni', label: 'Variazioni', permesso: 'prenotazioni.pagamenti' },
   ]},
@@ -269,15 +270,15 @@ export function AdminLayout({
                       <span
                         className="side-badge"
                         title={
-                          voce.id === 'partenze-orari' ? `${eventiDaCalcolareOrari} evento/i senza ancora nessun orario impostato`
-                            : voce.id === 'partenze-prezzi' ? `${eventiDaPrezzare} evento/i con almeno un tragitto non ancora prezzato`
-                            : voce.id === 'partenze-da-confermare' ? `${lineeProntoDaConfermare} evento/i con una Linea pronta da confermare (soglia di pareggio raggiunta)`
-                            : voce.id === 'partenze-preventivi' ? `${eventiPreventiviDaRichiedere} evento/i pronto/i per una richiesta preventivo, ${preventiviDaValutare} con risposte da valutare`
-                            : voce.id === 'partenze-confermato' ? `${allertePartenze} tratta/e con posti superati`
-                            : voce.id === 'lista-attesa' ? `${inAttesa} iscrizione/i in attesa di promozione`
-                            : voce.id === 'rimborsi' ? `${rimborsiInAttesa} richiesta/e di rimborso da gestire`
-                            : voce.id === 'chat' ? `${chatNonLette} conversazione/i con messaggi non letti`
-                            : voce.id === 'fornitori' ? `${fornitoriInAttesa} fornitore/i in attesa di approvazione`
+                          voce.id === 'partenze-orari' ? `${plurale(eventiDaCalcolareOrari, 'evento', 'eventi')} senza ancora nessun orario impostato`
+                            : voce.id === 'partenze-prezzi' ? `${plurale(eventiDaPrezzare, 'evento', 'eventi')} con almeno un tragitto da prezzare`
+                            : voce.id === 'partenze-da-confermare' ? `${plurale(lineeProntoDaConfermare, 'evento', 'eventi')} con una linea pronta da confermare (soglia di pareggio raggiunta)`
+                            : voce.id === 'partenze-preventivi' ? `${plurale(eventiPreventiviDaRichiedere, 'evento pronto', 'eventi pronti')} per una richiesta di preventivo, ${preventiviDaValutare} con risposte da valutare`
+                            : voce.id === 'partenze-confermato' ? `${plurale(allertePartenze, 'tragitto', 'tragitti')} con più passeggeri che posti`
+                            : voce.id === 'lista-attesa' ? `${plurale(inAttesa, 'iscrizione', 'iscrizioni')} in attesa di promozione`
+                            : voce.id === 'rimborsi' ? `${plurale(rimborsiInAttesa, 'richiesta', 'richieste')} di rimborso da gestire`
+                            : voce.id === 'chat' ? `${plurale(chatNonLette, 'conversazione', 'conversazioni')} con messaggi non letti`
+                            : voce.id === 'fornitori' ? `${plurale(fornitoriInAttesa, 'fornitore', 'fornitori')} in attesa di approvazione`
                             : undefined
                         }
                       >

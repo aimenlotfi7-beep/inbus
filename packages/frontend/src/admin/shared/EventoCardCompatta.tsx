@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { formattaData } from '../../shared/formato';
 
 /** La forma minima necessaria per disegnare la card — non l'intero
  *  tipo Evento (che non tutte le schermate hanno a disposizione: alcune
@@ -24,7 +25,7 @@ interface EventoMinimo {
  *  tanti e serve vederne di più in una schermata.
  *
  *  "badge" è per un'etichetta libera in alto a destra sulla copertina
- *  (es. "3 in attesa", "⚠ 2"). "richiedeIntervento" contorna la card
+ *  (es. "3 in attesa"). "richiedeIntervento" contorna la card
  *  di rosso — pensato per quando il badge da solo, con tanti eventi in
  *  elenco, rischia di passare inosservato. "completata" fa lo stesso
  *  ma di verde. "parziale" (giallo) è per il caso in mezzo — un evento
@@ -83,7 +84,7 @@ export function EventoCardCompatta({ evento, onClick, badge, badgeColore, richie
         <span className="evento-card-compatta-genere">{evento.genere}</span>
         <h4>{evento.artista}</h4>
         <p>{evento.luogo}, {evento.citta}</p>
-        <p>{new Date(evento.data).toLocaleDateString('it-IT')}</p>
+        <p>{formattaData(evento.data)}</p>
         {extra}
         {footer}
       </div>

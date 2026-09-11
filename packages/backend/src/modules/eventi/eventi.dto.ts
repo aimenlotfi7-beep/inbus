@@ -200,7 +200,9 @@ export const aggiornaPercorsoLineaSchema = z.object({
 // postiTotali: non si scrive più a mano, si ricalcola da solo dalla
 // somma dei bus veri registrati (vedi ricalcolaPostiTragitto).
 export const aggiornaTragittoOperativoSchema = z.object({
-  prezzoExtra: z.number().default(0),
+  // Facoltativo: se non arriva, resta il valore già salvato (prima un
+  // default a 0 lo azzerava in silenzio a ogni salvataggio da Partenze).
+  prezzoExtra: z.number().optional(),
   fermate: z.array(fermataSchema).default([]),
 }).refine(
   (t) => {
