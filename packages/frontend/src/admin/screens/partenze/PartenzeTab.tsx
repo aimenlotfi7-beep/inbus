@@ -920,9 +920,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                   </div>
                   <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 8, marginBottom: 0 }}>Per cambiare costo o fornitore, vai nella sezione Preventivi di questo tragitto.</p>
                 </div>
-                {/* A calcolo finito resta un messaggio solo se qualcosa non va:
-                    in rosso, non più in grigio chiaro a 12px come una nota qualunque. */}
-                {statoCalcoloPreventivo && <p className="testo-intro" role={calcolandoPreventivo ? undefined : 'alert'} style={{ fontSize: 'var(--testo-md)', marginTop: -4, marginBottom: 12, ...(calcolandoPreventivo ? {} : { color: 'var(--pink)', fontWeight: 600 }) }}>{statoCalcoloPreventivo}</p>}
+                {/* In rosso solo i problemi (indirizzo non trovato, preventivo
+                    mancante…), non più in grigio chiaro a 12px come una nota
+                    qualunque. Restano neutri il "Localizzo…" durante il calcolo e
+                    la nota informativa messa all'apertura quando i prezzi ci sono già. */}
+                {statoCalcoloPreventivo && (() => {
+                  const informativo = calcolandoPreventivo || statoCalcoloPreventivo.startsWith('Preventivo già registrato');
+                  return <p className="testo-intro" role={informativo ? undefined : 'alert'} style={{ fontSize: 'var(--testo-md)', marginTop: -4, marginBottom: 12, ...(informativo ? {} : { color: 'var(--pink)', fontWeight: 600 }) }}>{statoCalcoloPreventivo}</p>;
+                })()}
                 {prezziCalcolati && prezziCalcolati.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
                     <p className="section-label" style={{ marginBottom: 8 }}>Prezzi calcolati — controllali (e correggili se serve) prima di confermare</p>

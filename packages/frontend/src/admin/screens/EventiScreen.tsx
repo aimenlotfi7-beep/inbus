@@ -128,9 +128,9 @@ export function EventiScreen() {
               // "Modifica" scritto (il clic sulla card apre già la scheda) ed
               // "Elimina" meno in evidenza: prima l'unica azione visibile era
               // proprio quella distruttiva, in rosso a 10,5px.
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                <span style={{ fontSize: 'var(--testo-sm)', fontWeight: 600, color: 'var(--blue)' }}>Modifica →</span>
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', padding: '2px 6px', border: 'none' }} onClick={(e) => { e.stopPropagation(); setDaEliminare(ev); }} aria-label={`Elimina ${ev.artista}`}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                <span style={{ fontSize: 'var(--testo-sm)', fontWeight: 600, color: 'var(--blue)', whiteSpace: 'nowrap' }}>Modifica →</span>
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', padding: '2px 6px', border: 'none', whiteSpace: 'nowrap' }} onClick={(e) => { e.stopPropagation(); setDaEliminare(ev); }} aria-label={`Elimina ${ev.artista}`}>
                   Elimina
                 </button>
               </div>
