@@ -69,20 +69,29 @@ export const eventiController = {
     res.json(await eventiService.listaBus(req.params.id));
   },
 
+  // Dopo una linea o un bus aggiunti o modificati lo smistamento parte
+  // subito: chi aspetta un posto nelle ultime 24 ore (anche il giorno
+  // stesso) lo riceve senza aspettare il giro dell'ora. Non lancia mai.
+  // Dopo un'eliminazione invece no: si lascia il tempo di aggiungere il bus
+  // che la sostituisce.
   async creaLinea(req: Request, res: Response) {
     const risultato = await eventiService.creaLinea(req.params.id, req.body);
+    await smistamentoService.smistaSubitoPerLinea(risultato.lineaId);
     res.status(201).json(risultato);
   },
   async aggiungiBusALinea(req: Request, res: Response) {
     const { busId, tourLeaderAvvisato } = await eventiService.aggiungiBusALinea(req.params.lineaId, req.body);
+    await smistamentoService.smistaSubitoPerLinea(req.params.lineaId);
     res.status(201).json({ id: busId, tourLeaderAvvisato });
   },
   async aggiornaPercorsoLinea(req: Request, res: Response) {
     await eventiService.aggiornaPercorsoLinea(req.params.id, req.params.lineaId, req.body.fermateIds);
+    await smistamentoService.smistaSubitoPerLinea(req.params.lineaId);
     res.json({ ok: true });
   },
   async aggiornaBusDiLinea(req: Request, res: Response) {
     const { tourLeaderAvvisato } = await eventiService.aggiornaBusDiLinea(req.params.busId, req.body);
+    await smistamentoService.smistaSubitoPerBus(req.params.busId);
     res.json({ ok: true, tourLeaderAvvisato });
   },
   async listaLinee(req: Request, res: Response) {

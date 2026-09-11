@@ -9,6 +9,11 @@ import { giornoARoma, istanteOraRoma, leggiOrario, orarioLeggibile } from '../..
  *  Roma: il server gira in UTC. */
 export const ANTICIPO_SMISTAMENTO_MS = 24 * 60 * 60 * 1000;
 
+/** Dopo l'orario di partenza lo smistamento assegna ancora il bus per 2 ore:
+ *  copre un bus aggiunto all'ultimo momento o una partenza in ritardo. Poi
+ *  una prenotazione rimasta senza bus resta così. */
+export const TOLLERANZA_DOPO_PARTENZA_MS = 2 * 60 * 60 * 1000;
+
 /** Chi legge dal database: db, oppure una transazione già aperta. */
 export type Lettore = Pick<typeof db, 'select'>;
 
@@ -23,6 +28,8 @@ export interface TempiPartenza {
   partenza: Date;
   /** Partenza meno 24 ore. */
   disponibileDal: Date;
+  /** Partenza più 2 ore: fin qui lo smistamento può ancora assegnare il bus. */
+  smistabileFinoAl: Date;
   /** L'orario della fermata ("08:05") se ce l'ha — mai quello di riserva. */
   orarioFermata: string | null;
 }
@@ -42,7 +49,12 @@ export function calcolaTempi(orari: OrariTragitto, fermataCitta: string | null, 
   } else {
     partenza = new Date(orari.eventoData);
   }
-  return { partenza, disponibileDal: new Date(partenza.getTime() - ANTICIPO_SMISTAMENTO_MS), orarioFermata };
+  return {
+    partenza,
+    disponibileDal: new Date(partenza.getTime() - ANTICIPO_SMISTAMENTO_MS),
+    smistabileFinoAl: new Date(partenza.getTime() + TOLLERANZA_DOPO_PARTENZA_MS),
+    orarioFermata,
+  };
 }
 
 /** La prima partenza di un elenco (quella che arriva prima nel tempo). */

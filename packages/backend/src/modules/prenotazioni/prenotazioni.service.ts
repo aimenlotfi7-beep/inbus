@@ -372,6 +372,13 @@ async function inviaConfermaPrenotazione(risultato: Awaited<ReturnType<typeof cr
     // cliente non arriva nulla.
     console.error('Invio email di conferma prenotazione non riuscito:', err);
   }
+
+  // Chi prenota quando mancano meno di 24 ore alla partenza (anche il giorno
+  // stesso) riceve subito il bus e, a saldo completato, il biglietto, dopo la
+  // conferma: non aspetta il giro di smistamento dell'ora. Se la partenza è
+  // lontana non fa nulla; non lancia mai.
+  const { smistamentoService } = await import('./smistamento.service.js');
+  await smistamentoService.smistaSubito(risultato.tragittoId);
 }
 
 export const prenotazioniService = {
