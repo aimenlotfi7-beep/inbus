@@ -216,7 +216,7 @@ export function FermateScreen() {
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); window.open(f.link!, '_blank', 'noopener'); } }}
                         style={{ color: 'var(--blue)', fontSize: 12, marginLeft: 10, cursor: 'pointer', textDecoration: 'underline' }}
                       >
-                        🔗 apri link
+                        apri link →
                       </span>
                     )}
                   </span>

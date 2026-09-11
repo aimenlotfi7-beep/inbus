@@ -3,6 +3,7 @@ import { prenotazioniApi, type DettaglioPrenotazione } from '../api/prenotazioni
 import { ticketApi, type Biglietto } from '../api/ticket';
 import { calcolaStatoPrenotazione } from './statoPrenotazione';
 import { PulsanteCondividi } from './PulsanteCondividi';
+import { formattaEuro } from '../shared/formato';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -172,7 +173,7 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
         <div className="travel-timeline">
           <div className="travel-timeline-riga">✓ Prenotazione confermata</div>
           {pagamentoCompleto ? (
-            <div className="travel-timeline-riga">✓ Pagamento completato — €{Number(dettaglio.totale).toFixed(2)}</div>
+            <div className="travel-timeline-riga">✓ Pagamento completato — {formattaEuro(dettaglio.totale)}</div>
           ) : (
             <>
               <div className="travel-timeline-riga">✓ Acconto ricevuto</div>

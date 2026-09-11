@@ -97,7 +97,7 @@ export function WhiteLabelPreview({ tema, evento, larghezza = 360, onCtaClick }:
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: stile.spaziaturaPx * 0.6 }}>
         {elementiVisibili.prezzo && (
-          <span style={{ fontSize: tipografia.dimensioneTitoloPx * 0.75, fontWeight: 800 }}>da €30,00</span>
+          <span style={{ fontSize: tipografia.dimensioneTitoloPx * 0.75, fontWeight: 800 }}>da 30,00 €</span>
         )}
       </div>
 

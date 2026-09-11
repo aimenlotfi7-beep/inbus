@@ -20,9 +20,9 @@ export function AdminHome({ onVaiA }: { onVaiA: (s: SezioneGestionale) => void }
 
     const trovati: Risultato[] = [
       ...eventi.filter((e: Evento) => e.artista.toLowerCase().includes(q) || e.citta.toLowerCase().includes(q))
-        .map((e: Evento) => ({ tipo: 'Evento', titolo: `🎤 ${e.artista}`, sotto: `${e.luogo}, ${e.citta}`, azione: () => onVaiA('eventi') })),
+        .map((e: Evento) => ({ tipo: 'Evento', titolo: e.artista, sotto: `${e.luogo}, ${e.citta}`, azione: () => onVaiA('eventi') })),
       ...utenti.filter((u) => (u.nome ?? '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
-        .map((u) => ({ tipo: 'Utente', titolo: `👤 ${u.nome ?? ''} ${u.cognome ?? ''}`, sotto: u.email, azione: () => onVaiA('utenti') })),
+        .map((u) => ({ tipo: 'Utente', titolo: `${u.nome ?? ''} ${u.cognome ?? ''}`.trim() || u.email, sotto: u.email, azione: () => onVaiA('utenti') })),
     ];
     setRisultati(trovati);
     setCercando(false);

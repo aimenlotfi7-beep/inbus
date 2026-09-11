@@ -3,9 +3,9 @@ import { chatApi, type Conversazione, type MessaggioChat } from '../../api/chat'
 import { PanelHead } from '../shared/PanelHead';
 
 const ETICHETTA_STATO: Record<Conversazione['stato'], { testo: string; classe: string }> = {
-  APERTA: { testo: '🟡 Aperta', classe: 'attenzione' },
-  IN_CORSO: { testo: '🔵 In corso', classe: 'coperta' },
-  CHIUSA: { testo: '⚪ Chiusa', classe: 'non-coperta' },
+  APERTA: { testo: 'Aperta', classe: 'attenzione' },
+  IN_CORSO: { testo: 'In corso', classe: 'coperta' },
+  CHIUSA: { testo: 'Chiusa', classe: 'non-coperta' },
 };
 
 /** Ogni quanto ricontrollare messaggi/conversazioni da sole, senza che

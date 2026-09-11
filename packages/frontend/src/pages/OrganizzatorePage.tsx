@@ -6,6 +6,7 @@ import '../styles/promoter.css';
 import { organizzatoriApi, type Organizzatore, type EventoAssegnato, type StatisticheGenerali, type StatisticaEvento, type StatisticaBundle } from '../api/organizzatori';
 import { ErroreApi } from '../api/client';
 import { CookieBanner } from '../features/CookieBanner';
+import { formattaEuro } from '../shared/formato';
 
 const CHIAVE_TOKEN = 'inbus_organizzatore_token';
 
@@ -109,8 +110,8 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 22 }}>
               <div className="stat-box"><b>{generali.eventiAttivi}</b><span>Eventi attivi</span></div>
               <div className="stat-box"><b>{generali.viaggiatori}</b><span>Viaggiatori</span></div>
-              <div className="stat-box"><b>€{generali.fatturato.toFixed(2)}</b><span>Fatturato</span></div>
-              <div className="stat-box"><b>€{generali.quotaOrganizzatore.toFixed(2)}</b><span>Tua quota</span></div>
+              <div className="stat-box"><b>{formattaEuro(generali.fatturato)}</b><span>Fatturato</span></div>
+              <div className="stat-box"><b>{formattaEuro(generali.quotaOrganizzatore)}</b><span>Tua quota</span></div>
             </div>
           )}
           {!eventiOrdinati.length && (
@@ -134,7 +135,7 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
                   <p>{ev.luogo}, {ev.citta} · {fmtDataBreve(ev.data)}</p>
                   {s && (
                     <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 4 }}>
-                      {s.viaggiatori} viaggiator{s.viaggiatori === 1 ? 'e' : 'i'} · €{s.fatturato.toFixed(2)} fatturato · tua quota €{s.quotaOrganizzatore.toFixed(2)}
+                      {s.viaggiatori} viaggiator{s.viaggiatori === 1 ? 'e' : 'i'} · {formattaEuro(s.fatturato)} fatturato · tua quota {formattaEuro(s.quotaOrganizzatore)}
                     </p>
                   )}
                 </div>
@@ -155,7 +156,7 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
               <div>
                 <h3>{b.bundleNome} <span style={{ fontSize: 12, opacity: .7, fontWeight: 400 }}>bundle</span></h3>
                 <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 4 }}>
-                  {b.numeroOrdini} ordin{b.numeroOrdini === 1 ? 'e' : 'i'} · {b.viaggiatori} viaggiator{b.viaggiatori === 1 ? 'e' : 'i'} · €{b.fatturato.toFixed(2)} fatturato (sconto applicato €{b.scontoApplicato.toFixed(2)}) · tua quota €{b.quotaOrganizzatore.toFixed(2)}
+                  {b.numeroOrdini} ordin{b.numeroOrdini === 1 ? 'e' : 'i'} · {b.viaggiatori} viaggiator{b.viaggiatori === 1 ? 'e' : 'i'} · {formattaEuro(b.fatturato)} fatturato (sconto applicato {formattaEuro(b.scontoApplicato)}) · tua quota {formattaEuro(b.quotaOrganizzatore)}
                 </p>
               </div>
             </div>

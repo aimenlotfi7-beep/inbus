@@ -137,7 +137,7 @@ export function FornitoriScreen() {
         <div className="campo"><label>Referente</label><input value={form.referente ?? ''} onChange={(e) => setForm({ ...form, referente: e.target.value })} /></div>
         <div className="campo"><label>Telefono</label><input value={form.telefono ?? ''} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></div>
         <div className="campo"><label>Email</label><input value={form.email ?? ''} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-        <div className="campo"><label>Indirizzo</label><input value={form.indirizzo ?? ''} onChange={(e) => setForm({ ...form, indirizzo: e.target.value })} /></div>
+        <div className="campo"><label>Indirizzo</label><input value={form.indirizzo ?? ''} onChange={(e) => setForm({ ...form, indirizzo: e.target.value })} placeholder="Via e numero civico, città — serve a trovarlo sulla mappa" /></div>
         <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
         <label title="Se attivo, quando questo fornitore rientra nel raggio della PRIMA richiesta preventivo di un tragitto, la mail gli parte da sola." style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0', cursor: 'pointer' }}>
           <input type="checkbox" checked={form.invioAutomatico ?? false} onChange={(e) => setForm({ ...form, invioAutomatico: e.target.checked })} style={{ width: 'auto' }} />

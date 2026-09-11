@@ -598,7 +598,7 @@ export function LayoutBigliettoScreen() {
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
                 <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva'}</button>
                 <button className="btn btn-ghost" onClick={anteprima} disabled={generandoAnteprima}>
-                  {generandoAnteprima ? 'Genero...' : '📄 Genera anteprima PDF'}
+                  {generandoAnteprima ? 'Genero...' : 'Genera anteprima PDF'}
                 </button>
                 {selezionato && !selezionato.predefinito && (
                   <button className="btn btn-ghost" onClick={impostaPredefinito}>Imposta come predefinito</button>

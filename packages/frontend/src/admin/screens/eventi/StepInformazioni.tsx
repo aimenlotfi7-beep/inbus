@@ -46,6 +46,7 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
           <label>
             <EtichettaTooltip testo="Categoria" chiave="categoria" mappaTooltip={mappaTooltip} />
             <select
+              aria-label="Categoria"
               value={form.categoria ?? ''}
               onChange={(e) => { if (e.target.value === '__nuova__') { onNuovaCategoria(); return; } setForm({ ...form, categoria: e.target.value || null }); }}
             >
@@ -63,6 +64,7 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
           <label>
             <EtichettaTooltip testo="URL" chiave="url" mappaTooltip={mappaTooltip} />
             <input
+              aria-label="URL della pagina evento"
               value={form.slug ?? ''}
               onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
               placeholder={`es. ${(form.artista || 'nome-evento').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${(form.citta || 'citta').toLowerCase()}`}
@@ -74,6 +76,7 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
           <label>
             <EtichettaTooltip testo="Avviso disponibilità" chiave="avviso_disponibilita" mappaTooltip={mappaTooltip} />
             <select
+              aria-label="Avviso disponibilità"
               value={form.statoDisponibilita ?? ''}
               onChange={(e) => setForm({ ...form, statoDisponibilita: (e.target.value || null) as typeof form.statoDisponibilita })}
             >
@@ -89,7 +92,7 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
         </div>
         <div className="campo">
           <label>
-            <input type="checkbox" checked={form.visibileSito ?? true} onChange={(e) => setForm({ ...form, visibileSito: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} />
+            <input type="checkbox" aria-label="Visibile sul sito" checked={form.visibileSito ?? true} onChange={(e) => setForm({ ...form, visibileSito: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} />
             <EtichettaTooltip testo="Visibile sul sito" chiave="visibile_sito" mappaTooltip={mappaTooltip} />
           </label>
         </div>

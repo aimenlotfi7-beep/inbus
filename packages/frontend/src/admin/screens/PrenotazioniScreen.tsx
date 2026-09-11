@@ -7,6 +7,7 @@ import { PaginaSezione } from '../shared/PaginaSezione';
 import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { Modale } from '../shared/Modale';
 import { RicercaSezione } from '../shared/RicercaSezione';
+import { formattaEuro } from '../../shared/formato';
 
 type SottoTab = 'CONFERMATA' | 'CANCELLATA';
 
@@ -173,7 +174,7 @@ export function PrenotazioniScreen() {
                         </button>
                       </td>
                       <td>{ETICHETTA_METODO[r.metodoPagamento] ?? r.metodoPagamento}</td>
-                      <td style={{ textAlign: 'right' }}><b>€{Number(r.totale).toFixed(2)}</b></td>
+                      <td style={{ textAlign: 'right' }}><b>{formattaEuro(r.totale)}</b></td>
                       <td>{new Date(r.creataIl).toLocaleDateString('it-IT')}</td>
                       <td>
                         <button type="button" className="btn btn-ghost" style={{ padding: 0, border: 'none', background: 'none' }} onClick={() => setStoricoInModale(r)} title="Vedi lo storico">
@@ -184,7 +185,7 @@ export function PrenotazioniScreen() {
                         {r.stato === 'CONFERMATA' ? (
                           <>
                             <button className="btn btn-ghost" style={{ fontSize: 12, whiteSpace: 'nowrap', marginRight: 6 }} onClick={() => rigeneraBiglietto(r)} title="Se il biglietto non è mai arrivato al cliente">
-                              🎫 Rigenera biglietto
+                              Rigenera biglietto
                             </button>
                             <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => cancella(r)}>Cancella</button>
                           </>

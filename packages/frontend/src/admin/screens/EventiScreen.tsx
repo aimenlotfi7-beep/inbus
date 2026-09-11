@@ -9,6 +9,8 @@ import { RicercaSezione } from '../shared/RicercaSezione';
 import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 import { useSelezioneUrl } from '../shared/useSelezioneUrl';
+import { Modale } from '../shared/Modale';
+import { formattaEuro } from '../../shared/formato';
 
 export function EventiScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
@@ -74,11 +76,16 @@ export function EventiScreen() {
     }
   }
 
+  // Conferma nel modale del gestionale invece di confirm() del browser
+  // (non stilizzato, testo generico): dice anche che l'evento va nel
+  // Cestino e si può ripristinare da lì.
+  const [daEliminare, setDaEliminare] = useState<Evento | null>(null);
   async function elimina(ev: Evento) {
-    if (!confirm(`Eliminare l'evento "${ev.artista}"?`)) return;
+    setDaEliminare(null);
     try {
       await eventiApi.remove(ev.id);
       ricarica();
+      notifica(`"${ev.artista}" spostato nel Cestino.`, 'successo');
     } catch (e) {
       notifica(e instanceof ErroreApi ? e.message : "Eliminazione non riuscita: impossibile contattare il server.");
     }
@@ -112,15 +119,21 @@ export function EventiScreen() {
               const p = prezzoMinimoEvento(ev);
               return (
                 <p>
-                  {p !== null ? <b style={{ color: 'var(--paper)' }}>da €{p.toFixed(2)}</b> : ''}
+                  {p !== null ? <b style={{ color: 'var(--paper)' }}>da {formattaEuro(p)}</b> : ''}
                   {!ev.visibileSito && ' · nascosto'}
                 </p>
               );
             })()}
             footer={
-              <button className="btn btn-ghost" style={{ marginTop: 8, fontSize: 10.5, color: 'var(--pink)', padding: 0 }} onClick={(e) => { e.stopPropagation(); elimina(ev); }}>
-                Elimina
-              </button>
+              // "Modifica" scritto (il clic sulla card apre già la scheda) ed
+              // "Elimina" meno in evidenza: prima l'unica azione visibile era
+              // proprio quella distruttiva, in rosso a 10,5px.
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--blue)' }}>Modifica →</span>
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, color: 'var(--mist)', padding: '2px 6px', border: 'none' }} onClick={(e) => { e.stopPropagation(); setDaEliminare(ev); }} aria-label={`Elimina ${ev.artista}`}>
+                  Elimina
+                </button>
+              </div>
             }
           />
         ))}
@@ -130,6 +143,18 @@ export function EventiScreen() {
           </p>
         )}
       </div>
+
+      {daEliminare && (
+        <Modale titolo="Eliminare l'evento?" onClose={() => setDaEliminare(null)}>
+          <p style={{ marginBottom: 16 }}>
+            <b>{daEliminare.artista}</b> ({daEliminare.citta}, {new Date(daEliminare.data).toLocaleDateString('it-IT')}) finisce nel Cestino: sparisce dal sito e dagli elenchi, ma puoi ripristinarlo dalla sezione Cestino.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button type="button" className="btn btn-ghost" onClick={() => setDaEliminare(null)}>Annulla</button>
+            <button type="button" className="btn btn-primary" style={{ background: 'var(--pink)', color: '#fff' }} onClick={() => elimina(daEliminare)}>Sposta nel Cestino</button>
+          </div>
+        </Modale>
+      )}
     </div>
   );
 }

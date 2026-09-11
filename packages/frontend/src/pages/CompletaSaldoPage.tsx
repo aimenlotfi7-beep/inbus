@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { prenotazioniApi, type DifferenzaSaldo } from '../api/prenotazioni';
 import { ErroreApi } from '../api/client';
 import { Layout } from '../Layout';
+import { formattaEuro } from '../shared/formato';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -125,10 +126,10 @@ export function CompletaSaldoPage() {
                   {dati.dataEvento ? ` · partenza ${new Date(dati.dataEvento).toLocaleDateString('it-IT')}` : ''}
                 </p>
                 <p style={{ fontSize: 13, color: 'var(--mist)' }}>
-                  Acconto già versato: €{dati.accontoVersato.toFixed(2)} su un totale di €{dati.totaleReale.toFixed(2)}.
+                  Acconto già versato: {formattaEuro(dati.accontoVersato)} su un totale di {formattaEuro(dati.totaleReale)}.
                 </p>
                 <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 24, margin: '18px 0 6px' }}>
-                  Da saldare: €{(couponVerificato ? Math.max(0, dati.differenza - couponVerificato.sconto) : dati.differenza).toFixed(2)}
+                  Da saldare: {formattaEuro(couponVerificato ? Math.max(0, dati.differenza - couponVerificato.sconto) : dati.differenza)}
                 </p>
 
                 <div style={{ margin: '14px 0' }}>
@@ -154,7 +155,7 @@ export function CompletaSaldoPage() {
                     </button>
                   </div>
                   {couponErrore && <p style={{ color: '#c0392b', fontSize: 12, marginTop: 6 }}>{couponErrore}</p>}
-                  {couponVerificato && <p style={{ fontSize: 13, marginTop: 6 }}>Sconto applicato: <b>-€{couponVerificato.sconto.toFixed(2)}</b></p>}
+                  {couponVerificato && <p style={{ fontSize: 13, marginTop: 6 }}>Sconto applicato: <b>-{formattaEuro(couponVerificato.sconto)}</b></p>}
                 </div>
 
                 {messaggioErrore && <p className="errore">{messaggioErrore}</p>}

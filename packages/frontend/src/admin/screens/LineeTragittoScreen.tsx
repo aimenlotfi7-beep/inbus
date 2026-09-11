@@ -9,6 +9,7 @@ import { ErroreApi } from '../../api/client';
 import { CampoNumero } from '../shared/CampoNumero';
 import { PanelHead } from '../shared/PanelHead';
 import { useNavigazione } from '../shared/NavigazioneContext';
+import { formattaEuro } from '../../shared/formato';
 
 const BUS_VUOTO: BusDiLineaInput = { riferimento: '' };
 
@@ -370,7 +371,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         <div className="section-card" style={{ marginBottom: 16, borderColor: 'var(--green)' }}>
           <p style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>✓ Pronta da confermare</p>
           <p style={{ fontSize: 13.5, marginBottom: 8 }}>
-            {suggerimento.totaleConfermati} passeggeri confermati (soglia di pareggio: {suggerimento.postiDiPareggio}) — puoi creare la Linea con {suggerimento.postiBus} posti a €{suggerimento.costo?.toFixed(2)}, gli stessi del preventivo accettato.
+            {suggerimento.totaleConfermati} passeggeri confermati (soglia di pareggio: {suggerimento.postiDiPareggio}) — puoi creare la Linea con {suggerimento.postiBus} posti a {formattaEuro(suggerimento.costo)}, gli stessi del preventivo accettato.
           </p>
           {!!suggerimento.fermateSenzaPrenotazioni?.length && (
             <p style={{ fontSize: 12.5, color: 'var(--amber)', marginBottom: 8 }}>

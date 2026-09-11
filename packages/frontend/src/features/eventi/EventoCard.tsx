@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Evento } from '../../api/types';
 import { intervalloPrezzoEvento } from '../../api/prezzi';
+import { formattaEuro } from '../../shared/formato';
 
 function postiTotaliDisponibili(evento: Evento) {
   const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((v) => v.tragitti)];
@@ -38,8 +39,8 @@ function testoPrezzo(evento: Evento): string | null {
   const intervallo = intervalloPrezzoEvento(evento);
   if (!intervallo) return null;
   return intervallo.min === intervallo.max
-    ? `da €${intervallo.min.toFixed(0)}`
-    : `da €${intervallo.min.toFixed(0)} a €${intervallo.max.toFixed(0)}`;
+    ? `da ${formattaEuro(intervallo.min, { senzaDecimali: true })}`
+    : `da ${formattaEuro(intervallo.min, { senzaDecimali: true })} a ${formattaEuro(intervallo.max, { senzaDecimali: true })}`;
 }
 
 // La card porta sempre alla pagina dedicata dell'evento (/eventi/:slug):

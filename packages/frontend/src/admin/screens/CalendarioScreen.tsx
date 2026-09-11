@@ -5,9 +5,9 @@ import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
 
 const ETICHETTA_STATO: Record<string, string> = {
-  POCHI_POSTI: '🟡 Pochi posti',
-  NUOVI_POSTI: '🟢 Nuovi posti',
-  ESAURITO: '🔴 Esaurito',
+  POCHI_POSTI: 'Pochi posti',
+  NUOVI_POSTI: 'Nuovi posti',
+  ESAURITO: 'Esaurito',
 };
 
 export function CalendarioScreen() {
@@ -57,17 +57,17 @@ export function CalendarioScreen() {
 
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <a href={`/eventi/${ev.slug}`} target="_blank" rel="noreferrer" className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px', textDecoration: 'none' }}>
-                      🔗 Link sito
+                      Link sito →
                     </a>
                     <span className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px', cursor: 'default' }}>
-                      👥 {stat?.partecipanti ?? 0} partecipanti
+                      {stat?.partecipanti ?? 0} partecipanti
                     </span>
                     <span className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px', cursor: 'default' }}>
-                      🚌 {stat?.busCensiti ?? 0} bus censiti
+                      {stat?.busCensiti ?? 0} bus censiti
                     </span>
                     {inAttesaPerEvento[ev.id] > 0 && (
                       <span className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px', cursor: 'default', color: '#e0a95b' }}>
-                        ⏳ {inAttesaPerEvento[ev.id]} in lista d'attesa
+                        {inAttesaPerEvento[ev.id]} in lista d'attesa
                       </span>
                     )}
                   </div>

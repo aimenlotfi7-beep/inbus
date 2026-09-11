@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { notifica } from '../shared/notifiche';
+import { formattaEuro } from '../../shared/formato';
 import { couponApi, type Coupon, type CouponInput } from '../../api/coupon';
 import { eventiApi } from '../../api/eventi';
 import { promoterApi, type Promoter } from '../../api/promoter';
@@ -146,7 +147,7 @@ export function CouponScreen() {
         righe={couponFiltrati}
         colonne={[
           { etichetta: 'Codice', render: (c) => <b>{c.codice}</b> },
-          { etichetta: 'Sconto', render: (c) => <b>{c.tipo === 'PERCENTUALE' ? `${c.valore}%` : `€${c.valore}`}</b> },
+          { etichetta: 'Sconto', render: (c) => <b>{c.tipo === 'PERCENTUALE' ? `${c.valore}%` : formattaEuro(c.valore)}</b> },
           { etichetta: 'Usi', render: (c) => `${c.usiAttuali} / ${c.usiMax ?? '∞'}` },
           { etichetta: 'Valido per', render: (c) => c.eventoId ? (eventi.find((ev) => ev.id === c.eventoId)?.artista ?? 'Evento eliminato') : 'Tutti gli eventi' },
           { etichetta: 'Promoter', render: (c) => c.promoterId ? (promoterLista.find((p) => p.id === c.promoterId)?.nome ?? '—') : '—' },

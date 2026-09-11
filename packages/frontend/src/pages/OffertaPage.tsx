@@ -7,6 +7,7 @@ import type { OffertaCheckout } from '../features/checkout/CheckoutForm';
 import { CheckoutForm } from '../features/checkout/CheckoutForm';
 import { useSeoTags } from '../features/useSeoTags';
 import { Layout } from '../Layout';
+import { formattaEuro } from '../shared/formato';
 
 type Stato = 'caricamento' | 'pronto' | 'non-trovata';
 
@@ -84,8 +85,8 @@ export function OffertaPage() {
 
               {prezzoMinimo !== null && (
                 <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, marginTop: 14 }}>
-                  da €{applicaScontoOfferta(prezzoMinimo, offerta.scontoPercentuale).toFixed(2)}
-                  <span style={{ fontSize: 13, opacity: .7 }}> invece di €{prezzoMinimo.toFixed(2)}</span>
+                  da {formattaEuro(applicaScontoOfferta(prezzoMinimo, offerta.scontoPercentuale))}
+                  <span style={{ fontSize: 13, opacity: .7 }}> invece di {formattaEuro(prezzoMinimo)}</span>
                 </p>
               )}
 

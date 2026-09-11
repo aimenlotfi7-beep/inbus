@@ -7,6 +7,7 @@ import { geocodifica, durataViaggio, type Coordinate } from '../../shared/geo';
 import { PanelHead } from '../../shared/PanelHead';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { MappaPercorso, type PercorsoMappa } from '../../shared/MappaPercorso';
+import { formattaEuro } from '../../../shared/formato';
 
 function distanzaLineaRetta(a: Coordinate, b: Coordinate): number {
   const R = 6371;
@@ -293,20 +294,20 @@ export function AnalisiPercorsiScreen() {
                   <CampoNumero valuta value={costoCombinato} onChange={(v) => setCostoCombinatoMap((prev) => new Map(prev).set(idx, v))} />
                 </div>
                 <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-                  <p>Incasso totale (i prezzi per fermata non cambiano, uniti o separati): <strong>€{incassoTotale.toFixed(2)}</strong></p>
+                  <p>Incasso totale (i prezzi per fermata non cambiano, uniti o separati): <strong>{formattaEuro(incassoTotale)}</strong></p>
                   {margineCombinato !== null && (
-                    <p>Margine con bus unico: <strong style={{ color: margineCombinato >= 0 ? '#5be0a0' : 'var(--pink)' }}>€{margineCombinato.toFixed(2)}</strong></p>
+                    <p>Margine con bus unico: <strong style={{ color: margineCombinato >= 0 ? '#5be0a0' : 'var(--pink)' }}>{formattaEuro(margineCombinato)}</strong></p>
                   )}
                   {margineSeparato !== null ? (
-                    <p>Margine con {tragittiCoinvolti.length} bus separati (dai preventivi già registrati): <strong style={{ color: margineSeparato >= 0 ? '#5be0a0' : 'var(--pink)' }}>€{margineSeparato.toFixed(2)}</strong></p>
+                    <p>Margine con {tragittiCoinvolti.length} bus separati (dai preventivi già registrati): <strong style={{ color: margineSeparato >= 0 ? '#5be0a0' : 'var(--pink)' }}>{formattaEuro(margineSeparato)}</strong></p>
                   ) : (
                     <p style={{ color: 'var(--mist)' }}>Manca il preventivo su almeno un tragitto coinvolto — non posso confrontare col caso "bus separati".</p>
                   )}
                   {margineCombinato !== null && margineSeparato !== null && (
                     <p style={{ marginTop: 6, fontWeight: 700, color: margineCombinato > margineSeparato ? '#5be0a0' : 'var(--pink)' }}>
                       {margineCombinato > margineSeparato
-                        ? `Conviene unire — margine migliore di €${(margineCombinato - margineSeparato).toFixed(2)}`
-                        : `Conviene tenerli separati — margine migliore di €${(margineSeparato - margineCombinato).toFixed(2)}`}
+                        ? `Conviene unire — margine migliore di ${formattaEuro(margineCombinato - margineSeparato)}`
+                        : `Conviene tenerli separati — margine migliore di ${formattaEuro(margineSeparato - margineCombinato)}`}
                     </p>
                   )}
                 </div>

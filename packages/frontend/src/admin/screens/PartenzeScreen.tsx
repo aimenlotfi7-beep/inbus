@@ -106,8 +106,11 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   }
   function fattoInTab(p: Partenza, tabAttuale: TabPartenze): boolean {
     if (tabAttuale === 'fermate') return p.fermateCompilate;
-    if (tabAttuale === 'preventivi') return !!p.fornitoreId;
-    if (tabAttuale === 'da-prezzare') return !!p.preventivoCosto;
+    if (tabAttuale === 'preventivi') return !!p.fornitoreId || !!p.preventivoCosto; // accettato da un fornitore, o registrato a mano
+    // Fatto solo quando i prezzi di vendita sono salvati davvero (lo stato
+    // lascia DA_CONFERMARE) — prima bastava aver registrato il preventivo,
+    // e la card diceva "Fatto" su un tragitto ancora senza prezzi.
+    if (tabAttuale === 'da-prezzare') return p.stato !== 'DA_CONFERMARE';
     if (tabAttuale === 'da-confermare') return p.stato === 'CONFERMATO' && !scoperta(p);
     if (tabAttuale === 'confermato') return !scoperta(p); // qui dentro lo stato è già sempre CONFERMATO, per costruzione
     return false; // Passate: mai un contorno
@@ -115,7 +118,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   function etichettaStato(p: Partenza, tabAttuale: TabPartenze): { fatto: boolean; testo: string } {
     if (tabAttuale === 'fermate') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: '✓ Fatto' } : { fatto: false, testo: '◔ Da calcolare/esportare' };
     if (tabAttuale === 'preventivi') {
-      if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: '✓ Accettato' };
+      if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: p.fornitoreId ? '✓ Accettato' : '✓ Registrato' };
       // Prima servono gli orari (la richiesta al fornitore mostra
       // fermate/orari) — senza, non ha ancora senso segnalarlo come
       // "da fare" qui, resta solo un'attesa neutra.

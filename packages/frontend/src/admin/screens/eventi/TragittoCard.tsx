@@ -54,7 +54,17 @@ export function TragittoCard({
     <div key={idxTragitto} className="section-card" style={disattivato ? { opacity: .55, background: 'repeating-linear-gradient(135deg, var(--dusk), var(--dusk) 10px, var(--dusk-2) 10px, var(--dusk-2) 20px)' } : undefined}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }} onClick={onToggleAperto}>
-          <span style={{ color: 'var(--mist)', fontSize: 13 }}>{espansa ? '▾' : '▸'}</span>
+          {/* Un vero pulsante (raggiungibile da tastiera, area di tocco
+              decente) invece di una freccina da 13px in un div cliccabile. */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggleAperto(); }}
+            aria-expanded={espansa}
+            aria-label={espansa ? 'Chiudi il tragitto' : 'Apri il tragitto'}
+            style={{ background: 'none', border: 'none', color: 'var(--mist)', fontSize: 14, padding: '6px 8px', margin: '-6px 0 -6px -8px', cursor: 'pointer', lineHeight: 1 }}
+          >
+            {espansa ? '▾' : '▸'}
+          </button>
           <div style={{ flex: 1 }}>
             <input
               value={tragitto.nome}
@@ -172,8 +182,8 @@ export function TragittoCard({
                 trascinabile per riordinare le fermate, quindi una
                 pressione prolungata qui confliggerebbe col gesto
                 di trascinamento — resta chiuso di default e si
-                apre con un tocco normale sull'iconetta 📍 qui
-                sotto (className diverso da quello del campo,
+                apre con un tocco normale sul pulsante "Indirizzo"
+                qui sotto (className diverso da quello del campo,
                 sempre visibile, per non nascondere anche il modo
                 di aprirlo), si richiude togliendo il focus dal
                 campo (onBlur). */}
@@ -184,6 +194,7 @@ export function TragittoCard({
                 onChange={(e) => onAggiornaFermata(idxFermata, 'indirizzo', e.target.value)}
                 onBlur={() => setIndirizzoEspansoMobile(null)}
                 placeholder="Indirizzo"
+                aria-label="Indirizzo della fermata"
               />
               <button
                 type="button"
@@ -191,7 +202,7 @@ export function TragittoCard({
                 onClick={() => setIndirizzoEspansoMobile(`${idxTragitto}-${idxFermata}`)}
                 title="Modifica indirizzo"
               >
-                📍{f.indirizzo ? '' : ' Indirizzo'}
+                {f.indirizzo ? `Indirizzo: ${f.indirizzo}` : '+ Indirizzo'}
               </button>
             </div>
             <div
@@ -200,8 +211,11 @@ export function TragittoCard({
               draggable
               onDragStart={(e) => e.stopPropagation()}
             >
+              {/* "Min." da solo non diceva di cosa: il suggerimento al passaggio
+                  del mouse non esiste su telefono/tablet. */}
               <CampoNumero
-                placeholder="Min."
+                aria-label="Soglia minima partecipanti (facoltativa)"
+                placeholder="Min. pers."
                 value={f.sogliaMinima ?? undefined}
                 onChange={(v) => onAggiornaFermata(idxFermata, 'sogliaMinima', v !== undefined ? String(v) : '')}
               />
@@ -219,7 +233,8 @@ export function TragittoCard({
       ))}
       <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => onAggiungiFermata()}>+ Aggiungi fermata</button>
 
-      <p style={{ marginTop: 14, marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--pink)' }}>Arrivo</p>
+      {/* Blu, non rosso: il rosso nel gestionale vuol dire errore/attenzione. */}
+      <p style={{ marginTop: 14, marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--blue)' }}>Arrivo</p>
       {(() => {
         // Solo uno stile diverso (leggermente oscurato) per far
         // capire da dove viene il valore — il campo resta

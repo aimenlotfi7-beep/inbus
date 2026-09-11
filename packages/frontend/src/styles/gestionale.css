@@ -291,6 +291,14 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 .btn-ghost{border-color:var(--line); color:var(--paper); background:transparent;}
 .btn-ghost.active{border-color:var(--blue); color:var(--blue); background:rgba(37,99,235,.1);}
 .btn-ghost:hover{border-color:var(--mist);}
+/* Disattivato riconoscibile a colpo d'occhio: prima era identico a un
+   pulsante attivo (stesso colore, opacità piena, cursore a manina). */
+.btn:disabled{opacity:.45; cursor:not-allowed;}
+.btn-ghost:disabled:hover{border-color:var(--line);}
+/* Caselle di spunta: a 13px (default del browser) erano difficili da
+   centrare, soprattutto su tablet. min-* vale anche con gli style inline
+   "width:auto" usati in giro per il gestionale. */
+input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue);}
 
 /* Due taglie fisse in più, per pulsanti più piccoli dentro card/righe
    (trovate 15 combinazioni diverse di padding scritte a mano per
@@ -410,6 +418,9 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
 
 /* ---------- CARDS EVENTI ---------- */
 .cards-list{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px;}
+/* Un messaggio "Nessun…" dentro la griglia occupava una sola colonna
+   (~140px) e andava a capo a ogni parola: sempre a tutta larghezza. */
+.cards-list > p{grid-column:1 / -1;}
 .evento-card{
   background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
   padding:18px; cursor:pointer; transition:border-color .15s ease;
@@ -437,9 +448,10 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
   color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:10px; padding:0;
 }
 .evento-card-compatta-corpo{padding:8px 9px 9px;}
-.evento-card-compatta-corpo .evento-card-compatta-genere{font-size:8px; text-transform:uppercase; letter-spacing:.5px; color:var(--amber);}
-.evento-card-compatta-corpo h4{font-size:13px; margin:3px 0 1px; line-height:1.2;}
-.evento-card-compatta-corpo p{color:var(--mist); font-size:10px; margin:0; line-height:1.3;}
+/* Testi alzati: 8px (genere) e 10px (dettagli) erano sotto la soglia di leggibilità. */
+.evento-card-compatta-corpo .evento-card-compatta-genere{font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--amber);}
+.evento-card-compatta-corpo h4{font-size:14px; margin:3px 0 2px; line-height:1.2;}
+.evento-card-compatta-corpo p{color:var(--mist); font-size:12px; margin:0; line-height:1.35;}
 
 /* La card "richiede intervento" — bordo rosso ben visibile, pensato
    apposta per quando ci sono tanti eventi in elenco e il piccolo badge
@@ -643,7 +655,7 @@ main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
    visibile su desktop. Su mobile la riga è trascinabile (riordino
    fermate) — una pressione prolungata sulla città confliggerebbe col
    gesto di trascinamento, quindi lì resta chiuso di default e si apre
-   con un tap normale sul pulsantino 📍 (mai un tocco lungo). ---------- */
+   con un tap normale sul pulsante "Indirizzo" (mai un tocco lungo). ---------- */
 .apri-indirizzo-mobile{display:none;}
 @media (max-width:760px){
   .indirizzo-fermata-riga{display:none;}

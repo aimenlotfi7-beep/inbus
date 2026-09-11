@@ -5,6 +5,7 @@ import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
+import { formattaEuro } from '../../shared/formato';
 
 const VUOTO: CampagnaInput = { nome: '', piattaforma: '', tipo: '', utmSource: '', utmMedium: '', utmCampaign: '', utmContent: '', attiva: true };
 
@@ -52,16 +53,16 @@ function ReportFatturato() {
           </div>
           {righe.map((r) => (
             <div key={r.fonte} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
-              <span>{r.fonte}{r.scontoBundleApplicato > 0 && <span style={{ fontSize: 11, color: 'var(--mist)', display: 'block' }}>di cui €{r.scontoBundleApplicato.toFixed(2)} di sconto bundle</span>}</span>
+              <span>{r.fonte}{r.scontoBundleApplicato > 0 && <span style={{ fontSize: 11, color: 'var(--mist)', display: 'block' }}>di cui {formattaEuro(r.scontoBundleApplicato)} di sconto bundle</span>}</span>
               <span>{r.numeroPrenotazioni}</span>
               <span>{r.passeggeri}</span>
-              <span style={{ fontWeight: 600 }}>€{r.fatturato.toFixed(2)}</span>
-              <span style={{ color: r.commissione > 0 ? 'var(--pink)' : undefined }}>{r.commissione > 0 ? `− €${r.commissione.toFixed(2)}` : '—'}</span>
-              <span style={{ fontWeight: 700 }}>€{r.margineNetto.toFixed(2)}</span>
+              <span style={{ fontWeight: 600 }}>{formattaEuro(r.fatturato)}</span>
+              <span style={{ color: r.commissione > 0 ? 'var(--pink)' : undefined }}>{r.commissione > 0 ? `− ${formattaEuro(r.commissione)}` : '—'}</span>
+              <span style={{ fontWeight: 700 }}>{formattaEuro(r.margineNetto)}</span>
             </div>
           ))}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 10, padding: '10px 0 2px', fontSize: 13.5, fontWeight: 700 }}>
-            <span>Totale</span><span /><span /><span>€{totaleFatturato.toFixed(2)}</span><span /><span>€{totaleMargine.toFixed(2)}</span>
+            <span>Totale</span><span /><span /><span>{formattaEuro(totaleFatturato)}</span><span /><span>{formattaEuro(totaleMargine)}</span>
           </div>
         </>
       )}

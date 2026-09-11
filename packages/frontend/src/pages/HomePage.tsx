@@ -289,7 +289,8 @@ export function HomePage() {
             <h1 className="hero-title"><span>{t('hero_titolo_riga1', 'Sali sul bus.')}</span><span className="line2">{t('hero_titolo_riga2', 'Vivi il concerto.')}</span></h1>
             <p className="hero-sub">{t('hero_sottotitolo', 'Andata e ritorno in giornata, direttamente dalla tua città al palco del tuo artista preferito. Un solo biglietto, zero pensieri.')}</p>
             <div className="hero-stats">
-              <div className="stat"><b>{numeroPartenze}</b><span>{t('hero_statistica1_etichetta', 'Partenze attive')}</span></div>
+              {/* Al singolare solo se l'etichetta è quella predefinita — un testo scritto a mano da Contenuti sito resta com'è. */}
+              <div className="stat"><b>{numeroPartenze}</b><span>{numeroPartenze === 1 && t('hero_statistica1_etichetta', 'Partenze attive') === 'Partenze attive' ? 'Partenza attiva' : t('hero_statistica1_etichetta', 'Partenze attive')}</span></div>
               <div className="stat"><b>{cittaPartenza.length}</b><span>{t('hero_statistica2_etichetta', 'Città di partenza')}</span></div>
             </div>
           </div>
@@ -453,9 +454,9 @@ export function HomePage() {
           </label>
           <select value={prezzoMax} onChange={(e) => impostaFiltro('prezzoMax', e.target.value)} aria-label="Filtra per prezzo massimo">
             <option value="">Prezzo — qualsiasi</option>
-            <option value="30">Fino a €30</option>
-            <option value="60">Fino a €60</option>
-            <option value="100">Fino a €100</option>
+            <option value="30">Fino a 30 €</option>
+            <option value="60">Fino a 60 €</option>
+            <option value="100">Fino a 100 €</option>
           </select>
           {(partenzaAttiva || dataDa || dataA || prezzoMax) && (
             <button

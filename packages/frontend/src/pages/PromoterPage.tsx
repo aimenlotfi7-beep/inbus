@@ -8,6 +8,7 @@ import { eventiApi } from '../api/eventi';
 import type { Evento } from '../api/types';
 import { ErroreApi } from '../api/client';
 import { CookieBanner } from '../features/CookieBanner';
+import { formattaEuro } from '../shared/formato';
 
 const CHIAVE_TOKEN = 'inbus_promoter_token';
 
@@ -124,8 +125,8 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
           <h1 className="page-title" style={{ marginBottom: 20 }}>Panoramica</h1>
           <div className="stats-row">
             <div className="stat-box"><b>{stats.numeroPrenotazioni}</b><span>Vendite generate</span></div>
-            <div className="stat-box"><b>€{stats.fatturato.toFixed(2)}</b><span>Fatturato generato</span></div>
-            <div className="stat-box"><b>€{commissione.toFixed(2)}</b><span>Commissione maturata ({promoter.commissionePercentuale}%)</span></div>
+            <div className="stat-box"><b>{formattaEuro(stats.fatturato)}</b><span>Fatturato generato</span></div>
+            <div className="stat-box"><b>{formattaEuro(commissione)}</b><span>Commissione maturata ({promoter.commissionePercentuale}%)</span></div>
           </div>
 
           <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '24px 0 14px' }}>Revenue per evento</h2>
@@ -142,8 +143,8 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
           {statoEventoRevenue && (
             <div className="stats-row" style={{ marginBottom: 24 }}>
               <div className="stat-box"><b>{statoEventoRevenue.numeroPrenotazioni}</b><span>Vendite su questo evento</span></div>
-              <div className="stat-box"><b>€{statoEventoRevenue.fatturato.toFixed(2)}</b><span>Fatturato su questo evento</span></div>
-              <div className="stat-box"><b>€{statoEventoRevenue.commissione.toFixed(2)}</b><span>Tua commissione su questo evento</span></div>
+              <div className="stat-box"><b>{formattaEuro(statoEventoRevenue.fatturato)}</b><span>Fatturato su questo evento</span></div>
+              <div className="stat-box"><b>{formattaEuro(statoEventoRevenue.commissione)}</b><span>Tua commissione su questo evento</span></div>
             </div>
           )}
         </>
@@ -228,14 +229,14 @@ function SezioneCodiciSconto() {
         const scadenza = c.validoAl ? new Date(c.validoAl) : null;
         const scaduto = scadenza ? scadenza < new Date() : false;
         const compensoTesto = c.compensoTipo === 'FISSO'
-          ? `€${c.compensoValore?.toFixed(2)} ${c.compensoFissoPer === 'PASSEGGERO' ? 'a passeggero' : 'ad acquisto'}`
+          ? `${formattaEuro(c.compensoValore)} ${c.compensoFissoPer === 'PASSEGGERO' ? 'a passeggero' : 'ad acquisto'}`
           : c.compensoTipo === 'PERCENTUALE' ? `${c.compensoValore}%` : `${c.commissionePercentualeDefault}% (tasso di default)`;
         return (
           <div className="evento-link-card" key={c.codice}>
             <div>
               <h3>{c.codice}</h3>
               <p>
-                Sconto: {c.scontoTipo === 'PERCENTUALE' ? `${c.scontoValore}%` : `€${c.scontoValore.toFixed(2)}`}
+                Sconto: {c.scontoTipo === 'PERCENTUALE' ? `${c.scontoValore}%` : formattaEuro(c.scontoValore)}
                 {' · '}Il tuo compenso: <b>{compensoTesto}</b>
               </p>
               <p style={{ fontSize: 12.5, color: 'var(--mist)' }}>

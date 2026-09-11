@@ -14,6 +14,7 @@ import { ErroreApi } from '../api/client';
 import { listaAttesaApi, type MiaIscrizione } from '../api/listaAttesa';
 import { DettaglioViaggioModale } from '../features/DettaglioViaggioModale';
 import { calcolaStatoPrenotazione } from '../features/statoPrenotazione';
+import { formattaEuro } from '../shared/formato';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -286,7 +287,7 @@ function SezioneCredito({ email }: { email: string }) {
       <div className="panel-box" style={{ background: 'rgba(72,214,140,.1)', borderColor: 'var(--green)' }}>
         <h2>Disponibile ora</h2>
         <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 30, color: 'var(--green)', margin: '4px 0' }}>
-          €{(disponibile ?? 0).toFixed(2)}
+          {formattaEuro(disponibile ?? 0)}
         </p>
         <p style={{ color: 'var(--mist)', fontSize: 13 }}>
           Maturato dai tuoi viaggi — spendibile su qualsiasi prenotazione futura, non scade mai.
@@ -294,8 +295,8 @@ function SezioneCredito({ email }: { email: string }) {
       </div>
 
       <div className="stats-row" style={{ margin: '18px 0' }}>
-        <div className="stat-box"><b style={{ color: 'var(--green)' }}>+€{totaleMaturato.toFixed(2)}</b><span>Credito maturato (totale)</span></div>
-        <div className="stat-box"><b>-€{totaleUtilizzato.toFixed(2)}</b><span>Credito utilizzato (totale)</span></div>
+        <div className="stat-box"><b style={{ color: 'var(--green)' }}>+{formattaEuro(totaleMaturato)}</b><span>Credito maturato (totale)</span></div>
+        <div className="stat-box"><b>-{formattaEuro(totaleUtilizzato)}</b><span>Credito utilizzato (totale)</span></div>
       </div>
 
       {movimenti === null && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
@@ -310,7 +311,7 @@ function SezioneCredito({ email }: { email: string }) {
                   <p style={{ margin: 0, fontSize: 13.5 }}>{m.motivo}</p>
                   <p style={{ margin: 0, fontSize: 11.5, color: 'var(--mist)' }}>{new Date(m.creatoIl).toLocaleDateString('it-IT')}</p>
                 </div>
-                <b style={{ color: 'var(--green)' }}>+€{Number(m.importo).toFixed(2)}</b>
+                <b style={{ color: 'var(--green)' }}>+{formattaEuro(m.importo)}</b>
               </div>
             ))}
           </div>
@@ -327,7 +328,7 @@ function SezioneCredito({ email }: { email: string }) {
                   <p style={{ margin: 0, fontSize: 13.5 }}>{m.motivo}</p>
                   <p style={{ margin: 0, fontSize: 11.5, color: 'var(--mist)' }}>{new Date(m.creatoIl).toLocaleDateString('it-IT')}</p>
                 </div>
-                <b>-€{Math.abs(Number(m.importo)).toFixed(2)}</b>
+                <b>-{formattaEuro(Math.abs(Number(m.importo)))}</b>
               </div>
             ))}
           </div>
@@ -746,7 +747,7 @@ function SezioneViaggi({ email, viaggi, eventiPerId, onAprireViaggio }: {
             </div>
             <div className="viaggio-right">
               <span className={`badge ${calcolaStatoPrenotazione(p).classe}`}>{calcolaStatoPrenotazione(p).etichetta}</span>
-              <span className="totale">€{Number(p.totale).toFixed(2)}</span>
+              <span className="totale">{formattaEuro(p.totale)}</span>
               {p.stato === 'CONFERMATA' && (
                 <div className="viaggio-azioni">
                   <button className="btn-mini" onClick={(e) => { e.stopPropagation(); richiediRimborso(p.pnr); }}>Richiedi rimborso</button>

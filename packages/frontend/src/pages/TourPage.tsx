@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { tourApi, type TourPubblico } from '../api/tour';
 import { useSeoTags } from '../features/useSeoTags';
 import { Layout } from '../Layout';
+import { formattaEuro } from '../shared/formato';
 
 /** Pagina di un Tour (più date dello stesso spettacolo): copertina e
  *  nome a sinistra come per un evento, a destra le date a scorrimento
@@ -70,7 +71,7 @@ export function TourPage() {
                         <span style={{ fontSize: 12.5, color: 'var(--pink)' }}>Non disponibile</span>
                       ) : (
                         <>
-                          {d.prezzoMinimo !== null && <span style={{ display: 'block', fontWeight: 700 }}>da €{d.prezzoMinimo.toFixed(0)}</span>}
+                          {d.prezzoMinimo !== null && <span style={{ display: 'block', fontWeight: 700 }}>da {formattaEuro(d.prezzoMinimo, { senzaDecimali: true })}</span>}
                           <span className="card-cta" style={{ fontSize: 13 }}>Prenota</span>
                         </>
                       )}

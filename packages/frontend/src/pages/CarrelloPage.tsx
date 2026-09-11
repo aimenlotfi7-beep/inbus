@@ -7,6 +7,7 @@ import { clienteAuthApi, type DatiCliente } from '../api/clienteAuth';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { clienteLoggato } from '../features/clienteSessione';
 import { ErroreApi } from '../api/client';
+import { formattaEuro } from '../shared/formato';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -39,7 +40,6 @@ export function CarrelloPage() {
   const [couponVerificato, setCouponVerificato] = useState<{ sconto: number } | null>(null);
   const [verificandoCoupon, setVerificandoCoupon] = useState(false);
   const [couponErrore, setCouponErrore] = useState('');
-  const [metodoPagamento, setMetodoPagamento] = useState<'carta' | 'apple' | 'google'>('carta');
 
   useEffect(() => {
     if (clienteLoggato()) clienteAuthApi.me().then(setCliente).catch(() => {});
@@ -102,7 +102,7 @@ export function CarrelloPage() {
       fermataId: a.fermataId,
       passeggeri: a.passeggeri,
       tipoPagamento,
-      metodoPagamento: 'CARTA' as const,
+      metodoPagamento: 'DA_CONCORDARE' as const, // nessun pagamento online reale ancora: non registrare "Carta"
       cliente: a.cliente,
       partecipanti: a.partecipanti,
       offertaId: a.offertaId,
@@ -187,12 +187,12 @@ export function CarrelloPage() {
                     {a.fermataCitta}{a.fermataOrario ? ` — ore ${a.fermataOrario}` : ''} · {new Date(a.eventoData).toLocaleDateString('it-IT')}
                   </p>
                   <p style={{ margin: '4px 0 0' }}>
-                    {a.passeggeri} passeggero{a.passeggeri > 1 ? 'i' : ''}: {a.cliente.nome} {a.cliente.cognome}
+                    {a.passeggeri} {a.passeggeri === 1 ? 'passeggero' : 'passeggeri'}: {a.cliente.nome} {a.cliente.cognome}
                     {a.partecipanti.length > 0 && `, ${a.partecipanti.map((p) => `${p.nome} ${p.cognome}`).join(', ')}`}
                   </p>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
-                  <b>€{(a.prezzoStimato * a.passeggeri).toFixed(2)}</b>
+                  <b>{formattaEuro(a.prezzoStimato * a.passeggeri)}</b>
                   {step === 'riepilogo' && (
                     <button type="button" className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '4px 10px', fontSize: 11, color: '#c0392b' }} onClick={() => rimuovi(a.id)}>
                       Rimuovi
@@ -215,18 +215,18 @@ export function CarrelloPage() {
                   <b>Bundle: {bundle.nome}</b>
                   <p style={{ fontSize: 12, opacity: .7, margin: '4px 0 10px' }}>Il bundle si acquista tutto insieme: togliendo o aggiungendo un evento, lo sconto non si applica più.</p>
                   {bundle.promoterCodice && <p style={{ fontSize: 12, opacity: .7, margin: '0 0 8px' }}>Codice promoter applicato: <b>{bundle.promoterCodice}</b></p>}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span>Subtotale</span><span>€{totaleStimato.toFixed(2)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span>Sconto bundle (−{bundle.scontoPercentuale}%)</span><span>− €{scontoBundleStimato.toFixed(2)}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span>Subtotale</span><span>{formattaEuro(totaleStimato)}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span>Sconto bundle (−{bundle.scontoPercentuale}%)</span><span>− {formattaEuro(scontoBundleStimato)}</span></div>
                 </>
               )}
               {scontoCoupon > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: 'var(--verde, #2e7d32)' }}><span>Coupon "{couponCodice}"</span><span>− €{scontoCoupon.toFixed(2)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: 'var(--verde, #2e7d32)' }}><span>Coupon "{couponCodice}"</span><span>− {formattaEuro(scontoCoupon)}</span></div>
               )}
               {creditoApplicato > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: 'var(--verde, #2e7d32)' }}><span>Credito fedeltà</span><span>− €{creditoApplicato.toFixed(2)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: 'var(--verde, #2e7d32)' }}><span>Credito fedeltà</span><span>− {formattaEuro(creditoApplicato)}</span></div>
               )}
               <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, margin: '10px 0 4px' }}>
-                {tipoPagamento === 'ACCONTO' ? 'Totale stimato' : 'Totale'}: €{(tipoPagamento === 'COMPLETO' ? totaleFinale : totaleDopoBundle).toFixed(2)}
+                {tipoPagamento === 'ACCONTO' ? 'Totale stimato' : 'Totale'}: {formattaEuro(tipoPagamento === 'COMPLETO' ? totaleFinale : totaleDopoBundle)}
               </p>
               <p style={{ fontSize: 11, opacity: .65 }}>
                 {tipoPagamento === 'ACCONTO'
@@ -240,7 +240,7 @@ export function CarrelloPage() {
                 {creditoDisponibile > 0 && (!bundle || bundle.ammetteCredito) && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '14px 0 10px', cursor: tipoPagamento === 'COMPLETO' ? 'pointer' : 'default', opacity: tipoPagamento === 'COMPLETO' ? 1 : .5 }}>
                     <input type="checkbox" checked={usaCredito} onChange={(e) => setUsaCredito(e.target.checked)} style={{ width: 'auto' }} disabled={tipoPagamento !== 'COMPLETO'} />
-                    Usa il tuo credito fedeltà (€{creditoDisponibile.toFixed(2)} disponibili)
+                    Usa il tuo credito fedeltà ({formattaEuro(creditoDisponibile)} disponibili)
                   </label>
                 )}
 
@@ -285,35 +285,15 @@ export function CarrelloPage() {
               <>
                 <button type="button" className="search-cta-secondaria" style={{ marginTop: 14, marginBottom: 14 }} onClick={() => setStep('riepilogo')}>← Indietro</button>
 
-                <p className="section-label">Metodo di pagamento</p>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                  <button type="button" className={`mini-tab${metodoPagamento === 'carta' ? ' active' : ''}`} onClick={() => setMetodoPagamento('carta')}>💳 Carta</button>
-                  <button type="button" className={`mini-tab${metodoPagamento === 'apple' ? ' active' : ''}`} onClick={() => setMetodoPagamento('apple')}> Apple Pay</button>
-                  <button type="button" className={`mini-tab${metodoPagamento === 'google' ? ' active' : ''}`} onClick={() => setMetodoPagamento('google')}>G Pay</button>
-                </div>
-                {/* I campi giusti compaiono solo DOPO aver scelto il
-                    metodo, come richiesto — non tutti insieme prima. */}
-                {metodoPagamento === 'carta' && (
-                  <div style={{ marginBottom: 4 }}>
-                    <label className="field-label">Numero carta</label>
-                    <input type="text" inputMode="numeric" placeholder="0000 0000 0000 0000" autoComplete="cc-number" />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-                      <div>
-                        <label className="field-label">Scadenza</label>
-                        <input type="text" placeholder="MM/AA" autoComplete="cc-exp" />
-                      </div>
-                      <div>
-                        <label className="field-label">CVV</label>
-                        <input type="text" inputMode="numeric" placeholder="123" autoComplete="cc-csc" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {metodoPagamento !== 'carta' && (
-                  <p style={{ fontSize: 13, opacity: .7 }}>
-                    Al momento di completare l'ordine ti verrà mostrata la richiesta di conferma di {metodoPagamento === 'apple' ? 'Apple Pay' : 'Google Pay'}.
-                  </p>
-                )}
+                <p className="section-label">Pagamento</p>
+                {/* Nessun sistema di pagamento collegato ancora: niente
+                    campi carta finti (non venivano né controllati né
+                    inviati, ma il browser poteva proporre di compilarli
+                    con una carta vera). L'ordine si registra come "Da
+                    concordare" finché non si collega un fornitore. */}
+                <p style={{ fontSize: 13, opacity: .75 }}>
+                  Il pagamento online non è ancora attivo: la prenotazione viene registrata e il pagamento si concorda a parte.
+                </p>
 
                 {errore && <p className="errore">{errore}</p>}
 

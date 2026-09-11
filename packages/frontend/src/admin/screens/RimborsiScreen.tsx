@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { richiesteRimborsoApi, type RichiestaRimborso } from '../../api/richiesteRimborso';
 import { PanelHead } from '../shared/PanelHead';
+import { formattaEuro } from '../../shared/formato';
 
 const ETICHETTA_STATO: Record<RichiestaRimborso['stato'], { testo: string; classe: string }> = {
   IN_ATTESA: { testo: 'In attesa', classe: 'attenzione' },
@@ -94,7 +95,7 @@ export function RimborsiScreen() {
                     </span>
                   </td>
                   <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{r.clienteEmail}</span></td>
-                  <td style={{ textAlign: 'right' }}><b>€{Number(r.prenotazioneTotale).toFixed(2)}</b></td>
+                  <td style={{ textAlign: 'right' }}><b>{formattaEuro(r.prenotazioneTotale)}</b></td>
                   <td style={{ maxWidth: 260 }}>{r.motivo || <span style={{ color: 'var(--mist)' }}>—</span>}</td>
                   <td>{new Date(r.richiestaIl).toLocaleString('it-IT')}</td>
                   <td><span className={`badge ${ETICHETTA_STATO[r.stato].classe}`}>{ETICHETTA_STATO[r.stato].testo}</span></td>

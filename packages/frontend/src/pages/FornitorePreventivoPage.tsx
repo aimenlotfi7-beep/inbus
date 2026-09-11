@@ -4,6 +4,7 @@ import '../styles/tourleader.css';
 import { LogoOnWay } from '../features/LogoOnWay';
 import { preventiviApi, type DatiPubbliciPreventivo } from '../api/preventivi';
 import { ErroreApi } from '../api/client';
+import { formattaEuro } from '../shared/formato';
 import { CookieBanner } from '../features/CookieBanner';
 
 /** Pagina pubblica raggiunta dal link nella mail di richiesta
@@ -108,7 +109,7 @@ export function FornitorePreventivoPage() {
         {dati?.giaRisposto && !inviato && (
           <div className="success-box">
             <h2>Preventivo già inviato</h2>
-            <p>Hai già risposto a questa richiesta con un prezzo di €{dati.risposta?.prezzo}. Per modificarlo, contatta direttamente chi ti ha scritto.</p>
+            <p>Hai già risposto a questa richiesta con un prezzo di {formattaEuro(dati.risposta?.prezzo)}. Per modificarlo, contatta direttamente chi ti ha scritto.</p>
           </div>
         )}
 

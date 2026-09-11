@@ -81,10 +81,14 @@ export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }:
           {filtrate.map((o, i) => {
             // Intestazione di regione solo quando cambia rispetto alla
             // fermata precedente nell'elenco già ordinato — non una per
-            // fermata, una per gruppo.
-            const regionePrecedente = i > 0 ? (filtrate[i - 1].fermataRegione ?? 'Senza regione') : null;
-            const regioneCorrente = o.fermataRegione ?? 'Senza regione';
-            const nuovaRegione = regioneCorrente !== regionePrecedente;
+            // fermata, una per gruppo. Quelle senza regione stanno in
+            // fondo sotto "Altre fermate"; se nessuna ha una regione (la
+            // prima dell'elenco ordinato non ce l'ha) niente intestazioni:
+            // "Senza regione" è un dato interno, non da mostrare al cliente.
+            const almenoUnaRegione = !!filtrate[0].fermataRegione;
+            const regionePrecedente = i > 0 ? (filtrate[i - 1].fermataRegione ?? 'Altre fermate') : null;
+            const regioneCorrente = o.fermataRegione ?? 'Altre fermate';
+            const nuovaRegione = almenoUnaRegione && regioneCorrente !== regionePrecedente;
             return (
               <div key={o.fermataId}>
                 {nuovaRegione && (

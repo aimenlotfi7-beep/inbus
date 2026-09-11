@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { statisticheApi, type StatisticheGenerali, type ConfrontoMesi } from '../api/statistiche';
 import { preventiviApi } from '../api/preventivi';
 import { LogoOnWay } from '../features/LogoOnWay';
+import { formattaEuro } from '../shared/formato';
 
 function CardStat({ numero, etichetta }: { numero: string; etichetta: string }) {
   return (
@@ -61,7 +62,7 @@ function TabPreventivi() {
                   <td>{f.richiesteRicevute}</td>
                   <td>{f.risposteDate}</td>
                   <td style={{ fontWeight: f.volteScelto > 0 ? 700 : 400, color: f.volteScelto > 0 ? 'var(--green)' : undefined }}>{f.volteScelto}</td>
-                  <td>{f.prezzoMedio != null ? `€${f.prezzoMedio.toFixed(2)}` : '—'}</td>
+                  <td>{f.prezzoMedio != null ? formattaEuro(f.prezzoMedio) : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -82,8 +83,8 @@ function TabPreventivi() {
                   <td>{t.partenza} → {t.arrivo}</td>
                   <td>{t.artista}</td>
                   <td>{new Date(t.data).toLocaleDateString('it-IT')}</td>
-                  <td>€{t.prezzo.toFixed(2)}</td>
-                  <td>{t.km ? `€${(t.prezzo / t.km).toFixed(2)}/km` : '—'}</td>
+                  <td>{formattaEuro(t.prezzo)}</td>
+                  <td>{t.km ? `${formattaEuro(t.prezzo / t.km)}/km` : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -119,15 +120,15 @@ export function AdminDashboard({ onLogout, soloContenuto }: { onLogout: () => vo
         <div className="dash-grid">
           {generali && (
             <>
-              <CardStat numero={`€${generali.incassoTotale.toFixed(2)}`} etichetta="Incasso totale" />
+              <CardStat numero={formattaEuro(generali.incassoTotale)} etichetta="Incasso totale" />
               <CardStat numero={String(generali.numeroPrenotazioni)} etichetta="Prenotazioni confermate" />
               <CardStat numero={String(generali.numeroEventi)} etichetta="Eventi in catalogo" />
             </>
           )}
           {confronto && (
             <>
-              <CardStat numero={`€${confronto.meseCorrente.toFixed(0)}`} etichetta="Incasso mese corrente" />
-              <CardStat numero={`€${confronto.mesePrecedente.toFixed(0)}`} etichetta="Incasso mese scorso" />
+              <CardStat numero={formattaEuro(confronto.meseCorrente, { senzaDecimali: true })} etichetta="Incasso mese corrente" />
+              <CardStat numero={formattaEuro(confronto.mesePrecedente, { senzaDecimali: true })} etichetta="Incasso mese scorso" />
               <CardStat numero={`${variazione >= 0 ? '+' : ''}${variazione.toFixed(1)}%`} etichetta="Variazione" />
             </>
           )}

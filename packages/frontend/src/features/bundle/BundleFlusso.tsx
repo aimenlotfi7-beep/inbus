@@ -8,6 +8,7 @@ import { clienteLoggato } from '../clienteSessione';
 import { SelettoreFermata } from '../checkout/SelettoreFermata';
 import { tracciaInizioPrenotazione } from '../metaPixel';
 import { tracciaInizioCheckoutGA4 } from '../googleAnalytics';
+import { formattaEuro } from '../../shared/formato';
 
 type Passo = 'eventi' | 'configura' | 'dati';
 interface SceltaEvento { servizioId?: string; fermataId?: string }
@@ -157,14 +158,14 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                   {righeRiepilogo.map(({ evento, opzione }) => (
                     <div key={evento.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 6, fontSize: 13.5 }}>
                       <span>{evento.artista}{opzione ? ` · ${opzione.fermataCitta}` : ''}</span>
-                      <span>{opzione ? `€${(opzione.prezzoEffettivo * passeggeri).toFixed(2)}` : '—'}</span>
+                      <span>{opzione ? formattaEuro(opzione.prezzoEffettivo * passeggeri) : '—'}</span>
                     </div>
                   ))}
                   {tutteScelte && (
                     <div style={{ borderTop: '1px solid var(--line)', marginTop: 8, paddingTop: 8, fontSize: 13.5 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Totale originale</span><span>€{totaleOriginale.toFixed(2)}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Sconto bundle</span><span>− €{sconto.toFixed(2)}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 15, marginTop: 4 }}><span>Totale</span><span>€{(totaleOriginale - sconto).toFixed(2)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Totale originale</span><span>{formattaEuro(totaleOriginale)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Sconto bundle</span><span>− {formattaEuro(sconto)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 15, marginTop: 4 }}><span>Totale</span><span>{formattaEuro(totaleOriginale - sconto)}</span></div>
                       <p style={{ fontSize: 12, opacity: .7, marginTop: 4 }}>Per {passeggeri} {passeggeri === 1 ? 'passeggero' : 'passeggeri'}. Eventuali credito e codici si applicano al carrello.</p>
                     </div>
                   )}
@@ -225,7 +226,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                                   const scelta = lista.find((o) => o.fermataId === fermataId);
                                   if (scelta) { tracciaInizioPrenotazione(scelta.prezzoEffettivo * passeggeri); tracciaInizioCheckoutGA4(scelta.prezzoEffettivo * passeggeri, bundle.nome); }
                                 }}
-                                testoOpzione={(o) => `${o.fermataCitta} (${o.fermataOrario || 'orario da definire'}) — €${o.prezzoEffettivo.toFixed(2)}`}
+                                testoOpzione={(o) => `${o.fermataCitta} (${o.fermataOrario || 'orario da definire'}) — ${formattaEuro(o.prezzoEffettivo)}`}
                               />
                             : <p style={{ fontSize: 13 }}>Carico le partenze...</p>)}
                         </div>

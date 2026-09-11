@@ -10,6 +10,7 @@ import { CampoNumero } from '../shared/CampoNumero';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { CampoCopiabile } from '../shared/CampoCopiabile';
+import { formattaEuro } from '../../shared/formato';
 
 const VUOTO: PromoterInput = { nome: '', email: '', password: '', commissionePercentuale: 10 };
 
@@ -82,7 +83,7 @@ export function PromoterScreen() {
         </div>
         {statistiche && (
           <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 14 }}>
-            {statistiche.numeroPrenotazioni} prenotazioni portate · €{statistiche.fatturato.toFixed(2)} di fatturato generato
+            {statistiche.numeroPrenotazioni} prenotazioni portate · {formattaEuro(statistiche.fatturato)} di fatturato generato
           </p>
         )}
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva promoter'}</button>

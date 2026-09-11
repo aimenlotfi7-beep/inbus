@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { notifica } from '../../shared/notifiche';
+import { formattaEuro } from '../../../shared/formato';
 import type { ContestoPartenze } from '../partenze/tipi';
 import { TragittoCard } from './TragittoCard';
 import { StepInformazioni } from './StepInformazioni';
@@ -190,7 +191,7 @@ export function SchedaEventoModale({
   // Indirizzo e città sulla stessa riga, sempre visibile su desktop.
   // Su mobile la riga è trascinabile (per riordinare le fermate) — una
   // pressione prolungata confliggerebbe col gesto di trascinamento,
-  // quindi si apre con un tap normale sul pulsantino 📍 (vedi
+  // quindi si apre con un tap normale sul pulsante "Indirizzo" (vedi
   // "apri-indirizzo-mobile" più sotto), si richiude togliendo il focus
   // dal campo (onBlur). Chiave "idxTragitto-idxFermata", una alla volta.
   const [indirizzoEspansoMobile, setIndirizzoEspansoMobile] = useState<string | null>(null);
@@ -717,6 +718,7 @@ export function SchedaEventoModale({
       localStorage.removeItem('inbus_creazione_evento_in_corso');
       onSalvato();
       onClose();
+      notifica(evento ? 'Evento salvato.' : 'Evento creato.');
     } catch (e) {
       notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server. Controlla che il backend sia acceso.');
       // Il salvataggio è fallito — sul server non è cambiato nulla,
@@ -871,7 +873,7 @@ export function SchedaEventoModale({
         const arrivoPerTutti = arrivoPerTuttiMap.get(contesto) ?? { attivo: false, citta: '', indirizzo: '', orario: '' };
         const etichettaContesto = modalitaServizi === 'multiplo' && servizioTabAttivo && servizioTabAttivo !== 'liberi'
           ? servizi.find((v) => v.key === servizioTabAttivo)?.nome ?? 'questo servizio'
-          : 'questi tragitti';
+          : modalitaServizi === 'multiplo' ? 'questa scheda' : 'questo evento';
         // Se la città dell'evento è già stabilita da un tragitto FUORI
         // da questo servizio, qui non si può sceglierne un'altra: il
         // campo città si blocca su quella. Se invece il tragitto che
@@ -1113,9 +1115,11 @@ export function SchedaEventoModale({
                 <div className="riepilogo-riga-evento"><span>Genere</span><b>{form.genere || '—'}</b></div>
                 <div className="riepilogo-riga-evento"><span>Luogo</span><b>{form.luogo ? `${form.luogo}, ${form.citta}` : '—'}</b></div>
                 <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? new Date(form.data).toLocaleDateString('it-IT') : '—'}</b></div>
-                <div className="riepilogo-riga-evento"><span>Acconto</span><b>€{Number(form.accontoEur || 10).toFixed(2)}</b></div>
+                <div className="riepilogo-riga-evento"><span>Acconto</span><b>{formattaEuro(form.accontoEur || 10)}</b></div>
                 <div className="riepilogo-riga-evento"><span>In evidenza</span><b>{form.inEvidenza ? 'Sì' : 'No'}</b></div>
-                <div className="riepilogo-riga-evento"><span>Tragitti</span><b>{numeroTragitti > 0 ? `${numeroTragitti} configurate` : 'Nessuna'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Categoria</span><b>{form.categoria || '—'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Visibile sul sito</span><b>{form.visibileSito === false ? 'No' : 'Sì'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Tragitti</span><b>{numeroTragitti > 0 ? `${numeroTragitti} ${numeroTragitti === 1 ? 'configurato' : 'configurati'}` : 'Nessuno'}</b></div>
                 <div className="riepilogo-riga-evento"><span>Immagini</span><b>{(form.immagini ?? []).length}</b></div>
               </div>
             )}
@@ -1176,10 +1180,19 @@ export function SchedaEventoModale({
           <div className="riepilogo-riga-evento"><span>Genere</span><b>{form.genere || '—'}</b></div>
           <div className="riepilogo-riga-evento"><span>Luogo</span><b>{form.luogo ? `${form.luogo}, ${form.citta}` : '—'}</b></div>
           <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? new Date(form.data).toLocaleDateString('it-IT') : '—'}</b></div>
-          <div className="riepilogo-riga-evento"><span>Acconto</span><b>€{Number(form.accontoEur || 10).toFixed(2)}</b></div>
+          <div className="riepilogo-riga-evento"><span>Acconto</span><b>{formattaEuro(form.accontoEur || 10)}</b></div>
           <div className="riepilogo-riga-evento"><span>In evidenza</span><b>{form.inEvidenza ? 'Sì' : 'No'}</b></div>
-          <div className="riepilogo-riga-evento"><span>Tragitti</span><b>{numeroTragitti > 0 ? `${numeroTragitti} configurate` : 'Nessuna (aggiungibile dopo)'}</b></div>
-          <div className="riepilogo-riga-evento"><span>Immagini</span><b>{(form.immagini ?? []).length}</b></div>
+          <div className="riepilogo-riga-evento"><span>Categoria</span><b>{form.categoria || '—'}</b></div>
+          <div className="riepilogo-riga-evento"><span>Visibile sul sito</span><b>{form.visibileSito === false ? 'No' : 'Sì'}</b></div>
+          <div className="riepilogo-riga-evento"><span>Tragitti</span><b>{numeroTragitti > 0 ? `${numeroTragitti} ${numeroTragitti === 1 ? 'configurato' : 'configurati'}` : 'Nessuno'}</b></div>
+          {/* Il dettaglio di ogni tragitto: prima il riepilogo diceva solo "1 configurate". */}
+          {(form.tragitti ?? []).filter((t) => t.nome.trim()).map((t, i) => (
+            <div key={i} className="riepilogo-riga-evento">
+              <span>{t.nome}</span>
+              <b>{t.fermate.map((f) => `${f.citta}${f.orario ? ` ${f.orario}` : ''}`).join(' → ') || '—'} → {t.arrivoCitta || '—'}{t.arrivoOrario ? ` ${t.arrivoOrario}` : ''}</b>
+            </div>
+          ))}
+          <div className="riepilogo-riga-evento"><span>Immagini</span><b>{(form.immagini ?? []).length === 0 ? <span style={{ color: 'var(--pink)' }}>Nessuna — ne serve almeno una</span> : (form.immagini ?? []).length}</b></div>
         </div>
       )}
 
@@ -1190,6 +1203,8 @@ export function SchedaEventoModale({
             className="btn btn-primary"
             onClick={() => {
               if (step === 1 && !infoCompleta(form)) { notifica('Compila almeno artista, genere, luogo, città e data prima di proseguire.'); return; }
+              // Immagine obbligatoria: meglio dirlo qui che al clic finale su "Crea evento".
+              if (step === 3 && numeroImmagini(form) === 0) { notifica('Aggiungi almeno un\'immagine prima di proseguire.'); return; }
               setStep((s) => (s + 1) as 2 | 3 | 4);
             }}
           >

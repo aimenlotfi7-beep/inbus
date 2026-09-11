@@ -10,6 +10,7 @@ import { SezioniAccordion } from '../features/SezioniAccordion';
 import { PulsanteCondividi } from '../features/PulsanteCondividi';
 import { EventiCorrelati } from '../features/EventiCorrelati';
 import { Layout } from '../Layout';
+import { formattaEuro } from '../shared/formato';
 
 const ETICHETTA_STATO: Record<NonNullable<Evento['statoDisponibilita']>, string> = {
   POCHI_POSTI: 'Pochi posti disponibili',
@@ -68,7 +69,7 @@ export function EventoPage() {
   useSeoTags({
     title: evento ? `${evento.artista} — ${evento.luogo}, ${evento.citta} | OnWay` : 'Evento | OnWay',
     description: evento
-      ? (evento.descrizioneSeo?.trim() || `Bus per ${evento.artista} il ${new Date(evento.data).toLocaleDateString('it-IT')} a ${evento.citta}${prezzoMinimo !== null ? ` — a partire da €${prezzoMinimo.toFixed(2)}` : ''}. Prenota il tuo posto con OnWay.`)
+      ? (evento.descrizioneSeo?.trim() || `Bus per ${evento.artista} il ${new Date(evento.data).toLocaleDateString('it-IT')} a ${evento.citta}${prezzoMinimo !== null ? ` — a partire da ${formattaEuro(prezzoMinimo)}` : ''}. Prenota il tuo posto con OnWay.`)
       : 'Prenota il tuo bus per l\'evento con OnWay.',
     image: copertina,
     url: window.location.href,
@@ -125,7 +126,7 @@ export function EventoPage() {
               )}
 
               {prezzoMinimo !== null && (
-                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, marginTop: 14 }}>da €{prezzoMinimo.toFixed(2)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
+                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, marginTop: 14 }}>da {formattaEuro(prezzoMinimo)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
               )}
               {prenotazioniConfermate !== null && prenotazioniConfermate >= 10 && (
                 <p style={{ fontSize: 13, opacity: .75, marginTop: 4 }}>{prenotazioniConfermate} persone hanno già prenotato per questo evento</p>
@@ -187,7 +188,7 @@ export function EventoPage() {
                 onClick={apriPrenotazione}
               >
                 <span>
-                  {prezzoMinimo !== null ? <>da <b>€{prezzoMinimo.toFixed(2)}</b> /persona</> : 'Vedi disponibilità'}
+                  {prezzoMinimo !== null ? <>da <b>{formattaEuro(prezzoMinimo)}</b> /persona</> : 'Vedi disponibilità'}
                 </span>
                 <span className="checkout-riepilogo-cta">Acquista ora</span>
               </button>
@@ -207,7 +208,7 @@ export function EventoPage() {
           fino al modulo. */}
       {evento && !prenotazioneAperta && (
         <div className="barra-prenota-fissa-mobile">
-          <span>{prezzoMinimo !== null ? <>da <b>€{prezzoMinimo.toFixed(2)}</b> /persona</> : ''}</span>
+          <span>{prezzoMinimo !== null ? <>da <b>{formattaEuro(prezzoMinimo)}</b> /persona</> : ''}</span>
           <button type="button" onClick={apriPrenotazione}>Acquista ora</button>
         </div>
       )}

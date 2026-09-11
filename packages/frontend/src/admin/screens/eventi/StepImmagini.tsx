@@ -39,21 +39,24 @@ export function StepImmagini({ form, setForm, inCreazione, layoutDisponibili, ma
     {subTabImmagini === 'immagini' && (
       <>
         <p className="section-label" style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}>
-          Immagini
+          Immagini (almeno una)
           <InfoTooltip>{mappaTooltip.immagini_evento_intro ?? TOOLTIP_DEFAULT.immagini_evento_intro}</InfoTooltip>
         </p>
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
-          <input placeholder="https://..." value={nuovaImmagine} onChange={(e) => setNuovaImmagine(e.target.value)} style={{ flex: 1 }} />
+          <input placeholder="https://..." aria-label="Link dell'immagine" value={nuovaImmagine} onChange={(e) => setNuovaImmagine(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungiImmagine(); } }} style={{ flex: 1 }} />
           <button type="button" className="btn btn-ghost" onClick={aggiungiImmagine}>+ Aggiungi link</button>
           <CaricaFile onCaricato={(url) => setForm({ ...form, immagini: [...(form.immagini ?? []), url] })} etichetta="+ Carica file" />
         </div>
         {(form.immagini ?? []).map((url, idx) => (
-          <div key={idx} className="riga-cliccabile" style={{ cursor: 'default' }}>
-            <span className="riga-titolo" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 380 }}>{url}</span>
+          <div key={idx} className="riga-cliccabile" style={{ cursor: 'default', gap: 10 }}>
+            {/* Anteprima: prima si vedeva solo il link, senza poter
+                controllare che fosse l'immagine giusta (o che si caricasse). */}
+            <img src={url} alt="" style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0, background: 'var(--dusk-2)' }} />
+            <span className="riga-titolo" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</span>
             <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => rimuoviImmagine(idx)}>Rimuovi</button>
           </div>
         ))}
-        {(form.immagini ?? []).length === 0 && <p className="testo-intro" style={{ fontSize: 13 }}>Nessuna immagine ancora.</p>}
+        {(form.immagini ?? []).length === 0 && <p className="testo-intro" style={{ fontSize: 13 }}>Nessuna immagine ancora — ne serve almeno una per creare l'evento.</p>}
       </>
     )}
 

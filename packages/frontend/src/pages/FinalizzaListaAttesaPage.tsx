@@ -5,6 +5,7 @@ import { eventiApi } from '../api/eventi';
 import { ErroreApi } from '../api/client';
 import type { OpzionePartenza } from '../api/types';
 import { Layout } from '../Layout';
+import { formattaEuro } from '../shared/formato';
 
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'errore' | 'non-trovato';
 
@@ -99,12 +100,12 @@ export function FinalizzaListaAttesaPage() {
                     <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
                       {opzioni.filter((o) => o.postiDisponibili > 0).map((o) => (
                         <option key={o.fermataId} value={o.fermataId}>
-                          {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — €{o.prezzoEffettivo.toFixed(2)}
+                          {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — {formattaEuro(o.prezzoEffettivo)}
                         </option>
                       ))}
                     </select>
 
-                    <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 24, margin: '18px 0 6px' }}>€{totale.toFixed(2)}</p>
+                    <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 24, margin: '18px 0 6px' }}>{formattaEuro(totale)}</p>
 
                     {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
 

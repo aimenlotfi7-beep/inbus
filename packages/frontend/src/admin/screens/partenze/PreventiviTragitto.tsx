@@ -7,6 +7,7 @@ import { ErroreApi } from '../../../api/client';
 import { geocodifica } from '../../shared/geo';
 import { notifica } from '../../shared/notifiche';
 import { CampoNumero } from '../../shared/CampoNumero';
+import { formattaEuro } from '../../../shared/formato';
 
 /** Sezione "Preventivi" di UN tragitto (dentro Partenze): richiesta ai
  *  fornitori nel raggio, tabella delle risposte, accettazione, file
@@ -254,6 +255,19 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onA
         </div>
       )}
 
+      {/* Il preventivo registrato (a mano o accettato) si vede anche qui,
+          subito dopo il salvataggio — prima la sezione continuava a dire
+          "Da richiedere" / "Nessuna richiesta inviata" come se nulla fosse. */}
+      {tragittoVero?.preventivoCosto && (
+        <div className="section-card" style={{ marginTop: 14, background: 'var(--dusk-2)' }}>
+          <p style={{ margin: 0, fontWeight: 600 }}>
+            ✓ Preventivo registrato: {formattaEuro(tragittoVero.preventivoCosto)} · {tragittoVero.preventivoPostiBus ?? '—'} posti presunti
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--mist)' }}>
+            Fornitore: {fornitoriLista.find((f) => f.id === tragittoVero.fornitoreId)?.nome ?? 'nessuno indicato'}. Prossimo passo: calcolare i prezzi di vendita nella sezione Prezzi.
+          </p>
+        </div>
+      )}
       <p className="section-label" style={{ marginTop: 18, marginBottom: 8 }}>Risposte ricevute</p>
       {!risposte || risposte.length === 0 ? (
         <p className="testo-intro">Nessuna richiesta inviata ancora per questo tragitto.</p>
@@ -269,7 +283,7 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onA
                       economico e il più caro hanno anche icona e testo. */}
                   <td style={{ fontWeight: 700, color: r.risposta ? coloreScala(Number(r.risposta.prezzo)) : 'var(--mist)' }}
                     title={r.risposta && prezzi.length >= 2 ? (Number(r.risposta.prezzo) === minPrezzo ? 'Il più economico tra le risposte ricevute' : Number(r.risposta.prezzo) === maxPrezzo ? 'Il più caro tra le risposte ricevute' : undefined) : undefined}>
-                    {r.risposta ? `€${Number(r.risposta.prezzo).toFixed(2)}` : '— in attesa'}
+                    {r.risposta ? formattaEuro(r.risposta.prezzo) : '— in attesa'}
                     {r.risposta && prezzi.length >= 2 && Number(r.risposta.prezzo) === minPrezzo && <span style={{ fontSize: 11, fontWeight: 500, marginLeft: 6 }}>▼ più economico</span>}
                     {r.risposta && prezzi.length >= 2 && Number(r.risposta.prezzo) === maxPrezzo && maxPrezzo !== minPrezzo && <span style={{ fontSize: 11, fontWeight: 500, marginLeft: 6 }}>▲ più caro</span>}
                   </td>

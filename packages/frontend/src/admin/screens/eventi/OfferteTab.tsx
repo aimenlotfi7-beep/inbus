@@ -149,7 +149,7 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
               {o.attiva ? 'Attiva' : 'Disattiva'}
             </span>
             <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => copiaLink(o)}>
-              {linkCopiato === o.id ? '✓ Copiato' : '🔗 Copia link'}
+              {linkCopiato === o.id ? '✓ Copiato' : 'Copia link'}
             </button>
             <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px', color: 'var(--pink)' }} onClick={() => elimina(o)}>Elimina</button>
           </span>

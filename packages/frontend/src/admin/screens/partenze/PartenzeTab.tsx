@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { notifica } from '../../shared/notifiche';
+import { CampoNumero } from '../../shared/CampoNumero';
+import { formattaEuro } from '../../../shared/formato';
 import type { ContestoPartenze } from './tipi';
 import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea, type VenditePerFermata } from '../../../api/eventi';
 import type { Evento } from '../../../api/types';
@@ -289,6 +291,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
       chiudiModificaOperativa(tragittoId);
       ricarica();
       onSalvato?.();
+      notifica('Orari salvati.');
     } catch (e) {
       notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
     } finally {
@@ -372,9 +375,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
 
     // L'arrivo non è mai collegato all'anagrafica (l'indirizzo si
     // scrive a mano in Eventi) — va sempre geocodificato per testo.
-    const rArrivo = await geocodifica(arrivoIndirizzo);
+    // Con la città in coda, come già per le fermate: "Piazzale dello
+    // Sport 16" da solo non veniva trovato, con ", Milano" sì.
+    const cittaArrivo = tragittoVero.arrivoCitta?.trim();
+    const testoArrivo = cittaArrivo && !arrivoIndirizzo.toLowerCase().includes(cittaArrivo.toLowerCase())
+      ? `${arrivoIndirizzo}, ${cittaArrivo}` : arrivoIndirizzo;
+    const rArrivo = await geocodifica(testoArrivo);
     if (!rArrivo.coordinate) {
-      setStatoCalcoloPreventivoMap((prev) => new Map(prev).set(tragittoId, rArrivo.erroreRete ? 'Richiesta a OpenStreetMap non riuscita (rete/firewall).' : 'Indirizzo di arrivo non localizzato — controllalo.'));
+      setStatoCalcoloPreventivoMap((prev) => new Map(prev).set(tragittoId, rArrivo.erroreRete ? 'Richiesta a OpenStreetMap non riuscita (rete/firewall).' : `Indirizzo di arrivo "${testoArrivo}" non trovato sulla mappa — correggilo in Eventi, nella scheda di questo tragitto (via, numero civico e città).`));
       setCalcolandoPreventivoSet((prev) => { const s = new Set(prev); s.delete(tragittoId); return s; });
       return;
     }
@@ -418,7 +426,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
       prezzo: Math.round(prezzoMinimo + costoAlKmPerPersona * d.distanza),
     }))));
     const nonLocalizzate = distanze.length - valide.length;
-    setStatoCalcoloPreventivoMap((prev) => new Map(prev).set(tragittoId, nonLocalizzate > 0 ? `Fatto, ma ${nonLocalizzate} fermata/e non localizzata/e: resta senza prezzo, va impostato a mano dopo.` : 'Prezzi calcolati — controllali prima di confermare.'));
+    // Nessun messaggio se tutto è andato bene: il titolo dell'elenco qui
+    // sotto dice già "Prezzi calcolati — controllali" (prima compariva due volte).
+    setStatoCalcoloPreventivoMap((prev) => new Map(prev).set(tragittoId, nonLocalizzate > 0 ? `${nonLocalizzate} fermata/e non localizzata/e: resta/no senza prezzo, da impostare a mano qui sotto.` : ''));
     setCalcolandoPreventivoSet((prev) => { const s = new Set(prev); s.delete(tragittoId); return s; });
   }
 
@@ -436,6 +446,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
       chiudiPreventivo(tragittoId);
       ricarica();
       onSalvato?.();
+      notifica('Prezzi di vendita salvati.');
     } catch (e) {
       notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
     } finally {
@@ -627,7 +638,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             // contenuto dentro, visibile anche senza doverci cliccare.
             const tv = [...(eventoCompleto?.tragitti ?? []), ...(eventoCompleto?.servizi.flatMap((s) => s.tragitti) ?? [])].find((x) => x.id === t.tragittoId);
             const fattoQui = contestoPartenze?.tabOrigine === 'fermate' ? tv?.fermate.some((f) => f.orario)
-              : contestoPartenze?.tabOrigine === 'da-prezzare' ? !!tv?.preventivoCosto
+              : contestoPartenze?.tabOrigine === 'da-prezzare' ? t.stato !== 'DA_CONFERMARE' // prezzi di vendita salvati, non solo un preventivo
               : null; // "fatto/da fare" non si applica a Da Confermare/Confermato allo stesso modo — resta neutra
             return (
               <button
@@ -653,11 +664,11 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
         // server per "fermateCompilate": almeno una fermata con orario).
         const tragittoVeroPerOrari = [...(eventoCompleto?.tragitti ?? []), ...(eventoCompleto?.servizi.flatMap((s) => s.tragitti) ?? [])].find((t) => t.id === tragitto.tragittoId);
         const orariImpostati = tragittoVeroPerOrari?.fermate.some((f) => f.orario) ?? false;
-        // Stesso identico criterio, qui per il badge "Prezzato" nella
-        // tab Prezzi — la copertura bus (stato.classe) non c'entra con
-        // "ho gia' un preventivo dal fornitore o no", che e' la sola
-        // cosa rilevante mentre si sta prezzando.
-        const prezzato = !!tragittoVeroPerOrari?.preventivoCosto;
+        // Badge "Prezzato" nella tab Prezzi: vero solo quando i prezzi di
+        // vendita sono salvati (lo stato lascia DA_CONFERMARE) — prima
+        // bastava un preventivo registrato, e diceva "Prezzato" su un
+        // tragitto ancora senza nessun prezzo.
+        const prezzato = tragitto.stato !== 'DA_CONFERMARE';
         return (
         <div
           key={tragitto.tragittoId} className="section-card"
@@ -709,9 +720,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                   return (
                     <>
                       {' · '}
-                      <span style={{ color: '#5be0a0' }}>€{dati.incassato.toFixed(2)}</span>
+                      <span style={{ color: '#5be0a0' }}>{formattaEuro(dati.incassato)}</span>
                       {dati.costoCensito && (
-                        <> {' · '}<span style={{ color: dati.guadagno >= 0 ? '#5be0a0' : 'var(--pink)' }}>€{dati.guadagno.toFixed(2)}</span></>
+                        <> {' · '}<span style={{ color: dati.guadagno >= 0 ? '#5be0a0' : 'var(--pink)' }}>{formattaEuro(dati.guadagno)}</span></>
                       )}
                     </>
                   );
@@ -731,10 +742,11 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 </span>
               ) : contestoPartenze?.tabOrigine === 'preventivi' ? (
                 // Non lo stato generico "Coperta/Da confermare" (parla
-                // di posti e bus, non di preventivi) — qui conta solo
-                // se un fornitore è già stato accettato.
-                <span className={`badge ${tragittoVeroPerOrari?.fornitoreId ? 'badge-stato-verde' : 'badge-stato-arancio'}`}>
-                  {tragittoVeroPerOrari?.fornitoreId ? '✓ Accettato' : '◔ Da richiedere'}
+                // di posti e bus, non di preventivi) — qui conta solo se
+                // un preventivo c'è già: accettato da un fornitore, o
+                // registrato a mano (prima restava "Da richiedere").
+                <span className={`badge ${tragittoVeroPerOrari?.fornitoreId || tragittoVeroPerOrari?.preventivoCosto ? 'badge-stato-verde' : 'badge-stato-arancio'}`}>
+                  {tragittoVeroPerOrari?.fornitoreId ? '✓ Accettato' : tragittoVeroPerOrari?.preventivoCosto ? '✓ Registrato' : '◔ Da richiedere'}
                 </span>
               ) : (
                 <span className={`badge ${stato.classe === 'coperta' ? 'badge-stato-verde' : stato.classe === 'attenzione' ? 'badge-stato-arancio' : stato.classe === 'non-coperta' ? 'badge-stato-rosso' : stato.classe}`}>{stato.etichetta}</span>
@@ -822,7 +834,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                         )}
                       </div>
                       <div style={{ width: 110, flexShrink: 0 }}>
-                        <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermataOperativa(tragitto.tragittoId, idx, 'orario', v)} />
+                        {/* Larghezza vincolata al contenitore: prima il campo usciva di
+                            ~90px dal suo spazio, oltre il bordo e sotto "Rimuovi". */}
+                        <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermataOperativa(tragitto.tragittoId, idx, 'orario', v)} style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }} />
                       </div>
                       <button
                         type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
@@ -900,20 +914,29 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                     Preventivi. */}
                 <div className="section-card" style={{ marginBottom: 16, background: 'var(--dusk-2)' }}>
                   <div className="form-grid">
-                    <div><span style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase' }}>Costo del preventivo</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>€{formPreventivo.costo?.toFixed(2) ?? '—'}</p></div>
+                    <div><span style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase' }}>Costo del preventivo</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{formPreventivo.costo != null ? formattaEuro(formPreventivo.costo) : '—'}</p></div>
                     <div><span style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase' }}>Posti presunti del bus</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{formPreventivo.postiBus ?? '—'}</p></div>
                     <div><span style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase' }}>Fornitore</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{fornitoriLista.find((f) => f.id === formPreventivo.fornitoreId)?.nome ?? '— Nessuno indicato —'}</p></div>
                   </div>
                   <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 8, marginBottom: 0 }}>Per cambiare costo o fornitore, vai nella sezione Preventivi di questo tragitto.</p>
                 </div>
-                {statoCalcoloPreventivo && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 12 }}>{statoCalcoloPreventivo}</p>}
+                {/* A calcolo finito resta un messaggio solo se qualcosa non va:
+                    in rosso, non più in grigio chiaro a 12px come una nota qualunque. */}
+                {statoCalcoloPreventivo && <p className="testo-intro" role={calcolandoPreventivo ? undefined : 'alert'} style={{ fontSize: 13, marginTop: -4, marginBottom: 12, ...(calcolandoPreventivo ? {} : { color: 'var(--pink)', fontWeight: 600 }) }}>{statoCalcoloPreventivo}</p>}
                 {prezziCalcolati && prezziCalcolati.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
-                    <p className="section-label" style={{ marginBottom: 8 }}>Prezzi calcolati — controllali prima di confermare</p>
+                    <p className="section-label" style={{ marginBottom: 8 }}>Prezzi calcolati — controllali (e correggili se serve) prima di confermare</p>
                     {prezziCalcolati.map((p) => (
-                      <div key={p.fermataId} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
+                      <div key={p.fermataId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
                         <span>{p.citta} <span style={{ color: 'var(--mist)', fontSize: 12 }}>({p.distanza >= 0 ? `${p.distanza} km dall'arrivo` : 'distanza da ricalcolare'})</span></span>
-                        <strong>€{p.prezzo}</strong>
+                        {/* Modificabile a mano: prima il prezzo calcolato si poteva solo accettare così com'era. */}
+                        <CampoNumero
+                          valuta
+                          aria-label={`Prezzo di vendita da ${p.citta}`}
+                          value={p.prezzo}
+                          onChange={(v) => setPrezziCalcolatiMap((prev) => new Map(prev).set(tragitto.tragittoId, (prev.get(tragitto.tragittoId) ?? []).map((x) => x.fermataId === p.fermataId ? { ...x, prezzo: v ?? 0 } : x)))}
+                          style={{ width: 110, flexShrink: 0 }}
+                        />
                       </div>
                     ))}
                   </div>
@@ -921,7 +944,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     type="button" className="btn btn-primary" style={{ flex: 1 }}
-                    disabled={!prezziCalcolati || prezziCalcolati.length === 0 || salvandoPreventivo}
+                    disabled={!prezziCalcolati || prezziCalcolati.length === 0 || prezziCalcolati.some((p) => !(p.prezzo > 0)) || salvandoPreventivo}
                     onClick={() => salvaPreventivo(tragitto.tragittoId)}
                   >
                     {salvandoPreventivo ? 'Salvo...' : 'Conferma e vai in vendita'}
@@ -1000,10 +1023,10 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
               <div style={{ marginTop: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <p className="section-label" style={{ margin: 0 }}>Preventivo</p>
-                  {tv?.preventivoCosto && <span style={{ background: 'var(--green)', color: '#fff', padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>✓ Prezzato</span>}
+                  {tragitto.stato !== 'DA_CONFERMARE' && <span style={{ background: 'var(--green)', color: '#fff', padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>✓ Prezzato</span>}
                 </div>
                 {tv?.preventivoCosto
-                  ? <p style={{ fontSize: 13.5, marginBottom: 12 }}>€{Number(tv.preventivoCosto).toFixed(0)} · {tv.preventivoPostiBus ?? '—'} posti presunti</p>
+                  ? <p style={{ fontSize: 13.5, marginBottom: 12 }}>{formattaEuro(tv.preventivoCosto, { senzaDecimali: true })} · {tv.preventivoPostiBus ?? '—'} posti presunti</p>
                   : <p className="testo-intro" style={{ marginBottom: 12 }}>Nessun preventivo ancora registrato.</p>}
                 <p className="section-label" style={{ marginBottom: 8 }}>Fermate — orario e prezzo ({tv ? tv.fermate.filter((f) => f.attivo !== false).length : 0})</p>
                 {/* Colonne vere (grid), non flex space-between: con testi di
@@ -1020,7 +1043,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                       <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 130px', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
                         <span>{f.citta}</span>
                         <span style={{ color: f.orario ? 'var(--mist)' : 'var(--pink)' }}>{f.orario ?? 'non impostato'}</span>
-                        <span style={{ fontWeight: 600, color: f.prezzo ? undefined : 'var(--pink)' }}>{f.prezzo ? `€${Number(f.prezzo).toFixed(2)}` : 'non impostato'}</span>
+                        <span style={{ fontWeight: 600, color: f.prezzo ? undefined : 'var(--pink)' }}>{f.prezzo ? formattaEuro(f.prezzo) : 'non impostato'}</span>
                       </div>
                     ))}
                   </>}
@@ -1074,7 +1097,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                   <div>
                     <strong style={{ fontSize: 13.5 }}>Preventivo</strong>{' '}
                     <span style={{ color: 'var(--mist)', fontSize: 13 }}>
-                      · {tragittoVero?.preventivoCosto ? `€${Number(tragittoVero.preventivoCosto).toFixed(0)} · ${tragittoVero.preventivoPostiBus ?? '—'} posti presunti` : 'non registrato'}
+                      · {tragittoVero?.preventivoCosto ? `${formattaEuro(tragittoVero.preventivoCosto, { senzaDecimali: true })} · ${tragittoVero.preventivoPostiBus ?? '—'} posti presunti` : 'non registrato'}
                     </span>
                   </div>
                   <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }} onClick={() => apriPreventivo(tragitto.tragittoId)}>Modifica</button>
@@ -1087,8 +1110,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                   <div style={{ ...rigaStile, borderBottom: dati.perLinea.length > 1 ? '1px solid var(--line)' : 'none' }}>
                     <div>
                       <strong style={{ fontSize: 13.5 }}>Costo</strong>{' '}
-                      <span style={{ color: '#5be0a0', fontSize: 13 }}>· Incassato €{dati.incassato.toFixed(2)}</span>
-                      {dati.costoCensito && <span style={{ color: dati.guadagno >= 0 ? '#5be0a0' : 'var(--pink)', fontSize: 13 }}> · Guadagno €{dati.guadagno.toFixed(2)}</span>}
+                      <span style={{ color: '#5be0a0', fontSize: 13 }}>· Incassato {formattaEuro(dati.incassato)}</span>
+                      {dati.costoCensito && <span style={{ color: dati.guadagno >= 0 ? '#5be0a0' : 'var(--pink)', fontSize: 13 }}> · Guadagno {formattaEuro(dati.guadagno)}</span>}
                     </div>
                   </div>
                 )}
@@ -1102,8 +1125,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                   <div key={pl.lineaId} style={{ ...rigaStile, paddingLeft: 14, borderBottom: idx === dati.perLinea.length - 1 ? 'none' : '1px solid var(--line)' }}>
                     <div>
                       <span style={{ fontSize: 12.5, color: 'var(--mist)' }}>{pl.lineaNome}</span>{' '}
-                      <span style={{ color: '#5be0a0', fontSize: 12.5 }}>· Incassato €{pl.incassato.toFixed(2)}</span>
-                      {pl.costoCensito && <span style={{ color: pl.guadagno >= 0 ? '#5be0a0' : 'var(--pink)', fontSize: 12.5 }}> · Guadagno €{pl.guadagno.toFixed(2)}</span>}
+                      <span style={{ color: '#5be0a0', fontSize: 12.5 }}>· Incassato {formattaEuro(pl.incassato)}</span>
+                      {pl.costoCensito && <span style={{ color: pl.guadagno >= 0 ? '#5be0a0' : 'var(--pink)', fontSize: 12.5 }}> · Guadagno {formattaEuro(pl.guadagno)}</span>}
                     </div>
                   </div>
                 ))}

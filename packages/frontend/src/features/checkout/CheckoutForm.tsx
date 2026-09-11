@@ -14,6 +14,7 @@ import { useCarrello } from '../carrello/CarrelloContext';
 import { SelettoreFermata } from './SelettoreFermata';
 import { tracciaInizioPrenotazione, tracciaAcquisto, leggiCookieMeta } from '../metaPixel';
 import { tracciaInizioCheckoutGA4, tracciaAcquistoGA4, tracciaAcquistoGoogleAds } from '../googleAnalytics';
+import { formattaEuro } from '../../shared/formato';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -97,10 +98,9 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
 
   const [messaggioErrore, setMessaggioErrore] = useState('');
   const [pnrConfermato, setPnrConfermato] = useState('');
-  // Solo interfaccia per ora — non c'è ancora un vero gateway di
-  // pagamento collegato (serve un fornitore tipo Stripe). I campi carta
-  // non vengono validati né inviati da nessuna parte.
-  const [metodoPagamento, setMetodoPagamento] = useState<'carta' | 'apple' | 'google'>('carta');
+  // Nessun gateway di pagamento collegato ancora (serve un fornitore tipo
+  // Stripe): niente scelta del metodo né campi carta, l'ordine si registra
+  // come "Da concordare".
 
   useEffect(() => {
     // Se serve ancora scegliere il servizio, non c'è ancora nulla da
@@ -225,7 +225,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
         fermataId: opzioneScelta.fermataId,
         passeggeri,
         tipoPagamento,
-        metodoPagamento: 'CARTA' as const,
+        metodoPagamento: 'DA_CONCORDARE' as const, // nessun pagamento online reale ancora: non registrare "Carta"
         cliente: { email, nome, cognome, telefono },
         partecipanti,
         ...(promoterCodice && { promoterCodice }),
@@ -363,7 +363,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 )}
               </span>
             </div>
-            {opzioneScelta && <div className="checkout-riepilogo-totale">€{(step === 3 ? totaleConCredito : totale).toFixed(2)}</div>}
+            {opzioneScelta && <div className="checkout-riepilogo-totale">{formattaEuro(step === 3 ? totaleConCredito : totale)}</div>}
           </div>
 
           {/* Il tragitto completo della fermata scelta, con lei
@@ -433,8 +433,8 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 }}
                 testoOpzione={(o) => {
                   const prezzoMostrato = offerta ? applicaScontoOfferta(o.prezzoEffettivo, offerta.scontoPercentuale) : o.prezzoEffettivo;
-                  return `${o.fermataCitta} (${o.fermataOrario || 'orario da definire'}) — €${prezzoMostrato.toFixed(2)}`
-                    + (offerta ? ` (invece di €${o.prezzoEffettivo.toFixed(2)})` : '')
+                  return `${o.fermataCitta} (${o.fermataOrario || 'orario da definire'}) — ${formattaEuro(prezzoMostrato)}`
+                    + (offerta ? ` (invece di ${formattaEuro(o.prezzoEffettivo)})` : '')
                     + (o.postiDisponibili === 0 ? ' — ESAURITO, lista d\'attesa' : '');
                 }}
               />
@@ -621,18 +621,18 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                   <div style={{ background: '#faf7f0', border: '1px solid #e5ded0', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13 }}>
                     <p style={{ margin: '0 0 4px', fontWeight: 700 }}>{evento.artista}</p>
                     <p style={{ margin: 0, opacity: .75 }}>
-                      {opzioneScelta?.fermataCitta}{opzioneScelta?.fermataOrario ? ` — ore ${opzioneScelta.fermataOrario}` : ''} · {passeggeri} passeggero{passeggeri > 1 ? 'i' : ''}
+                      {opzioneScelta?.fermataCitta}{opzioneScelta?.fermataOrario ? ` — ore ${opzioneScelta.fermataOrario}` : ''} · {passeggeri} {passeggeri === 1 ? 'passeggero' : 'passeggeri'}
                     </p>
                   </div>
 
                   <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, margin: '0 0 6px' }}>
                     {creditoApplicato > 0 ? (
                       <>
-                        <span style={{ textDecoration: 'line-through', opacity: .5, fontSize: 16, marginRight: 8 }}>€{totale.toFixed(2)}</span>
-                        €{totaleConCredito.toFixed(2)}
+                        <span style={{ textDecoration: 'line-through', opacity: .5, fontSize: 16, marginRight: 8 }}>{formattaEuro(totale)}</span>
+                        {formattaEuro(totaleConCredito)}
                       </>
                     ) : (
-                      <>€{totale.toFixed(2)}</>
+                      <>{formattaEuro(totale)}</>
                     )}
                   </p>
                   <p style={{ fontSize: 12, opacity: .7, marginTop: -4 }}>I biglietti arriveranno via email al richiedente.</p>
@@ -640,7 +640,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                   {creditoDisponibile > 0 && (
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '10px 0', cursor: 'pointer' }}>
                       <input type="checkbox" checked={usaCredito} onChange={(e) => setUsaCredito(e.target.checked)} style={{ width: 'auto' }} />
-                      Usa il tuo credito fedeltà (€{creditoDisponibile.toFixed(2)} disponibili)
+                      Usa il tuo credito fedeltà ({formattaEuro(creditoDisponibile)} disponibili)
                     </label>
                   )}
 
@@ -670,7 +670,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                     {couponErrore && <p style={{ color: '#c0392b', fontSize: 12, marginTop: 6 }}>{couponErrore}</p>}
                     {couponVerificato && (
                       <p style={{ fontSize: 13, marginTop: 6 }}>
-                        Sconto: <b>-€{couponVerificato.sconto.toFixed(2)}</b> — nuovo totale (pagando tutto subito): <b>€{Math.max(0, totale - couponVerificato.sconto).toFixed(2)}</b>
+                        Sconto: <b>-{formattaEuro(couponVerificato.sconto)}</b> — nuovo totale (pagando tutto subito): <b>{formattaEuro(Math.max(0, totale - couponVerificato.sconto))}</b>
                       </p>
                     )}
                     <p style={{ fontSize: 11.5, opacity: .65, marginTop: 6 }}>
@@ -679,34 +679,16 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                     </p>
                   </div>
 
-                  <p className="section-label" style={{ marginTop: 18 }}>Metodo di pagamento</p>
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                    <button type="button" className={`mini-tab${metodoPagamento === 'carta' ? ' active' : ''}`} onClick={() => setMetodoPagamento('carta')}>💳 Carta</button>
-                    <button type="button" className={`mini-tab${metodoPagamento === 'apple' ? ' active' : ''}`} onClick={() => setMetodoPagamento('apple')}> Apple Pay</button>
-                    <button type="button" className={`mini-tab${metodoPagamento === 'google' ? ' active' : ''}`} onClick={() => setMetodoPagamento('google')}>G Pay</button>
-                  </div>
+                  <p className="section-label" style={{ marginTop: 18 }}>Pagamento</p>
 
-                  {metodoPagamento === 'carta' && (
-                    <div style={{ marginBottom: 14 }}>
-                      <label className="field-label" htmlFor="checkout-carta-numero">Numero carta</label>
-                      <input id="checkout-carta-numero" type="text" inputMode="numeric" placeholder="0000 0000 0000 0000" autoComplete="cc-number" />
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-                        <div>
-                          <label className="field-label" htmlFor="checkout-carta-scadenza">Scadenza</label>
-                          <input id="checkout-carta-scadenza" type="text" placeholder="MM/AA" autoComplete="cc-exp" />
-                        </div>
-                        <div>
-                          <label className="field-label" htmlFor="checkout-carta-cvv">CVV</label>
-                          <input id="checkout-carta-cvv" type="text" inputMode="numeric" placeholder="123" autoComplete="cc-csc" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {metodoPagamento !== 'carta' && (
-                    <p style={{ fontSize: 13, opacity: .7, marginBottom: 14 }}>
-                      Al momento di completare l'ordine ti verrà mostrata la richiesta di conferma di {metodoPagamento === 'apple' ? 'Apple Pay' : 'Google Pay'}.
-                    </p>
-                  )}
+                  {/* Nessun sistema di pagamento collegato ancora: niente
+                      campi carta finti (non venivano né controllati né
+                      inviati, ma il browser poteva proporre di compilarli
+                      con una carta vera). L'ordine si registra come "Da
+                      concordare" finché non si collega un fornitore. */}
+                  <p style={{ fontSize: 13, opacity: .75, marginBottom: 14 }}>
+                    Il pagamento online non è ancora attivo: la prenotazione viene registrata e il pagamento si concorda a parte.
+                  </p>
 
                   <button
                     className="search-cta"
@@ -731,8 +713,8 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                       legge veloce poteva pensare non impegnasse a nulla.
                       Ora è la prima cosa sotto il pulsante giusto. */}
                   <p style={{ fontSize: 11, opacity: .65, marginTop: 6, textAlign: 'center' }}>
-                    Acconto di €{Number(evento.accontoEur ?? 10).toFixed(2)} a passeggero
-                    ({(Number(evento.accontoEur ?? 10) * passeggeri).toFixed(2)}€ totali ora) — salderai il resto entro
+                    Acconto di {formattaEuro(evento.accontoEur ?? 10)} a passeggero
+                    ({formattaEuro(Number(evento.accontoEur ?? 10) * passeggeri)} totali ora) — salderai il resto entro
                     15 giorni prima della partenza.
                   </p>
                   <p style={{ fontSize: 11, opacity: .6, marginTop: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>

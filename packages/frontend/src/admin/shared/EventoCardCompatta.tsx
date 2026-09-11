@@ -55,24 +55,30 @@ export function EventoCardCompatta({ evento, onClick, badge, badgeColore, richie
     <div
       className={`evento-card-compatta${richiedeIntervento ? ' richiede-intervento' : ''}${parziale ? ' parziale' : ''}${completata ? ' completata' : ''}${selezionato ? ' selezionata' : ''}`}
       onClick={onClick}
+      // Raggiungibile anche da tastiera (Tab, poi Invio o Spazio), non solo col mouse.
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(); } }}
       style={opacitaRidotta ? { opacity: .65 } : undefined}
     >
-      {evento.immagineUrl && (
-        <div className="evento-card-compatta-copertina">
-          <img src={evento.immagineUrl} alt="" />
-          {badge && <div className="evento-card-compatta-badge" style={badgeColore ? { '--badge-colore': badgeColore } as CSSProperties : undefined}>{badge}</div>}
-          {mostraLinkPubblico && evento.slug && (
-            <button
-              type="button"
-              className="evento-card-compatta-link-pubblico"
-              title="Apri la pagina pubblica dell'evento"
-              onClick={(e) => { e.stopPropagation(); window.open(`${window.location.origin}/eventi/${evento.slug}`, '_blank'); }}
-            >
-              ↗
-            </button>
-          )}
-        </div>
-      )}
+      {/* Copertina sempre presente, anche senza immagine: prima una card
+          senza foto perdeva il badge (es. "Bozza") e, accanto a una con
+          la foto, restava alta e vuota. */}
+      <div className={`evento-card-compatta-copertina${evento.immagineUrl ? '' : ' senza-immagine'}`}>
+        {evento.immagineUrl && <img src={evento.immagineUrl} alt="" />}
+        {badge && <div className="evento-card-compatta-badge" style={badgeColore ? { '--badge-colore': badgeColore } as CSSProperties : undefined}>{badge}</div>}
+        {mostraLinkPubblico && evento.slug && (
+          <button
+            type="button"
+            className="evento-card-compatta-link-pubblico"
+            title="Apri la pagina pubblica dell'evento"
+            aria-label="Apri la pagina pubblica dell'evento"
+            onClick={(e) => { e.stopPropagation(); window.open(`${window.location.origin}/eventi/${evento.slug}`, '_blank'); }}
+          >
+            ↗
+          </button>
+        )}
+      </div>
       <div className="evento-card-compatta-corpo">
         <span className="evento-card-compatta-genere">{evento.genere}</span>
         <h4>{evento.artista}</h4>

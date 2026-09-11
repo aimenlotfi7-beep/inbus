@@ -116,7 +116,7 @@ export function TourLeaderScreen() {
         titolo="Tour Leader"
         azione={
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-ghost" onClick={copiaLink}>{linkCopiato ? '✓ Link copiato' : '🔗 Copia link candidatura'}</button>
+            <button className="btn btn-ghost" onClick={copiaLink}>{linkCopiato ? '✓ Link copiato' : 'Copia link candidatura'}</button>
             <button className="btn btn-primary" onClick={apriNuovo}>+ Censisci tour leader</button>
           </div>
         }
@@ -151,7 +151,7 @@ export function TourLeaderScreen() {
             etichetta: 'Accesso scansione',
             render: (t) => (
               <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => attivaAccesso(t)}>
-                {t.passwordAttiva ? 'Rigenera credenziali' : '🔑 Attiva accesso'}
+                {t.passwordAttiva ? 'Rigenera credenziali' : 'Attiva accesso'}
               </button>
             ),
           },
