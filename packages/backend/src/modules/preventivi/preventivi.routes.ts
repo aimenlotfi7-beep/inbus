@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import crypto from 'node:crypto';
-import { eq, and, asc, inArray, isNull, isNotNull, gte, sql } from 'drizzle-orm';
+import { eq, and, asc, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { preventiviRichieste, preventiviRisposte, fornitori, tragitti, eventi, fermate } from '../../db/schema.js';
@@ -474,71 +474,6 @@ export const preventiviService = {
       .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNotNull(tragitti.preventivoCosto), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
     return (await cambiPercorso(righe.map((r) => r.id))).size;
   },
-  // Per ogni fornitore: quante richieste ha ricevuto, quante ha
-  // risposto, quante volte è stato scelto (accettato), prezzo medio di
-  // quelle accettate. dataDa facoltativo — filtra per quando è stata
-  // fatta la richiesta (creataIl), non quando è stata accettata (non
-  // teniamo quella data a parte, l'accettazione aggiorna solo il
-  // tragitto).
-  statistichePerFornitore: async (dataDa?: Date) => {
-    // Quattro query in tutto invece di quattro PER fornitore.
-    const richieste = await db.select().from(preventiviRichieste).where(dataDa ? gte(preventiviRichieste.creataIl, dataDa) : undefined);
-    if (richieste.length === 0) return [];
-    const fornitoriIds = [...new Set(richieste.map((r) => r.fornitoreId))];
-    const [tuttiFornitori, risposte, tragittiCoinvolti] = await Promise.all([
-      db.select().from(fornitori).where(inArray(fornitori.id, fornitoriIds)),
-      db.select({ richiestaId: preventiviRisposte.richiestaId }).from(preventiviRisposte).where(inArray(preventiviRisposte.richiestaId, richieste.map((r) => r.id))),
-      db.select({ id: tragitti.id, fornitoreId: tragitti.fornitoreId, preventivoCosto: tragitti.preventivoCosto }).from(tragitti).where(inArray(tragitti.id, [...new Set(richieste.map((r) => r.tragittoId))])),
-    ]);
-    const richiesteConRisposta = new Set(risposte.map((r) => r.richiestaId));
-    const tragittoPerId = new Map(tragittiCoinvolti.map((t) => [t.id, t]));
-    const risultato = tuttiFornitori.map((f) => {
-      const sue = richieste.filter((r) => r.fornitoreId === f.id);
-      // "Scelto" = tra i tragitti per cui è stato contattato, quelli che
-      // oggi hanno LUI come fornitore accettato (un tragitto contato una
-      // volta sola anche se contattato più volte).
-      const tragittiVinti = [...new Set(sue.map((r) => r.tragittoId))].map((id) => tragittoPerId.get(id)).filter((t) => t && t.fornitoreId === f.id);
-      const prezziAccettati = tragittiVinti.filter((t) => t!.preventivoCosto).map((t) => Number(t!.preventivoCosto));
-      return {
-        fornitore: f,
-        richiesteRicevute: sue.length,
-        risposteDate: sue.filter((r) => richiesteConRisposta.has(r.id)).length,
-        volteScelto: tragittiVinti.length,
-        prezzoMedio: prezziAccettati.length ? prezziAccettati.reduce((a, b) => a + b, 0) / prezziAccettati.length : null,
-      };
-    });
-    return risultato.sort((a, b) => b.volteScelto - a.volteScelto);
-  },
-  // Storico prezzi per coppia partenza→arrivo (solo tragitti con un
-  // preventivo accettato) — €/km oltre al prezzo totale, per
-  // confrontare tratte con un numero diverso di fermate (vedi
-  // conversazione). dataDa filtra sulla creazione del tragitto stesso
-  // (non teniamo una data di accettazione a parte).
-  storicoPerTratta: async (dataDa?: Date) => {
-    const condizioniBase = [sql`${tragitti.preventivoCosto} IS NOT NULL`, sql`${tragitti.fornitoreId} IS NOT NULL`];
-    if (dataDa) condizioniBase.push(gte(eventi.data, dataDa));
-    const righe = await db.select({ tragitto: tragitti, evento: eventi }).from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId)).where(and(...condizioniBase));
-    if (righe.length === 0) return [];
-    // Una query per tutte le partenze, non una per tragitto.
-    const partenze = await db.select({ tragittoId: fermate.tragittoId, citta: fermate.citta }).from(fermate)
-      .where(and(inArray(fermate.tragittoId, righe.map((r) => r.tragitto.id)), eq(fermate.ordine, 0)));
-    const partenzaPerTragitto = new Map(partenze.map((p) => [p.tragittoId, p]));
-    const conPartenza = [];
-    for (const r of righe) {
-      const partenza = partenzaPerTragitto.get(r.tragitto.id);
-      if (!partenza) continue;
-      conPartenza.push({
-        partenza: partenza.citta,
-        arrivo: r.tragitto.arrivoCitta ?? '—',
-        prezzo: Number(r.tragitto.preventivoCosto),
-        km: r.tragitto.kmAccettati,
-        data: r.evento.data,
-        nomeTragitto: r.tragitto.nome,
-        artista: r.evento.artista,
-      });
-    }
-    return conPartenza.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
-  },
 };
 
 export const preventiviRouter = Router();
@@ -590,14 +525,6 @@ preventiviRouter.get('/percorso/:tragittoId', richiedePermesso('eventi.partenze'
 // "Il preventivo va ancora bene": stesso permesso di chi accetta i preventivi.
 preventiviRouter.post('/tragitto/:tragittoId/percorso-ok', richiedePermesso('preventivi.accetta'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.confermaPercorso(req.params.tragittoId));
-}));
-preventiviRouter.get('/statistiche/fornitori', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
-  const dataDa = req.query.dataDa ? new Date(req.query.dataDa as string) : undefined;
-  res.json(await preventiviService.statistichePerFornitore(dataDa));
-}));
-preventiviRouter.get('/statistiche/tratte', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
-  const dataDa = req.query.dataDa ? new Date(req.query.dataDa as string) : undefined;
-  res.json(await preventiviService.storicoPerTratta(dataDa));
 }));
 preventiviRouter.put('/risposte/:id/accetta', richiedePermesso('preventivi.accetta'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.accetta(req.params.id));

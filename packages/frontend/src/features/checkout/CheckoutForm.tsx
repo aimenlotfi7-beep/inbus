@@ -12,6 +12,7 @@ import { clienteAuthApi } from '../../api/clienteAuth';
 import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
 import { useCarrello } from '../carrello/CarrelloContext';
 import { SelettoreFermata } from './SelettoreFermata';
+import { provenienzaDaUrl } from './provenienza';
 import { tracciaInizioPrenotazione, tracciaAcquisto, leggiCookieMeta } from '../metaPixel';
 import { tracciaInizioCheckoutGA4, tracciaAcquistoGA4, tracciaAcquistoGoogleAds } from '../googleAnalytics';
 import { formattaEuro } from '../../shared/formato';
@@ -207,12 +208,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
     setAzioneInCorso(tipoPagamento === 'COMPLETO' ? 'acquista' : 'prenota');
     setMessaggioErrore('');
     try {
-      const promoterCodice = new URLSearchParams(window.location.search).get('promo') || undefined;
-      const parametriUrl = new URLSearchParams(window.location.search);
-      const utmSource = parametriUrl.get('utm_source') || undefined;
-      const utmMedium = parametriUrl.get('utm_medium') || undefined;
-      const utmCampaign = parametriUrl.get('utm_campaign') || undefined;
-      const utmContent = parametriUrl.get('utm_content') || undefined;
+      const { promoterCodice, utmSource, utmMedium, utmCampaign, utmContent } = provenienzaDaUrl();
       // Il pixel di INBUS traccia SEMPRE (anche dal widget White
       // Label) — in più, se l'organizzatore ha impostato il suo pixel
       // (WidgetPubblicoPage lo inizializza insieme al nostro), lo
@@ -595,6 +591,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                             offertaId: offerta?.id,
                             cliente: { email, nome, cognome, telefono, citta: citta || undefined, dataNascita: dataNascita || undefined },
                             partecipanti,
+                            ...provenienzaDaUrl(),
                           });
                           navigate('/carrello');
                         } else {

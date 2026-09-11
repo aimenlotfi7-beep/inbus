@@ -18,6 +18,16 @@ export interface ArticoloCarrello {
   // è già loggato le ha già sul proprio account, non le ripete qui.
   cliente: { email: string; nome: string; cognome: string; telefono: string; citta?: string; dataNascita?: string };
   partecipanti: { nome: string; cognome: string }[];
+  /** Chi ha portato il cliente (?promo=, ?utm_…), letto dall'indirizzo della
+   *  pagina quando l'articolo entra nel carrello: la stessa regola del
+   *  checkout singolo, che lo legge al momento dell'invio. Senza, gli ordini
+   *  dal carrello perdevano promoter e campagna (su /carrello l'indirizzo è
+   *  un altro). */
+  promoterCodice?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
 }
 
 /** Se il carrello è l'acquisto di un bundle: quale, e le sue regole
@@ -72,11 +82,22 @@ export function CarrelloProvider({ children }: { children: ReactNode }) {
     try { const s = localStorage.getItem(CHIAVE_BUNDLE); return s ? JSON.parse(s) : null; } catch { return null; }
   });
 
+  // Archivio del browser bloccato o pieno: il carrello resta in memoria per
+  // questa visita invece di rompersi.
   useEffect(() => {
-    localStorage.setItem(CHIAVE_STORAGE, JSON.stringify(articoli));
+    try {
+      localStorage.setItem(CHIAVE_STORAGE, JSON.stringify(articoli));
+    } catch {
+      // si perde solo il salvataggio tra una visita e l'altra
+    }
   }, [articoli]);
   useEffect(() => {
-    if (bundle) localStorage.setItem(CHIAVE_BUNDLE, JSON.stringify(bundle)); else localStorage.removeItem(CHIAVE_BUNDLE);
+    try {
+      if (bundle) localStorage.setItem(CHIAVE_BUNDLE, JSON.stringify(bundle));
+      else localStorage.removeItem(CHIAVE_BUNDLE);
+    } catch {
+      // come sopra
+    }
   }, [bundle]);
 
   const nuovoId = () => `art-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;

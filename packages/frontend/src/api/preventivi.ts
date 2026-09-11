@@ -106,8 +106,6 @@ export const preventiviApi = {
   percorso: (tragittoId: string) => api.get<CambioPercorso | null>(`/api/preventivi/percorso/${tragittoId}`),
   // "Il preventivo va ancora bene": il percorso di adesso diventa quello del preventivo.
   confermaPercorso: (tragittoId: string) => api.post<{ ok: true }>(`/api/preventivi/tragitto/${tragittoId}/percorso-ok`, {}),
-  statistichePerFornitore: (dataDa?: string) => api.get<{ fornitore: Fornitore; richiesteRicevute: number; risposteDate: number; volteScelto: number; prezzoMedio: number | null }[]>(`/api/preventivi/statistiche/fornitori${dataDa ? `?dataDa=${dataDa}` : ''}`),
-  storicoPerTratta: (dataDa?: string) => api.get<{ partenza: string; arrivo: string; prezzo: number; km: number | null; data: string; nomeTragitto: string; artista: string }[]>(`/api/preventivi/statistiche/tratte${dataDa ? `?dataDa=${dataDa}` : ''}`),
   accetta: (rispostaId: string) => api.put<EsitoAccettazione>(`/api/preventivi/risposte/${rispostaId}/accetta`, {}),
   scaricaFile: (rispostaId: string, quale: 'originale' | 'firmato') =>
     api.get<{ nome: string; contenuto: string }>(`/api/preventivi/risposte/${rispostaId}/file?quale=${quale}`),

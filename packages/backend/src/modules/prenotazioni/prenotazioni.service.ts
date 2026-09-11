@@ -103,6 +103,25 @@ async function calcolaTotaleReale(p: typeof prenotazioni.$inferSelect) {
   return prezzoEffettivo * p.passeggeri - Number(p.sconto);
 }
 
+/** Un codice promoter vale per questo evento? Può essere il codice opaco di un
+ *  LINK (promoter, evento), anche specifico dell'evento, oppure per
+ *  compatibilità il codice diretto del promoter. Non vale se è il link di un
+ *  altro evento o se il promoter è escluso dall'evento. `codice` è quello da
+ *  salvare: sempre il codice vero del promoter, mai quello del link. Un codice
+ *  che non corrisponde a nessun promoter resta com'è (un vecchio codice o un
+ *  errore di battitura non blocca l'acquisto). */
+async function promoterPerEvento(lettore: Pick<typeof db, 'select'>, codice: string, eventoId: string): Promise<{ valido: true; codice: string } | { valido: false }> {
+  const [link] = await lettore.select().from(promoterLink).where(eq(promoterLink.codice, codice)).limit(1);
+  if (link && link.eventoId !== eventoId) return { valido: false };
+  const [p] = link
+    ? await lettore.select().from(promoter).where(eq(promoter.id, link.promoterId)).limit(1)
+    : await lettore.select().from(promoter).where(eq(promoter.codice, codice)).limit(1);
+  if (!p) return { valido: true, codice };
+  const [escluso] = await lettore.select().from(promoterEventi)
+    .where(and(eq(promoterEventi.promoterId, p.id), eq(promoterEventi.eventoId, eventoId))).limit(1);
+  return escluso ? { valido: false } : { valido: true, codice: p.codice };
+}
+
 /** La vera logica di creazione di UNA prenotazione (blocco posti,
  *  calcolo prezzo, coupon, credito, inserimento) — prende "tx" come
  *  parametro invece di aprire una propria transazione, così può
@@ -230,24 +249,9 @@ async function creaRigaInterna(
   // cambia nulla a valle.
   let promoterCodiceDaSalvare = promoterCodiceEffettivo;
   if (promoterCodiceEffettivo) {
-    const [link] = await tx.select().from(promoterLink).where(eq(promoterLink.codice, promoterCodiceEffettivo)).limit(1);
-    let p: typeof promoter.$inferSelect | undefined;
-    if (link) {
-      // Il codice link è ANCHE specifico dell'evento — se qualcuno lo
-      // riusa su un evento diverso da quello per cui è stato generato,
-      // il codice semplicemente non corrisponde a nulla di valido qui.
-      if (link.eventoId !== input.eventoId) throw new ErroreApplicativo('Questo codice non è valido per questo evento.', 400, 'PROMOTER_EVENTO_ESCLUSO');
-      [p] = await tx.select().from(promoter).where(eq(promoter.id, link.promoterId)).limit(1);
-    } else {
-      [p] = await tx.select().from(promoter).where(eq(promoter.codice, promoterCodiceEffettivo)).limit(1);
-    }
-    if (p) {
-      const [escluso] = await tx.select().from(promoterEventi).where(and(eq(promoterEventi.promoterId, p.id), eq(promoterEventi.eventoId, input.eventoId))).limit(1);
-      if (escluso) throw new ErroreApplicativo('Questo codice non è valido per questo evento.', 400, 'PROMOTER_EVENTO_ESCLUSO');
-      promoterCodiceDaSalvare = p.codice;
-    }
-    // Codice non riconosciuto: si salva comunque com'è (compatibilità —
-    // potrebbe essere un vecchio codice o un typo, non blocca l'acquisto).
+    const esito = await promoterPerEvento(tx, promoterCodiceEffettivo, input.eventoId);
+    if (!esito.valido) throw new ErroreApplicativo('Questo codice non è valido per questo evento.', 400, 'PROMOTER_EVENTO_ESCLUSO');
+    promoterCodiceDaSalvare = esito.codice;
   }
 
   const acconto = evento.accontoEur ? Number(evento.accontoEur) : env.ACCONTO_FISSO_EUR;
@@ -459,6 +463,16 @@ export const prenotazioniService = {
       }
       scontiPerRiga = ripartisciSconto(importi, bundleScelto.scontoPercentuale);
     }
+
+    // Nel carrello il codice promoter è quello di quando l'articolo è stato
+    // aggiunto, anche giorni prima: se nel frattempo non vale più per
+    // quell'evento si toglie da quella riga invece di bloccare l'intero
+    // ordine. Nel checkout singolo resta l'errore (creaRigaInterna).
+    articoli = await Promise.all(articoli.map(async (a) => (
+      a.promoterCodice && !(await promoterPerEvento(db, a.promoterCodice, a.eventoId)).valido
+        ? { ...a, promoterCodice: undefined }
+        : a
+    )));
 
     const { ordine, righe } = await db.transaction(async (tx) => {
       const righeCreate = [];
@@ -698,7 +712,7 @@ export const prenotazioniService = {
       // arrivavano due richieste quasi insieme.
       const [aggiornata] = await tx
         .update(prenotazioni)
-        .set({ stato: 'CANCELLATA', motivoCancellazione: motivo })
+        .set({ stato: 'CANCELLATA', motivoCancellazione: motivo, cancellataIl: new Date() })
         .where(and(eq(prenotazioni.pnr, pnr), ne(prenotazioni.stato, 'CANCELLATA')))
         .returning();
       if (!aggiornata) return { ...p, appenaCancellata: false }; // già cancellata un istante fa da un'altra richiesta, nessun altro effetto da rifare

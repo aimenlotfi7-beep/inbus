@@ -96,27 +96,32 @@ export function CarrelloPage() {
     // porta e manda UN evento Purchase con il totale, non uno per riga.
     const metaEventId = crypto.randomUUID();
     const { fbp, fbc } = leggiCookieMeta();
-    const righe = articoli.map((a) => ({
-      eventoId: a.eventoId,
-      tragittoId: a.tragittoId,
-      fermataId: a.fermataId,
-      passeggeri: a.passeggeri,
-      tipoPagamento,
-      metodoPagamento: 'DA_CONCORDARE' as const, // nessun pagamento online reale ancora: non registrare "Carta"
-      cliente: a.cliente,
-      partecipanti: a.partecipanti,
-      offertaId: a.offertaId,
-      ...(usaCredito && tipoPagamento === 'COMPLETO' && { usaCredito: true }),
-      ...(couponCodice.trim() && tipoPagamento === 'COMPLETO' && { couponCodice: couponCodice.trim() }),
-      ...(bundle?.promoterCodice && { promoterCodice: bundle.promoterCodice }),
-      ...(bundle?.utmSource && { utmSource: bundle.utmSource }),
-      ...(bundle?.utmMedium && { utmMedium: bundle.utmMedium }),
-      ...(bundle?.utmCampaign && { utmCampaign: bundle.utmCampaign }),
-      ...(bundle?.utmContent && { utmContent: bundle.utmContent }),
-      metaEventId,
-      ...(fbp && { metaFbp: fbp }),
-      ...(fbc && { metaFbc: fbc }),
-    }));
+    const righe = articoli.map((a) => {
+      // Un bundle ha una provenienza sola per tutto l'ordine; altrimenti vale
+      // quella di ogni articolo, letta quando è entrato nel carrello.
+      const provenienza = bundle ?? a;
+      return {
+        eventoId: a.eventoId,
+        tragittoId: a.tragittoId,
+        fermataId: a.fermataId,
+        passeggeri: a.passeggeri,
+        tipoPagamento,
+        metodoPagamento: 'DA_CONCORDARE' as const, // nessun pagamento online reale ancora: non registrare "Carta"
+        cliente: a.cliente,
+        partecipanti: a.partecipanti,
+        offertaId: a.offertaId,
+        ...(usaCredito && tipoPagamento === 'COMPLETO' && { usaCredito: true }),
+        ...(couponCodice.trim() && tipoPagamento === 'COMPLETO' && { couponCodice: couponCodice.trim() }),
+        ...(provenienza.promoterCodice && { promoterCodice: provenienza.promoterCodice }),
+        ...(provenienza.utmSource && { utmSource: provenienza.utmSource }),
+        ...(provenienza.utmMedium && { utmMedium: provenienza.utmMedium }),
+        ...(provenienza.utmCampaign && { utmCampaign: provenienza.utmCampaign }),
+        ...(provenienza.utmContent && { utmContent: provenienza.utmContent }),
+        metaEventId,
+        ...(fbp && { metaFbp: fbp }),
+        ...(fbc && { metaFbc: fbc }),
+      };
+    });
     try {
       const risultato = clienteLoggato()
         ? await prenotazioniApi.creaOrdine(righe, bundle?.id)

@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { AdminLogin } from './AdminLogin';
 import { AdminLayout, type SezioneGestionale } from './shared/AdminLayout';
 import { AdminHome } from './screens/AdminHome';
-import { AdminDashboard } from './AdminDashboard';
+import { StatisticheScreen } from './screens/statistiche/StatisticheScreen';
 import { SessioneContext } from './shared/SessioneContext';
 import { NavigazioneContext } from './shared/NavigazioneContext';
+import { PERMESSO_SEZIONE } from './shared/permessiSezioni';
 import { EventiScreen } from './screens/EventiScreen';
 import { VetrinaScreen } from './screens/VetrinaScreen';
 import { CalendarioScreen } from './screens/CalendarioScreen';
@@ -45,12 +46,8 @@ import { authApi, haPermesso, type SessioneAdmin } from '../api/auth';
 import { Toaster } from './shared/Toaster';
 import { ConfermeHost } from './shared/conferma';
 
-function StatisticheSenzaHeader() {
-  return <AdminDashboard onLogout={() => {}} soloContenuto />;
-}
-
 const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
-  statistiche: StatisticheSenzaHeader,
+  statistiche: StatisticheScreen,
   eventi: EventiScreen,
   bundle: BundleScreen,
   tour: TourScreen,
@@ -92,54 +89,6 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   'template-email': TemplateEmailScreen,
   'layout-biglietto': LayoutBigliettoScreen,
   'beta-tragitti-vicini': AnalisiPercorsiScreen,
-};
-
-// Permesso richiesto per ogni sezione, usato per bloccare l'accesso
-// diretto (non solo nascondere la voce di menu) se qualcuno perde un
-// permesso mentre è già loggato.
-const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
-  statistiche: 'statistiche.visualizza',
-  eventi: 'eventi.visualizza',
-  bundle: 'bundle.visualizza',
-  tour: 'tour.visualizza',
-  vetrina: 'eventi.vetrina',
-  calendario: 'eventi.calendario',
-  cestino: 'eventi.cestino',
-  transazioni: 'prenotazioni.transazioni',
-  pagamenti: 'prenotazioni.pagamenti',
-  rimborsi: 'prenotazioni.pagamenti',
-  variazioni: 'prenotazioni.pagamenti',
-  utenti: 'utenti.visualizza',
-  fornitori: 'fornitori.visualizza',
-  fermate: 'tragitti.visualizza',
-  tragitti: 'tragitti.visualizza',
-  promoter: 'promoter.visualizza',
-  organizzatori: 'organizzatori.visualizza',
-  'white-label': 'white-label.visualizza',
-  tourleader: 'tourleader.visualizza',
-  coupon: 'coupon.visualizza',
-  voucher: 'coupon.visualizza',
-  campagne: 'campagne.gestisci',
-  'lista-attesa': 'eventi.partenze',
-  offerte: 'offerte.gestisci',
-  chat: 'chat.visualizza',
-  comunicazioni: 'eventi.crea',
-  contenuti: 'pagine.gestisci',
-  amministratori: 'utenze.gestisci',
-  ruoli: 'permessi.gestisci',
-  'testi-tooltip': 'impostazioni.gestisci',
-  'partenze-orari': 'eventi.partenze',
-  'partenze-preventivi': 'eventi.partenze',
-  'partenze-prezzi': 'eventi.partenze',
-  'partenze-da-confermare': 'eventi.partenze',
-  'partenze-confermato': 'eventi.partenze',
-  'partenze-passate': 'eventi.partenze',
-  linee: 'eventi.partenze',
-  impostazioni: 'impostazioni.gestisci',
-  tracciamento: 'impostazioni.gestisci',
-  'template-email': 'template-email.gestisci',
-  'layout-biglietto': 'layout-biglietto.gestisci',
-  'beta-tragitti-vicini': 'eventi.partenze',
 };
 
 /** Legge la sezione attiva dall'indirizzo (?sezione=...) — così se

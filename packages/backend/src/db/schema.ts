@@ -841,6 +841,9 @@ export const prenotazioni = pgTable('prenotazioni', {
   commissioneImportoSnapshot: numeric('commissione_importo_snapshot', { precision: 10, scale: 2 }),
   stato: statoPrenotazioneEnum('stato').notNull().default('CONFERMATA'),
   motivoCancellazione: text('motivo_cancellazione'),
+  // Quando è stata cancellata (per le statistiche delle cancellazioni):
+  // registrata da settembre 2026, prima restava vuota.
+  cancellataIl: timestamp('cancellata_il'),
   rimborsoStato: text('rimborso_stato'), // 'richiesto' | 'approvato'
   rimborsoImporto: numeric('rimborso_importo', { precision: 10, scale: 2 }),
   rimborsoData: timestamp('rimborso_data'),
