@@ -1,4 +1,4 @@
-import { api } from './client';
+import { api, scaricaBlob } from './client';
 import type { Evento, OpzionePartenza } from './types';
 
 export interface FermataInput {
@@ -105,7 +105,19 @@ export interface BusDiLinea {
   tourLeaderId: string | null; tourLeaderNome: string | null; costo: string | null; postiBus: number | null; note: string | null;
 }
 export interface Linea { id: string; nome: string; fermate: FermataLinea[]; bus: BusDiLinea[]; }
-export interface PasseggeroBus { pnr: string; nome: string; cognome: string; fermata: string; telefono: string; email: string; }
+/** Un passeggero di UN bus: solo le prenotazioni che lo smistamento ha
+ *  messo su quel bus, in ordine di orario della fermata e cognome. id = il
+ *  partecipante (serve per segnare la salita); orario "HH:MM". */
+export interface PasseggeroBus { id: string; pnr: string; nome: string; cognome: string; fermata: string; orario: string | null; telefono: string | null; salito: boolean }
+/** Come lo smistamento automatico riempirebbe i bus di un tragitto adesso
+ *  (nessuna scrittura): le prenotazioni già assegnate restano ferme, le
+ *  altre sono simulate. etaMedia in anni, una cifra decimale. */
+export interface AnteprimaSmistamento {
+  smistamentoIl: string | null; // ISO: quando parte lo smistamento (partenza meno 24 ore); null se non calcolabile
+  giaSmistato: boolean;         // true se la finestra delle 24 ore è già iniziata
+  linee: { lineaId: string; lineaNome: string; bus: { busId: string; riferimento: string; postiBus: number | null; passeggeri: number; prenotazioni: number; etaMedia: number | null }[] }[];
+  senzaPosto: { prenotazioni: number; passeggeri: number };
+}
 export interface RiepilogoEconomicoLinea { lineaId: string; lineaNome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; }
 export interface RiepilogoEconomicoTratta { tragittoId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; perLinea: RiepilogoEconomicoLinea[]; }
 export interface SuggerimentoLinea {
@@ -154,7 +166,13 @@ export const eventiApi = {
   aggiornaBusDiLinea: (busId: string, input: Partial<BusDiLineaInput>) =>
     api.put<{ ok: true; tourLeaderAvvisato: boolean | null }>(`/api/eventi/linee/bus/${busId}`, input),
   listaLinee: (tragittoId: string) => api.get<Linea[]>(`/api/eventi/tragitti/${tragittoId}/linee`),
-  versaLinea: (lineaId: string) => api.post<{ versate: number; restanoInAttesa: number }>(`/api/eventi/linee/${lineaId}/versa`, {}),
+  // Elimina la linea e i suoi bus: i passeggeri assegnati tornano senza bus
+  // e li riprende lo smistamento. 409 se i posti del tragitto scenderebbero
+  // sotto quelli venduti.
+  eliminaLinea: (lineaId: string) => api.delete<{ ok: true }>(`/api/eventi/linee/${lineaId}`),
+  // L'assegnazione ai bus è solo automatica (per età, il giorno prima della
+  // partenza): questa è l'anteprima, senza scritture.
+  anteprimaSmistamento: (tragittoId: string) => api.get<AnteprimaSmistamento>(`/api/eventi/tragitti/${tragittoId}/anteprima-smistamento`),
   // Fase 2 — orario/prezzo/posti si modificano da Partenze, non più da
   // Eventi. aggiornaServizio esisteva già lato backend (mai usata dal
   // frontend finora) — qui il client mancante.
@@ -174,6 +192,8 @@ export const eventiApi = {
     api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/prezzi-vendita`, input),
   rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
   listaPasseggeriBus: (id: string, busId: string) => api.get<PasseggeroBus[]>(`/api/eventi/${id}/bus/${busId}/passeggeri`),
+  // PDF A4 della lista passeggeri del bus (casella da spuntare a mano).
+  scaricaPdfPasseggeriBus: (eventoId: string, busId: string): Promise<Blob> => scaricaBlob(`/api/eventi/${eventoId}/bus/${busId}/passeggeri/pdf`),
   riepilogoEconomico: (id: string) => api.get<RiepilogoEconomicoTratta[]>(`/api/eventi/${id}/riepilogo-economico`),
   venditePerFermata: (tragittoId: string) => api.get<VenditePerFermata>(`/api/eventi/tragitti/${tragittoId}/vendite`),
   suggerimentoLinea: (tragittoId: string) => api.get<SuggerimentoLinea>(`/api/eventi/tragitti/${tragittoId}/suggerimento-linea`),

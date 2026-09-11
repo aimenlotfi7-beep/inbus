@@ -1,7 +1,7 @@
-import { and, eq, ne, sql, desc, inArray, isNull, gte } from 'drizzle-orm';
+import { and, eq, ne, sql, desc, inArray } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, lineaFermate, busFisici, promoter, promoterEventi, promoterLink, whiteLabel } from '../../db/schema.js';
+import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, promoter, promoterEventi, promoterLink, whiteLabel } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { bundleService } from '../bundle/bundle.service.js';
@@ -328,19 +328,27 @@ async function creaRigaInterna(
   return { ...prenotazione, totaleComplessivo: totale, eventoArtista: evento.artista, utenteNome: utente.nome ?? '', utenteEmail: utente.email };
 }
 
-/** Manda l'email/biglietto giusto dopo che una prenotazione è stata
- *  creata — SEMPRE fuori dalla transazione (se l'invio fallisce o
- *  impiega tempo, la prenotazione resta comunque salvata, il cliente
- *  non deve mai perdere il posto per un problema di posta). Riusata
- *  sia per una prenotazione singola sia per ognuna di un ordine con
- *  più articoli. */
+/** Manda l'email giusta dopo che una prenotazione è stata creata —
+ *  SEMPRE fuori dalla transazione (se l'invio fallisce o impiega tempo,
+ *  la prenotazione resta comunque salvata, il cliente non deve mai
+ *  perdere il posto per un problema di posta). Riusata sia per una
+ *  prenotazione singola sia per ognuna di un ordine con più articoli
+ *  (carrello e bundle). */
 async function inviaConfermaPrenotazione(risultato: Awaited<ReturnType<typeof creaRigaInterna>>) {
   try {
     if (risultato.tipoPagamento === 'COMPLETO') {
-      // Pagamento pieno subito: il biglietto vero (PDF+QR) parte
-      // immediatamente, non serve una email di conferma separata.
+      // Pagamento pieno: SUBITO la conferma di pagamento, senza PDF. Il
+      // biglietto con il bus parte solo dopo lo smistamento sui bus, il
+      // giorno prima della partenza (smistamento.service.ts). I codici QR
+      // si registrano già adesso (credito fedeltà, area cliente), senza
+      // email; se questo fallisce la conferma parte comunque.
       const { ticketService } = await import('../ticket/ticket.service.js');
-      await ticketService.emetti(risultato.pnr);
+      try {
+        await ticketService.emetti(risultato.pnr);
+      } catch (err) {
+        console.error(`Registrazione biglietto non riuscita per PNR ${risultato.pnr} (la conferma di pagamento parte comunque):`, err);
+      }
+      await ticketService.inviaConfermaPagamento(risultato.pnr);
     } else {
       // Solo acconto: nessun biglietto ancora (si emette solo a saldo
       // completato) — mando la conferma "normale", senza allegato.
@@ -750,15 +758,29 @@ export const prenotazioniService = {
 
     if (!appenaSaldata) return aggiornata; // era già saldata prima di questa chiamata, nessun biglietto da rigenerare
 
-    // Ora che ha saldato per intero, il biglietto vero (PDF+QR) può
-    // essere emesso — fuori dalla transazione: se l'email fallisce, il
-    // saldo resta comunque segnato come pagato, non blocchiamo per un
-    // problema di posta.
+    // Saldo completato — fuori dalla transazione: un problema di posta non
+    // toglie mai il saldo già segnato. Subito la conferma di pagamento
+    // (senza PDF) e i codici QR registrati; il biglietto con il bus parte
+    // dopo lo smistamento. Se lo smistamento è già passato mentre mancava
+    // il saldo, il bus c'è già e il biglietto parte adesso (lo smistamento
+    // lo manda solo a chi ha pagato tutto).
+    const { ticketService } = await import('../ticket/ticket.service.js');
     try {
-      const { ticketService } = await import('../ticket/ticket.service.js');
       await ticketService.emetti(pnr);
     } catch (err) {
-      console.error('Emissione biglietto dopo saldo non riuscita:', err);
+      console.error('Registrazione biglietto dopo saldo non riuscita (la conferma di pagamento parte comunque):', err);
+    }
+    try {
+      await ticketService.inviaConfermaPagamento(pnr);
+    } catch (err) {
+      console.error(`Invio conferma di pagamento dopo saldo non riuscito (PNR ${pnr}):`, err);
+    }
+    if (aggiornata.busId) {
+      try {
+        await ticketService.inviaBigliettoConBus(pnr);
+      } catch (err) {
+        console.error(`Invio biglietto con il bus dopo saldo non riuscito (PNR ${pnr}):`, err);
+      }
     }
 
     return aggiornata;
@@ -818,119 +840,7 @@ export const prenotazioniService = {
     return { inviata };
   },
 
-  /** Assegna ogni prenotazione confermata al bus/Linea giusto,
-   *  raggruppando per età (il titolare dell'account, non i singoli
-   *  partecipanti — una prenotazione non si spezza mai tra bus diversi,
-   *  anche se copre persone di età diverse, es. un genitore con figli).
-   *  Scatta da sola, una volta sola per fermata, appena la partenza
-   *  entra nelle prossime 24 ore — prima di allora il biglietto vero
-   *  non è ancora scaricabile (prenotazioni.busId resta vuoto).
-   *
-   *  Algoritmo: ordina tutte le prenotazioni di quella fermata per età
-   *  (dalla più anziana alla più giovane), poi le versa nei bus nello
-   *  stesso ordine, riempiendo il primo fino alla sua capienza prima di
-   *  passare al secondo — chi ha età vicina finisce quasi sempre nello
-   *  stesso bus, senza però poter garantire una combinazione perfetta
-   *  se i posti non lo permettono (un caso accettato fin dall'inizio:
-   *  un sessantenne può finire in un bus di ventenni se non c'è altro
-   *  posto). Se una fermata non ha nessun bus che la copre ancora,
-   *  resta semplicemente da fare — non è un errore, è solo presto. */
-  async riordinaPerFasceEta() {
-    const oraAdesso = new Date();
-    const tra24Ore = new Date(oraAdesso.getTime() + 24 * 3600 * 1000);
-
-    // Tutte le prenotazioni confermate ancora senza bus assegnato, di
-    // eventi non ancora passati — filtro l'orario preciso di ciascuna
-    // fermata (data evento + orario fermata) più sotto, in JS: troppo
-    // specifico da esprimere comodamente in una singola query SQL.
-    const candidate = await db.select({
-      prenotazioneId: prenotazioni.id,
-      tragittoId: prenotazioni.tragittoId,
-      fermataCitta: prenotazioni.fermataCitta,
-      fermataOrario: prenotazioni.fermataOrario,
-      utenteId: prenotazioni.utenteId,
-      passeggeri: prenotazioni.passeggeri,
-      eventoData: eventi.data,
-    }).from(prenotazioni)
-      .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
-      .where(and(eq(prenotazioni.stato, 'CONFERMATA'), isNull(prenotazioni.busId), gte(eventi.data, oraAdesso)));
-
-    // Raggruppo per (tragittoId, fermataCitta) — ogni gruppo si
-    // riordina indipendentemente dagli altri.
-    const gruppi = new Map<string, typeof candidate>();
-    for (const c of candidate) {
-      if (!c.fermataOrario) continue; // senza orario non posso calcolare quando parte davvero
-      const [ore, minuti] = c.fermataOrario.split(':').map(Number);
-      if (Number.isNaN(ore) || Number.isNaN(minuti)) continue;
-      const partenzaVera = new Date(c.eventoData);
-      partenzaVera.setHours(ore, minuti, 0, 0);
-      if (partenzaVera > tra24Ore) continue; // non ancora nelle prossime 24 ore — troppo presto
-      const chiave = `${c.tragittoId}::${c.fermataCitta}`;
-      if (!gruppi.has(chiave)) gruppi.set(chiave, []);
-      gruppi.get(chiave)!.push(c);
-    }
-
-    let riordinate = 0;
-    for (const [chiave, righe] of gruppi) {
-      const [tragittoId, fermataCitta] = chiave.split('::');
-
-      // I bus che coprono davvero questa fermata specifica — tramite
-      // il modello Linee (una Linea copre certe fermate, uno o più bus
-      // dentro). Se nessuno la copre ancora, non c'è niente da fare
-      // per questo gruppo, si riprova al prossimo giro.
-      const fermataRiga = await db.select({ id: fermate.id }).from(fermate)
-        .where(and(eq(fermate.tragittoId, tragittoId), eq(fermate.citta, fermataCitta))).limit(1);
-      if (fermataRiga.length === 0) continue;
-      const busCopertura = await db.select({ busId: busFisici.id, postiBus: busFisici.postiBus }).from(lineaFermate)
-        .innerJoin(busFisici, eq(busFisici.lineaId, lineaFermate.lineaId))
-        .where(eq(lineaFermate.fermataId, fermataRiga[0].id));
-      if (busCopertura.length === 0) continue;
-
-      // Quanti passeggeri ha già ogni bus — versati a mano da un admin
-      // (vedi versaLinea) o da un giro precedente di questo stesso
-      // scheduler. Senza questo conteggio, si ripartirebbe ogni volta
-      // dalla capienza PIENA del bus, rischiando di assegnarne più di
-      // quanti posti liberi restano davvero.
-      const busIds = busCopertura.map((b) => b.busId);
-      const giaAssegnati = busIds.length
-        ? await db.select({ busId: prenotazioni.busId, passeggeri: prenotazioni.passeggeri }).from(prenotazioni)
-          .where(and(inArray(prenotazioni.busId, busIds), eq(prenotazioni.stato, 'CONFERMATA')))
-        : [];
-      const postiGiaOccupati = new Map<string, number>();
-      for (const r of giaAssegnati) {
-        if (!r.busId) continue;
-        postiGiaOccupati.set(r.busId, (postiGiaOccupati.get(r.busId) ?? 0) + r.passeggeri);
-      }
-
-      // Età dal titolare dell'account — chi non ha una data di nascita
-      // impostata (account creati prima che il campo fosse
-      // obbligatorio) finisce in fondo all'ordinamento, non bloccante.
-      const utentiIds = [...new Set(righe.map((r) => r.utenteId))];
-      const utentiDati = await db.select({ id: utenti.id, dataNascita: utenti.dataNascita }).from(utenti).where(inArray(utenti.id, utentiIds));
-      const mappaEta = new Map(utentiDati.map((u) => [u.id, u.dataNascita ? oraAdesso.getTime() - u.dataNascita.getTime() : -1]));
-
-      const ordinate = [...righe].sort((a, b) => (mappaEta.get(b.utenteId) ?? -1) - (mappaEta.get(a.utenteId) ?? -1));
-
-      let busCorrente = 0;
-      let postiRimastiBusCorrente = (busCopertura[0]?.postiBus ?? 0) - (postiGiaOccupati.get(busCopertura[0]?.busId) ?? 0);
-      for (const r of ordinate) {
-        // Passa al bus successivo se quello corrente non ha più posto
-        // per NESSUNO — non spezza una prenotazione tra due bus, ma
-        // nemmeno lascia posti vuoti se la prossima prenotazione
-        // ci starebbe comunque (qui semplificato: un posto per
-        // prenotazione, il conteggio vero dei passeggeri l'ha già
-        // gestito la vendita — qui serve solo la distribuzione).
-        while (busCorrente < busCopertura.length - 1 && postiRimastiBusCorrente <= 0) {
-          busCorrente++;
-          postiRimastiBusCorrente = (busCopertura[busCorrente]?.postiBus ?? 0) - (postiGiaOccupati.get(busCopertura[busCorrente]?.busId) ?? 0);
-        }
-        await db.update(prenotazioni).set({ busId: busCopertura[busCorrente].busId }).where(eq(prenotazioni.id, r.prenotazioneId));
-        postiRimastiBusCorrente -= r.passeggeri;
-        riordinate++;
-      }
-    }
-    return { riordinate };
-  },
+  // Lo smistamento sui bus per età vive in smistamento.service.ts.
 
   async inviaPromemoriaSaldo() {
     const oraAdesso = new Date();

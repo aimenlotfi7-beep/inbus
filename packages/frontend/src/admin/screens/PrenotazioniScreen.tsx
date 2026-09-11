@@ -8,7 +8,7 @@ import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { Modale } from '../shared/Modale';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { formattaEuro } from '../../shared/formato';
-import { confermaConTesto } from '../shared/conferma';
+import { conferma, confermaConTesto } from '../shared/conferma';
 import { motivoErrore } from '../shared/errori';
 
 type SottoTab = 'CONFERMATA' | 'CANCELLATA';
@@ -111,10 +111,19 @@ export function PrenotazioniScreen() {
     }
   }
   async function rigeneraBiglietto(r: PrenotazioneRiga) {
-    if (!confirm(`Rigenerare il biglietto per ${r.pnr}? Utile se non era mai stato emesso (es. per un problema tecnico) — non tocca il biglietto se esiste già.`)) return;
+    // Il biglietto indica il bus, quindi esiste solo dopo lo smistamento
+    // per età del giorno prima: qui lo si rigenera e lo si manda di nuovo.
+    const ok = await conferma({
+      titolo: `Reinviare il biglietto di ${r.pnr}?`,
+      testo: 'Il biglietto con il bus assegnato viene rigenerato e inviato di nuovo via email al cliente. Funziona solo dopo lo smistamento sui bus, il giorno prima della partenza.',
+      conferma: 'Reinvia biglietto',
+    });
+    if (!ok) return;
     try {
-      await prenotazioniAdminApi.rigeneraBiglietto(r.pnr);
-      notifica('Fatto — se il cliente ora apre "I miei biglietti" nella sua area, dovrebbe trovarlo.');
+      const { inviata } = await prenotazioniAdminApi.rigeneraBiglietto(r.pnr);
+      notifica(inviata
+        ? 'Biglietto reinviato al cliente via email.'
+        : "Biglietto rigenerato, ma l'email al cliente non è partita: può comunque scaricarlo dalla sua area.", inviata ? 'successo' : 'errore');
     } catch (e) {
       notifica(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: impossibile contattare il server.');
     }
@@ -197,8 +206,8 @@ export function PrenotazioniScreen() {
                       <td>
                         {r.stato === 'CONFERMATA' ? (
                           <>
-                            <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', whiteSpace: 'nowrap', marginRight: 6 }} onClick={() => rigeneraBiglietto(r)} title="Se il biglietto non è mai arrivato al cliente">
-                              Rigenera biglietto
+                            <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', whiteSpace: 'nowrap', marginRight: 6 }} onClick={() => rigeneraBiglietto(r)} title="Rimanda al cliente il biglietto con il bus (dopo lo smistamento, il giorno prima della partenza)">
+                              Reinvia biglietto
                             </button>
                             <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => cancella(r)}>Cancella</button>
                           </>

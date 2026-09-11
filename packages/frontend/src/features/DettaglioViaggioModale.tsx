@@ -73,20 +73,6 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
 
   const ev = dettaglio.evento;
 
-  // Stessa soglia già applicata sul server (rigeneraPdfPerToken) — qui
-  // serve solo per decidere COSA MOSTRARE (timer o pulsanti), il vero
-  // blocco resta comunque lato server, questo è solo per non far
-  // vedere un pulsante "Scarica" che poi fallirebbe con un errore.
-  let oreAllaPartenza: number | null = null;
-  if (ev?.data && dettaglio.fermataOrario) {
-    const [ore, minuti] = dettaglio.fermataOrario.split(':').map(Number);
-    if (!Number.isNaN(ore) && !Number.isNaN(minuti)) {
-      const partenzaVera = new Date(ev.data);
-      partenzaVera.setHours(ore, minuti, 0, 0);
-      oreAllaPartenza = (partenzaVera.getTime() - adesso) / 3600000;
-    }
-  }
-  const bigliettoBloccato = oreAllaPartenza !== null && oreAllaPartenza > 24;
   const oggi = new Date().toISOString().slice(0, 10);
   const giorniAlViaggio = ev ? Math.ceil((new Date(ev.data).getTime() - Date.now()) / (24 * 3600 * 1000)) : null;
   const pagamentoCompleto = dettaglio.tipoPagamento === 'COMPLETO' || dettaglio.saldoPagato;
@@ -125,49 +111,61 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
           ))}
         </div>
 
-        {dettaglio.stato === 'CONFERMATA' && (
-          <>
-            <p className="section-label" style={{ marginTop: 18 }}>I miei biglietti</p>
-            {bigliettoBloccato && oreAllaPartenza !== null ? (
-              <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '14px 16px' }}>
-                <p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>
-                  🕒 Il biglietto sarà scaricabile a partire da 24 ore prima della partenza.
+        {dettaglio.stato === 'CONFERMATA' && (() => {
+          // Il biglietto arriva dopo lo smistamento sui bus per età, il
+          // giorno prima della partenza: prima non si sa su quale bus si
+          // viaggia. Data e bus arrivano dal server (disponibileDal, bus),
+          // che fa lo stesso controllo quando si scarica.
+          const disponibileDal = biglietti.find((b) => b.disponibileDal)?.disponibileDal ?? null;
+          const msAllaDisponibilita = disponibileDal ? new Date(disponibileDal).getTime() - adesso : null;
+          const busAssegnato = biglietti.find((b) => b.bus)?.bus ?? null;
+          return (
+            <>
+              <p className="section-label" style={{ marginTop: 18 }}>I miei biglietti</p>
+              {!pagamentoCompleto ? (
+                <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>
+                  I biglietti saranno disponibili dopo il saldo, il giorno prima della partenza.
                 </p>
-                <p style={{ margin: '6px 0 0', fontSize: 'var(--testo-2xl)', fontWeight: 700 }}>
-                  {formattaConteggio(oreAllaPartenza - 24)}
-                </p>
-                <p style={{ margin: '4px 0 0', fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>
-                  Torna qui più vicino alla data — l'autobus assegnato compare in automatico appena disponibile.
-                </p>
-              </div>
-            ) : biglietti.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {biglietti.map((b) => (
-                  <div key={b.token} className="travel-biglietto-riga">
-                    <span>🎫 {b.nome} {b.cognome}</span>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <a className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 10px', textDecoration: 'none' }} href={ticketApi.urlDownload(b.token)} target="_blank" rel="noreferrer">
-                        Scarica
-                      </a>
-                      <PulsanteCondividi
-                        titolo={`Biglietto OnWay — ${ev?.artista ?? ''}`}
-                        testo={`Ecco il biglietto per ${b.nome} ${b.cognome} — ${ev?.artista ?? ''}`}
-                        link={ticketApi.urlDownload(b.token)}
-                        etichetta="Condividi"
-                      />
+              ) : msAllaDisponibilita !== null && msAllaDisponibilita > 0 ? (
+                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '14px 16px' }}>
+                  <p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>
+                    Il biglietto con il tuo bus arriva via email il giorno prima della partenza, e da quel momento puoi scaricarlo anche da qui.
+                  </p>
+                  <p style={{ margin: '6px 0 0', fontSize: 'var(--testo-2xl)', fontWeight: 700 }}>
+                    {formattaConteggio(msAllaDisponibilita / 3600000)}
+                  </p>
+                  <p style={{ margin: '4px 0 0', fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>
+                    Prima dividiamo i passeggeri sui bus: per questo il bus non è ancora indicato.
+                  </p>
+                </div>
+              ) : biglietti.length > 0 && busAssegnato ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>Il tuo bus: <b>{busAssegnato}</b></p>
+                  {biglietti.map((b) => (
+                    <div key={b.token} className="travel-biglietto-riga">
+                      <span>{b.nome} {b.cognome}</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <a className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 10px', textDecoration: 'none' }} href={ticketApi.urlDownload(b.token)} target="_blank" rel="noreferrer">
+                          Scarica
+                        </a>
+                        <PulsanteCondividi
+                          titolo={`Biglietto OnWay — ${ev?.artista ?? ''}`}
+                          testo={`Ecco il biglietto per ${b.nome} ${b.cognome} — ${ev?.artista ?? ''}`}
+                          link={ticketApi.urlDownload(b.token)}
+                          etichetta="Condividi"
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>
-                {pagamentoCompleto
-                  ? 'I biglietti sono in preparazione — se non compaiono entro poco, scrivici in chat.'
-                  : 'I biglietti saranno disponibili qui non appena il saldo sarà completato.'}
-              </p>
-            )}
-          </>
-        )}
+                  ))}
+                </div>
+              ) : (
+                <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>
+                  Stiamo assegnando i posti sui bus: il biglietto arriva a breve via email e comparirà qui. Se non arriva entro qualche ora, scrivici in chat.
+                </p>
+              )}
+            </>
+          );
+        })()}
 
         <p className="section-label" style={{ marginTop: 18 }}>Pagamento</p>
         <div className="travel-timeline">

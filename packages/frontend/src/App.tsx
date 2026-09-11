@@ -30,6 +30,7 @@ import { TourLeaderPasswordDimenticataPage } from './pages/TourLeaderPasswordDim
 import { TourLeaderReimpostaPasswordPage } from './pages/TourLeaderReimpostaPasswordPage';
 import { TourLeaderBusListPage } from './pages/TourLeaderBusListPage';
 import { TourLeaderScanPage } from './pages/TourLeaderScanPage';
+import { TourLeaderPasseggeriPage } from './pages/TourLeaderPasseggeriPage';
 import { AccediPage } from './pages/AccediPage';
 import { PasswordDimenticataPage } from './pages/PasswordDimenticataPage';
 import { ReimpostaPasswordPage } from './pages/ReimpostaPasswordPage';
@@ -95,6 +96,7 @@ export function App() {
       <Route path="/scansione" element={<TourLeaderBusListPage />} />
       <Route path="/scansione/cerca" element={<TourLeaderCercaPage />} />
       <Route path="/scansione/bus/:busId" element={<TourLeaderScanPage />} />
+      <Route path="/scansione/bus/:busId/passeggeri" element={<TourLeaderPasseggeriPage />} />
       <Route path="/accedi" element={<AccediPage />} />
       <Route path="/password-dimenticata" element={<PasswordDimenticataPage />} />
       <Route path="/reimposta-password/:token" element={<ReimpostaPasswordPage />} />

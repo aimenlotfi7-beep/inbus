@@ -44,5 +44,7 @@ export const prenotazioniAdminApi = {
     ),
   eliminaDefinitivamente: (pnr: string) => api.delete<void>(`/api/prenotazioni/${pnr}`),
   inviaSollecito: (pnr: string) => api.post<{ inviata: boolean }>(`/api/prenotazioni/${pnr}/sollecito`),
-  rigeneraBiglietto: (pnr: string) => api.post<{ ok: true }>(`/api/prenotazioni/${pnr}/rigenera-biglietto`),
+  // Rigenera e reinvia l'email del biglietto (con il bus). 409 se il bus non
+  // è ancora assegnato: il biglietto parte dopo lo smistamento.
+  rigeneraBiglietto: (pnr: string) => api.post<{ inviata: boolean }>(`/api/prenotazioni/${pnr}/rigenera-biglietto`),
 };

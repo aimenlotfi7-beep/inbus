@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { eventiService } from './eventi.service.js';
+import { smistamentoService } from '../prenotazioni/smistamento.service.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 
 export const eventiController = {
@@ -87,8 +88,15 @@ export const eventiController = {
   async listaLinee(req: Request, res: Response) {
     res.json(await eventiService.listaLinee(req.params.tragittoId));
   },
-  async versaLinea(req: Request, res: Response) {
-    res.json(await eventiService.versaLinea(req.params.lineaId));
+  /** Elimina la linea e i suoi bus: i passeggeri assegnati tornano senza
+   *  bus e li riprende lo smistamento automatico. */
+  async eliminaLinea(req: Request, res: Response) {
+    await eventiService.eliminaLinea(req.params.lineaId);
+    res.json({ ok: true });
+  },
+  /** Come verrebbero riempiti i bus del tragitto, senza scritture. */
+  async anteprimaSmistamento(req: Request, res: Response) {
+    res.json(await smistamentoService.anteprima(req.params.tragittoId));
   },
 
   async aggiornaTragittoOperativo(req: Request, res: Response) {
@@ -108,12 +116,18 @@ export const eventiController = {
   },
 
   async rimuoviBus(req: Request, res: Response) {
-    await eventiService.rimuoviBus(req.params.busId);
+    await eventiService.rimuoviBus(req.params.id, req.params.busId);
     res.status(204).send();
   },
 
   async listaPasseggeriBus(req: Request, res: Response) {
-    res.json(await eventiService.listaPasseggeriBus(req.params.busId));
+    res.json(await eventiService.listaPasseggeriBus(req.params.id, req.params.busId));
+  },
+  async pdfPasseggeriBus(req: Request, res: Response) {
+    const { pdf, nomeFile } = await eventiService.pdfPasseggeriBus(req.params.id, req.params.busId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nomeFile}"`);
+    res.send(pdf);
   },
 
   async riepilogoEconomico(req: Request, res: Response) {

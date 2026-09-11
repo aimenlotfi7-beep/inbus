@@ -1,4 +1,5 @@
 import { prenotazioniService } from '../modules/prenotazioni/prenotazioni.service.js';
+import { smistamentoService } from '../modules/prenotazioni/smistamento.service.js';
 import { creditoService } from '../modules/credito/credito.service.js';
 import { disattivaFermateSottoSoglia } from '../modules/variazioni/variazioni.service.js';
 
@@ -33,20 +34,16 @@ export function avviaSchedulerPromemoriaSaldo() {
   setInterval(esegui, UN_GIORNO_MS);
 }
 
-/** Controlla ogni ora se ci sono prenotazioni da assegnare a un bus
- *  (riordino per fasce d'età) — più frequente del controllo giornaliero
- *  sopra perché il momento in cui una partenza "entra" nelle prossime
- *  24 ore è preciso: un controllo solo giornaliero potrebbe far
- *  aspettare un cliente fino al giorno dopo prima di poter scaricare
- *  il biglietto, anche se la soglia delle 24 ore è già scattata da
- *  ore. Gestisce anche prenotazioni arrivate DOPO il primo riordino di
- *  quella fermata (restano senza bus finché non passa di nuovo — entro
- *  un'ora al massimo). */
+/** Ogni ora (e all'avvio) lo smistamento dei passeggeri sui bus per età —
+ *  vedi smistamento.service.ts. Ogni ora e non una volta al giorno perché
+ *  il momento in cui una partenza "entra" nelle 24 ore è preciso: da lì
+ *  parte il biglietto con il bus. Prende anche le prenotazioni arrivate
+ *  dopo il primo giro (restano senza bus al massimo un'ora). */
 export function avviaSchedulerRiordinoEta() {
   async function esegui() {
     // Prima le soglie (una fermata che non ce l'ha fatta va disattivata
-    // e comunicata PRIMA di calcolare il riordino per età — altrimenti
-    // rischierei di assegnare posti su una fermata che sta per sparire).
+    // e comunicata PRIMA dello smistamento — altrimenti si rischierebbe
+    // di assegnare posti su una fermata che sta per sparire).
     try {
       const { disattivate } = await disattivaFermateSottoSoglia();
       if (disattivate > 0) console.log(`Fermate "Partenza" disattivate per soglia non raggiunta: ${disattivate}.`);
@@ -54,10 +51,11 @@ export function avviaSchedulerRiordinoEta() {
       console.error('Errore durante il controllo soglia minima fermate:', err);
     }
     try {
-      const { riordinate } = await prenotazioniService.riordinaPerFasceEta();
-      if (riordinate > 0) console.log(`Prenotazioni riordinate per fascia d'età e assegnate a un bus: ${riordinate}.`);
+      const { assegnate, senzaPosto } = await smistamentoService.esegui();
+      if (assegnate > 0) console.log(`Smistamento sui bus: ${assegnate} prenotazioni assegnate a un bus.`);
+      if (senzaPosto > 0) console.warn(`Smistamento sui bus: ${senzaPosto} prenotazioni restano senza bus (dettagli nelle righe [smistamento] qui sopra).`);
     } catch (err) {
-      console.error('Errore durante il riordino per fasce d\'età:', err);
+      console.error('Errore durante lo smistamento sui bus:', err);
     }
   }
 

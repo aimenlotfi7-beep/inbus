@@ -251,14 +251,15 @@ export async function disegnaBigliettoPdf(config: ConfigurazioneLayout, dati: {
         doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('EVENTO', pos.x, pos.y, { width: pos.larghezza });
         doc.fillColor('#000').font('Helvetica-Bold').fontSize(18).text(dati.artista, pos.x, doc.y, { width: pos.larghezza });
         doc.font('Helvetica').fontSize(12).text(
-          dati.dataEvento.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+          dati.dataEvento.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
           pos.x, doc.y, { width: pos.larghezza },
         );
       } else if (sezione === 'partenza') {
         doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('PARTENZA', pos.x, pos.y, { width: pos.larghezza });
         doc.fillColor('#000').font('Helvetica').fontSize(13).text(`${dati.fermataCitta}${dati.fermataOrario ? ` — ore ${dati.fermataOrario}` : ''}`, pos.x, doc.y, { width: pos.larghezza });
         if (dati.nomeBus) {
-          doc.fillColor('#666').font('Helvetica').fontSize(10).text(dati.nomeBus, pos.x, doc.y, { width: pos.larghezza });
+          // Linea e bus: il passeggero deve salire proprio su quello.
+          doc.fillColor('#000').font('Helvetica-Bold').fontSize(11).text(dati.nomeBus, pos.x, doc.y, { width: pos.larghezza });
         }
       } else if (sezione === 'passeggero') {
         doc.fillColor(colore).font('Helvetica-Bold').fontSize(10).text('PASSEGGER' + (dati.passeggeriNomi.length > 1 ? 'I' : 'O'), pos.x, pos.y, { width: pos.larghezza });
@@ -357,6 +358,7 @@ export const layoutBigliettoService = {
       pnr: 'IB1DI38J',
       qrDataUrl,
       immagineIntestazioneUrl: null,
+      nomeBus: 'Linea 1 · Bus AB123CD',
     });
   },
 };

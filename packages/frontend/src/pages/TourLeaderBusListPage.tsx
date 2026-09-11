@@ -32,18 +32,21 @@ export function TourLeaderBusListPage() {
               {new Date(b.eventoData).toLocaleDateString('it-IT')} · Bus {b.riferimento}
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {/* La lista si riempie il giorno prima della partenza, dopo lo
+                  smistamento per età: la pagina lo spiega se è ancora presto. */}
               <button
-                disabled
-                title="Non ancora disponibile — arriverà inviata dal gestionale"
-                style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #e3e5ea', background: '#f3f4f6', color: '#9ca3af', fontSize: 'var(--testo-md)', cursor: 'not-allowed' }}
+                type="button"
+                onClick={() => navigate(`/scansione/bus/${b.busId}/passeggeri`)}
+                style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #e3e5ea', background: '#fff', color: '#1f2430', fontSize: 'var(--testo-md)', fontWeight: 600, cursor: 'pointer' }}
               >
-                📋 Lista partecipanti
+                Lista passeggeri
               </button>
               <button
+                type="button"
                 onClick={() => navigate(`/scansione/bus/${b.busId}`)}
                 style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 'var(--testo-md)', fontWeight: 600, cursor: 'pointer' }}
               >
-                📷 Scansiona
+                Scansiona biglietti
               </button>
             </div>
           </div>

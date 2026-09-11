@@ -62,6 +62,22 @@ async function richiesta<T>(path: string, opzioni: RequestInit = {}, chiaveToken
   return res.json() as Promise<T>;
 }
 
+/** Scarica un file (es. un PDF) con il token della sessione indicata —
+ *  stessa gestione di 401 ed errori di `richiesta`: un errore del server
+ *  arriva come ErroreApi con il suo messaggio. */
+export async function scaricaBlob(path: string, chiaveToken = 'inbus_admin_token'): Promise<Blob> {
+  const token = localStorage.getItem(chiaveToken);
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const corpo = await res.json().catch(() => ({ errore: res.statusText }));
+    if (res.status === 401 && token) gestisci401(chiaveToken);
+    throw new ErroreApi(corpo.errore ?? 'Errore sconosciuto', res.status);
+  }
+  return res.blob();
+}
+
 export const api = {
   get: <T>(path: string) => richiesta<T>(path),
   post: <T>(path: string, body?: unknown) =>

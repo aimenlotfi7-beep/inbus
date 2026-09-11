@@ -85,10 +85,12 @@ export const prenotazioniController = {
   async inviaSollecitoManuale(req: Request, res: Response) {
     res.json(await prenotazioniService.inviaSollecitoManuale(req.params.pnr));
   },
+  /** Rigenera i PDF e reinvia l'email del biglietto con il bus. Senza bus
+   *  (smistamento non ancora avvenuto) risponde 409. */
   async rigeneraBiglietto(req: Request, res: Response) {
     const { ticketService } = await import('../ticket/ticket.service.js');
-    await ticketService.emetti(req.params.pnr);
-    res.json({ ok: true });
+    const { inviata } = await ticketService.inviaBigliettoConBus(req.params.pnr);
+    res.json({ inviata });
   },
 };
 

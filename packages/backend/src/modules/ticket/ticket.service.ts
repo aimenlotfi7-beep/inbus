@@ -1,11 +1,30 @@
 import crypto from 'node:crypto';
 import QRCode from 'qrcode';
-import { eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { prenotazioni, eventi, utenti, partecipantiPrenotazione, whiteLabel, busFisici } from '../../db/schema.js';
+import { prenotazioni, eventi, utenti, partecipantiPrenotazione, whiteLabel, busFisici, linee } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { inviaEmail } from '../../shared/email.service.js';
+import { formattaData, formattaEuro, formattaOra } from '../../shared/formato.js';
 import { layoutBigliettoService, disegnaBigliettoPdf } from '../layout-biglietto/layout-biglietto.service.js';
+import { templateEmailService } from '../template-email/template-email.service.js';
+import { tempiPrenotazione } from '../prenotazioni/partenza.js';
+
+/** Biglietti ed email del biglietto.
+ *
+ *  Il flusso (deciso dal proprietario):
+ *  1. al pagamento completo (o al saldo) il cliente riceve SUBITO la
+ *     conferma di pagamento, senza PDF; i codici QR si creano già adesso
+ *     (servono al credito fedeltà e all'area cliente), senza email;
+ *  2. il giorno prima della partenza lo smistamento assegna il bus, e solo
+ *     allora parte l'email con i PDF, che riportano linea e bus;
+ *  3. dall'area cliente il PDF si scarica da 24 ore prima della partenza e
+ *     solo con il bus assegnato. */
+
+type Prenotazione = typeof prenotazioni.$inferSelect;
+type Evento = typeof eventi.$inferSelect;
+
+export const MESSAGGIO_BIGLIETTO_PRIMA_DELLO_SMISTAMENTO = 'Il biglietto si invia dopo lo smistamento sui bus, il giorno prima della partenza.';
 
 /** Il layout del biglietto da usare per QUESTA prenotazione — se è
  *  arrivata da una White Label che ha un suo layout proprio impostato,
@@ -28,78 +47,94 @@ function generaToken() {
   return crypto.randomBytes(24).toString('hex');
 }
 
+/** "05/09/2026 alle 14:00" (ora di Roma). */
+function dataEOra(data: Date) {
+  return `${formattaData(data)} alle ${formattaOra(data)}`;
+}
+
+async function busDellaPrenotazione(busId: string | null): Promise<{ riferimento: string; lineaNome: string | null } | null> {
+  if (!busId) return null;
+  const [riga] = await db.select({ riferimento: busFisici.riferimento, lineaNome: linee.nome }).from(busFisici)
+    .leftJoin(linee, eq(linee.id, busFisici.lineaId))
+    .where(eq(busFisici.id, busId)).limit(1);
+  return riga ?? null;
+}
+
+/** "Linea 1 · Bus AB123CD" */
+function etichettaBus(bus: { riferimento: string; lineaNome: string | null }) {
+  return bus.lineaNome ? `${bus.lineaNome} · Bus ${bus.riferimento}` : `Bus ${bus.riferimento}`;
+}
+
+/** I partecipanti della prenotazione, ognuno con il SUO codice QR: crea
+ *  solo quelli mancanti, non cambia mai un codice già dato (un PDF già
+ *  inviato deve restare valido). */
+async function partecipantiConToken(prenotazioneId: string) {
+  const elenco = () => db.select().from(partecipantiPrenotazione)
+    .where(eq(partecipantiPrenotazione.prenotazioneId, prenotazioneId))
+    .orderBy(asc(partecipantiPrenotazione.ordine));
+  const partecipanti = await elenco();
+  if (partecipanti.every((pt) => pt.ticketToken)) return partecipanti;
+  for (const pt of partecipanti) {
+    if (pt.ticketToken) continue;
+    await db.update(partecipantiPrenotazione).set({ ticketToken: generaToken() })
+      .where(and(eq(partecipantiPrenotazione.id, pt.id), isNull(partecipantiPrenotazione.ticketToken)));
+  }
+  return elenco();
+}
+
+async function configurazioneBiglietto(p: Prenotazione, evento: Evento) {
+  const layoutIdEffettivo = await risolviLayoutBigliettoId(p.whiteLabelId, evento.layoutBigliettoId);
+  const config = await layoutBigliettoService.getPerEvento(layoutIdEffettivo);
+  return evento.ticketColoreAccento ? { ...config, coloreAccento: evento.ticketColoreAccento } : config;
+}
+
+async function pdfPartecipante(
+  config: Awaited<ReturnType<typeof configurazioneBiglietto>>,
+  p: Prenotazione,
+  evento: Evento,
+  pt: { nome: string; cognome: string; ticketToken: string | null },
+  orarioFermata: string | null,
+  nomeBus: string,
+) {
+  const qrDataUrl = await QRCode.toDataURL(`ONWAY:TICKET:${p.pnr}:${pt.ticketToken}`, { margin: 1, width: 300 });
+  return disegnaBigliettoPdf(config, {
+    artista: evento.artista,
+    dataEvento: evento.data,
+    fermataCitta: p.fermataCitta,
+    fermataOrario: orarioFermata ?? p.fermataOrario,
+    passeggeriNomi: [`${pt.nome} ${pt.cognome}`],
+    pnr: p.pnr,
+    qrDataUrl,
+    immagineIntestazioneUrl: evento.ticketImmagineSfondoUrl,
+    nomeBus,
+  });
+}
+
 export const ticketService = {
-  /** Emette davvero il biglietto: genera un PDF+QR per ogni passeggero
-   *  (ognuno col proprio codice univoco, non condiviso), seguendo il
-   *  layout scelto per l'evento (o quello predefinito), manda l'email
-   *  con gli allegati. Va chiamata solo quando la prenotazione è pagata
-   *  per intero (subito se paga tutto, oppure dopo che ha saldato il
-   *  resto se aveva pagato ad acconto) — non prima, altrimenti un
-   *  cliente con solo l'acconto avrebbe già in mano un biglietto
-   *  "valido" per salire sul bus senza aver finito di pagare. */
+  /** Registra il biglietto (codici QR dei passeggeri, stato EMESSO) e
+   *  matura il credito — SENZA email: il biglietto vero, con il bus, parte
+   *  dopo lo smistamento (inviaBigliettoConBus). Solo a pagamento completo:
+   *  con il solo acconto non esiste ancora un biglietto valido. Si può
+   *  richiamare: la seconda volta non fa nulla. */
   async emetti(pnr: string) {
     const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
     if (!p) throw new NonTrovato('Prenotazione');
     if (p.stato !== 'CONFERMATA') throw new ConflittoDati('Questa prenotazione non è più valida.');
     if (!p.saldoPagato) throw new ConflittoDati('Il biglietto si emette solo a saldo completato.');
-    if (p.ticketToken) return; // già emesso, non rifarlo (es. saldaResto chiamato due volte)
+    if (p.ticketToken) return; // già emesso
 
-    const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
-    if (!evento) throw new NonTrovato('Evento');
+    await partecipantiConToken(p.id);
 
-    // Il richiedente conta sempre come primo partecipante (vedi
-    // prenotazioni.service.ts) — questa lista non è mai vuota.
-    const partecipanti = await db
-      .select()
-      .from(partecipantiPrenotazione)
-      .where(eq(partecipantiPrenotazione.prenotazioneId, p.id))
-      .orderBy(partecipantiPrenotazione.ordine);
-
-    // Il layout (colori, ordine delle sezioni, posizione del QR) è
-    // quello scelto per questo evento, o il predefinito se non ne ha
-    // scelto uno — calcolato una sola volta, riusato per ogni passeggero.
-    const layoutIdEffettivo = await risolviLayoutBigliettoId(p.whiteLabelId, evento.layoutBigliettoId);
-    const config = await layoutBigliettoService.getPerEvento(layoutIdEffettivo);
-    const configEffettiva = evento.ticketColoreAccento ? { ...config, coloreAccento: evento.ticketColoreAccento } : config;
-
-    // Un PDF distinto per ogni passeggero, con un QR proprio (diverso da
-    // quello degli altri) — così sul bus si può contare davvero chi è
-    // salito, persona per persona, non solo "la prenotazione nel suo
-    // complesso".
-    const allegati = await Promise.all(partecipanti.map(async (pt, indice) => {
-      const tokenPersonale = generaToken();
-      await db.update(partecipantiPrenotazione).set({ ticketToken: tokenPersonale }).where(eq(partecipantiPrenotazione.id, pt.id));
-
-      const qrDataUrl = await QRCode.toDataURL(`ONWAY:TICKET:${p.pnr}:${tokenPersonale}`, { margin: 1, width: 300 });
-      const pdfBuffer = await disegnaBigliettoPdf(configEffettiva, {
-        artista: evento.artista,
-        dataEvento: evento.data,
-        fermataCitta: p.fermataCitta,
-        fermataOrario: p.fermataOrario,
-        passeggeriNomi: [`${pt.nome} ${pt.cognome}`],
-        pnr: p.pnr,
-        qrDataUrl,
-        immagineIntestazioneUrl: evento.ticketImmagineSfondoUrl,
-      });
-      const nomeFile = partecipanti.length > 1
-        ? `biglietto-${p.pnr}-${indice + 1}-${pt.nome}-${pt.cognome}`.replace(/[^a-zA-Z0-9-]+/g, '-') + '.pdf'
-        : `biglietto-${p.pnr}.pdf`;
-      return { nomeFile, contenuto: pdfBuffer, tipo: 'application/pdf' };
-    }));
-
-    // Il token sulla prenotazione resta come "lotto" — segna che
-    // l'emissione è avvenuta, non è più usato per il controllo accessi
-    // (quello guarda i token sui singoli partecipanti).
-    await db.update(prenotazioni).set({
+    // Il token sulla prenotazione resta come "lotto": segna che l'emissione
+    // è avvenuta (il controllo accessi guarda i token dei partecipanti).
+    // Atomico: due chiamate quasi insieme, solo una emette e matura il credito.
+    const [emesso] = await db.update(prenotazioni).set({
       ticketToken: generaToken(),
       ticketStato: 'EMESSO',
       ticketEmessoIl: new Date(),
-    }).where(eq(prenotazioni.id, p.id));
+    }).where(and(eq(prenotazioni.id, p.id), isNull(prenotazioni.ticketToken))).returning({ id: prenotazioni.id });
+    if (!emesso) return;
 
-    // Il biglietto è già emesso a questo punto — quello che succede da
-    // qui in poi (credito, email) non deve MAI più poter far sparire un
-    // biglietto già assegnato: ogni pezzo isolato col proprio try/catch,
-    // un problema in uno non deve fermare gli altri.
     try {
       const { creditoService } = await import('../credito/credito.service.js');
       await creditoService.maturaCreditoSubito(p.id);
@@ -107,29 +142,79 @@ export const ticketService = {
     } catch (err) {
       console.error(`Maturazione credito fallita per PNR ${p.pnr} (biglietto comunque emesso):`, err);
     }
-
-    const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
-    if (utente?.email) {
-      const { templateEmailService } = await import('../template-email/template-email.service.js');
-      const { oggetto, html } = await templateEmailService.renderizza('ticket', {
-        evento: evento.artista,
-        pnr: p.pnr,
-      });
-      await inviaEmail({
-        a: utente.email,
-        oggetto,
-        html,
-        allegati,
-      });
-    }
   },
 
-  /** L'elenco dei biglietti di una prenotazione, per il cliente che
-   *  vuole recuperarli — solo se sono stati davvero emessi (pagamento
-   *  completo). Verifica l'email come altrove: non un vero controllo
-   *  d'accesso, ma non lascia vedere prenotazioni altrui a chi non
-   *  conosce già l'email giusta. */
-  async bigliettiPerCliente(pnr: string, email: string) {
+  /** Email "pagamento ricevuto", subito dopo il pagamento completo o il
+   *  saldo: niente PDF, spiega quando arriva il biglietto con il bus. */
+  async inviaConfermaPagamento(pnr: string): Promise<{ inviata: boolean }> {
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
+    if (!p) throw new NonTrovato('Prenotazione');
+    const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
+    const [utente] = await db.select({ email: utenti.email, nome: utenti.nome }).from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+    if (!evento || !utente?.email) return { inviata: false };
+
+    const tempi = await tempiPrenotazione(p);
+    const { oggetto, html } = await templateEmailService.renderizza('conferma_pagamento', {
+      nome: utente.nome ?? '',
+      evento: evento.artista,
+      data: formattaData(evento.data),
+      fermata: p.fermataCitta,
+      pnr: p.pnr,
+      importo: formattaEuro(p.totale),
+      disponibileDal: tempi ? dataEOra(tempi.disponibileDal) : 'giorno prima della partenza',
+    }, { escapaHtml: ['nome', 'evento', 'fermata', 'pnr'] });
+    return inviaEmail({ a: utente.email, oggetto, html });
+  },
+
+  /** L'email del biglietto con i PDF (uno per passeggero, con linea e bus).
+   *  La manda lo smistamento quando assegna il bus, il saldo se il bus c'era
+   *  già, e "Rigenera biglietto" nel gestionale. 409 senza bus o senza saldo. */
+  async inviaBigliettoConBus(pnr: string): Promise<{ inviata: boolean }> {
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
+    if (!p) throw new NonTrovato('Prenotazione');
+    if (p.stato !== 'CONFERMATA') throw new ConflittoDati('Questa prenotazione non è più valida.');
+    if (!p.busId) throw new ConflittoDati(MESSAGGIO_BIGLIETTO_PRIMA_DELLO_SMISTAMENTO);
+    if (!p.saldoPagato) throw new ConflittoDati('Il biglietto si invia solo a saldo completato.');
+    const bus = await busDellaPrenotazione(p.busId);
+    if (!bus) throw new ConflittoDati(MESSAGGIO_BIGLIETTO_PRIMA_DELLO_SMISTAMENTO);
+    const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
+    if (!evento) throw new NonTrovato('Evento');
+
+    // Se l'emissione al pagamento non era riuscita, la si recupera qui.
+    await ticketService.emetti(pnr);
+    const partecipanti = await partecipantiConToken(p.id);
+    const tempi = await tempiPrenotazione(p);
+    const config = await configurazioneBiglietto(p, evento);
+    const nomeBus = etichettaBus(bus);
+
+    const allegati = await Promise.all(partecipanti.map(async (pt, indice) => ({
+      nomeFile: partecipanti.length > 1
+        ? `biglietto-${p.pnr}-${indice + 1}-${pt.nome}-${pt.cognome}`.replace(/[^a-zA-Z0-9-]+/g, '-') + '.pdf'
+        : `biglietto-${p.pnr}.pdf`,
+      contenuto: await pdfPartecipante(config, p, evento, pt, tempi?.orarioFermata ?? null, nomeBus),
+      tipo: 'application/pdf',
+    })));
+
+    const [utente] = await db.select({ email: utenti.email, nome: utenti.nome }).from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+    if (!utente?.email) return { inviata: false };
+    const { oggetto, html } = await templateEmailService.renderizza('ticket', {
+      nome: utente.nome ?? '',
+      evento: evento.artista,
+      data: formattaData(evento.data),
+      fermata: p.fermataCitta,
+      orario: tempi?.orarioFermata ?? 'da definire',
+      bus: nomeBus,
+      pnr: p.pnr,
+    }, { escapaHtml: ['nome', 'evento', 'fermata', 'orario', 'bus', 'pnr'] });
+    return inviaEmail({ a: utente.email, oggetto, html, allegati });
+  },
+
+  /** L'elenco dei biglietti di una prenotazione, per il cliente che vuole
+   *  recuperarli — solo quelli registrati (pagamento completo), ognuno con
+   *  da quando è scaricabile e con il bus (null finché non c'è). Verifica
+   *  l'email come altrove: non un vero controllo d'accesso, ma non lascia
+   *  vedere prenotazioni altrui a chi non conosce già l'email giusta. */
+  async bigliettiPerCliente(pnr: string, email: string): Promise<{ nome: string; cognome: string; token: string; disponibileDal: string | null; bus: string | null }[]> {
     const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
     if (!p) throw new NonTrovato('Prenotazione');
     const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
@@ -139,66 +224,46 @@ export const ticketService = {
       .select()
       .from(partecipantiPrenotazione)
       .where(eq(partecipantiPrenotazione.prenotazioneId, p.id))
-      .orderBy(partecipantiPrenotazione.ordine);
+      .orderBy(asc(partecipantiPrenotazione.ordine));
+    const conBiglietto = partecipanti.filter((pt) => pt.ticketToken);
+    if (conBiglietto.length === 0) return [];
 
-    return partecipanti
-      .filter((pt) => pt.ticketToken) // solo quelli con biglietto davvero emesso
-      .map((pt) => ({ nome: pt.nome, cognome: pt.cognome, token: pt.ticketToken as string }));
+    const tempi = await tempiPrenotazione(p);
+    const bus = await busDellaPrenotazione(p.busId);
+    return conBiglietto.map((pt) => ({
+      nome: pt.nome,
+      cognome: pt.cognome,
+      token: pt.ticketToken as string,
+      disponibileDal: tempi ? tempi.disponibileDal.toISOString() : null,
+      bus: bus?.riferimento ?? null,
+    }));
   },
 
-  /** Ridisegna lo STESSO biglietto già emesso (stesso QR, stesso
-   *  token) — non ne genera uno nuovo: il PDF non veniva salvato da
-   *  nessuna parte dopo l'invio via email, quindi va ricreato identico
-   *  al bisogno, ma deve restare lo stesso oggetto "valido" di prima,
-   *  non uno che invalida il precedente. */
+  /** Ridisegna lo STESSO biglietto già emesso (stesso QR, stesso token) —
+   *  il PDF non viene salvato da nessuna parte, si ricrea identico al
+   *  bisogno. Scaricabile solo da 24 ore prima della partenza (ora di Roma)
+   *  e con il bus già assegnato dallo smistamento. */
   async rigeneraPdfPerToken(token: string) {
     const [pt] = await db.select().from(partecipantiPrenotazione).where(eq(partecipantiPrenotazione.ticketToken, token)).limit(1);
     if (!pt) throw new NonTrovato('Biglietto');
 
     const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, pt.prenotazioneId)).limit(1);
     if (!p) throw new NonTrovato('Prenotazione');
+    if (p.stato !== 'CONFERMATA') throw new ConflittoDati('Questa prenotazione è stata cancellata: il biglietto non è più valido.');
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
     if (!evento) throw new NonTrovato('Evento');
 
-    // Il biglietto vero diventa scaricabile solo nelle ultime 24 ore
-    // prima della partenza — prima di allora l'assegnazione del bus
-    // (dal riordino per fasce d'età) non è ancora definitiva. Se
-    // manca l'orario della fermata non posso calcolare la soglia con
-    // precisione: in quel caso lascio passare (meglio permettere il
-    // download che bloccarlo per un dato mancante).
-    if (p.fermataOrario) {
-      const [ore, minuti] = p.fermataOrario.split(':').map(Number);
-      if (!Number.isNaN(ore) && !Number.isNaN(minuti)) {
-        const partenzaVera = new Date(evento.data);
-        partenzaVera.setHours(ore, minuti, 0, 0);
-        const oreAllaPartenza = (partenzaVera.getTime() - Date.now()) / 3600000;
-        if (oreAllaPartenza > 24) {
-          throw new ConflittoDati(`Il biglietto sarà scaricabile a partire dalle 24 ore prima della partenza (${partenzaVera.toLocaleString('it-IT', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}).`);
-        }
-      }
+    const tempi = await tempiPrenotazione(p);
+    if (tempi && Date.now() < tempi.disponibileDal.getTime()) {
+      throw new ConflittoDati(`Il biglietto sarà scaricabile dal ${dataEOra(tempi.disponibileDal)}, quando i passeggeri saranno assegnati ai bus: ti arriverà anche via email.`);
+    }
+    const bus = await busDellaPrenotazione(p.busId);
+    if (!bus) {
+      throw new ConflittoDati('Il biglietto non è ancora scaricabile: stiamo assegnando i passeggeri ai bus. Appena è pronto ti arriva anche via email.');
     }
 
-    let nomeBus: string | null = null;
-    if (p.busId) {
-      const [bus] = await db.select({ riferimento: busFisici.riferimento }).from(busFisici).where(eq(busFisici.id, p.busId)).limit(1);
-      nomeBus = bus?.riferimento ?? null;
-    }
-
-    const layoutIdEffettivo = await risolviLayoutBigliettoId(p.whiteLabelId, evento.layoutBigliettoId);
-    const config = await layoutBigliettoService.getPerEvento(layoutIdEffettivo);
-    const configEffettiva = evento.ticketColoreAccento ? { ...config, coloreAccento: evento.ticketColoreAccento } : config;
-    const qrDataUrl = await QRCode.toDataURL(`ONWAY:TICKET:${p.pnr}:${token}`, { margin: 1, width: 300 });
-    const pdfBuffer = await disegnaBigliettoPdf(configEffettiva, {
-      artista: evento.artista,
-      dataEvento: evento.data,
-      fermataCitta: p.fermataCitta,
-      fermataOrario: p.fermataOrario,
-      passeggeriNomi: [`${pt.nome} ${pt.cognome}`],
-      pnr: p.pnr,
-      qrDataUrl,
-      immagineIntestazioneUrl: evento.ticketImmagineSfondoUrl,
-      nomeBus,
-    });
+    const config = await configurazioneBiglietto(p, evento);
+    const pdfBuffer = await pdfPartecipante(config, p, evento, pt, tempi?.orarioFermata ?? null, etichettaBus(bus));
     const nomeFile = `biglietto-${p.pnr}-${pt.nome}-${pt.cognome}`.replace(/[^a-zA-Z0-9-]+/g, '-') + '.pdf';
     return { pdfBuffer, nomeFile };
   },

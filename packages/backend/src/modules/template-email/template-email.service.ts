@@ -61,24 +61,47 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
         <li><b>PNR:</b> {{pnr}}</li>
         <li><b>Partenza da:</b> {{fermata}} alle {{orario}}</li>
         <li><b>Passeggeri:</b> {{passeggeri}}</li>
-        <li><b>Totale:</b> €{{totale}} (acconto — il saldo va completato entro la scadenza indicata via email; il biglietto vero arriverà via email a saldo completato)</li>
+        <li><b>Totale:</b> €{{totale}} (acconto — il saldo va completato entro la scadenza indicata via email)</li>
       </ul>
       <p>Puoi completare il saldo in qualsiasi momento da <a href="{{link_saldo}}">questa pagina</a>, con già tutti i tuoi dati e la cifra da versare pronti.</p>
+      <p>Dopo il saldo, il biglietto con il bus su cui viaggerai ti arriverà via email il giorno prima della partenza: da quel momento potrai scaricarlo anche dalla tua area personale.</p>
       <p>A presto!</p>
     `,
     segnaposto: ['nome', 'pnr', 'fermata', 'orario', 'passeggeri', 'totale', 'evento', 'link_saldo'],
   },
   {
+    chiave: 'conferma_pagamento',
+    nome: 'Conferma pagamento (pagamento completo o saldo, senza biglietto)',
+    oggetto: 'Pagamento ricevuto — {{evento}}',
+    corpo: `
+      <p>Ciao {{nome}},</p>
+      <p>abbiamo ricevuto il tuo pagamento: la prenotazione per <b>{{evento}}</b> del {{data}} è confermata.</p>
+      <ul>
+        <li><b>PNR:</b> {{pnr}}</li>
+        <li><b>Partenza da:</b> {{fermata}}</li>
+        <li><b>Importo pagato:</b> {{importo}}</li>
+      </ul>
+      <p>Il biglietto, con il bus su cui viaggerai, ti arriverà via email il giorno prima della partenza, quando assegniamo i passeggeri ai bus. Sarà scaricabile anche dalla tua area personale dal {{disponibileDal}}.</p>
+      <p>A presto!</p>
+    `,
+    segnaposto: ['nome', 'evento', 'data', 'fermata', 'pnr', 'importo', 'disponibileDal'],
+  },
+  {
     chiave: 'ticket',
     nome: 'Biglietto digitale (PDF con QR in allegato)',
-    oggetto: 'Il tuo biglietto — PNR {{pnr}}',
+    oggetto: 'Il tuo biglietto e il tuo bus — PNR {{pnr}}',
     corpo: `
-      <p>Ciao,</p>
-      <p>ecco il tuo biglietto digitale per <b>{{evento}}</b> — trovi tutto in allegato (PDF con QR).</p>
-      <p>Mostralo al momento della salita sul bus, anche direttamente dallo schermo del telefono.</p>
-      <p>PNR: <b>{{pnr}}</b></p>
+      <p>Ciao {{nome}},</p>
+      <p>ecco il tuo biglietto per <b>{{evento}}</b> del {{data}}: in allegato trovi un PDF con QR per ogni passeggero.</p>
+      <ul>
+        <li><b>Il tuo bus:</b> {{bus}}</li>
+        <li><b>Partenza da:</b> {{fermata}} alle {{orario}}</li>
+        <li><b>PNR:</b> {{pnr}}</li>
+      </ul>
+      <p>Sali sul bus indicato e mostra il QR al tour leader, anche direttamente dallo schermo del telefono. Puoi scaricare di nuovo i biglietti in qualsiasi momento dalla tua area personale.</p>
+      <p>Buon viaggio!</p>
     `,
-    segnaposto: ['evento', 'pnr'],
+    segnaposto: ['nome', 'evento', 'data', 'fermata', 'orario', 'bus', 'pnr'],
   },
   {
     chiave: 'promemoria_saldo',
@@ -144,7 +167,7 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
       <p>Ciao {{nome}},</p>
       <p>Grazie! Hai acquistato il bundle <b>{{bundle}}</b>: {{eventi}}.</p>
       <p>Totale originale {{totaleOriginale}} — sconto bundle {{sconto}} — <b>totale {{totale}}</b>.</p>
-      <p>Riceverai una conferma e un biglietto separati per ogni evento.</p>
+      <p>Riceverai una conferma separata per ogni evento; i biglietti, con il bus assegnato, ti arriveranno via email il giorno prima di ogni partenza.</p>
     `,
     segnaposto: ['nome', 'bundle', 'eventi', 'totaleOriginale', 'sconto', 'totale'],
   },
@@ -262,12 +285,45 @@ const VECCHIO_CORPO_PREVENTIVO_NON_SCELTO = `
       <p>Grazie per il preventivo inviato — per questo tragitto abbiamo scelto un altro fornitore. Ci teniamo comunque a ringraziarla per la disponibilità, e restiamo a disposizione per le prossime richieste.</p>
     `;
 
+/** Testi di base di prima che il biglietto partisse solo dopo lo
+ *  smistamento sui bus (il giorno prima della partenza): promettevano il
+ *  biglietto a saldo completato / subito, e il biglietto non citava il bus. */
+const VECCHIO_CORPO_CONFERMA_ACCONTO_BIGLIETTO_A_SALDO = `
+      <p>Ciao {{nome}},</p>
+      <p>La tua prenotazione è confermata! Ecco i dettagli:</p>
+      <ul>
+        <li><b>PNR:</b> {{pnr}}</li>
+        <li><b>Partenza da:</b> {{fermata}} alle {{orario}}</li>
+        <li><b>Passeggeri:</b> {{passeggeri}}</li>
+        <li><b>Totale:</b> €{{totale}} (acconto — il saldo va completato entro la scadenza indicata via email; il biglietto vero arriverà via email a saldo completato)</li>
+      </ul>
+      <p>Puoi completare il saldo in qualsiasi momento da <a href="{{link_saldo}}">questa pagina</a>, con già tutti i tuoi dati e la cifra da versare pronti.</p>
+      <p>A presto!</p>
+    `;
+const VECCHIO_OGGETTO_TICKET = 'Il tuo biglietto — PNR {{pnr}}';
+const VECCHIO_CORPO_TICKET = `
+      <p>Ciao,</p>
+      <p>ecco il tuo biglietto digitale per <b>{{evento}}</b> — trovi tutto in allegato (PDF con QR).</p>
+      <p>Mostralo al momento della salita sul bus, anche direttamente dallo schermo del telefono.</p>
+      <p>PNR: <b>{{pnr}}</b></p>
+    `;
+const VECCHIO_CORPO_BUNDLE_CONFERMA = `
+      <p>Ciao {{nome}},</p>
+      <p>Grazie! Hai acquistato il bundle <b>{{bundle}}</b>: {{eventi}}.</p>
+      <p>Totale originale {{totaleOriginale}} — sconto bundle {{sconto}} — <b>totale {{totale}}</b>.</p>
+      <p>Riceverai una conferma e un biglietto separati per ogni evento.</p>
+    `;
+
 /** Testi di base cambiati nel tempo: si portano al testo nuovo SOLO se
- *  la riga salvata è ancora esattamente il vecchio testo di base (mai
- *  toccata dal gestionale). Una modifica vera resta sempre com'è. */
+ *  la riga salvata è ancora esattamente un vecchio testo di base (mai
+ *  toccata dal gestionale). Una modifica vera resta sempre com'è. Una
+ *  chiave può comparire più volte (un testo per ogni vecchia versione). */
 const AGGIORNAMENTI_TESTO_BASE: { chiave: string; vecchioOggetto?: string; vecchioCorpo: string }[] = [
   { chiave: 'conferma_acconto', vecchioCorpo: VECCHIO_CORPO_CONFERMA_ACCONTO },
+  { chiave: 'conferma_acconto', vecchioCorpo: VECCHIO_CORPO_CONFERMA_ACCONTO_BIGLIETTO_A_SALDO },
   { chiave: 'preventivo_non_scelto', vecchioOggetto: VECCHIO_OGGETTO_PREVENTIVO_NON_SCELTO, vecchioCorpo: VECCHIO_CORPO_PREVENTIVO_NON_SCELTO },
+  { chiave: 'ticket', vecchioOggetto: VECCHIO_OGGETTO_TICKET, vecchioCorpo: VECCHIO_CORPO_TICKET },
+  { chiave: 'bundle_conferma', vecchioCorpo: VECCHIO_CORPO_BUNDLE_CONFERMA },
 ];
 
 /** Da chiamare una volta all'avvio del server (come già si fa per i
@@ -284,8 +340,8 @@ export async function sincronizzaTemplateEmail() {
       await db.insert(templateEmail).values({ chiave: modello.chiave, nome: modello.nome, oggetto: modello.oggetto, corpo: modello.corpo });
       continue;
     }
-    const aggiornamento = AGGIORNAMENTI_TESTO_BASE.find((a) => a.chiave === modello.chiave);
-    if (aggiornamento && esistente.corpo === aggiornamento.vecchioCorpo) {
+    const aggiornamento = AGGIORNAMENTI_TESTO_BASE.find((a) => a.chiave === modello.chiave && a.vecchioCorpo === esistente.corpo);
+    if (aggiornamento) {
       await db.update(templateEmail).set({
         corpo: modello.corpo,
         ...(aggiornamento.vecchioOggetto !== undefined && esistente.oggetto === aggiornamento.vecchioOggetto && { oggetto: modello.oggetto }),

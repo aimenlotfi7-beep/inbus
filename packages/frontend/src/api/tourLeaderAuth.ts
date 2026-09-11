@@ -1,3 +1,8 @@
+import { scaricaBlob } from './client';
+import type { PasseggeroBus } from './eventi';
+
+export type { PasseggeroBus };
+
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 const CHIAVE_TOKEN = 'inbus_tourleader_token';
 const CHIAVE_NOME = 'inbus_tourleader_nome';
@@ -51,14 +56,25 @@ export interface BusAssegnato {
 }
 export interface StatoBus {
   riferimento: string;
-  totale: number;
+  totale: number; // passeggeri assegnati a questo bus dallo smistamento
   saliti: number;
 }
+/** bus_sbagliato: la prenotazione è su un altro bus (busGiusto = il suo
+ *  riferimento) o non ancora su nessuno (busGiusto null); messaggio già
+ *  pronto da mostrare. */
 export type EsitoScansione =
   | { esito: 'valido'; nome: string }
   | { esito: 'gia_a_bordo'; nome: string }
-  | { esito: 'bus_sbagliato' }
+  | { esito: 'bus_sbagliato'; nome: string; busGiusto: string | null; messaggio: string }
   | { esito: 'non_valido' };
+
+/** La lista del bus: disponibile solo da 24 ore prima della partenza
+ *  (prima disponibile false, lista vuota e disponibileDal ISO). */
+export interface ListaPasseggeriBus {
+  disponibile: boolean;
+  disponibileDal: string | null;
+  passeggeri: PasseggeroBus[];
+}
 
 export const controlloAccessiApi = {
   busAssegnati: () => chiamata<BusAssegnato[]>('/api/controllo-accessi/bus'),
@@ -68,9 +84,22 @@ export const controlloAccessiApi = {
       method: 'POST',
       body: JSON.stringify({ token }),
     }),
-  cerca: (q: string) => chiamata<RisultatoRicerca[]>(`/api/controllo-accessi/cerca?q=${encodeURIComponent(q)}`),
-  checkinManuale: (partecipanteId: string) =>
-    chiamata<{ nome: string }>('/api/controllo-accessi/checkin-manuale', { method: 'POST', body: JSON.stringify({ partecipanteId }) }),
+  // busId facoltativo: con il bus, "valido" vuol dire "su questo bus";
+  // senza, "su uno dei miei bus".
+  cerca: (q: string, busId?: string) =>
+    chiamata<RisultatoRicerca[]>(`/api/controllo-accessi/cerca?q=${encodeURIComponent(q)}${busId ? `&busId=${encodeURIComponent(busId)}` : ''}`),
+  // 403 con un messaggio che indica il bus giusto se il passeggero è altrove.
+  checkinManuale: (partecipanteId: string, busId?: string) =>
+    chiamata<{ nome: string }>('/api/controllo-accessi/checkin-manuale', { method: 'POST', body: JSON.stringify({ partecipanteId, busId }) }),
+  listaPasseggeri: (busId: string) => chiamata<ListaPasseggeriBus>(`/api/controllo-accessi/bus/${busId}/passeggeri`),
+  // Stesso dato della scansione e del check-in manuale; 403 se il
+  // passeggero non è di quel bus.
+  segnaSalito: (busId: string, passeggeroId: string, salito: boolean) =>
+    chiamata<{ salito: boolean }>(`/api/controllo-accessi/bus/${busId}/passeggeri/${passeggeroId}/salito`, {
+      method: 'PUT',
+      body: JSON.stringify({ salito }),
+    }),
+  scaricaPdfPasseggeri: (busId: string): Promise<Blob> => scaricaBlob(`/api/controllo-accessi/bus/${busId}/passeggeri/pdf`, CHIAVE_TOKEN),
 };
 
 export interface RisultatoRicerca {
@@ -80,4 +109,8 @@ export interface RisultatoRicerca {
   pnr: string;
   fermataCitta: string;
   giaSalito: boolean;
+  busId: string | null; // il bus assegnato dallo smistamento
+  bus: string | null;   // il suo riferimento (targa)
+  valido: boolean;      // il check-in si può fare
+  messaggio: string | null; // se non valido: dove viaggia davvero
 }

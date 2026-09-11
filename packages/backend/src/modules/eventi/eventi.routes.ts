@@ -72,10 +72,13 @@ eventiRouter.post('/:id/linee', richiedeAuth, richiedePermesso('eventi.crea'), v
 eventiRouter.post('/linee/:lineaId/bus', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiungiBusALineaSchema), asyncHandler(eventiController.aggiungiBusALinea));
 eventiRouter.put('/:id/linee/:lineaId/percorso', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaPercorsoLineaSchema), asyncHandler(eventiController.aggiornaPercorsoLinea));
 eventiRouter.put('/linee/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaBusDiLineaSchema), asyncHandler(eventiController.aggiornaBusDiLinea));
+// Elimina una linea con i suoi bus (i passeggeri tornano senza bus). Non
+// esiste più l'assegnazione a mano ("versa"): decide solo lo smistamento.
+eventiRouter.delete('/linee/:lineaId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.eliminaLinea));
 eventiRouter.get('/tragitti/:tragittoId/linee', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaLinee));
+eventiRouter.get('/tragitti/:tragittoId/anteprima-smistamento', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.anteprimaSmistamento));
 eventiRouter.get('/tragitti/:tragittoId/vendite', richiedeAuth, richiedePermesso('eventi.economia'), asyncHandler(eventiController.venditePerFermata));
 eventiRouter.get('/tragitti/:tragittoId/suggerimento-linea', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.suggerimentoLinea));
-eventiRouter.post('/linee/:lineaId/versa', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.versaLinea));
 eventiRouter.put('/tragitti/:tragittoId/operativo', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaTragittoOperativoSchema), asyncHandler(eventiController.aggiornaTragittoOperativo));
 // Anteprima delle variazioni (e di quanti clienti verrebbero avvisati)
 // per lo stesso corpo del PUT qui sopra — nessuna scrittura.
@@ -84,4 +87,5 @@ eventiRouter.put('/tragitti/:tragittoId/preventivo', richiedeAuth, richiedePerme
 eventiRouter.put('/tragitti/:tragittoId/prezzi-vendita', richiedeAuth, richiedePermesso('eventi.crea'), valida(calcolaPrezziVenditaSchema), asyncHandler(eventiController.calcolaPrezziVendita));
 eventiRouter.delete('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.rimuoviBus));
 eventiRouter.get('/:id/bus/:busId/passeggeri', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaPasseggeriBus));
+eventiRouter.get('/:id/bus/:busId/passeggeri/pdf', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.pdfPasseggeriBus));
 eventiRouter.get('/:id/riepilogo-economico', richiedeAuth, richiedePermesso('eventi.economia'), asyncHandler(eventiController.riepilogoEconomico));

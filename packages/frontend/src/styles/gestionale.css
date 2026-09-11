@@ -545,6 +545,38 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 }
 /* Sfondo delle cartine (vedi sfondoMappa.ts): colori smorzati. */
 .sfondo-mappa{filter:saturate(.35) brightness(1.04);}
+
+/* ---------- LINEE DI UN TRAGITTO (Partenze → Da confermare) ---------- */
+/* In alto i numeri per decidere, poi un solo "prossimo passo", poi
+   fermate in tabella e linee con dentro i loro bus e i moduli. */
+.riepilogo-numeri{display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:14px;}
+.riepilogo-numero{background:var(--dusk-2); border-radius:10px; padding:10px 12px; min-width:0;}
+.riepilogo-numero span{display:block; font-size:var(--testo-sm); color:var(--mist);}
+.riepilogo-numero b{display:block; font-size:var(--testo-2xl); font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums;}
+.prossimo-passo{display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:18px;}
+.prossimo-passo p{margin:0;}
+.prossimo-passo .titolo{font-weight:700; margin-bottom:2px;}
+.prossimo-passo.azione{background:var(--blue-dim); border-color:var(--blue);}
+.prossimo-passo.avviso{background:color-mix(in srgb, var(--amber) 12%, transparent); border-color:var(--amber);}
+.prossimo-passo.info{background:var(--dusk-2);}
+.tabella-righe{border:1px solid var(--line); border-radius:12px; margin-bottom:18px;}
+.tabella-righe .riga{display:grid; grid-template-columns:minmax(0,1fr) 70px 80px 80px 44px; gap:8px; align-items:center; padding:8px 12px; border-top:1px solid var(--line); font-size:var(--testo-base);}
+.tabella-righe .riga:first-child{border-top:none;}
+.tabella-righe .riga.intestazione{font-size:var(--testo-xs); color:var(--mist); text-transform:uppercase; letter-spacing:.3px; background:var(--dusk-2); border-radius:12px 12px 0 0;}
+.tabella-righe .riga.spenta{color:var(--mist);}
+.tabella-righe .num{text-align:right; font-variant-numeric:tabular-nums;}
+.scheda-linea{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:var(--dusk);}
+.scheda-linea .riga-bus{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-top:1px solid var(--line); margin-top:10px; padding-top:10px;}
+.scheda-linea .pannello-in-linea{background:var(--dusk-2); border-radius:10px; padding:12px; margin-top:10px;}
+.nota-margine{font-size:var(--testo-md); margin:-4px 0 12px;}
+.menu-azioni{position:relative; display:inline-block;}
+.menu-azioni-voci{position:absolute; right:0; top:calc(100% + 4px); z-index:30; min-width:190px; padding:4px; display:flex; flex-direction:column; background:var(--dusk); border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12);}
+.menu-azioni-voci button{background:none; border:none; text-align:left; padding:8px 10px; border-radius:6px; font-family:inherit; font-size:var(--testo-md); color:var(--paper); cursor:pointer;}
+.menu-azioni-voci button:hover{background:var(--dusk-2);}
+.menu-azioni-voci button.pericolosa{color:var(--pink);}
+@media (max-width:600px){
+  .tabella-righe .riga{grid-template-columns:minmax(0,1fr) 52px 62px 58px 36px; gap:6px; font-size:var(--testo-md);}
+}
 .badge{padding:3px 10px; border-radius:999px; font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:.5px;}
 /* Varianti a sfondo pieno (testo sempre bianco) per le etichette di
    stato dentro Partenze — verde/arancio/rosso, non il pattern

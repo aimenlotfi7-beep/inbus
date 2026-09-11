@@ -1,7 +1,10 @@
 import { eq, inArray, and, isNull, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { busFisici, linee, lineaFermate, fermate, tragitti, eventi, prenotazioni, partecipantiPrenotazione } from '../../db/schema.js';
-import { NonTrovato, VietatoDaiPermessi } from '../../shared/errors.js';
+import { busFisici, linee, tragitti, eventi, prenotazioni, partecipantiPrenotazione } from '../../db/schema.js';
+import { ConflittoDati, NonTrovato, VietatoDaiPermessi } from '../../shared/errors.js';
+import { formattaData, formattaOra } from '../../shared/formato.js';
+import { tempiBus } from '../prenotazioni/partenza.js';
+import { generaPdfPasseggeriBus, leggiSchedaBus, passeggeriDelBus, type PasseggeroBus } from '../eventi/passeggeri-bus.service.js';
 
 /** Verifica che il bus appartenga davvero a questo tour leader — ogni
  *  funzione qui sotto la richiama per prima cosa, così un tour leader
@@ -14,35 +17,32 @@ async function verificaProprietaBus(busId: string, tourLeaderId: string) {
   return bus;
 }
 
-/** Cosa copre davvero questo bus — il tragitto E le fermate specifiche
- *  (via la sua Linea), non più l'intero tragitto come col vecchio
- *  sistema. Un bus può condividere il tragitto con un ALTRO bus (Linee
- *  diverse dello stesso tragitto, es. una per le fermate del nord e
- *  una per quelle del sud) — controllare solo il tragitto avrebbe
- *  lasciato salire un passeggero sul bus sbagliato. */
-async function coperturaDelBus(busId: string): Promise<{ tragittoId: string; fermateCitta: string[] } | null> {
-  const [bus] = await db.select({ lineaId: busFisici.lineaId }).from(busFisici).where(eq(busFisici.id, busId)).limit(1);
-  if (!bus?.lineaId) return null;
-  const [lineaVera] = await db.select().from(linee).where(eq(linee.id, bus.lineaId)).limit(1);
-  if (!lineaVera) return null;
-  const righeFermate = await db.select({ citta: fermate.citta }).from(lineaFermate)
-    .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
-    .where(eq(lineaFermate.lineaId, bus.lineaId));
-  return { tragittoId: lineaVera.tragittoId, fermateCitta: righeFermate.map((f) => f.citta) };
+/** I bus di questo tour leader, con il tragitto della loro linea. */
+async function busDelTourLeader(tourLeaderId: string) {
+  return db.select({ id: busFisici.id, riferimento: busFisici.riferimento, tragittoId: linee.tragittoId }).from(busFisici)
+    .innerJoin(linee, eq(linee.id, busFisici.lineaId))
+    .where(eq(busFisici.tourLeaderId, tourLeaderId));
 }
 
-/** Stessa cosa di coperturaDelBus, ma per TUTTI i bus di un tour
- *  leader insieme — usata dove serve cercare/validare senza sapere a
- *  priori su quale bus specifico (ricerca manuale, check-in manuale). */
-async function coperturaCompleta(tourLeaderId: string): Promise<Set<string>> {
-  const busIds = (await db.select({ id: busFisici.id }).from(busFisici).where(eq(busFisici.tourLeaderId, tourLeaderId))).map((b) => b.id);
-  const chiavi = new Set<string>();
-  for (const busId of busIds) {
-    const copertura = await coperturaDelBus(busId);
-    if (!copertura) continue;
-    for (const citta of copertura.fermateCitta) chiavi.add(`${copertura.tragittoId}::${citta}`);
-  }
-  return chiavi;
+/** Riferimento (targa) di ogni bus indicato. */
+async function riferimentiBus(busIds: (string | null)[]): Promise<Map<string, string>> {
+  const ids = [...new Set(busIds.filter((id): id is string => !!id))];
+  if (ids.length === 0) return new Map();
+  const righe = await db.select({ id: busFisici.id, riferimento: busFisici.riferimento }).from(busFisici).where(inArray(busFisici.id, ids));
+  return new Map(righe.map((r) => [r.id, r.riferimento]));
+}
+
+/** Per un passeggero che non è su questo bus: dice qual è quello giusto. */
+function messaggioBusSbagliato(nome: string, busGiusto: string | null): string {
+  return busGiusto ? `${nome} viaggia sul bus ${busGiusto}, non su questo.` : `${nome} non è ancora assegnato a nessun bus.`;
+}
+
+/** La lista del bus si vede da 24 ore prima della sua partenza (la prima
+ *  fermata della linea, ora di Roma): prima lo smistamento non è avvenuto. */
+async function disponibilitaLista(busId: string) {
+  const tempi = await tempiBus(busId);
+  const disponibileDal = tempi?.disponibileDal ?? null;
+  return { disponibile: disponibileDal !== null && Date.now() >= disponibileDal.getTime(), disponibileDal };
 }
 
 export const controlloAccessiService = {
@@ -67,50 +67,32 @@ export const controlloAccessiService = {
     return righe.sort((a, b) => +new Date(a.eventoData) - +new Date(b.eventoData));
   },
 
-  /** Contatore in tempo reale: quanti passeggeri attesi su questo bus,
-   *  quanti sono già saliti (scansionati almeno una volta). */
+  /** Contatore in tempo reale: quanti passeggeri sono assegnati a questo
+   *  bus dallo smistamento, quanti sono già saliti. */
   async statoBus(busId: string, tourLeaderId: string) {
     const bus = await verificaProprietaBus(busId, tourLeaderId);
-    const copertura = await coperturaDelBus(busId);
-    if (!copertura || copertura.fermateCitta.length === 0) return { riferimento: bus.riferimento, totale: 0, saliti: 0 };
-
-    const prenotazioniBus = await db
-      .select({ id: prenotazioni.id })
-      .from(prenotazioni)
-      .where(and(
-        eq(prenotazioni.tragittoId, copertura.tragittoId),
-        inArray(prenotazioni.fermataCitta, copertura.fermateCitta),
-        eq(prenotazioni.stato, 'CONFERMATA'),
-      ));
-    const prenotazioniIds = prenotazioniBus.map((p) => p.id);
-    if (prenotazioniIds.length === 0) return { riferimento: bus.riferimento, totale: 0, saliti: 0 };
-
-    const [{ totale }] = await db
-      .select({ totale: sql<number>`count(*)::int` })
+    const [conteggio] = await db
+      .select({
+        totale: sql<number>`count(*)::int`,
+        saliti: sql<number>`count(${partecipantiPrenotazione.ticketUtilizzatoIl})::int`,
+      })
       .from(partecipantiPrenotazione)
-      .where(inArray(partecipantiPrenotazione.prenotazioneId, prenotazioniIds));
-    const [{ saliti }] = await db
-      .select({ saliti: sql<number>`count(*)::int` })
-      .from(partecipantiPrenotazione)
-      .where(and(
-        inArray(partecipantiPrenotazione.prenotazioneId, prenotazioniIds),
-        sql`${partecipantiPrenotazione.ticketUtilizzatoIl} is not null`,
-      ));
-
-    return { riferimento: bus.riferimento, totale, saliti };
+      .innerJoin(prenotazioni, eq(prenotazioni.id, partecipantiPrenotazione.prenotazioneId))
+      .where(and(eq(prenotazioni.busId, busId), eq(prenotazioni.stato, 'CONFERMATA')));
+    return { riferimento: bus.riferimento, totale: conteggio?.totale ?? 0, saliti: conteggio?.saliti ?? 0 };
   },
 
   /** Scansiona un QR — restituisce sempre un esito chiaro, mai un
    *  errore HTTP "secco": è pensata per essere usata in movimento, sul
-   *  bus, dove serve un feedback immediato e leggibile a schermo. */
+   *  bus, dove serve un feedback immediato e leggibile a schermo. Valido
+   *  solo se la prenotazione è assegnata a QUESTO bus. */
   async scansiona(busId: string, tourLeaderId: string, token: string): Promise<
     | { esito: 'valido'; nome: string }
     | { esito: 'gia_a_bordo'; nome: string }
-    | { esito: 'bus_sbagliato' }
+    | { esito: 'bus_sbagliato'; nome: string; busGiusto: string | null; messaggio: string }
     | { esito: 'non_valido' }
   > {
     await verificaProprietaBus(busId, tourLeaderId);
-    const copertura = await coperturaDelBus(busId);
 
     const [partecipante] = await db
       .select()
@@ -121,14 +103,12 @@ export const controlloAccessiService = {
 
     const [pren] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, partecipante.prenotazioneId)).limit(1);
     if (!pren || pren.stato !== 'CONFERMATA') return { esito: 'non_valido' };
-    // Deve combaciare sia il tragitto SIA la fermata specifica — un
-    // passeggero di una fermata coperta da un'ALTRA Linea dello stesso
-    // tragitto non sale su questo bus.
-    if (!copertura || pren.tragittoId !== copertura.tragittoId || !copertura.fermateCitta.includes(pren.fermataCitta)) {
-      return { esito: 'bus_sbagliato' };
-    }
 
     const nome = `${partecipante.nome} ${partecipante.cognome}`;
+    if (pren.busId !== busId) {
+      const busGiusto = pren.busId ? (await riferimentiBus([pren.busId])).get(pren.busId) ?? null : null;
+      return { esito: 'bus_sbagliato', nome, busGiusto, messaggio: messaggioBusSbagliato(nome, busGiusto) };
+    }
 
     // Atomico: la condizione "non ancora usato" si riverifica proprio
     // nel comando che lo segna usato — due scansioni quasi simultanee
@@ -144,69 +124,142 @@ export const controlloAccessiService = {
     return { esito: 'valido', nome };
   },
 
-  /** Cerca un passeggero per nome, cognome, PNR o email — su tutte le
-   *  tratte assegnate a questo tour leader, non solo un bus alla volta.
-   *  Serve per il check-in manuale quando il QR non si legge o il
-   *  cliente non ce l'ha a portata di mano. */
-  async cerca(tourLeaderId: string, query: string) {
-    const chiaviCoperte = await coperturaCompleta(tourLeaderId);
-    if (chiaviCoperte.size === 0 || query.trim().length < 2) return [];
-    const tragittiIds = [...new Set([...chiaviCoperte].map((c) => c.split('::')[0]))];
+  /** Cerca un passeggero per nome, cognome o PNR sui tragitti dei bus di
+   *  questo tour leader. Ogni risultato dice su quale bus viaggia e se il
+   *  check-in è valido: sul bus indicato (busId) oppure, senza busId, su
+   *  uno dei suoi bus. Serve per il check-in manuale quando il QR non si
+   *  legge o il cliente non ce l'ha a portata di mano. */
+  async cerca(tourLeaderId: string, query: string, busId?: string) {
+    const mieiBus = await busDelTourLeader(tourLeaderId);
+    if (busId && !mieiBus.some((b) => b.id === busId)) throw new VietatoDaiPermessi('Questo bus non ti è assegnato.');
+    const q = query.trim().toLowerCase();
+    if (mieiBus.length === 0 || q.length < 2) return [];
+    const tragittiIds = [...new Set(mieiBus.map((b) => b.tragittoId))];
+    const mieiBusIds = new Set(mieiBus.map((b) => b.id));
 
-    const prenotazioniAssegnate = (await db
+    const prenotazioniTragitti = await db
       .select()
       .from(prenotazioni)
-      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA'))))
-      .filter((p) => chiaviCoperte.has(`${p.tragittoId}::${p.fermataCitta}`));
-    if (!prenotazioniAssegnate.length) return [];
+      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')));
+    if (!prenotazioniTragitti.length) return [];
 
-    const prenotazioniPerId = new Map(prenotazioniAssegnate.map((p) => [p.id, p]));
+    const prenotazioniPerId = new Map(prenotazioniTragitti.map((p) => [p.id, p]));
     const partecipantiRighe = await db
       .select()
       .from(partecipantiPrenotazione)
       .where(inArray(partecipantiPrenotazione.prenotazioneId, Array.from(prenotazioniPerId.keys())));
 
-    const q = query.trim().toLowerCase();
-    return partecipantiRighe
-      .filter((p) => {
-        const pren = prenotazioniPerId.get(p.prenotazioneId)!;
-        return `${p.nome} ${p.cognome} ${pren.pnr}`.toLowerCase().includes(q);
-      })
-      .map((p) => {
-        const pren = prenotazioniPerId.get(p.prenotazioneId)!;
-        return {
-          partecipanteId: p.id,
-          nome: p.nome,
-          cognome: p.cognome,
-          pnr: pren.pnr,
-          fermataCitta: pren.fermataCitta,
-          giaSalito: !!p.ticketUtilizzatoIl,
-        };
-      })
+    const trovati = partecipantiRighe
+      .filter((p) => `${p.nome} ${p.cognome} ${prenotazioniPerId.get(p.prenotazioneId)!.pnr}`.toLowerCase().includes(q))
       .slice(0, 20);
+    const riferimenti = await riferimentiBus(trovati.map((p) => prenotazioniPerId.get(p.prenotazioneId)!.busId));
+
+    return trovati.map((p) => {
+      const pren = prenotazioniPerId.get(p.prenotazioneId)!;
+      const bus = pren.busId ? riferimenti.get(pren.busId) ?? null : null;
+      const valido = busId ? pren.busId === busId : pren.busId !== null && mieiBusIds.has(pren.busId);
+      const nome = `${p.nome} ${p.cognome}`;
+      let messaggio: string | null = null;
+      if (!valido) {
+        if (!pren.busId) messaggio = `${nome} non è ancora assegnato a nessun bus.`;
+        else if (mieiBusIds.has(pren.busId)) messaggio = `${nome} viaggia sul tuo bus ${bus}, non su questo.`;
+        else messaggio = `${nome} viaggia sul bus ${bus}, che non è assegnato a te.`;
+      }
+      return {
+        partecipanteId: p.id,
+        nome: p.nome,
+        cognome: p.cognome,
+        pnr: pren.pnr,
+        fermataCitta: pren.fermataCitta,
+        giaSalito: !!p.ticketUtilizzatoIl,
+        busId: pren.busId,
+        bus,
+        valido,
+        messaggio,
+      };
+    });
   },
 
   /** Check-in manuale — stesso identico effetto della scansione QR, ma
-   *  scelto dalla lista di ricerca invece che leggendo il codice. */
-  async checkinManuale(tourLeaderId: string, partecipanteId: string) {
+   *  scelto dalla lista di ricerca. Con busId: valido solo su quel bus;
+   *  senza: solo su uno dei bus di questo tour leader. */
+  async checkinManuale(tourLeaderId: string, partecipanteId: string, busId?: string) {
     const [partecipante] = await db.select().from(partecipantiPrenotazione).where(eq(partecipantiPrenotazione.id, partecipanteId)).limit(1);
     if (!partecipante) throw new NonTrovato('Passeggero');
     const [pren] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, partecipante.prenotazioneId)).limit(1);
     if (!pren) throw new NonTrovato('Prenotazione');
+    if (pren.stato !== 'CONFERMATA') throw new ConflittoDati('Questa prenotazione è stata cancellata: il biglietto non è valido.');
 
-    const chiaviCoperte = await coperturaCompleta(tourLeaderId);
-    if (!chiaviCoperte.has(`${pren.tragittoId}::${pren.fermataCitta}`)) {
-      throw new VietatoDaiPermessi('Questo passeggero non è su una tua tratta.');
+    const nome = `${partecipante.nome} ${partecipante.cognome}`;
+    const busGiusto = pren.busId ? (await riferimentiBus([pren.busId])).get(pren.busId) ?? null : null;
+    if (busId) {
+      await verificaProprietaBus(busId, tourLeaderId);
+      if (pren.busId !== busId) throw new VietatoDaiPermessi(messaggioBusSbagliato(nome, busGiusto));
+    } else {
+      const mieiBus = await busDelTourLeader(tourLeaderId);
+      if (!pren.busId || !mieiBus.some((b) => b.id === pren.busId)) {
+        throw new VietatoDaiPermessi(busGiusto ? `${nome} viaggia sul bus ${busGiusto}, che non è assegnato a te.` : `${nome} non è ancora assegnato a nessun bus.`);
+      }
     }
 
-    // Stesso motivo del controllo atomico in scansiona() qui sopra —
-    // anche se qui il danno pratico di una doppia corsa è minore (non
-    // cambia la risposta), resta comunque scorretto lasciare che due
-    // richieste quasi simultanee sovrascrivano lo stesso orario due
-    // volte invece di una.
+    // Stesso motivo del controllo atomico in scansiona(): due richieste
+    // quasi simultanee non sovrascrivono l'orario di salita due volte.
     await db.update(partecipantiPrenotazione)
       .set({ ticketUtilizzatoIl: new Date() })
       .where(and(eq(partecipantiPrenotazione.id, partecipanteId), isNull(partecipantiPrenotazione.ticketUtilizzatoIl)));
-    return { nome: `${partecipante.nome} ${partecipante.cognome}` };
+    return { nome };
+  },
+
+  /** La lista dei passeggeri del bus, da 24 ore prima della partenza; prima
+   *  disponibile: false e lista vuota. */
+  async listaPasseggeri(busId: string, tourLeaderId: string): Promise<{ disponibile: boolean; disponibileDal: string | null; passeggeri: PasseggeroBus[] }> {
+    await verificaProprietaBus(busId, tourLeaderId);
+    const { disponibile, disponibileDal } = await disponibilitaLista(busId);
+    const dal = disponibileDal ? disponibileDal.toISOString() : null;
+    if (!disponibile) return { disponibile: false, disponibileDal: dal, passeggeri: [] };
+    const scheda = await leggiSchedaBus(busId);
+    if (!scheda) throw new NonTrovato('Bus');
+    return { disponibile: true, disponibileDal: dal, passeggeri: await passeggeriDelBus(busId, scheda.tragittoId) };
+  },
+
+  /** Segna (o toglie) la salita dalla lista: lo stesso dato della
+   *  scansione del QR e del check-in manuale. 403 se il passeggero non è
+   *  di questo bus. */
+  async segnaSalito(busId: string, tourLeaderId: string, partecipanteId: string, salito: boolean): Promise<{ salito: boolean }> {
+    await verificaProprietaBus(busId, tourLeaderId);
+    const [partecipante] = await db.select().from(partecipantiPrenotazione).where(eq(partecipantiPrenotazione.id, partecipanteId)).limit(1);
+    if (!partecipante) throw new NonTrovato('Passeggero');
+    const [pren] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, partecipante.prenotazioneId)).limit(1);
+    const nome = `${partecipante.nome} ${partecipante.cognome}`;
+    if (!pren || pren.stato !== 'CONFERMATA') throw new VietatoDaiPermessi(`${nome} non è su questo bus: la prenotazione non è più valida.`);
+    if (pren.busId !== busId) {
+      const busGiusto = pren.busId ? (await riferimentiBus([pren.busId])).get(pren.busId) ?? null : null;
+      throw new VietatoDaiPermessi(messaggioBusSbagliato(nome, busGiusto));
+    }
+
+    if (salito) {
+      // Se era già segnato resta l'orario della prima salita.
+      await db.update(partecipantiPrenotazione)
+        .set({ ticketUtilizzatoIl: new Date() })
+        .where(and(eq(partecipantiPrenotazione.id, partecipanteId), isNull(partecipantiPrenotazione.ticketUtilizzatoIl)));
+    } else {
+      await db.update(partecipantiPrenotazione)
+        .set({ ticketUtilizzatoIl: null })
+        .where(eq(partecipantiPrenotazione.id, partecipanteId));
+    }
+    return { salito };
+  },
+
+  /** Il PDF della lista (lo stesso del gestionale), con la stessa regola
+   *  delle 24 ore della lista. */
+  async pdfPasseggeri(busId: string, tourLeaderId: string) {
+    await verificaProprietaBus(busId, tourLeaderId);
+    const { disponibile, disponibileDal } = await disponibilitaLista(busId);
+    if (!disponibile) {
+      throw new ConflittoDati(disponibileDal
+        ? `La lista passeggeri sarà disponibile dal ${formattaData(disponibileDal)} alle ${formattaOra(disponibileDal)}, dopo lo smistamento sui bus.`
+        : 'La lista passeggeri sarà disponibile il giorno prima della partenza, dopo lo smistamento sui bus.');
+    }
+    return generaPdfPasseggeriBus(busId);
   },
 };
