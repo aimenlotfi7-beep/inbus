@@ -33,6 +33,9 @@ export interface RisultatoGeocodifica {
   // indirizzo, se Nominatim la riconosce — usata per raggruppare
   // fornitori e fermate. null se non trovata o per indirizzi esteri.
   regione: string | null;
+  // Il comune ("Genova", "Cecina", ...), per mostrare a chi salva DOVE
+  // è stato trovato l'indirizzo. null se Nominatim non lo indica.
+  comune: string | null;
 }
 
 // Stessa richiesta ripetuta più volte nella stessa sessione (fermate
@@ -51,26 +54,28 @@ export async function geocodifica(indirizzo: string): Promise<RisultatoGeocodifi
     const res = await fetch(url, { headers: { 'Accept-Language': 'it' } });
     if (!res.ok) {
       console.error('Nominatim ha risposto con errore:', res.status, res.statusText);
-      return { coordinate: null, erroreRete: true, regione: null };
+      return { coordinate: null, erroreRete: true, regione: null, comune: null };
     }
     const risultati = await res.json();
     if (risultati?.[0]) {
+      const indirizzoTrovato = risultati[0].address ?? {};
       const trovato: RisultatoGeocodifica = {
         coordinate: { lat: Number(risultati[0].lat), lng: Number(risultati[0].lon) },
         erroreRete: false,
-        regione: risultati[0].address?.state ?? null,
+        regione: indirizzoTrovato.state ?? null,
+        comune: indirizzoTrovato.city ?? indirizzoTrovato.town ?? indirizzoTrovato.village ?? indirizzoTrovato.municipality ?? null,
       };
       cacheGeocodifica.set(chiave, trovato);
       return trovato;
     }
-    const nonTrovato: RisultatoGeocodifica = { coordinate: null, erroreRete: false, regione: null }; // richiesta riuscita, ma indirizzo non trovato
+    const nonTrovato: RisultatoGeocodifica = { coordinate: null, erroreRete: false, regione: null, comune: null }; // richiesta riuscita, ma indirizzo non trovato
     cacheGeocodifica.set(chiave, nonTrovato);
     return nonTrovato;
   } catch (e) {
     // Qui arrivano i problemi di rete/CORS/firewall: li stampo in console
     // per poterli diagnosticare (apri la Console del browser con F12).
     console.error('Geocodifica fallita per "' + indirizzo + '":', e);
-    return { coordinate: null, erroreRete: true, regione: null };
+    return { coordinate: null, erroreRete: true, regione: null, comune: null };
   }
 }
 

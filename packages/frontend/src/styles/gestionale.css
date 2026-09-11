@@ -522,6 +522,29 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
   color:var(--mist); padding:10px 12px; border-bottom:1px solid var(--line);
 }
 .data-table td{padding:10px 12px; border-bottom:1px solid var(--line);}
+/* Titoletto di gruppo dentro la tabella (es. la regione in Fornitori):
+   una sola tabella per tutti i gruppi, così le colonne restano allineate. */
+.data-table .riga-gruppo th{
+  font-family:'Poppins',sans-serif; font-size:var(--testo-lg); font-weight:700; text-transform:none;
+  color:var(--paper); padding:22px 12px 8px;
+}
+.data-table tbody .riga-gruppo:first-child th{padding-top:12px;}
+/* Colonne che seguono lo spazio vero della tabella, non la larghezza
+   della finestra (con o senza barra laterale lo spazio cambia in modo
+   diverso): "solo-largo" sparisce quando lo spazio è poco, "solo-stretto"
+   compare solo allora (es. Telefono ed Email unite in Contatti). */
+.table-scroll.adattiva{container-type:inline-size;}
+.data-table .solo-stretto{display:none;}
+.data-table .azioni-riga{white-space:nowrap;}
+@container (max-width:960px){
+  .data-table .solo-largo{display:none;}
+  .data-table .solo-stretto{display:table-cell;}
+  /* Con poco spazio anche Modifica ed Elimina vanno uno sotto l'altro. */
+  .data-table .azioni-riga{white-space:normal;}
+  .data-table .azioni-riga .btn{margin-block:2px;}
+}
+/* Sfondo delle cartine (vedi sfondoMappa.ts): colori smorzati. */
+.sfondo-mappa{filter:saturate(.35) brightness(1.04);}
 .badge{padding:3px 10px; border-radius:999px; font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:.5px;}
 /* Varianti a sfondo pieno (testo sempre bianco) per le etichette di
    stato dentro Partenze — verde/arancio/rosso, non il pattern

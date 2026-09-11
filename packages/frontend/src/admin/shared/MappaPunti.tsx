@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { geocodifica } from './geo';
 import { creaPinDiamante } from './pinMappa';
+import { aggiungiSfondoMappa } from './sfondoMappa';
 
 export interface PuntoMappa {
   id: string;
@@ -36,12 +37,7 @@ export function MappaPunti({ punti }: { punti: PuntoMappa[] }) {
 
       if (!mappaRef.current && contenitoreRef.current) {
         mappaRef.current = L.map(contenitoreRef.current);
-        // Stesso fornitore di tile usato nelle altre mappe del
-        // gestionale — stile coerente ovunque.
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-          attribution: '© OpenStreetMap © CARTO',
-          maxZoom: 19,
-        }).addTo(mappaRef.current);
+        aggiungiSfondoMappa(mappaRef.current);
       }
       const mappa = mappaRef.current;
       if (!mappa) { setStato('errore'); return; }

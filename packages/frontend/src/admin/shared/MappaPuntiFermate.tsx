@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { geocodifica } from './geo';
 import { creaPinDiamante } from './pinMappa';
+import { aggiungiSfondoMappa } from './sfondoMappa';
 
 export type CategoriaTesta = 'sempre' | 'mai' | 'a-volte';
 
@@ -50,12 +51,7 @@ export function MappaPuntiFermate({ punti }: { punti: PuntoFermataMappa[] }) {
 
       if (!mappaRef.current && contenitoreRef.current) {
         mappaRef.current = L.map(contenitoreRef.current);
-        // Stesso fornitore usato in MappaPercorso.tsx (CartoDB Positron)
-        // — stile coerente su tutte e due le mappe del gestionale.
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-          attribution: '© OpenStreetMap © CARTO',
-          maxZoom: 19,
-        }).addTo(mappaRef.current);
+        aggiungiSfondoMappa(mappaRef.current);
       }
       const mappa = mappaRef.current;
       if (!mappa) { setStato('errore'); return; }

@@ -27,17 +27,26 @@ export interface CampoExtraConfig {
   ordine: number;
 }
 
+/** Quante partenze, richieste di preventivo e bus puntano a un
+ *  fornitore: se almeno una, il server non lo lascia eliminare. */
+export interface CollegamentiFornitore {
+  partenze: number;
+  richiestePreventivo: number;
+  bus: number;
+}
+
 export const fornitoriApi = {
   list: () => api.get<Fornitore[]>('/api/fornitori'),
   create: (input: Partial<FornitoreInput>) => api.post<Fornitore>('/api/fornitori', input),
   update: (id: string, input: Partial<FornitoreInput>) => api.put<Fornitore>(`/api/fornitori/${id}`, input),
   remove: (id: string) => api.delete<void>(`/api/fornitori/${id}`),
+  collegamenti: (id: string) => api.get<CollegamentiFornitore>(`/api/fornitori/${id}/collegamenti`),
   cambiaStato: (id: string, stato: StatoFornitore) => api.put<Fornitore>(`/api/fornitori/${id}/stato`, { stato }),
   contaInAttesa: () => api.get<{ conteggio: number }>('/api/fornitori/conta-in-attesa'),
   // Pubbliche — nessun accesso da amministratore, usate dal form di
   // autoregistrazione (fuori dall'area /admin).
   campiExtraConfig: () => api.get<CampoExtraConfig[]>('/api/fornitori/campi-extra-config'),
-  registrazionePubblica: (input: { nome: string; partitaIva?: string; referente?: string; telefono?: string; email: string; indirizzo: string; lat?: number; lng?: number; campiExtra?: { etichetta: string; valore: string }[] }) =>
+  registrazionePubblica: (input: { nome: string; partitaIva?: string; referente?: string; telefono?: string; email: string; indirizzo: string; lat?: number; lng?: number; regione?: string; campiExtra?: { etichetta: string; valore: string }[] }) =>
     api.post<Fornitore>('/api/fornitori/registrazione', input),
   // Gestione dei campi extra configurabili — schermata admin.
   creaCampoExtraConfig: (input: { etichetta: string; ordine?: number }) => api.post<CampoExtraConfig>('/api/fornitori/campi-extra-config', input),

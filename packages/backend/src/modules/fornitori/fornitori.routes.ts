@@ -1,9 +1,9 @@
 import { Router, type Request, type Response } from 'express';
-import { eq, count } from 'drizzle-orm';
+import { eq, count, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
-import { fornitori, fornitoriCampiExtraConfig } from '../../db/schema.js';
-import { NonTrovato } from '../../shared/errors.js';
+import { fornitori, fornitoriCampiExtraConfig, tragitti, preventiviRichieste, busFisici } from '../../db/schema.js';
+import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
@@ -51,9 +51,24 @@ async function getById(id: string) {
   return f;
 }
 
+// Cosa punta a questo fornitore. Eliminarlo cancellerebbe lo storico
+// delle richieste di preventivo (onDelete cascade) e lascerebbe partenze
+// e bus senza fornitore (set null): con anche un solo collegamento
+// l'eliminazione è bloccata, e il gestionale propone di disattivarlo.
+async function collegamenti(id: string) {
+  await getById(id);
+  const [[partenze], [richiestePreventivo], [bus]] = await Promise.all([
+    db.select({ valore: count() }).from(tragitti).where(eq(tragitti.fornitoreId, id)),
+    db.select({ valore: count() }).from(preventiviRichieste).where(eq(preventiviRichieste.fornitoreId, id)),
+    db.select({ valore: count() }).from(busFisici).where(eq(busFisici.fornitoreId, id)),
+  ]);
+  return { partenze: partenze.valore, richiestePreventivo: richiestePreventivo.valore, bus: bus.valore };
+}
+
 export const fornitoriService = {
   list: () => db.select().from(fornitori),
   getById,
+  collegamenti,
   // Creato dall'admin da questa schermata — nasce già APPROVATO (il
   // default della colonna), l'approvazione manuale serve solo a chi
   // arriva dal form pubblico di autoregistrazione qui sotto.
@@ -67,7 +82,10 @@ export const fornitoriService = {
     return aggiornato;
   },
   remove: async (id: string) => {
-    await getById(id);
+    const c = await collegamenti(id);
+    if (c.partenze + c.richiestePreventivo + c.bus > 0) {
+      throw new ConflittoDati('Non si può eliminare: il fornitore è collegato a partenze, preventivi o bus e si perderebbe lo storico. Disattivalo invece.');
+    }
     await db.delete(fornitori).where(eq(fornitori.id, id));
   },
   cambiaStato: async (id: string, stato: 'IN_ATTESA' | 'APPROVATO' | 'DISATTIVATO') => {
@@ -80,7 +98,13 @@ export const fornitoriService = {
     return valore;
   },
   registraPubblico: async (input: z.infer<typeof registrazioneSchema>) => {
-    const [nuovo] = await db.insert(fornitori).values({ ...input, stato: 'IN_ATTESA' }).returning();
+    // Una sola registrazione per email: chi reinvia il form non crea
+    // doppioni da approvare. Confronto senza maiuscole, come le email.
+    const email = input.email.trim();
+    const [giaRegistrato] = await db.select({ id: fornitori.id }).from(fornitori)
+      .where(sql`lower(${fornitori.email}) = ${email.toLowerCase()}`).limit(1);
+    if (giaRegistrato) throw new ConflittoDati('Questa email risulta già registrata come fornitore: non serve registrarsi di nuovo.');
+    const [nuovo] = await db.insert(fornitori).values({ ...input, email, stato: 'IN_ATTESA' }).returning();
     return nuovo;
   },
   listaCampiExtraConfig: () => db.select().from(fornitoriCampiExtraConfig).orderBy(fornitoriCampiExtraConfig.ordine),
@@ -115,6 +139,7 @@ fornitoriRouter.use(richiedeAuth);
 fornitoriRouter.get('/', richiedePermesso('fornitori.visualizza'), asyncHandler(async (_req: Request, res: Response) => res.json(await fornitoriService.list())));
 fornitoriRouter.get('/conta-in-attesa', richiedePermesso('fornitori.visualizza'), asyncHandler(async (_req: Request, res: Response) => res.json({ conteggio: await fornitoriService.contaInAttesa() })));
 fornitoriRouter.get('/:id', richiedePermesso('fornitori.visualizza'), asyncHandler(async (req: Request, res: Response) => res.json(await fornitoriService.getById(req.params.id))));
+fornitoriRouter.get('/:id/collegamenti', richiedePermesso('fornitori.visualizza'), asyncHandler(async (req: Request, res: Response) => res.json(await fornitoriService.collegamenti(req.params.id))));
 fornitoriRouter.post('/', richiedePermesso('fornitori.gestisci'), valida(fornitoreSchema), asyncHandler(async (req: Request, res: Response) => res.status(201).json(await fornitoriService.create(req.body))));
 fornitoriRouter.put('/:id', richiedePermesso('fornitori.gestisci'), valida(aggiornaFornitoreSchema), asyncHandler(async (req: Request, res: Response) => res.json(await fornitoriService.update(req.params.id, req.body))));
 fornitoriRouter.put('/:id/stato', richiedePermesso('fornitori.gestisci'), valida(cambiaStatoSchema), asyncHandler(async (req: Request, res: Response) => res.json(await fornitoriService.cambiaStato(req.params.id, req.body.stato))));

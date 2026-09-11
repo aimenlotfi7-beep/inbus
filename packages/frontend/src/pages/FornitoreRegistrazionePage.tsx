@@ -28,8 +28,9 @@ export function FornitoreRegistrazionePage() {
 
   async function invia() {
     setErrore('');
+    const email = form.email.trim();
     if (!form.nome.trim()) { setErrore('Inserisci la ragione sociale.'); return; }
-    if (!form.email.includes('@')) { setErrore('Inserisci un indirizzo email valido.'); return; }
+    if (!email.includes('@')) { setErrore('Inserisci un indirizzo email valido.'); return; }
     if (!form.indirizzo.trim()) { setErrore('Inserisci l\'indirizzo — serve per calcolare la distanza dagli eventi.'); return; }
     setInviando(true);
     try {
@@ -37,14 +38,18 @@ export function FornitoreRegistrazionePage() {
       // admin) — se non si trova, si registra comunque: un admin potrà
       // sistemare l'indirizzo a mano in approvazione, non blocca
       // l'invio per un indirizzo scritto in modo un po' insolito.
-      const { coordinate } = await geocodifica(form.indirizzo);
+      const { coordinate, regione } = await geocodifica(form.indirizzo);
       const campiExtra = campiExtraConfig
         .map((c) => ({ etichetta: c.etichetta, valore: (valoriExtra[c.id] ?? '').trim() }))
         .filter((c) => c.valore);
       await fornitoriApi.registrazionePubblica({
         ...form,
+        email,
         lat: coordinate?.lat,
         lng: coordinate?.lng,
+        // Senza la regione il fornitore finiva nel gruppo "Senza regione"
+        // del gestionale anche con l'indirizzo trovato.
+        regione: regione ?? undefined,
         campiExtra: campiExtra.length ? campiExtra : undefined,
       });
       setInviato(true);
@@ -69,16 +74,20 @@ export function FornitoreRegistrazionePage() {
         {!inviato && (
           <form onSubmit={(e) => e.preventDefault()}>
             <div className="form-grid">
-              <label>Ragione sociale <input type="text" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required /></label>
+              <label>Ragione sociale <input type="text" autoComplete="organization" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required /></label>
               <label>Partita IVA <input type="text" value={form.partitaIva} onChange={(e) => setForm({ ...form, partitaIva: e.target.value })} /></label>
-              <label>Nome referente <input type="text" value={form.referente} onChange={(e) => setForm({ ...form, referente: e.target.value })} /></label>
-              <label>Telefono <input type="text" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></label>
-              <label>Email <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></label>
-              <label className="full">Indirizzo <input type="text" placeholder="Via, città, provincia" value={form.indirizzo} onChange={(e) => setForm({ ...form, indirizzo: e.target.value })} required /></label>
+              <label>Nome referente <input type="text" autoComplete="name" value={form.referente} onChange={(e) => setForm({ ...form, referente: e.target.value })} /></label>
+              <label>Telefono <input type="tel" inputMode="tel" autoComplete="tel" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></label>
+              <label>Email <input type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></label>
+              <label className="full">Indirizzo <input type="text" autoComplete="street-address" placeholder="Via, città, provincia" value={form.indirizzo} onChange={(e) => setForm({ ...form, indirizzo: e.target.value })} required /></label>
               {campiExtraConfig.map((c) => (
                 <label key={c.id} className="full">{c.etichetta} <input type="text" value={valoriExtra[c.id] ?? ''} onChange={(e) => setValoriExtra({ ...valoriExtra, [c.id]: e.target.value })} /></label>
               ))}
             </div>
+            <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)', lineHeight: 1.5, margin: '10px 0 0' }}>
+              I dati inseriti servono a valutare la registrazione e, se approvata, a inviarti le richieste di preventivo.
+              Leggi l'<Link to="/pagina/privacy" target="_blank" rel="noopener" style={{ color: 'inherit', textDecoration: 'underline' }}>informativa privacy</Link>.
+            </p>
             <p className="errore">{errore}</p>
             <button type="button" className="btn-primary" disabled={inviando} onClick={invia}>{inviando ? 'Invio...' : 'Registrati'}</button>
           </form>

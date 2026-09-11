@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { geocodifica, tracciatoPercorso, type Coordinate } from './geo';
 import { creaPinDiamante } from './pinMappa';
+import { aggiungiSfondoMappa } from './sfondoMappa';
 
 export interface TappaMappa {
   etichetta: string; // testo mostrato sul marcatore (es. "Testa — Milano")
@@ -130,14 +131,7 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
 
       if (!mappaRef.current && contenitoreRef.current) {
         mappaRef.current = L.map(contenitoreRef.current);
-        // Stile chiaro, quasi bianco e nero, con le scritte delle
-        // città sempre leggibili — CartoDB "Positron", gratuito, nessuna
-        // chiave richiesta (al contrario di es. Stamen Toner, che dal
-        // 2023 richiede un account Stadia Maps).
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-          attribution: '© OpenStreetMap © CARTO',
-          maxZoom: 19,
-        }).addTo(mappaRef.current);
+        aggiungiSfondoMappa(mappaRef.current);
         // Cliccare sulla cartina ma FUORI da una linea (sullo sfondo)
         // toglie l'evidenziazione — le linee hanno il proprio click
         // separato più sotto, che ferma la propagazione qui: i due
