@@ -272,7 +272,7 @@ export function AdminLayout({
                         title={
                           voce.id === 'partenze-orari' ? `${plurale(eventiDaCalcolareOrari, 'evento', 'eventi')} senza ancora nessun orario impostato`
                             : voce.id === 'partenze-prezzi' ? `${plurale(eventiDaPrezzare, 'evento', 'eventi')} con almeno un tragitto da prezzare`
-                            : voce.id === 'partenze-da-confermare' ? `${plurale(lineeProntoDaConfermare, 'evento', 'eventi')} con una linea pronta da confermare (soglia di pareggio raggiunta)`
+                            : voce.id === 'partenze-da-confermare' ? `${plurale(lineeProntoDaConfermare, 'evento', 'eventi')} con una linea da confermare`
                             : voce.id === 'partenze-preventivi' ? `${plurale(eventiPreventiviDaRichiedere, 'evento pronto', 'eventi pronti')} per una richiesta di preventivo, ${preventiviDaValutare} con risposte da valutare`
                             : voce.id === 'partenze-confermato' ? `${plurale(allertePartenze, 'tragitto', 'tragitti')} con più passeggeri che posti`
                             : voce.id === 'lista-attesa' ? `${plurale(inAttesa, 'iscrizione', 'iscrizioni')} in attesa di promozione`

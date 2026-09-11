@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, isNull, sql, gte, lt, asc } from 'drizzle-orm';
+import { and, eq, ilike, inArray, isNull, sql, gte, lt, asc, ne } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
   eventi,
@@ -73,6 +73,8 @@ async function senzaFermateCoperteDaLinee(
   if (disattivate.size === 0 || rilevate.length === 0) return rilevate;
   const coperte = await db.selectDistinct({ citta: fermate.citta }).from(lineaFermate)
     .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
+    // Solo linee confermate: una linea da confermare non ha ancora un bus.
+    .innerJoin(linee, and(eq(linee.id, lineaFermate.lineaId), eq(linee.daConfermare, false)))
     .where(eq(fermate.tragittoId, tragittoId));
   const cittaCoperte = new Set(coperte.map((c) => c.citta));
   return rilevate.filter((v) => !(v.fermataVecchia && disattivate.has(v.fermataVecchia.citta) && cittaCoperte.has(v.fermataVecchia.citta)));
@@ -259,14 +261,11 @@ export const includeCompleto = {
   allegati: true,
 } as const;
 
-/** Ricalcola i posti totali di un tragitto dalla somma dei bus VERI
- *  registrati su di lui — non più un numero scritto a mano: la fonte
- *  di verità sono i bus censiti. I posti già occupati (venduti)
- *  restano tali, solo i disponibili si aggiustano di conseguenza —
- *  stessa logica già usata per gli altri aggiustamenti manuali. Va
- *  richiamata ogni volta che l'elenco bus di un tragitto cambia
- *  (registrato un bus nuovo, cambiati i posti di uno esistente,
- *  spostato o rimosso un bus da questo tragitto). */
+/** Rimette i posti in vendita di un tragitto a "quasi illimitati" ogni
+ *  volta che l'elenco dei bus cambia (bus nuovo, posti cambiati, bus o
+ *  linea tolti): le vendite non si fermano per i posti dei bus. I posti
+ *  già occupati (venduti) restano tali. Blocca solo la rimozione
+ *  dell'ultimo bus di un tragitto con posti venduti. */
 // Usato quando un tragitto diventa prenotabile (preventivo registrato)
 // ma non ha ancora nessun bus vero — le vendite non devono avere un
 // tetto in quella fase (vedi registraPreventivo). Un numero enorme
@@ -303,34 +302,41 @@ async function ricalcolaPostiTragitto(tx: Parameters<Parameters<typeof db.transa
     .innerJoin(linee, eq(linee.id, busFisici.lineaId))
     .where(eq(linee.tragittoId, tragittoId));
   const idBusUnici = new Set(daLinee.map((r) => r.busId));
-  if (idBusUnici.size === 0) {
-    // Nessun bus più collegato — se non c'era ancora nessuna
-    // prenotazione confermata va benissimo (torna semplicemente senza
-    // copertura), ma se ce ne sono già bloccare è l'unica scelta
-    // sicura: azzerare i posti lascerebbe clienti paganti senza nessun
-    // bus assegnato, senza nemmeno un avviso.
-    if (postiOccupati > 0) {
-      if (azione === 'rimuovi_bus') throw new ConflittoDati(`Non puoi rimuovere questo bus: sul tragitto ${testoPostiVenduti(postiOccupati)} e senza di lui non resterebbe nessun bus. Aggiungi prima un altro bus, poi riprova.`);
-      if (azione === 'elimina_linea') throw new ConflittoDati(`Non puoi eliminare questa linea: sul tragitto ${testoPostiVenduti(postiOccupati)} e senza i suoi bus non resterebbe nessun bus. Aggiungi prima un bus su un'altra linea, poi riprova.`);
-      throw new ConflittoDati(`Questo tragitto ha già ${postiOccupati} posti venduti — non puoi restare senza nessun bus che li copra. Registra prima un bus/Linea sostitutivo con capienza sufficiente.`);
-    }
-    await tx.update(tragitti).set({ postiTotali: 0, postiDisponibili: 0 }).where(eq(tragitti.id, tragittoId));
-    return;
+  if (idBusUnici.size === 0 && postiOccupati > 0) {
+    // Togliere l'ultimo bus di un tragitto con posti venduti lascerebbe
+    // clienti paganti senza nessun bus, senza nemmeno un avviso.
+    if (azione === 'rimuovi_bus') throw new ConflittoDati(`Non puoi rimuovere questo bus: sul tragitto ${testoPostiVenduti(postiOccupati)} e senza di lui non resterebbe nessun bus. Aggiungi prima un altro bus, poi riprova.`);
+    if (azione === 'elimina_linea') throw new ConflittoDati(`Non puoi eliminare questa linea: sul tragitto ${testoPostiVenduti(postiOccupati)} e senza i suoi bus non resterebbe nessun bus. Aggiungi prima un bus su un'altra linea, poi riprova.`);
   }
-  const bus = await tx.select({ postiBus: busFisici.postiBus }).from(busFisici).where(inArray(busFisici.id, [...idBusUnici]));
-  const nuovoTotale = bus.reduce((somma, r) => somma + (r.postiBus ?? 0), 0);
-  // Stessa protezione: la nuova capienza non può mai scendere sotto
-  // quanto già venduto, altrimenti postiTotali diventerebbe più basso
-  // dei posti occupati — un'incoerenza che non dovrebbe mai esistere.
-  if (nuovoTotale < postiOccupati) {
-    if (azione === 'rimuovi_bus') throw new ConflittoDati(`Non puoi rimuovere questo bus: sul tragitto ${testoPostiVenduti(postiOccupati)} e senza di lui i posti scenderebbero a ${nuovoTotale}. Aggiungi prima un altro bus o aumenta i posti di quelli che restano, poi riprova.`);
-    if (azione === 'elimina_linea') throw new ConflittoDati(`Non puoi eliminare questa linea: sul tragitto ${testoPostiVenduti(postiOccupati)} e senza i suoi bus i posti scenderebbero a ${nuovoTotale}. Aggiungi prima altri bus o aumenta i posti di quelli che restano, poi riprova.`);
-    throw new ConflittoDati(`La nuova capienza (${nuovoTotale} posti) è inferiore ai ${postiOccupati} posti già venduti su questo tragitto — aumenta i posti dei bus coinvolti, o aggiungine un altro, prima di procedere.`);
-  }
+  // Le vendite non si fermano mai per i posti dei bus (deciso dal
+  // proprietario: quando i bus si riempiono nasce una linea da confermare,
+  // vedi linee-da-confermare.service.ts). I posti in vendita restano "quasi
+  // illimitati"; i posti veri dei bus contano per le linee da confermare e
+  // per lo smistamento. Un evento si ferma solo con "Ferma vendite".
   await tx.update(tragitti).set({
-    postiTotali: nuovoTotale,
-    postiDisponibili: Math.max(0, nuovoTotale - postiOccupati),
+    postiTotali: POSTI_QUASI_ILLIMITATI,
+    postiDisponibili: Math.max(0, POSTI_QUASI_ILLIMITATI - postiOccupati),
   }).where(eq(tragitti.id, tragittoId));
+}
+
+/** Per ogni tragitto: i posti dei bus veri e quante linee da confermare ha.
+ *  Servono al posto di postiTotali, che resta "quasi illimitato". */
+async function postiBusELineeDaConfermare(tragittiIds: string[]) {
+  const postiSuiBus = new Map<string, number>();
+  const lineeDaConfermare = new Map<string, number>();
+  if (tragittiIds.length === 0) return { postiSuiBus, lineeDaConfermare };
+  const righeLinee = await db.select({ id: linee.id, tragittoId: linee.tragittoId, daConfermare: linee.daConfermare })
+    .from(linee).where(inArray(linee.tragittoId, tragittiIds));
+  const righeBus = righeLinee.length
+    ? await db.select({ lineaId: busFisici.lineaId, postiBus: busFisici.postiBus }).from(busFisici).where(inArray(busFisici.lineaId, righeLinee.map((l) => l.id)))
+    : [];
+  const tragittoDiLinea = new Map(righeLinee.map((l) => [l.id, l.tragittoId]));
+  for (const b of righeBus) {
+    const tragittoId = b.lineaId ? tragittoDiLinea.get(b.lineaId) : undefined;
+    if (tragittoId) postiSuiBus.set(tragittoId, (postiSuiBus.get(tragittoId) ?? 0) + (b.postiBus ?? 0));
+  }
+  for (const l of righeLinee) if (l.daConfermare) lineeDaConfermare.set(l.tragittoId, (lineeDaConfermare.get(l.tragittoId) ?? 0) + 1);
+  return { postiSuiBus, lineeDaConfermare };
 }
 
 async function getById(id: string) {
@@ -585,6 +591,7 @@ export const eventiService = {
     if (query.soloVisibili) {
       condizioni.push(eq(eventi.visibileSito, true));
       condizioni.push(eq(eventi.bozza, false)); // le bozze non compaiono mai sul sito pubblico
+      condizioni.push(eq(eventi.venditeFermate, false)); // "Ferma vendite": l'evento sparisce dal sito
       // Un evento senza nemmeno un tragitto confermato (nessun bus vero
       // registrato) non compare affatto — come se non esistesse ancora,
       // non solo "senza niente da prenotare". Basta UN tragitto
@@ -1041,6 +1048,11 @@ export const eventiService = {
       .from(prenotazioni)
       .where(and(eq(prenotazioni.eventoId, eventoId), eq(prenotazioni.stato, 'CONFERMATA')));
 
+    // Posti dei bus veri e linee da confermare: postiTotali resta "quasi
+    // illimitato" (le vendite non si fermano per i bus) e non dice più
+    // quanti posti ci sono davvero.
+    const { postiSuiBus, lineeDaConfermare } = await postiBusELineeDaConfermare(tuttiITragitti.map((t) => t.id));
+
     return tuttiITragitti.map((tragitto) => {
       const fermateOrdinate = [...tragitto.fermate].sort((a, b) => a.ordine - b.ordine);
 
@@ -1072,34 +1084,26 @@ export const eventiService = {
 
       const totalePasseggeri = fermateConPasseggeri.reduce((s, f) => s + f.passeggeri, 0);
 
-      // Coperta = automatico, non più un interruttore da cliccare: usa
-      // direttamente postiTotali del tragitto (già mantenuto corretto
-      // da ricalcolaPostiTragitto, che considera già ogni bus/Linea
-      // registrata) — prima questa funzione lo ricalcolava DA SOLA con
-      // una propria query, guardando solo bus_tratte: un bus registrato
-      // tramite una Linea (bus_fermate o il contenitore) non veniva
-      // considerato, un'incoerenza mai notata finché non è rimasta
-      // l'unica strada davvero in uso.
-      // Finché non c'è ancora nessun bus vero registrato, postiTotali
-      // resta sul placeholder "quasi illimitato" (vedi più sotto): con
-      // quello, ANCHE UNA SOLA prenotazione risultava "coperta", perché
-      // qualunque numero piccolo sta sotto un placeholder enorme.
-      // "Coperta" deve dire "hai un bus vero che copre tutti", non "il
-      // numero è ancora fittizio" — richiede quindi anche un bus vero.
-      const coperta = totalePasseggeri > 0 && tragitto.postiTotali < POSTI_QUASI_ILLIMITATI && tragitto.postiTotali >= totalePasseggeri;
+      // Coperta = i bus veri delle linee confermate bastano per tutti i
+      // passeggeri confermati. postiTotali del tragitto non serve più: resta
+      // "quasi illimitato" perché le vendite non si fermano per i bus.
+      const postiBus = postiSuiBus.get(tragitto.id) ?? 0;
+      const coperta = totalePasseggeri > 0 && postiBus >= totalePasseggeri;
 
       return {
         tragittoId: tragitto.id,
         servizioId: tragitto.servizioId,
         nome: tragitto.nome,
         stato: tragitto.stato,
-        postiTotali: tragitto.postiTotali,
+        // Posti dei bus confermati, non quelli in vendita.
+        postiTotali: postiBus,
         capienzaPerBus: capienza,
         fermate: fermateConPasseggeri,
         totalePasseggeri,
         busSuggeriti,
         coperta,
-        postiBusCensiti: tragitto.postiTotali,
+        postiBusCensiti: postiBus,
+        lineeDaConfermare: lineeDaConfermare.get(tragitto.id) ?? 0,
       };
     });
   },
@@ -1278,27 +1282,18 @@ export const eventiService = {
         await tx.update(tragitti).set({ stato: 'PREZZATO' }).where(eq(tragitti.id, tragittoId));
       }
 
-      // Da qui il tragitto è prenotabile sul sito — ma se non c'è
-      // ancora nessun bus vero registrato in una Linea, le vendite non
-      // devono essere limitate: il numero "posti presunti" scritto nel
-      // preventivo (sezione Preventivi) è solo reportistica, non un
-      // tetto alle vendite (deciso esplicitamente così — si vende
-      // prima, si decidono i bus dopo in base a quanto si è venduto).
-      // "Quasi illimitato" invece di un vero infinito: il sito comunque
-      // non mostra mai il numero esatto (solo "Posti disponibili"/
-      // "Pochi posti"/"Esaurito" a soglie — vedi PercorsoBus.tsx), un
-      // numero enorme si comporta a tutti gli effetti come nessun
-      // limite, restando comunque un intero valido nel database.
-      const daLinee = await tx.select({ busId: busFisici.id }).from(busFisici)
-        .innerJoin(linee, eq(linee.id, busFisici.lineaId))
-        .where(eq(linee.tragittoId, tragittoId));
-      if (daLinee.length === 0) {
-        const postiOccupati = esiste.postiTotali - esiste.postiDisponibili;
-        await tx.update(tragitti).set({
-          postiTotali: POSTI_QUASI_ILLIMITATI,
-          postiDisponibili: POSTI_QUASI_ILLIMITATI - postiOccupati,
-        }).where(eq(tragitti.id, tragittoId));
-      }
+      // Da qui il tragitto è prenotabile sul sito, senza tetto: le vendite
+      // non si fermano mai per i posti dei bus (deciso dal proprietario,
+      // vedi ricalcolaPostiTragitto), né per i "posti presunti" del
+      // preventivo, che contano solo per le linee da confermare. "Quasi
+      // illimitato" invece di un vero infinito: il sito non mostra mai il
+      // numero esatto (solo "Posti disponibili"/"Pochi posti"/"Esaurito" a
+      // soglie — vedi PercorsoBus.tsx) e resta un intero valido nel database.
+      const postiOccupati = esiste.postiTotali - esiste.postiDisponibili;
+      await tx.update(tragitti).set({
+        postiTotali: POSTI_QUASI_ILLIMITATI,
+        postiDisponibili: Math.max(0, POSTI_QUASI_ILLIMITATI - postiOccupati),
+      }).where(eq(tragitti.id, tragittoId));
     });
   },
 
@@ -1358,9 +1353,11 @@ export const eventiService = {
       return {
         lineaId: nuovaLinea.id,
         busId: nuovoBus.id,
-        // Prima Linea del tragitto E passaggio vero a CONFERMATO: è il
-        // momento in cui la partenza diventa certa per chi ha prenotato.
-        partenzaConfermata: lineeEsistenti.length === 0 && passatiAConfermato.length > 0,
+        tragittoId: tragittoDelleFermate.id,
+        // Prima linea confermata del tragitto E passaggio vero a
+        // CONFERMATO: è il momento in cui la partenza diventa certa per chi
+        // ha prenotato. Le linee da confermare (senza bus) non contano.
+        partenzaConfermata: lineeEsistenti.every((l) => l.daConfermare) && passatiAConfermato.length > 0,
       };
     });
 
@@ -1372,12 +1369,80 @@ export const eventiService = {
     return { ...creata, ...avvisiClienti, tourLeaderAvvisato };
   },
 
+  /** Conferma una linea da confermare (creata in automatico, vedi
+   *  linee-da-confermare.service.ts): fermate scelte e primo bus, come
+   *  creaLinea. Se è la prima linea confermata del tragitto, la partenza
+   *  diventa confermata e chi ha prenotato riceve l'email. */
+  async confermaLinea(lineaId: string, input: { riferimento: string; fornitoreId?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus: number; note?: string; fermateIds: string[] }) {
+    const [linea] = await db.select().from(linee).where(eq(linee.id, lineaId)).limit(1);
+    if (!linea) throw new ErroreApplicativo('Linea non trovata: potrebbe essere sparita perché non serviva più. Ricarica la pagina.', 404, 'NON_TROVATO');
+    if (!linea.daConfermare) throw new ConflittoDati(`${linea.nome} è già confermata: ricarica la pagina.`);
+    const fermateTragitto = await db.select({ id: fermate.id, orario: fermate.orario }).from(fermate).where(eq(fermate.tragittoId, linea.tragittoId));
+    const fermateScelte = fermateTragitto.filter((f) => input.fermateIds.includes(f.id));
+    if (fermateScelte.length === 0) throw new ConflittoDati('Seleziona almeno una fermata per la linea.');
+    // Per orario, come creaLinea; quelle senza orario in fondo.
+    const fermateOrdinate = [...fermateScelte].sort((a, b) => {
+      if (!a.orario && !b.orario) return 0;
+      if (!a.orario) return 1;
+      if (!b.orario) return -1;
+      return a.orario.localeCompare(b.orario);
+    });
+    const tourLeaderId = input.tourLeaderId || undefined;
+
+    const confermata = await db.transaction(async (tx) => {
+      // Stesso lucchetto delle linee automatiche: la linea non sparisce
+      // mentre la si conferma.
+      await tx.select({ id: tragitti.id }).from(tragitti).where(eq(tragitti.id, linea.tragittoId)).for('update').limit(1);
+      const [ancora] = await tx.update(linee).set({ daConfermare: false })
+        .where(and(eq(linee.id, lineaId), eq(linee.daConfermare, true)))
+        .returning({ id: linee.id });
+      if (!ancora) throw new ConflittoDati(`${linea.nome} non è più da confermare: è sparita perché non serviva più, o è già stata confermata. Ricarica la pagina.`);
+      const altreConfermate = await tx.select({ id: linee.id }).from(linee)
+        .where(and(eq(linee.tragittoId, linea.tragittoId), eq(linee.daConfermare, false), ne(linee.id, lineaId)));
+
+      await tx.delete(lineaFermate).where(eq(lineaFermate.lineaId, lineaId));
+      await tx.insert(lineaFermate).values(fermateOrdinate.map((f, ordine) => ({ lineaId, fermataId: f.id, ordine })));
+      const [nuovoBus] = await tx.insert(busFisici).values({
+        lineaId,
+        fornitoreId: input.fornitoreId,
+        riferimento: input.riferimento,
+        autistaNome: input.autistaNome,
+        autistaTelefono: input.autistaTelefono,
+        tourLeaderId,
+        costo: input.costo?.toFixed(2),
+        postiBus: input.postiBus,
+        note: input.note,
+      }).returning();
+
+      const passatiAConfermato = await tx.update(tragitti).set({ stato: 'CONFERMATO' })
+        .where(and(eq(tragitti.id, linea.tragittoId), inArray(tragitti.stato, ['DA_CONFERMARE', 'PREZZATO'])))
+        .returning({ id: tragitti.id });
+      await ricalcolaPostiTragitto(tx, linea.tragittoId);
+      return {
+        lineaId,
+        busId: nuovoBus.id,
+        tragittoId: linea.tragittoId,
+        partenzaConfermata: altreConfermate.length === 0 && passatiAConfermato.length > 0,
+      };
+    });
+
+    // Avvisi solo a transazione confermata, best effort (non lanciano mai).
+    const avvisiClienti = confermata.partenzaConfermata
+      ? await avvisaPartenzaConfermata(confermata.tragittoId)
+      : { clientiAvvisati: 0, emailNonInviate: 0 };
+    const tourLeaderAvvisato = tourLeaderId ? await avvisaTourLeader(confermata.busId) : null;
+    return { ...confermata, ...avvisiClienti, tourLeaderAvvisato };
+  },
+
   /** Aggiunge un ULTERIORE bus a una Linea già esistente — stesse
    *  fermate della Linea (non si ridefiniscono), solo un bus in più
    *  per assorbire più prenotazioni sulle stesse fermate. */
-  async aggiungiBusALinea(lineaId: string, input: { riferimento: string; fornitoreId?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus: number; note?: string }): Promise<{ busId: string; tourLeaderAvvisato: boolean | null }> {
+  async aggiungiBusALinea(lineaId: string, input: { riferimento: string; fornitoreId?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus: number; note?: string }): Promise<{ busId: string; tragittoId: string; tourLeaderAvvisato: boolean | null }> {
     const [lineaEsiste] = await db.select().from(linee).where(eq(linee.id, lineaId)).limit(1);
     if (!lineaEsiste) throw new NonTrovato('Linea');
+    // Il primo bus di una linea da confermare arriva con la conferma
+    // (fermate e partenza confermata comprese), non da qui.
+    if (lineaEsiste.daConfermare) throw new ConflittoDati(`${lineaEsiste.nome} è da confermare: usa "Conferma linea".`);
     const tourLeaderId = input.tourLeaderId || undefined;
 
     const busId = await db.transaction(async (tx) => {
@@ -1396,7 +1461,7 @@ export const eventiService = {
       return nuovoBus.id;
     });
     const tourLeaderAvvisato = tourLeaderId ? await avvisaTourLeader(busId) : null;
-    return { busId, tourLeaderAvvisato };
+    return { busId, tragittoId: lineaEsiste.tragittoId, tourLeaderAvvisato };
   },
 
   /** Modifica il percorso (le fermate) di una Linea intera — cambia
@@ -1500,6 +1565,8 @@ export const eventiService = {
     return righeLinee.map((l) => ({
       id: l.id,
       nome: l.nome,
+      // Creata in automatico e senza bus finché non la si conferma.
+      daConfermare: l.daConfermare,
       fermate: righeFermate.filter((f) => f.lineaId === l.id).map((f) => ({
         fermataId: f.fermataId, citta: f.citta, orario: f.orario,
         inAttesa: mappaInAttesa.get(f.citta) ?? 0,
@@ -1517,23 +1584,29 @@ export const eventiService = {
 
   /** Elimina una linea con tutti i suoi bus. Le prenotazioni assegnate a
    *  quei bus tornano senza bus (le riprende lo smistamento automatico, e
-   *  il nuovo biglietto riparte con il bus nuovo). I posti del tragitto si
-   *  ricalcolano come per la rimozione di un bus, con lo stesso rifiuto se
-   *  scenderebbero sotto quelli già venduti. */
-  async eliminaLinea(lineaId: string) {
+   *  il nuovo biglietto riparte con il bus nuovo). Non si può togliere
+   *  l'ultimo bus di un tragitto con posti venduti. Le linee da confermare
+   *  non si eliminano a mano: spariscono da sole quando non servono più. */
+  async eliminaLinea(lineaId: string): Promise<{ tragittoId: string }> {
     const [linea] = await db.select().from(linee).where(eq(linee.id, lineaId)).limit(1);
     if (!linea) throw new ErroreApplicativo('Linea non trovata: potrebbe essere già stata eliminata.', 404, 'NON_TROVATO');
+    if (linea.daConfermare) {
+      throw new ConflittoDati(`${linea.nome} è da confermare e sparisce da sola quando non serve più: puoi confermarla, oppure aggiungere un bus a un'altra linea.`);
+    }
     await db.transaction(async (tx) => {
+      const busLinea = await tx.select({ id: busFisici.id }).from(busFisici).where(eq(busFisici.lineaId, lineaId));
       // bus_fisici → prenotazioni.bus_id va a null da solo (vincolo "set null").
       await tx.delete(busFisici).where(eq(busFisici.lineaId, lineaId));
       await tx.delete(linee).where(eq(linee.id, lineaId));
-      await ricalcolaPostiTragitto(tx, linea.tragittoId, 'elimina_linea');
+      // Una linea già senza bus non toglie nessun bus: niente rifiuto.
+      await ricalcolaPostiTragitto(tx, linea.tragittoId, busLinea.length > 0 ? 'elimina_linea' : undefined);
     });
+    return { tragittoId: linea.tragittoId };
   },
 
   /** Rimuove un bus dell'evento. Le prenotazioni assegnate tornano senza
    *  bus (le riprende lo smistamento). */
-  async rimuoviBus(eventoId: string, busId: string) {
+  async rimuoviBus(eventoId: string, busId: string): Promise<{ tragittoId: string | null }> {
     const [bus] = await db.select({ id: busFisici.id, tragittoId: linee.tragittoId, eventoId: tragitti.eventoId }).from(busFisici)
       .leftJoin(linee, eq(linee.id, busFisici.lineaId))
       .leftJoin(tragitti, eq(tragitti.id, linee.tragittoId))
@@ -1545,6 +1618,7 @@ export const eventiService = {
       await tx.delete(busFisici).where(eq(busFisici.id, busId));
       if (bus.tragittoId) await ricalcolaPostiTragitto(tx, bus.tragittoId, 'rimuovi_bus');
     });
+    return { tragittoId: bus.tragittoId };
   },
 
   /** I passeggeri di UN bus: solo le prenotazioni che lo smistamento ha
@@ -1596,7 +1670,8 @@ export const eventiService = {
         .filter((p) => p.tragittoId === tragitto.id)
         .reduce((s, p) => s + Number(p.totale), 0);
 
-      const lineeTratta = tutteLeLinee.filter((l) => l.tragittoId === tragitto.id);
+      // Le linee da confermare non hanno bus né costi: fuori dal riepilogo.
+      const lineeTratta = tutteLeLinee.filter((l) => l.tragittoId === tragitto.id && !l.daConfermare);
       const perLinea = lineeTratta.map((l) => {
         const cittaLinea = new Set(tutteLeFermateDiLinea.filter((f) => f.lineaId === l.id).map((f) => f.citta));
         const incassatoLinea = prenotazioniConfermate
@@ -1823,41 +1898,19 @@ export const eventiService = {
    *  accettato — il segnale "c'è qualcosa da fare in Preventivi",
    *  distinto da "risposte arrivate da valutare" (contaDaValutare, nel
    *  modulo preventivi) che invece guarda le richieste già inviate. */
-  /** Quanti EVENTI hanno almeno un tragitto con una Linea pronta da
-   *  confermare (soglia di pareggio raggiunta, nessun bus vero ancora
-   *  registrato) — per il pallino di notifica su "Da Confermare" nel
-   *  menu, stesso schema degli altri badge di Partenze. Query mirata,
-   *  non un giro di suggerimentoLinea() per ogni tragitto uno per uno. */
+  /** Quanti EVENTI hanno almeno una linea da confermare (creata in
+   *  automatico: soglia di pareggio raggiunta, o bus pieni) — il pallino
+   *  su "Da confermare" nel menu. Solo tragitti attivi di eventi non
+   *  passati e non nel cestino. */
   async contaLineeProntoDaConfermare() {
-    const candidati = await db.select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id, preventivoPostiBus: tragitti.preventivoPostiBus })
-      .from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+    const righe = await db.selectDistinct({ eventoId: tragitti.eventoId }).from(linee)
+      .innerJoin(tragitti, eq(tragitti.id, linee.tragittoId))
+      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
       .where(and(
-        isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`,
-        inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), sql`${tragitti.preventivoPostiBus} IS NOT NULL`,
+        eq(linee.daConfermare, true), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl),
+        isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`,
       ));
-    if (candidati.length === 0) return 0;
-
-    // Fuori i tragitti che hanno GIÀ un bus vero — quelli non sono più
-    // "da suggerire", sono già confermati (o da ampliare, altro badge).
-    const conBusVero = await db.select({ tragittoId: linee.tragittoId }).from(linee)
-      .innerJoin(busFisici, eq(busFisici.lineaId, linee.id)).where(inArray(linee.tragittoId, candidati.map((c) => c.tragittoId)));
-    const idConBus = new Set(conBusVero.map((r) => r.tragittoId));
-    const daValutare = candidati.filter((c) => !idConBus.has(c.tragittoId));
-    if (daValutare.length === 0) return 0;
-
-    const somme = await db.select({ tragittoId: prenotazioni.tragittoId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
-      .from(prenotazioni).where(and(inArray(prenotazioni.tragittoId, daValutare.map((c) => c.tragittoId)), eq(prenotazioni.stato, 'CONFERMATA')))
-      .groupBy(prenotazioni.tragittoId);
-    const confermatiPerTragitto = new Map(somme.map((s) => [s.tragittoId, Number(s.totale)]));
-
-    const soglia = await leggiSogliaOccupazionePareggio();
-    const eventiPronti = new Set<string>();
-    for (const c of daValutare) {
-      const confermati = confermatiPerTragitto.get(c.tragittoId) ?? 0;
-      const postiDiPareggio = Math.round((c.preventivoPostiBus ?? 0) * (soglia / 100));
-      if (confermati >= postiDiPareggio && postiDiPareggio > 0) eventiPronti.add(c.eventoId);
-    }
-    return eventiPronti.size;
+    return righe.length;
   },
 
   async contaEventiPreventiviDaRichiedere() {
@@ -1894,52 +1947,36 @@ export const eventiService = {
    *  nessuna Linea costruita — questo, e non lo stato interno
    *  "DA_CONFERMARE" (un nome simile ma un concetto diverso), è il
    *  conteggio giusto per la tappa di menu "Da Confermare". */
-  async contaAllertePartenze() {
-    const righeTragitti = await db.select({ tragittoId: tragitti.id, postiTotali: tragitti.postiTotali }).from(tragitti);
-    if (righeTragitti.length === 0) return 0;
-
-    const somme = await db
-      .select({ tragittoId: prenotazioni.tragittoId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
-      .from(prenotazioni)
-      .where(eq(prenotazioni.stato, 'CONFERMATA'))
-      .groupBy(prenotazioni.tragittoId);
-    const mappaPasseggeri = new Map(somme.map((s) => [s.tragittoId, Number(s.totale)]));
-
-    let conteggio = 0;
-    for (const r of righeTragitti) {
-      const passeggeri = mappaPasseggeri.get(r.tragittoId) ?? 0;
-      if (passeggeri === 0) continue; // niente da coprire, non è un allarme
-      if (r.postiTotali < passeggeri) conteggio++;
-    }
-    return conteggio;
+  async contaAllertePartenze(): Promise<number> {
+    const perEvento = await eventiService.allertePartenzePerEvento();
+    return Object.values(perEvento).reduce((somma, n) => somma + n, 0);
   },
 
   /** Come sopra, ma per singolo evento — quante tratte con posti
    *  superati ha OGNI evento (non solo il totale generale), usata per
    *  mostrare il pallino di avviso sulla card dell'evento specifico
-   *  nella sezione Partenze, non solo nel menu laterale. */
+   *  nella sezione Partenze, non solo nel menu laterale. Contano i posti
+   *  dei bus veri dei tragitti confermati: quelli in vendita restano
+   *  "quasi illimitati". */
   async allertePartenzePerEvento(): Promise<Record<string, number>> {
-    const righeTragitti = await db.select({ tragittoId: tragitti.id, eventoId: tragitti.eventoId, postiTotali: tragitti.postiTotali }).from(tragitti);
+    const righeTragitti = await db.select({ tragittoId: tragitti.id, eventoId: tragitti.eventoId }).from(tragitti)
+      .where(and(eq(tragitti.stato, 'CONFERMATO'), isNull(tragitti.eliminatoIl)));
     if (righeTragitti.length === 0) return {};
-    const mappaEventoDiTragitto = new Map(righeTragitti.map((r) => [r.tragittoId, r.eventoId]));
-    const mappaPostiTotali = new Map(righeTragitti.map((r) => [r.tragittoId, r.postiTotali]));
+    const tragittiIds = righeTragitti.map((r) => r.tragittoId);
 
     const somme = await db
       .select({ tragittoId: prenotazioni.tragittoId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
       .from(prenotazioni)
-      .where(eq(prenotazioni.stato, 'CONFERMATA'))
+      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')))
       .groupBy(prenotazioni.tragittoId);
     const mappaPasseggeri = new Map(somme.map((s) => [s.tragittoId, Number(s.totale)]));
+    const { postiSuiBus } = await postiBusELineeDaConfermare(tragittiIds);
 
     const risultato: Record<string, number> = {};
     for (const r of righeTragitti) {
       const passeggeri = mappaPasseggeri.get(r.tragittoId) ?? 0;
-      if (passeggeri === 0) continue;
-      const postiTotali = mappaPostiTotali.get(r.tragittoId) ?? 0;
-      if (postiTotali < passeggeri) {
-        const eventoId = mappaEventoDiTragitto.get(r.tragittoId)!;
-        risultato[eventoId] = (risultato[eventoId] ?? 0) + 1;
-      }
+      if (passeggeri === 0) continue; // niente da coprire, non è un allarme
+      if ((postiSuiBus.get(r.tragittoId) ?? 0) < passeggeri) risultato[r.eventoId] = (risultato[r.eventoId] ?? 0) + 1;
     }
     return risultato;
   },
@@ -2008,11 +2045,17 @@ export const eventiService = {
       if (f.orario) mappaFermateCompilate.set(f.tragittoId, true);
     }
 
+    // Posti dei bus veri e linee da confermare: postiTotali resta "quasi
+    // illimitato" (le vendite non si fermano per i bus).
+    const { postiSuiBus, lineeDaConfermare } = await postiBusELineeDaConfermare(tragittiIds);
+
     return righe.map((r) => ({
       tragittoId: r.tragittoId,
       tragittoNome: r.tragittoNome,
       stato: r.stato,
       postiTotali: r.postiTotali,
+      postiSuiBus: postiSuiBus.get(r.tragittoId) ?? 0,
+      lineeDaConfermare: lineeDaConfermare.get(r.tragittoId) ?? 0,
       totalePasseggeri: mappaPasseggeri.get(r.tragittoId) ?? 0,
       preventivoCosto: r.preventivoCosto,
       fornitoreId: r.fornitoreId,
@@ -2030,5 +2073,18 @@ export const eventiService = {
         immagineUrl: mappaImmagine.get(r.eventoId) ?? null,
       },
     }));
+  },
+
+  /** "Ferma vendite" sulla card dell'evento in Eventi: l'evento sparisce dal
+   *  sito (elenchi, tour, bundle, sitemap) e nessuno può più prenotarlo,
+   *  nemmeno con il link o dal widget White Label; la pagina dell'evento
+   *  dice che le prenotazioni sono chiuse. Chi ha già prenotato non cambia
+   *  nulla. */
+  async impostaVenditeFermate(eventoId: string, fermate: boolean): Promise<boolean> {
+    const [aggiornato] = await db.update(eventi).set({ venditeFermate: fermate })
+      .where(eq(eventi.id, eventoId))
+      .returning({ venditeFermate: eventi.venditeFermate });
+    if (!aggiornato) throw new NonTrovato('Evento');
+    return aggiornato.venditeFermate;
   },
 };

@@ -12,7 +12,7 @@ import { notifica } from '../shared/notifiche';
 import { motivoErrore } from '../shared/errori';
 import { plurale } from '../../shared/formato';
 
-import { TITOLI_PARTENZE, SEZIONE_PARTENZE, POSTI_SENZA_BUS, type TabPartenze, type AzionePartenze } from './partenze/tipi';
+import { TITOLI_PARTENZE, SEZIONE_PARTENZE, type TabPartenze, type AzionePartenze } from './partenze/tipi';
 export type { TabPartenze } from './partenze/tipi';
 type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
 
@@ -96,8 +96,10 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   function passata(p: Partenza) {
     return new Date(p.evento.data).getTime() < adesso;
   }
+  // Contano i posti dei bus confermati, non quelli in vendita (sempre
+  // "quasi illimitati": le vendite non si fermano per i bus).
   function scoperta(p: Partenza) {
-    return p.totalePasseggeri > p.postiTotali;
+    return p.stato === 'CONFERMATO' && p.totalePasseggeri > p.postiSuiBus;
   }
   // A quali tappe appartiene questo tragitto, TUTTE insieme (un
   // tragitto compare in più tappe insieme man mano che avanza — es. in
@@ -123,8 +125,8 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
     // lascia DA_CONFERMARE) — prima bastava aver registrato il preventivo,
     // e la card diceva "Fatto" su un tragitto ancora senza prezzi.
     if (tabAttuale === 'da-prezzare') return p.stato !== 'DA_CONFERMARE';
-    if (tabAttuale === 'da-confermare') return p.stato === 'CONFERMATO' && !scoperta(p);
-    if (tabAttuale === 'confermato') return !scoperta(p); // qui dentro lo stato è già sempre CONFERMATO, per costruzione
+    if (tabAttuale === 'da-confermare') return p.stato === 'CONFERMATO' && !scoperta(p) && p.lineeDaConfermare === 0;
+    if (tabAttuale === 'confermato') return !scoperta(p) && p.lineeDaConfermare === 0; // qui dentro lo stato è già sempre CONFERMATO, per costruzione
     return false; // Passate: mai un contorno
   }
   // Stesse parole della pagina del tragitto (PartenzeTab): prima la card
@@ -141,14 +143,12 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
       return { fatto: false, testo: 'Da richiedere' };
     }
     if (tabAttuale === 'da-prezzare') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'In vendita' } : { fatto: false, testo: 'Da prezzare' };
-    if (tabAttuale === 'da-confermare') {
-      if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: 'Confermata' };
-      if (scoperta(p)) return { fatto: false, testo: postiMancanti(p.totalePasseggeri - p.postiTotali) };
-      return { fatto: false, testo: 'Serve una linea' };
-    }
-    if (tabAttuale === 'confermato') {
-      if (scoperta(p)) return { fatto: false, testo: postiMancanti(p.totalePasseggeri - p.postiTotali) };
-      return { fatto: true, testo: '' };
+    if (tabAttuale === 'da-confermare' || tabAttuale === 'confermato') {
+      // Le linee da confermare nascono da sole (pareggio raggiunto, bus pieni).
+      if (p.lineeDaConfermare > 0) return { fatto: false, testo: p.lineeDaConfermare === 1 ? 'Linea da confermare' : `${p.lineeDaConfermare} linee da confermare` };
+      if (scoperta(p)) return { fatto: false, testo: postiMancanti(p.totalePasseggeri - p.postiSuiBus) };
+      if (tabAttuale === 'confermato') return { fatto: true, testo: '' };
+      return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'Confermata' } : { fatto: false, testo: 'Sotto il pareggio' };
     }
     return { fatto: true, testo: '' }; // Passate: nessuna etichetta di stato, mai contorno
   }
@@ -255,11 +255,11 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
               : parziale ? `${stati.length - daFare.length}/${stati.length} pronti`
               : etichetteDaFareUniche.length === 1 ? etichetteDaFareUniche[0]
               : `${daFare.length} da completare`;
-            // Senza bus il server segna i posti come illimitati: si
-            // contano i passeggeri, mai "2/999999 posti".
+            // Contano i posti dei bus confermati: quelli in vendita sono
+            // sempre "quasi illimitati", mai "2/999999 posti".
             const passeggeri = gruppo.reduce((s, p) => s + p.totalePasseggeri, 0);
-            const senzaBus = gruppo.filter((p) => p.postiTotali >= POSTI_SENZA_BUS).length;
-            const posti = gruppo.reduce((s, p) => s + (p.postiTotali >= POSTI_SENZA_BUS ? 0 : p.postiTotali), 0);
+            const senzaBus = gruppo.filter((p) => p.postiSuiBus === 0).length;
+            const posti = gruppo.reduce((s, p) => s + p.postiSuiBus, 0);
             const testoPosti = senzaBus === gruppo.length
               ? `${plurale(passeggeri, 'passeggero', 'passeggeri')} · nessun bus`
               : `${passeggeri}/${posti} posti${senzaBus > 0 ? ` · ${senzaBus} senza bus` : ''}`;

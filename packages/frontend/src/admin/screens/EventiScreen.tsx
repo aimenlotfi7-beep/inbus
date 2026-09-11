@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { notifica } from '../shared/notifiche';
+import { conferma } from '../shared/conferma';
+import { motivoErrore } from '../shared/errori';
 import { eventiApi } from '../../api/eventi';
 import { ErroreApi } from '../../api/client';
 import { prezzoMinimoEvento } from '../../api/prezzi';
@@ -91,9 +93,38 @@ export function EventiScreen() {
     }
   }
 
+  /** "Ferma vendite": l'evento sparisce dal sito e nessuno può più
+   *  prenotarlo, nemmeno con il link o dal widget. Le vendite non si
+   *  fermano mai da sole per i posti dei bus: questo è l'unico modo. */
+  const [venditeInSalvataggio, setVenditeInSalvataggio] = useState<string | null>(null);
+  async function alternaVendite(ev: Evento) {
+    const fermare = !ev.venditeFermate;
+    const ok = await conferma({
+      titolo: fermare ? `Fermare le vendite di ${ev.artista}?` : `Riaprire le vendite di ${ev.artista}?`,
+      testo: fermare
+        ? <>L'evento sparisce dal sito e nessuno può più prenotarlo, nemmeno con il link o dal widget. Chi ha già prenotato non cambia nulla. Puoi riaprire le vendite quando vuoi.</>
+        : <>Si potrà prenotare di nuovo{ev.visibileSito ? " e l'evento torna sul sito" : ''}.</>,
+      conferma: fermare ? 'Ferma le vendite' : 'Riapri le vendite',
+      pericolosa: fermare,
+    });
+    if (!ok) return;
+    setVenditeInSalvataggio(ev.id);
+    try {
+      await eventiApi.impostaVenditeFermate(ev.id, fermare);
+      notifica(fermare ? `Vendite di "${ev.artista}" fermate.` : `Vendite di "${ev.artista}" riaperte.`, 'successo');
+      ricarica();
+    } catch (e) {
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
+    } finally {
+      setVenditeInSalvataggio(null);
+    }
+  }
+
   if (modaleAperta) {
     return <SchedaEventoModale evento={inModifica} tabIniziale="dettagli" soloQuestaTab onClose={() => { setNuovoInCorso(false); chiudiUrl(); setInModifica(null); }} onSalvato={ricarica} />;
   }
+
+  const stilePulsanteCard = { fontSize: 'var(--testo-sm)', color: 'var(--mist)', padding: '2px 6px', border: 'none', whiteSpace: 'nowrap' } as const;
 
   return (
     <div>
@@ -114,7 +145,7 @@ export function EventiScreen() {
             onClick={() => apriModifica(ev)}
             opacitaRidotta={tab === 'passati'}
             mostraLinkPubblico
-            badge={ev.bozza ? 'Bozza' : undefined}
+            badge={ev.bozza ? 'Bozza' : ev.venditeFermate ? 'Vendite ferme' : undefined}
             extra={(() => {
               const p = prezzoMinimoEvento(ev);
               return (
@@ -130,9 +161,20 @@ export function EventiScreen() {
               // proprio quella distruttiva, in rosso a 10,5px.
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
                 <span style={{ fontSize: 'var(--testo-sm)', fontWeight: 600, color: 'var(--blue)', whiteSpace: 'nowrap' }}>Modifica →</span>
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', padding: '2px 6px', border: 'none', whiteSpace: 'nowrap' }} onClick={(e) => { e.stopPropagation(); setDaEliminare(ev); }} aria-label={`Elimina ${ev.artista}`}>
-                  Elimina
-                </button>
+                <span style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  {tab === 'futuri' && !ev.bozza && (
+                    <button
+                      type="button" className="btn btn-ghost" style={stilePulsanteCard}
+                      disabled={venditeInSalvataggio === ev.id}
+                      onClick={(e) => { e.stopPropagation(); alternaVendite(ev); }}
+                    >
+                      {venditeInSalvataggio === ev.id ? 'Salvo…' : ev.venditeFermate ? 'Riapri vendite' : 'Ferma vendite'}
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-ghost" style={stilePulsanteCard} onClick={(e) => { e.stopPropagation(); setDaEliminare(ev); }} aria-label={`Elimina ${ev.artista}`}>
+                    Elimina
+                  </button>
+                </span>
               </div>
             }
           />

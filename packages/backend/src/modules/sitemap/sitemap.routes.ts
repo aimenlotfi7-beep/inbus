@@ -24,6 +24,7 @@ sitemapRouter.get('/sitemap.xml', async (_req: Request, res: Response) => {
     .from(eventi)
     .where(and(
       eq(eventi.visibileSito, true),
+      eq(eventi.venditeFermate, false),
       gte(eventi.data, new Date()),
       // Stessa regola già applicata alla lista/pagina pubblica: senza
       // nemmeno un tragitto confermato, l'evento non esiste ancora per

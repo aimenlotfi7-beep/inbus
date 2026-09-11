@@ -11,6 +11,8 @@ export const listaAttesaService = {
   async iscriviti(input: IscrivitiListaAttesaInput) {
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, input.eventoId)).limit(1);
     if (!evento) throw new NonTrovato('Evento');
+    // "Ferma vendite": niente prenotazioni, e nemmeno la lista d'attesa.
+    if (evento.venditeFermate) throw new ConflittoDati('Le prenotazioni per questo evento sono chiuse.');
 
     const [riga] = await db.insert(listaAttesa).values({
       eventoId: input.eventoId,

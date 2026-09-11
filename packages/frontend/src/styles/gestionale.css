@@ -566,6 +566,7 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .tabella-righe .riga.spenta{color:var(--mist);}
 .tabella-righe .num{text-align:right; font-variant-numeric:tabular-nums;}
 .scheda-linea{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:var(--dusk);}
+.scheda-linea.da-confermare{border-style:dashed; border-color:var(--amber); background:color-mix(in srgb, var(--amber) 5%, var(--dusk));}
 .scheda-linea .riga-bus{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-top:1px solid var(--line); margin-top:10px; padding-top:10px;}
 .scheda-linea .pannello-in-linea{background:var(--dusk-2); border-radius:10px; padding:12px; margin-top:10px;}
 .nota-margine{font-size:var(--testo-md); margin:-4px 0 12px;}

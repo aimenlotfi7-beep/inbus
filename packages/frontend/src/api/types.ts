@@ -67,6 +67,9 @@ export interface Evento {
   statoDisponibilita: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
   visibileSito: boolean;
   bozza: boolean;
+  /** "Ferma vendite" dal gestionale: l'evento non compare sul sito e non si
+   *  può prenotare, nemmeno con il link o dal widget. */
+  venditeFermate?: boolean;
   descrizione: string | null;
   descrizioneSeo: string | null;
   cosaIncluso: string | null;

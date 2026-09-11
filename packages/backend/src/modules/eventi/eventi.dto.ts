@@ -190,6 +190,10 @@ export const aggiornaBusDiLineaSchema = creaLineaSchema.omit({ fermateIds: true 
 export const aggiornaPercorsoLineaSchema = z.object({
   fermateIds: z.array(z.string()).min(1),
 });
+// Interruttore "Ferma vendite" sulla card dell'evento.
+export const impostaVenditeFermateSchema = z.object({
+  fermate: z.boolean(),
+});
 
 // Fase 2 della revisione architetturale: orario/prezzo/posti per
 // fermata e per tragitto si modificano ora da Partenze, non più da

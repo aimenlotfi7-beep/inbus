@@ -61,6 +61,7 @@ export interface CalcoloBusTragitto {
   servizioId: string | null;
   nome: string;
   stato: 'DA_CONFERMARE' | 'PREZZATO' | 'CONFERMATO';
+  /** Posti dei bus confermati: quelli in vendita non si fermano mai. */
   postiTotali: number;
   capienzaPerBus: number;
   fermate: FermataConPasseggeri[];
@@ -68,6 +69,7 @@ export interface CalcoloBusTragitto {
   busSuggeriti: number;
   coperta: boolean;
   postiBusCensiti: number;
+  lineeDaConfermare: number;
 }
 export interface BusFisico {
   id: string;
@@ -104,7 +106,9 @@ export interface BusDiLinea {
   id: string; fornitoreId: string | null; riferimento: string; autistaNome: string | null; autistaTelefono: string | null;
   tourLeaderId: string | null; tourLeaderNome: string | null; costo: string | null; postiBus: number | null; note: string | null;
 }
-export interface Linea { id: string; nome: string; fermate: FermataLinea[]; bus: BusDiLinea[]; }
+/** daConfermare: linea creata in automatico (soglia di pareggio raggiunta o
+ *  bus pieni), senza bus finché l'admin non la conferma con confermaLinea. */
+export interface Linea { id: string; nome: string; daConfermare: boolean; fermate: FermataLinea[]; bus: BusDiLinea[]; }
 /** Un passeggero di UN bus: solo le prenotazioni che lo smistamento ha
  *  messo su quel bus, in ordine di orario della fermata e cognome. id = il
  *  partecipante (serve per segnare la salita); orario "HH:MM". */
@@ -155,6 +159,9 @@ export const eventiApi = {
   anteprimaVariazioni: (id: string, input: Partial<EventoInput>) =>
     api.post<AnteprimaVariazioniEvento>(`/api/eventi/${id}/anteprima-variazioni`, input),
   remove: (id: string) => api.delete<void>(`/api/eventi/${id}`),
+  // "Ferma vendite" / "Riapri vendite": con le vendite ferme l'evento non
+  // compare sul sito e non si può prenotare, nemmeno con il link.
+  impostaVenditeFermate: (id: string, fermate: boolean) => api.put<{ ok: true; venditeFermate: boolean }>(`/api/eventi/${id}/vendite`, { fermate }),
 
   calcolaBus: (id: string) => api.get<CalcoloBusTragitto[]>(`/api/eventi/${id}/calcola-bus`),
   listaBus: (id: string) => api.get<BusFisico[]>(`/api/eventi/${id}/bus`),
@@ -170,6 +177,10 @@ export const eventiApi = {
   // e li riprende lo smistamento. 409 se i posti del tragitto scenderebbero
   // sotto quelli venduti.
   eliminaLinea: (lineaId: string) => api.delete<{ ok: true }>(`/api/eventi/linee/${lineaId}`),
+  // Conferma una linea da confermare (creata in automatico): dati del primo
+  // bus e fermate, come creaLinea. 409 se nel frattempo è sparita perché non
+  // serviva più, o è già confermata.
+  confermaLinea: (lineaId: string, input: LineaInput) => api.post<EsitoCreaLinea>(`/api/eventi/linee/${lineaId}/conferma`, input),
   // L'assegnazione ai bus è solo automatica (per età, il giorno prima della
   // partenza): questa è l'anteprima, senza scritture.
   anteprimaSmistamento: (tragittoId: string) => api.get<AnteprimaSmistamento>(`/api/eventi/tragitti/${tragittoId}/anteprima-smistamento`),
@@ -207,6 +218,8 @@ export const eventiApi = {
     tragittoId: string; tragittoNome: string;
     stato: 'DA_CONFERMARE' | 'PREZZATO' | 'CONFERMATO';
     postiTotali: number; totalePasseggeri: number;
+    // Posti dei bus confermati (postiTotali resta "quasi illimitato") e linee da confermare.
+    postiSuiBus: number; lineeDaConfermare: number;
     preventivoCosto: string | null; fornitoreId: string | null; fermateCompilate: boolean; servizioNome: string | null; servizioId: string | null;
     evento: { id: string; artista: string; genere: string; data: string; citta: string; luogo: string; slug: string; immagineUrl: string | null };
   }>>('/api/eventi/elenco-partenze'),

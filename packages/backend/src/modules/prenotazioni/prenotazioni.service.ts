@@ -146,6 +146,9 @@ async function creaRigaInterna(
 
   const [evento] = await tx.select().from(eventi).where(eq(eventi.id, input.eventoId)).limit(1);
   if (!evento) throw new NonTrovato('Evento');
+  // "Ferma vendite" dal gestionale: nessuna prenotazione da nessun canale
+  // (sito, link diretto, widget White Label, carrello, lista d'attesa).
+  if (evento.venditeFermate) throw new ConflittoDati('Le prenotazioni per questo evento sono chiuse.');
 
   // --- Blocco posti atomico sul bus (come prima) ---
   const righeAggiornate = await tx
@@ -372,6 +375,11 @@ async function inviaConfermaPrenotazione(risultato: Awaited<ReturnType<typeof cr
     // cliente non arriva nulla.
     console.error('Invio email di conferma prenotazione non riuscito:', err);
   }
+
+  // Con i passeggeri nuovi può servire una linea da confermare (soglia di
+  // pareggio raggiunta, bus pieni). Non lancia mai.
+  const { lineeDaConfermareService } = await import('../eventi/linee-da-confermare.service.js');
+  await lineeDaConfermareService.allineaSubito(risultato.tragittoId);
 
   // Chi prenota quando mancano meno di 24 ore alla partenza (anche il giorno
   // stesso) riceve subito il bus e, a saldo completato, il biglietto, dopo la
@@ -676,7 +684,7 @@ export const prenotazioniService = {
    *  anche quando cancellava l'organizzazione). appenaCancellata dice se
    *  l'ha cancellata questa chiamata (false = lo era già). */
   async cancella(pnr: string, motivo: string): Promise<typeof prenotazioni.$inferSelect & { appenaCancellata: boolean }> {
-    return db.transaction(async (tx) => {
+    const esito = await db.transaction(async (tx) => {
       const [p] = await tx.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
       if (!p) throw new NonTrovato('Prenotazione');
       if (p.stato === 'CANCELLATA') return { ...p, appenaCancellata: false };
@@ -712,6 +720,13 @@ export const prenotazioniService = {
 
       return { ...aggiornata, appenaCancellata: true };
     });
+    // Con meno passeggeri una linea da confermare può non servire più: si
+    // toglie da sola. Non lancia mai.
+    if (esito.appenaCancellata) {
+      const { lineeDaConfermareService } = await import('../eventi/linee-da-confermare.service.js');
+      await lineeDaConfermareService.allineaSubito(esito.tragittoId);
+    }
+    return esito;
   },
 
   /** Elimina DEFINITIVAMENTE una prenotazione dal database — solo se già

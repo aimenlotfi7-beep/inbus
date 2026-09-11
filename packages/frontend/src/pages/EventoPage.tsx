@@ -119,7 +119,13 @@ export function EventoPage() {
               <p className="meta-riga">📍 {evento.luogo}, {evento.citta}</p>
               <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
 
-              {evento.statoDisponibilita && (
+              {/* "Ferma vendite" dal gestionale: chi arriva col link lo legge
+                  qui, anche su cellulare dove il modulo resta chiuso. */}
+              {evento.venditeFermate ? (
+                <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 'var(--testo-md)', display: 'inline-block', marginTop: 10 }}>
+                  Le prenotazioni per questo evento sono chiuse.
+                </p>
+              ) : evento.statoDisponibilita && (
                 <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 'var(--testo-md)', display: 'inline-block', marginTop: 10 }}>
                   {ETICHETTA_STATO[evento.statoDisponibilita]}
                 </p>
@@ -182,16 +188,18 @@ export function EventoPage() {
               {/* Su desktop questo bottone non si vede mai (è il CSS
                   a nasconderlo sopra i 900px) — il modulo lì è sempre
                   visibile per intero, come prima. */}
-              <button
-                type="button"
-                className="checkout-riepilogo-chiuso"
-                onClick={apriPrenotazione}
-              >
-                <span>
-                  {prezzoMinimo !== null ? <>da <b>{formattaEuro(prezzoMinimo)}</b> /persona</> : 'Vedi disponibilità'}
-                </span>
-                <span className="checkout-riepilogo-cta">Acquista ora</span>
-              </button>
+              {!evento.venditeFermate && (
+                <button
+                  type="button"
+                  className="checkout-riepilogo-chiuso"
+                  onClick={apriPrenotazione}
+                >
+                  <span>
+                    {prezzoMinimo !== null ? <>da <b>{formattaEuro(prezzoMinimo)}</b> /persona</> : 'Vedi disponibilità'}
+                  </span>
+                  <span className="checkout-riepilogo-cta">Acquista ora</span>
+                </button>
+              )}
               <div className="checkout-form-wrap">
                 <CheckoutForm evento={evento} />
               </div>
@@ -206,7 +214,7 @@ export function EventoPage() {
           quando il modulo è ancora chiuso — resta sempre raggiungibile
           col pollice mentre si scorre la pagina, senza dover risalire
           fino al modulo. */}
-      {evento && !prenotazioneAperta && (
+      {evento && !prenotazioneAperta && !evento.venditeFermate && (
         <div className="barra-prenota-fissa-mobile">
           <span>{prezzoMinimo !== null ? <>da <b>{formattaEuro(prezzoMinimo)}</b> /persona</> : ''}</span>
           <button type="button" onClick={apriPrenotazione}>Acquista ora</button>

@@ -142,6 +142,11 @@ export const eventi = pgTable('eventi', {
   // (default), vale comunque la regola "non visibile dopo la data
   // dell'evento" applicata separatamente.
   visibileSito: boolean('visibile_sito').notNull().default(true),
+  // "Ferma vendite" (card dell'evento in Eventi): l'evento sparisce dal sito
+  // (elenchi, tour, bundle, sitemap) e nessuno può prenotarlo, nemmeno con
+  // il link o dal widget White Label. Le vendite non si fermano mai da sole
+  // per i posti dei bus: questo è l'unico interruttore.
+  venditeFermate: boolean('vendite_fermate').notNull().default(false),
   // Vero mentre l'evento è ancora in fase di creazione, non ancora
   // confermato dall'amministratore — salvato in automatico man mano che
   // si compila il modulo "Nuovo evento", così un'uscita accidentale (o
@@ -551,6 +556,11 @@ export const linee = pgTable('linee', {
   tragittoId: text('tragitto_id').notNull().references(() => tragitti.id, { onDelete: 'cascade' }),
   nome: text('nome').notNull(), // es. "Linea 1" — assegnato in automatico, modificabile
   ordine: integer('ordine').notNull().default(0),
+  // Vera per una linea creata in automatico e non ancora confermata
+  // dall'admin (soglia di pareggio raggiunta, o bus pieni): non ha bus,
+  // copre le fermate attive e sparisce da sola se non serve più. Si
+  // conferma con i dati del bus (vedi linee-da-confermare.service.ts).
+  daConfermare: boolean('da_confermare').notNull().default(false),
   creatoIl: timestamp('creato_il').notNull().defaultNow(),
 }, (t) => ({
   perTragitto: index('linee_tragitto_idx').on(t.tragittoId),

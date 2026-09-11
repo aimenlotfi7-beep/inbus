@@ -37,18 +37,25 @@ type PrezzoFermata = {
 };
 
 /** Un solo indicatore di stato per tragitto, con le stesse parole delle
- *  card in elenco (PartenzeScreen): rosso se mancano posti (il problema
- *  più urgente, ha sempre la precedenza), arancio se serve ancora
- *  qualcosa, verde se è a posto. Niente simboli: il colore basta. */
+ *  card in elenco (PartenzeScreen): arancio se c'è una linea da confermare
+ *  o il pareggio non è raggiunto, rosso se su un tragitto confermato
+ *  mancano posti sui bus, verde se è a posto. Niente simboli: il colore
+ *  basta. */
 function statoTragitto(tragitto: CalcoloBusTragitto) {
   // Finché i prezzi non sono salvati il tragitto non è nemmeno in
   // vendita (non può avere prenotazioni): gli altri controlli non hanno
   // ancora senso.
   if (tragitto.stato === 'DA_CONFERMARE') return { classe: 'attenzione', etichetta: 'Da prezzare, non ancora in vendita' };
-  const mancanti = tragitto.totalePasseggeri - tragitto.postiTotali;
-  if (mancanti > 0) return { classe: 'non-coperta', etichetta: mancanti === 1 ? 'Manca 1 posto' : `Mancano ${mancanti} posti` };
-  if (tragitto.stato === 'CONFERMATO') return { classe: 'coperta', etichetta: 'Confermata' };
-  return { classe: 'attenzione', etichetta: 'Serve una linea' };
+  // Le linee da confermare nascono da sole (pareggio raggiunto, bus pieni).
+  if (tragitto.lineeDaConfermare > 0) return { classe: 'attenzione', etichetta: tragitto.lineeDaConfermare === 1 ? 'Linea da confermare' : `${tragitto.lineeDaConfermare} linee da confermare` };
+  if (tragitto.stato === 'CONFERMATO') {
+    // postiTotali qui = posti dei bus confermati (quelli in vendita non si
+    // fermano mai).
+    const mancanti = tragitto.totalePasseggeri - tragitto.postiTotali;
+    if (mancanti > 0) return { classe: 'non-coperta', etichetta: mancanti === 1 ? 'Manca 1 posto' : `Mancano ${mancanti} posti` };
+    return { classe: 'coperta', etichetta: 'Confermata' };
+  }
+  return { classe: 'attenzione', etichetta: 'Sotto il pareggio' };
 }
 
 function classeBadge(classe: string) {
@@ -1059,7 +1066,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
             // ogni riga porta alla modifica di quel dato specifico.
             caricaLineeSeServe(tragitto.tragittoId);
             const lineeCaricate = lineePerTragitto.get(tragitto.tragittoId);
-            const linee = Array.isArray(lineeCaricate) ? lineeCaricate : [];
+            const tutteLeLinee = Array.isArray(lineeCaricate) ? lineeCaricate : [];
+            const linee = tutteLeLinee.filter((l) => !l.daConfermare);
+            const lineeDaConfermare = tutteLeLinee.length - linee.length;
             const busNelleLinee = linee.flatMap((l) => l.bus);
             const postiNelleLinee = busNelleLinee.reduce((tot, b) => tot + (b.postiBus ?? 0), 0);
             const rigaStile: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--line)' };
@@ -1084,7 +1093,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
                     <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>
                       · {lineeCaricate === undefined ? 'Carico…'
                         : lineeCaricate === 'errore' ? 'non disponibili'
-                        : `${plurale(linee.length, 'linea', 'linee')} · ${plurale(busNelleLinee.length, 'bus', 'bus')} · ${plurale(postiNelleLinee, 'posto', 'posti')}`}
+                        : `${plurale(linee.length, 'linea', 'linee')}${lineeDaConfermare > 0 ? ` (+${lineeDaConfermare} da confermare)` : ''} · ${plurale(busNelleLinee.length, 'bus', 'bus')} · ${plurale(postiNelleLinee, 'posto', 'posti')}`}
                     </span>
                   </div>
                   <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px' }} onClick={() => apriPaginaLinee(tragitto.tragittoId)}>Modifica</button>

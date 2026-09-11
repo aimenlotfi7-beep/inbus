@@ -610,6 +610,13 @@
       "when": 1789063588580,
       "tag": "0086_organic_mister_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1789133293205,
+      "tag": "0087_certain_starbolt",
+      "breakpoints": true
     }
   ]
 }

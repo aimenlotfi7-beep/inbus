@@ -32,6 +32,10 @@ type Pannello =
   | { tipo: 'aggiungi-bus'; lineaId: string }
   | { tipo: 'modifica-percorso'; lineaId: string };
 
+/** Il modale a due passi (dati del bus, poi fermate): per una linea nuova o
+ *  per confermare una linea da confermare creata in automatico. */
+type ModaleLinea = { tipo: 'nuova' } | { tipo: 'conferma'; linea: Linea };
+
 /** Pagina delle linee di UN tragitto — sia come pagina a sé
  *  (?sezione=linee&evento=...&tragitto=...&da=..., aperta da
  *  Confermate/Passate) sia INCORPORATA direttamente dentro "Da
@@ -44,6 +48,12 @@ type Pannello =
  *  I posti sui bus non si assegnano a mano: li decide lo smistamento
  *  automatico per età il giorno prima della partenza (gruppi uniti, dal
  *  più grande al più giovane). Qui se ne vede l'anteprima.
+ *
+ *  Le linee "da confermare" nascono da sole: la prima quando le
+ *  prenotazioni raggiungono la soglia di pareggio, un'altra ogni volta che
+ *  i passeggeri riempiono i posti delle linee che ci sono. Non hanno bus
+ *  finché non le si conferma con i dati del bus, e spariscono da sole se
+ *  non servono più. Le vendite non si fermano per i posti dei bus.
  *
  *  Una "linea" è un CONTENITORE: un percorso (quali fermate copre) che
  *  può avere uno o più bus dentro. Linee diverse dello stesso tragitto
@@ -73,8 +83,8 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
 
   const [fermataInSalvataggio, setFermataInSalvataggio] = useState<string | null>(null);
   const [pannello, setPannello] = useState<Pannello | null>(null);
-  const [nuovaLineaAperta, setNuovaLineaAperta] = useState(false);
-  const [stepNuovaLinea, setStepNuovaLinea] = useState<1 | 2>(1);
+  const [modaleLinea, setModaleLinea] = useState<ModaleLinea | null>(null);
+  const [stepLinea, setStepLinea] = useState<1 | 2>(1);
   const [formBus, setFormBus] = useState<BusDiLineaInput & { postiBus?: number }>(BUS_VUOTO);
   const [fermateSelezionate, setFermateSelezionate] = useState<string[]>([]);
   const [percorsoModificato, setPercorsoModificato] = useState<string[]>([]);
@@ -163,12 +173,23 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   const calcoloTragitto = calcolo.find((c) => c.tragittoId === idTragitto);
   const prenotatiPerFermata = new Map(calcoloTragitto?.fermate.map((f) => [f.fermataId, f.passeggeri]) ?? []);
   const passeggeriTotali = calcoloTragitto?.totalePasseggeri ?? 0;
-  const tuttiIBus = linee.flatMap((l) => l.bus);
+  const lineeConfermate = linee.filter((l) => !l.daConfermare);
+  const lineeDaConfermare = linee.filter((l) => l.daConfermare);
+  const tuttiIBus = lineeConfermate.flatMap((l) => l.bus);
   const postiSuiBus = tuttiIBus.reduce((tot, b) => tot + (b.postiBus ?? 0), 0);
+  const postiPrevistiPerLinea = tragittoVero.preventivoPostiBus;
   const datiEconomia = economia.find((e) => e.tragittoId === idTragitto);
   const anteprimaPerBus = new Map((anteprima?.linee ?? []).flatMap((l) => l.bus).map((b) => [b.busId, b]));
   const giorniAllEvento = Math.ceil((new Date(evento.data).getTime() - Date.now()) / 86400000);
   const testoGiorni = giorniAllEvento < 0 ? 'Passato' : giorniAllEvento === 0 ? 'Oggi' : giorniAllEvento === 1 ? 'Domani' : `Tra ${giorniAllEvento} giorni`;
+  // Dati del preventivo accettato (fornitore, posti, costo): per una linea
+  // nuova o da confermare resta da scrivere solo la targa.
+  const busDalPreventivo: BusDiLineaInput & { postiBus?: number } = {
+    riferimento: '',
+    fornitoreId: tragittoVero.fornitoreId ?? undefined,
+    postiBus: tragittoVero.preventivoPostiBus ?? undefined,
+    costo: tragittoVero.preventivoCosto ? Number(tragittoVero.preventivoCosto) : undefined,
+  };
 
   /** Quanti passeggeri sono già sui bus, per città, sommando tutte le linee. */
   function suiBusPerCitta(citta: string) {
@@ -177,9 +198,9 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
 
   // ---- Fermate ----
   // Chi viene avvisato quando si esclude una fermata lo calcola il server
-  // (anteprima): chi ha prenotato su una fermata che nessuna linea copre
-  // riceve l'email di variazione; le fermate già dentro una linea restano
-  // servite, e lì non si avvisa nessuno.
+  // (anteprima): chi ha prenotato su una fermata che nessuna linea
+  // confermata copre riceve l'email di variazione; le fermate già dentro
+  // una linea confermata restano servite, e lì non si avvisa nessuno.
   async function alternaFermataAttiva(f: Fermata) {
     const t = tragittoVero;
     if (!t || fermataInSalvataggio) return;
@@ -207,7 +228,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
           return;
         }
         const prenotati = prenotatiPerFermata.get(f.id) ?? 0;
-        const giaInUnaLinea = linee.some((l) => l.fermate.some((lf) => lf.citta === f.citta));
+        const giaInUnaLinea = lineeConfermate.some((l) => l.fermate.some((lf) => lf.citta === f.citta));
         if (avvisi.clientiTotali > 0) {
           if (!(await confermaAvvisiClienti(avvisi, 'Escludi e avvisa i clienti'))) return;
         } else if (prenotati > 0 && giaInUnaLinea) {
@@ -237,24 +258,34 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   function apriNuovaLinea() {
     setFormBus(BUS_VUOTO);
     setFermateSelezionate([]);
-    setStepNuovaLinea(1);
+    setStepLinea(1);
     chiudiPannello();
-    setNuovaLineaAperta(true);
+    setModaleLinea({ tipo: 'nuova' });
   }
-  /** Dai dati del preventivo accettato (fornitore, posti, costo) e con
-   *  tutte le fermate attive già scelte: resta da scrivere solo la targa. */
+  /** Dai dati del preventivo accettato e con tutte le fermate attive già
+   *  scelte: resta da scrivere solo la targa. */
   function apriNuovaLineaDaSuggerimento() {
-    setFormBus({ riferimento: '', fornitoreId: suggerimento?.fornitoreId ?? undefined, postiBus: suggerimento?.postiBus ?? undefined, costo: suggerimento?.costo ?? undefined });
+    setFormBus(busDalPreventivo);
     setFermateSelezionate(fermateAttive.map((f) => f.id));
-    setStepNuovaLinea(1);
+    setStepLinea(1);
     chiudiPannello();
-    setNuovaLineaAperta(true);
+    setModaleLinea({ tipo: 'nuova' });
+  }
+  /** Conferma di una linea da confermare: dati del preventivo e le fermate
+   *  della linea (solo quelle ancora attive, le altre non si possono scegliere). */
+  function apriConfermaLinea(linea: Linea) {
+    setFormBus(busDalPreventivo);
+    setFermateSelezionate(linea.fermate.map((f) => f.fermataId).filter((id) => fermateAttive.some((f) => f.id === id)));
+    setStepLinea(1);
+    chiudiPannello();
+    setModaleLinea({ tipo: 'conferma', linea });
   }
 
-  async function salvaNuovaLinea() {
+  async function salvaLinea() {
+    if (!modaleLinea) return;
     if (!formBus.riferimento?.trim() || !formBus.postiBus) {
       notifica('Indica un riferimento per il bus e quanti posti ha.', 'errore');
-      setStepNuovaLinea(1);
+      setStepLinea(1);
       return;
     }
     if (fermateSelezionate.length === 0) {
@@ -263,16 +294,23 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     }
     setSalvando(true);
     try {
-      const esito = await eventiApi.creaLinea(idEvento, { ...formBus, postiBus: formBus.postiBus, fermateIds: fermateSelezionate });
-      setNuovaLineaAperta(false);
-      // Con la prima linea la partenza diventa confermata e chi ha
-      // prenotato riceve l'email: il messaggio dice com'è andata.
-      if (esito.partenzaConfermata) notificaEsitoAvvisi('Linea creata e partenza confermata', esito);
-      else notifica('Linea creata.', 'successo');
+      const input = { ...formBus, postiBus: formBus.postiBus, fermateIds: fermateSelezionate };
+      const esito = modaleLinea.tipo === 'conferma'
+        ? await eventiApi.confermaLinea(modaleLinea.linea.id, input)
+        : await eventiApi.creaLinea(idEvento, input);
+      const fatto = modaleLinea.tipo === 'conferma' ? `${modaleLinea.linea.nome} confermata` : 'Linea creata';
+      setModaleLinea(null);
+      // Con la prima linea confermata la partenza diventa confermata e chi
+      // ha prenotato riceve l'email: il messaggio dice com'è andata.
+      if (esito.partenzaConfermata) notificaEsitoAvvisi(`${fatto} e partenza confermata`, esito);
+      else notifica(`${fatto}.`, 'successo');
       if (esito.tourLeaderAvvisato !== null) notifica(esito.tourLeaderAvvisato ? 'Il tour leader è stato avvisato via email.' : "L'email al tour leader non è partita: avvisalo tu.", esito.tourLeaderAvvisato ? 'successo' : 'errore');
       aggiornaDopoModifica();
     } catch (e) {
       notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
+      // Una linea da confermare può essere sparita nel frattempo (non
+      // serviva più): la pagina si rimette in pari.
+      if (modaleLinea.tipo === 'conferma') ricarica();
     } finally {
       setSalvando(false);
     }
@@ -466,14 +504,31 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
 
   // ---- Il prossimo passo: una cosa sola, con un solo pulsante blu ----
   let prossimoPasso: { tono: 'azione' | 'avviso' | 'info'; titolo: string; testo: ReactNode; azione?: { testo: string; onClick: () => void } };
-  const mancanoPosti = linee.length > 0 ? passeggeriTotali - postiSuiBus : 0;
-  if (linee.length === 0) {
-    const mancantiAlPareggio = suggerimento?.postiDiPareggio != null ? Math.max(0, Math.ceil(suggerimento.postiDiPareggio - suggerimento.totaleConfermati)) : null;
+  const mancanoPosti = lineeConfermate.length > 0 ? passeggeriTotali - postiSuiBus : 0;
+  const mancantiAlPareggio = suggerimento?.postiDiPareggio != null ? Math.max(0, Math.ceil(suggerimento.postiDiPareggio - suggerimento.totaleConfermati)) : null;
+  if (lineeDaConfermare.length > 0) {
+    const prima = lineeDaConfermare[0];
+    prossimoPasso = {
+      tono: 'azione',
+      titolo: lineeDaConfermare.length === 1 ? `${prima.nome} da confermare` : `${lineeDaConfermare.length} linee da confermare`,
+      testo: lineeConfermate.length === 0
+        ? 'Le prenotazioni hanno raggiunto la soglia di pareggio: inserisci i dati del bus per confermare la linea. Fornitore, posti e costo arrivano dal preventivo.'
+        : 'I passeggeri hanno riempito i posti dei bus confermati: inserisci i dati del prossimo bus. Intanto le vendite continuano.',
+      azione: { testo: `Conferma ${prima.nome}`, onClick: () => apriConfermaLinea(prima) },
+    };
+  } else if (lineeConfermate.length === 0) {
     prossimoPasso = suggerimento?.pronta
       ? { tono: 'azione', titolo: 'Pronta da confermare', testo: 'Le prenotazioni coprono il costo: crea la linea, i dati del preventivo sono già pronti.', azione: { testo: 'Crea la linea', onClick: apriNuovaLineaDaSuggerimento } }
-      : { tono: 'azione', titolo: 'Nessuna linea ancora', testo: mancantiAlPareggio ? `Mancano ${plurale(mancantiAlPareggio, 'passeggero', 'passeggeri')} alla soglia di pareggio: puoi aspettare o creare già la linea.` : 'Crea la prima linea quando le prenotazioni bastano.', azione: { testo: 'Crea la linea', onClick: apriNuovaLinea } };
+      : {
+        tono: 'info',
+        titolo: 'Nessuna linea ancora',
+        testo: mancantiAlPareggio
+          ? `Mancano ${plurale(mancantiAlPareggio, 'passeggero', 'passeggeri')} alla soglia di pareggio: a quel punto la linea da confermare si crea da sola. Se vuoi, puoi crearla già adesso.`
+          : 'La linea da confermare si crea da sola quando le prenotazioni raggiungono la soglia di pareggio.',
+        azione: { testo: 'Crea la linea', onClick: apriNuovaLinea },
+      };
   } else if (mancanoPosti > 0) {
-    prossimoPasso = { tono: 'avviso', titolo: mancanoPosti === 1 ? 'Manca 1 posto' : `Mancano ${mancanoPosti} posti`, testo: 'I passeggeri confermati sono più dei posti sui bus: aggiungi un bus a una linea.', azione: { testo: 'Aggiungi un bus', onClick: () => apriAggiungiBus(linee[0].id) } };
+    prossimoPasso = { tono: 'avviso', titolo: mancanoPosti === 1 ? 'Manca 1 posto' : `Mancano ${mancanoPosti} posti`, testo: 'I passeggeri confermati sono più dei posti sui bus: aggiungi un bus a una linea.', azione: { testo: 'Aggiungi un bus', onClick: () => apriAggiungiBus(lineeConfermate[0].id) } };
   } else if (anteprima && anteprima.senzaPosto.passeggeri > 0) {
     prossimoPasso = { tono: 'avviso', titolo: `${anteprima.senzaPosto.passeggeri === 1 ? '1 passeggero resterebbe' : `${anteprima.senzaPosto.passeggeri} passeggeri resterebbero`} senza posto`, testo: 'La loro fermata non è in nessuna linea, oppure i bus che la coprono sono pieni.', azione: { testo: 'Crea una linea', onClick: apriNuovaLinea } };
   } else if (anteprima?.giaSmistato) {
@@ -556,6 +611,31 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       {linee.length === 0 && <p className="testo-intro">Nessuna linea ancora per questo tragitto.</p>}
       {linee.map((l) => {
         const percorso = l.fermate.map((f) => f.citta).join(' → ');
+
+        // Linea da confermare: nessun bus, un solo pulsante per confermarla.
+        if (l.daConfermare) {
+          const motivo = lineeConfermate.length === 0 && lineeDaConfermare[0]?.id === l.id
+            ? 'Creata in automatico: le prenotazioni hanno raggiunto la soglia di pareggio.'
+            : 'Creata in automatico: i passeggeri hanno riempito i posti delle altre linee.';
+          return (
+            <div key={l.id} className="scheda-linea da-confermare">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontWeight: 700, margin: 0 }}>{l.nome} <span className="badge attenzione" style={{ marginLeft: 4 }}>Da confermare</span></p>
+                  <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', margin: '2px 0 0' }}>
+                    {percorso || 'Nessuna fermata'}{postiPrevistiPerLinea ? ` · ${plurale(postiPrevistiPerLinea, 'posto previsto', 'posti previsti')}` : ''}
+                  </p>
+                </div>
+                <button type="button" className="btn btn-primary btn-piccolo" onClick={() => apriConfermaLinea(l)}>Conferma linea</button>
+              </div>
+              <p style={{ fontSize: 'var(--testo-md)', margin: '10px 0 0' }}>{motivo} Inserisci i dati del bus per confermarla: da quel momento lo smistamento per età ci mette i passeggeri.</p>
+              {lineeConfermate.length > 0 && (
+                <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', margin: '6px 0 0' }}>Preferisci un bus in più su una linea già confermata? Aggiungilo lì: questa linea sparisce da sola.</p>
+              )}
+            </div>
+          );
+        }
+
         const prenotazioniLinea = l.fermate.reduce((tot, f) => tot + f.inAttesa + f.versati, 0);
         const postiLinea = l.bus.reduce((tot, b) => tot + (b.postiBus ?? 0), 0);
         return (
@@ -684,19 +764,23 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         );
       })}
 
-      {nuovaLineaAperta && (
-        <Modale titolo={`Nuova linea — passo ${stepNuovaLinea} di 2`} onClose={() => setNuovaLineaAperta(false)} larga>
-          {stepNuovaLinea === 1 && (
+      {modaleLinea && (
+        <Modale titolo={`${modaleLinea.tipo === 'conferma' ? `Conferma ${modaleLinea.linea.nome}` : 'Nuova linea'} — passo ${stepLinea} di 2`} onClose={() => setModaleLinea(null)} larga>
+          {stepLinea === 1 && (
             <>
-              <p className="testo-intro" style={{ marginTop: -4 }}>Dati del primo bus della linea.</p>
+              <p className="testo-intro" style={{ marginTop: -4 }}>
+                {modaleLinea.tipo === 'conferma'
+                  ? 'Dati del bus che farà questa linea: fornitore, posti e costo arrivano dal preventivo, controllali e scrivi la targa.'
+                  : 'Dati del primo bus della linea.'}
+              </p>
               {campiBus(true)}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setNuovaLineaAperta(false)}>Annulla</button>
+                <button type="button" className="btn btn-ghost" onClick={() => setModaleLinea(null)}>Annulla</button>
                 <button
                   type="button" className="btn btn-primary"
                   onClick={() => {
                     if (!formBus.riferimento?.trim() || !formBus.postiBus) { notifica('Indica un riferimento per il bus e quanti posti ha.', 'errore'); return; }
-                    setStepNuovaLinea(2);
+                    setStepLinea(2);
                   }}
                 >
                   Avanti: scegli le fermate
@@ -704,9 +788,13 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
               </div>
             </>
           )}
-          {stepNuovaLinea === 2 && (
+          {stepLinea === 2 && (
             <>
-              <p className="testo-intro" style={{ marginTop: -4 }}>Scegli le fermate in qualsiasi ordine: l'ordine finale lo decide l'orario di ciascuna.</p>
+              <p className="testo-intro" style={{ marginTop: -4 }}>
+                {modaleLinea.tipo === 'conferma'
+                  ? "Le fermate della linea: di solito tutte, lo smistamento divide i passeggeri per età tra i bus. L'ordine lo decide l'orario di ciascuna."
+                  : "Scegli le fermate in qualsiasi ordine: l'ordine finale lo decide l'orario di ciascuna."}
+              </p>
               {fermateAttive.map((f) => (
                 <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 'var(--testo-base)' }}>
                   <input
@@ -729,8 +817,10 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
                 </p>
               )}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setStepNuovaLinea(1)}>← Dati del bus</button>
-                <button type="button" className="btn btn-primary" onClick={salvaNuovaLinea} disabled={salvando}>{salvando ? 'Salvo…' : 'Crea la linea'}</button>
+                <button type="button" className="btn btn-ghost" onClick={() => setStepLinea(1)}>← Dati del bus</button>
+                <button type="button" className="btn btn-primary" onClick={salvaLinea} disabled={salvando}>
+                  {salvando ? 'Salvo…' : modaleLinea.tipo === 'conferma' ? 'Conferma la linea' : 'Crea la linea'}
+                </button>
               </div>
             </>
           )}

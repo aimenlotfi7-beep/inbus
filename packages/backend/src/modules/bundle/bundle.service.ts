@@ -19,12 +19,13 @@ async function slugUnivoco(base: string, idDaEscludere?: string) {
 }
 
 /** Vendibilità di ogni evento in una query: futuro, non eliminato, con
- *  almeno un tragitto prezzato/confermato attivo e con posti. */
+ *  almeno un tragitto prezzato/confermato attivo e con posti, e vendite non
+ *  fermate dal gestionale. */
 async function vendibilitaEventi(eventiIds: string[]): Promise<Map<string, boolean>> {
   if (eventiIds.length === 0) return new Map();
   const righe = await db.select({ eventoId: tragitti.eventoId })
     .from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-    .where(and(inArray(tragitti.eventoId, eventiIds), inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), sql`${tragitti.postiDisponibili} > 0`, isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
+    .where(and(inArray(tragitti.eventoId, eventiIds), inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), sql`${tragitti.postiDisponibili} > 0`, isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`, eq(eventi.venditeFermate, false)));
   const ok = new Set(righe.map((r) => r.eventoId));
   return new Map(eventiIds.map((id) => [id, ok.has(id)]));
 }

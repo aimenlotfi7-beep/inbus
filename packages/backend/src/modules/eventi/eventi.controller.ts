@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { eventiService } from './eventi.service.js';
+import { lineeDaConfermareService } from './linee-da-confermare.service.js';
 import { smistamentoService } from '../prenotazioni/smistamento.service.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 
@@ -40,6 +41,11 @@ export const eventiController = {
     await eventiService.remove(req.params.id);
     res.status(204).send();
   },
+  /** "Ferma vendite" / "Riapri vendite" sulla card dell'evento in Eventi. */
+  async impostaVenditeFermate(req: Request, res: Response) {
+    const venditeFermate = await eventiService.impostaVenditeFermate(req.params.id, req.body.fermate);
+    res.json({ ok: true, venditeFermate });
+  },
 
   async eventiEliminati(_req: Request, res: Response) {
     res.json(await eventiService.eventiEliminati());
@@ -69,18 +75,30 @@ export const eventiController = {
     res.json(await eventiService.listaBus(req.params.id));
   },
 
-  // Dopo una linea o un bus aggiunti o modificati lo smistamento parte
-  // subito: chi aspetta un posto nelle ultime 24 ore (anche il giorno
-  // stesso) lo riceve senza aspettare il giro dell'ora. Non lancia mai.
-  // Dopo un'eliminazione invece no: si lascia il tempo di aggiungere il bus
-  // che la sostituisce.
+  // Dopo una linea o un bus aggiunti, modificati o tolti: le linee da
+  // confermare si aggiornano (ne nasce una se i posti non bastano più,
+  // sparisce se non serve) e lo smistamento parte subito, così chi aspetta
+  // un posto nelle ultime 24 ore (anche il giorno stesso) lo riceve senza
+  // aspettare il giro dell'ora. Dopo un'eliminazione lo smistamento no: si
+  // lascia il tempo di aggiungere il bus che la sostituisce. Nessuna di
+  // queste chiamate lancia.
   async creaLinea(req: Request, res: Response) {
     const risultato = await eventiService.creaLinea(req.params.id, req.body);
+    await lineeDaConfermareService.allineaSubito(risultato.tragittoId);
     await smistamentoService.smistaSubitoPerLinea(risultato.lineaId);
     res.status(201).json(risultato);
   },
+  /** Conferma una linea da confermare (creata in automatico): dati del bus
+   *  e fermate. */
+  async confermaLinea(req: Request, res: Response) {
+    const risultato = await eventiService.confermaLinea(req.params.lineaId, req.body);
+    await lineeDaConfermareService.allineaSubito(risultato.tragittoId);
+    await smistamentoService.smistaSubitoPerLinea(risultato.lineaId);
+    res.json(risultato);
+  },
   async aggiungiBusALinea(req: Request, res: Response) {
-    const { busId, tourLeaderAvvisato } = await eventiService.aggiungiBusALinea(req.params.lineaId, req.body);
+    const { busId, tragittoId, tourLeaderAvvisato } = await eventiService.aggiungiBusALinea(req.params.lineaId, req.body);
+    await lineeDaConfermareService.allineaSubito(tragittoId);
     await smistamentoService.smistaSubitoPerLinea(req.params.lineaId);
     res.status(201).json({ id: busId, tourLeaderAvvisato });
   },
@@ -91,6 +109,7 @@ export const eventiController = {
   },
   async aggiornaBusDiLinea(req: Request, res: Response) {
     const { tourLeaderAvvisato } = await eventiService.aggiornaBusDiLinea(req.params.busId, req.body);
+    await lineeDaConfermareService.allineaSubitoPerBus(req.params.busId);
     await smistamentoService.smistaSubitoPerBus(req.params.busId);
     res.json({ ok: true, tourLeaderAvvisato });
   },
@@ -100,7 +119,8 @@ export const eventiController = {
   /** Elimina la linea e i suoi bus: i passeggeri assegnati tornano senza
    *  bus e li riprende lo smistamento automatico. */
   async eliminaLinea(req: Request, res: Response) {
-    await eventiService.eliminaLinea(req.params.lineaId);
+    const { tragittoId } = await eventiService.eliminaLinea(req.params.lineaId);
+    await lineeDaConfermareService.allineaSubito(tragittoId);
     res.json({ ok: true });
   },
   /** Come verrebbero riempiti i bus del tragitto, senza scritture. */
@@ -115,17 +135,22 @@ export const eventiController = {
   async anteprimaTragittoOperativo(req: Request, res: Response) {
     res.json(await eventiService.anteprimaTragittoOperativo(req.params.tragittoId, req.body));
   },
+  // Preventivo e prezzi decidono quando un tragitto è in vendita e quanti
+  // posti conta una linea: le linee da confermare si aggiornano subito.
   async registraPreventivoManuale(req: Request, res: Response) {
     await eventiService.registraPreventivoManuale(req.params.tragittoId, req.body);
+    await lineeDaConfermareService.allineaSubito(req.params.tragittoId);
     res.json({ ok: true });
   },
   async calcolaPrezziVendita(req: Request, res: Response) {
     await eventiService.calcolaPrezziVendita(req.params.tragittoId, req.body);
+    await lineeDaConfermareService.allineaSubito(req.params.tragittoId);
     res.json({ ok: true });
   },
 
   async rimuoviBus(req: Request, res: Response) {
-    await eventiService.rimuoviBus(req.params.id, req.params.busId);
+    const { tragittoId } = await eventiService.rimuoviBus(req.params.id, req.params.busId);
+    if (tragittoId) await lineeDaConfermareService.allineaSubito(tragittoId);
     res.status(204).send();
   },
 

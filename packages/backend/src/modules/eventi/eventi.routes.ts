@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { eventiController } from './eventi.controller.js';
-import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema, creaLineaSchema, aggiungiBusALineaSchema, aggiornaBusDiLineaSchema, aggiornaPercorsoLineaSchema } from './eventi.dto.js';
+import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema, creaLineaSchema, aggiungiBusALineaSchema, aggiornaBusDiLineaSchema, aggiornaPercorsoLineaSchema, impostaVenditeFermateSchema } from './eventi.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
@@ -63,12 +63,18 @@ eventiRouter.delete(
   richiedePermesso('eventi.elimina'),
   asyncHandler(eventiController.remove)
 );
+// "Ferma vendite" / "Riapri vendite": l'evento sparisce dal sito e nessuno
+// può più prenotarlo, nemmeno con il link o dal widget.
+eventiRouter.put('/:id/vendite', richiedeAuth, richiedePermesso('eventi.crea'), valida(impostaVenditeFermateSchema), asyncHandler(eventiController.impostaVenditeFermate));
 
 // Sezione Partenze: calcolo bus necessari, copertura tratte, bus fisici.
 eventiRouter.get('/:id/calcola-bus', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.calcolaBus));
 eventiRouter.get('/:id/bus', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaBus));
 
 eventiRouter.post('/:id/linee', richiedeAuth, richiedePermesso('eventi.crea'), valida(creaLineaSchema), asyncHandler(eventiController.creaLinea));
+// Conferma una linea da confermare (creata in automatico): dati del primo
+// bus e fermate, come la creazione di una linea.
+eventiRouter.post('/linee/:lineaId/conferma', richiedeAuth, richiedePermesso('eventi.crea'), valida(creaLineaSchema), asyncHandler(eventiController.confermaLinea));
 eventiRouter.post('/linee/:lineaId/bus', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiungiBusALineaSchema), asyncHandler(eventiController.aggiungiBusALinea));
 eventiRouter.put('/:id/linee/:lineaId/percorso', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaPercorsoLineaSchema), asyncHandler(eventiController.aggiornaPercorsoLinea));
 eventiRouter.put('/linee/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaBusDiLineaSchema), asyncHandler(eventiController.aggiornaBusDiLinea));

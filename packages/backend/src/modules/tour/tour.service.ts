@@ -39,11 +39,13 @@ async function prezziMinimiPerEvento(eventiIds: string[]): Promise<Map<string, n
 }
 
 /** Quali eventi sono vendibili (stesso criterio usato ovunque nel
- *  sito): almeno un tragitto prezzato/confermato, attivo, con posti. */
+ *  sito): almeno un tragitto prezzato/confermato, attivo, con posti, e
+ *  vendite non fermate dal gestionale. */
 async function vendibilitaEventi(eventiIds: string[]): Promise<Map<string, boolean>> {
   if (eventiIds.length === 0) return new Map();
   const righe = await db.select({ eventoId: tragitti.eventoId }).from(tragitti)
-    .where(and(inArray(tragitti.eventoId, eventiIds), inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), sql`${tragitti.postiDisponibili} > 0`));
+    .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+    .where(and(inArray(tragitti.eventoId, eventiIds), inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), sql`${tragitti.postiDisponibili} > 0`, eq(eventi.venditeFermate, false)));
   const ok = new Set(righe.map((r) => r.eventoId));
   return new Map(eventiIds.map((id) => [id, ok.has(id)]));
 }
@@ -112,7 +114,7 @@ export const tourService = {
     if (!t) throw new NonTrovato('Tour');
     const membri = await db.select({ e: eventi, ordine: tourEventi.ordine }).from(tourEventi)
       .innerJoin(eventi, eq(eventi.id, tourEventi.eventoId))
-      .where(and(eq(tourEventi.tourId, t.id), eq(eventi.visibileSito, true), eq(eventi.bozza, false), isNull(eventi.eliminatoIl)));
+      .where(and(eq(tourEventi.tourId, t.id), eq(eventi.visibileSito, true), eq(eventi.bozza, false), eq(eventi.venditeFermate, false), isNull(eventi.eliminatoIl)));
     membri.sort((a, b) => a.ordine - b.ordine || (a.e.data < b.e.data ? -1 : 1));
     const ids = membri.map((m) => m.e.id);
     const [prezzi, vendibili, immagini] = await Promise.all([

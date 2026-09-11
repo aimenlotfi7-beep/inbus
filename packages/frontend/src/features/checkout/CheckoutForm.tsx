@@ -307,6 +307,18 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
     );
   }
 
+  // "Ferma vendite" dal gestionale: niente modulo e niente lista d'attesa
+  // (il server rifiuta comunque ogni prenotazione). Vale anche nel widget.
+  if (evento.venditeFermate) {
+    return (
+      <div className="checkout-form" style={styleTema}>
+        <h3>Prenotazioni chiuse</h3>
+        <div className="checkout-summary">Le prenotazioni per <b>{evento.artista}</b> sono chiuse.</div>
+        {onChiudi && <button className="search-cta" onClick={onChiudi}>Chiudi</button>}
+      </div>
+    );
+  }
+
   return (
     <div className="checkout-form" style={styleTema}>
       <h3>Prenota</h3>
