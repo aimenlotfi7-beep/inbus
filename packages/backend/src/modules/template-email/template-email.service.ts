@@ -138,6 +138,18 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
     segnaposto: ['evento', 'tragitto', 'data', 'link'],
   },
   {
+    chiave: 'preventivo_richiesta_cambio_percorso',
+    nome: 'Nuova richiesta preventivo a un fornitore, perché il percorso è cambiato',
+    oggetto: 'Percorso cambiato: nuovo preventivo — {{evento}} ({{tragitto}})',
+    corpo: `
+      <p>Buongiorno,</p>
+      <p>Il percorso del tragitto <b>{{tragitto}}</b> (evento <b>{{evento}}</b> del {{data}}) è cambiato: alcune fermate sono state tolte o aggiunte. Le chiediamo un nuovo preventivo sul percorso aggiornato.</p>
+      <p><a href="{{link}}">Apri la richiesta e rispondi</a></p>
+      <p>Il link mostra le fermate e gli orari aggiornati e permette di caricare il nuovo preventivo.</p>
+    `,
+    segnaposto: ['evento', 'tragitto', 'data', 'link'],
+  },
+  {
     chiave: 'preventivo_non_scelto',
     nome: 'Avviso al fornitore non scelto (dopo aver accettato un altro preventivo)',
     oggetto: 'Aggiornamento sulla richiesta preventivo — {{evento}} ({{tragitto}})',

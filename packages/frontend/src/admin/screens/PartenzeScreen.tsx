@@ -13,6 +13,7 @@ import { motivoErrore } from '../shared/errori';
 import { plurale } from '../../shared/formato';
 
 import { TITOLI_PARTENZE, SEZIONE_PARTENZE, type TabPartenze, type AzionePartenze } from './partenze/tipi';
+import { ETICHETTA_CAMBIO_PERCORSO } from '../shared/AvvisoCambioPercorso';
 export type { TabPartenze } from './partenze/tipi';
 type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
 
@@ -120,7 +121,8 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   }
   function fattoInTab(p: Partenza, tabAttuale: TabPartenze): boolean {
     if (tabAttuale === 'fermate') return p.fermateCompilate;
-    if (tabAttuale === 'preventivi') return !!p.fornitoreId || !!p.preventivoCosto; // accettato da un fornitore, o registrato a mano
+    // Accettato da un fornitore, o registrato a mano, e sul percorso di adesso.
+    if (tabAttuale === 'preventivi') return !p.cambioPercorso && (!!p.fornitoreId || !!p.preventivoCosto);
     // Fatto solo quando i prezzi di vendita sono salvati davvero (lo stato
     // lascia DA_CONFERMARE) — prima bastava aver registrato il preventivo,
     // e la card diceva "Fatto" su un tragitto ancora senza prezzi.
@@ -135,6 +137,8 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   function etichettaStato(p: Partenza, tabAttuale: TabPartenze): { fatto: boolean; testo: string } {
     if (tabAttuale === 'fermate') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'Orari impostati' } : { fatto: false, testo: 'Orari da impostare' };
     if (tabAttuale === 'preventivi') {
+      // Prima di tutto, in viola: il preventivo va rifatto perché il percorso è cambiato.
+      if (p.cambioPercorso) return { fatto: false, testo: ETICHETTA_CAMBIO_PERCORSO[p.cambioPercorso] };
       if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: p.fornitoreId ? 'Accettato' : 'Registrato' };
       // Prima servono gli orari (la richiesta al fornitore mostra
       // fermate/orari) — senza, non ha ancora senso segnalarlo come
@@ -163,9 +167,14 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
     eventiRaggruppati.set(p.evento.id, lista);
   }
   const cardsGrezze = [...eventiRaggruppati.values()];
-  const cardsFiltrate = ricerca.trim()
+  const cardsCercate = ricerca.trim()
     ? cardsGrezze.filter((gruppo) => `${gruppo[0].evento.artista} ${gruppo[0].evento.citta} ${gruppo[0].evento.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : cardsGrezze;
+  // In Preventivi le card viola (percorso cambiato, preventivo da rifare)
+  // vanno in cima: sono le più urgenti.
+  const cardsFiltrate = tab === 'preventivi'
+    ? [...cardsCercate].sort((a, b) => Number(b.some((p) => p.cambioPercorso)) - Number(a.some((p) => p.cambioPercorso)))
+    : cardsCercate;
 
   // Sempre un fetch fresco dal server, non l'oggetto già in memoria —
   // quella lista potrebbe non riflettere l'ultimo stato vero.
@@ -263,20 +272,30 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
             const testoPosti = senzaBus === gruppo.length
               ? `${plurale(passeggeri, 'passeggero', 'passeggeri')} · nessun bus`
               : `${passeggeri}/${posti} posti${senzaBus > 0 ? ` · ${senzaBus} senza bus` : ''}`;
+            // Viola, sopra ogni altro stato: un tragitto dell'evento ha il
+            // percorso cambiato dopo il preventivo accettato. In Preventivi
+            // la card intera; nelle altre tappe una nota.
+            const cambiati = tab !== 'passate' ? gruppo.filter((p) => p.cambioPercorso) : [];
+            const violaInCard = tab === 'preventivi' && cambiati.length > 0;
+            const testoViola = cambiati.length === 1 && cambiati[0].cambioPercorso
+              ? ETICHETTA_CAMBIO_PERCORSO[cambiati[0].cambioPercorso]
+              : `${cambiati.length} percorsi cambiati`;
             return (
               <EventoCardCompatta
                 key={gruppo[0].evento.id}
                 evento={gruppo[0].evento}
                 onClick={() => apriGruppo(gruppo)}
-                richiedeIntervento={tab !== 'passate' && nienteFatto}
-                parziale={tab !== 'passate' && parziale}
-                completata={tab !== 'passate' && tuttoFatto}
-                badge={testoBadge}
-                badgeColore={tuttoFatto ? 'var(--green)' : parziale ? 'var(--amber)' : 'var(--pink)'}
+                percorsoCambiato={violaInCard}
+                richiedeIntervento={!violaInCard && tab !== 'passate' && nienteFatto}
+                parziale={!violaInCard && tab !== 'passate' && parziale}
+                completata={!violaInCard && tab !== 'passate' && tuttoFatto}
+                badge={violaInCard ? testoViola : testoBadge}
+                badgeColore={violaInCard ? 'var(--viola)' : tuttoFatto ? 'var(--green)' : parziale ? 'var(--amber)' : 'var(--pink)'}
                 extra={
                   <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 2 }}>
                     {plurale(gruppo.length, 'tragitto', 'tragitti')}
                     {(tab === 'da-confermare' || tab === 'confermato') && ` · ${testoPosti}`}
+                    {!violaInCard && cambiati.length > 0 && <span style={{ color: 'var(--viola)', fontWeight: 600 }}> · percorso cambiato</span>}
                   </p>
                 }
               />

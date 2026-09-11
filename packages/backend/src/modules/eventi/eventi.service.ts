@@ -29,7 +29,7 @@ import {
   rilevaVariazioni, generaComunicazioniVariazione, anteprimaComunicazioni, normalizzaOrario, normalizzaTesto,
   type FermataConfronto, type VariazioneRilevata, type EsitoComunicazioni,
 } from '../variazioni/variazioni.service.js';
-import { calcolaKmApprossimati } from '../../shared/distanza.js';
+import { cambiPercorso, fotografiaPercorso } from '../preventivi/cambio-percorso.js';
 import { tourService } from '../tour/tour.service.js';
 import { templateEmailService } from '../template-email/template-email.service.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
@@ -1236,8 +1236,10 @@ export const eventiService = {
     const [esiste] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
     if (!esiste) throw new NonTrovato('Tragitto');
 
+    // Il percorso di adesso (fermate e km) diventa quello del preventivo:
+    // un preventivo nuovo registrato chiude anche un "percorso cambiato".
+    const percorso = await fotografiaPercorso(tragittoId);
     await db.transaction(async (tx) => {
-      const kmAccettati = input.fornitoreId ? await calcolaKmApprossimati(tragittoId) : null;
       await tx.update(tragitti).set({
         preventivoCosto: input.preventivoCosto.toFixed(2),
         preventivoPostiBus: input.preventivoPostiBus,
@@ -1245,7 +1247,7 @@ export const eventiService = {
         // presente (es. un preventivo accettato in precedenza tramite
         // la tab Preventivi, poi ritoccato qui solo nel costo).
         ...(input.fornitoreId && { fornitoreId: input.fornitoreId }),
-        ...(kmAccettati != null && { kmAccettati }),
+        ...percorso,
       }).where(eq(tragitti.id, tragittoId));
 
       // Un inserimento manuale con fornitore indicato genera comunque
@@ -2048,6 +2050,8 @@ export const eventiService = {
     // Posti dei bus veri e linee da confermare: postiTotali resta "quasi
     // illimitato" (le vendite non si fermano per i bus).
     const { postiSuiBus, lineeDaConfermare } = await postiBusELineeDaConfermare(tragittiIds);
+    // Percorso cambiato dopo il preventivo accettato: la card va in viola.
+    const cambi = await cambiPercorso(tragittiIds);
 
     return righe.map((r) => ({
       tragittoId: r.tragittoId,
@@ -2056,6 +2060,7 @@ export const eventiService = {
       postiTotali: r.postiTotali,
       postiSuiBus: postiSuiBus.get(r.tragittoId) ?? 0,
       lineeDaConfermare: lineeDaConfermare.get(r.tragittoId) ?? 0,
+      cambioPercorso: cambi.get(r.tragittoId)?.stato ?? null,
       totalePasseggeri: mappaPasseggeri.get(r.tragittoId) ?? 0,
       preventivoCosto: r.preventivoCosto,
       fornitoreId: r.fornitoreId,

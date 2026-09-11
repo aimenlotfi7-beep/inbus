@@ -32,10 +32,12 @@ interface EventoMinimo {
  *  con più tragitti insieme, dove ALCUNI sono a posto per questa tappa
  *  e ALTRI no ancora (es. metà evento già in vendita, l'altra metà da
  *  prezzare): né tutto fatto né niente fatto, va distinto da entrambi.
- *  Solo UNO tra richiedeIntervento/parziale/completata deve essere
- *  vero alla volta — il contorno colorato si AGGIUNGE al badge
+ *  "percorsoCambiato" (viola) è il più urgente: un preventivo da rifare
+ *  perché le fermate sono cambiate dopo averlo accettato.
+ *  Solo UNO tra percorsoCambiato/richiedeIntervento/parziale/completata
+ *  deve essere vero alla volta — il contorno colorato si AGGIUNGE al badge
  *  testuale, non lo sostituisce (i due possono comparire insieme). */
-export function EventoCardCompatta({ evento, onClick, badge, badgeColore, richiedeIntervento, parziale, completata, extra, opacitaRidotta, mostraLinkPubblico, footer, selezionato }: {
+export function EventoCardCompatta({ evento, onClick, badge, badgeColore, richiedeIntervento, parziale, completata, percorsoCambiato, extra, opacitaRidotta, mostraLinkPubblico, footer, selezionato }: {
   evento: EventoMinimo;
   onClick: () => void;
   badge?: ReactNode;
@@ -46,6 +48,7 @@ export function EventoCardCompatta({ evento, onClick, badge, badgeColore, richie
   richiedeIntervento?: boolean;
   parziale?: boolean;
   completata?: boolean;
+  percorsoCambiato?: boolean;
   extra?: ReactNode;
   opacitaRidotta?: boolean;
   mostraLinkPubblico?: boolean;
@@ -54,7 +57,7 @@ export function EventoCardCompatta({ evento, onClick, badge, badgeColore, richie
 }) {
   return (
     <div
-      className={`evento-card-compatta${richiedeIntervento ? ' richiede-intervento' : ''}${parziale ? ' parziale' : ''}${completata ? ' completata' : ''}${selezionato ? ' selezionata' : ''}`}
+      className={`evento-card-compatta${percorsoCambiato ? ' percorso-cambiato' : ''}${richiedeIntervento ? ' richiede-intervento' : ''}${parziale ? ' parziale' : ''}${completata ? ' completata' : ''}${selezionato ? ' selezionata' : ''}`}
       onClick={onClick}
       // Raggiungibile anche da tastiera (Tab, poi Invio o Spazio), non solo col mouse.
       role="button"

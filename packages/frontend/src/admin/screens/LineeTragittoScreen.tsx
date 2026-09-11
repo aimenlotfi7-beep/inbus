@@ -3,6 +3,7 @@ import { notifica } from '../shared/notifiche';
 import { conferma } from '../shared/conferma';
 import { motivoErrore } from '../shared/errori';
 import { confermaAvvisiClienti, notificaEsitoAvvisi } from '../shared/avvisiClienti';
+import { AvvisoCambioPercorso, notificaPercorsiCambiati } from '../shared/AvvisoCambioPercorso';
 import { Modale } from '../shared/Modale';
 import { MenuAzioni } from '../shared/MenuAzioni';
 import {
@@ -11,7 +12,7 @@ import {
 } from '../../api/eventi';
 import type { Evento, Fermata } from '../../api/types';
 import { fornitoriApi, type Fornitore } from '../../api/fornitori';
-import { preventiviApi } from '../../api/preventivi';
+import { preventiviApi, type CambioPercorso } from '../../api/preventivi';
 import { tourLeaderApi, type TourLeader } from '../../api/tourleader';
 import { haPermesso } from '../../api/auth';
 import { CampoNumero } from '../shared/CampoNumero';
@@ -55,6 +56,9 @@ type ModaleLinea = { tipo: 'nuova' } | { tipo: 'conferma'; linea: Linea };
  *  finché non le si conferma con i dati del bus, e spariscono da sole se
  *  non servono più. Le vendite non si fermano per i posti dei bus.
  *
+ *  Se il percorso è cambiato dopo il preventivo accettato, in cima c'è il
+ *  riquadro viola che porta al preventivo da rifare.
+ *
  *  Una "linea" è un CONTENITORE: un percorso (quali fermate copre) che
  *  può avere uno o più bus dentro. Linee diverse dello stesso tragitto
  *  possono coprire fermate diverse. */
@@ -88,7 +92,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   const [formBus, setFormBus] = useState<BusDiLineaInput & { postiBus?: number }>(BUS_VUOTO);
   const [fermateSelezionate, setFermateSelezionate] = useState<string[]>([]);
   const [percorsoModificato, setPercorsoModificato] = useState<string[]>([]);
-  const [verificaKm, setVerificaKm] = useState<{ kmAccettati: number | null; kmAttuali: number | null; cambiatoParecchio: boolean } | null>(null);
+  const [cambioPercorso, setCambioPercorso] = useState<CambioPercorso | null>(null);
   const [suggerimento, setSuggerimento] = useState<SuggerimentoLinea | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [passeggeri, setPasseggeri] = useState<PasseggeroBus[] | null>(null);
@@ -119,7 +123,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     // al posto del fornitore già assegnato si rischia di salvarlo cancellato.
     fornitoriApi.list().then(setFornitori).catch((e) => setErroreElenchi(`Elenco fornitori non disponibile: ${motivoErrore(e)}`));
     tourLeaderApi.list().then(setTourLeaders).catch((e) => setErroreElenchi(`Elenco tour leader non disponibile: ${motivoErrore(e)}`));
-    if (tragittoId) preventiviApi.verificaKm(tragittoId).then(setVerificaKm).catch(() => {});
+    if (tragittoId) preventiviApi.percorso(tragittoId).then(setCambioPercorso).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventoId, tragittoId]);
 
@@ -196,6 +200,11 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     return linee.reduce((tot, l) => tot + (l.fermate.find((x) => x.citta === citta)?.versati ?? 0), 0);
   }
 
+  /** Al preventivo di QUESTO tragitto in Partenze, Preventivi (non all'elenco). */
+  function vaiAlPreventivo() {
+    navigaSezione(SEZIONE_PARTENZE.preventivi as never, { evento: null, tragitto: null, da: null, eventoId: idEvento, tragittiIds: idTragitto });
+  }
+
   // ---- Fermate ----
   // Chi viene avvisato quando si esclude una fermata lo calcola il server
   // (anteprima): chi ha prenotato su una fermata che nessuna linea
@@ -242,8 +251,9 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       }
       const esito = await eventiApi.aggiornaTragittoOperativo(idTragitto, input);
       notificaEsitoAvvisi(escludi ? `Fermata di ${f.citta} esclusa` : `Fermata di ${f.citta} riattivata`, esito);
+      notificaPercorsiCambiati(esito.percorsiCambiati);
       aggiornaDopoModifica();
-      preventiviApi.verificaKm(idTragitto).then(setVerificaKm).catch(() => {});
+      preventiviApi.percorso(idTragitto).then(setCambioPercorso).catch(() => {});
     } catch (e) {
       notifica(`Modifica della fermata non riuscita: ${motivoErrore(e)}`, 'errore');
     } finally {
@@ -564,14 +574,11 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         )}
       </div>
 
-      {verificaKm?.cambiatoParecchio && (
-        <div className="prossimo-passo avviso">
-          <div>
-            <p className="titolo">Le fermate sono cambiate parecchio</p>
-            <p>Da quando hai accettato il preventivo: circa {Math.round(verificaKm.kmAccettati!)} km allora, {Math.round(verificaKm.kmAttuali!)} km ora. Potrebbe servire un nuovo preventivo.</p>
-          </div>
-          <button type="button" className="btn btn-ghost" onClick={() => tornaAPartenze('preventivi')}>Vai a Preventivi →</button>
-        </div>
+      {cambioPercorso && (
+        <AvvisoCambioPercorso
+          cambio={cambioPercorso}
+          azioni={<button type="button" className="btn btn-viola" onClick={vaiAlPreventivo}>Vai al preventivo di questo tragitto →</button>}
+        />
       )}
 
       <div className={`prossimo-passo ${prossimoPasso.tono}`} role={prossimoPasso.tono === 'avviso' ? 'alert' : undefined}>

@@ -124,6 +124,9 @@ export function AdminLayout({
   const [eventiDaPrezzare, setEventiDaPrezzare] = useState(0);
   const [lineeProntoDaConfermare, setLineeProntoDaConfermare] = useState(0);
   const [preventiviDaValutare, setPreventiviDaValutare] = useState(0);
+  // Viola, a parte: tragitti con il percorso cambiato dopo il preventivo
+  // accettato (preventivo da rifare, più urgente degli altri avvisi).
+  const [cambiPercorso, setCambiPercorso] = useState(0);
   const [eventiPreventiviDaRichiedere, setEventiPreventiviDaRichiedere] = useState(0);
   const [inAttesa, setInAttesa] = useState(0);
   const [rimborsiInAttesa, setRimborsiInAttesa] = useState(0);
@@ -145,6 +148,7 @@ export function AdminLayout({
     eventiApi.lineeProntoDaConfermare().then((r) => setLineeProntoDaConfermare(r.conteggio)).catch(() => {});
     eventiApi.eventiPreventiviDaRichiedere().then((r) => setEventiPreventiviDaRichiedere(r.conteggio)).catch(() => {});
     preventiviApi.contaDaValutare().then((r) => setPreventiviDaValutare(r.conteggio)).catch(() => {});
+    preventiviApi.contaCambiPercorso().then((r) => setCambiPercorso(r.conteggio)).catch(() => {});
     listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
   }, [sessione]);
 
@@ -174,6 +178,11 @@ export function AdminLayout({
   // mostrare sull'intestazione del gruppo (che deve restare visibile
   // anche quando il gruppo è chiuso a tendina su mobile — altrimenti
   // una notifica dentro un gruppo chiuso passerebbe inosservata).
+  /** Le notifiche viola (più urgenti) di una voce: per ora i tragitti con il
+   *  percorso cambiato dopo il preventivo accettato, su "Preventivi". */
+  function notificaUrgenteVoce(id: string): number {
+    return id === 'partenze-preventivi' ? cambiPercorso : 0;
+  }
   function notificaVoce(id: string): number {
     if (id === 'partenze-orari') return eventiDaCalcolareOrari;
     if (id === 'partenze-prezzi') return eventiDaPrezzare;
@@ -250,7 +259,13 @@ export function AdminLayout({
                     // ridondante.
                     if (!gruppiCollassati[gruppo.titolo]) return null;
                     const totaleGruppo = gruppo.voci.reduce((tot, v) => tot + notificaVoce(v.id), 0);
-                    return totaleGruppo > 0 ? <span className="side-badge side-badge-gruppo">{totaleGruppo}</span> : null;
+                    const urgentiGruppo = gruppo.voci.reduce((tot, v) => tot + notificaUrgenteVoce(v.id), 0);
+                    return (
+                      <>
+                        {urgentiGruppo > 0 && <span className="side-badge side-badge-gruppo urgente">{urgentiGruppo}</span>}
+                        {totaleGruppo > 0 && <span className="side-badge side-badge-gruppo">{totaleGruppo}</span>}
+                      </>
+                    );
                   })()}
                   <span className="group-caret">▾</span>
                 </span>
@@ -266,6 +281,11 @@ export function AdminLayout({
                     }}
                   >
                     {voce.label}
+                    {notificaUrgenteVoce(voce.id) > 0 && (
+                      <span className="side-badge urgente" title={`${plurale(notificaUrgenteVoce(voce.id), 'tragitto', 'tragitti')} con il percorso cambiato: il preventivo va rifatto`}>
+                        {notificaUrgenteVoce(voce.id)}
+                      </span>
+                    )}
                     {notificaVoce(voce.id) > 0 && (
                       <span
                         className="side-badge"

@@ -367,6 +367,13 @@ export const tragitti = pgTable('tragitti', {
   // costosa da tenere sempre aggiornata), solo un indicatore per
   // accorgersi di un cambio grosso.
   kmAccettati: doublePrecision('km_accettati'),
+  // Le fermate attive (città, nell'ordine) del percorso su cui è stato
+  // accettato o registrato il preventivo, e quando: se oggi le fermate
+  // attive sono diverse (tolte o aggiunte) il preventivo va rifatto — vedi
+  // preventivi/cambio-percorso.ts. Si aggiornano accettando un nuovo
+  // preventivo o confermando che quello attuale va ancora bene.
+  fermatePreventivo: jsonb('fermate_preventivo').$type<string[]>(),
+  percorsoPreventivoIl: timestamp('percorso_preventivo_il'),
   // Sezione "Partenze": indica se questa tratta è coperta (bus prenotato
   // con l'agenzia/fornitore), a prescindere dal calcolo automatico dei
   // bus necessari, che resta solo un suggerimento.
@@ -459,6 +466,10 @@ export const preventiviRichieste = pgTable('preventivi_richieste', {
   // richiede nessun accesso/login, il token stesso è la chiave.
   token: text('token').notNull().unique(),
   tipoInvio: tipoInvioRichiestaEnum('tipo_invio').notNull(),
+  // Vera per una richiesta mandata perché il percorso è cambiato dopo aver
+  // accettato un preventivo: il fornitore può rispondere anche se il
+  // viaggio ha già un preventivo, e mail e pagina lo spiegano.
+  perCambioPercorso: boolean('per_cambio_percorso').notNull().default(false),
   creataIl: timestamp('creata_il').notNull().defaultNow(),
 });
 

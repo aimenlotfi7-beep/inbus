@@ -17,6 +17,7 @@
   --pink-dim:#dc262633;
   --amber:#f59e0b;       /* ARANCIONE: avvisi/attenzione */
   --blue:#2563eb;        /* BLU: azione principale, stati attivi/informativi */
+  --viola:#7c3aed;       /* VIOLA: percorso cambiato dopo il preventivo, da rifare (più urgente degli altri avvisi) */
   --blue-dim:#2563eb33;
   --green:#16a34a;       /* VERDE: confermato/positivo/completato */
   --green-dim:#16a34a26;
@@ -567,6 +568,18 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .tabella-righe .num{text-align:right; font-variant-numeric:tabular-nums;}
 .scheda-linea{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:var(--dusk);}
 .scheda-linea.da-confermare{border-style:dashed; border-color:var(--amber); background:color-mix(in srgb, var(--amber) 5%, var(--dusk));}
+/* Viola: preventivo da rifare perché il percorso è cambiato dopo averlo
+   accettato. Colore riservato a questo caso, più urgente degli avvisi rossi. */
+.avviso-percorso{border:1px solid var(--viola); background:color-mix(in srgb, var(--viola) 8%, var(--dusk)); border-radius:12px; padding:12px 14px; margin-bottom:14px;}
+.avviso-percorso p{margin:0 0 6px; font-size:var(--testo-base);}
+.avviso-percorso .titolo{font-weight:700; color:var(--viola); margin-bottom:4px;}
+.avviso-percorso .azioni{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+.btn.btn-viola{background:var(--viola); color:#fff; border-color:var(--viola);}
+.badge.percorso-cambiato{background:color-mix(in srgb, var(--viola) 14%, transparent); color:var(--viola);}
+.side-badge.urgente{background:var(--viola);}
+.side-badge.urgente + .side-badge{margin-left:4px;}
+.evento-card-compatta.percorso-cambiato{border:1px solid var(--viola); box-shadow:0 0 14px 1px color-mix(in srgb, var(--viola) 45%, transparent);}
+.toast.toast-urgente{border-left-color:var(--viola);} .toast.toast-urgente .toast-icona{background:var(--viola);}
 .scheda-linea .riga-bus{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-top:1px solid var(--line); margin-top:10px; padding-top:10px;}
 .scheda-linea .pannello-in-linea{background:var(--dusk-2); border-radius:10px; padding:12px; margin-top:10px;}
 .nota-margine{font-size:var(--testo-md); margin:-4px 0 12px;}

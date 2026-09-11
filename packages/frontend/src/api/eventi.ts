@@ -154,7 +154,8 @@ export const eventiApi = {
   create: (input: EventoInput) => api.post<Evento>('/api/eventi', input),
   // L'evento aggiornato, più l'esito degli avvisi ai clienti per le
   // variazioni (fermate, data, luogo) che il salvataggio ha generato.
-  update: (id: string, input: Partial<EventoInput>) => api.put<Evento & EsitoAvvisiClienti>(`/api/eventi/${id}`, input),
+  // percorsiCambiati: tragitti il cui percorso ora è diverso dal preventivo accettato (avviso viola).
+  update: (id: string, input: Partial<EventoInput>) => api.put<Evento & EsitoAvvisiClienti & { percorsiCambiati?: string[] }>(`/api/eventi/${id}`, input),
   // Stesso corpo di update, nessuna scrittura: cosa verrebbe comunicato.
   anteprimaVariazioni: (id: string, input: Partial<EventoInput>) =>
     api.post<AnteprimaVariazioniEvento>(`/api/eventi/${id}/anteprima-variazioni`, input),
@@ -190,7 +191,7 @@ export const eventiApi = {
 
   // prezzoExtra facoltativo: se non lo mandi resta quello salvato.
   aggiornaTragittoOperativo: (tragittoId: string, input: { prezzoExtra?: number; fermate: FermataInput[] }) =>
-    api.put<{ ok: true } & EsitoAvvisiClienti>(`/api/eventi/tragitti/${tragittoId}/operativo`, input),
+    api.put<{ ok: true; percorsiCambiati?: string[] } & EsitoAvvisiClienti>(`/api/eventi/tragitti/${tragittoId}/operativo`, input),
   // Stesso corpo, nessuna scrittura: quali variazioni e quanti clienti.
   anteprimaTragittoOperativo: (tragittoId: string, input: { prezzoExtra?: number; fermate: FermataInput[] }) =>
     api.post<AnteprimaVariazioniTragitto>(`/api/eventi/tragitti/${tragittoId}/operativo/anteprima`, input),
@@ -220,6 +221,8 @@ export const eventiApi = {
     postiTotali: number; totalePasseggeri: number;
     // Posti dei bus confermati (postiTotali resta "quasi illimitato") e linee da confermare.
     postiSuiBus: number; lineeDaConfermare: number;
+    // Percorso cambiato dopo il preventivo accettato: cosa c'è da fare (null = in regola).
+    cambioPercorso: 'da_richiedere' | 'in_attesa' | 'da_valutare' | null;
     preventivoCosto: string | null; fornitoreId: string | null; fermateCompilate: boolean; servizioNome: string | null; servizioId: string | null;
     evento: { id: string; artista: string; genere: string; data: string; citta: string; luogo: string; slug: string; immagineUrl: string | null };
   }>>('/api/eventi/elenco-partenze'),

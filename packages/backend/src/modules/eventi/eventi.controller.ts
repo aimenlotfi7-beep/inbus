@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { eventiService } from './eventi.service.js';
 import { lineeDaConfermareService } from './linee-da-confermare.service.js';
 import { smistamentoService } from '../prenotazioni/smistamento.service.js';
+import { nomiPercorsiCambiati } from '../preventivi/cambio-percorso.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 
 export const eventiController = {
@@ -28,10 +29,13 @@ export const eventiController = {
     res.status(201).json(evento);
   },
 
+  // Dopo aver salvato le fermate (scheda evento o Partenze): i tragitti con
+  // un preventivo accettato il cui percorso ora è diverso, per l'avviso viola.
   async update(req: Request, res: Response) {
     const { id, clientiAvvisati, emailNonInviate } = await eventiService.update(req.params.id, req.body as AggiornaEventoInput);
     const evento = await eventiService.getById(id);
-    res.json({ ...evento, clientiAvvisati, emailNonInviate });
+    const percorsiCambiati = await nomiPercorsiCambiati([...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((t) => t.id));
+    res.json({ ...evento, clientiAvvisati, emailNonInviate, percorsiCambiati });
   },
   async anteprimaVariazioniEvento(req: Request, res: Response) {
     res.json(await eventiService.anteprimaVariazioniEvento(req.params.id, req.body as AggiornaEventoInput));
@@ -130,7 +134,8 @@ export const eventiController = {
 
   async aggiornaTragittoOperativo(req: Request, res: Response) {
     const { clientiAvvisati, emailNonInviate } = await eventiService.aggiornaTragittoOperativo(req.params.tragittoId, req.body);
-    res.json({ ok: true, clientiAvvisati, emailNonInviate });
+    const percorsiCambiati = await nomiPercorsiCambiati([req.params.tragittoId]);
+    res.json({ ok: true, clientiAvvisati, emailNonInviate, percorsiCambiati });
   },
   async anteprimaTragittoOperativo(req: Request, res: Response) {
     res.json(await eventiService.anteprimaTragittoOperativo(req.params.tragittoId, req.body));

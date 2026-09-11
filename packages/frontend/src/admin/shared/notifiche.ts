@@ -6,7 +6,8 @@
  *  testo, che nel gestionale è già scritto in modo coerente
  *  ("Salvataggio non riuscito: …", "… salvata.", "Link copiato — …").
  *  Chi vuole essere esplicito passa il secondo argomento. */
-export type TipoNotifica = 'errore' | 'successo' | 'info';
+/** "urgente" (viola): un preventivo da rifare perché il percorso è cambiato. */
+export type TipoNotifica = 'errore' | 'successo' | 'info' | 'urgente';
 export interface Notifica { id: number; testo: string; tipo: TipoNotifica }
 
 type Ascoltatore = (n: Notifica) => void;

@@ -20,6 +20,7 @@ import type { Evento } from '../../../api/types';
 import { PaginaSezione } from '../../shared/PaginaSezione';
 import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
 import { confermaAvvisiClienti, notificaEsitoAvvisi } from '../../shared/avvisiClienti';
+import { notificaPercorsiCambiati } from '../../shared/AvvisoCambioPercorso';
 import { motivoErrore } from '../../shared/errori';
 import { PartenzeTab } from '../partenze/PartenzeTab';
 import { ListaAttesaTab } from './ListaAttesaTab';
@@ -729,6 +730,7 @@ export function SchedaEventoModale({
         onSalvato();
         onClose();
         notificaEsitoAvvisi('Evento salvato', esito);
+        notificaPercorsiCambiati(esito.percorsiCambiati);
       } else {
         await eventiApi.create(payload);
         localStorage.removeItem('inbus_bozza_form_evento');

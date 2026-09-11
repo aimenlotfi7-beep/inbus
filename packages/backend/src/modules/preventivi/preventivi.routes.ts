@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import crypto from 'node:crypto';
-import { eq, and, inArray, isNull, gte, sql } from 'drizzle-orm';
+import { eq, and, asc, inArray, isNull, isNotNull, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { preventiviRichieste, preventiviRisposte, fornitori, tragitti, eventi, fermate } from '../../db/schema.js';
@@ -15,6 +15,7 @@ import { limitePnr } from '../../shared/rateLimit.js';
 import { distanzaKm, calcolaKmApprossimati } from '../../shared/distanza.js';
 import { formattaData, formattaEuro } from '../../shared/formato.js';
 import { classificaCandidato, destinatariRichiesta } from './classifica-candidato.js';
+import { cambiPercorso, fotografiaPercorso, richiestaAperta } from './cambio-percorso.js';
 
 function generaToken() {
   return crypto.randomBytes(24).toString('hex');
@@ -33,6 +34,10 @@ const richiediSchema = z.object({
   // automatico attivo, nel raggio e mai contattati prima, partono da
   // soli indipendentemente da questa lista.
   fornitoriManualiIds: z.array(z.string()).default([]),
+  // Nuova richiesta perché il percorso è cambiato dopo il preventivo
+  // accettato: si possono scegliere anche i fornitori già contattati, e
+  // possono rispondere anche se il viaggio ha già un preventivo.
+  perCambioPercorso: z.boolean().optional(),
 });
 
 // Limite per singolo allegato, lato server (il cap globale di Express a
@@ -130,13 +135,29 @@ async function candidatiPerTragitto(tragittoId: string, lat: number, lng: number
 
 type EsitoRichiesta = 'inviata' | 'non_inviata' | 'senza_email';
 
-async function inviaRichiestaSingola(tragittoId: string, fornitore: typeof fornitori.$inferSelect, tipoInvio: 'AUTOMATICO' | 'MANUALE'): Promise<EsitoRichiesta> {
+/** La mail di richiesta: per un cambio di percorso ce n'è una apposita,
+ *  che spiega che le fermate sono cambiate. */
+function modelloRichiesta(perCambioPercorso: boolean) {
+  return perCambioPercorso ? 'preventivo_richiesta_cambio_percorso' : 'preventivo_richiesta';
+}
+
+/** Si può ancora rispondere a una richiesta se il viaggio non ha un
+ *  preventivo accettato, oppure se è una richiesta per cambio percorso
+ *  della tornata in corso. */
+function puoRispondere(
+  richiesta: { perCambioPercorso: boolean; creataIl: Date },
+  tragitto: { fornitoreId: string | null; percorsoPreventivoIl: Date | null },
+): boolean {
+  return !tragitto.fornitoreId || (richiesta.perCambioPercorso && richiestaAperta(richiesta.creataIl, tragitto.percorsoPreventivoIl));
+}
+
+async function inviaRichiestaSingola(tragittoId: string, fornitore: typeof fornitori.$inferSelect, tipoInvio: 'AUTOMATICO' | 'MANUALE', perCambioPercorso = false): Promise<EsitoRichiesta> {
   const { tragitto, evento } = await tragittoConEvento(tragittoId);
   const token = generaToken();
-  await db.insert(preventiviRichieste).values({ tragittoId, fornitoreId: fornitore.id, token, tipoInvio });
+  await db.insert(preventiviRichieste).values({ tragittoId, fornitoreId: fornitore.id, token, tipoInvio, perCambioPercorso });
   if (!fornitore.email) return 'senza_email'; // registrato ma non contattabile: la richiesta resta in lista
   const link = urlSito(`/fornitore/preventivo/${token}`);
-  const inviata = await inviaEmailModello(fornitore.email, 'preventivo_richiesta', { ...variabiliTragitto(tragitto, evento), link });
+  const inviata = await inviaEmailModello(fornitore.email, modelloRichiesta(perCambioPercorso), { ...variabiliTragitto(tragitto, evento), link });
   return inviata ? 'inviata' : 'non_inviata';
 }
 
@@ -166,7 +187,10 @@ export const preventiviService = {
     const raggioKm = input.raggioKm ?? await leggiRaggioKmPreventivo();
     const candidati = await candidatiPerTragitto(tragittoId, lat, lng, raggioKm);
 
-    const { automatici: daInviareAuto, manuali: daInviareManuale } = destinatariRichiesta(candidati, new Set(input.fornitoriManualiIds));
+    // Per un cambio di percorso anche i fornitori già contattati si possono
+    // scegliere di nuovo, e ricevono la mail che spiega il cambio.
+    const perCambioPercorso = !!input.perCambioPercorso;
+    const { automatici: daInviareAuto, manuali: daInviareManuale } = destinatariRichiesta(candidati, new Set(input.fornitoriManualiIds), { cambioPercorso: perCambioPercorso });
 
     const esito = { inviateAutomatiche: 0, inviateManuali: 0, nonInviate: 0, senzaEmail: 0 };
     const conta = (r: EsitoRichiesta, campoInviate: 'inviateAutomatiche' | 'inviateManuali') => {
@@ -174,8 +198,8 @@ export const preventiviService = {
       else if (r === 'non_inviata') esito.nonInviate++;
       else esito.senzaEmail++;
     };
-    for (const f of daInviareAuto) conta(await inviaRichiestaSingola(tragittoId, f, 'AUTOMATICO'), 'inviateAutomatiche');
-    for (const f of daInviareManuale) conta(await inviaRichiestaSingola(tragittoId, f, 'MANUALE'), 'inviateManuali');
+    for (const f of daInviareAuto) conta(await inviaRichiestaSingola(tragittoId, f, 'AUTOMATICO', perCambioPercorso), 'inviateAutomatiche');
+    for (const f of daInviareManuale) conta(await inviaRichiestaSingola(tragittoId, f, 'MANUALE', perCambioPercorso), 'inviateManuali');
 
     return esito;
   },
@@ -190,14 +214,15 @@ export const preventiviService = {
     const [fornitore] = await db.select().from(fornitori).where(eq(fornitori.id, richiesta.fornitoreId)).limit(1);
     if (!fornitore?.email) throw new ConflittoDati('Questo fornitore non ha un indirizzo email: aggiungilo nella sua scheda prima di reinviare la richiesta.');
     const { tragitto, evento } = await tragittoConEvento(richiesta.tragittoId);
-    // Il suo preventivo verrebbe comunque rifiutato (vedi rispondi).
-    if (tragitto.fornitoreId) throw new ConflittoDati(MESSAGGIO_GIA_ASSEGNATO);
+    // Il suo preventivo verrebbe comunque rifiutato (vedi rispondi), tranne
+    // per una richiesta per cambio percorso ancora aperta.
+    if (!puoRispondere(richiesta, tragitto)) throw new ConflittoDati(MESSAGGIO_GIA_ASSEGNATO);
 
     if (await linkScaduto(richiesta, false)) {
       await db.update(preventiviRichieste).set({ creataIl: new Date() }).where(eq(preventiviRichieste.id, richiesta.id));
     }
     const link = urlSito(`/fornitore/preventivo/${richiesta.token}`);
-    const inviata = await inviaEmailModello(fornitore.email, 'preventivo_richiesta', { ...variabiliTragitto(tragitto, evento), link });
+    const inviata = await inviaEmailModello(fornitore.email, modelloRichiesta(richiesta.perCambioPercorso), { ...variabiliTragitto(tragitto, evento), link });
     return { inviata };
   },
   // Tre query in tutto (non una per riga), e delle risposte SOLO i
@@ -217,11 +242,17 @@ export const preventiviService = {
       haFileFirmato: sql<boolean>`${preventiviRisposte.fileFirmatoContenuto} IS NOT NULL`,
     }).from(preventiviRisposte).where(inArray(preventiviRisposte.richiestaId, richieste.map((r) => r.id)));
     const giorniValidita = await leggiGiorniValiditaLinkPreventivo();
+    // Le richieste per cambio percorso sono della tornata in corso ("aperta")
+    // o di un cambio già risolto ("chiusa").
+    const [tragittoRiga] = await db.select({ percorsoPreventivoIl: tragitti.percorsoPreventivoIl }).from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
     const fornitorePerId = new Map(fornitoriRighe.map((f) => [f.id, f]));
     const rispostaPerRichiesta = new Map(risposte.map((r) => [r.richiestaId, r]));
     return richieste.map((r) => {
       const fornitore = fornitorePerId.get(r.fornitoreId);
       const risposta = rispostaPerRichiesta.get(r.id) ?? null;
+      const cambioPercorso: 'aperta' | 'chiusa' | null = r.perCambioPercorso
+        ? (richiestaAperta(r.creataIl, tragittoRiga?.percorsoPreventivoIl ?? null) ? 'aperta' : 'chiusa')
+        : null;
       return {
         // Campi piatti per ogni richiesta, con o senza risposta.
         richiestaId: r.id,
@@ -229,6 +260,7 @@ export const preventiviService = {
         creataIl: r.creataIl,
         haRisposta: !!risposta,
         linkScaduto: !risposta && scadutoDopoGiorni(r.creataIl, giorniValidita),
+        cambioPercorso,
         richiesta: r,
         fornitore,
         risposta,
@@ -248,7 +280,11 @@ export const preventiviService = {
     const [richiesta] = await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.token, token)).limit(1);
     if (!richiesta) throw new NonTrovato('Richiesta preventivo');
     const { tragitto, evento } = await tragittoConEvento(richiesta.tragittoId);
-    const fermateTragitto = await db.select().from(fermate).where(eq(fermate.tragittoId, richiesta.tragittoId));
+    // Le fermate attive di adesso, in ordine: dopo un cambio di percorso il
+    // fornitore deve vedere il percorso aggiornato.
+    const fermateTragitto = await db.select().from(fermate)
+      .where(and(eq(fermate.tragittoId, richiesta.tragittoId), eq(fermate.attivo, true)))
+      .orderBy(asc(fermate.ordine));
     const [risposta] = await db.select().from(preventiviRisposte).where(eq(preventiviRisposte.richiestaId, richiesta.id)).limit(1);
     return {
       tragitto: { nome: tragitto.nome, arrivoCitta: tragitto.arrivoCitta, arrivoOrario: tragitto.arrivoOrario },
@@ -259,8 +295,10 @@ export const preventiviService = {
       giaRisposto: !!risposta,
       scaduto: await linkScaduto(richiesta, !!risposta),
       // Un preventivo è già stato accettato per questo viaggio: nuove
-      // risposte vengono rifiutate (vedi rispondi).
-      giaAssegnato: tragitto.fornitoreId != null,
+      // risposte vengono rifiutate (vedi rispondi), tranne per una richiesta
+      // per cambio percorso ancora aperta.
+      giaAssegnato: !puoRispondere(richiesta, tragitto),
+      perCambioPercorso: richiesta.perCambioPercorso && richiestaAperta(richiesta.creataIl, tragitto.percorsoPreventivoIl),
       risposta: risposta ? { prezzo: risposta.prezzo, fileNome: risposta.fileNome } : null,
     };
   },
@@ -270,9 +308,10 @@ export const preventiviService = {
     const [esistente] = await db.select().from(preventiviRisposte).where(eq(preventiviRisposte.richiestaId, richiesta.id)).limit(1);
     if (esistente) throw new ConflittoDati('Hai già inviato una risposta per questa richiesta — per modificarla, contatta direttamente chi ti ha scritto.');
     // "Accettato" = il tragitto ha un fornitore scelto (stesso segnale
-    // usato dal gestionale per mostrare "Accettato").
+    // usato dal gestionale per mostrare "Accettato"). Si risponde comunque
+    // a una richiesta per cambio percorso ancora aperta.
     const { tragitto } = await tragittoConEvento(richiesta.tragittoId);
-    if (tragitto.fornitoreId) throw new ConflittoDati(MESSAGGIO_GIA_ASSEGNATO);
+    if (!puoRispondere(richiesta, tragitto)) throw new ConflittoDati(MESSAGGIO_GIA_ASSEGNATO);
     if (await linkScaduto(richiesta, false)) throw new ConflittoDati('Questo link è scaduto — se vuole ancora inviare un preventivo, contatti direttamente chi le ha scritto.');
     try {
       const [nuova] = await db.insert(preventiviRisposte).values({
@@ -301,17 +340,23 @@ export const preventiviService = {
     const nessunAvviso = { ok: true as const, fornitoreAvvisato: false, nonSceltiAvvisati: 0 };
 
     // Idempotente: riaccettare la risposta già accettata (doppio click,
-    // pagina non aggiornata) non riscrive nulla e non manda email.
+    // pagina non aggiornata) non manda email. Il percorso del preventivo si
+    // aggiorna comunque: accettare vuol dire che il prezzo vale per le
+    // fermate di adesso (chiude anche un "percorso cambiato" quando il
+    // fornitore conferma lo stesso prezzo).
     const precedenteFornitoreId = tragitto.fornitoreId;
     const giaAccettata = precedenteFornitoreId === richiesta.fornitoreId
       && tragitto.preventivoCosto != null && Number(tragitto.preventivoCosto) === Number(risposta.prezzo);
-    if (giaAccettata) return nessunAvviso;
+    const percorso = await fotografiaPercorso(richiesta.tragittoId);
+    if (giaAccettata) {
+      await db.update(tragitti).set(percorso).where(eq(tragitti.id, richiesta.tragittoId));
+      return nessunAvviso;
+    }
 
     // Scrive esattamente negli stessi campi già usati per l'inserimento
     // a mano in Prezzi — un preventivo accettato non è concettualmente
     // diverso da uno scritto a mano con fornitore indicato.
-    const kmAccettati = await calcolaKmApprossimati(richiesta.tragittoId);
-    await db.update(tragitti).set({ preventivoCosto: risposta.prezzo, fornitoreId: richiesta.fornitoreId, ...(kmAccettati != null && { kmAccettati }) }).where(eq(tragitti.id, richiesta.tragittoId));
+    await db.update(tragitti).set({ preventivoCosto: risposta.prezzo, fornitoreId: richiesta.fornitoreId, ...percorso }).where(eq(tragitti.id, richiesta.tragittoId));
 
     // Stesso fornitore già scelto, con un'altra sua risposta: sa già di
     // essere stato scelto e gli altri sono già stati avvisati — cambia
@@ -394,18 +439,40 @@ export const preventiviService = {
     const tragittiSenzaAccettazione = await db.select({ id: tragitti.id }).from(tragitti).where(and(inArray(tragitti.id, tragittiIds), isNull(tragitti.fornitoreId), isNull(tragitti.eliminatoIl)));
     return tragittiSenzaAccettazione.length;
   },
-  // Per il banner in Linee — confronta i km salvati al momento
-  // dell'accettazione con quelli ricalcolati ORA sulle fermate attive.
-  // "Cambiato parecchio" = oltre il 15% di differenza, soglia semplice
-  // per non segnalare ogni minima imprecisione della geocodifica.
-  verificaKm: async (tragittoId: string) => {
-    const [t] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+  /** Il percorso è cambiato dal preventivo accettato? Per il riquadro viola
+   *  in Preventivi e in Da confermare: fermate tolte e aggiunte, cosa fare e
+   *  i km (solo se salvati con lo stesso calcolo, cioè da quando il percorso
+   *  del preventivo ha una data). null se il percorso è quello del preventivo. */
+  percorso: async (tragittoId: string) => {
+    const [t] = await db.select({ kmAccettati: tragitti.kmAccettati, percorsoPreventivoIl: tragitti.percorsoPreventivoIl })
+      .from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
     if (!t) throw new NonTrovato('Tragitto');
-    if (t.kmAccettati == null) return { kmAccettati: null, kmAttuali: null, cambiatoParecchio: false };
-    const kmAttuali = await calcolaKmApprossimati(tragittoId);
-    if (kmAttuali == null) return { kmAccettati: t.kmAccettati, kmAttuali: null, cambiatoParecchio: false };
-    const differenza = Math.abs(kmAttuali - t.kmAccettati) / t.kmAccettati;
-    return { kmAccettati: t.kmAccettati, kmAttuali, cambiatoParecchio: differenza > 0.15 };
+    const cambio = (await cambiPercorso([tragittoId])).get(tragittoId);
+    if (!cambio) return null;
+    const kmConfrontabili = t.percorsoPreventivoIl != null && t.kmAccettati != null;
+    return {
+      ...cambio,
+      kmPreventivo: kmConfrontabili ? t.kmAccettati : null,
+      kmOra: kmConfrontabili ? await calcolaKmApprossimati(tragittoId) : null,
+    };
+  },
+  /** "Il preventivo va ancora bene": il percorso di adesso diventa quello
+   *  del preventivo, senza cambiare costo né scrivere a nessuno. Le
+   *  richieste per cambio percorso ancora aperte si chiudono. */
+  confermaPercorso: async (tragittoId: string) => {
+    const [t] = await db.select({ preventivoCosto: tragitti.preventivoCosto }).from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!t) throw new NonTrovato('Tragitto');
+    if (t.preventivoCosto == null) throw new ConflittoDati('Questo tragitto non ha ancora un preventivo da confermare.');
+    await db.update(tragitti).set(await fotografiaPercorso(tragittoId)).where(eq(tragitti.id, tragittoId));
+    return { ok: true as const };
+  },
+  /** Per il pallino viola su "Preventivi": tragitti attivi di eventi non
+   *  passati con il percorso cambiato dal preventivo accettato. */
+  contaCambiPercorso: async () => {
+    const righe = await db.select({ id: tragitti.id }).from(tragitti)
+      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNotNull(tragitti.preventivoCosto), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
+    return (await cambiPercorso(righe.map((r) => r.id))).size;
   },
   // Per ogni fornitore: quante richieste ha ricevuto, quante ha
   // risposto, quante volte è stato scelto (accettato), prezzo medio di
@@ -513,8 +580,16 @@ preventiviRouter.get('/tragitto/:tragittoId', richiedePermesso('eventi.partenze'
 preventiviRouter.get('/conta-da-valutare', richiedePermesso('eventi.partenze'), asyncHandler(async (_req: Request, res: Response) => {
   res.json({ conteggio: await preventiviService.contaDaValutare() });
 }));
-preventiviRouter.get('/verifica-km/:tragittoId', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
-  res.json(await preventiviService.verificaKm(req.params.tragittoId));
+preventiviRouter.get('/conta-cambi-percorso', richiedePermesso('eventi.partenze'), asyncHandler(async (_req: Request, res: Response) => {
+  res.json({ conteggio: await preventiviService.contaCambiPercorso() });
+}));
+// Percorso cambiato dopo il preventivo accettato (null = in regola).
+preventiviRouter.get('/percorso/:tragittoId', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
+  res.json(await preventiviService.percorso(req.params.tragittoId));
+}));
+// "Il preventivo va ancora bene": stesso permesso di chi accetta i preventivi.
+preventiviRouter.post('/tragitto/:tragittoId/percorso-ok', richiedePermesso('preventivi.accetta'), asyncHandler(async (req: Request, res: Response) => {
+  res.json(await preventiviService.confermaPercorso(req.params.tragittoId));
 }));
 preventiviRouter.get('/statistiche/fornitori', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
   const dataDa = req.query.dataDa ? new Date(req.query.dataDa as string) : undefined;

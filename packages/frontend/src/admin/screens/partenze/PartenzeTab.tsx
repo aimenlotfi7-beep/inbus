@@ -3,6 +3,7 @@ import { notifica } from '../../shared/notifiche';
 import { conferma } from '../../shared/conferma';
 import { motivoErrore, ERRORE_MAPPE } from '../../shared/errori';
 import { confermaAvvisiClienti, notificaEsitoAvvisi } from '../../shared/avvisiClienti';
+import { notificaPercorsiCambiati } from '../../shared/AvvisoCambioPercorso';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { formattaEuro, plurale } from '../../../shared/formato';
 import type { ContestoPartenze } from './tipi';
@@ -323,6 +324,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
       ricarica();
       onSalvato?.();
       notificaEsitoAvvisi('Orari salvati', esito);
+      notificaPercorsiCambiati(esito.percorsiCambiati);
     } catch (e) {
       notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {

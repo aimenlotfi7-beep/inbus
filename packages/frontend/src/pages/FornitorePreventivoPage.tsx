@@ -12,7 +12,8 @@ import { CookieBanner } from '../features/CookieBanner';
  *  chiave. Mostra solo il tragitto per cui questo fornitore è stato
  *  interpellato (non l'intero evento) — vedi conversazione. Una volta
  *  inviata la risposta è definitiva: non si può più modificare da
- *  qui. */
+ *  qui. Se la richiesta nasce da un cambio di percorso, lo dice in
+ *  evidenza (stesso viola del gestionale). */
 export function FornitorePreventivoPage() {
   const { token } = useParams<{ token: string }>();
   const [dati, setDati] = useState<DatiPubbliciPreventivo | null>(null);
@@ -67,10 +68,17 @@ export function FornitorePreventivoPage() {
       </header>
 
       <main>
-        <h1>Richiesta preventivo</h1>
+        <h1>{dati?.perCambioPercorso ? 'Nuovo preventivo: percorso cambiato' : 'Richiesta preventivo'}</h1>
 
         {caricando && <p className="sub">Carico...</p>}
         {erroreCaricamento && <p className="errore">{erroreCaricamento}</p>}
+
+        {dati?.perCambioPercorso && !dati.giaRisposto && !inviato && (
+          <div style={{ border: '1px solid #7c3aed', background: '#f5f0ff', color: '#3b1f7a', borderRadius: 10, padding: '12px 14px', margin: '0 0 14px' }}>
+            <p style={{ margin: 0, fontWeight: 700 }}>Il percorso è cambiato</p>
+            <p style={{ margin: '4px 0 0' }}>Dopo il preventivo precedente alcune fermate sono state tolte o aggiunte: quelle qui sotto sono le fermate aggiornate. Le chiediamo un nuovo prezzo su questo percorso.</p>
+          </div>
+        )}
 
         {dati && (
           <div className="evento-context">

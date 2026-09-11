@@ -8,6 +8,21 @@ export interface FornitoreCandidato extends Fornitore {
   statoCandidato: StatoCandidato;
 }
 
+/** Percorso cambiato dopo il preventivo accettato: cosa c'è da fare.
+ *  da_richiedere = chiedere un nuovo preventivo (o confermare l'attuale);
+ *  in_attesa = richiesta inviata, nessuna risposta; da_valutare = risposte
+ *  arrivate, da accettare. */
+export type StatoCambioPercorso = 'da_richiedere' | 'in_attesa' | 'da_valutare';
+export interface CambioPercorso {
+  tragittoId: string;
+  stato: StatoCambioPercorso;
+  fermateTolte: string[];
+  fermateAggiunte: string[];
+  // Solo se confrontabili (salvati con lo stesso calcolo): altrimenti null.
+  kmPreventivo: number | null;
+  kmOra: number | null;
+}
+
 export interface RispostaPreventivo {
   id: string;
   richiestaId: string;
@@ -32,7 +47,11 @@ export interface RichiestaConRisposta {
   // Solo per chi non ha risposto: il link del fornitore non è più valido
   // (si può reinviare con reinviaRichiesta, che lo rimette in validità).
   linkScaduto: boolean;
-  richiesta: { id: string; tragittoId: string; fornitoreId: string; tipoInvio: 'AUTOMATICO' | 'MANUALE'; creataIl: string };
+  // Richiesta mandata per un cambio di percorso: "aperta" se è della
+  // tornata in corso (il fornitore può rispondere), "chiusa" se nel
+  // frattempo il percorso del preventivo è stato aggiornato; null = normale.
+  cambioPercorso: 'aperta' | 'chiusa' | null;
+  richiesta: { id: string; tragittoId: string; fornitoreId: string; tipoInvio: 'AUTOMATICO' | 'MANUALE'; creataIl: string; perCambioPercorso: boolean };
   fornitore: Fornitore;
   risposta: RispostaPreventivo | null;
 }
@@ -63,13 +82,17 @@ export interface DatiPubbliciPreventivo {
   scaduto: boolean;
   // Un preventivo è già stato accettato per questo viaggio: nuove risposte rifiutate (409).
   giaAssegnato: boolean;
+  // Nuova richiesta perché il percorso è cambiato: la pagina lo spiega.
+  perCambioPercorso: boolean;
   risposta: { prezzo: string; fileNome: string | null } | null;
 }
 
 export const preventiviApi = {
   candidati: (tragittoId: string, lat: number, lng: number, raggioKm?: number) =>
     api.get<FornitoreCandidato[]>(`/api/preventivi/candidati/${tragittoId}?lat=${lat}&lng=${lng}${raggioKm ? `&raggioKm=${raggioKm}` : ''}`),
-  richiedi: (tragittoId: string, input: { lat?: number; lng?: number; raggioKm?: number; fornitoriManualiIds: string[] }) =>
+  // perCambioPercorso: nuova richiesta perché il percorso è cambiato — anche
+  // i fornitori già contattati si possono scegliere e possono rispondere.
+  richiedi: (tragittoId: string, input: { lat?: number; lng?: number; raggioKm?: number; fornitoriManualiIds: string[]; perCambioPercorso?: boolean }) =>
     api.post<EsitoRichiestaPreventivi>(`/api/preventivi/richiedi/${tragittoId}`, input),
   // Solo richieste senza risposta: stesso link (rimesso in validità se scaduto).
   // 409 se ha già risposto, se il fornitore non ha email o se il viaggio è già assegnato.
@@ -77,7 +100,12 @@ export const preventiviApi = {
     api.post<{ inviata: boolean }>(`/api/preventivi/richieste/${richiestaId}/reinvia`, {}),
   listaPerTragitto: (tragittoId: string) => api.get<RichiestaConRisposta[]>(`/api/preventivi/tragitto/${tragittoId}`),
   contaDaValutare: () => api.get<{ conteggio: number }>('/api/preventivi/conta-da-valutare'),
-  verificaKm: (tragittoId: string) => api.get<{ kmAccettati: number | null; kmAttuali: number | null; cambiatoParecchio: boolean }>(`/api/preventivi/verifica-km/${tragittoId}`),
+  // Tragitti con il percorso cambiato dopo il preventivo (il pallino viola).
+  contaCambiPercorso: () => api.get<{ conteggio: number }>('/api/preventivi/conta-cambi-percorso'),
+  // null se il percorso è ancora quello del preventivo accettato.
+  percorso: (tragittoId: string) => api.get<CambioPercorso | null>(`/api/preventivi/percorso/${tragittoId}`),
+  // "Il preventivo va ancora bene": il percorso di adesso diventa quello del preventivo.
+  confermaPercorso: (tragittoId: string) => api.post<{ ok: true }>(`/api/preventivi/tragitto/${tragittoId}/percorso-ok`, {}),
   statistichePerFornitore: (dataDa?: string) => api.get<{ fornitore: Fornitore; richiesteRicevute: number; risposteDate: number; volteScelto: number; prezzoMedio: number | null }[]>(`/api/preventivi/statistiche/fornitori${dataDa ? `?dataDa=${dataDa}` : ''}`),
   storicoPerTratta: (dataDa?: string) => api.get<{ partenza: string; arrivo: string; prezzo: number; km: number | null; data: string; nomeTragitto: string; artista: string }[]>(`/api/preventivi/statistiche/tratte${dataDa ? `?dataDa=${dataDa}` : ''}`),
   accetta: (rispostaId: string) => api.put<EsitoAccettazione>(`/api/preventivi/risposte/${rispostaId}/accetta`, {}),
