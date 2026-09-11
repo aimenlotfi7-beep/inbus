@@ -322,10 +322,10 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
           {' · '}{linee.reduce((tot, l) => tot + l.bus.length, 0)} bus censit{linee.reduce((tot, l) => tot + l.bus.length, 0) === 1 ? 'o' : 'i'}
         </p>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => setGestisciFermateAperto((v) => !v)}>
+          <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 10px' }} onClick={() => setGestisciFermateAperto((v) => !v)}>
             {gestisciFermateAperto ? 'Chiudi fermate' : 'Gestisci fermate'}
           </button>
-          <button className="btn btn-primary" style={{ fontSize: 12.5, padding: '6px 14px' }} onClick={apriPopupNuovaLinea}>+ Nuova linea</button>
+          <button className="btn btn-primary" style={{ fontSize: 'var(--testo-md)', padding: '6px 14px' }} onClick={apriPopupNuovaLinea}>+ Nuova linea</button>
         </div>
       </div>
 
@@ -340,14 +340,14 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
                 return (
                   <span key={f.id} className="chip" style={{ opacity: 0.55 }}>
                     <span style={{ textDecoration: 'line-through' }}>{f.citta}</span>
-                    <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Riattiva questa fermata" style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0, fontSize: 13 }}>↺</button>
+                    <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Riattiva questa fermata" style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0, fontSize: 'var(--testo-md)' }}>↺</button>
                   </span>
                 );
               }
               return (
                 <span key={f.id} className="chip">
                   {f.citta}
-                  <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Escludi questa fermata" style={{ background: 'none', border: 'none', color: 'var(--mist)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
+                  <button type="button" onClick={() => alternaFermataAttiva(f.id)} title="Escludi questa fermata" style={{ background: 'none', border: 'none', color: 'var(--mist)', cursor: 'pointer', padding: 0, fontSize: 'var(--testo-md)' }}>✕</button>
                 </span>
               );
             })}
@@ -357,7 +357,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       )}
 
       {verificaKm?.cambiatoParecchio && (
-        <div style={{ background: 'var(--dusk)', border: '1px solid var(--amber)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ background: 'var(--dusk)', border: '1px solid var(--amber)', borderRadius: 8, padding: '10px 14px', fontSize: 'var(--testo-md)', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span><b style={{ color: 'var(--amber)' }}>⚠ Le fermate sono cambiate parecchio</b> da quando hai accettato il preventivo (~{Math.round(verificaKm.kmAccettati!)} km allora, ~{Math.round(verificaKm.kmAttuali!)} km ora) — potrebbe servire un nuovo preventivo.</span>
           <button type="button" className="btn btn-ghost" style={{ flexShrink: 0 }} onClick={() => tornaAPartenze('preventivi')}>Vai a Preventivi →</button>
         </div>
@@ -370,11 +370,11 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       {suggerimento?.pronta && (
         <div className="section-card" style={{ marginBottom: 16, borderColor: 'var(--green)' }}>
           <p style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>✓ Pronta da confermare</p>
-          <p style={{ fontSize: 13.5, marginBottom: 8 }}>
+          <p style={{ fontSize: 'var(--testo-base)', marginBottom: 8 }}>
             {suggerimento.totaleConfermati} passeggeri confermati (soglia di pareggio: {suggerimento.postiDiPareggio}) — puoi creare la Linea con {suggerimento.postiBus} posti a {formattaEuro(suggerimento.costo)}, gli stessi del preventivo accettato.
           </p>
           {!!suggerimento.fermateSenzaPrenotazioni?.length && (
-            <p style={{ fontSize: 12.5, color: 'var(--amber)', marginBottom: 8 }}>
+            <p style={{ fontSize: 'var(--testo-md)', color: 'var(--amber)', marginBottom: 8 }}>
               ⚠ {suggerimento.fermateSenzaPrenotazioni.length} fermata/e senza nessuna prenotazione ({suggerimento.fermateSenzaPrenotazioni.map((f) => f.citta).join(', ')}) — se vuoi accorciare il tragitto, deselezionale nel passo 2 qui sotto; controlla anche il preventivo, potrebbe convenirti richiederne uno migliorativo (il banner "km cambiati" te lo segnala da solo).
             </p>
           )}
@@ -384,7 +384,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       {suggerimento?.serveSecondoBus && (
         <div className="section-card" style={{ marginBottom: 16, borderColor: 'var(--pink)' }}>
           <p style={{ fontWeight: 700, color: 'var(--pink)', marginBottom: 6 }}>⚠ Serve un secondo bus</p>
-          <p style={{ fontSize: 13.5, marginBottom: 8 }}>
+          <p style={{ fontSize: 'var(--testo-base)', marginBottom: 8 }}>
             {suggerimento.totaleConfermati} passeggeri confermati, ma i bus già registrati coprono solo {suggerimento.capienzaReale} posti.
           </p>
         </div>
@@ -405,14 +405,14 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }} onClick={() => alternaLineaEspansa(l.id)}>
                       <div>
                         <p style={{ fontWeight: 700, marginBottom: 4 }}>{l.nome}</p>
-                        <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 8 }}>{percorso || 'Nessuna fermata'}</p>
-                        <p style={{ fontSize: 12.5 }}>
+                        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 8 }}>{percorso || 'Nessuna fermata'}</p>
+                        <p style={{ fontSize: 'var(--testo-md)' }}>
                           Prenotazioni: <b>{prenotazioniLinea(l)}</b>
                           <span style={{ color: 'var(--mist)' }}> · </span>
                           Bus censiti: <b>{l.bus.length}</b>
                         </p>
                       </div>
-                      <span style={{ color: 'var(--mist)', fontSize: 18, flexShrink: 0 }}>{espansa ? '▲' : '▼'}</span>
+                      <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-2xl)', flexShrink: 0 }}>{espansa ? '▲' : '▼'}</span>
                     </div>
 
                     {espansa && (
@@ -420,7 +420,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
                           {l.fermate.map((f) => (
                             <span key={f.fermataId} className="chip">
-                              {f.citta}{f.orario && <span style={{ color: 'var(--mist)', fontSize: 11.5 }}>({f.orario})</span>}
+                              {f.citta}{f.orario && <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>({f.orario})</span>}
                               <span style={{ color: 'var(--pink)', fontFamily: "'Space Mono',monospace" }}>{f.inAttesa}</span>
                               <span style={{ color: 'var(--mist)' }}>/</span>
                               <span style={{ color: 'var(--green)', fontFamily: "'Space Mono',monospace" }}>{f.versati}</span>
@@ -429,17 +429,17 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
                         </div>
 
                         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                          <button className="btn btn-primary" style={{ fontSize: 12.5 }} onClick={() => versa(l.id)} disabled={versando}>
+                          <button className="btn btn-primary" style={{ fontSize: 'var(--testo-md)' }} onClick={() => versa(l.id)} disabled={versando}>
                             {versando && lineaAttivaId === l.id ? 'Verso...' : '↓ Versa le prenotazioni in attesa'}
                           </button>
-                          <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => apriModificaPercorso(l.id)}>Modifica percorso</button>
+                          <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} onClick={() => apriModificaPercorso(l.id)}>Modifica percorso</button>
                         </div>
 
-                        <p className="section-label" style={{ fontSize: 12, marginBottom: 8 }}>Bus su questa linea</p>
+                        <p className="section-label" style={{ fontSize: 'var(--testo-sm)', marginBottom: 8 }}>Bus su questa linea</p>
                         {l.bus.length === 0 ? (
                           <div>
                             <p className="testo-intro" style={{ marginBottom: 10 }}>Nessun bus censito.</p>
-                            <button className="btn btn-primary" style={{ fontSize: 12.5 }} onClick={() => apriAggiungiBus(l.id)}>+ Censisci bus</button>
+                            <button className="btn btn-primary" style={{ fontSize: 'var(--testo-md)' }} onClick={() => apriAggiungiBus(l.id)}>+ Censisci bus</button>
                           </div>
                         ) : (
                           <>
@@ -447,15 +447,15 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
                               <div key={b.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
                                 <span className="riga-titolo">
                                   {b.riferimento}{b.autistaNome ? ` — ${b.autistaNome}` : ''}
-                                  {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>Tour leader: {b.tourLeaderNome}</span></>}
-                                  <br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{b.postiBus ?? '—'} posti</span>
+                                  {b.tourLeaderNome && <><br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>Tour leader: {b.tourLeaderNome}</span></>}
+                                  <br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{b.postiBus ?? '—'} posti</span>
                                 </span>
                                 <span className="riga-meta">
-                                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => apriModificaBus(l.id, b.id)}>Modifica</button>
+                                  <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px' }} onClick={() => apriModificaBus(l.id, b.id)}>Modifica</button>
                                 </span>
                               </div>
                             ))}
-                            <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 12 }} onClick={() => apriAggiungiBus(l.id)}>+ Aggiungi un altro bus a questa Linea</button>
+                            <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', marginTop: 12 }} onClick={() => apriAggiungiBus(l.id)}>+ Aggiungi un altro bus a questa Linea</button>
                           </>
                         )}
                       </div>
@@ -514,17 +514,17 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
                 Scegli le fermate — in QUALSIASI ordine (l'ordine finale lo decide da solo l'orario di ciascuna).
               </p>
               {fermateAttive.map((f) => (
-                <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 13.5 }}>
+                <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 'var(--testo-base)' }}>
                   <input
                     type="checkbox"
                     checked={fermateSelezionate.includes(f.id)}
                     onChange={(e) => setFermateSelezionate((prev) => e.target.checked ? [...prev, f.id] : prev.filter((id) => id !== f.id))}
                   />
-                  {f.citta} {f.orario && <span style={{ color: 'var(--mist)', fontSize: 12 }}>({f.orario})</span>}
+                  {f.citta} {f.orario && <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>({f.orario})</span>}
                 </label>
               ))}
               {fermateSelezionate.length > 0 && (
-                <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 10 }}>
+                <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginTop: 10 }}>
                   Ordine finale: {[...fermateAttive].filter((f) => fermateSelezionate.includes(f.id)).sort(perOrario).map((f) => f.citta).join(' → ')}
                 </p>
               )}
@@ -594,13 +594,13 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         <div className="section-card" style={{ marginTop: 20 }}>
           <p className="section-label" style={{ marginBottom: 12 }}>Modifica percorso — cambia per tutti i bus di questa Linea</p>
           {fermateAttive.map((f) => (
-            <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 13.5 }}>
+            <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 'var(--testo-base)' }}>
               <input
                 type="checkbox"
                 checked={percorsoModificato.includes(f.id)}
                 onChange={(e) => setPercorsoModificato((prev) => e.target.checked ? [...prev, f.id] : prev.filter((id) => id !== f.id))}
               />
-              {f.citta} {f.orario && <span style={{ color: 'var(--mist)', fontSize: 12 }}>({f.orario})</span>}
+              {f.citta} {f.orario && <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>({f.orario})</span>}
             </label>
           ))}
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>

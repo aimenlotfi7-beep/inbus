@@ -59,7 +59,7 @@ export function RegistratiPage() {
         <h1>Crea il tuo account</h1>
         <p className="sottotitolo-auth">Serve per prenotare, vedere i tuoi viaggi e il tuo credito fedeltà.</p>
         {searchParams.get('ref') && (
-          <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 4 }}>
+          <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '10px 14px', fontSize: 'var(--testo-md)', marginBottom: 4 }}>
             Sei stato invitato da un amico — completa la registrazione e ti aspetta un piccolo bonus di benvenuto sul tuo credito fedeltà.
           </p>
         )}
@@ -86,7 +86,7 @@ export function RegistratiPage() {
 
         <label>Data di nascita</label>
         <input type="date" autoComplete="bday" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} required />
-        <p className="sottotitolo-auth" style={{ fontSize: 12.5, marginTop: -6 }}>Serve per organizzare al meglio i gruppi sui bus quando prenoti in più persone.</p>
+        <p className="sottotitolo-auth" style={{ fontSize: 'var(--testo-md)', marginTop: -6 }}>Serve per organizzare al meglio i gruppi sui bus quando prenoti in più persone.</p>
 
         <label>Password (almeno 8 caratteri)</label>
         <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required />

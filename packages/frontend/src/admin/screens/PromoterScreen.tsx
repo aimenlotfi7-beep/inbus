@@ -70,7 +70,7 @@ export function PromoterScreen() {
         {inModifica && (
           <div className="campo">
             <label>Il suo link per un evento</label>
-            <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 6 }}>
+            <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginBottom: 6 }}>
               Un codice diverso per ogni evento (mai il suo nome nel link) — scegli l'evento, il link si genera da solo.
             </p>
             <SelettoreLinkPromoter promoterId={inModifica.id} />
@@ -78,11 +78,11 @@ export function PromoterScreen() {
         )}
         <div className="campo">
           <label>Eventi esclusi (facoltativo)</label>
-          <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 6 }}>Di default vende tutti gli eventi, anche quelli creati dopo — scegli qui solo quelli che NON deve poter vendere.</p>
+          <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginBottom: 6 }}>Di default vende tutti gli eventi, anche quelli creati dopo — scegli qui solo quelli che NON deve poter vendere.</p>
           <SelettoreEventi selezionati={form.eventiEsclusi ?? []} onChange={(ids) => setForm({ ...form, eventiEsclusi: ids })} />
         </div>
         {statistiche && (
-          <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 14 }}>
+          <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 14 }}>
             {statistiche.numeroPrenotazioni} prenotazioni portate · {formattaEuro(statistiche.fatturato)} di fatturato generato
           </p>
         )}
@@ -138,7 +138,7 @@ function SelettoreLinkPromoter({ promoterId }: { promoterId: string }) {
         <option value="">— Scegli un evento —</option>
         {eventi.map((ev) => <option key={ev.id} value={ev.id}>{ev.artista} — {new Date(ev.data).toLocaleDateString('it-IT')}</option>)}
       </select>
-      {eventoId && (caricando ? <p style={{ fontSize: 13, color: 'var(--mist)' }}>Genero il link...</p> : link && <CampoCopiabile etichetta="" valore={link} />)}
+      {eventoId && (caricando ? <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>Genero il link...</p> : link && <CampoCopiabile etichetta="" valore={link} />)}
     </div>
   );
 }

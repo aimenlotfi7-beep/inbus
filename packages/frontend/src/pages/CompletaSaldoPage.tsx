@@ -92,7 +92,7 @@ export function CompletaSaldoPage() {
         {stato === 'chiedi-email' && (
           <div className="evento-pagina-checkout" style={{ position: 'static' }}>
             <h3>Completa il saldo</h3>
-            <p style={{ fontSize: 13.5, color: 'var(--mist)', margin: '0 0 14px' }}>
+            <p style={{ fontSize: 'var(--testo-base)', color: 'var(--mist)', margin: '0 0 14px' }}>
               Per motivi di sicurezza, conferma l'indirizzo email con cui hai prenotato.
             </p>
             <div className="campo">
@@ -121,14 +121,14 @@ export function CompletaSaldoPage() {
             ) : (
               <>
                 <h3>Completa il saldo</h3>
-                <p style={{ fontSize: 13.5, color: 'var(--mist)', margin: '0 0 4px' }}>
+                <p style={{ fontSize: 'var(--testo-base)', color: 'var(--mist)', margin: '0 0 4px' }}>
                   {dati.artista} — prenotazione <b>{dati.pnr}</b>
                   {dati.dataEvento ? ` · partenza ${new Date(dati.dataEvento).toLocaleDateString('it-IT')}` : ''}
                 </p>
-                <p style={{ fontSize: 13, color: 'var(--mist)' }}>
+                <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>
                   Acconto già versato: {formattaEuro(dati.accontoVersato)} su un totale di {formattaEuro(dati.totaleReale)}.
                 </p>
-                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 24, margin: '18px 0 6px' }}>
+                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 'var(--testo-4xl)', margin: '18px 0 6px' }}>
                   Da saldare: {formattaEuro(couponVerificato ? Math.max(0, dati.differenza - couponVerificato.sconto) : dati.differenza)}
                 </p>
 
@@ -154,8 +154,8 @@ export function CompletaSaldoPage() {
                       {verificandoCoupon ? '...' : couponVerificato ? '✓ Applicato' : 'Applica'}
                     </button>
                   </div>
-                  {couponErrore && <p style={{ color: '#c0392b', fontSize: 12, marginTop: 6 }}>{couponErrore}</p>}
-                  {couponVerificato && <p style={{ fontSize: 13, marginTop: 6 }}>Sconto applicato: <b>-{formattaEuro(couponVerificato.sconto)}</b></p>}
+                  {couponErrore && <p style={{ color: '#c0392b', fontSize: 'var(--testo-sm)', marginTop: 6 }}>{couponErrore}</p>}
+                  {couponVerificato && <p style={{ fontSize: 'var(--testo-md)', marginTop: 6 }}>Sconto applicato: <b>-{formattaEuro(couponVerificato.sconto)}</b></p>}
                 </div>
 
                 {messaggioErrore && <p className="errore">{messaggioErrore}</p>}

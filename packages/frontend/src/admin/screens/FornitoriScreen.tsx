@@ -114,11 +114,11 @@ export function FornitoriScreen() {
   if (gestisciCampiExtraAperto) {
     return (
       <PaginaSezione titolo="Campi extra nel form pubblico" onIndietro={() => setGestisciCampiExtraAperto(false)}>
-        <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 16 }}>Campi in più, oltre a ragione sociale/P.IVA/indirizzo/email/telefono/referente, che compaiono nel form di autoregistrazione — solo testo semplice, un'etichetta e basta.</p>
+        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 16 }}>Campi in più, oltre a ragione sociale/P.IVA/indirizzo/email/telefono/referente, che compaiono nel form di autoregistrazione — solo testo semplice, un'etichetta e basta.</p>
         {campiExtraConfig.map((c) => (
           <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
             <span>{c.etichetta}</span>
-            <button className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => rimuoviCampoExtra(c.id)}>Rimuovi</button>
+            <button className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 'var(--testo-sm)' }} onClick={() => rimuoviCampoExtra(c.id)}>Rimuovi</button>
           </div>
         ))}
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
@@ -145,8 +145,8 @@ export function FornitoriScreen() {
         </label>
         {inModifica?.campiExtra && inModifica.campiExtra.length > 0 && (
           <div style={{ marginBottom: 14 }}>
-            <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 6 }}>Campi extra (dall'autoregistrazione)</p>
-            {inModifica.campiExtra.map((c, i) => <p key={i} style={{ fontSize: 13, margin: '2px 0' }}>{c.etichetta}: {c.valore}</p>)}
+            <p style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 6 }}>Campi extra (dall'autoregistrazione)</p>
+            {inModifica.campiExtra.map((c, i) => <p key={i} style={{ fontSize: 'var(--testo-md)', margin: '2px 0' }}>{c.etichetta}: {c.valore}</p>)}
           </div>
         )}
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva fornitore'}</button>
@@ -165,7 +165,7 @@ export function FornitoriScreen() {
         </div>
       } />
       {inAttesaCount > 0 && (
-        <p style={{ background: 'var(--dusk)', border: '1px solid var(--amber)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 14 }}>
+        <p style={{ background: 'var(--dusk)', border: '1px solid var(--amber)', borderRadius: 8, padding: '10px 14px', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
           <b style={{ color: 'var(--amber)' }}>{inAttesaCount}</b> fornitore/i in attesa di approvazione — controlla la colonna Stato qui sotto.
         </p>
       )}
@@ -178,7 +178,7 @@ export function FornitoriScreen() {
       ) : (
         regioniOrdinate.map((regione) => (
           <div key={regione} style={{ marginBottom: 24 }}>
-            <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px' }}>{regione}</p>
+            <p style={{ fontWeight: 700, fontSize: 'var(--testo-lg)', margin: '0 0 8px' }}>{regione}</p>
             <TabellaGenerica
               righe={gruppiPerRegione.get(regione)!}
               colonne={[
@@ -192,9 +192,9 @@ export function FornitoriScreen() {
                   render: (f) => (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span className={`badge ${CLASSE_STATO[f.stato]}`}>{ETICHETTA_STATO[f.stato]}</span>
-                      {f.stato === 'IN_ATTESA' && <button className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => cambiaStato(f, 'APPROVATO')}>Approva</button>}
-                      {f.stato === 'APPROVATO' && <button className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px', color: 'var(--pink)' }} onClick={() => cambiaStato(f, 'DISATTIVATO')}>Disattiva</button>}
-                      {f.stato === 'DISATTIVATO' && <button className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => cambiaStato(f, 'APPROVATO')}>Riattiva</button>}
+                      {f.stato === 'IN_ATTESA' && <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '2px 8px' }} onClick={() => cambiaStato(f, 'APPROVATO')}>Approva</button>}
+                      {f.stato === 'APPROVATO' && <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '2px 8px', color: 'var(--pink)' }} onClick={() => cambiaStato(f, 'DISATTIVATO')}>Disattiva</button>}
+                      {f.stato === 'DISATTIVATO' && <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '2px 8px' }} onClick={() => cambiaStato(f, 'APPROVATO')}>Riattiva</button>}
                     </div>
                   ),
                 },

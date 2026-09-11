@@ -194,7 +194,7 @@ export function FermateScreen() {
       ) : (
         regioniOrdinate.map((regione) => (
           <div key={regione} style={{ marginBottom: 22 }}>
-            <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px' }}>{regione}</p>
+            <p style={{ fontWeight: 700, fontSize: 'var(--testo-lg)', margin: '0 0 8px' }}>{regione}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {gruppiPerRegione.get(regione)!.map((f) => (
                 <button
@@ -206,7 +206,7 @@ export function FermateScreen() {
                 >
                   <span>
                     <span className="riga-titolo">{f.nome}</span>
-                    <span style={{ color: 'var(--mist)', fontSize: 12.5, marginLeft: 10 }}>{f.citta} · {f.indirizzo}</span>
+                    <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginLeft: 10 }}>{f.citta} · {f.indirizzo}</span>
                     {f.link && (
                       <span
                         role="button"
@@ -214,7 +214,7 @@ export function FermateScreen() {
                         title={f.link}
                         onClick={(e) => { e.stopPropagation(); window.open(f.link!, '_blank', 'noopener'); }}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); window.open(f.link!, '_blank', 'noopener'); } }}
-                        style={{ color: 'var(--blue)', fontSize: 12, marginLeft: 10, cursor: 'pointer', textDecoration: 'underline' }}
+                        style={{ color: 'var(--blue)', fontSize: 'var(--testo-sm)', marginLeft: 10, cursor: 'pointer', textDecoration: 'underline' }}
                       >
                         apri link →
                       </span>
@@ -225,7 +225,7 @@ export function FermateScreen() {
                     tabIndex={0}
                     onClick={(e) => { e.stopPropagation(); elimina(f); }}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); elimina(f); } }}
-                    style={{ fontSize: 11, color: 'var(--pink)', flexShrink: 0 }}
+                    style={{ fontSize: 'var(--testo-xs)', color: 'var(--pink)', flexShrink: 0 }}
                   >
                     Elimina
                   </span>
@@ -277,10 +277,10 @@ export function FermateScreen() {
               (es. dopo una modifica salvata prima di questo pulsante) o
               se Nominatim aveva sbagliato la prima volta. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: -6, marginBottom: 12 }}>
-            <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} disabled={ricalcolando} onClick={ricalcolaPosizione}>
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} disabled={ricalcolando} onClick={ricalcolaPosizione}>
               {ricalcolando ? 'Cerco...' : '↻ Ricalcola posizione e regione'}
             </button>
-            <span style={{ fontSize: 12, color: 'var(--mist)' }}>Regione attuale: <b>{form.regione ?? 'nessuna'}</b></span>
+            <span style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>Regione attuale: <b>{form.regione ?? 'nessuna'}</b></span>
           </div>
           <div className="campo">
             <label><EtichettaTooltip testo="Link" chiave="fermata_link_campo" mappaTooltip={mappaTooltip} /></label>

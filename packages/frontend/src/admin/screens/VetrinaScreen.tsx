@@ -23,7 +23,7 @@ export function VetrinaScreen() {
   return (
     <div>
       <PanelHead titolo="Vetrina" />
-      <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 16 }}>
+      <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 16 }}>
         Scegli quali eventi mostrare nel carosello "Eventi Consigliati" in homepage — clicca una card per attivarla/disattivarla.
       </p>
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista o città..." />

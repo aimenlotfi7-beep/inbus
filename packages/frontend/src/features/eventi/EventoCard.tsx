@@ -67,7 +67,7 @@ export function EventoCard({ evento }: { evento: Evento }) {
           <h3>{evento.artista}</h3>
           <div className="card-meta"><span>{evento.luogo}</span><span>{evento.citta}</span></div>
           <div className="card-foot">
-            {prezzo && <span style={{ fontSize: 13, fontWeight: 700 }}>{prezzo}</span>}
+            {prezzo && <span style={{ fontSize: 'var(--testo-md)', fontWeight: 700 }}>{prezzo}</span>}
             <span className="card-cta">Vedi le date</span>
           </div>
         </div>
@@ -125,7 +125,7 @@ export function EventoCard({ evento }: { evento: Evento }) {
           </div>
         )}
         <div className="card-foot">
-          {prezzo && posti !== 0 && <span style={{ fontSize: 13, fontWeight: 700 }}>{prezzo}</span>}
+          {prezzo && posti !== 0 && <span style={{ fontSize: 'var(--testo-md)', fontWeight: 700 }}>{prezzo}</span>}
           <span className="card-cta">
             {posti === 0 ? "Lista d'attesa" : 'Prenota'}
           </span>

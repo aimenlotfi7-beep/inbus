@@ -55,7 +55,7 @@ export function VariazionePage() {
         {dati && stato !== 'non-trovato' && stato !== 'errore' && (
           <div className="evento-pagina-checkout" style={{ position: 'static' }}>
             <h3>Una variazione al tuo viaggio</h3>
-            <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 16 }}>PNR {dati.pnr}</p>
+            <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 16 }}>PNR {dati.pnr}</p>
             <p className="checkout-summary" style={{ marginBottom: 20 }}>{dati.descrizione}</p>
 
             {stato === 'fatto' ? (
@@ -66,7 +66,7 @@ export function VariazionePage() {
               </p>
             ) : (
               <>
-                <p style={{ fontSize: 13.5, color: 'var(--mist)', marginBottom: 16 }}>
+                <p style={{ fontSize: 'var(--testo-base)', color: 'var(--mist)', marginBottom: 16 }}>
                   Se va bene così, non devi fare nulla — puoi anche chiudere questa pagina, la tua prenotazione resta confermata automaticamente. Se invece preferisci il rimborso, scegli qui sotto.
                 </p>
                 <button className="search-cta" style={{ opacity: stato === 'invio' ? .5 : 1 }} disabled={stato === 'invio'} onClick={() => rispondi('ACCETTATA')}>

@@ -32,7 +32,7 @@ export function UtentiScreen() {
       <TabellaGenerica
         righe={utentiFiltrati}
         colonne={[
-          { etichetta: 'Nome', render: (u) => <button className="btn btn-ghost" style={{ padding: 0, fontSize: 14, color: 'var(--paper)', textDecoration: 'underline' }} onClick={() => apriUtente(u)}>{`${u.nome ?? ''} ${u.cognome ?? ''}`.trim() || '—'}</button> },
+          { etichetta: 'Nome', render: (u) => <button className="btn btn-ghost" style={{ padding: 0, fontSize: 'var(--testo-base)', color: 'var(--paper)', textDecoration: 'underline' }} onClick={() => apriUtente(u)}>{`${u.nome ?? ''} ${u.cognome ?? ''}`.trim() || '—'}</button> },
           { etichetta: 'Email', render: (u) => u.email },
           { etichetta: 'Telefono', render: (u) => u.telefono ?? '—' },
           { etichetta: 'Città', render: (u) => u.citta ?? '—' },
@@ -54,7 +54,7 @@ export function UtentiScreen() {
           {prenotazioni !== null && prenotazioni.length === 0 && <p className="testo-intro">Nessuna prenotazione ancora.</p>}
           {prenotazioni?.map((p) => (
             <div key={p.id} className="riga-cliccabile" style={{ cursor: 'default' }}>
-              <span className="riga-titolo">{p.artista} · {p.pnr}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{new Date(p.dataEvento).toLocaleDateString('it-IT')} · {p.passeggeri} passeggero/i · {formattaEuro(p.totale)}</span></span>
+              <span className="riga-titolo">{p.artista} · {p.pnr}<br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{new Date(p.dataEvento).toLocaleDateString('it-IT')} · {p.passeggeri} passeggero/i · {formattaEuro(p.totale)}</span></span>
               <span className={`badge ${p.stato === 'CONFERMATA' ? 'coperta' : 'non-coperta'}`}>{p.stato === 'CONFERMATA' ? 'Confermata' : 'Cancellata'}</span>
             </div>
           ))}

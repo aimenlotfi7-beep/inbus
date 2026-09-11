@@ -65,7 +65,7 @@ export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }:
         aria-label="Mostra tutte le fermate"
         style={{
           position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-          background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, opacity: .6, padding: 4,
+          background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--testo-md)', opacity: .6, padding: 4,
         }}
       >
         ▾
@@ -77,7 +77,7 @@ export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }:
           background: '#fff', border: '1px solid #e5ded0', borderRadius: 10, maxHeight: 260, overflowY: 'auto',
           boxShadow: '0 6px 18px rgba(0,0,0,.12)',
         }}>
-          {filtrate.length === 0 && <p style={{ padding: '10px 14px', fontSize: 13, opacity: .6, margin: 0 }}>Nessuna fermata trovata.</p>}
+          {filtrate.length === 0 && <p style={{ padding: '10px 14px', fontSize: 'var(--testo-md)', opacity: .6, margin: 0 }}>Nessuna fermata trovata.</p>}
           {filtrate.map((o, i) => {
             // Intestazione di regione solo quando cambia rispetto alla
             // fermata precedente nell'elenco già ordinato — non una per
@@ -92,13 +92,13 @@ export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }:
             return (
               <div key={o.fermataId}>
                 {nuovaRegione && (
-                  <p style={{ margin: 0, padding: '9px 14px 5px', fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .4, color: 'inherit', background: 'rgba(0,0,0,.04)' }}>{regioneCorrente}</p>
+                  <p style={{ margin: 0, padding: '9px 14px 5px', fontSize: 'var(--testo-md)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: .4, color: 'inherit', background: 'rgba(0,0,0,.04)' }}>{regioneCorrente}</p>
                 )}
                 <button
                   type="button"
                   onClick={() => scegli(o)}
                   style={{
-                    display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13.5,
+                    display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 'var(--testo-base)',
                     background: o.fermataId === valore ? '#faf4ea' : 'transparent', border: 'none', cursor: 'pointer',
                   }}
                 >

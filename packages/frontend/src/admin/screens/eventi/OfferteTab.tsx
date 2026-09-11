@@ -140,7 +140,7 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
           <span className="riga-titolo">
             {o.nome} — -{Number(o.scontoPercentuale).toFixed(0)}% su tutte le tratte
             <br />
-            <span style={{ color: 'var(--mist)', fontSize: 12 }}>
+            <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>
               /offerta/{o.slug} · {o.utilizzi} utilizzi{o.limiteUtilizzi ? ` / ${o.limiteUtilizzi}` : ''}
             </span>
           </span>
@@ -148,10 +148,10 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
             <span className={`badge ${o.attiva ? 'coperta' : 'non-coperta'}`} style={{ cursor: 'pointer' }} onClick={() => toggleAttiva(o)}>
               {o.attiva ? 'Attiva' : 'Disattiva'}
             </span>
-            <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={() => copiaLink(o)}>
+            <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px' }} onClick={() => copiaLink(o)}>
               {linkCopiato === o.id ? '✓ Copiato' : 'Copia link'}
             </button>
-            <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px', color: 'var(--pink)' }} onClick={() => elimina(o)}>Elimina</button>
+            <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px', color: 'var(--pink)' }} onClick={() => elimina(o)}>Elimina</button>
           </span>
         </div>
       ))}

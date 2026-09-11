@@ -48,10 +48,10 @@ export function OfferteScreen() {
       <div className="cards-list">
         {eventiFiltrati.map((ev) => (
           <div key={ev.id} className="evento-card" onClick={() => apriEvento(ev)}>
-            <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
-            <h3 style={{ fontSize: 17, margin: '6px 0 4px' }}>{ev.artista}</h3>
-            <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{ev.luogo}, {ev.citta}</p>
-            <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
+            <span style={{ fontSize: 'var(--testo-2xs)', textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
+            <h3 style={{ fontSize: 'var(--testo-2xl)', margin: '6px 0 4px' }}>{ev.artista}</h3>
+            <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>{ev.luogo}, {ev.citta}</p>
+            <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
           </div>
         ))}
         {!eventiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun evento trovato.' : 'Nessun evento ancora — creane uno dalla sezione Eventi.'}</p>}

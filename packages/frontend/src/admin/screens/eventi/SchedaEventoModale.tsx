@@ -762,7 +762,7 @@ export function SchedaEventoModale({
           passare a più servizi, disponibile fin da subito (anche per
           un evento non ancora salvato). */}
       {modalitaServizi === 'singolo' && (
-        <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, marginBottom: 16, borderRadius: 999 }} onClick={aggiungiServizioAdEventoSingolo}>
+        <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)', marginBottom: 16, borderRadius: 999 }} onClick={aggiungiServizioAdEventoSingolo}>
           + Aggiungi un servizio
         </button>
       )}
@@ -793,7 +793,7 @@ export function SchedaEventoModale({
                   Tragitti liberi
                 </button>
               )}
-              <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5, borderRadius: 999 }} onClick={nuovoServizio}>+ Nuovo servizio</button>
+              <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)', borderRadius: 999 }} onClick={nuovoServizio}>+ Nuovo servizio</button>
             </div>
 
             {servizioTabAttivo && servizioTabAttivo !== 'liberi' && (() => {
@@ -813,16 +813,16 @@ export function SchedaEventoModale({
                         autoFocus
                         style={{ flex: 1, minWidth: 120, border: 'none', background: 'transparent', padding: '6px 0' }}
                       />
-                      <button type="button" className="btn btn-ghost" style={{ fontSize: 12, borderRadius: 999 }} onClick={() => setRinominaServizioAperto(false)}>✓ Fatto</button>
+                      <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', borderRadius: 999 }} onClick={() => setRinominaServizioAperto(false)}>✓ Fatto</button>
                     </div>
                   ) : (
                     <div style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14, fontSize: 13, flexWrap: 'wrap',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14, fontSize: 'var(--testo-md)', flexWrap: 'wrap',
                       background: 'var(--dusk)', border: '1.5px solid var(--blue)', borderRadius: 999, padding: '8px 8px 8px 16px',
                     }}>
                       <span style={{ fontWeight: 600 }}>{servizioCorrente.nome}</span>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button type="button" className="btn btn-ghost" style={{ fontSize: 12, borderRadius: 999 }} onClick={() => setRinominaServizioAperto(true)}>Rinomina</button>
+                        <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', borderRadius: 999 }} onClick={() => setRinominaServizioAperto(true)}>Rinomina</button>
                         {/* Un servizio CON tragitti si "svuota" rimuovendoli
                             uno a uno (sparisce da solo quando arriva a
                             zero) — ma uno ancora vuoto, appena creato, non
@@ -834,7 +834,7 @@ export function SchedaEventoModale({
                           <button
                             type="button"
                             className="btn btn-ghost"
-                            style={{ color: 'var(--pink)', fontSize: 12, borderRadius: 999 }}
+                            style={{ color: 'var(--pink)', fontSize: 'var(--testo-sm)', borderRadius: 999 }}
                             onClick={() => rimuoviServizio(servizioCorrente.key, form.tragitti ?? [])}
                           >
                             Annulla (è ancora vuoto)
@@ -948,7 +948,7 @@ export function SchedaEventoModale({
 
             {cittaPercorsoScelta && (
               <>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '10px 0', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--testo-md)', margin: '10px 0', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={tuttiSelezionabiliSelezionati}
@@ -964,7 +964,7 @@ export function SchedaEventoModale({
                   {percorsiDellaCitta.map((t) => {
                     const usato = giaUsato(t);
                     return (
-                      <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, padding: '4px 0', opacity: usato ? .5 : 1, cursor: usato ? 'default' : 'pointer' }}>
+                      <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--testo-md)', padding: '4px 0', opacity: usato ? .5 : 1, cursor: usato ? 'default' : 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={percorsiSelezionatiIds.has(t.id)}

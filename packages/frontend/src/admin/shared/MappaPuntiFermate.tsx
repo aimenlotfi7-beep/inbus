@@ -106,12 +106,12 @@ export function MappaPuntiFermate({ punti }: { punti: PuntoFermataMappa[] }) {
       {stato === 'carico' && <p style={{ color: 'var(--mist)' }}>Cerco le fermate sulla cartina...</p>}
       {stato === 'errore' && <p style={{ color: 'var(--pink)' }}>Non riesco a mostrare la cartina — nessuna fermata trovata con un indirizzo o città valida.</p>}
       {nonTrovate.length > 0 && (
-        <p style={{ color: 'var(--amber)', fontSize: 12.5, marginBottom: 8 }}>Non trovate sulla cartina: {nonTrovate.join(', ')}.</p>
+        <p style={{ color: 'var(--amber)', fontSize: 'var(--testo-md)', marginBottom: 8 }}>Non trovate sulla cartina: {nonTrovate.join(', ')}.</p>
       )}
       <div ref={contenitoreRef} style={{ height: 420, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--line)' }} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 10 }}>
         {(Object.keys(COLORI) as CategoriaTesta[]).map((c) => (
-          <span key={c} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--mist)' }}>
+          <span key={c} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>
             <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORI[c].fill, flexShrink: 0 }} />
             {COLORI[c].etichetta}
           </span>

@@ -90,11 +90,11 @@ export function RimborsiScreen() {
                   <td><b>{r.pnr}</b></td>
                   <td>
                     {r.eventoArtista}<br />
-                    <span style={{ color: 'var(--mist)', fontSize: 12 }}>
+                    <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>
                       {new Date(r.eventoData).toLocaleDateString('it-IT')}{r.eventoCategoria ? ` · ${r.eventoCategoria}` : ''}
                     </span>
                   </td>
-                  <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{r.clienteEmail}</span></td>
+                  <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{r.clienteEmail}</span></td>
                   <td style={{ textAlign: 'right' }}><b>{formattaEuro(r.prenotazioneTotale)}</b></td>
                   <td style={{ maxWidth: 260 }}>{r.motivo || <span style={{ color: 'var(--mist)' }}>—</span>}</td>
                   <td>{new Date(r.richiestaIl).toLocaleString('it-IT')}</td>
@@ -102,8 +102,8 @@ export function RimborsiScreen() {
                   <td>
                     {r.stato === 'IN_ATTESA' && (
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn btn-primary" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => approva(r)}>Approva</button>
-                        <button className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px', color: 'var(--pink)' }} onClick={() => rifiuta(r)}>Rifiuta</button>
+                        <button className="btn btn-primary" style={{ fontSize: 'var(--testo-sm)', padding: '4px 10px' }} onClick={() => approva(r)}>Approva</button>
+                        <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '4px 10px', color: 'var(--pink)' }} onClick={() => rifiuta(r)}>Rifiuta</button>
                       </div>
                     )}
                   </td>

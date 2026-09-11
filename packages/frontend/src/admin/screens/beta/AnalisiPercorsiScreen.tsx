@@ -210,9 +210,9 @@ export function AnalisiPercorsiScreen() {
           {analizzando ? 'Analizzo...' : 'Costruisci percorsi'}
         </button>
         {analizzando && progresso && (
-          <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 8 }}>{progresso}</p>
+          <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginTop: 8 }}>{progresso}</p>
         )}
-        <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 10 }}>
+        <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 10 }}>
           Ogni coppia di fermate candidate richiede una verifica sul tempo di guida vero — con molte fermate insieme
           può richiedere qualche decina di secondi, non è istantaneo.
         </p>
@@ -268,18 +268,18 @@ export function AnalisiPercorsiScreen() {
                 <p style={{ fontWeight: 700, marginBottom: 4 }}>
                   Percorso di {p.fermate.length} fermate, da {tragittiCoinvolti.length} tragitti diversi
                 </p>
-                <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 10 }}>
+                <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 10 }}>
                   {p.fermate.map((f) => `${f.citta} (${f.tragittoNome})`).join(' → ')}
                 </p>
                 {p.collegamenti.map((c, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: i === p.collegamenti.length - 1 ? 'none' : '1px solid var(--line)', fontSize: 13 }}>
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: i === p.collegamenti.length - 1 ? 'none' : '1px solid var(--line)', fontSize: 'var(--testo-md)' }}>
                     <span>{c.da.citta} → {c.a.citta}</span>
                     <span style={{ color: 'var(--mist)' }}>{c.minutiGuida} min di guida, {c.minutiDisponibili} min disponibili</span>
                   </div>
                 ))}
 
                 <p className="section-label" style={{ marginTop: 16, marginBottom: 8 }}>Simula questo percorso come un bus unico</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 20px', marginBottom: 10, fontSize: 13 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 20px', marginBottom: 10, fontSize: 'var(--testo-md)' }}>
                   <span>Passeggeri confermati: <strong>{passeggeriTotali}</strong></span>
                   <span>Posti di pareggio: <strong>{postiPareggio}</strong> <span style={{ color: 'var(--mist)' }}>(posti bus {postiPerBusGlobale} × soglia {sogliaOccupazionePercento}%)</span></span>
                   <span style={{ color: passeggeriTotali >= postiPareggio ? '#5be0a0' : 'var(--pink)' }}>
@@ -293,7 +293,7 @@ export function AnalisiPercorsiScreen() {
                   <label>Costo ipotetico bus unico (€)</label>
                   <CampoNumero valuta value={costoCombinato} onChange={(v) => setCostoCombinatoMap((prev) => new Map(prev).set(idx, v))} />
                 </div>
-                <div style={{ fontSize: 13, lineHeight: 1.7 }}>
+                <div style={{ fontSize: 'var(--testo-md)', lineHeight: 1.7 }}>
                   <p>Incasso totale (i prezzi per fermata non cambiano, uniti o separati): <strong>{formattaEuro(incassoTotale)}</strong></p>
                   {margineCombinato !== null && (
                     <p>Margine con bus unico: <strong style={{ color: margineCombinato >= 0 ? '#5be0a0' : 'var(--pink)' }}>{formattaEuro(margineCombinato)}</strong></p>

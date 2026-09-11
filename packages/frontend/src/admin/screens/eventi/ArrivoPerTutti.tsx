@@ -17,7 +17,7 @@ export function ArrivoPerTutti({ valore, etichettaContesto, bloccataDaAltroServi
 }) {
   return (
     <div className="section-card" style={{ marginBottom: 16 }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--testo-md)', cursor: 'pointer' }}>
         <input type="checkbox" checked={valore.attivo} onChange={(e) => onFlag(e.target.checked)} style={{ width: 'auto' }} />
         Imposta lo stesso arrivo per tutti i tragitti di {etichettaContesto}
       </label>

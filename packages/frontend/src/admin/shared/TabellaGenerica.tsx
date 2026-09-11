@@ -29,8 +29,8 @@ export function TabellaGenerica<T extends { id: string }>({
               {colonne.map((c) => <td key={c.etichetta}>{c.render(riga)}</td>)}
               {(onModifica || onElimina) && (
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  {onModifica && <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 11.5, marginRight: 6 }} onClick={() => onModifica(riga)}>Modifica</button>}
-                  {onElimina && <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 11.5, color: 'var(--pink)' }} onClick={() => onElimina(riga)}>Elimina</button>}
+                  {onModifica && <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 'var(--testo-sm)', marginRight: 6 }} onClick={() => onModifica(riga)}>Modifica</button>}
+                  {onElimina && <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 'var(--testo-sm)', color: 'var(--pink)' }} onClick={() => onElimina(riga)}>Elimina</button>}
                 </td>
               )}
             </tr>

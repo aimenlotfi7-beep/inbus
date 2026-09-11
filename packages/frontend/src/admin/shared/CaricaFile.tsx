@@ -47,7 +47,7 @@ export function CaricaFile({ onCaricato, accept = 'image/*', etichetta = '+ Cari
       <button
         type="button"
         className="btn btn-ghost"
-        style={{ fontSize: 12, padding: '3px 10px', opacity: nonAncoraAttivo ? 0.5 : 1, cursor: nonAncoraAttivo ? 'not-allowed' : 'pointer' }}
+        style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px', opacity: nonAncoraAttivo ? 0.5 : 1, cursor: nonAncoraAttivo ? 'not-allowed' : 'pointer' }}
         onClick={() => !nonAncoraAttivo && inputRef.current?.click()}
         disabled={caricando || attivo === null}
         title={nonAncoraAttivo ? 'Caricamento file non ancora configurato — usa il link qui accanto per ora' : undefined}

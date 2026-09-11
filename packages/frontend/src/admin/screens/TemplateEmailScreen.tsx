@@ -120,7 +120,7 @@ export function TemplateEmailScreen() {
               className="riga-cliccabile"
               style={{ textAlign: 'left', border: 'none', width: '100%', cursor: 'pointer', background: selezionato?.chiave === t.chiave ? 'var(--dusk-2)' : undefined }}
             >
-              <span className="riga-titolo" style={{ fontSize: 13.5 }}>{t.nome}</span>
+              <span className="riga-titolo" style={{ fontSize: 'var(--testo-base)' }}>{t.nome}</span>
             </button>
           ))}
         </div>
@@ -128,7 +128,7 @@ export function TemplateEmailScreen() {
         {selezionato && (
           <div className="section-card" style={{ flex: 1, minWidth: 320 }}>
             <p className="section-label" style={{ marginBottom: 4 }}>{selezionato.nome}</p>
-            <p className="testo-intro" style={{ fontSize: 11.5, marginBottom: 14 }}>
+            <p className="testo-intro" style={{ fontSize: 'var(--testo-sm)', marginBottom: 14 }}>
               Segnaposto disponibili qui:{' '}
               {selezionato.segnaposto.map((s) => (
                 <button
@@ -136,7 +136,7 @@ export function TemplateEmailScreen() {
                   type="button"
                   onClick={() => inserisciSegnaposto(s)}
                   className="btn btn-ghost"
-                  style={{ fontSize: 11, padding: '2px 8px', marginRight: 4, marginBottom: 4 }}
+                  style={{ fontSize: 'var(--testo-xs)', padding: '2px 8px', marginRight: 4, marginBottom: 4 }}
                   title="Clicca per inserirlo nel testo"
                 >
                   {'{{' + s + '}}'}
@@ -153,7 +153,7 @@ export function TemplateEmailScreen() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <label style={{ marginBottom: 0 }}>Corpo (HTML)</label>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px' }} onClick={inserisciImmagineDaLink}>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px' }} onClick={inserisciImmagineDaLink}>
                     + Immagine (link)
                   </button>
                   <CaricaFile onCaricato={inserisciTagImmagine} etichetta="+ Carica immagine" />
@@ -164,7 +164,7 @@ export function TemplateEmailScreen() {
                 value={corpo}
                 onChange={(e) => setCorpo(e.target.value)}
                 rows={14}
-                style={{ fontFamily: "'Space Mono',monospace", fontSize: 12.5 }}
+                style={{ fontFamily: "'Space Mono',monospace", fontSize: 'var(--testo-md)' }}
               />
             </div>
 

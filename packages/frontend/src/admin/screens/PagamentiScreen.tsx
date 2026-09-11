@@ -48,26 +48,26 @@ export function PagamentiScreen() {
       <PanelHead titolo="Pagamenti" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))', gap: 14, marginBottom: 24 }}>
         <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
-          <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 24 }}>{formattaEuro(incassoTotale)}</div>
-          <div style={{ color: 'var(--mist)', fontSize: 12 }}>Incassato totale</div>
+          <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 'var(--testo-4xl)' }}>{formattaEuro(incassoTotale)}</div>
+          <div style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>Incassato totale</div>
         </div>
         <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
-          <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 24 }}>{inAttesaSaldo.length}</div>
-          <div style={{ color: 'var(--mist)', fontSize: 12 }}>Acconti in attesa di saldo (tutti gli eventi)</div>
+          <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 'var(--testo-4xl)' }}>{inAttesaSaldo.length}</div>
+          <div style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>Acconti in attesa di saldo (tutti gli eventi)</div>
         </div>
       </div>
 
-      <h3 style={{ fontSize: 15, marginBottom: 12 }}>Incassi per metodo di pagamento</h3>
+      <h3 style={{ fontSize: 'var(--testo-lg)', marginBottom: 12 }}>Incassi per metodo di pagamento</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 480, marginBottom: 24 }}>
         {Object.entries(perMetodo).map(([metodo, importo]) => (
-          <div key={metodo} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 14px', fontSize: 13.5 }}>
+          <div key={metodo} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 14px', fontSize: 'var(--testo-base)' }}>
             <span>{metodo}</span><span>{formattaEuro(importo)}</span>
           </div>
         ))}
         {!Object.keys(perMetodo).length && <p style={{ color: 'var(--mist)' }}>Nessun pagamento registrato ancora.</p>}
       </div>
 
-      <h3 style={{ fontSize: 15, marginBottom: 12 }}>Suddivisione per evento</h3>
+      <h3 style={{ fontSize: 'var(--testo-lg)', marginBottom: 12 }}>Suddivisione per evento</h3>
       <div className="mini-tabs" style={{ flexWrap: 'wrap', marginBottom: 18 }}>
         {eventi.map((ev) => (
           <button key={ev.id} type="button" className={`mini-tab${eventoSelezionatoId === ev.id ? ' active' : ''}`} onClick={() => { setEventoSelezionatoId(ev.id); setDettaglioAcconti(false); }}>
@@ -84,8 +84,8 @@ export function PagamentiScreen() {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))', gap: 14, marginBottom: 20 }}>
             <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
-              <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 24 }}>{formattaEuro(incassoEvento)}</div>
-              <div style={{ color: 'var(--mist)', fontSize: 12 }}>Incassato per questo evento</div>
+              <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 'var(--testo-4xl)' }}>{formattaEuro(incassoEvento)}</div>
+              <div style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>Incassato per questo evento</div>
             </div>
             <button
               type="button"
@@ -93,8 +93,8 @@ export function PagamentiScreen() {
               disabled={accontiEvento.length === 0}
               style={{ textAlign: 'left', background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, cursor: accontiEvento.length > 0 ? 'pointer' : 'default' }}
             >
-              <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 24, color: accontiEvento.length > 0 ? 'var(--amber)' : undefined }}>{accontiEvento.length}</div>
-              <div style={{ color: 'var(--mist)', fontSize: 12 }}>Acconti in attesa di saldo {accontiEvento.length > 0 ? '— clicca per i dettagli' : ''}</div>
+              <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 'var(--testo-4xl)', color: accontiEvento.length > 0 ? 'var(--amber)' : undefined }}>{accontiEvento.length}</div>
+              <div style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>Acconti in attesa di saldo {accontiEvento.length > 0 ? '— clicca per i dettagli' : ''}</div>
             </button>
           </div>
         </>
@@ -117,11 +117,11 @@ export function PagamentiScreen() {
                 {accontiEvento.map((r) => (
                   <tr key={r.id}>
                     <td>{r.pnr}</td>
-                    <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{r.clienteEmail}</span></td>
+                    <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{r.clienteEmail}</span></td>
                     <td>{new Date(r.creataIl).toLocaleDateString('it-IT')}</td>
                     <td>{r.scadenzaSaldo ? new Date(r.scadenzaSaldo).toLocaleDateString('it-IT') : '—'}</td>
                     <td>
-                      <button className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} disabled={inviandoSollecito === r.pnr} onClick={() => sollecita(r.pnr)}>
+                      <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '4px 10px' }} disabled={inviandoSollecito === r.pnr} onClick={() => sollecita(r.pnr)}>
                         {inviandoSollecito === r.pnr ? 'Invio...' : 'Invia sollecito'}
                       </button>
                     </td>

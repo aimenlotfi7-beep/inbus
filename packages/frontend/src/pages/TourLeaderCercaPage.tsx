@@ -38,8 +38,8 @@ export function TourLeaderCercaPage() {
 
   return (
     <TourLeaderLayout vocedAttiva="cerca">
-      <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1f2430', margin: '0 0 4px' }}>Cerca passeggero</h1>
-      <p style={{ color: '#6b7280', fontSize: 13.5, marginBottom: 20 }}>Nome, cognome o PNR — su tutti i tuoi eventi insieme.</p>
+      <h1 style={{ fontSize: 'var(--testo-3xl)', fontWeight: 700, color: '#1f2430', margin: '0 0 4px' }}>Cerca passeggero</h1>
+      <p style={{ color: '#6b7280', fontSize: 'var(--testo-base)', marginBottom: 20 }}>Nome, cognome o PNR — su tutti i tuoi eventi insieme.</p>
 
       <input
         type="text"
@@ -47,28 +47,28 @@ export function TourLeaderCercaPage() {
         placeholder="es. Mario Rossi, o IB4X7K2..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        style={{ width: '100%', maxWidth: 400, padding: '11px 14px', borderRadius: 10, border: '1px solid #e3e5ea', background: '#fff', color: '#1f2430', fontSize: 15, marginBottom: 20 }}
+        style={{ width: '100%', maxWidth: 400, padding: '11px 14px', borderRadius: 10, border: '1px solid #e3e5ea', background: '#fff', color: '#1f2430', fontSize: 'var(--testo-lg)', marginBottom: 20 }}
       />
 
-      {cercando && <p style={{ color: '#6b7280', fontSize: 13 }}>Cerco...</p>}
+      {cercando && <p style={{ color: '#6b7280', fontSize: 'var(--testo-md)' }}>Cerco...</p>}
       {!cercando && query.trim().length >= 2 && risultati?.length === 0 && (
-        <p style={{ color: '#6b7280', fontSize: 13 }}>Nessun passeggero trovato con questi dati, sui tuoi eventi.</p>
+        <p style={{ color: '#6b7280', fontSize: 'var(--testo-md)' }}>Nessun passeggero trovato con questi dati, sui tuoi eventi.</p>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {risultati?.map((r) => (
           <div key={r.partecipanteId} style={{ background: '#fff', border: '1px solid #e3e5ea', borderRadius: 10, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <div>
-              <p style={{ fontWeight: 600, fontSize: 14.5, margin: 0, color: '#1f2430' }}>{r.nome} {r.cognome}</p>
-              <p style={{ color: '#6b7280', fontSize: 12.5, margin: '2px 0 0' }}>PNR {r.pnr} · da {r.fermataCitta}</p>
+              <p style={{ fontWeight: 600, fontSize: 'var(--testo-lg)', margin: 0, color: '#1f2430' }}>{r.nome} {r.cognome}</p>
+              <p style={{ color: '#6b7280', fontSize: 'var(--testo-md)', margin: '2px 0 0' }}>PNR {r.pnr} · da {r.fermataCitta}</p>
             </div>
             {r.giaSalito ? (
-              <span style={{ color: '#16a34a', fontSize: 13, fontWeight: 600 }}>✓ Già a bordo</span>
+              <span style={{ color: '#16a34a', fontSize: 'var(--testo-md)', fontWeight: 600 }}>✓ Già a bordo</span>
             ) : (
               <button
                 onClick={() => faiCheckin(r)}
                 disabled={checkinInCorso === r.partecipanteId}
-                style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 'var(--testo-md)', fontWeight: 600, cursor: 'pointer' }}
               >
                 {checkinInCorso === r.partecipanteId ? '...' : 'Check-in'}
               </button>

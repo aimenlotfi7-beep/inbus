@@ -62,7 +62,7 @@ export function PromoterPage() {
               onKeyDown={(e) => e.key === 'Enter' && accedi()} />
             <button className="btn btn-primary" onClick={accedi}>Accedi</button>
             <p className="errore">{errore}</p>
-            <p style={{ marginTop: 10 }}><Link to="/promoter/password-dimenticata" style={{ fontSize: 12.5 }}>Password dimenticata?</Link></p>
+            <p style={{ marginTop: 10 }}><Link to="/promoter/password-dimenticata" style={{ fontSize: 'var(--testo-md)' }}>Password dimenticata?</Link></p>
           </div>
         )}
       </main>
@@ -129,7 +129,7 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
             <div className="stat-box"><b>{formattaEuro(commissione)}</b><span>Commissione maturata ({promoter.commissionePercentuale}%)</span></div>
           </div>
 
-          <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '24px 0 14px' }}>Revenue per evento</h2>
+          <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-2xl)', margin: '24px 0 14px' }}>Revenue per evento</h2>
           <div className="mini-tabs" style={{ flexWrap: 'wrap', marginBottom: 14 }}>
             {eventiOrdinati.filter((ev) => statsPerEvento[ev.id]).map((ev) => (
               <button key={ev.id} type="button" className={`mini-tab${eventoRevenue === ev.id ? ' active' : ''}`} onClick={() => setEventoRevenue(ev.id)}>
@@ -137,7 +137,7 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
               </button>
             ))}
             {!eventiOrdinati.some((ev) => statsPerEvento[ev.id]) && (
-              <p style={{ color: 'var(--mist)', fontSize: 13 }}>Nessuna vendita ancora — appena arriva la prima, comparirà qui divisa per evento.</p>
+              <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>Nessuna vendita ancora — appena arriva la prima, comparirà qui divisa per evento.</p>
             )}
           </div>
           {statoEventoRevenue && (
@@ -153,7 +153,7 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
       {voce === 'link' && (
         <>
           <h1 className="page-title" style={{ marginBottom: 6 }}>I tuoi link</h1>
-          <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 20 }}>
+          <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 20 }}>
             Un link per ogni evento — copialo e condividilo dove vuoi. Decidi tu quali pubblicizzare.
           </p>
 
@@ -172,7 +172,7 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
         </>
       )}
 
-      <div className="toast" style={{ position: 'fixed', bottom: 26, left: '50%', transform: 'translateX(-50%)', background: 'var(--paper)', color: 'var(--ink)', padding: '12px 20px', borderRadius: 10, fontSize: 13.5, fontWeight: 600, opacity: toast ? 1 : 0, pointerEvents: 'none', transition: 'opacity .25s ease', zIndex: 999 }}>
+      <div className="toast" style={{ position: 'fixed', bottom: 26, left: '50%', transform: 'translateX(-50%)', background: 'var(--paper)', color: 'var(--ink)', padding: '12px 20px', borderRadius: 10, fontSize: 'var(--testo-base)', fontWeight: 600, opacity: toast ? 1 : 0, pointerEvents: 'none', transition: 'opacity .25s ease', zIndex: 999 }}>
         {toast}
       </div>
       <CookieBanner />
@@ -221,8 +221,8 @@ function SezioneCodiciSconto() {
 
   return (
     <>
-      <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 18, margin: '24px 0 14px' }}>I tuoi codici sconto</h2>
-      <p style={{ color: 'var(--mist)', fontSize: 13, marginTop: -8, marginBottom: 16 }}>
+      <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-2xl)', margin: '24px 0 14px' }}>I tuoi codici sconto</h2>
+      <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginTop: -8, marginBottom: 16 }}>
         Condividi il codice — chi lo usa ha uno sconto, tu una commissione.
       </p>
       {coupon.map((c) => {
@@ -239,7 +239,7 @@ function SezioneCodiciSconto() {
                 Sconto: {c.scontoTipo === 'PERCENTUALE' ? `${c.scontoValore}%` : formattaEuro(c.scontoValore)}
                 {' · '}Il tuo compenso: <b>{compensoTesto}</b>
               </p>
-              <p style={{ fontSize: 12.5, color: 'var(--mist)' }}>
+              <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>
                 Usato {c.usiAttuali}{c.usiMax ? ` / ${c.usiMax}` : ''} volt{c.usiAttuali === 1 ? 'a' : 'e'}
                 {scadenza && ` · ${scaduto ? 'Scaduto il' : 'Valido fino al'} ${scadenza.toLocaleDateString('it-IT')}`}
                 {!c.attivo && ' · Disattivato'}

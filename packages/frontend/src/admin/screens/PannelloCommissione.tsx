@@ -28,7 +28,7 @@ export function PannelloCommissione({ organizzatoreId }: { organizzatoreId: stri
   return (
     <div className="section-card" style={{ marginTop: 20, padding: '14px 16px' }}>
       <p className="section-label" style={{ marginBottom: 10 }}>Commissione</p>
-      <p style={{ fontSize: 13, marginBottom: 10 }}>
+      <p style={{ fontSize: 'var(--testo-md)', marginBottom: 10 }}>
         Percentuale attuale: <b>{attiva ? `${attiva.percentuale}%` : 'nessuna impostata (0%)'}</b>
       </p>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
@@ -43,10 +43,10 @@ export function PannelloCommissione({ organizzatoreId }: { organizzatoreId: stri
       </div>
       {storico.length > 1 && (
         <details>
-          <summary style={{ fontSize: 12, color: 'var(--mist)', cursor: 'pointer' }}>Storico ({storico.length})</summary>
+          <summary style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', cursor: 'pointer' }}>Storico ({storico.length})</summary>
           <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {storico.map((r) => (
-              <p key={r.id} style={{ fontSize: 12, color: 'var(--mist)' }}>
+              <p key={r.id} style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>
                 {r.percentuale}% — dal {new Date(r.validoDal).toLocaleDateString('it-IT')}
                 {r.validoA ? ` al ${new Date(r.validoA).toLocaleDateString('it-IT')}` : ' (attiva)'}
               </p>

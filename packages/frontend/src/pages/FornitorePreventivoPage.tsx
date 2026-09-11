@@ -80,7 +80,7 @@ export function FornitorePreventivoPage() {
               <>
                 <p style={{ marginTop: 10, marginBottom: 4 }}><b>Fermate</b></p>
                 {dati.fermate.map((f, i) => (
-                  <p key={i} style={{ margin: '2px 0', fontSize: 13.5 }}>{f.citta}{f.indirizzo ? ` — ${f.indirizzo}` : ''}{f.orario ? ` · ore ${f.orario}` : ''}</p>
+                  <p key={i} style={{ margin: '2px 0', fontSize: 'var(--testo-base)' }}>{f.citta}{f.indirizzo ? ` — ${f.indirizzo}` : ''}{f.orario ? ` · ore ${f.orario}` : ''}</p>
                 ))}
               </>
             )}
@@ -102,7 +102,7 @@ export function FornitorePreventivoPage() {
             </div>
             <p className="errore">{errore}</p>
             <button type="button" className="btn-primary" disabled={inviando} onClick={invia}>{inviando ? 'Invio...' : 'Invia preventivo'}</button>
-            <p className="sub" style={{ marginTop: 12, fontSize: 12.5 }}>Attenzione: una volta inviata, la risposta non potrà più essere modificata da qui — per correzioni, contatta direttamente chi ti ha scritto.</p>
+            <p className="sub" style={{ marginTop: 12, fontSize: 'var(--testo-md)' }}>Attenzione: una volta inviata, la risposta non potrà più essere modificata da qui — per correzioni, contatta direttamente chi ti ha scritto.</p>
           </form>
         )}
 

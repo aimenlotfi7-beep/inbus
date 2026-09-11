@@ -48,12 +48,12 @@ function ReportFatturato() {
         <p className="testo-intro">Nessuna prenotazione confermata in questo periodo.</p>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 10, padding: '4px 0', fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .3, borderBottom: '1px solid var(--line)', marginBottom: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 10, padding: '4px 0', fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .3, borderBottom: '1px solid var(--line)', marginBottom: 4 }}>
             <span>Fonte</span><span>Prenotazioni</span><span>Passeggeri</span><span>Fatturato</span><span>Commissione</span><span>Margine netto</span>
           </div>
           {righe.map((r) => (
-            <div key={r.fonte} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
-              <span>{r.fonte}{r.scontoBundleApplicato > 0 && <span style={{ fontSize: 11, color: 'var(--mist)', display: 'block' }}>di cui {formattaEuro(r.scontoBundleApplicato)} di sconto bundle</span>}</span>
+            <div key={r.fonte} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--line)', fontSize: 'var(--testo-base)' }}>
+              <span>{r.fonte}{r.scontoBundleApplicato > 0 && <span style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)', display: 'block' }}>di cui {formattaEuro(r.scontoBundleApplicato)} di sconto bundle</span>}</span>
               <span>{r.numeroPrenotazioni}</span>
               <span>{r.passeggeri}</span>
               <span style={{ fontWeight: 600 }}>{formattaEuro(r.fatturato)}</span>
@@ -61,7 +61,7 @@ function ReportFatturato() {
               <span style={{ fontWeight: 700 }}>{formattaEuro(r.margineNetto)}</span>
             </div>
           ))}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 10, padding: '10px 0 2px', fontSize: 13.5, fontWeight: 700 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: 10, padding: '10px 0 2px', fontSize: 'var(--testo-base)', fontWeight: 700 }}>
             <span>Totale</span><span /><span /><span>{formattaEuro(totaleFatturato)}</span><span /><span>{formattaEuro(totaleMargine)}</span>
           </div>
         </>

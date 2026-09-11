@@ -301,7 +301,7 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
       {stato === 'carico-tracciati' && <p style={{ color: 'var(--mist)' }}>Fermate trovate — calcolo i tracciati stradali...</p>}
       {stato === 'errore' && <p style={{ color: 'var(--pink)' }}>Non riesco a mostrare la cartina — nessuna fermata trovata con un indirizzo o città valida.</p>}
       {tappeNonTrovateTotali.length > 0 && (
-        <p style={{ color: 'var(--amber)', fontSize: 12.5, marginBottom: 8 }}>
+        <p style={{ color: 'var(--amber)', fontSize: 'var(--testo-md)', marginBottom: 8 }}>
           Non trovate sulla cartina: {tappeNonTrovateTotali.join(', ')}.
         </p>
       )}
@@ -319,7 +319,7 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
               })}
               title="Evidenzia questo tragitto sulla cartina — puoi sceglierne più di uno insieme"
               style={{
-                display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5,
+                display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--testo-md)',
                 color: selezionati.has(r.id) ? 'var(--paper)' : 'var(--mist)',
                 background: 'none', border: 'none', padding: 0, cursor: 'pointer',
                 fontWeight: selezionati.has(r.id) ? 600 : 400,

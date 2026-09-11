@@ -61,18 +61,18 @@ export function TourPage() {
                     }}
                   >
                     <span>
-                      <b style={{ display: 'block', fontSize: 15 }}>
+                      <b style={{ display: 'block', fontSize: 'var(--testo-lg)' }}>
                         {new Date(d.data).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'long', year: 'numeric' })}
                       </b>
-                      <span style={{ fontSize: 13, color: 'var(--mist)' }}>{d.luogo}, {d.citta}</span>
+                      <span style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>{d.luogo}, {d.citta}</span>
                     </span>
                     <span style={{ textAlign: 'right', flexShrink: 0 }}>
                       {!d.vendibile ? (
-                        <span style={{ fontSize: 12.5, color: 'var(--pink)' }}>Non disponibile</span>
+                        <span style={{ fontSize: 'var(--testo-md)', color: 'var(--pink)' }}>Non disponibile</span>
                       ) : (
                         <>
                           {d.prezzoMinimo !== null && <span style={{ display: 'block', fontWeight: 700 }}>da {formattaEuro(d.prezzoMinimo, { senzaDecimali: true })}</span>}
-                          <span className="card-cta" style={{ fontSize: 13 }}>Prenota</span>
+                          <span className="card-cta" style={{ fontSize: 'var(--testo-md)' }}>Prenota</span>
                         </>
                       )}
                     </span>

@@ -96,7 +96,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
               <button key={s.key} type="button" className={`mini-tab${servizioAttivo === s.key ? ' active' : ''}`} onClick={() => setServizioAttivo(s.key)}>
                 {s.nome}
                 {inAttesaQui > 0 && (
-                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 10.5, padding: '1px 6px', fontWeight: 700 }}>
+                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 'var(--testo-xs)', padding: '1px 6px', fontWeight: 700 }}>
                     {inAttesaQui}
                   </span>
                 )}
@@ -109,7 +109,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
               <button type="button" className={`mini-tab${servizioAttivo === 'liberi' ? ' active' : ''}`} onClick={() => setServizioAttivo('liberi')}>
                 Senza preferenza
                 {inAttesaLiberi > 0 && (
-                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 10.5, padding: '1px 6px', fontWeight: 700 }}>
+                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 'var(--testo-xs)', padding: '1px 6px', fontWeight: 700 }}>
                     {inAttesaLiberi}
                   </span>
                 )}
@@ -125,16 +125,16 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
             <p className="section-label" style={{ marginBottom: 8 }}>
               Email non configurata — invia questo link a {linkDaCopiare.nome} a mano
             </p>
-            <button type="button" className="btn btn-ghost" style={{ fontSize: 16, padding: '0 6px' }} onClick={() => setLinkDaCopiare(null)} title="Chiudi">✕</button>
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-xl)', padding: '0 6px' }} onClick={() => setLinkDaCopiare(null)} title="Chiudi">✕</button>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
               readOnly
               value={linkDaCopiare.link}
               onFocus={(e) => e.target.select()}
-              style={{ flex: 1, background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 6, padding: '8px 10px', color: 'var(--paper)', fontSize: 13 }}
+              style={{ flex: 1, background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 6, padding: '8px 10px', color: 'var(--paper)', fontSize: 'var(--testo-md)' }}
             />
-            <button type="button" className="btn btn-primary" style={{ fontSize: 13, padding: '8px 14px', flexShrink: 0 }} onClick={copiaLink}>
+            <button type="button" className="btn btn-primary" style={{ fontSize: 'var(--testo-md)', padding: '8px 14px', flexShrink: 0 }} onClick={copiaLink}>
               {linkCopiato ? '✓ Copiato' : 'Copia link'}
             </button>
           </div>
@@ -144,18 +144,18 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
         <div className="section-card" style={{ flex: 1, minWidth: 140 }}>
           <p className="section-label" style={{ marginBottom: 4 }}>Lista d'attesa</p>
-          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 26 }}>{lista.length}</p>
-          <p className="testo-intro" style={{ fontSize: 11, marginTop: 2, marginBottom: 0 }}>iscrizioni totali</p>
+          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 'var(--testo-5xl)' }}>{lista.length}</p>
+          <p className="testo-intro" style={{ fontSize: 'var(--testo-xs)', marginTop: 2, marginBottom: 0 }}>iscrizioni totali</p>
         </div>
         <div className="section-card" style={{ flex: 1, minWidth: 140 }}>
           <p className="section-label" style={{ marginBottom: 4 }}>Promosse</p>
-          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 26, color: 'var(--amber)' }}>{promosse}</p>
-          <p className="testo-intro" style={{ fontSize: 11, marginTop: 2, marginBottom: 0 }}>link mandato in totale (comprese quelle già confermate)</p>
+          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 'var(--testo-5xl)', color: 'var(--amber)' }}>{promosse}</p>
+          <p className="testo-intro" style={{ fontSize: 'var(--testo-xs)', marginTop: 2, marginBottom: 0 }}>link mandato in totale (comprese quelle già confermate)</p>
         </div>
         <div className="section-card" style={{ flex: 1, minWidth: 140 }}>
           <p className="section-label" style={{ marginBottom: 4 }}>Confermate</p>
-          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 26, color: 'var(--green)' }}>{confermate}</p>
-          <p className="testo-intro" style={{ fontSize: 11, marginTop: 2, marginBottom: 0 }}>hanno completato davvero la prenotazione</p>
+          <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 'var(--testo-5xl)', color: 'var(--green)' }}>{confermate}</p>
+          <p className="testo-intro" style={{ fontSize: 'var(--testo-xs)', marginTop: 2, marginBottom: 0 }}>hanno completato davvero la prenotazione</p>
         </div>
       </div>
 
@@ -163,7 +163,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
         <div className="section-card" style={{ marginBottom: 16 }}>
           <p className="section-label" style={{ marginBottom: 10 }}>Richieste per fermata</p>
           {Array.from(perFermata.entries()).map(([citta, dati]) => (
-            <div key={citta} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 14 }}>
+            <div key={citta} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 'var(--testo-base)' }}>
               <span>{citta}</span>
               <span style={{ color: 'var(--mist)' }}>{dati.passeggeri} passeggero/i · {dati.iscritti} iscrizione/i</span>
             </div>
@@ -174,7 +174,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 10 }}>
         <p className="section-label" style={{ marginBottom: 0 }}>Lista d'attesa</p>
         {inAttesa.length > 0 && (
-          <button className="btn btn-primary" style={{ fontSize: 13, padding: '6px 14px' }} onClick={promuoviTutte}>
+          <button className="btn btn-primary" style={{ fontSize: 'var(--testo-md)', padding: '6px 14px' }} onClick={promuoviTutte}>
             Promuovi tutte ({inAttesa.length})
           </button>
         )}
@@ -207,7 +207,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
             {riga.nome} {riga.cognome ?? ''} · {riga.passeggeri} passeggero/i
             {riga.fermataCitta && <> · <span style={{ color: 'var(--amber)' }}>{riga.fermataCitta}</span></>}
             <br />
-            <span style={{ color: 'var(--mist)', fontSize: 12 }}>{riga.email}{riga.telefono ? ` · ${riga.telefono}` : ''}</span>
+            <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{riga.email}{riga.telefono ? ` · ${riga.telefono}` : ''}</span>
           </span>
           <span className="riga-meta">
             {riga.stato === 'PROMOSSA' ? (
@@ -215,7 +215,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
                 {riga.completata ? 'Completata' : riga.emailInviata ? 'Promossa (email inviata)' : 'Promossa (email non inviata)'}
               </span>
             ) : (
-              <button className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => promuovi(riga)}>Promuovi</button>
+              <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 12px' }} onClick={() => promuovi(riga)}>Promuovi</button>
             )}
           </span>
         </div>

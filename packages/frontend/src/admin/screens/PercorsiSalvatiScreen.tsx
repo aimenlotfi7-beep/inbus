@@ -248,20 +248,20 @@ export function PercorsiSalvatiScreen() {
                 salvato non si inverte più direttamente: prima si clona,
                 poi si inverte la copia, così l'originale resta intatto
                 e riutilizzabile per la direzione originale. */}
-            <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={invertiFermatePercorso}>↔ Inverti</button>
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)' }} onClick={invertiFermatePercorso}>↔ Inverti</button>
           </div>
         )}
 
-        <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate (le due Teste si scrivono in Eventi)</p>
+        <p style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Fermate (le due Teste si scrivono in Eventi)</p>
         {fermate.map((f, idx) => {
           const eArrivo = idx === fermate.length - 1;
           return (
           <div key={idx} style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 9.5, fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: (idx === 0 || eArrivo) ? '#5be0a0' : 'var(--amber)' }}>
+              <span style={{ fontSize: 'var(--testo-2xs)', fontFamily: "'Space Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, color: (idx === 0 || eArrivo) ? '#5be0a0' : 'var(--amber)' }}>
                 {idx === 0 ? 'TESTA — PARTENZA' : eArrivo ? 'TESTA — ARRIVO' : `FERMATA ${idx + 1}`}
               </span>
-              <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 11, color: 'var(--pink)' }} onClick={() => rimuoviFermata(idx)}>✕</button>
+              <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 'var(--testo-xs)', color: 'var(--pink)' }} onClick={() => rimuoviFermata(idx)}>✕</button>
             </div>
             {eArrivo ? (
               // L'arrivo ha SOLO una città, mai un indirizzo — quello
@@ -272,7 +272,7 @@ export function PercorsiSalvatiScreen() {
               // un indirizzo fisso con sé.
               <>
                 <input placeholder="Città di arrivo" value={f.citta} onChange={(e) => aggiornaFermata(idx, 'citta', e.target.value)} />
-                <p style={{ fontSize: 10.5, color: 'var(--mist)', marginTop: 4 }}>L'indirizzo esatto si sceglie in Eventi — la stessa città può avere venue diverse a seconda dell'evento.</p>
+                <p style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)', marginTop: 4 }}>L'indirizzo esatto si sceglie in Eventi — la stessa città può avere venue diverse a seconda dell'evento.</p>
               </>
             ) : (
             <div style={{ display: 'grid', gridTemplateColumns: f.fermataAnagraficaId !== null ? '1fr .6fr' : '1fr 1.4fr .6fr', gap: 8 }}>
@@ -308,7 +308,7 @@ export function PercorsiSalvatiScreen() {
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva tragitto'}</button>
       </div>
       <div style={{ position: 'sticky', top: 0 }}>
-        <p style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Cartina — in tempo reale</p>
+        <p style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Cartina — in tempo reale</p>
         {tragittiStessaDestinazione.length > 0 && (
           <select
             style={{ marginBottom: 10, width: '100%' }}
@@ -342,7 +342,7 @@ export function PercorsiSalvatiScreen() {
 
       {tab === 'cartina' ? (
         <div>
-          <p style={{ fontSize: 13, color: 'var(--mist)', marginBottom: 10 }}>Scegli una città di arrivo, poi quale tragitto vederci — con più di uno, si vedono sovrapposti sulla stessa cartina.</p>
+          <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 10 }}>Scegli una città di arrivo, poi quale tragitto vederci — con più di uno, si vedono sovrapposti sulla stessa cartina.</p>
           {(() => {
             const cittaDisponibili = [...new Set(percorsi.map((p) => arrivoDi(p)))].sort((a, b) => a.localeCompare(b));
             return percorsiCartinaScelte.map((scelta, idx) => (
@@ -476,8 +476,8 @@ export function PercorsiSalvatiScreen() {
                 <h3>{t.nome}</h3>
                 <p>{t.fermate.map((f) => f.citta).filter(Boolean).join(' → ') || 'Nessuna fermata'}</p>
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button className="btn btn-ghost" style={{ fontSize: 13, padding: '3px 8px' }} onClick={(e) => { e.stopPropagation(); apriClona(t); }} title="Clona — crea un tragitto nuovo a partire da questo, utile per es. invertire la direzione senza toccare l'originale">⧉</button>
-                  <button className="btn btn-ghost" style={{ fontSize: 11, color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(t); }}>Elimina</button>
+                  <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)', padding: '3px 8px' }} onClick={(e) => { e.stopPropagation(); apriClona(t); }} title="Clona — crea un tragitto nuovo a partire da questo, utile per es. invertire la direzione senza toccare l'originale">⧉</button>
+                  <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', color: 'var(--pink)' }} onClick={(e) => { e.stopPropagation(); elimina(t); }}>Elimina</button>
                 </div>
               </div>
             ))}

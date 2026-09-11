@@ -378,12 +378,12 @@ export function LayoutBigliettoScreen() {
               key={l.id} type="button" onClick={() => apri(l)} className="riga-cliccabile"
               style={{ textAlign: 'left', border: 'none', width: '100%', cursor: 'pointer', background: selezionato?.id === l.id ? 'var(--dusk-2)' : undefined }}
             >
-              <span className="riga-titolo" style={{ fontSize: 13.5 }}>
+              <span className="riga-titolo" style={{ fontSize: 'var(--testo-base)' }}>
                 {l.nome} {l.predefinito && <span className="badge coperta" style={{ marginLeft: 6 }}>Predefinito</span>}
               </span>
             </button>
           ))}
-          {lista.length === 0 && <p className="testo-intro" style={{ fontSize: 13 }}>Nessun layout ancora — creane uno.</p>}
+          {lista.length === 0 && <p className="testo-intro" style={{ fontSize: 'var(--testo-md)' }}>Nessun layout ancora — creane uno.</p>}
         </div>
 
         {(selezionato || nome) && (
@@ -393,7 +393,7 @@ export function LayoutBigliettoScreen() {
                 <button
                   type="button"
                   className={`btn btn-ghost${mostraGriglia ? ' active' : ''}`}
-                  style={{ fontSize: 12 }}
+                  style={{ fontSize: 'var(--testo-sm)' }}
                   onClick={() => setMostraGriglia((v) => !v)}
                   title="Mostra/nascondi la griglia di riferimento sul canvas"
                 >
@@ -484,11 +484,11 @@ export function LayoutBigliettoScreen() {
                   );
                 })}
               </div>
-              <p style={{ fontSize: 11, color: 'var(--mist)', marginTop: 8, textAlign: 'center' }}>
+              <p style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)', marginTop: 8, textAlign: 'center' }}>
                 Clicca un elemento per selezionarlo — trascina il pallino per ridimensionarlo.
               </p>
               {attivoId?.startsWith('extra:') && (
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', width: '100%', marginTop: 6 }} onClick={rimuoviLogoAttivo}>
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', color: 'var(--pink)', width: '100%', marginTop: 6 }} onClick={rimuoviLogoAttivo}>
                   Rimuovi questo logo
                 </button>
               )}
@@ -520,23 +520,23 @@ export function LayoutBigliettoScreen() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <CaricaFile etichetta={config.sfondoImmagineUrl ? 'Cambia immagine' : '+ Importa immagine'} onCaricato={(url) => setConfig({ ...config, sfondoImmagineUrl: url })} />
                 {config.sfondoImmagineUrl && (
-                  <button type="button" className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)' }} onClick={() => setConfig({ ...config, sfondoImmagineUrl: null })}>Rimuovi</button>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', color: 'var(--pink)' }} onClick={() => setConfig({ ...config, sfondoImmagineUrl: null })}>Rimuovi</button>
                 )}
               </div>
               <input
                 placeholder="...oppure incolla qui il link di un'immagine"
                 value={config.sfondoImmagineUrl ?? ''}
                 onChange={(e) => setConfig({ ...config, sfondoImmagineUrl: e.target.value || null })}
-                style={{ fontSize: 12.5, marginBottom: 10 }}
+                style={{ fontSize: 'var(--testo-md)', marginBottom: 10 }}
               />
 
               <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>Loghi / immagini aggiuntive</p>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
                 <CaricaFile etichetta="+ Aggiungi logo" onCaricato={aggiungiLogo} />
-                <span style={{ fontSize: 11.5, color: 'var(--mist)' }}>oppure</span>
+                <span style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>oppure</span>
                 <input
                   placeholder="incolla un link e premi Invio"
-                  style={{ fontSize: 12.5, flex: 1, minWidth: 160 }}
+                  style={{ fontSize: 'var(--testo-md)', flex: 1, minWidth: 160 }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && e.currentTarget.value.trim()) {
                       aggiungiLogo(e.currentTarget.value.trim());
@@ -546,13 +546,13 @@ export function LayoutBigliettoScreen() {
                 />
               </div>
               {config.immaginiExtra.length > 0 && (
-                <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 6 }}>
+                <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 6 }}>
                   {config.immaginiExtra.length} logo{config.immaginiExtra.length === 1 ? '' : ''} sul biglietto — clicca uno sul canvas per spostarlo, ridimensionarlo o rimuoverlo.
                 </p>
               )}
 
               <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>Sfumatura</p>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, marginBottom: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--testo-md)', marginBottom: 10 }}>
                 <input type="checkbox" checked={config.sfumatura.attiva} onChange={(e) => setConfig({ ...config, sfumatura: { ...config.sfumatura, attiva: e.target.checked } })} />
                 Attiva sfumatura sopra lo sfondo
               </label>
@@ -591,7 +591,7 @@ export function LayoutBigliettoScreen() {
               )}
 
               <p className="section-label" style={{ marginTop: 18, marginBottom: 10 }}>QR code</p>
-              <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: -4 }}>
+              <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: -4 }}>
                 Dimensione e posizione si controllano trascinandolo sul canvas, come ogni altro elemento — resta sempre un quadrato (usa il lato più corto, se lo trascini in un rettangolo).
               </p>
 

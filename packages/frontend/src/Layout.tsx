@@ -169,7 +169,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="footer-grid">
           <div>
             <LogoOnWay come="testo" />
-            <p style={{ color: 'var(--mist)', fontSize: 13.5, maxWidth: '32ch', marginTop: 14 }}>Non vendiamo un viaggio. Portiamo le persone verso un'esperienza.</p>
+            <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', maxWidth: '32ch', marginTop: 14 }}>Non vendiamo un viaggio. Portiamo le persone verso un'esperienza.</p>
           </div>
           <div>
             <h5>Naviga</h5>

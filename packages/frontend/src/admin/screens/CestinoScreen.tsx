@@ -64,11 +64,11 @@ export function CestinoScreen() {
               <span className="riga-titolo">
                 {ev.artista}
                 <br />
-                <span style={{ color: 'var(--mist)', fontSize: 12 }}>
+                <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>
                   {ev.luogo}, {ev.citta} · eliminato il {new Date(ev.eliminatoIl).toLocaleDateString('it-IT')}
                 </span>
               </span>
-              <button className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => ripristinaEvento(ev.id, ev.artista)}>
+              <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 12px' }} onClick={() => ripristinaEvento(ev.id, ev.artista)}>
                 ↺ Ripristina
               </button>
             </div>
@@ -85,11 +85,11 @@ export function CestinoScreen() {
               <span className="riga-titolo">
                 {t.nome}
                 <br />
-                <span style={{ color: 'var(--mist)', fontSize: 12 }}>
+                <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>
                   Evento: {t.eventoArtista} · eliminata il {new Date(t.eliminatoIl).toLocaleDateString('it-IT')}
                 </span>
               </span>
-              <button className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => ripristinaTratta(t.id, t.nome)}>
+              <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 12px' }} onClick={() => ripristinaTratta(t.id, t.nome)}>
                 ↺ Ripristina
               </button>
             </div>

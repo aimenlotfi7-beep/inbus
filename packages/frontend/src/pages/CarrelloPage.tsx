@@ -194,7 +194,7 @@ export function CarrelloPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
                   <b>{formattaEuro(a.prezzoStimato * a.passeggeri)}</b>
                   {step === 'riepilogo' && (
-                    <button type="button" className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '4px 10px', fontSize: 11, color: '#c0392b' }} onClick={() => rimuovi(a.id)}>
+                    <button type="button" className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '4px 10px', fontSize: 'var(--testo-xs)', color: '#c0392b' }} onClick={() => rimuovi(a.id)}>
                       Rimuovi
                     </button>
                   )}
@@ -213,22 +213,22 @@ export function CarrelloPage() {
               {bundle && (
                 <>
                   <b>Bundle: {bundle.nome}</b>
-                  <p style={{ fontSize: 12, opacity: .7, margin: '4px 0 10px' }}>Il bundle si acquista tutto insieme: togliendo o aggiungendo un evento, lo sconto non si applica più.</p>
-                  {bundle.promoterCodice && <p style={{ fontSize: 12, opacity: .7, margin: '0 0 8px' }}>Codice promoter applicato: <b>{bundle.promoterCodice}</b></p>}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span>Subtotale</span><span>{formattaEuro(totaleStimato)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}><span>Sconto bundle (−{bundle.scontoPercentuale}%)</span><span>− {formattaEuro(scontoBundleStimato)}</span></div>
+                  <p style={{ fontSize: 'var(--testo-sm)', opacity: .7, margin: '4px 0 10px' }}>Il bundle si acquista tutto insieme: togliendo o aggiungendo un evento, lo sconto non si applica più.</p>
+                  {bundle.promoterCodice && <p style={{ fontSize: 'var(--testo-sm)', opacity: .7, margin: '0 0 8px' }}>Codice promoter applicato: <b>{bundle.promoterCodice}</b></p>}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--testo-base)' }}><span>Subtotale</span><span>{formattaEuro(totaleStimato)}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--testo-base)' }}><span>Sconto bundle (−{bundle.scontoPercentuale}%)</span><span>− {formattaEuro(scontoBundleStimato)}</span></div>
                 </>
               )}
               {scontoCoupon > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: 'var(--verde, #2e7d32)' }}><span>Coupon "{couponCodice}"</span><span>− {formattaEuro(scontoCoupon)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--testo-base)', color: 'var(--verde, #2e7d32)' }}><span>Coupon "{couponCodice}"</span><span>− {formattaEuro(scontoCoupon)}</span></div>
               )}
               {creditoApplicato > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: 'var(--verde, #2e7d32)' }}><span>Credito fedeltà</span><span>− {formattaEuro(creditoApplicato)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--testo-base)', color: 'var(--verde, #2e7d32)' }}><span>Credito fedeltà</span><span>− {formattaEuro(creditoApplicato)}</span></div>
               )}
-              <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, margin: '10px 0 4px' }}>
+              <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-4xl)', margin: '10px 0 4px' }}>
                 {tipoPagamento === 'ACCONTO' ? 'Totale stimato' : 'Totale'}: {formattaEuro(tipoPagamento === 'COMPLETO' ? totaleFinale : totaleDopoBundle)}
               </p>
-              <p style={{ fontSize: 11, opacity: .65 }}>
+              <p style={{ fontSize: 'var(--testo-xs)', opacity: .65 }}>
                 {tipoPagamento === 'ACCONTO'
                   ? 'Con l\'acconto verserai solo una parte ora per ciascun articolo, non questo totale — coupon e credito non si applicano in questa modalità.'
                   : 'Il totale definitivo viene comunque verificato di nuovo dal server al momento di completare l\'ordine.'}
@@ -238,7 +238,7 @@ export function CarrelloPage() {
             {step === 'riepilogo' ? (
               <>
                 {creditoDisponibile > 0 && (!bundle || bundle.ammetteCredito) && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '14px 0 10px', cursor: tipoPagamento === 'COMPLETO' ? 'pointer' : 'default', opacity: tipoPagamento === 'COMPLETO' ? 1 : .5 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--testo-md)', margin: '14px 0 10px', cursor: tipoPagamento === 'COMPLETO' ? 'pointer' : 'default', opacity: tipoPagamento === 'COMPLETO' ? 1 : .5 }}>
                     <input type="checkbox" checked={usaCredito} onChange={(e) => setUsaCredito(e.target.checked)} style={{ width: 'auto' }} disabled={tipoPagamento !== 'COMPLETO'} />
                     Usa il tuo credito fedeltà ({formattaEuro(creditoDisponibile)} disponibili)
                   </label>
@@ -260,8 +260,8 @@ export function CarrelloPage() {
                     {verificandoCoupon ? '...' : couponVerificato ? '✓ Applicato' : 'Applica'}
                   </button>
                 </div>
-                {couponErrore && <p style={{ color: '#c0392b', fontSize: 12, marginTop: 6 }}>{couponErrore}</p>}
-                <p style={{ fontSize: 11.5, opacity: .65, marginTop: 6 }}>
+                {couponErrore && <p style={{ color: '#c0392b', fontSize: 'var(--testo-sm)', marginTop: 6 }}>{couponErrore}</p>}
+                <p style={{ fontSize: 'var(--testo-sm)', opacity: .65, marginTop: 6 }}>
                   Coupon e credito si applicano solo pagando tutto subito — con l'acconto potrai usarli quando salderai il resto.
                 </p>
                 </>)}
@@ -272,7 +272,7 @@ export function CarrelloPage() {
                   {(!bundle || bundle.ammetteAcconto) && <button type="button" className={`mini-tab${tipoPagamento === 'ACCONTO' ? ' active' : ''}`} onClick={() => setTipoPagamento('ACCONTO')}>Solo acconto</button>}
                 </div>
                 {tipoPagamento === 'ACCONTO' && (
-                  <p style={{ fontSize: 11.5, opacity: .7, marginTop: 6 }}>
+                  <p style={{ fontSize: 'var(--testo-sm)', opacity: .7, marginTop: 6 }}>
                     Verserai solo l'acconto per ciascun articolo ora, e salderai il resto entro la scadenza indicata via email.
                   </p>
                 )}
@@ -291,7 +291,7 @@ export function CarrelloPage() {
                     inviati, ma il browser poteva proporre di compilarli
                     con una carta vera). L'ordine si registra come "Da
                     concordare" finché non si collega un fornitore. */}
-                <p style={{ fontSize: 13, opacity: .75 }}>
+                <p style={{ fontSize: 'var(--testo-md)', opacity: .75 }}>
                   Il pagamento online non è ancora attivo: la prenotazione viene registrata e il pagamento si concorda a parte.
                 </p>
 
@@ -305,7 +305,7 @@ export function CarrelloPage() {
                     prima della decisione, non dopo (era sotto il
                     pulsante, chi confermava in fretta non la vedeva
                     mai prima di cliccare). */}
-                <p style={{ fontSize: 11, opacity: .6, marginTop: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                <p style={{ fontSize: 'var(--testo-xs)', opacity: .6, marginTop: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                   🔒 I tuoi dati sono trattati in modo riservato, secondo la nostra informativa privacy.
                 </p>
               </>

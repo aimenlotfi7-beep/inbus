@@ -72,7 +72,7 @@ export function WhiteLabelScreen() {
           <div key={wl.id} className="section-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px' }}>
             <div>
               <b>{wl.organizzatoreNome}</b> — {wl.bundleNome ? `${wl.bundleNome} (bundle)` : wl.eventoArtista}
-              <span style={{ marginLeft: 10, fontSize: 11.5, color: wl.attiva ? '#5be0a0' : 'var(--mist)' }}>{wl.attiva ? '● Attiva' : '○ Disattivata'}</span>
+              <span style={{ marginLeft: 10, fontSize: 'var(--testo-sm)', color: wl.attiva ? '#5be0a0' : 'var(--mist)' }}>{wl.attiva ? '● Attiva' : '○ Disattivata'}</span>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-ghost" onClick={() => { setWhiteLabelAttiva(wl); setVista('editor'); }}>Modifica</button>
@@ -144,11 +144,11 @@ function NuovaWhiteLabel({ organizzatori, onIndietro, onCreata }: { organizzator
             {bundleOrganizzatore.length > 0 && <optgroup label="Bundle">{bundleOrganizzatore.map((b) => <option key={b.id} value={`bundle:${b.id}`}>{b.nome} (bundle)</option>)}</optgroup>}
           </select>
           {eventiOrganizzatore.length === 0 && bundleOrganizzatore.length === 0 && (
-            <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 6 }}>Questo organizzatore non ha ancora nessun evento associato (Organizzatori) né bundle associato (Bundle → Vendita → organizzatore).</p>
+            <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 6 }}>Questo organizzatore non ha ancora nessun evento associato (Organizzatori) né bundle associato (Bundle → Vendita → organizzatore).</p>
           )}
         </div>
       )}
-      {errore && <p style={{ color: 'var(--pink)', fontSize: 13 }}>{errore}</p>}
+      {errore && <p style={{ color: 'var(--pink)', fontSize: 'var(--testo-md)' }}>{errore}</p>}
       <button className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} onClick={crea} disabled={!organizzatoreId || !eventoId || caricamento}>
         {caricamento ? 'Creazione...' : 'Crea White Label'}
       </button>
@@ -188,7 +188,7 @@ function MetaPixelOrganizzatore({ whiteLabel, onSalvato }: { whiteLabel: WhiteLa
   return (
     <div className="section-card" style={{ maxWidth: 480, marginBottom: 20 }}>
       <p className="section-label" style={{ marginBottom: 8 }}>Pixel di Meta dell'organizzatore (facoltativo)</p>
-      <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 10 }}>
+      <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 10 }}>
         Se questo organizzatore ha un suo account pubblicitario Meta, le vendite dal suo widget arriveranno anche al suo pixel — oltre che al nostro, sempre.
       </p>
       <div className="campo" style={{ marginBottom: 8 }}>
@@ -223,7 +223,7 @@ function SelettoreLayoutBiglietto({ whiteLabel, onSalvato }: { whiteLabel: White
   return (
     <div className="section-card" style={{ maxWidth: 480, marginBottom: 20 }}>
       <p className="section-label" style={{ marginBottom: 8 }}>Layout biglietto (PDF) di questa White Label</p>
-      <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 10 }}>
+      <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 10 }}>
         Diverso dal tema qui sotto — questo è il vero documento che il cliente riceve. Se non scegli nulla, usa il layout impostato per l'evento.
       </p>
       <select value={whiteLabel.layoutBigliettoId ?? ''} onChange={(e) => cambia(e.target.value)} disabled={salvando}>

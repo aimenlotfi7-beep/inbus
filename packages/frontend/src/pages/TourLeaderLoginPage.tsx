@@ -30,40 +30,40 @@ export function TourLeaderLoginPage() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', padding: 20, fontFamily: "'Poppins',sans-serif" }}>
       <form onSubmit={accedi} style={{ background: '#fff', border: '1px solid #e3e5ea', borderRadius: 12, padding: 32, width: '100%', maxWidth: 360, boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
         <h1 style={{ marginBottom: 6 }}><LogoOnWay come="testo" chiaro /></h1>
-        <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 24 }}>Accesso tour leader — controllo biglietti</p>
+        <p style={{ color: '#6b7280', fontSize: 'var(--testo-base)', marginBottom: 24 }}>Accesso tour leader — controllo biglietti</p>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: 'block', color: '#6b7280', fontSize: 12, marginBottom: 6, textTransform: 'uppercase' }}>Email</label>
+          <label style={{ display: 'block', color: '#6b7280', fontSize: 'var(--testo-sm)', marginBottom: 6, textTransform: 'uppercase' }}>Email</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e3e5ea', background: '#f3f4f6', color: '#1f2430', fontSize: 15 }}
+            style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e3e5ea', background: '#f3f4f6', color: '#1f2430', fontSize: 'var(--testo-lg)' }}
           />
         </div>
         <div style={{ marginBottom: 20 }}>
-          <label style={{ display: 'block', color: '#6b7280', fontSize: 12, marginBottom: 6, textTransform: 'uppercase' }}>Password</label>
+          <label style={{ display: 'block', color: '#6b7280', fontSize: 'var(--testo-sm)', marginBottom: 6, textTransform: 'uppercase' }}>Password</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e3e5ea', background: '#f3f4f6', color: '#1f2430', fontSize: 15 }}
+            style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e3e5ea', background: '#f3f4f6', color: '#1f2430', fontSize: 'var(--testo-lg)' }}
           />
         </div>
 
-        {errore && <p style={{ color: 'var(--ow-danger-ink, #A31414)', fontSize: 13, marginBottom: 14 }}>{errore}</p>}
+        {errore && <p style={{ color: 'var(--ow-danger-ink, #A31414)', fontSize: 'var(--testo-md)', marginBottom: 14 }}>{errore}</p>}
 
         <button
           type="submit"
           disabled={caricamento}
-          style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}
+          style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 700, fontSize: 'var(--testo-lg)', cursor: 'pointer' }}
         >
           {caricamento ? 'Accesso...' : 'Accedi'}
         </button>
         <p style={{ textAlign: 'center', marginTop: 14 }}>
-          <Link to="/scansione/password-dimenticata" style={{ fontSize: 12.5, color: '#6b7280' }}>Password dimenticata?</Link>
+          <Link to="/scansione/password-dimenticata" style={{ fontSize: 'var(--testo-md)', color: '#6b7280' }}>Password dimenticata?</Link>
         </p>
       </form>
     </div>

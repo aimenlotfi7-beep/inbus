@@ -90,7 +90,7 @@ export function ContenutiScreen() {
       <PanelHead titolo="Contenuti sito" />
 
       <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
-        <h3 style={{ fontSize: 15, marginBottom: 14 }}>Pagine del sito</h3>
+        <h3 style={{ fontSize: 'var(--testo-lg)', marginBottom: 14 }}>Pagine del sito</h3>
         <div className="campo">
           <label>Pagina</label>
           <select value={chiaveSelezionata} onChange={(e) => setChiaveSelezionata(e.target.value)}>
@@ -101,44 +101,44 @@ export function ContenutiScreen() {
         <div className="campo">
           <label>Contenuto (HTML)</label>
           <textarea value={contenuto} onChange={(e) => setContenuto(e.target.value)} rows={6}
-            style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, color: 'var(--paper)', fontFamily: 'monospace', fontSize: 13 }} />
+            style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, color: 'var(--paper)', fontFamily: 'monospace', fontSize: 'var(--testo-md)' }} />
         </div>
         <button className="btn btn-primary" onClick={salvaPagina}>Salva pagina</button>
       </div>
 
       <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
-        <h3 style={{ fontSize: 15, marginBottom: 4 }}>Categorie (i pulsanti in alto sul sito)</h3>
-        <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 14 }}>Si associano a un evento dalla sua scheda, sezione Informazioni.</p>
+        <h3 style={{ fontSize: 'var(--testo-lg)', marginBottom: 4 }}>Categorie (i pulsanti in alto sul sito)</h3>
+        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 14 }}>Si associano a un evento dalla sua scheda, sezione Informazioni.</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
           {categorieEvento.map((c) => (
             <span key={c.id} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               {c.nome}
-              <button type="button" onClick={() => eliminaCategoriaEvento(c)} title="Elimina" style={{ background: 'none', border: 'none', color: 'var(--pink)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
+              <button type="button" onClick={() => eliminaCategoriaEvento(c)} title="Elimina" style={{ background: 'none', border: 'none', color: 'var(--pink)', cursor: 'pointer', padding: 0, fontSize: 'var(--testo-md)' }}>✕</button>
             </span>
           ))}
-          {!categorieEvento.length && <p style={{ color: 'var(--mist)', fontSize: 13 }}>Nessuna categoria ancora.</p>}
+          {!categorieEvento.length && <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>Nessuna categoria ancora.</p>}
         </div>
         <button className="btn btn-ghost" onClick={nuovaCategoriaEvento}>+ Nuova categoria</button>
       </div>
 
       <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
-        <h3 style={{ fontSize: 15, marginBottom: 4 }}>Generi</h3>
-        <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 14 }}>Testo libero associato a ogni evento — diverso dalle categorie qui sopra.</p>
+        <h3 style={{ fontSize: 'var(--testo-lg)', marginBottom: 4 }}>Generi</h3>
+        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 14 }}>Testo libero associato a ogni evento — diverso dalle categorie qui sopra.</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
           {generi.map((g) => (
             <span key={g.id} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               {g.nome}
-              <button type="button" onClick={() => eliminaGenere(g)} title="Elimina" style={{ background: 'none', border: 'none', color: 'var(--pink)', cursor: 'pointer', padding: 0, fontSize: 13 }}>✕</button>
+              <button type="button" onClick={() => eliminaGenere(g)} title="Elimina" style={{ background: 'none', border: 'none', color: 'var(--pink)', cursor: 'pointer', padding: 0, fontSize: 'var(--testo-md)' }}>✕</button>
             </span>
           ))}
-          {!generi.length && <p style={{ color: 'var(--mist)', fontSize: 13 }}>Nessun genere ancora.</p>}
+          {!generi.length && <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>Nessun genere ancora.</p>}
         </div>
         <button className="btn btn-ghost" onClick={nuovoGenere}>+ Nuovo genere</button>
       </div>
 
       <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
-        <h3 style={{ fontSize: 15, marginBottom: 4 }}>Testi Hero homepage</h3>
-        <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 14 }}>Il primo blocco che si vede aprendo il sito — titolo, sottotitolo, etichette delle statistiche.</p>
+        <h3 style={{ fontSize: 'var(--testo-lg)', marginBottom: 4 }}>Testi Hero homepage</h3>
+        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 14 }}>Il primo blocco che si vede aprendo il sito — titolo, sottotitolo, etichette delle statistiche.</p>
         {[
           { chiave: 'hero_eyebrow', etichetta: 'Etichetta sopra il titolo', default: 'Bus per concerti in tutta Italia' },
           { chiave: 'hero_titolo_riga1', etichetta: 'Titolo — prima riga', default: 'Sali sul bus.' },
@@ -158,7 +158,7 @@ export function ContenutiScreen() {
       </div>
 
       <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20, marginBottom: 24 }}>
-        <h3 style={{ fontSize: 15, marginBottom: 14 }}>Sfondo homepage</h3>
+        <h3 style={{ fontSize: 'var(--testo-lg)', marginBottom: 14 }}>Sfondo homepage</h3>
         <div className="campo">
           <label>URL immagine di sfondo</label>
           <input
@@ -170,14 +170,14 @@ export function ContenutiScreen() {
       </div>
 
       <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
-        <h3 style={{ fontSize: 15, marginBottom: 14 }}>Testi configurabili (hero, statistiche, ecc.)</h3>
+        <h3 style={{ fontSize: 'var(--testo-lg)', marginBottom: 14 }}>Testi configurabili (hero, statistiche, ecc.)</h3>
         {contenuti.filter((c) => c.chiave !== 'sfondoUrl' && !c.chiave.startsWith('hero_') && !c.chiave.startsWith('tooltip_')).map((c) => (
           <div className="campo" key={c.chiave}>
             <label>{c.chiave}</label>
             <input defaultValue={c.valore} onBlur={(e) => salvaContenuto(c.chiave, e.target.value)} />
           </div>
         ))}
-        {!contenuti.length && <p style={{ color: 'var(--mist)', fontSize: 13 }}>Nessun contenuto configurato ancora.</p>}
+        {!contenuti.length && <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>Nessun contenuto configurato ancora.</p>}
       </div>
     </div>
   );

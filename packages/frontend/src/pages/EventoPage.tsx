@@ -120,16 +120,16 @@ export function EventoPage() {
               <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
 
               {evento.statoDisponibilita && (
-                <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, display: 'inline-block', marginTop: 10 }}>
+                <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 'var(--testo-md)', display: 'inline-block', marginTop: 10 }}>
                   {ETICHETTA_STATO[evento.statoDisponibilita]}
                 </p>
               )}
 
               {prezzoMinimo !== null && (
-                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, marginTop: 14 }}>da {formattaEuro(prezzoMinimo)} <span style={{ fontSize: 13, opacity: .7 }}>/persona</span></p>
+                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-4xl)', marginTop: 14 }}>da {formattaEuro(prezzoMinimo)} <span style={{ fontSize: 'var(--testo-md)', opacity: .7 }}>/persona</span></p>
               )}
               {prenotazioniConfermate !== null && prenotazioniConfermate >= 10 && (
-                <p style={{ fontSize: 13, opacity: .75, marginTop: 4 }}>{prenotazioniConfermate} persone hanno già prenotato per questo evento</p>
+                <p style={{ fontSize: 'var(--testo-md)', opacity: .75, marginTop: 4 }}>{prenotazioniConfermate} persone hanno già prenotato per questo evento</p>
               )}
 
               {/* "Informazioni pratiche" — SEMPRE visibile, non dentro un
@@ -148,19 +148,19 @@ export function EventoPage() {
                 if (!arrivo && !evento.cosaIncluso && !evento.requisitiNote) return null;
                 return (
                   <div className="panel-box" style={{ marginTop: 18 }}>
-                    <h2 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 16, margin: '0 0 10px' }}>Informazioni pratiche</h2>
+                    <h2 style={{ fontFamily: "'Poppins',sans-serif", fontSize: 'var(--testo-xl)', margin: '0 0 10px' }}>Informazioni pratiche</h2>
                     {arrivo && (
-                      <p style={{ fontSize: 13.5, marginBottom: 8 }}>
+                      <p style={{ fontSize: 'var(--testo-base)', marginBottom: 8 }}>
                         📍 <b>Punto di arrivo:</b> {arrivo.arrivoIndirizzo}{arrivo.arrivoOrario ? ` — ore ${arrivo.arrivoOrario}` : ''}
                       </p>
                     )}
                     {evento.cosaIncluso && (
-                      <p style={{ fontSize: 13.5, marginBottom: 8, whiteSpace: 'pre-line' }}>✓ <b>Cosa include:</b> {evento.cosaIncluso}</p>
+                      <p style={{ fontSize: 'var(--testo-base)', marginBottom: 8, whiteSpace: 'pre-line' }}>✓ <b>Cosa include:</b> {evento.cosaIncluso}</p>
                     )}
                     {evento.requisitiNote && (
-                      <p style={{ fontSize: 13.5, marginBottom: 8, whiteSpace: 'pre-line' }}>⚠️ {evento.requisitiNote}</p>
+                      <p style={{ fontSize: 'var(--testo-base)', marginBottom: 8, whiteSpace: 'pre-line' }}>⚠️ {evento.requisitiNote}</p>
                     )}
-                    <p style={{ fontSize: 12, opacity: .7, marginTop: 10, marginBottom: 0 }}>
+                    <p style={{ fontSize: 'var(--testo-sm)', opacity: .7, marginTop: 10, marginBottom: 0 }}>
                       <Link to="/pagina/termini">Politica di cancellazione e termini</Link>
                     </p>
                   </div>

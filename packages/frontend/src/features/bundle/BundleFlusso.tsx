@@ -147,7 +147,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
               </div>
               <h1>{bundle.nome}</h1>
               <p className="meta-riga">{bundle.tipo === 'FISSO' ? `${bundle.eventi.length} eventi inclusi` : `Scegli ${bundle.maxEventi ? `da ${minEv} a ${bundle.maxEventi}` : `almeno ${minEv}`} eventi tra ${bundle.eventi.length}`}</p>
-              <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, marginTop: 14 }}>−{Number(bundle.scontoPercentuale)}% <span style={{ fontSize: 13, opacity: .7 }}>sul totale dei posti</span></p>
+              <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-4xl)', marginTop: 14 }}>−{Number(bundle.scontoPercentuale)}% <span style={{ fontSize: 'var(--testo-md)', opacity: .7 }}>sul totale dei posti</span></p>
               {bundle.descrizione && <p style={{ marginTop: 14, whiteSpace: 'pre-line' }}>{bundle.descrizione}</p>}
               {bundle.stato === 'PROGRAMMATO' && bundle.inizioVendita && <p className="checkout-summary" style={{ marginTop: 14 }}>Disponibile dal {formattaDataOraIt(bundle.inizioVendita)}</p>}
               {bundle.stato === 'VENDITA_TERMINATA' && <p className="checkout-summary" style={{ marginTop: 14 }}>Vendita terminata</p>}
@@ -156,17 +156,17 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                 <div className="checkout-summary" style={{ marginTop: 18 }}>
                   <b>Il tuo bundle</b>
                   {righeRiepilogo.map(({ evento, opzione }) => (
-                    <div key={evento.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 6, fontSize: 13.5 }}>
+                    <div key={evento.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 6, fontSize: 'var(--testo-base)' }}>
                       <span>{evento.artista}{opzione ? ` · ${opzione.fermataCitta}` : ''}</span>
                       <span>{opzione ? formattaEuro(opzione.prezzoEffettivo * passeggeri) : '—'}</span>
                     </div>
                   ))}
                   {tutteScelte && (
-                    <div style={{ borderTop: '1px solid var(--line)', marginTop: 8, paddingTop: 8, fontSize: 13.5 }}>
+                    <div style={{ borderTop: '1px solid var(--line)', marginTop: 8, paddingTop: 8, fontSize: 'var(--testo-base)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Totale originale</span><span>{formattaEuro(totaleOriginale)}</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Sconto bundle</span><span>− {formattaEuro(sconto)}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 15, marginTop: 4 }}><span>Totale</span><span>{formattaEuro(totaleOriginale - sconto)}</span></div>
-                      <p style={{ fontSize: 12, opacity: .7, marginTop: 4 }}>Per {passeggeri} {passeggeri === 1 ? 'passeggero' : 'passeggeri'}. Eventuali credito e codici si applicano al carrello.</p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 'var(--testo-lg)', marginTop: 4 }}><span>Totale</span><span>{formattaEuro(totaleOriginale - sconto)}</span></div>
+                      <p style={{ fontSize: 'var(--testo-sm)', opacity: .7, marginTop: 4 }}>Per {passeggeri} {passeggeri === 1 ? 'passeggero' : 'passeggeri'}. Eventuali credito e codici si applicano al carrello.</p>
                     </div>
                   )}
                 </div>
@@ -181,7 +181,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                     {bundle.stato === 'PROGRAMMATO' ? `Questo bundle sarà acquistabile dal ${bundle.inizioVendita ? formattaDataOraIt(bundle.inizioVendita) : '…'}.`
                       : bundle.stato === 'VENDITA_TERMINATA' ? 'La vendita di questo bundle è terminata.'
                       : 'Al momento uno o più eventi del bundle non sono disponibili: il bundle non è acquistabile.'}
-                    <p style={{ marginTop: 8, fontSize: 13 }}>Gli eventi restano acquistabili singolarmente dalle loro pagine.</p>
+                    <p style={{ marginTop: 8, fontSize: 'var(--testo-md)' }}>Gli eventi restano acquistabili singolarmente dalle loro pagine.</p>
                   </div>
                 )}
 
@@ -189,7 +189,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                   <>
                     <h3>Scegli {bundle.maxEventi ? `da ${minEv} a ${bundle.maxEventi}` : `almeno ${minEv}`} eventi</h3>
                     {bundle.eventi.map((e) => <RigaEvento key={e.id} evento={e} selezionabile={e.vendibile} selezionato={selezionati.includes(e.id)} onToggle={() => toggleEvento(e.id)} />)}
-                    <p style={{ marginTop: 10, fontSize: 13 }}>Eventi selezionati: <b>{selezionati.length}</b></p>
+                    <p style={{ marginTop: 10, fontSize: 'var(--testo-md)' }}>Eventi selezionati: <b>{selezionati.length}</b></p>
                     <button type="button" className="btn-primary" disabled={!selezioneValida} onClick={() => setPasso('configura')} style={{ marginTop: 10 }}>Continua</button>
                   </>
                 )}
@@ -198,7 +198,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                   <>
                     {bundle.tipo === 'FISSO' && <><h3>Il bundle include</h3>{bundle.eventi.map((e) => <RigaEvento key={e.id} evento={e} selezionabile={false} selezionato onToggle={() => {}} />)}</>}
                     <h3 style={{ marginTop: 16 }}>Quanti passeggeri?</h3>
-                    <p style={{ fontSize: 13, opacity: .8 }}>Lo stesso numero per tutti gli eventi (da {bundle.minPosti} a {bundle.maxPosti}).</p>
+                    <p style={{ fontSize: 'var(--testo-md)', opacity: .8 }}>Lo stesso numero per tutti gli eventi (da {bundle.minPosti} a {bundle.maxPosti}).</p>
                     <input type="number" min={bundle.minPosti} max={bundle.maxPosti} value={passeggeri} onChange={(e) => setPasseggeri(Math.min(bundle.maxPosti, Math.max(bundle.minPosti, Number(e.target.value) || bundle.minPosti)))} style={{ width: 100 }} />
                     <h3 style={{ marginTop: 16 }}>Partenza per ogni evento</h3>
                     {selezionati.map((id) => {
@@ -210,7 +210,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                       return (
                         <div key={id} style={{ marginTop: 12 }}>
                           <p style={{ fontWeight: 600 }}>{ev.artista} <span style={{ opacity: .7, fontWeight: 400 }}>· {new Date(ev.data).toLocaleDateString('it-IT')}</span></p>
-                          {!completo && <p style={{ fontSize: 13 }}>Carico...</p>}
+                          {!completo && <p style={{ fontSize: 'var(--testo-md)' }}>Carico...</p>}
                           {multi && (
                             <select value={sc.servizioId ?? ''} onChange={(e) => setScelte((p) => ({ ...p, [id]: { servizioId: e.target.value || undefined } }))} style={{ marginBottom: 6 }}>
                               <option value="">— Scegli il servizio —</option>
@@ -228,7 +228,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                                 }}
                                 testoOpzione={(o) => `${o.fermataCitta} (${o.fermataOrario || 'orario da definire'}) — ${formattaEuro(o.prezzoEffettivo)}`}
                               />
-                            : <p style={{ fontSize: 13 }}>Carico le partenze...</p>)}
+                            : <p style={{ fontSize: 'var(--testo-md)' }}>Carico le partenze...</p>)}
                         </div>
                       );
                     })}
@@ -285,8 +285,8 @@ function RigaEvento({ evento, selezionabile, selezionato, onToggle }: { evento: 
       {evento.immagineUrl && <img src={evento.immagineUrl} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6 }} />}
       <span style={{ flex: 1 }}>
         <b>{evento.artista}</b><br />
-        <span style={{ fontSize: 12.5, opacity: .75 }}>{evento.luogo}, {evento.citta} · {new Date(evento.data).toLocaleDateString('it-IT')}</span>
-        {!evento.vendibile && <span style={{ fontSize: 12, marginLeft: 6 }}>(non disponibile)</span>}
+        <span style={{ fontSize: 'var(--testo-md)', opacity: .75 }}>{evento.luogo}, {evento.citta} · {new Date(evento.data).toLocaleDateString('it-IT')}</span>
+        {!evento.vendibile && <span style={{ fontSize: 'var(--testo-sm)', marginLeft: 6 }}>(non disponibile)</span>}
       </span>
     </label>
   );

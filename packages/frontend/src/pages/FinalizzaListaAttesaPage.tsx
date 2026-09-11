@@ -85,10 +85,10 @@ export function FinalizzaListaAttesaPage() {
             ) : (
               <>
                 <h3>Completa la tua prenotazione</h3>
-                <p style={{ fontSize: 13.5, color: 'var(--mist)', margin: '0 0 4px' }}>
+                <p style={{ fontSize: 'var(--testo-base)', color: 'var(--mist)', margin: '0 0 4px' }}>
                   {dati.artista} — {dati.luogo}, {dati.citta}{dati.data ? ` · ${new Date(dati.data).toLocaleDateString('it-IT')}` : ''}
                 </p>
-                <p style={{ fontSize: 13, color: 'var(--mist)' }}>
+                <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>
                   {dati.nome} {dati.cognome} · {dati.email} · {dati.passeggeri} passeggero/i
                 </p>
 
@@ -105,7 +105,7 @@ export function FinalizzaListaAttesaPage() {
                       ))}
                     </select>
 
-                    <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 24, margin: '18px 0 6px' }}>{formattaEuro(totale)}</p>
+                    <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 'var(--testo-4xl)', margin: '18px 0 6px' }}>{formattaEuro(totale)}</p>
 
                     {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
 

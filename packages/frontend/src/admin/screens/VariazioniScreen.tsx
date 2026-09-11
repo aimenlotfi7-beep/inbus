@@ -42,7 +42,7 @@ export function VariazioniScreen() {
                 <div>
                   <p style={{ fontWeight: 600, marginBottom: 4 }}>{v.fermataDescrizione}</p>
                   <p className="section-sub" style={{ marginBottom: 8 }}>{v.descrizione}</p>
-                  <p style={{ fontSize: 12, color: 'var(--mist)' }}>{new Date(v.creataIl).toLocaleString('it-IT')}</p>
+                  <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>{new Date(v.creataIl).toLocaleString('it-IT')}</p>
                 </div>
                 <span className={`badge ${v.stato === 'IN_CORSO' ? 'attenzione' : 'neutro'}`} style={{ flexShrink: 0 }}>
                   {v.stato === 'IN_CORSO' ? '◔ In corso' : '✓ Gestita'}

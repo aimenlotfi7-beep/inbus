@@ -161,12 +161,12 @@ export function PrenotazioniScreen() {
                   return (
                     <tr key={r.id}>
                       <td><b>{r.pnr}</b></td>
-                      <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 12 }}>{r.clienteEmail}{r.clienteTelefono ? ` · ${r.clienteTelefono}` : ''}</span></td>
+                      <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{r.clienteEmail}{r.clienteTelefono ? ` · ${r.clienteTelefono}` : ''}</span></td>
                       <td style={{ textAlign: 'right' }}>
                         <button
                           type="button"
                           className="btn btn-ghost"
-                          style={{ fontSize: 13, padding: '2px 10px', textDecoration: 'underline' }}
+                          style={{ fontSize: 'var(--testo-md)', padding: '2px 10px', textDecoration: 'underline' }}
                           onClick={() => setPasseggeriInModale(r)}
                           title="Vedi nomi e dati dei passeggeri"
                         >
@@ -184,13 +184,13 @@ export function PrenotazioniScreen() {
                       <td>
                         {r.stato === 'CONFERMATA' ? (
                           <>
-                            <button className="btn btn-ghost" style={{ fontSize: 12, whiteSpace: 'nowrap', marginRight: 6 }} onClick={() => rigeneraBiglietto(r)} title="Se il biglietto non è mai arrivato al cliente">
+                            <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', whiteSpace: 'nowrap', marginRight: 6 }} onClick={() => rigeneraBiglietto(r)} title="Se il biglietto non è mai arrivato al cliente">
                               Rigenera biglietto
                             </button>
-                            <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => cancella(r)}>Cancella</button>
+                            <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => cancella(r)}>Cancella</button>
                           </>
                         ) : (
-                          <button className="btn btn-ghost" style={{ fontSize: 12, color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => eliminaDefinitivamente(r)}>Elimina def.</button>
+                          <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', color: 'var(--pink)', whiteSpace: 'nowrap' }} onClick={() => eliminaDefinitivamente(r)}>Elimina def.</button>
                         )}
                       </td>
                     </tr>
@@ -267,7 +267,7 @@ export function PrenotazioniScreen() {
                 placeholder="Cerca tra gli eventi con prenotazioni..."
                 value={ricercaTab}
                 onChange={(e) => setRicercaTab(e.target.value)}
-                style={{ fontSize: 15, textAlign: 'left', padding: '10px 4px' }}
+                style={{ fontSize: 'var(--testo-lg)', textAlign: 'left', padding: '10px 4px' }}
               />
             </div>
           )}

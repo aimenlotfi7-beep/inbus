@@ -110,9 +110,9 @@ export function TourLeaderScanPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#000', color: '#fff', position: 'relative', fontFamily: "'Poppins',sans-serif" }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: '#14121f' }}>
-        <button onClick={() => navigate('/scansione')} style={{ background: 'none', border: 'none', color: '#a99fc2', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>← Bus</button>
+        <button onClick={() => navigate('/scansione')} style={{ background: 'none', border: 'none', color: '#a99fc2', fontSize: 'var(--testo-base)', cursor: 'pointer', fontFamily: 'inherit' }}>← Bus</button>
         {contatore && (
-          <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: 'var(--testo-lg)' }}>
             {contatore.saliti} / {contatore.totale} <span style={{ color: '#a99fc2', fontWeight: 400 }}>saliti — Bus {contatore.riferimento}</span>
           </p>
         )}

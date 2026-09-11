@@ -56,7 +56,7 @@ export function OrganizzatorePage() {
               onKeyDown={(e) => e.key === 'Enter' && accedi()} />
             <button className="btn btn-primary" onClick={accedi}>Accedi</button>
             <p className="errore">{errore}</p>
-            <p style={{ marginTop: 10 }}><Link to="/organizzatore/password-dimenticata" style={{ fontSize: 12.5 }}>Password dimenticata?</Link></p>
+            <p style={{ marginTop: 10 }}><Link to="/organizzatore/password-dimenticata" style={{ fontSize: 'var(--testo-md)' }}>Password dimenticata?</Link></p>
           </div>
         )}
       </main>
@@ -134,7 +134,7 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
                   <h3>{ev.artista}</h3>
                   <p>{ev.luogo}, {ev.citta} · {fmtDataBreve(ev.data)}</p>
                   {s && (
-                    <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 4 }}>
+                    <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginTop: 4 }}>
                       {s.viaggiatori} viaggiator{s.viaggiatori === 1 ? 'e' : 'i'} · {formattaEuro(s.fatturato)} fatturato · tua quota {formattaEuro(s.quotaOrganizzatore)}
                     </p>
                   )}
@@ -148,14 +148,14 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
       {voce === 'bundle' && perBundle.length > 0 && (
         <>
           <h1 className="page-title" style={{ marginBottom: 6 }}>I tuoi bundle</h1>
-          <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 20 }}>
+          <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 20 }}>
             Gli stessi acquisti contano anche sotto ogni evento — questa è una vista in più, non una somma a parte.
           </p>
           {perBundle.map((b) => (
             <div className="evento-link-card" key={b.bundleId}>
               <div>
-                <h3>{b.bundleNome} <span style={{ fontSize: 12, opacity: .7, fontWeight: 400 }}>bundle</span></h3>
-                <p style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: 4 }}>
+                <h3>{b.bundleNome} <span style={{ fontSize: 'var(--testo-sm)', opacity: .7, fontWeight: 400 }}>bundle</span></h3>
+                <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginTop: 4 }}>
                   {b.numeroOrdini} ordin{b.numeroOrdini === 1 ? 'e' : 'i'} · {b.viaggiatori} viaggiator{b.viaggiatori === 1 ? 'e' : 'i'} · {formattaEuro(b.fatturato)} fatturato (sconto applicato {formattaEuro(b.scontoApplicato)}) · tua quota {formattaEuro(b.quotaOrganizzatore)}
                 </p>
               </div>

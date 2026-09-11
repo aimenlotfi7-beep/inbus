@@ -312,7 +312,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
       <h3>Prenota</h3>
 
       {offerta && (
-        <p style={{ background: '#e8f7ea', border: '1px solid #b6e3bb', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
+        <p style={{ background: '#e8f7ea', border: '1px solid #b6e3bb', borderRadius: 8, padding: '10px 12px', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
           🎉 Offerta "{offerta.nome}": -{offerta.scontoPercentuale.toFixed(0)}% su tutte le fermate.
         </p>
       )}
@@ -343,7 +343,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
             <div>
               <b>{evento.artista}</b>
               {tragittoScelto?.arrivoOrario && (
-                <span style={{ fontWeight: 400, fontSize: 12, marginLeft: 8, color: 'var(--mist)' }}>
+                <span style={{ fontWeight: 400, fontSize: 'var(--testo-sm)', marginLeft: 8, color: 'var(--mist)' }}>
                   Arrivo {tragittoScelto.arrivoOrario}
                 </span>
               )}
@@ -355,7 +355,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                   <button
                     type="button"
                     className="mini-tab active"
-                    style={{ marginLeft: 8, padding: '3px 10px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, verticalAlign: 'middle' }}
+                    style={{ marginLeft: 8, padding: '3px 10px', fontSize: 'var(--testo-xs)', display: 'inline-flex', alignItems: 'center', gap: 4, verticalAlign: 'middle' }}
                     onClick={() => setPercorsoAperto(true)}
                   >
                     🗺️ Tragitto
@@ -381,7 +381,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
 
           {multiServizio && !servizioScelto && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <p style={{ fontSize: 13.5, opacity: .75, marginTop: -6 }}>Questo evento ha più opzioni di servizio — scegli quella che preferisci.</p>
+              <p style={{ fontSize: 'var(--testo-base)', opacity: .75, marginTop: -6 }}>Questo evento ha più opzioni di servizio — scegli quella che preferisci.</p>
               {evento.servizi.map((v) => {
                 const orariDistinti = [...new Set(v.tragitti.map((t) => t.arrivoOrario).filter((o): o is string => !!o))];
                 const arrivoComune = orariDistinti.length === 1 ? orariDistinti[0] : null;
@@ -405,18 +405,18 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
           {step === 1 && (
             <>
               {multiServizio && (
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, marginBottom: 12, padding: '5px 10px' }} onClick={() => setServizioScelto(null)}>
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', marginBottom: 12, padding: '5px 10px' }} onClick={() => setServizioScelto(null)}>
                   ← Cambia servizio
                 </button>
               )}
               {tutteEsaurite && (
-                <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
+                <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
                   Al momento non ci sono posti disponibili. Puoi comunque compilare i tuoi dati e iscriverti alla
                   lista d'attesa: ti avviseremo via email non appena si libera un posto.
                 </p>
               )}
               {!tutteEsaurite && fermataEsaurita && (
-                <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
+                <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
                   I posti da questa fermata sono esauriti. Scegli un'altra fermata, oppure iscriviti alla lista
                   d'attesa apposta per questa: ti avviseremo se si libera un posto qui.
                 </p>
@@ -439,7 +439,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 }}
               />
               {opzioneScelta?.sogliaMinima != null && (
-                <p className="checkout-nota" style={{ fontSize: 12.5, color: 'var(--mist)', marginTop: -8, marginBottom: 12 }}>
+                <p className="checkout-nota" style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginTop: -8, marginBottom: 12 }}>
                   Questa fermata richiede almeno {opzioneScelta.sogliaMinima} partecipanti confermati per essere garantita
                   {opzioneScelta.partecipantiAttuali != null && <> — al momento ce ne sono {opzioneScelta.partecipantiAttuali}</>}.
                   Se non si raggiunge la soglia, ti avviseremo e potrai scegliere se accettare un'alternativa o essere rimborsato.
@@ -485,7 +485,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 // nuovo endpoint ospite.
                 <div style={{ textAlign: 'center', padding: '20px 10px' }}>
                   <p className="field-label" style={{ marginBottom: 10 }}>Serve un account per prenotare</p>
-                  <p style={{ fontSize: 13, opacity: .75, marginBottom: 18 }}>
+                  <p style={{ fontSize: 'var(--testo-md)', opacity: .75, marginBottom: 18 }}>
                     Ti serve solo un minuto — dopo aver effettuato l'accesso, tornerai qui a completare la
                     prenotazione con la fermata e i passeggeri già scelti.
                   </p>
@@ -499,7 +499,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
               ) : (
                 <>
                   {!clienteLoggato() && (
-                    <p style={{ fontSize: 12.5, textAlign: 'right', marginTop: -4, marginBottom: 10 }}>
+                    <p style={{ fontSize: 'var(--testo-md)', textAlign: 'right', marginTop: -4, marginBottom: 10 }}>
                       Hai già un account? <a href={`/accedi?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`}>Accedi</a>
                     </p>
                   )}
@@ -604,7 +604,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
 
               {fermataEsaurita ? (
                 <>
-                  <p style={{ fontSize: 13.5, marginBottom: 14 }}>
+                  <p style={{ fontSize: 'var(--testo-base)', marginBottom: 14 }}>
                     Confermi l'iscrizione alla lista d'attesa per <b>{passeggeri}</b> passeggero/i su "{evento.artista}"{opzioneScelta ? ` da ${opzioneScelta.fermataCitta}` : ''}?
                   </p>
                   <button
@@ -618,27 +618,27 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 </>
               ) : (
                 <>
-                  <div style={{ background: '#faf7f0', border: '1px solid #e5ded0', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 13 }}>
+                  <div style={{ background: '#faf7f0', border: '1px solid #e5ded0', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 'var(--testo-md)' }}>
                     <p style={{ margin: '0 0 4px', fontWeight: 700 }}>{evento.artista}</p>
                     <p style={{ margin: 0, opacity: .75 }}>
                       {opzioneScelta?.fermataCitta}{opzioneScelta?.fermataOrario ? ` — ore ${opzioneScelta.fermataOrario}` : ''} · {passeggeri} {passeggeri === 1 ? 'passeggero' : 'passeggeri'}
                     </p>
                   </div>
 
-                  <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, margin: '0 0 6px' }}>
+                  <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-4xl)', margin: '0 0 6px' }}>
                     {creditoApplicato > 0 ? (
                       <>
-                        <span style={{ textDecoration: 'line-through', opacity: .5, fontSize: 16, marginRight: 8 }}>{formattaEuro(totale)}</span>
+                        <span style={{ textDecoration: 'line-through', opacity: .5, fontSize: 'var(--testo-xl)', marginRight: 8 }}>{formattaEuro(totale)}</span>
                         {formattaEuro(totaleConCredito)}
                       </>
                     ) : (
                       <>{formattaEuro(totale)}</>
                     )}
                   </p>
-                  <p style={{ fontSize: 12, opacity: .7, marginTop: -4 }}>I biglietti arriveranno via email al richiedente.</p>
+                  <p style={{ fontSize: 'var(--testo-sm)', opacity: .7, marginTop: -4 }}>I biglietti arriveranno via email al richiedente.</p>
 
                   {creditoDisponibile > 0 && (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '10px 0', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--testo-md)', margin: '10px 0', cursor: 'pointer' }}>
                       <input type="checkbox" checked={usaCredito} onChange={(e) => setUsaCredito(e.target.checked)} style={{ width: 'auto' }} />
                       Usa il tuo credito fedeltà ({formattaEuro(creditoDisponibile)} disponibili)
                     </label>
@@ -667,13 +667,13 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                         {verificandoCoupon ? '...' : couponVerificato ? '✓ Applicato' : 'Applica'}
                       </button>
                     </div>
-                    {couponErrore && <p style={{ color: '#c0392b', fontSize: 12, marginTop: 6 }}>{couponErrore}</p>}
+                    {couponErrore && <p style={{ color: '#c0392b', fontSize: 'var(--testo-sm)', marginTop: 6 }}>{couponErrore}</p>}
                     {couponVerificato && (
-                      <p style={{ fontSize: 13, marginTop: 6 }}>
+                      <p style={{ fontSize: 'var(--testo-md)', marginTop: 6 }}>
                         Sconto: <b>-{formattaEuro(couponVerificato.sconto)}</b> — nuovo totale (pagando tutto subito): <b>{formattaEuro(Math.max(0, totale - couponVerificato.sconto))}</b>
                       </p>
                     )}
-                    <p style={{ fontSize: 11.5, opacity: .65, marginTop: 6 }}>
+                    <p style={{ fontSize: 'var(--testo-sm)', opacity: .65, marginTop: 6 }}>
                       Il coupon si applica solo pagando tutto subito ("Acquista"). Se prenoti con acconto, potrai
                       usarlo quando salderai il resto.
                     </p>
@@ -686,7 +686,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                       inviati, ma il browser poteva proporre di compilarli
                       con una carta vera). L'ordine si registra come "Da
                       concordare" finché non si collega un fornitore. */}
-                  <p style={{ fontSize: 13, opacity: .75, marginBottom: 14 }}>
+                  <p style={{ fontSize: 'var(--testo-md)', opacity: .75, marginBottom: 14 }}>
                     Il pagamento online non è ancora attivo: la prenotazione viene registrata e il pagamento si concorda a parte.
                   </p>
 
@@ -698,7 +698,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                   >
                     {azioneInCorso === 'acquista' ? 'Invio...' : 'Acquista'}
                   </button>
-                  <p style={{ fontSize: 11, opacity: .6, marginTop: 4, textAlign: 'center' }}>Pagamento completo, subito</p>
+                  <p style={{ fontSize: 'var(--testo-xs)', opacity: .6, marginTop: 4, textAlign: 'center' }}>Pagamento completo, subito</p>
 
                   <button
                     className="search-cta-secondaria"
@@ -712,12 +712,12 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                       pulsanti, non chiaramente legata a "Prenota" — chi
                       legge veloce poteva pensare non impegnasse a nulla.
                       Ora è la prima cosa sotto il pulsante giusto. */}
-                  <p style={{ fontSize: 11, opacity: .65, marginTop: 6, textAlign: 'center' }}>
+                  <p style={{ fontSize: 'var(--testo-xs)', opacity: .65, marginTop: 6, textAlign: 'center' }}>
                     Acconto di {formattaEuro(evento.accontoEur ?? 10)} a passeggero
                     ({formattaEuro(Number(evento.accontoEur ?? 10) * passeggeri)} totali ora) — salderai il resto entro
                     15 giorni prima della partenza.
                   </p>
-                  <p style={{ fontSize: 11, opacity: .6, marginTop: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                  <p style={{ fontSize: 'var(--testo-xs)', opacity: .6, marginTop: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                     🔒 I tuoi dati sono trattati in modo riservato, secondo la nostra informativa privacy.
                   </p>
                 </>

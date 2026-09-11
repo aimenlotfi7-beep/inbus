@@ -121,10 +121,10 @@ export function TourLeaderScreen() {
           </div>
         }
       />
-      <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 6 }}>
+      <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 6 }}>
         Le candidature arrivano anche dal form pubblico di autocandidatura. Cambia lo stato per approvarle o archiviarle.
       </p>
-      <p style={{ color: 'var(--mist)', fontSize: 12.5, marginBottom: 16 }}>
+      <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 16 }}>
         Modulo pubblico: <code style={{ color: 'var(--paper)' }}>{linkCandidatura}</code>
       </p>
       <div style={{ maxWidth: 480, marginBottom: 20 }}>
@@ -150,7 +150,7 @@ export function TourLeaderScreen() {
           {
             etichetta: 'Accesso scansione',
             render: (t) => (
-              <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => attivaAccesso(t)}>
+              <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '4px 10px' }} onClick={() => attivaAccesso(t)}>
                 {t.passwordAttiva ? 'Rigenera credenziali' : 'Attiva accesso'}
               </button>
             ),

@@ -13,14 +13,14 @@ export function TourCardCompatta({ tour, onClick, onElimina }: { tour: TourRiga;
         </div>
       ) : (
         <div className="evento-card-compatta-copertina" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--dusk-2)' }}>
-          <span style={{ fontSize: 12, color: 'var(--mist)' }}>Nessuna copertina</span>
+          <span style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>Nessuna copertina</span>
           <div className="evento-card-compatta-badge badge">{tour.numeroEventi} date</div>
         </div>
       )}
       <div className="evento-card-compatta-corpo">
         <span className="evento-card-compatta-genere">Tour</span>
         <h4>{tour.nome}</h4>
-        <button className="btn btn-ghost" style={{ marginTop: 8, fontSize: 10.5, color: 'var(--pink)', padding: 0 }} onClick={(e) => { e.stopPropagation(); onElimina(); }}>
+        <button className="btn btn-ghost" style={{ marginTop: 8, fontSize: 'var(--testo-xs)', color: 'var(--pink)', padding: 0 }} onClick={(e) => { e.stopPropagation(); onElimina(); }}>
           Elimina
         </button>
       </div>

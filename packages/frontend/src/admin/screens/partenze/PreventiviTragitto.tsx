@@ -190,7 +190,7 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onA
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
         <p className="section-label" style={{ marginBottom: 0 }}>Richiedi preventivo</p>
         {!apertoManuale && (
-          <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => setApertoManuale(true)}>+ Registra un preventivo avuto altrove</button>
+          <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} onClick={() => setApertoManuale(true)}>+ Registra un preventivo avuto altrove</button>
         )}
       </div>
       {apertoManuale && (
@@ -227,7 +227,7 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onA
         <div style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 14 }}>
           {candidati.length === 0 && <p className="testo-intro">Nessun fornitore approvato entro il raggio impostato — allarga il raggio in Impostazioni o registra un fornitore più vicino.</p>}
           {candidati.filter((c) => c.statoCandidato === 'automatico').length > 0 && (
-            <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 8 }}>
+            <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 8 }}>
               Invio automatico a: {candidati.filter((c) => c.statoCandidato === 'automatico').map((c) => c.nome).join(', ')}
             </p>
           )}
@@ -242,9 +242,9 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onA
                   onChange={() => toggleManuale(c.id)}
                   style={{ width: 'auto' }}
                 />
-                <span style={{ flex: 1 }}>{c.nome} <span style={{ color: 'var(--mist)', fontSize: 12 }}>({c.distanzaKm} km)</span></span>
-                {oscurato && <span style={{ fontSize: 11, color: 'var(--mist)' }}>già contattato, non scelto</span>}
-                {c.statoCandidato === 'accettato_in_precedenza' && <span style={{ fontSize: 11, color: 'var(--green)' }}>fornitore di fiducia per questo tragitto</span>}
+                <span style={{ flex: 1 }}>{c.nome} <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>({c.distanzaKm} km)</span></span>
+                {oscurato && <span style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)' }}>già contattato, non scelto</span>}
+                {c.statoCandidato === 'accettato_in_precedenza' && <span style={{ fontSize: 'var(--testo-xs)', color: 'var(--green)' }}>fornitore di fiducia per questo tragitto</span>}
               </label>
             );
           })}
@@ -263,7 +263,7 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onA
           <p style={{ margin: 0, fontWeight: 600 }}>
             ✓ Preventivo registrato: {formattaEuro(tragittoVero.preventivoCosto)} · {tragittoVero.preventivoPostiBus ?? '—'} posti presunti
           </p>
-          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--mist)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>
             Fornitore: {fornitoriLista.find((f) => f.id === tragittoVero.fornitoreId)?.nome ?? 'nessuno indicato'}. Prossimo passo: calcolare i prezzi di vendita nella sezione Prezzi.
           </p>
         </div>
@@ -284,27 +284,27 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onA
                   <td style={{ fontWeight: 700, color: r.risposta ? coloreScala(Number(r.risposta.prezzo)) : 'var(--mist)' }}
                     title={r.risposta && prezzi.length >= 2 ? (Number(r.risposta.prezzo) === minPrezzo ? 'Il più economico tra le risposte ricevute' : Number(r.risposta.prezzo) === maxPrezzo ? 'Il più caro tra le risposte ricevute' : undefined) : undefined}>
                     {r.risposta ? formattaEuro(r.risposta.prezzo) : '— in attesa'}
-                    {r.risposta && prezzi.length >= 2 && Number(r.risposta.prezzo) === minPrezzo && <span style={{ fontSize: 11, fontWeight: 500, marginLeft: 6 }}>▼ più economico</span>}
-                    {r.risposta && prezzi.length >= 2 && Number(r.risposta.prezzo) === maxPrezzo && maxPrezzo !== minPrezzo && <span style={{ fontSize: 11, fontWeight: 500, marginLeft: 6 }}>▲ più caro</span>}
+                    {r.risposta && prezzi.length >= 2 && Number(r.risposta.prezzo) === minPrezzo && <span style={{ fontSize: 'var(--testo-xs)', fontWeight: 500, marginLeft: 6 }}>▼ più economico</span>}
+                    {r.risposta && prezzi.length >= 2 && Number(r.risposta.prezzo) === maxPrezzo && maxPrezzo !== minPrezzo && <span style={{ fontSize: 'var(--testo-xs)', fontWeight: 500, marginLeft: 6 }}>▲ più caro</span>}
                   </td>
-                  <td style={{ fontSize: 12, color: 'var(--mist)' }}>
+                  <td style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>
                     {tragittoVero?.fornitoreId === r.fornitore.id ? '✓ Accettato' : r.risposta ? 'Risposto' : 'In attesa'}
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {r.risposta?.haFile && (
-                      <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => scaricaFileRisposta(r.risposta!.id, 'originale')}>Scarica file</button>
+                      <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '3px 8px' }} onClick={() => scaricaFileRisposta(r.risposta!.id, 'originale')}>Scarica file</button>
                     )}
                     {r.risposta && puoAccettare && tragittoVero?.fornitoreId !== r.fornitore.id && (
-                      <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: 'var(--green)' }} onClick={() => accettaPreventivo(r.risposta!.id)}>Accetta</button>
+                      <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '3px 8px', color: 'var(--green)' }} onClick={() => accettaPreventivo(r.risposta!.id)}>Accetta</button>
                     )}
                     {r.risposta && tragittoVero?.fornitoreId === r.fornitore.id && !r.risposta.haFileFirmato && (
-                      <label className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px', cursor: 'pointer' }}>
+                      <label className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '3px 8px', cursor: 'pointer' }}>
                         Carica firmato
                         <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) caricaFileFirmatoPerRisposta(r.risposta!.id, f); }} />
                       </label>
                     )}
                     {r.risposta?.haFileFirmato && (
-                      <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: 'var(--green)' }} onClick={() => scaricaFileRisposta(r.risposta!.id, 'firmato')}>✓ Firmato e inviato — scarica</button>
+                      <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '3px 8px', color: 'var(--green)' }} onClick={() => scaricaFileRisposta(r.risposta!.id, 'firmato')}>✓ Firmato e inviato — scarica</button>
                     )}
                   </td>
                 </tr>

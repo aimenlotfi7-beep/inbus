@@ -98,11 +98,11 @@ export function ChatScreen() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <b style={{ fontSize: 13.5 }}>{c.clienteNome}</b>
-                {c.nonLetti > 0 && <span style={{ background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 10, padding: '1px 7px' }}>{c.nonLetti}</span>}
+                <b style={{ fontSize: 'var(--testo-base)' }}>{c.clienteNome}</b>
+                {c.nonLetti > 0 && <span style={{ background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 'var(--testo-2xs)', padding: '1px 7px' }}>{c.nonLetti}</span>}
               </div>
-              <div style={{ fontSize: 11.5, opacity: .75 }}>{c.eventoArtista}</div>
-              <div style={{ fontSize: 10.5, opacity: .6, marginTop: 2 }}>{ETICHETTA_STATO[c.stato].testo} · {new Date(c.ultimoMessaggioIl).toLocaleString('it-IT')}</div>
+              <div style={{ fontSize: 'var(--testo-sm)', opacity: .75 }}>{c.eventoArtista}</div>
+              <div style={{ fontSize: 'var(--testo-xs)', opacity: .6, marginTop: 2 }}>{ETICHETTA_STATO[c.stato].testo} · {new Date(c.ultimoMessaggioIl).toLocaleString('it-IT')}</div>
             </button>
           ))}
         </div>
@@ -113,23 +113,23 @@ export function ChatScreen() {
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
                 <div>
-                  <b>{selezionata.clienteNome}</b> <span style={{ color: 'var(--mist)', fontSize: 12 }}>· {selezionata.eventoArtista}</span>
-                  <div style={{ fontSize: 11 }}><span className={`badge ${ETICHETTA_STATO[selezionata.stato].classe}`}>{ETICHETTA_STATO[selezionata.stato].testo}</span></div>
+                  <b>{selezionata.clienteNome}</b> <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>· {selezionata.eventoArtista}</span>
+                  <div style={{ fontSize: 'var(--testo-xs)' }}><span className={`badge ${ETICHETTA_STATO[selezionata.stato].classe}`}>{ETICHETTA_STATO[selezionata.stato].testo}</span></div>
                 </div>
                 {selezionata.stato === 'CHIUSA'
-                  ? <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={riapri}>Riapri</button>
-                  : <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={chiudi}>Chiudi conversazione</button>}
+                  ? <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)' }} onClick={riapri}>Riapri</button>
+                  : <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)' }} onClick={chiudi}>Chiudi conversazione</button>}
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {messaggi.map((m) => (
                   <div key={m.id} style={{
-                    maxWidth: '75%', padding: '9px 13px', borderRadius: 12, fontSize: 13.5,
+                    maxWidth: '75%', padding: '9px 13px', borderRadius: 12, fontSize: 'var(--testo-base)',
                     alignSelf: m.autore === 'ADMIN' ? 'flex-end' : 'flex-start',
                     background: m.autore === 'ADMIN' ? 'var(--pink)' : 'var(--night)',
                     color: m.autore === 'ADMIN' ? '#fff' : 'var(--paper)',
                   }}>
                     {m.testo}
-                    <div style={{ fontSize: 10, opacity: .7, marginTop: 4 }}>{m.nome} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
+                    <div style={{ fontSize: 'var(--testo-2xs)', opacity: .7, marginTop: 4 }}>{m.nome} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
                   </div>
                 ))}
               </div>
@@ -142,7 +142,7 @@ export function ChatScreen() {
                 </div>
               )}
               {selezionata.stato === 'CHIUSA' && (
-                <p style={{ padding: 12, textAlign: 'center', color: 'var(--mist)', fontSize: 12 }}>
+                <p style={{ padding: 12, textAlign: 'center', color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>
                   Conversazione chiusa — riapri per rispondere ancora.
                 </p>
               )}

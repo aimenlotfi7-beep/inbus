@@ -96,7 +96,7 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
     <PaginaSezione titolo={tourId ? 'Modifica tour' : 'Nuovo tour'} onIndietro={onChiudi} larga
       azioni={<button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva tour'}</button>}>
       {eventiEliminati.length > 0 && (
-        <p style={{ background: 'var(--dusk)', border: '1px solid var(--pink)', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 14 }}>
+        <p style={{ background: 'var(--dusk)', border: '1px solid var(--pink)', borderRadius: 8, padding: '10px 14px', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
           ⚠ {eventiEliminati.length} evento/i in questo tour {eventiEliminati.length === 1 ? 'è stato eliminato' : 'sono stati eliminati'} ({eventiEliminati.join(', ')}) — salvando, {eventiEliminati.length === 1 ? 'esce' : 'escono'} automaticamente dal tour.
         </p>
       )}

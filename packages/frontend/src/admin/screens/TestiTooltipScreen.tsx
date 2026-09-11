@@ -81,13 +81,13 @@ function RigaTooltip({ etichetta, valoreIniziale, salvando, onSalva }: {
         value={testo}
         onChange={(e) => setTesto(e.target.value)}
         rows={4}
-        style={{ marginBottom: 8, width: '100%', minHeight: 90, resize: 'vertical', lineHeight: 1.5, fontSize: 13.5 }}
+        style={{ marginBottom: 8, width: '100%', minHeight: 90, resize: 'vertical', lineHeight: 1.5, fontSize: 'var(--testo-base)' }}
       />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button className="btn btn-ghost" disabled={!modificato || salvando} onClick={handleSalva}>
           {salvando ? 'Salvo...' : 'Salva'}
         </button>
-        {appenaSalvato && <span style={{ color: 'var(--green, #4ade80)', fontSize: 12.5 }}>✓ Salvato</span>}
+        {appenaSalvato && <span style={{ color: 'var(--green, #4ade80)', fontSize: 'var(--testo-md)' }}>✓ Salvato</span>}
       </div>
     </div>
   );

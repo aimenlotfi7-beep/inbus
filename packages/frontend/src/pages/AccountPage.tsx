@@ -191,7 +191,7 @@ function SezioneProfilo({ email }: { email: string }) {
 
       <form onSubmit={salva} className="panel-box">
         <h2>I miei dati</h2>
-        <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 14 }}>
+        <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
           Sei collegato con l'indirizzo <b style={{ color: 'var(--paper)' }}>{email}</b> — non modificabile da qui.
         </p>
 
@@ -219,7 +219,7 @@ function SezioneProfilo({ email }: { email: string }) {
         <input type="date" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} required style={{ maxWidth: 200 }} />
 
         {erroreSalva && <p className="errore">{erroreSalva}</p>}
-        {messaggio && <p style={{ color: 'var(--green)', fontSize: 13, marginTop: 8 }}>{messaggio}</p>}
+        {messaggio && <p style={{ color: 'var(--green)', fontSize: 'var(--testo-md)', marginTop: 8 }}>{messaggio}</p>}
         <button type="submit" className="btn btn-primary" style={{ marginTop: 14, width: 'auto' }} disabled={salvando}>
           {salvando ? 'Salvo...' : 'Salva le modifiche'}
         </button>
@@ -227,7 +227,7 @@ function SezioneProfilo({ email }: { email: string }) {
 
       <div className="panel-box" style={{ marginTop: 22, borderColor: '#c0392b' }}>
         <h2 style={{ color: '#e74c3c' }}>Elimina il mio account</h2>
-        <p style={{ color: 'var(--mist)', fontSize: 13, marginBottom: 14 }}>
+        <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
           I tuoi dati personali (nome, telefono, città) vengono rimossi e non potrai più accedere. Le prenotazioni
           già fatte restano nello storico per motivi contabili, ma non saranno più collegate a un account attivo.
           <b style={{ color: 'var(--paper)' }}> Questa azione non si può annullare.</b>
@@ -286,10 +286,10 @@ function SezioneCredito({ email }: { email: string }) {
 
       <div className="panel-box" style={{ background: 'rgba(72,214,140,.1)', borderColor: 'var(--green)' }}>
         <h2>Disponibile ora</h2>
-        <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 30, color: 'var(--green)', margin: '4px 0' }}>
+        <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-6xl)', color: 'var(--green)', margin: '4px 0' }}>
           {formattaEuro(disponibile ?? 0)}
         </p>
-        <p style={{ color: 'var(--mist)', fontSize: 13 }}>
+        <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>
           Maturato dai tuoi viaggi — spendibile su qualsiasi prenotazione futura, non scade mai.
         </p>
       </div>
@@ -308,8 +308,8 @@ function SezioneCredito({ email }: { email: string }) {
             {maturati.map((m) => (
               <div key={m.id} className="viaggio-card" style={{ padding: '10px 14px' }}>
                 <div className="viaggio-main">
-                  <p style={{ margin: 0, fontSize: 13.5 }}>{m.motivo}</p>
-                  <p style={{ margin: 0, fontSize: 11.5, color: 'var(--mist)' }}>{new Date(m.creatoIl).toLocaleDateString('it-IT')}</p>
+                  <p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>{m.motivo}</p>
+                  <p style={{ margin: 0, fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>{new Date(m.creatoIl).toLocaleDateString('it-IT')}</p>
                 </div>
                 <b style={{ color: 'var(--green)' }}>+{formattaEuro(m.importo)}</b>
               </div>
@@ -325,8 +325,8 @@ function SezioneCredito({ email }: { email: string }) {
             {utilizzati.map((m) => (
               <div key={m.id} className="viaggio-card" style={{ padding: '10px 14px' }}>
                 <div className="viaggio-main">
-                  <p style={{ margin: 0, fontSize: 13.5 }}>{m.motivo}</p>
-                  <p style={{ margin: 0, fontSize: 11.5, color: 'var(--mist)' }}>{new Date(m.creatoIl).toLocaleDateString('it-IT')}</p>
+                  <p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>{m.motivo}</p>
+                  <p style={{ margin: 0, fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>{new Date(m.creatoIl).toLocaleDateString('it-IT')}</p>
                 </div>
                 <b>-{formattaEuro(Math.abs(Number(m.importo)))}</b>
               </div>
@@ -374,10 +374,10 @@ function SezioneInvitaAmico() {
           <div className="panel-box">
             <h2>Il tuo link</h2>
             <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              <input type="text" readOnly value={link} onClick={(e) => (e.target as HTMLInputElement).select()} style={{ flex: '1 1 260px', fontSize: 13 }} />
+              <input type="text" readOnly value={link} onClick={(e) => (e.target as HTMLInputElement).select()} style={{ flex: '1 1 260px', fontSize: 'var(--testo-md)' }} />
               <button type="button" className="btn btn-primary" onClick={copia} style={{ flexShrink: 0 }}>{copiato ? '✓ Copiato' : 'Copia link'}</button>
             </div>
-            <p style={{ color: 'var(--mist)', fontSize: 12.5, marginTop: 10 }}>
+            <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginTop: 10 }}>
               Oppure condividi solo il codice: <b style={{ letterSpacing: 1 }}>{dati.codice}</b>
             </p>
           </div>
@@ -393,8 +393,8 @@ function SezioneInvitaAmico() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {inSospeso.map((i, idx) => (
                   <div key={idx} className="viaggio-card" style={{ padding: '10px 14px' }}>
-                    <div className="viaggio-main"><p style={{ margin: 0, fontSize: 13.5 }}>{i.nome}</p></div>
-                    <span style={{ fontSize: 12, color: 'var(--mist)' }}>Registrato, non ha ancora prenotato</span>
+                    <div className="viaggio-main"><p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>{i.nome}</p></div>
+                    <span style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>Registrato, non ha ancora prenotato</span>
                   </div>
                 ))}
               </div>
@@ -407,7 +407,7 @@ function SezioneInvitaAmico() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {completati.map((i, idx) => (
                   <div key={idx} className="viaggio-card" style={{ padding: '10px 14px' }}>
-                    <div className="viaggio-main"><p style={{ margin: 0, fontSize: 13.5 }}>{i.nome}</p></div>
+                    <div className="viaggio-main"><p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>{i.nome}</p></div>
                     <b style={{ color: 'var(--green)' }}>✓ Bonus ricevuto</b>
                   </div>
                 ))}
@@ -433,14 +433,14 @@ function BloccoConsenso({ titolo, descrizione, valore, onScegli, salvando }: {
   return (
     <div className="panel-box">
       <h2>{titolo}</h2>
-      <p style={{ color: 'var(--mist)', fontSize: 13.5, marginBottom: 10 }}>{descrizione}</p>
+      <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', marginBottom: 10 }}>{descrizione}</p>
       <div style={{ display: 'flex', gap: 10 }}>
         <button
           type="button"
           disabled={salvando}
           onClick={() => onScegli(true)}
           className={`btn ${valore === true ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: 13 }}
+          style={{ fontSize: 'var(--testo-md)' }}
         >
           {valore === true ? '✓ ' : ''}Acconsento
         </button>
@@ -449,12 +449,12 @@ function BloccoConsenso({ titolo, descrizione, valore, onScegli, salvando }: {
           disabled={salvando}
           onClick={() => onScegli(false)}
           className={`btn ${valore === false ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: 13 }}
+          style={{ fontSize: 'var(--testo-md)' }}
         >
           {valore === false ? '✓ ' : ''}Non acconsento
         </button>
       </div>
-      {valore === null && <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 8 }}>Non hai ancora scelto.</p>}
+      {valore === null && <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 8 }}>Non hai ancora scelto.</p>}
     </div>
   );
 }
@@ -484,7 +484,7 @@ function SezionePrivacy({ email }: { email: string }) {
   return (
     <section className="acc-sezione">
       <h1>Preferenze Privacy</h1>
-      <p style={{ color: 'var(--mist)', fontSize: 13.5, marginBottom: 18 }}>
+      <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', marginBottom: 18 }}>
         Rivedi o cambia in qualsiasi momento come usiamo i tuoi dati. Leggi anche la nostra{' '}
         <Link to="/pagina/privacy" style={{ color: 'var(--paper)', textDecoration: 'underline' }}>informativa completa sulla privacy</Link>.
       </p>
@@ -513,7 +513,7 @@ function SezionePrivacy({ email }: { email: string }) {
 
       <div className="panel-box">
         <h2>Cookie</h2>
-        <p style={{ color: 'var(--mist)', fontSize: 13.5, marginBottom: 10 }}>
+        <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', marginBottom: 10 }}>
           Puoi rivedere o cambiare in qualsiasi momento quali cookie hai accettato su questo dispositivo.
         </p>
         <LinkPreferenzeCookie />
@@ -569,14 +569,14 @@ function SezioneDashboard({ email, viaggi, eventiPerId, onNavigare, onAprireViag
       {viaggi !== null && eventoProssimo && prenotazioneProssima && (
         <div className="panel-box" style={{ background: 'linear-gradient(135deg, rgba(255,212,0,.14), rgba(255,212,0,.04))', borderColor: 'var(--pink)' }}>
           {giorniAlViaggio === 0 ? (
-            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 20, color: 'var(--pink)', margin: '0 0 6px' }}>Il tuo viaggio è oggi!</p>
+            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-3xl)', color: 'var(--pink)', margin: '0 0 6px' }}>Il tuo viaggio è oggi!</p>
           ) : giorniAlViaggio === 1 ? (
-            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 20, color: 'var(--pink)', margin: '0 0 6px' }}>Domani si parte!</p>
+            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-3xl)', color: 'var(--pink)', margin: '0 0 6px' }}>Domani si parte!</p>
           ) : (
-            <p style={{ textTransform: 'uppercase', fontSize: 11, letterSpacing: 1, color: 'var(--mist)', margin: '0 0 6px' }}>Il tuo prossimo viaggio</p>
+            <p style={{ textTransform: 'uppercase', fontSize: 'var(--testo-xs)', letterSpacing: 1, color: 'var(--mist)', margin: '0 0 6px' }}>Il tuo prossimo viaggio</p>
           )}
           <h2 style={{ margin: '0 0 4px' }}>{eventoProssimo.artista}</h2>
-          <p style={{ color: 'var(--mist)', fontSize: 13.5, margin: '0 0 14px' }}>
+          <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', margin: '0 0 14px' }}>
             {prenotazioneProssima.fermataCitta}
             {prenotazioneProssima.fermataOrario && ` · ore ${prenotazioneProssima.fermataOrario}`}
             {' → '}{eventoProssimo.citta}
@@ -588,14 +588,14 @@ function SezioneDashboard({ email, viaggi, eventiPerId, onNavigare, onAprireViag
               non serve più a ridosso della partenza, quello che serve
               è sapere cosa fare. */}
           {giorniAlViaggio !== null && giorniAlViaggio <= 1 && giorniAlViaggio >= 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, fontSize: 13 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, fontSize: 'var(--testo-md)' }}>
               <p style={{ margin: '0 0 4px', fontWeight: 600 }}>Ricordati:</p>
               <span>• Arrivare in anticipo rispetto all'orario di partenza</span>
               <span>• Avere un documento d'identità con te</span>
               <span>• Avere la prenotazione a portata di mano (basta questa pagina)</span>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, fontSize: 13 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, fontSize: 'var(--testo-md)' }}>
               <span>✓ Prenotazione confermata</span>
               {prenotazioneProssima.tipoPagamento === 'COMPLETO' || prenotazioneProssima.saldoPagato ? (
                 <span>✓ Pagamento completato</span>
@@ -677,7 +677,7 @@ function SezioneListaAttesa({ email }: { email: string }) {
           </div>
           <div className="viaggio-right">
             <span className="badge attenzione">Sei in lista d'attesa</span>
-            <span style={{ fontSize: 13, color: 'var(--mist)' }}>Posizione #{i.posizione}</span>
+            <span style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>Posizione #{i.posizione}</span>
           </div>
         </div>
       ))}
@@ -829,7 +829,7 @@ function SezioneChat({ email }: { email: string }) {
           <p className="section-label">Conversazioni precedenti</p>
           {chiuse.map((c) => (
             <details key={c.id} style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 10, padding: '10px 14px', marginBottom: 8 }}>
-              <summary style={{ cursor: 'pointer', fontSize: 13 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 'var(--testo-md)' }}>
                 {new Date(c.creataIl).toLocaleDateString('it-IT')} — {c.messaggi.length} messaggi
               </summary>
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>

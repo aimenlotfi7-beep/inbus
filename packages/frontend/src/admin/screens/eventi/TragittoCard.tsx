@@ -61,7 +61,7 @@ export function TragittoCard({
             onClick={(e) => { e.stopPropagation(); onToggleAperto(); }}
             aria-expanded={espansa}
             aria-label={espansa ? 'Chiudi il tragitto' : 'Apri il tragitto'}
-            style={{ background: 'none', border: 'none', color: 'var(--mist)', fontSize: 14, padding: '6px 8px', margin: '-6px 0 -6px -8px', cursor: 'pointer', lineHeight: 1 }}
+            style={{ background: 'none', border: 'none', color: 'var(--mist)', fontSize: 'var(--testo-base)', padding: '6px 8px', margin: '-6px 0 -6px -8px', cursor: 'pointer', lineHeight: 1 }}
           >
             {espansa ? '▾' : '▸'}
           </button>
@@ -83,7 +83,7 @@ export function TragittoCard({
           </div>
         </div>
         <label
-          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--mist)', cursor: 'pointer', flexShrink: 0 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--testo-sm)', color: 'var(--mist)', cursor: 'pointer', flexShrink: 0 }}
           onClick={(e) => e.stopPropagation()}
           title="Disattivato: resta configurato, ma non è più prenotabile sul sito"
         >
@@ -95,7 +95,7 @@ export function TragittoCard({
           />
           Attivo
         </label>
-        <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12.5, flexShrink: 0 }} onClick={onRimuoviTragitto}>Rimuovi tragitto</button>
+        <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 'var(--testo-md)', flexShrink: 0 }} onClick={onRimuoviTragitto}>Rimuovi tragitto</button>
       </div>
 
       {/* Solo qui, nella tab "Tragitti liberi" — un modo diretto per
@@ -107,7 +107,7 @@ export function TragittoCard({
           <select
             value=""
             onChange={(e) => { if (e.target.value) onAggiorna('servizioId', e.target.value); }}
-            style={{ fontSize: 12.5, maxWidth: 260 }}
+            style={{ fontSize: 'var(--testo-md)', maxWidth: 260 }}
           >
             <option value="" disabled>↳ Sposta in un servizio...</option>
             {serviziAssegnabili.map((v) => <option key={v.key} value={v.key}>{v.nome || 'Senza nome'}</option>)}
@@ -122,11 +122,11 @@ export function TragittoCard({
         <InfoTooltip>{mappaTooltip.fermate_orario_intro ?? TOOLTIP_DEFAULT.fermate_orario_intro}</InfoTooltip>
       </p>
 
-      <p style={{ fontSize: 11.5, color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla.</p>
+      <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginBottom: 6 }}>Trascina una fermata per riordinarla.</p>
       {tragitto.fermate.map((f, idxFermata) => (
         <div key={idxFermata} style={{ marginBottom: 6 }}>
           {idxFermata === 0 && (
-            <p style={{ marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--green)' }}>Partenza</p>
+            <p style={{ marginBottom: 4, fontSize: 'var(--testo-lg)', fontWeight: 700, color: 'var(--green)' }}>Partenza</p>
           )}
           <div
             className="riga-fermata"
@@ -140,7 +140,7 @@ export function TragittoCard({
               opacity: trascinata?.tragitto === idxTragitto && trascinata.fermata === idxFermata ? 0.4 : 1, cursor: 'grab',
             }}
           >
-            <span style={{ color: 'var(--mist)', fontSize: 14, textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
+            <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', textAlign: 'center' }} title="Trascina per riordinare">⠿</span>
             {/* !== null da solo non basta — dati salvati prima che
                 il controllo qui sotto intercettasse "__manuale__"
                 potrebbero avere quella stringa letterale scritta
@@ -222,7 +222,7 @@ export function TragittoCard({
             </div>
             <label
               title={f.attivo === false ? 'Fermata esclusa — non compare più nelle Linee né sul sito' : 'Fermata attiva — clicca per escluderla (es. per scarse adesioni), senza doverla rimuovere del tutto'}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: f.attivo === false ? 'var(--pink)' : 'var(--mist)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 'var(--testo-xs)', color: f.attivo === false ? 'var(--pink)' : 'var(--mist)', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               <input type="checkbox" checked={f.attivo !== false} onChange={(e) => onAggiornaFermata(idxFermata, 'attivo', e.target.checked)} style={{ width: 'auto' }} />
               <span className="etichetta-attiva-fermata">{f.attivo === false ? 'Esclusa' : 'Attiva'}</span>
@@ -231,10 +231,10 @@ export function TragittoCard({
           </div>
         </div>
       ))}
-      <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => onAggiungiFermata()}>+ Aggiungi fermata</button>
+      <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} onClick={() => onAggiungiFermata()}>+ Aggiungi fermata</button>
 
       {/* Blu, non rosso: il rosso nel gestionale vuol dire errore/attenzione. */}
-      <p style={{ marginTop: 14, marginBottom: 4, fontSize: 15, fontWeight: 700, color: 'var(--blue)' }}>Arrivo</p>
+      <p style={{ marginTop: 14, marginBottom: 4, fontSize: 'var(--testo-lg)', fontWeight: 700, color: 'var(--blue)' }}>Arrivo</p>
       {(() => {
         // Solo uno stile diverso (leggermente oscurato) per far
         // capire da dove viene il valore — il campo resta

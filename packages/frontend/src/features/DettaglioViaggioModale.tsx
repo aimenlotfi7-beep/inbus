@@ -103,7 +103,7 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
 
         <h1 id={idTitolo} style={{ margin: '10px 0 2px' }}>{ev?.artista ?? 'Evento'}</h1>
         {ev && (
-          <p style={{ color: 'var(--mist)', fontSize: 13.5, margin: 0 }}>
+          <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', margin: 0 }}>
             {new Date(ev.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             {giorniAlViaggio !== null && ev.data >= oggi && (giorniAlViaggio === 0 ? ' · oggi!' : giorniAlViaggio === 1 ? ' · domani!' : ` · tra ${giorniAlViaggio} giorni`)}
           </p>
@@ -111,12 +111,12 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
 
         <div className="travel-route">
           <b>{dettaglio.fermataCitta}</b>
-          {dettaglio.fermataOrario && <span style={{ color: 'var(--mist)', fontSize: 12 }}>{dettaglio.fermataOrario}</span>}
+          {dettaglio.fermataOrario && <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{dettaglio.fermataOrario}</span>}
           <span className="travel-arrow">→</span>
           <b>{ev?.citta}</b>
         </div>
 
-        <p style={{ fontSize: 12.5, color: 'var(--mist)' }}>PNR <span className="pnr-tag">{dettaglio.pnr}</span></p>
+        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>PNR <span className="pnr-tag">{dettaglio.pnr}</span></p>
 
         <p className="section-label" style={{ marginTop: 18 }}>Partecipanti ({dettaglio.passeggeri})</p>
         <div className="travel-partecipanti">
@@ -130,13 +130,13 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
             <p className="section-label" style={{ marginTop: 18 }}>I miei biglietti</p>
             {bigliettoBloccato && oreAllaPartenza !== null ? (
               <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '14px 16px' }}>
-                <p style={{ margin: 0, fontSize: 13.5 }}>
+                <p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>
                   🕒 Il biglietto sarà scaricabile a partire da 24 ore prima della partenza.
                 </p>
-                <p style={{ margin: '6px 0 0', fontSize: 18, fontWeight: 700 }}>
+                <p style={{ margin: '6px 0 0', fontSize: 'var(--testo-2xl)', fontWeight: 700 }}>
                   {formattaConteggio(oreAllaPartenza - 24)}
                 </p>
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--mist)' }}>
+                <p style={{ margin: '4px 0 0', fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>
                   Torna qui più vicino alla data — l'autobus assegnato compare in automatico appena disponibile.
                 </p>
               </div>
@@ -146,7 +146,7 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
                   <div key={b.token} className="travel-biglietto-riga">
                     <span>🎫 {b.nome} {b.cognome}</span>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <a className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 10px', textDecoration: 'none' }} href={ticketApi.urlDownload(b.token)} target="_blank" rel="noreferrer">
+                      <a className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 10px', textDecoration: 'none' }} href={ticketApi.urlDownload(b.token)} target="_blank" rel="noreferrer">
                         Scarica
                       </a>
                       <PulsanteCondividi
@@ -160,7 +160,7 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
                 ))}
               </div>
             ) : (
-              <p style={{ color: 'var(--mist)', fontSize: 13 }}>
+              <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>
                 {pagamentoCompleto
                   ? 'I biglietti sono in preparazione — se non compaiono entro poco, scrivici in chat.'
                   : 'I biglietti saranno disponibili qui non appena il saldo sarà completato.'}

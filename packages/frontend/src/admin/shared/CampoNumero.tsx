@@ -31,7 +31,7 @@ export function CampoNumero({
   return (
     <div style={{ position: 'relative', ...(style as object) }}>
       {valuta && (
-        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', opacity: .55, pointerEvents: 'none', fontSize: 14 }}>
+        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', opacity: .55, pointerEvents: 'none', fontSize: 'var(--testo-base)' }}>
           €
         </span>
       )}

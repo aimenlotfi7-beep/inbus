@@ -79,14 +79,14 @@ export function OffertaPage() {
               <p className="meta-riga">📍 {evento.luogo}, {evento.citta}</p>
               <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
 
-              <p style={{ background: 'rgba(91,224,160,.15)', border: '1px solid rgba(91,224,160,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, display: 'inline-block', marginTop: 10 }}>
+              <p style={{ background: 'rgba(91,224,160,.15)', border: '1px solid rgba(91,224,160,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 'var(--testo-md)', display: 'inline-block', marginTop: 10 }}>
                 -{offerta.scontoPercentuale.toFixed(0)}% su tutte le fermate
               </p>
 
               {prezzoMinimo !== null && (
-                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 22, marginTop: 14 }}>
+                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-4xl)', marginTop: 14 }}>
                   da {formattaEuro(applicaScontoOfferta(prezzoMinimo, offerta.scontoPercentuale))}
-                  <span style={{ fontSize: 13, opacity: .7 }}> invece di {formattaEuro(prezzoMinimo)}</span>
+                  <span style={{ fontSize: 'var(--testo-md)', opacity: .7 }}> invece di {formattaEuro(prezzoMinimo)}</span>
                 </p>
               )}
 

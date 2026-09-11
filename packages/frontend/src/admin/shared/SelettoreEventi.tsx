@@ -50,7 +50,7 @@ export function SelettoreEventi({ selezionati, onChange }: { selezionati: string
           aria-label={espanso ? 'Comprimi elenco eventi' : 'Espandi elenco eventi'}
           style={{
             flexShrink: 0, width: 38, height: 38, borderRadius: 8, border: '1px solid var(--line)',
-            background: 'var(--dusk)', color: 'var(--mist)', cursor: 'pointer', fontSize: 12,
+            background: 'var(--dusk)', color: 'var(--mist)', cursor: 'pointer', fontSize: 'var(--testo-sm)',
             transform: espanso ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease',
           }}
         >
@@ -60,22 +60,22 @@ export function SelettoreEventi({ selezionati, onChange }: { selezionati: string
 
       {espanso && (
         <div style={{ height: 220, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 10, padding: '6px 4px' }}>
-          {daMostrare.length === 0 && <p style={{ fontSize: 12.5, color: 'var(--mist)', padding: '8px 10px' }}>Nessun evento trovato.</p>}
+          {daMostrare.length === 0 && <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', padding: '8px 10px' }}>Nessun evento trovato.</p>}
           {daMostrare.map((e) => (
-            <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 13, cursor: 'pointer' }}>
+            <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 'var(--testo-md)', cursor: 'pointer' }}>
               <input type="checkbox" checked={selezionati.includes(e.id)} onChange={() => toggle(e.id)} />
               <span>{e.artista} — {e.citta}, {new Date(e.data).toLocaleDateString('it-IT')}</span>
             </label>
           ))}
           {altreNascoste > 0 && (
-            <p style={{ fontSize: 11.5, color: 'var(--mist)', padding: '8px 10px', fontStyle: 'italic' }}>
+            <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', padding: '8px 10px', fontStyle: 'italic' }}>
               + altri {altreNascoste} eventi — restringi la ricerca per trovarli.
             </p>
           )}
         </div>
       )}
 
-      <p style={{ fontSize: 11.5, color: 'var(--mist)', marginTop: 6 }}>{selezionati.length} event{selezionati.length === 1 ? 'o' : 'i'} selezionat{selezionati.length === 1 ? 'o' : 'i'}.</p>
+      <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 6 }}>{selezionati.length} event{selezionati.length === 1 ? 'o' : 'i'} selezionat{selezionati.length === 1 ? 'o' : 'i'}.</p>
     </div>
   );
 }

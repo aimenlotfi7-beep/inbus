@@ -131,14 +131,14 @@ export function ImpostazioniScreen() {
               fermata dal costo del fornitore. */}
           <div className="section-card" style={{ borderColor: 'var(--blue)' }}>
             <p className="section-label" style={{ marginBottom: 4 }}>Formula di calcolo prezzi</p>
-            <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 12, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginBottom: 12, lineHeight: 1.5 }}>
               Usata dal pulsante "Calcola preventivo" per suggerire il prezzo di ogni fermata, partendo dal costo del fornitore:
               <br />
-              <code style={{ fontSize: 11.5 }}>Posti di pareggio = Posti bus × Soglia di occupazione</code>
+              <code style={{ fontSize: 'var(--testo-sm)' }}>Posti di pareggio = Posti bus × Soglia di occupazione</code>
               <br />
-              <code style={{ fontSize: 11.5 }}>Prezzo minimo = Costo bus ÷ Posti di pareggio</code>
+              <code style={{ fontSize: 'var(--testo-sm)' }}>Prezzo minimo = Costo bus ÷ Posti di pareggio</code>
               <br />
-              <code style={{ fontSize: 11.5 }}>Prezzo fermata = Prezzo minimo + (tariffa al km × km fino all'arrivo)</code>
+              <code style={{ fontSize: 'var(--testo-sm)' }}>Prezzo fermata = Prezzo minimo + (tariffa al km × km fino all'arrivo)</code>
               <br />
               Nessuna fermata scende mai sotto il prezzo minimo — chi sale più lontano dall'arrivo paga di più.
             </p>

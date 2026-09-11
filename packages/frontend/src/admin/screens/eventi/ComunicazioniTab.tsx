@@ -83,7 +83,7 @@ export function ComunicazioniTab({ evento }: { evento: Evento }) {
       <div className="section-card" style={{ marginBottom: 16 }}>
         <p className="section-label" style={{ marginBottom: 10 }}>A chi</p>
 
-        <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 6 }}>
+        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 6 }}>
           Servizi (nessuno selezionato = tutto l'evento)
         </p>
         {evento.servizi.length > 0 ? (
@@ -96,10 +96,10 @@ export function ComunicazioniTab({ evento }: { evento: Evento }) {
             ))}
           </div>
         ) : (
-          <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 14 }}>Questo evento non ha servizi distinti.</p>
+          <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 14 }}>Questo evento non ha servizi distinti.</p>
         )}
 
-        <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 6 }}>Tratta specifica (facoltativo)</p>
+        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 6 }}>Tratta specifica (facoltativo)</p>
         <select value={tragittoId} onChange={(e) => setTragittoId(e.target.value)} style={{ marginBottom: 14 }}>
           <option value="">Tutte le tratte {servizioIds.length === 1 ? 'di questo servizio' : ''}</option>
           {tratteDisponibili.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
@@ -107,7 +107,7 @@ export function ComunicazioniTab({ evento }: { evento: Evento }) {
 
         {tragittoScelto && tragittoScelto.fermate.length > 0 && (
           <>
-            <p style={{ fontSize: 12.5, color: 'var(--mist)', marginBottom: 6 }}>Fermata specifica (facoltativo)</p>
+            <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 6 }}>Fermata specifica (facoltativo)</p>
             <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
               <option value="">Tutte le fermate della tratta</option>
               {tragittoScelto.fermate.map((f) => <option key={f.id} value={f.id}>{f.citta} — {f.indirizzo}</option>)}
@@ -115,7 +115,7 @@ export function ComunicazioniTab({ evento }: { evento: Evento }) {
           </>
         )}
 
-        <p style={{ fontSize: 13, marginTop: 14, fontWeight: 600 }}>
+        <p style={{ fontSize: 'var(--testo-md)', marginTop: 14, fontWeight: 600 }}>
           {calcolando ? 'Calcolo...' : `${numeroDestinatari ?? 0} destinatari${numeroDestinatari === 1 ? 'o' : ''}`}
         </p>
       </div>
@@ -125,15 +125,15 @@ export function ComunicazioniTab({ evento }: { evento: Evento }) {
         <input placeholder="Oggetto" value={oggetto} onChange={(e) => setOggetto(e.target.value)} style={{ marginBottom: 10 }} />
         <textarea placeholder="Testo del messaggio..." value={corpo} onChange={(e) => setCorpo(e.target.value)} rows={5} style={{ width: '100%', marginBottom: 10 }} />
         <div style={{ display: 'flex', gap: 16, marginBottom: 14 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--testo-md)' }}>
             <input type="checkbox" checked={canaleEmail} onChange={(e) => setCanaleEmail(e.target.checked)} /> Email
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--testo-md)' }}>
             <input type="checkbox" checked={canaleChat} onChange={(e) => setCanaleChat(e.target.checked)} /> Chat (nella loro conversazione di questo evento)
           </label>
         </div>
-        {errore && <p style={{ color: 'var(--pink)', fontSize: 13, marginBottom: 10 }}>{errore}</p>}
-        {fatto && <p style={{ color: 'var(--green)', fontSize: 13, marginBottom: 10 }}>✓ Comunicazione inviata.</p>}
+        {errore && <p style={{ color: 'var(--pink)', fontSize: 'var(--testo-md)', marginBottom: 10 }}>{errore}</p>}
+        {fatto && <p style={{ color: 'var(--green)', fontSize: 'var(--testo-md)', marginBottom: 10 }}>✓ Comunicazione inviata.</p>}
         <button className="btn btn-primary" onClick={invia} disabled={inviando || numeroDestinatari === 0}>
           {inviando ? 'Invio...' : `Invia a ${numeroDestinatari ?? 0} client${numeroDestinatari === 1 ? 'e' : 'i'}`}
         </button>
@@ -141,12 +141,12 @@ export function ComunicazioniTab({ evento }: { evento: Evento }) {
 
       <div className="section-card">
         <p className="section-label" style={{ marginBottom: 10 }}>Storico comunicazioni</p>
-        {caricamentoStorico && <p style={{ fontSize: 13, color: 'var(--mist)' }}>Carico...</p>}
-        {!caricamentoStorico && storico.length === 0 && <p style={{ fontSize: 13, color: 'var(--mist)' }}>Nessuna comunicazione inviata ancora per questo evento.</p>}
+        {caricamentoStorico && <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>Carico...</p>}
+        {!caricamentoStorico && storico.length === 0 && <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>Nessuna comunicazione inviata ancora per questo evento.</p>}
         {storico.map((c) => (
           <div key={c.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--line)' }}>
-            <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>{c.oggetto}</p>
-            <p style={{ fontSize: 12, color: 'var(--mist)', margin: '2px 0 0' }}>
+            <p style={{ fontWeight: 600, fontSize: 'var(--testo-base)', margin: 0 }}>{c.oggetto}</p>
+            <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', margin: '2px 0 0' }}>
               {new Date(c.creataIl).toLocaleString('it-IT')} · {c.numeroDestinatari} destinatari · {c.canali.join(' + ')}
             </p>
           </div>

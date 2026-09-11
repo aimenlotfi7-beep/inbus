@@ -17,7 +17,7 @@ export interface SerieGrafico {
 export function GraficoLinee({ serie, altezza = 220 }: { serie: SerieGrafico[]; altezza?: number }) {
   const tutteLeX = [...new Set(serie.flatMap((s) => s.punti.map((p) => p.x)))].sort();
   if (tutteLeX.length === 0 || serie.every((s) => s.punti.length === 0)) {
-    return <p style={{ color: 'var(--mist)', fontSize: 12.5 }}>Nessun dato ancora per il grafico.</p>;
+    return <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>Nessun dato ancora per il grafico.</p>;
   }
 
   const larghezza = 600;
@@ -61,7 +61,7 @@ export function GraficoLinee({ serie, altezza = 220 }: { serie: SerieGrafico[]; 
       </svg>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginTop: 6 }}>
         {serie.map((s, idx) => (
-          <span key={s.nome} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--mist)' }}>
+          <span key={s.nome} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>
             <span style={{ width: 9, height: 9, borderRadius: '50%', background: PALETTE[idx % PALETTE.length], flexShrink: 0 }} />
             {s.nome}
           </span>

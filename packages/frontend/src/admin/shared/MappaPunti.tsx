@@ -92,7 +92,7 @@ export function MappaPunti({ punti }: { punti: PuntoMappa[] }) {
       {stato === 'carico' && <p style={{ color: 'var(--mist)' }}>Cerco i punti sulla cartina...</p>}
       {stato === 'errore' && <p style={{ color: 'var(--pink)' }}>Non riesco a mostrare la cartina — nessun punto trovato con un indirizzo o città valida.</p>}
       {nonTrovati.length > 0 && (
-        <p style={{ color: 'var(--amber)', fontSize: 12.5, marginBottom: 8 }}>Non trovati sulla cartina: {nonTrovati.join(', ')}.</p>
+        <p style={{ color: 'var(--amber)', fontSize: 'var(--testo-md)', marginBottom: 8 }}>Non trovati sulla cartina: {nonTrovati.join(', ')}.</p>
       )}
       <div ref={contenitoreRef} style={{ height: 420, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--line)' }} />
     </div>

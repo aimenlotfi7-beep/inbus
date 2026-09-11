@@ -33,7 +33,7 @@ export function RichiediResetGenerico({ onRichiedi, linkIndietro, titoloExtra }:
         </p>
 
         {inviato ? (
-          <p style={{ fontSize: 14 }}>✓ Controlla la posta (anche lo spam) — il link resta valido per un paio d'ore.</p>
+          <p style={{ fontSize: 'var(--testo-base)' }}>✓ Controlla la posta (anche lo spam) — il link resta valido per un paio d'ore.</p>
         ) : (
           <>
             <label>Email</label>

@@ -53,10 +53,10 @@ export function StepImmagini({ form, setForm, inCreazione, layoutDisponibili, ma
                 controllare che fosse l'immagine giusta (o che si caricasse). */}
             <img src={url} alt="" style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0, background: 'var(--dusk-2)' }} />
             <span className="riga-titolo" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</span>
-            <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 12 }} onClick={() => rimuoviImmagine(idx)}>Rimuovi</button>
+            <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 'var(--testo-sm)' }} onClick={() => rimuoviImmagine(idx)}>Rimuovi</button>
           </div>
         ))}
-        {(form.immagini ?? []).length === 0 && <p className="testo-intro" style={{ fontSize: 13 }}>Nessuna immagine ancora — ne serve almeno una per creare l'evento.</p>}
+        {(form.immagini ?? []).length === 0 && <p className="testo-intro" style={{ fontSize: 'var(--testo-md)' }}>Nessuna immagine ancora — ne serve almeno una per creare l'evento.</p>}
       </>
     )}
 

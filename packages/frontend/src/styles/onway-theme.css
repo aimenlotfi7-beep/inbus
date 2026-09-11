@@ -344,7 +344,7 @@ footer{ background:#0A0C10; }
   font-family:'Poppins', sans-serif;
 }
 .pagina-partner header{ background:var(--ow-night); color:var(--ow-paper); border-bottom-color:rgba(247,245,241,.1); }
-.pagina-partner .logo{ font-size:22px; color:var(--ow-paper); }
+.pagina-partner .logo{ font-size:var(--testo-4xl); color:var(--ow-paper); }
 .pagina-partner .logo span{ color:inherit; }
 .pagina-partner .stat-box b{ color:var(--ow-ink); font-weight:800; }
 .pagina-partner .mini-tab{ color:var(--ow-muted-ink); border-color:var(--ow-line-ink); }

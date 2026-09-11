@@ -51,7 +51,7 @@ export function AdminLogin({ onLogin, messaggioIniziale }: { onLogin: (sessione:
           {caricamento ? 'Accesso...' : 'Accedi'}
         </button>
         {errore && <p className="error-msg">{errore}</p>}
-        <button type="button" className="btn btn-ghost" style={{ marginTop: 10, fontSize: 12.5 }} onClick={() => setVista('richiedi-reset')}>
+        <button type="button" className="btn btn-ghost" style={{ marginTop: 10, fontSize: 'var(--testo-md)' }} onClick={() => setVista('richiedi-reset')}>
           Password dimenticata?
         </button>
       </form>
@@ -81,14 +81,14 @@ function RichiediReset({ onIndietro }: { onIndietro: () => void }) {
         <div className="logo"><LogoOnWay come="testo" variante="nera" /> <small>gestionale</small></div>
         <p>Scrivi la tua email: se corrisponde a un account, ti mandiamo un link per scegliere una nuova password.</p>
         {inviato ? (
-          <p style={{ fontSize: 13.5 }}>✓ Controlla la posta (anche lo spam).</p>
+          <p style={{ fontSize: 'var(--testo-base)' }}>✓ Controlla la posta (anche lo spam).</p>
         ) : (
           <>
             <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <button className="btn btn-primary" type="submit" disabled={caricamento}>{caricamento ? 'Invio...' : 'Invia link'}</button>
           </>
         )}
-        <button type="button" className="btn btn-ghost" style={{ marginTop: 10, fontSize: 12.5 }} onClick={onIndietro}>← Torna al login</button>
+        <button type="button" className="btn btn-ghost" style={{ marginTop: 10, fontSize: 'var(--testo-md)' }} onClick={onIndietro}>← Torna al login</button>
       </form>
     </div>
   );
@@ -123,7 +123,7 @@ function NuovaPassword({ token, onFatto }: { token: string; onFatto: () => void 
         <div className="logo"><LogoOnWay come="testo" variante="nera" /> <small>gestionale</small></div>
         {fatto ? (
           <>
-            <p style={{ fontSize: 13.5 }}>✓ Fatto — la tua password è stata cambiata.</p>
+            <p style={{ fontSize: 'var(--testo-base)' }}>✓ Fatto — la tua password è stata cambiata.</p>
             <button className="btn btn-primary" onClick={onFatto}>Vai al login</button>
           </>
         ) : (

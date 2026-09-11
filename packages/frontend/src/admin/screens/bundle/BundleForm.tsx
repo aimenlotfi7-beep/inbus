@@ -218,7 +218,7 @@ function BundleEventi({ form, agg, nonVendibili }: { form: BundleInput; agg: (p:
         </div>
       )}
       {nonVendibili.length > 0 && (
-        <p style={{ marginTop: 10, fontSize: 13, color: 'var(--amber)' }}>
+        <p style={{ marginTop: 10, fontSize: 'var(--testo-md)', color: 'var(--amber)' }}>
           ⚠ {nonVendibili.length} evento/i del bundle non {nonVendibili.length === 1 ? 'è' : 'sono'} al momento vendibil{nonVendibili.length === 1 ? 'e' : 'i'} (nessun tragitto prezzato con posti, o evento passato/eliminato): {nonVendibili.map((e) => e.artista).join(', ')}.
           {form.tipo === 'FISSO' ? ' Un bundle fisso con un evento non vendibile non è acquistabile.' : ''}
         </p>

@@ -75,7 +75,7 @@ export function TracciamentoScreen() {
                   value={valori[c.chiave] ?? ''}
                   onChange={(e) => setValori((v) => ({ ...v, [c.chiave]: e.target.value }))}
                 />
-                <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 6 }}>{c.nota}</p>
+                <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 6 }}>{c.nota}</p>
               </div>
               <button className="btn btn-ghost" onClick={() => salva(c.chiave)} disabled={salvataggio === c.chiave}>
                 {salvataggio === c.chiave ? 'Salvataggio...' : 'Salva'}

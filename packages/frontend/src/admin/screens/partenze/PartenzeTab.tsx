@@ -601,7 +601,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
               <button key={v.key} type="button" className={`mini-tab${servizioAttivo === v.key ? ' active' : ''}`} onClick={() => setServizioAttivo(v.key)}>
                 {v.nome}
                 {nonCopertiQui > 0 && (
-                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 10.5, padding: '1px 6px', fontWeight: 700 }}>
+                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 'var(--testo-xs)', padding: '1px 6px', fontWeight: 700 }}>
                     {nonCopertiQui}
                   </span>
                 )}
@@ -614,7 +614,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
               <button type="button" className={`mini-tab${servizioAttivo === 'liberi' ? ' active' : ''}`} onClick={() => setServizioAttivo('liberi')}>
                 Tragitti liberi
                 {nonCopertiLiberi > 0 && (
-                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 10.5, padding: '1px 6px', fontWeight: 700 }}>
+                  <span style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 'var(--testo-xs)', padding: '1px 6px', fontWeight: 700 }}>
                     {nonCopertiLiberi}
                   </span>
                 )}
@@ -752,24 +752,24 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 <span className={`badge ${stato.classe === 'coperta' ? 'badge-stato-verde' : stato.classe === 'attenzione' ? 'badge-stato-arancio' : stato.classe === 'non-coperta' ? 'badge-stato-rosso' : stato.classe}`}>{stato.etichetta}</span>
               )}
               {tragitto.stato === 'PREZZATO' && (
-                <span style={{ fontSize: 10.5, color: 'var(--mist)' }}>Prezzato, bus vero ancora da opzionare</span>
+                <span style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)' }}>Prezzato, bus vero ancora da opzionare</span>
               )}
               {!contestoPartenze && (
                 <>
                   <button
-                    type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }}
+                    type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px' }}
                     onClick={(e) => { e.stopPropagation(); apriModificaOperativa(tragitto); }}
                   >
                     Modifica orario/prezzo/posti
                   </button>
                   <button
-                    type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }}
+                    type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px' }}
                     onClick={(e) => { e.stopPropagation(); apriPaginaLinee(tragitto.tragittoId); }}
                   >
                     Gestisci Linee{busTragitto.length > 0 ? ` (${busTragitto.length})` : ''}
                   </button>
                   <button
-                    type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px', borderColor: 'var(--pink-dim)', color: 'var(--pink)' }}
+                    type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px', borderColor: 'var(--pink-dim)', color: 'var(--pink)' }}
                     onClick={(e) => { e.stopPropagation(); apriPreventivo(tragitto.tragittoId); }}
                   >
                     {tragitto.stato === 'DA_CONFERMARE' ? 'Registra preventivo' : 'Vedi/modifica preventivo'}
@@ -795,18 +795,18 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
                   <p className="section-label" style={{ marginBottom: 0 }}>Fermate</p>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => calcolaOrariDaArrivo(tragitto.tragittoId)} disabled={calcolandoOrari}>
+                    <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} onClick={() => calcolaOrariDaArrivo(tragitto.tragittoId)} disabled={calcolandoOrari}>
                       {calcolandoOrari ? 'Calcolo orari...' : '↻ Calcola orari dall\'arrivo'}
                     </button>
                     <button
-                      type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }}
+                      type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }}
                       onClick={() => esportaFermateCsv(tragitto.nome, formOperativo.fermate)}
                     >
                       ⤓ Esporta CSV per il fornitore
                     </button>
                   </div>
                 </div>
-                {statoCalcoloOrari && <p className="testo-intro" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>{statoCalcoloOrari}</p>}
+                {statoCalcoloOrari && <p className="testo-intro" style={{ fontSize: 'var(--testo-sm)', marginTop: -4, marginBottom: 10 }}>{statoCalcoloOrari}</p>}
                 {formOperativo.fermate.map((f, idx) => {
                   const chiaveEspanso = `${tragitto.tragittoId}::${idx}`;
                   const espansa = fermateIndirizzoEspanso.has(chiaveEspanso);
@@ -826,9 +826,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                         title="Doppio tap per modificare l'indirizzo"
                         style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 6, cursor: 'pointer' }}
                       >
-                        <span style={{ fontSize: 13.5, flexShrink: 0 }}>{f.citta}</span>
+                        <span style={{ fontSize: 'var(--testo-base)', flexShrink: 0 }}>{f.citta}</span>
                         {!espansa && (
-                          <span style={{ fontSize: 12, color: 'var(--mist)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             — {f.indirizzo || 'nessun indirizzo'}
                           </span>
                         )}
@@ -839,7 +839,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                         <OrarioInput value={f.orario ?? ''} onChange={(v) => aggiornaFermataOperativa(tragitto.tragittoId, idx, 'orario', v)} style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }} />
                       </div>
                       <button
-                        type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
+                        type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 'var(--testo-xs)', padding: '2px 8px', flexShrink: 0 }}
                         onClick={() => setFormOperativoMap((prev) => {
                           const f2 = prev.get(tragitto.tragittoId);
                           if (!f2) return prev;
@@ -855,7 +855,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                         onChange={(e) => aggiornaFermataOperativa(tragitto.tragittoId, idx, 'indirizzo', e.target.value)}
                         placeholder="Indirizzo"
                         autoFocus
-                        style={{ width: '100%', marginTop: 6, fontSize: 12.5, padding: '4px 8px' }}
+                        style={{ width: '100%', marginTop: 6, fontSize: 'var(--testo-md)', padding: '4px 8px' }}
                       />
                     )}
                   </div>
@@ -901,7 +901,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                     Preventivo
                     <InfoTooltip>{mappaTooltip.preventivo_form_intro ?? TOOLTIP_DEFAULT.preventivo_form_intro}</InfoTooltip>
                   </p>
-                  <button type="button" className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={() => calcolaPrezziPreventivo(tragitto.tragittoId)} disabled={calcolandoPreventivo}>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} onClick={() => calcolaPrezziPreventivo(tragitto.tragittoId)} disabled={calcolandoPreventivo}>
                     {calcolandoPreventivo ? 'Calcolo prezzi...' : '↻ Calcola prezzi per fermata'}
                   </button>
                 </div>
@@ -914,21 +914,21 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                     Preventivi. */}
                 <div className="section-card" style={{ marginBottom: 16, background: 'var(--dusk-2)' }}>
                   <div className="form-grid">
-                    <div><span style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase' }}>Costo del preventivo</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{formPreventivo.costo != null ? formattaEuro(formPreventivo.costo) : '—'}</p></div>
-                    <div><span style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase' }}>Posti presunti del bus</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{formPreventivo.postiBus ?? '—'}</p></div>
-                    <div><span style={{ fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase' }}>Fornitore</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{fornitoriLista.find((f) => f.id === formPreventivo.fornitoreId)?.nome ?? '— Nessuno indicato —'}</p></div>
+                    <div><span style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase' }}>Costo del preventivo</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{formPreventivo.costo != null ? formattaEuro(formPreventivo.costo) : '—'}</p></div>
+                    <div><span style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase' }}>Posti presunti del bus</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{formPreventivo.postiBus ?? '—'}</p></div>
+                    <div><span style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase' }}>Fornitore</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{fornitoriLista.find((f) => f.id === formPreventivo.fornitoreId)?.nome ?? '— Nessuno indicato —'}</p></div>
                   </div>
-                  <p style={{ fontSize: 12, color: 'var(--mist)', marginTop: 8, marginBottom: 0 }}>Per cambiare costo o fornitore, vai nella sezione Preventivi di questo tragitto.</p>
+                  <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 8, marginBottom: 0 }}>Per cambiare costo o fornitore, vai nella sezione Preventivi di questo tragitto.</p>
                 </div>
                 {/* A calcolo finito resta un messaggio solo se qualcosa non va:
                     in rosso, non più in grigio chiaro a 12px come una nota qualunque. */}
-                {statoCalcoloPreventivo && <p className="testo-intro" role={calcolandoPreventivo ? undefined : 'alert'} style={{ fontSize: 13, marginTop: -4, marginBottom: 12, ...(calcolandoPreventivo ? {} : { color: 'var(--pink)', fontWeight: 600 }) }}>{statoCalcoloPreventivo}</p>}
+                {statoCalcoloPreventivo && <p className="testo-intro" role={calcolandoPreventivo ? undefined : 'alert'} style={{ fontSize: 'var(--testo-md)', marginTop: -4, marginBottom: 12, ...(calcolandoPreventivo ? {} : { color: 'var(--pink)', fontWeight: 600 }) }}>{statoCalcoloPreventivo}</p>}
                 {prezziCalcolati && prezziCalcolati.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
                     <p className="section-label" style={{ marginBottom: 8 }}>Prezzi calcolati — controllali (e correggili se serve) prima di confermare</p>
                     {prezziCalcolati.map((p) => (
-                      <div key={p.fermataId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
-                        <span>{p.citta} <span style={{ color: 'var(--mist)', fontSize: 12 }}>({p.distanza >= 0 ? `${p.distanza} km dall'arrivo` : 'distanza da ricalcolare'})</span></span>
+                      <div key={p.fermataId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 'var(--testo-base)' }}>
+                        <span>{p.citta} <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>({p.distanza >= 0 ? `${p.distanza} km dall'arrivo` : 'distanza da ricalcolare'})</span></span>
                         {/* Modificabile a mano: prima il prezzo calcolato si poteva solo accettare così com'era. */}
                         <CampoNumero
                           valuta
@@ -975,7 +975,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
               <div style={{ marginTop: 14 }}>
                 <p className="section-label" style={{ marginBottom: 8 }}>Partenza</p>
                 {partenzaVero ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 'var(--testo-base)', marginBottom: 14 }}>
                     <span>{partenzaVero.citta}</span>
                     <span style={{ color: partenzaVero.orario ? 'var(--mist)' : 'var(--pink)' }}>{partenzaVero.orario ?? 'orario mancante'}</span>
                   </div>
@@ -985,7 +985,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 {fermateIntermedie.length === 0
                   ? <p className="testo-intro">Nessuna fermata intermedia — si va dritti dalla partenza all'arrivo.</p>
                   : fermateIntermedie.map((f) => (
-                    <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
+                    <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 'var(--testo-base)' }}>
                       <span>{f.citta}</span>
                       <span style={{ color: 'var(--mist)' }}>{f.orario ?? '— orario non impostato'}</span>
                     </div>
@@ -999,7 +999,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                     indovinare o tornare su Eventi per controllare. */}
                 <p className="section-label" style={{ marginTop: 14, marginBottom: 8 }}>Arrivo</p>
                 {tragittoVero?.arrivoCitta || tragittoVero?.arrivoIndirizzo || tragittoVero?.arrivoOrario ? (
-                  <p style={{ fontSize: 13.5 }}>
+                  <p style={{ fontSize: 'var(--testo-base)' }}>
                     {tragittoVero.arrivoCitta || '— città mancante'}
                     {tragittoVero.arrivoIndirizzo && ` — ${tragittoVero.arrivoIndirizzo}`}
                     {' · '}
@@ -1008,7 +1008,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                     </span>
                   </p>
                 ) : (
-                  <p style={{ color: 'var(--pink)', fontSize: 13.5 }}>Non impostato — vai su Eventi, nella scheda di questo tragitto, per scriverlo.</p>
+                  <p style={{ color: 'var(--pink)', fontSize: 'var(--testo-base)' }}>Non impostato — vai su Eventi, nella scheda di questo tragitto, per scriverlo.</p>
                 )}
                 <button type="button" className="btn btn-ghost" style={{ marginTop: 10 }} onClick={() => apriModificaOperativa(tragitto)}>Modifica</button>
               </div>
@@ -1023,10 +1023,10 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
               <div style={{ marginTop: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <p className="section-label" style={{ margin: 0 }}>Preventivo</p>
-                  {tragitto.stato !== 'DA_CONFERMARE' && <span style={{ background: 'var(--green)', color: '#fff', padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>✓ Prezzato</span>}
+                  {tragitto.stato !== 'DA_CONFERMARE' && <span style={{ background: 'var(--green)', color: '#fff', padding: '2px 9px', borderRadius: 999, fontSize: 'var(--testo-xs)', fontWeight: 700 }}>✓ Prezzato</span>}
                 </div>
                 {tv?.preventivoCosto
-                  ? <p style={{ fontSize: 13.5, marginBottom: 12 }}>{formattaEuro(tv.preventivoCosto, { senzaDecimali: true })} · {tv.preventivoPostiBus ?? '—'} posti presunti</p>
+                  ? <p style={{ fontSize: 'var(--testo-base)', marginBottom: 12 }}>{formattaEuro(tv.preventivoCosto, { senzaDecimali: true })} · {tv.preventivoPostiBus ?? '—'} posti presunti</p>
                   : <p className="testo-intro" style={{ marginBottom: 12 }}>Nessun preventivo ancora registrato.</p>}
                 <p className="section-label" style={{ marginBottom: 8 }}>Fermate — orario e prezzo ({tv ? tv.fermate.filter((f) => f.attivo !== false).length : 0})</p>
                 {/* Colonne vere (grid), non flex space-between: con testi di
@@ -1036,11 +1036,11 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 {!tv || tv.fermate.length === 0
                   ? <p className="testo-intro">Nessuna fermata su questo tragitto.</p>
                   : <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 130px', gap: 10, padding: '4px 0', fontSize: 11, color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .3 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 130px', gap: 10, padding: '4px 0', fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .3 }}>
                       <span>Città</span><span>Orario</span><span>Prezzo</span>
                     </div>
                     {tv.fermate.map((f) => (
-                      <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 130px', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 13.5 }}>
+                      <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 130px', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 'var(--testo-base)' }}>
                         <span>{f.citta}</span>
                         <span style={{ color: f.orario ? 'var(--mist)' : 'var(--pink)' }}>{f.orario ?? 'non impostato'}</span>
                         <span style={{ fontWeight: 600, color: f.prezzo ? undefined : 'var(--pink)' }}>{f.prezzo ? formattaEuro(f.prezzo) : 'non impostato'}</span>
@@ -1090,28 +1090,28 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
             return (
               <div style={{ marginTop: 14 }}>
                 <div style={rigaStile}>
-                  <div><strong style={{ fontSize: 13.5 }}>Fermate</strong> <span style={{ color: 'var(--mist)', fontSize: 13 }}>· {tragitto.fermate.length} fermate</span></div>
-                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }} onClick={() => apriModificaOperativa(tragitto)}>Modifica</button>
+                  <div><strong style={{ fontSize: 'var(--testo-base)' }}>Fermate</strong> <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>· {tragitto.fermate.length} fermate</span></div>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px' }} onClick={() => apriModificaOperativa(tragitto)}>Modifica</button>
                 </div>
                 <div style={rigaStile}>
                   <div>
-                    <strong style={{ fontSize: 13.5 }}>Preventivo</strong>{' '}
-                    <span style={{ color: 'var(--mist)', fontSize: 13 }}>
+                    <strong style={{ fontSize: 'var(--testo-base)' }}>Preventivo</strong>{' '}
+                    <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>
                       · {tragittoVero?.preventivoCosto ? `${formattaEuro(tragittoVero.preventivoCosto, { senzaDecimali: true })} · ${tragittoVero.preventivoPostiBus ?? '—'} posti presunti` : 'non registrato'}
                     </span>
                   </div>
-                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }} onClick={() => apriPreventivo(tragitto.tragittoId)}>Modifica</button>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px' }} onClick={() => apriPreventivo(tragitto.tragittoId)}>Modifica</button>
                 </div>
                 <div style={rigaStile}>
-                  <div><strong style={{ fontSize: 13.5 }}>Linee</strong> <span style={{ color: 'var(--mist)', fontSize: 13 }}>· {linee.length} Linee · {busNelleLinee.length} bus · {postiNelleLinee} posti</span></div>
-                  <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5, padding: '3px 10px' }} onClick={() => apriPaginaLinee(tragitto.tragittoId)}>Modifica</button>
+                  <div><strong style={{ fontSize: 'var(--testo-base)' }}>Linee</strong> <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>· {linee.length} Linee · {busNelleLinee.length} bus · {postiNelleLinee} posti</span></div>
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px' }} onClick={() => apriPaginaLinee(tragitto.tragittoId)}>Modifica</button>
                 </div>
                 {vedeEconomia && dati && (
                   <div style={{ ...rigaStile, borderBottom: dati.perLinea.length > 1 ? '1px solid var(--line)' : 'none' }}>
                     <div>
-                      <strong style={{ fontSize: 13.5 }}>Costo</strong>{' '}
-                      <span style={{ color: '#5be0a0', fontSize: 13 }}>· Incassato {formattaEuro(dati.incassato)}</span>
-                      {dati.costoCensito && <span style={{ color: dati.guadagno >= 0 ? '#5be0a0' : 'var(--pink)', fontSize: 13 }}> · Guadagno {formattaEuro(dati.guadagno)}</span>}
+                      <strong style={{ fontSize: 'var(--testo-base)' }}>Costo</strong>{' '}
+                      <span style={{ color: '#5be0a0', fontSize: 'var(--testo-md)' }}>· Incassato {formattaEuro(dati.incassato)}</span>
+                      {dati.costoCensito && <span style={{ color: dati.guadagno >= 0 ? '#5be0a0' : 'var(--pink)', fontSize: 'var(--testo-md)' }}> · Guadagno {formattaEuro(dati.guadagno)}</span>}
                     </div>
                   </div>
                 )}
@@ -1124,9 +1124,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato }: 
                 {vedeEconomia && dati && dati.perLinea.length > 1 && dati.perLinea.map((pl, idx) => (
                   <div key={pl.lineaId} style={{ ...rigaStile, paddingLeft: 14, borderBottom: idx === dati.perLinea.length - 1 ? 'none' : '1px solid var(--line)' }}>
                     <div>
-                      <span style={{ fontSize: 12.5, color: 'var(--mist)' }}>{pl.lineaNome}</span>{' '}
-                      <span style={{ color: '#5be0a0', fontSize: 12.5 }}>· Incassato {formattaEuro(pl.incassato)}</span>
-                      {pl.costoCensito && <span style={{ color: pl.guadagno >= 0 ? '#5be0a0' : 'var(--pink)', fontSize: 12.5 }}> · Guadagno {formattaEuro(pl.guadagno)}</span>}
+                      <span style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>{pl.lineaNome}</span>{' '}
+                      <span style={{ color: '#5be0a0', fontSize: 'var(--testo-md)' }}>· Incassato {formattaEuro(pl.incassato)}</span>
+                      {pl.costoCensito && <span style={{ color: pl.guadagno >= 0 ? '#5be0a0' : 'var(--pink)', fontSize: 'var(--testo-md)' }}> · Guadagno {formattaEuro(pl.guadagno)}</span>}
                     </div>
                   </div>
                 ))}

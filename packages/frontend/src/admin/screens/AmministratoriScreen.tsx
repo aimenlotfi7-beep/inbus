@@ -154,7 +154,7 @@ export function AmministratoriScreen() {
             ))}
           </select>
           {ruoliAssegnabili.length === 0 && (
-            <p className="testo-intro" style={{ fontSize: 13, marginTop: 6, marginBottom: 0 }}>
+            <p className="testo-intro" style={{ fontSize: 'var(--testo-md)', marginTop: 6, marginBottom: 0 }}>
               Nessun ruolo assegnabile trovato: vai in "Ruoli" e crea prima un ruolo con permessi tuoi o inferiori.
             </p>
           )}
@@ -203,13 +203,13 @@ export function AmministratoriScreen() {
           { etichetta: 'Email', render: (a) => a.email },
           { etichetta: 'Ruolo', render: (a) => nomeRuolo(a.ruoloId) },
           { etichetta: 'Stato', render: (a) => a.attivo ? 'Attivo' : 'Disattivo' },
-          { etichetta: 'Permessi extra', render: (a) => <button className="btn btn-ghost" style={{ padding: '5px 12px', fontSize: 12.5 }} onClick={() => apriPermessi(a)}>Personalizza</button> },
+          { etichetta: 'Permessi extra', render: (a) => <button className="btn btn-ghost" style={{ padding: '5px 12px', fontSize: 'var(--testo-md)' }} onClick={() => apriPermessi(a)}>Personalizza</button> },
         ]}
         onModifica={apriModifica}
         onElimina={elimina}
       />
 
-      <h3 style={{ fontSize: 16, margin: '30px 0 14px' }}>Log attività recenti</h3>
+      <h3 style={{ fontSize: 'var(--testo-xl)', margin: '30px 0 14px' }}>Log attività recenti</h3>
       <TabellaGenerica
         righe={log.map((l) => ({ ...l, id: l.id }))}
         colonne={[

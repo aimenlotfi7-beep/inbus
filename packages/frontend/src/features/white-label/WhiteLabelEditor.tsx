@@ -83,7 +83,7 @@ export function WhiteLabelEditor({ whiteLabel, evento, onSalvato }: { whiteLabel
         <p className="section-label" style={{ margin: '18px 0 10px' }}>Elementi visibili</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           {(Object.keys(tema.elementiVisibili) as (keyof WhiteLabelTheme['elementiVisibili'])[]).map((campo) => (
-            <label key={campo} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            <label key={campo} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--testo-md)' }}>
               <input type="checkbox" checked={tema.elementiVisibili[campo]} onChange={(e) => aggiorna('elementiVisibili', campo, e.target.checked)} />
               {campo}
             </label>
@@ -91,7 +91,7 @@ export function WhiteLabelEditor({ whiteLabel, evento, onSalvato }: { whiteLabel
         </div>
 
         <p className="section-label" style={{ margin: '18px 0 10px' }}>Domini autorizzati</p>
-        <p style={{ fontSize: 12, color: 'var(--mist)', marginBottom: 6 }}>Uno per riga, es. https://www.sitoorganizzatore.it — controllo aggiuntivo, non l'unico meccanismo di sicurezza.</p>
+        <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginBottom: 6 }}>Uno per riga, es. https://www.sitoorganizzatore.it — controllo aggiuntivo, non l'unico meccanismo di sicurezza.</p>
         <textarea value={domini} onChange={(e) => setDomini(e.target.value)} rows={3} style={{ width: '100%' }} />
 
         <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={salva} disabled={salvando}>
