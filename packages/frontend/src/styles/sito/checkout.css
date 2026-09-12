@@ -59,17 +59,54 @@
 .stepper-voce.completato{ color:var(--sup-testo); }
 .stepper-voce.completato .stepper-cerchio{ background:var(--sup-testo); border-color:var(--sup-testo); color:var(--stepper-spunta); }
 
-/* ---------- RIEPILOGO PERSISTENTE ---------- */
+/* ---------- FASCE FISSE: passi e riepilogo in alto, azioni in basso ----------
+   Restano visibili mentre si scorre l'elenco delle fermate o il modulo
+   (passi 1 e 2; nel passo finale i pulsanti di conferma restano nella
+   pagina, due pulsanti grandi fissi coprirebbero mezzo schermo).
+   Il contenitore che scorre imposta, sul .checkout-form:
+   --checkout-fisso-top    dove si ferma la fascia alta: altezza della sua testata
+                           fissa (foglio), oppure meno il suo padding (pannello e
+                           popup: Chrome ferma le fasce al bordo del contenuto, e
+                           nei 24px di padding si vedrebbe l'elenco scorrere)
+   --checkout-fisso-giu    lo stesso per la fascia bassa
+   --checkout-bordo-x      il suo padding orizzontale: lo sfondo va da bordo a bordo
+   --checkout-fisso-bottom spazio sotto (barra di sistema dei telefoni)
+   Le regole per foglio e pannello sono in evento.css, il popup è qui sotto. */
+.checkout-testata, .checkout-nav-fissa{
+  position:sticky; z-index:3; background:var(--checkout-fondo, var(--ow-paper));
+  margin-inline:calc(var(--checkout-bordo-x, 0px) * -1); padding-inline:var(--checkout-bordo-x, 0px);
+}
+.checkout-testata{
+  top:var(--checkout-fisso-top, 0px); display:flex; flex-direction:column; gap:var(--sp-3);
+  margin-top:calc(var(--sp-3) * -1); padding-block:var(--sp-3);
+}
+.checkout-nav.checkout-nav-fissa{
+  bottom:var(--checkout-fisso-giu, 0px); align-items:flex-end; padding-top:var(--sp-3); padding-bottom:calc(var(--sp-3) + var(--checkout-fisso-bottom, 0px));
+  border-top:1px solid var(--sup-bordo); box-shadow:0 -10px 20px -16px rgba(20,22,26,.45);
+}
+.checkout-nav-fissa .btn-primary{ min-width:0; }
+.checkout-nav-passeggeri{ flex:0 0 auto; display:flex; flex-direction:column; gap:var(--sp-1); }
+.checkout-nav-passeggeri .campo-etichetta{ margin:0; font-size:var(--t-label); }
+.checkout-nav-passeggeri .qty-control{ gap:var(--sp-1); }
+.checkout-nav-passeggeri .qty-control .qty-input{ width:44px; }
+/* Schermo basso (telefono girato, tastiera aperta): le fasce tornano nel
+   flusso, altrimenti non resterebbe spazio per i campi. */
+@media (max-height:520px){
+  .checkout-testata, .checkout-nav-fissa{ position:static; box-shadow:none; }
+}
+
+/* ---------- RIEPILOGO PERSISTENTE (compatto: sta nella fascia fissa) ---------- */
 .riepilogo{
   display:flex; justify-content:space-between; align-items:flex-start; gap:var(--sp-3);
-  padding:var(--sp-3) var(--sp-4); background:var(--ow-paper-2); border:1px solid var(--ow-line-ink); border-radius:var(--radius);
+  padding:var(--sp-2) var(--sp-3); background:var(--ow-paper-2); border:1px solid var(--ow-line-ink); border-radius:var(--radius);
 }
-.riepilogo-testo{ min-width:0; display:flex; flex-direction:column; gap:var(--sp-1); }
-.riepilogo-artista{ margin:0; font-weight:700; font-size:var(--t-body); }
-.riepilogo-riga{ margin:0; display:flex; gap:var(--sp-2); align-items:flex-start; font-size:var(--t-caption); color:var(--sup-testo-2); }
+.riepilogo-testo{ min-width:0; display:flex; flex-direction:column; gap:2px; }
+.riepilogo-artista{ margin:0; font-weight:700; font-size:var(--t-small); line-height:var(--lh-snug); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.riepilogo-riga{ margin:0; display:flex; gap:var(--sp-2); align-items:flex-start; font-size:var(--t-caption); color:var(--sup-testo-2); line-height:var(--lh-normal); }
 .riepilogo-riga svg{ flex-shrink:0; margin-top:2px; }
-.riepilogo-percorso{ align-self:flex-start; padding-inline:0; min-height:var(--control-h-sm); text-decoration:underline; text-underline-offset:3px; }
-.riepilogo-totale{ margin:0; font-size:var(--t-h3); font-weight:800; letter-spacing:-.02em; white-space:nowrap; }
+.riepilogo-lato{ flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; }
+.riepilogo-percorso{ padding-inline:0; min-height:var(--control-h-sm); margin-bottom:calc(var(--sp-2) * -1); font-size:var(--t-caption); text-decoration:underline; text-underline-offset:3px; }
+.riepilogo-totale{ margin:0; font-size:var(--t-h4); font-weight:800; letter-spacing:-.02em; line-height:1.2; white-space:nowrap; }
 .riepilogo-card{
   display:flex; flex-direction:column; gap:2px; padding:var(--sp-3) var(--sp-4);
   background:var(--ow-paper-2); border:1px solid var(--ow-line-ink); border-radius:var(--radius);
@@ -245,7 +282,14 @@
   position:relative; width:100%; max-width:440px; max-height:90vh; overflow-y:auto; padding:var(--sp-6);
   background:var(--ow-paper); color:var(--ow-ink); border-radius:var(--radius-lg); box-shadow:0 30px 60px -20px rgba(0,0,0,.6);
 }
-.checkout-modal .checkout-form{ padding-top:var(--sp-6); }
+.checkout-modal .checkout-form{
+  padding-top:var(--sp-6);
+  --checkout-bordo-x:var(--sp-6); --checkout-fisso-top:calc(var(--sp-6) * -1); --checkout-fisso-giu:calc(var(--sp-6) * -1);
+}
+.checkout-modal{ scroll-padding-block:150px 110px; }
+@media (max-width:640px){
+  .checkout-modal .checkout-form{ --checkout-bordo-x:var(--sp-5); --checkout-fisso-top:calc(var(--sp-5) * -1); --checkout-fisso-giu:calc(var(--sp-5) * -1); }
+}
 .modal-close{
   position:absolute; top:var(--sp-3); right:var(--sp-3); z-index:5; display:inline-flex; align-items:center; justify-content:center;
   min-width:var(--tap); min-height:var(--tap); background:none; border:none; color:var(--ow-ink); font-size:var(--t-h4); cursor:pointer; opacity:.7;
@@ -253,7 +297,10 @@
 .modal-close:hover{ opacity:1; }
 @media (max-width:640px){
   .modal-overlay{ padding:var(--sp-3); align-items:flex-start; padding-top:var(--sp-6); }
-  .checkout-modal{ padding:var(--sp-5); max-height:none; }
+  /* Scorre al suo interno: con max-height:none il popup più alto dello
+     schermo non scorreva affatto (l'overlay è fisso) e "Continua" restava
+     irraggiungibile sotto il bordo. */
+  .checkout-modal{ padding:var(--sp-5); max-height:calc(100vh - var(--sp-6) - var(--sp-3)); max-height:calc(100dvh - var(--sp-6) - var(--sp-3)); }
 }
 .checkout-summary{
   background:#fff; border:1px solid var(--ow-line-ink); border-radius:var(--radius-sm);

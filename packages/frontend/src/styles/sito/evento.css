@@ -187,6 +187,11 @@
 .evento-lato .prenota-pannello{
   position:sticky; top:calc(var(--header-h) + var(--sp-4));
   max-height:calc(100vh - var(--header-h) - var(--sp-8)); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin;
+  scroll-padding-block:150px 110px; /* un campo che prende il fuoco non finisce sotto le fasce fisse */
+}
+/* Fasce fisse del modulo (checkout.css): sfondo fino ai bordi del pannello */
+.evento-lato .prenota-pannello .checkout-form{
+  --checkout-bordo-x:var(--sp-6); --checkout-fisso-top:calc(var(--sp-6) * -1); --checkout-fisso-giu:calc(var(--sp-6) * -1);
 }
 .prenota-titolo{ margin:0 0 var(--sp-4); font-family:var(--font-sans); font-size:var(--t-h4); font-weight:800; text-transform:none; }
 @media (max-width:480px){
@@ -220,9 +225,21 @@ body.con-cookie-banner .barra-prenota{ display:none; }
 .foglio-prenota{
   position:fixed; inset:0; z-index:var(--z-modale); background:var(--ow-paper); color:var(--ow-ink);
   overflow:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+  /* altezza della testata "Prenota ✕": pulsante 44px + padding + bordo */
+  --foglio-testata-h:calc(var(--tap) + var(--sp-2) * 2 + 1px);
+  scroll-padding-top:calc(var(--foglio-testata-h) + 150px); scroll-padding-bottom:110px;
 }
+/* Fasce fisse del modulo (checkout.css): passi e riepilogo sotto la testata,
+   sfondo da bordo a bordo, spazio per la barra di sistema in basso. */
+.foglio-prenota .checkout-form{
+  --checkout-fisso-top:calc(var(--foglio-testata-h) + env(safe-area-inset-top));
+  --checkout-bordo-x:var(--gutter);
+  --checkout-fisso-bottom:env(safe-area-inset-bottom);
+}
+/* Con la barra fissa in basso il margine sotto il modulo non serve più */
+.foglio-prenota-corpo:has(.checkout-nav-fissa){ padding-bottom:0; }
 .foglio-prenota-testata{
-  position:sticky; top:0; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3);
+  position:sticky; top:0; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3);
   padding:var(--sp-2) var(--gutter); padding-top:calc(var(--sp-2) + env(safe-area-inset-top));
   background:var(--ow-paper); border-bottom:1px solid var(--ow-line-ink);
 }

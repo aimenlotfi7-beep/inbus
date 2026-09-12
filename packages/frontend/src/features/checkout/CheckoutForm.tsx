@@ -18,6 +18,7 @@ import { tracciaInizioPrenotazione, tracciaAcquisto, leggiCookieMeta } from '../
 import { tracciaInizioCheckoutGA4, tracciaAcquistoGA4, tracciaAcquistoGoogleAds } from '../googleAnalytics';
 import { formattaEuro, plurale } from '../../shared/formato';
 import { MESSAGGIO_CONNESSIONE, testoErrore } from '../../shared/errori';
+import { comportamentoScorrimento } from '../../shared/movimento';
 import { Icona } from '../Icone';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
@@ -89,10 +90,37 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
     '--pink': temaColori.cta,
     '--cta-sfondo': temaColori.cta,
     '--cta-testo': temaColori.testoCta,
+    // Sfondo delle fasce fisse (passi e riepilogo in alto, azioni in basso)
+    '--checkout-fondo': temaColori.superficie,
   } as React.CSSProperties : undefined;
 
   const [servizioScelto, setServizioScelto] = useState<Servizio | null>(multiServizio ? null : (evento.servizi[0] ?? null));
   const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  // Cambiando passo si riparte dall'inizio del modulo: con le fasce fisse
+  // l'utente preme "Continua" anche a metà elenco, e il passo nuovo si
+  // aprirebbe a metà. Scorre solo il contenitore del modulo (foglio,
+  // pannello, popup o pagina del widget) e solo se l'inizio è fuori vista.
+  const radiceRef = useRef<HTMLDivElement>(null);
+  const stepPrecedente = useRef(step);
+  useEffect(() => {
+    if (stepPrecedente.current === step) return;
+    stepPrecedente.current = step;
+    const radice = radiceRef.current;
+    if (!radice) return;
+    let contenitore: HTMLElement | null = null;
+    for (let p = radice.parentElement; p; p = p.parentElement) {
+      const o = getComputedStyle(p).overflowY;
+      if ((o === 'auto' || o === 'scroll') && p.scrollHeight > p.clientHeight) { contenitore = p; break; }
+    }
+    const scarto = radice.getBoundingClientRect().top - (contenitore ? contenitore.getBoundingClientRect().top : 0);
+    if (scarto >= 0) return;
+    // Foglio, pannello e popup contengono solo il modulo (e il suo titolo):
+    // si torna in cima, sotto le loro testate fisse. Nella pagina del widget
+    // si porta l'inizio del modulo in cima alla finestra.
+    if (contenitore) contenitore.scrollTo({ top: 0, behavior: comportamentoScorrimento() });
+    else window.scrollBy({ top: scarto, behavior: comportamentoScorrimento() });
+  }, [step]);
   const [opzioni, setOpzioni] = useState<OpzionePartenza[]>([]);
   const [fermataId, setFermataId] = useState('');
   const [erroreFermata, setErroreFermata] = useState('');
@@ -468,9 +496,9 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   const partiRiepilogo: string[] = [formattaDataBreve(evento.data)];
   if (multiServizio && servizioScelto) partiRiepilogo.push(servizioScelto.nome);
   if (opzioneScelta) {
-    partiRiepilogo.push(
-      `${opzioneScelta.fermataCitta}${opzioneScelta.fermataOrario ? ` ${opzioneScelta.fermataOrario}` : ''} → ${evento.citta}${tragittoScelto?.arrivoOrario ? ` ${tragittoScelto.arrivoOrario}` : ''}`,
-    );
+    // Breve apposta: il riepilogo resta fisso in alto e deve occupare poco.
+    // Arrivo e ritorno sono nel percorso ("Vedi il percorso") e nel passo finale.
+    partiRiepilogo.push(`${opzioneScelta.fermataCitta}${opzioneScelta.fermataOrario ? ` ${opzioneScelta.fermataOrario}` : ''}`);
   }
   partiRiepilogo.push(plurale(passeggeri, 'passeggero', 'passeggeri'));
   const idPercorso = `${prefisso}-percorso`;
@@ -478,23 +506,29 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   const invio = stato === 'invio';
 
   return (
-    <div className="checkout-form" style={styleTema}>
+    <div className="checkout-form" style={styleTema} ref={radiceRef}>
       {offerta && (
         <p className="avviso avviso-ok">Offerta {offerta.nome}: −{offerta.scontoPercentuale.toFixed(0)}% su tutte le fermate.</p>
       )}
 
-      <Stepper voci={vociStepper} attivo={passoAttivo} />
+      {/* Fascia fissa in alto (checkout.css): passi e riepilogo restano
+          visibili mentre si scorre l'elenco delle fermate o il modulo. */}
+      <div className="checkout-testata">
+        <Stepper voci={vociStepper} attivo={passoAttivo} />
 
-      {/* Riepilogo sempre visibile, in ogni passo: cosa si sta per prenotare. */}
-      <div className="riepilogo">
-        <div className="riepilogo-testo">
-          <p className="riepilogo-artista">{evento.artista}</p>
-          <p className="riepilogo-riga"><Icona nome="bus" dimensione={16} /><span>{partiRiepilogo.join(' · ')}</span></p>
+        {/* Riepilogo sempre visibile, in ogni passo: cosa si sta per prenotare. */}
+        <div className="riepilogo">
+          <div className="riepilogo-testo">
+            <p className="riepilogo-artista">{evento.artista}</p>
+            <p className="riepilogo-riga"><Icona nome="bus" dimensione={16} /><span>{partiRiepilogo.join(' · ')}</span></p>
+          </div>
           {opzioneScelta && (
-            <button ref={percorsoApriRef} type="button" className="btn btn-tertiary btn-sm riepilogo-percorso" onClick={() => setPercorsoAperto(true)}>Vedi il percorso</button>
+            <div className="riepilogo-lato">
+              <p className="riepilogo-totale">{formattaEuro(step === 3 ? totaleConCredito : totale)}</p>
+              <button ref={percorsoApriRef} type="button" className="btn btn-tertiary btn-sm riepilogo-percorso" onClick={() => setPercorsoAperto(true)}>Vedi il percorso</button>
+            </div>
           )}
         </div>
-        {opzioneScelta && <p className="riepilogo-totale">{formattaEuro(step === 3 ? totaleConCredito : totale)}</p>}
       </div>
 
       {percorsoAperto && opzioneScelta && (
@@ -559,7 +593,10 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 </p>
               )}
 
-              <div className="campo">
+              {/* Fascia fissa in basso: passeggeri e "Continua" sempre a
+                  portata, anche scegliendo la prima fermata di un elenco lungo. */}
+              <div className="checkout-nav checkout-nav-fissa">
+              <div className="campo checkout-nav-passeggeri">
                 <span className="campo-etichetta" id={idPasseggeri}>Passeggeri</span>
                 <div className="qty-control" role="group" aria-labelledby={idPasseggeri}>
                   <button type="button" onClick={() => setPasseggeri((p) => Math.max(1, p - 1))} aria-label="Togli un passeggero" disabled={passeggeri <= 1}>−</button>
@@ -580,9 +617,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                   <span className="sr-only" aria-live="polite">{plurale(passeggeri, 'passeggero', 'passeggeri')}</span>
                 </div>
               </div>
-
-              <div className="checkout-nav">
-                <button type="button" className="btn btn-primary btn-lg btn-block" onClick={continuaPasso1}>Continua</button>
+                <button type="button" className="btn btn-primary btn-lg" onClick={continuaPasso1}>Continua</button>
               </div>
             </div>
           )}
@@ -668,7 +703,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                   </fieldset>
                 ))}
 
-                <div className="checkout-nav">
+                <div className="checkout-nav checkout-nav-fissa">
                   <button type="button" className="btn btn-tertiary" onClick={() => setStep(1)}>Indietro</button>
                   <button type="submit" className="btn btn-primary btn-lg">Continua</button>
                 </div>
