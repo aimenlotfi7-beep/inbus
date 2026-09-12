@@ -283,7 +283,7 @@
 .account-cliente .viaggio-media{ width:96px; height:120px; border-radius:var(--radius-sm); overflow:hidden; background:var(--ow-surface-2); }
 .account-cliente .viaggio-media img{ width:100%; height:100%; object-fit:cover; }
 .account-cliente .viaggio-main{ min-width:0; display:flex; flex-direction:column; gap:var(--sp-1); }
-.account-cliente .viaggio-card h3{
+.account-cliente .viaggio-card :is(h2, h3){
   margin:0 0 var(--sp-1); font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--t-h4);
   line-height:var(--lh-snug); text-transform:none; overflow-wrap:anywhere;
 }

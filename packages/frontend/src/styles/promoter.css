@@ -97,7 +97,7 @@
   min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   font-family:var(--font-sans); font-weight:600; font-size:var(--t-small); color:var(--sidebar-text);
 }
-.pagina-partner .account-topbar-logo{ display:flex; align-items:center; flex-shrink:0; color:var(--sidebar-text); }
+.pagina-partner .account-topbar-logo{ display:flex; align-items:center; flex-shrink:0; min-height:var(--tap); color:var(--sidebar-text); }
 .pagina-partner .account-topbar-logo .logo{ font-size:var(--testo-6xl); }
 
 .pagina-partner .account-corpo{ display:flex; flex:1; min-height:0; }

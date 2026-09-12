@@ -48,6 +48,8 @@ export const clienteAuthApi = {
     chiamata<{ ok: true }>('/api/cliente-auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
 
   me: () => chiamata<DatiCliente>('/api/cliente-auth/me', {}, true),
+  /** Saldo e movimenti del credito (positivi = maturati, negativi = utilizzati), dal più recente. */
+  meCredito: () => chiamata<{ disponibile: number; movimenti: { id: string; importo: string; motivo: string; creatoIl: string }[] }>('/api/cliente-auth/me/credito', {}, true),
   meReferral: () => chiamata<{ codice: string; invitati: { nome: string; completato: boolean }[] }>('/api/cliente-auth/me/referral', {}, true),
   aggiornaProfilo: (input: { nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: string }) =>
     chiamata<{ ok: true }>('/api/cliente-auth/me', { method: 'PATCH', body: JSON.stringify(input) }, true),

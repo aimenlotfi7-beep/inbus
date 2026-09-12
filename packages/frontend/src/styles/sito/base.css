@@ -438,5 +438,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
   .cookie-banner-azioni .btn{ width:100%; min-height:var(--tap); }
 }
 .link-preferenze-cookie{
-  background:none; border:none; color:var(--mist); font-size:var(--testo-md); text-decoration:underline; cursor:pointer; padding:0;
+  /* padding verticale: area di tocco di 44px (era alta 20px nella sezione Privacy dell'account) */
+  background:none; border:none; color:var(--mist); font-size:var(--testo-md); text-decoration:underline; cursor:pointer; padding:var(--sp-3) 0;
+  align-self:flex-start;
 }

@@ -28,3 +28,15 @@ export function formattaDataOra(valore: string | number | Date): string {
   const d = new Date(valore);
   return Number.isNaN(d.getTime()) ? '—' : dataOra.format(d);
 }
+
+/** Giorni di calendario (ora di Roma) da oggi alla data di un evento:
+ *  0 = oggi, 1 = domani, negativo = passato. La data dell'evento è salvata
+ *  a mezzanotte UTC: con la differenza in ore (Math.ceil) tra mezzanotte e
+ *  le 2 di notte un viaggio di oggi risultava "domani". */
+const giornoRoma = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' });
+export function giorniAllaData(valore: string | number | Date, ora: Date = new Date()): number {
+  const d = new Date(valore);
+  if (Number.isNaN(d.getTime())) return Number.NaN;
+  const giorno = (x: Date) => { const [a, m, g] = giornoRoma.format(x).split('-').map(Number); return Date.UTC(a, m - 1, g); };
+  return Math.round((giorno(d) - giorno(ora)) / 86400000);
+}

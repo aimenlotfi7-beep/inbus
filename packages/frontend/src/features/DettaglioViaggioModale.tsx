@@ -5,7 +5,7 @@ import { calcolaStatoPrenotazione } from './statoPrenotazione';
 import { PulsanteCondividi } from './PulsanteCondividi';
 import { ModaleRimborso } from './ModaleRimborso';
 import { Icona } from './Icone';
-import { formattaEuro, formattaData, plurale } from '../shared/formato';
+import { formattaEuro, formattaData, giorniAllaData, plurale } from '../shared/formato';
 
 const formatoDataLunga = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -80,7 +80,7 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
 
   const ev = dettaglio.evento;
   const oggi = new Date().toISOString().slice(0, 10);
-  const giorniAlViaggio = ev ? Math.ceil((new Date(ev.data).getTime() - Date.now()) / (24 * 3600 * 1000)) : null;
+  const giorniAlViaggio = ev ? giorniAllaData(ev.data) : null;
   const pagamentoCompleto = dettaglio.tipoPagamento === 'COMPLETO' || dettaglio.saldoPagato;
   const stato = calcolaStatoPrenotazione(dettaglio);
 

@@ -1,12 +1,12 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { clienteAuthService } from './cliente-auth.service.js';
 import { richiedeAuthCliente } from './cliente-auth.middleware.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { db } from '../../db/client.js';
-import { utenti } from '../../db/schema.js';
+import { movimentiCredito, utenti } from '../../db/schema.js';
 import { NonAutorizzato } from '../../shared/errors.js';
 import { limiteAutenticazione, limiteRegistrazione } from '../../shared/rateLimit.js';
 
@@ -125,6 +125,23 @@ clienteAuthRouter.post(
     res.json({ ok: true });
   }),
 );
+
+/** Il proprio credito per l'area personale: saldo e movimenti (positivi =
+ *  maturati, negativi = utilizzati), dal più recente. Preso dal token.
+ *  Sostituisce GET /api/credito/movimenti?email=…, tolto il 31/08/2026
+ *  (leggeva lo storico di chiunque conoscendo l'email): l'area cliente lo
+ *  chiamava ancora e mostrava "Nessun movimento" e totali a 0 a tutti. */
+clienteAuthRouter.get('/me/credito', richiedeAuthCliente, asyncHandler(async (req: Request, res: Response) => {
+  if (!req.cliente) throw new NonAutorizzato();
+  const [u] = await db.select({ credito: utenti.creditoDisponibile }).from(utenti).where(eq(utenti.id, req.cliente.sub)).limit(1);
+  if (!u) throw new NonAutorizzato();
+  const movimenti = await db
+    .select({ id: movimentiCredito.id, importo: movimentiCredito.importo, motivo: movimentiCredito.motivo, creatoIl: movimentiCredito.creatoIl })
+    .from(movimentiCredito)
+    .where(eq(movimentiCredito.utenteId, req.cliente.sub))
+    .orderBy(desc(movimentiCredito.creatoIl));
+  res.json({ disponibile: Number(u.credito), movimenti });
+}));
 
 /** "Invita un amico" — codice personale (generato al primo utilizzo)
  *  e lo storico di chi è stato invitato: "in sospeso" (registrato, non

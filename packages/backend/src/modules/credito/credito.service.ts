@@ -120,9 +120,6 @@ export const creditoService = {
     return u ? Number(u.credito) : 0;
   },
 
-  /** Lo storico completo dei movimenti — usato per la sezione dedicata
-   *  nell'area cliente, separata in maturato (guadagnato) e utilizzato
-   *  (speso), invece del solo saldo attuale. */
   /** Scala il credito usato al momento di una prenotazione — chiamata
    *  DENTRO la stessa transazione della creazione prenotazione, per non
    *  rischiare mai di scalare credito senza che la prenotazione vada a

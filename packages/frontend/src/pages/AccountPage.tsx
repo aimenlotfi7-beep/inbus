@@ -15,7 +15,8 @@ import { listaAttesaApi, type MiaIscrizione } from '../api/listaAttesa';
 import { DettaglioViaggioModale } from '../features/DettaglioViaggioModale';
 import { ModaleRimborso } from '../features/ModaleRimborso';
 import { calcolaStatoPrenotazione } from '../features/statoPrenotazione';
-import { formattaEuro, formattaData, plurale } from '../shared/formato';
+import { formattaEuro, formattaData, giorniAllaData, plurale } from '../shared/formato';
+import { testoErrore } from '../shared/errori';
 import { Icona } from '../features/Icone';
 import { CampoTesto } from '../features/checkout/CampoTesto';
 import { CampoPassword } from '../features/CampoPassword';
@@ -38,11 +39,6 @@ const formatoDataBreve = new Intl.DateTimeFormat('it-IT', { weekday: 'short', da
 function dataBreve(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '—' : formatoDataBreve.format(d);
-}
-
-/** Giorni interi che mancano a una data (0 = oggi). */
-function giorniAllaData(iso: string): number {
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / (24 * 3600 * 1000));
 }
 
 export function AccountPage() {
@@ -140,7 +136,7 @@ export function AccountPage() {
           {sezione === 'profilo' && <SezioneProfilo email={email} onEsci={esci} />}
           {sezione === 'viaggi' && <SezioneViaggi email={email} viaggi={viaggi} eventiPerId={eventiPerId} onAprireViaggio={setPnrAperto} />}
           {sezione === 'lista-attesa' && <SezioneListaAttesa email={email} />}
-          {sezione === 'credito' && <SezioneCredito email={email} />}
+          {sezione === 'credito' && <SezioneCredito />}
           {sezione === 'invita' && <SezioneInvitaAmico />}
           {sezione === 'privacy' && <SezionePrivacy email={email} />}
           {sezione === 'chat' && <SezioneChat email={email} nome={nomeCliente} />}
@@ -189,11 +185,11 @@ function SezionePanoramica({ nome, email, viaggi, eventiPerId, onNavigare, onApr
   // Il prossimo viaggio si ricava dai dati già arrivati dal padre
   // (viaggi + eventiPerId, condivisi con la sezione Viaggi) invece di
   // un giro proprio a recuperare di nuovo gli stessi dettagli evento.
-  const oggi = new Date().toISOString().slice(0, 10);
+  // "Oggi" in ora di Roma (giorniAllaData), non il giorno UTC di toISOString.
   const futuri = (viaggi ?? [])
     .filter((p) => p.stato === 'CONFERMATA')
     .map((p) => ({ p, ev: eventiPerId[p.eventoId] }))
-    .filter((c): c is { p: Prenotazione; ev: Evento } => !!c.ev && c.ev.data >= oggi)
+    .filter((c): c is { p: Prenotazione; ev: Evento } => !!c.ev && giorniAllaData(c.ev.data) >= 0)
     .sort((a, b) => a.ev.data.localeCompare(b.ev.data));
   const prossimo = futuri[0] ?? null;
 
@@ -207,7 +203,7 @@ function SezionePanoramica({ nome, email, viaggi, eventiPerId, onNavigare, onApr
 
       {viaggi !== null && !prossimo && (
         <div className="stato-vuoto">
-          <h3>Non hai viaggi in programma</h3>
+          <h2>Non hai viaggi in programma</h2>
           <p>Scegli un evento, prenota il tuo posto sul bus e lo ritrovi qui con tutti i dettagli.</p>
           <Link className="btn btn-primary" to="/">Scopri gli eventi</Link>
         </div>
@@ -355,11 +351,17 @@ function SezioneViaggi({ email, viaggi, eventiPerId, onAprireViaggio }: {
   const [rimborsoPnr, setRimborsoPnr] = useState<string | null>(null);
   const [esito, setEsito] = useState('');
 
-  const oggi = new Date().toISOString().slice(0, 10);
+  // Prossimi: dal più vicino (oggi in ora di Roma). Passati: dal più
+  // recente. Sempre per data dell'evento, poi per orario della fermata.
   const viaggiFiltrati = (viaggi ?? []).filter((p) => {
     const ev = eventiPerId[p.eventoId];
     if (!ev) return tab === 'prossimi';
-    return tab === 'passati' ? ev.data < oggi : ev.data >= oggi;
+    return tab === 'passati' ? giorniAllaData(ev.data) < 0 : giorniAllaData(ev.data) >= 0;
+  }).sort((a, b) => {
+    const da = eventiPerId[a.eventoId]?.data ?? '9999';
+    const db = eventiPerId[b.eventoId]?.data ?? '9999';
+    const perData = tab === 'passati' ? db.localeCompare(da) : da.localeCompare(db);
+    return perData || (a.fermataOrario ?? '').localeCompare(b.fermataOrario ?? '');
   });
 
   return (
@@ -377,7 +379,7 @@ function SezioneViaggi({ email, viaggi, eventiPerId, onAprireViaggio }: {
 
       {viaggi !== null && !viaggiFiltrati.length && (
         <div className="stato-vuoto">
-          <h3>{tab === 'passati' ? 'Nessun viaggio passato' : 'Nessun viaggio in programma'}</h3>
+          <h2>{tab === 'passati' ? 'Nessun viaggio passato' : 'Nessun viaggio in programma'}</h2>
           <p>
             {tab === 'passati'
               ? 'Qui finiscono i viaggi già fatti, con il loro riepilogo.'
@@ -398,7 +400,7 @@ function SezioneViaggi({ email, viaggi, eventiPerId, onAprireViaggio }: {
             </div>
 
             <div className="viaggio-main">
-              <h3>{ev?.artista ?? 'Evento'}</h3>
+              <h2>{ev?.artista ?? 'Evento'}</h2>
               <p className="acc-riga">{ev ? `${dataBreve(ev.data)} · ${ev.citta}` : 'Dettagli dell\'evento non disponibili'}</p>
               <p className="acc-riga">
                 <Icona nome="pin" dimensione={14} />
@@ -452,7 +454,7 @@ function SezioneListaAttesa({ email }: { email: string }) {
 
       {iscrizioni?.length === 0 && (
         <div className="stato-vuoto">
-          <h3>Non sei in lista d'attesa</h3>
+          <h2>Non sei in lista d'attesa</h2>
           <p>Quando un evento è esaurito puoi metterti in lista: ti avvisiamo appena si libera un posto.</p>
           <Link className="btn btn-primary" to="/">Guarda gli eventi</Link>
         </div>
@@ -479,20 +481,33 @@ function SezioneListaAttesa({ email }: { email: string }) {
 
 /** Il credito, diviso tra quanto maturato in totale (guadagnato dai
  *  viaggi) e quanto già usato, non solo il saldo attuale. */
-function SezioneCredito({ email }: { email: string }) {
+function SezioneCredito() {
   const [disponibile, setDisponibile] = useState<number | null>(null);
   const [movimenti, setMovimenti] = useState<MovimentoCredito[] | null>(null);
+  // Se il caricamento non riesce lo si dice: mai "0,00 €" e "Nessun
+  // movimento" inventati (succedeva quando l'indirizzo non esisteva più).
+  const [errore, setErrore] = useState('');
+  const [tentativo, setTentativo] = useState(0);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/credito?email=${encodeURIComponent(email)}`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => setDisponibile(d ? d.disponibile : 0))
-      .catch(() => setDisponibile(0));
-    fetch(`${API_URL}/api/credito/movimenti?email=${encodeURIComponent(email)}`)
-      .then((r) => r.ok ? r.json() : [])
-      .then(setMovimenti)
-      .catch(() => setMovimenti([]));
-  }, [email]);
+    setErrore('');
+    clienteAuthApi.meCredito()
+      .then((d) => { setDisponibile(Number(d.disponibile)); setMovimenti(d.movimenti); })
+      .catch((e) => setErrore(testoErrore(e)));
+  }, [tentativo]);
+
+  if (errore) {
+    return (
+      <section className="acc-sezione">
+        <h1>Credito</h1>
+        <div className="stato-vuoto" role="alert">
+          <h2>Non riesco a caricare il credito</h2>
+          <p>{errore}</p>
+          <button type="button" className="btn btn-secondary" onClick={() => setTentativo((n) => n + 1)}>Riprova</button>
+        </div>
+      </section>
+    );
+  }
 
   const maturati = movimenti?.filter((m) => Number(m.importo) > 0) ?? [];
   const utilizzati = movimenti?.filter((m) => Number(m.importo) < 0) ?? [];
@@ -505,18 +520,18 @@ function SezioneCredito({ email }: { email: string }) {
 
       <div className="pannello pannello-credito">
         <h2>Disponibile ora</h2>
-        <p className="numero-grande">{formattaEuro(disponibile ?? 0)}</p>
+        <p className="numero-grande">{disponibile === null ? '—' : formattaEuro(disponibile)}</p>
         <p className="acc-riga">Maturato dai tuoi viaggi: lo spendi su qualsiasi prenotazione futura e non scade.</p>
       </div>
 
       <div className="acc-due-colonne">
         <div className="pannello">
           <h2>Maturato in totale</h2>
-          <p className="numero-grande">{formattaEuro(totaleMaturato)}</p>
+          <p className="numero-grande">{movimenti === null ? '—' : formattaEuro(totaleMaturato)}</p>
         </div>
         <div className="pannello">
           <h2>Già utilizzato</h2>
-          <p className="numero-grande">{formattaEuro(totaleUtilizzato)}</p>
+          <p className="numero-grande">{movimenti === null ? '—' : formattaEuro(totaleUtilizzato)}</p>
         </div>
       </div>
 
@@ -524,7 +539,7 @@ function SezioneCredito({ email }: { email: string }) {
 
       {movimenti?.length === 0 && (
         <div className="stato-vuoto">
-          <h3>Nessun movimento</h3>
+          <h2>Nessun movimento</h2>
           <p>Il credito matura dopo il tuo primo viaggio pagato per intero.</p>
         </div>
       )}
@@ -643,7 +658,7 @@ function SezioneInvitaAmico() {
 
           {dati.invitati.length === 0 && (
             <div className="stato-vuoto">
-              <h3>Nessun invito ancora</h3>
+              <h2>Nessun invito ancora</h2>
               <p>Condividi il link qui sopra per iniziare.</p>
             </div>
           )}
@@ -840,6 +855,12 @@ function SezioneProfilo({ email, onEsci }: { email: string; onEsci: () => void }
         </div>
       </form>
 
+      {/* Su telefono la colonna del menu non c'è: "Esci" vive qui, prima
+          della zona pericolosa (che resta in fondo, lontana dai gesti abituali). */}
+      <div className="account-esci-mobile">
+        <button type="button" className="btn btn-ghost btn-block" onClick={onEsci}>Esci</button>
+      </div>
+
       <div className="pannello pannello-pericolo">
         <h2>Elimina l'account</h2>
         <p className="acc-riga">
@@ -850,11 +871,6 @@ function SezioneProfilo({ email, onEsci }: { email: string; onEsci: () => void }
         <div className="acc-azioni">
           <button type="button" className="btn btn-danger" onClick={() => setEliminaAperta(true)}>Elimina l'account</button>
         </div>
-      </div>
-
-      {/* Su telefono la colonna del menu non c'è: "Esci" vive qui. */}
-      <div className="account-esci-mobile">
-        <button type="button" className="btn btn-ghost btn-block" onClick={onEsci}>Esci</button>
       </div>
 
       {eliminaAperta && <ModaleEliminaAccount onChiudi={() => setEliminaAperta(false)} />}
