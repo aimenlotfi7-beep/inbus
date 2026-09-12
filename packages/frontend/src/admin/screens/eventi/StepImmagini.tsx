@@ -29,6 +29,21 @@ export function StepImmagini({ form, setForm, inCreazione, layoutDisponibili, ma
   function rimuoviImmagine(idx: number) {
     setForm({ ...form, immagini: (form.immagini ?? []).filter((_, i) => i !== idx) });
   }
+  /** Sposta l'immagine di una posizione (-1 su, +1 giù). L'ordine è quello
+   *  salvato: la prima è la copertina, le altre vanno nella sezione Foto. */
+  function spostaImmagine(idx: number, direzione: -1 | 1) {
+    const elenco = [...(form.immagini ?? [])];
+    const destinazione = idx + direzione;
+    if (destinazione < 0 || destinazione >= elenco.length) return;
+    [elenco[idx], elenco[destinazione]] = [elenco[destinazione], elenco[idx]];
+    setForm({ ...form, immagini: elenco });
+  }
+  /** Porta l'immagine in cima: diventa la copertina, le altre scendono di uno. */
+  function usaComeCopertina(idx: number) {
+    const elenco = [...(form.immagini ?? [])];
+    const [scelta] = elenco.splice(idx, 1);
+    setForm({ ...form, immagini: [scelta, ...elenco] });
+  }
   return (
   <>
     <div className="sub-tabs">
@@ -47,12 +62,28 @@ export function StepImmagini({ form, setForm, inCreazione, layoutDisponibili, ma
           <button type="button" className="btn btn-ghost" onClick={aggiungiImmagine}>+ Aggiungi link</button>
           <CaricaFile onCaricato={(url) => setForm({ ...form, immagini: [...(form.immagini ?? []), url] })} etichetta="+ Carica file" />
         </div>
-        {(form.immagini ?? []).map((url, idx) => (
-          <div key={idx} className="riga-cliccabile" style={{ cursor: 'default', gap: 10 }}>
+        {(form.immagini ?? []).length > 1 && (
+          <p className="testo-intro" style={{ fontSize: 'var(--testo-md)', marginBottom: 8 }}>
+            La prima immagine è la copertina: card dell'evento, cima della pagina e anteprima quando si condivide il link. Le altre compaiono nella sezione Foto, in quest'ordine.
+          </p>
+        )}
+        {(form.immagini ?? []).map((url, idx, elenco) => (
+          <div key={`${idx}-${url}`} className="riga-cliccabile" style={{ cursor: 'default', gap: 10, flexWrap: 'wrap' }}>
             {/* Anteprima: prima si vedeva solo il link, senza poter
                 controllare che fosse l'immagine giusta (o che si caricasse). */}
             <img src={url} alt="" style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0, background: 'var(--dusk-2)' }} />
-            <span className="riga-titolo" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</span>
+            <span className="riga-titolo" style={{ flex: 1, minWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</span>
+            {idx === 0 ? (
+              <span className="badge neutro">Copertina</span>
+            ) : (
+              <button type="button" className="btn btn-ghost btn-piccolo" onClick={() => usaComeCopertina(idx)}>Usa come copertina</button>
+            )}
+            {elenco.length > 1 && (
+              <span style={{ display: 'inline-flex', gap: 4 }}>
+                <button type="button" className="btn btn-ghost btn-piccolo" onClick={() => spostaImmagine(idx, -1)} disabled={idx === 0} aria-label={`Sposta su l'immagine ${idx + 1}`} title="Sposta su">↑</button>
+                <button type="button" className="btn btn-ghost btn-piccolo" onClick={() => spostaImmagine(idx, 1)} disabled={idx === elenco.length - 1} aria-label={`Sposta giù l'immagine ${idx + 1}`} title="Sposta giù">↓</button>
+              </span>
+            )}
             <button type="button" className="btn btn-ghost" style={{ color: 'var(--pink)', fontSize: 'var(--testo-sm)' }} onClick={() => rimuoviImmagine(idx)}>Rimuovi</button>
           </div>
         ))}
