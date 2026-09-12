@@ -117,7 +117,7 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
 
   const statoVuotoEventi = (
     <div className="stato-vuoto">
-      <h3>Nessun evento associato</h3>
+      <h2>Nessun evento associato</h2>
       <p>Contatta OnWay per farti assegnare i tuoi eventi: compariranno qui con viaggiatori e incassi.</p>
     </div>
   );
@@ -154,7 +154,7 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
             return (
               <div className="evento-link-card" key={ev.id}>
                 <div>
-                  <h3>{ev.artista}</h3>
+                  <h2>{ev.artista}</h2>
                   <p>{ev.luogo}, {ev.citta} · {fmtDataBreve(ev.data)}</p>
                   {s && (
                     <p className="partner-dettaglio">
@@ -177,7 +177,7 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
           {perBundle.map((b) => (
             <div className="evento-link-card" key={b.bundleId}>
               <div>
-                <h3>{b.bundleNome} <span className="partner-etichetta">bundle</span></h3>
+                <h2>{b.bundleNome} <span className="partner-etichetta">bundle</span></h2>
                 <p className="partner-dettaglio">
                   {plurale(b.numeroOrdini, 'ordine', 'ordini')} · {plurale(b.viaggiatori, 'viaggiatore', 'viaggiatori')} · {formattaEuro(b.fatturato)} di incasso (sconto applicato {formattaEuro(b.scontoApplicato)}) · tua quota {formattaEuro(b.quotaOrganizzatore)}
                 </p>

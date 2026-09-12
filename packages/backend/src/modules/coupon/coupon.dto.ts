@@ -5,8 +5,11 @@ export const creaCouponSchema = z.object({
   tipo: z.enum(['PERCENTUALE', 'FISSO']),
   valore: z.number().positive(),
   usiMax: z.number().int().positive().optional(),
-  validoDal: z.coerce.date().optional(),
-  validoAl: z.coerce.date().optional(),
+  // nullable PRIMA della conversione: il gestionale manda null quando la
+  // data è vuota, e z.coerce.date() trasformava null in 01/01/1970 — il
+  // codice nasceva già scaduto e il checkout lo rifiutava.
+  validoDal: z.coerce.date().nullable().optional(),
+  validoAl: z.coerce.date().nullable().optional(),
   attivo: z.boolean().default(true),
   // Vuoto/assente = valido su tutti gli eventi.
   eventoId: z.string().nullable().optional(),

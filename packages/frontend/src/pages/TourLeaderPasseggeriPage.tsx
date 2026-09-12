@@ -124,28 +124,33 @@ export function TourLeaderPasseggeriPage() {
                     <th>Salito</th>
                     <th>Passeggero</th>
                     <th>Fermata</th>
-                    <th>Telefono</th>
+                    <th className="tl-col-tel">Telefono</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtrati.map((p) => (
                     <tr key={p.id} className={p.salito ? 'salito' : undefined}>
                       <td>
-                        <input
-                          type="checkbox" className="tl-check" checked={p.salito} disabled={inSalvataggio === p.id}
-                          onChange={() => alternaSalito(p)}
-                          aria-label={`${p.nome} ${p.cognome} è salito`}
-                        />
+                        {/* L'etichetta allarga l'area toccabile a 44px: sul bus si spunta di corsa. */}
+                        <label className="tl-check-area">
+                          <input
+                            type="checkbox" className="tl-check" checked={p.salito} disabled={inSalvataggio === p.id}
+                            onChange={() => alternaSalito(p)}
+                            aria-label={`${p.nome} ${p.cognome} è salito`}
+                          />
+                        </label>
                       </td>
                       <td>
                         <b>{p.cognome} {p.nome}</b>
                         <span className="secondaria">{p.pnr}</span>
+                        {/* Su telefono la colonna Telefono è nascosta (usciva dallo schermo): il numero va qui. */}
+                        {p.telefono && <a className="tl-tel-stretto" href={`tel:${p.telefono}`}>{p.telefono}</a>}
                       </td>
                       <td>
                         {p.fermata}
                         {p.orario && <span className="secondaria">{p.orario}</span>}
                       </td>
-                      <td>
+                      <td className="tl-col-tel">
                         {p.telefono ? <a href={`tel:${p.telefono}`}>{p.telefono}</a> : <span className="secondaria">—</span>}
                       </td>
                     </tr>

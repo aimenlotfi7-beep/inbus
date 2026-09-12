@@ -177,7 +177,7 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
 
           {!eventiOrdinati.length && (
             <div className="stato-vuoto">
-              <h3>Nessun evento in vendita</h3>
+              <h2>Nessun evento in vendita</h2>
               <p>Quando OnWay pubblica un nuovo evento, il suo link compare qui.</p>
             </div>
           )}
@@ -213,7 +213,7 @@ function CardLinkPromoter({ evento, onCopia }: { evento: Evento; onCopia: (link:
   return (
     <div className="evento-link-card">
       <div>
-        <h3>{evento.artista}</h3>
+        <h2>{evento.artista}</h2>
         <p>{evento.luogo}, {evento.citta} · {fmtDataBreve(evento.data)}</p>
       </div>
       <div className="link-azione">
@@ -239,7 +239,7 @@ function SezioneCodiciSconto() {
   if (coupon.length === 0) {
     return (
       <div className="stato-vuoto">
-        <h3>Nessun codice sconto assegnato</h3>
+        <h2>Nessun codice sconto assegnato</h2>
         <p>Se ti serve un codice da far usare ai tuoi contatti, chiedilo allo staff OnWay.</p>
       </div>
     );
@@ -257,7 +257,7 @@ function SezioneCodiciSconto() {
         return (
           <div className="evento-link-card" key={c.codice}>
             <div>
-              <h3>{c.codice}</h3>
+              <h2>{c.codice}</h2>
               <p>
                 Sconto: {c.scontoTipo === 'PERCENTUALE' ? `${c.scontoValore}%` : formattaEuro(c.scontoValore)}
                 {' · '}Il tuo compenso: <b>{compensoTesto}</b>

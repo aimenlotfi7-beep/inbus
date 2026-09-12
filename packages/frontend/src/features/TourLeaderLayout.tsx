@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { nomeTourLeader, logoutTourLeader } from '../api/tourLeaderAuth';
 import { AccountShell } from './AccountShell';
+import { useSeoTags } from './useSeoTags';
 import '../styles/account.css';
 import '../styles/promoter.css';
 import '../styles/tourleader.css';
@@ -16,6 +17,12 @@ const ROTTA_PER_VOCE: Record<string, string> = {
  *  interne, quindi cambiare voce naviga invece di cambiare stato. */
 export function TourLeaderLayout({ vocedAttiva, children }: { vocedAttiva: 'cerca' | 'eventi'; children: ReactNode }) {
   const navigate = useNavigate();
+  // Senza, la scheda del browser restava "OnWay — Viaggi verso concerti ed eventi".
+  useSeoTags({
+    title: `${vocedAttiva === 'cerca' ? 'Cerca passeggero' : 'I tuoi eventi'} — Area tour leader OnWay`,
+    description: 'Lista dei passeggeri e controllo dei biglietti del tuo bus.',
+    url: `${window.location.origin}/scansione`,
+  });
 
   function esci() {
     logoutTourLeader();

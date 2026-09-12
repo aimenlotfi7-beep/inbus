@@ -97,7 +97,20 @@
 .pagina-partner .tl-tabella tr.salito td{ background:rgba(87,211,154,.12); }
 .pagina-partner .tl-tabella .secondaria{ display:block; color:var(--mist); font-size:var(--t-caption); }
 .pagina-partner .tl-tabella a{ color:var(--ow-ink); }
-.pagina-partner .tl-check{ width:24px; height:24px; margin:10px; cursor:pointer; accent-color:var(--ow-ok-ink); }
+.pagina-partner .tl-check-area{
+  display:flex; align-items:center; justify-content:center; width:var(--tap); height:var(--tap);
+  margin:calc(var(--sp-2) * -1) 0; cursor:pointer; /* area di tocco 44px, la riga non cresce */
+}
+.pagina-partner .tl-check{ width:26px; height:26px; margin:0; cursor:pointer; accent-color:var(--ow-ok-ink); }
+/* Telefono: niente quarta colonna (usciva dallo schermo a 390px), il numero
+   sta sotto il nome con la sua area di tocco. */
+.pagina-partner .tl-tel-stretto{ display:none; }
+@media (max-width:640px){
+  .pagina-partner .tl-col-tel{ display:none; }
+  .pagina-partner .tl-tabella .tl-tel-stretto{ display:inline-block; padding-block:var(--sp-2); margin-bottom:calc(var(--sp-2) * -1); font-weight:600; }
+  .pagina-partner .tl-tabella th:first-child{ width:auto; }
+  .pagina-partner .tl-tabella :is(th, td){ padding-inline:var(--sp-2); }
+}
 
 /* <dialog> di conferma (account.css) sul tema chiaro */
 .pagina-partner .modale-conferma{ background:var(--dusk); color:var(--paper); border-color:var(--line); box-shadow:0 30px 60px rgba(20,22,26,.25); }

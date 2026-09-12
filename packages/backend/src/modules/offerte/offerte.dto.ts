@@ -11,8 +11,9 @@ export const creaOffertaSchema = z.object({
   // di qualunque fermata scelga il cliente — non un prezzo fisso.
   scontoPercentuale: z.number().positive().max(100),
   attiva: z.boolean().default(true),
-  validoDal: z.coerce.date().optional(),
-  validoAl: z.coerce.date().optional(),
+  // nullable: con null z.coerce.date() darebbe 01/01/1970 (vedi coupon.dto.ts)
+  validoDal: z.coerce.date().nullable().optional(),
+  validoAl: z.coerce.date().nullable().optional(),
   limiteUtilizzi: z.number().int().positive().optional(),
 });
 export type CreaOffertaInput = z.infer<typeof creaOffertaSchema>;

@@ -53,7 +53,9 @@ async function trovaOCreaLinkPromoter(promoterId: string, eventoId: string): Pro
     }
     throw new Error('Impossibile generare un codice link univoco.');
   })();
-  return { codice, url: `${urlSito}/eventi/${evento.slug}?promo=${codice}` };
+  // urlSito è una funzione: dentro `${urlSito}` finiva il suo codice
+  // sorgente ("function urlSito(percorso) {…}/eventi/…") al posto del sito.
+  return { codice, url: urlSito(`/eventi/${evento.slug}?promo=${codice}`) };
 }
 
 const creaPromoterSchema = z.object({
