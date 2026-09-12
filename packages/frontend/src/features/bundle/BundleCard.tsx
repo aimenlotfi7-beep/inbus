@@ -1,6 +1,7 @@
 import type { BundlePubblico } from '../../api/bundle';
 import { CardBase, formattaDataCard, inizialiDi, type FormatoCard } from '../eventi/EventoCard';
 import { Icona } from '../Icone';
+import { plurale } from '../../shared/formato';
 
 /** "sab 1 nov 2026", più "alle 18:00" solo se la vendita non parte a
  *  mezzanotte (ora di Roma). */
@@ -16,11 +17,15 @@ function testoInizioVendita(iso: string): string {
 export function BundleCard({ bundle, formato, priorita }: { bundle: BundlePubblico; formato?: FormatoCard; priorita?: boolean }) {
   const sconto = Number(bundle.scontoPercentuale);
   const scontoTesto = Number.isFinite(sconto) && sconto > 0 ? ` · −${sconto.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%` : '';
+  const n = bundle.numeroEventi;
+  const composizione = n
+    ? (bundle.tipo === 'FISSO' ? plurale(n, 'evento', 'eventi') : `Scegli tra ${plurale(n, 'evento', 'eventi')}`)
+    : (bundle.tipo === 'FISSO' ? 'Pacchetto fisso' : 'Scegli tu gli eventi');
   const righe = (
     <>
       <span className="card-riga">
         <Icona nome="spunta" dimensione={16} />
-        <span>{bundle.tipo === 'FISSO' ? 'Pacchetto fisso' : 'Scegli tu gli eventi'}{scontoTesto}</span>
+        <span>{composizione}{scontoTesto}</span>
       </span>
       {bundle.stato === 'PROGRAMMATO' && bundle.inizioVendita && (
         <span className="card-riga">

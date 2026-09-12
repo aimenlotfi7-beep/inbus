@@ -261,6 +261,27 @@ function CardProssimoViaggio({ dati, onApri, onScrivi }: {
         </p>
         {giorni > 1 && <span className="chip-conto">tra {plurale(giorni, 'giorno', 'giorni')}</span>}
 
+        {/* Il giorno prima e il giorno stesso lo stato del pagamento conta
+            meno: serve sapere cosa fare prima di partire. */}
+        {giorni <= 1 ? (
+          <>
+            <p className="prossimo-viaggio-promemoria">Ricordati:</p>
+            <ul className="viaggio-timeline">
+              <li>
+                <Icona nome="orologio" dimensione={18} className="in-attesa" />
+                <span>Arriva alla fermata in anticipo rispetto all'orario di partenza</span>
+              </li>
+              <li>
+                <Icona nome="documento" dimensione={18} className="in-attesa" />
+                <span>Porta con te un documento d'identità</span>
+              </li>
+              <li>
+                <Icona nome="spunta" dimensione={18} strokeWidth={2.4} className="fatto" />
+                <span>Tieni a portata di mano la prenotazione: basta questa pagina</span>
+              </li>
+            </ul>
+          </>
+        ) : (
         <ul className="viaggio-timeline">
           <li>
             <Icona nome="spunta" dimensione={18} strokeWidth={2.4} className="fatto" />
@@ -287,11 +308,34 @@ function CardProssimoViaggio({ dati, onApri, onScrivi }: {
             <span>Bus e biglietto il giorno prima della partenza</span>
           </li>
         </ul>
+        )}
 
-        <div className="prossimo-viaggio-azioni">
-          <button type="button" className="btn btn-primary" onClick={onApri}>Apri il viaggio</button>
-          <button type="button" className="btn btn-secondary" onClick={onScrivi}>Scrivi allo staff</button>
-        </div>
+        {/* Il giorno della partenza: prima di tutto come arrivare alla
+            fermata, poi chat e assistenza a portata di pollice. */}
+        {giorni <= 0 && p.fermataIndirizzo ? (
+          <div className="prossimo-viaggio-azioni">
+            <a
+              className="btn btn-primary"
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.fermataIndirizzo}, ${p.fermataCitta}`)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Icona nome="pin" dimensione={18} />Apri la mappa della fermata
+            </a>
+            <button type="button" className="btn btn-secondary" onClick={onScrivi}>
+              <Icona nome="messaggio" dimensione={18} />Scrivi allo staff
+            </button>
+            <Link className="btn btn-secondary" to="/faq">
+              <Icona nome="info" dimensione={18} />Assistenza
+            </Link>
+            <button type="button" className="btn btn-tertiary" onClick={onApri}>Apri il viaggio</button>
+          </div>
+        ) : (
+          <div className="prossimo-viaggio-azioni">
+            <button type="button" className="btn btn-primary" onClick={onApri}>Apri il viaggio</button>
+            <button type="button" className="btn btn-secondary" onClick={onScrivi}>Scrivi allo staff</button>
+          </div>
+        )}
       </div>
     </article>
   );

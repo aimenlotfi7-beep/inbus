@@ -237,6 +237,7 @@
 :is(.account-cliente, .travel-card) svg.fatto{ color:var(--ow-ok); }
 :is(.account-cliente, .travel-card) svg.in-attesa{ color:var(--ow-warn); }
 :is(.account-cliente, .travel-card) svg.scaduto{ color:var(--ow-danger); }
+.account-cliente .prossimo-viaggio-promemoria{ margin:var(--sp-2) 0 0; font-size:var(--t-caption); font-weight:600; }
 
 /* ---------- PANORAMICA: tessere ---------- */
 .account-cliente .acc-tessere{ display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:var(--sp-3); margin-top:var(--sp-2); }

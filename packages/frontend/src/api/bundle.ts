@@ -35,6 +35,9 @@ export interface BundleDettaglio extends Omit<BundleInput, 'eventiIds' | 'sconto
 export interface BundlePubblico {
   id: string; slug: string; nome: string; descrizione: string | null; copertinaUrl: string | null; tipo: TipoBundle;
   scontoPercentuale: string; inizioVendita: string | null; fineVendita: string | null; inEvidenzaHome: boolean; stato: StatoBundle;
+  /** Eventi (non eliminati) nel bundle. Solo nell'elenco pubblico; facoltativo
+   *  finché il backend nuovo non è online. */
+  numeroEventi?: number;
 }
 
 export interface BundlePubblicoDettaglio extends BundlePubblico {

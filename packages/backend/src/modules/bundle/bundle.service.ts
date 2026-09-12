@@ -120,10 +120,18 @@ export const bundleService = {
   async listaPubblica() {
     const righe = await db.select().from(bundle).where(and(isNull(bundle.eliminatoIl), eq(bundle.attivo, true))).orderBy(desc(bundle.creatoIl));
     const visibili = righe.filter((b) => bundleVisibile(b));
+    if (visibili.length === 0) return [];
+    // Quanti eventi contiene ogni bundle, per la card ("2 eventi · −15%"):
+    // si contano solo gli eventi non eliminati, come nel dettaglio pubblico.
+    const conteggi = await db.select({ bundleId: bundleEventi.bundleId, n: sql<number>`count(*)::int` }).from(bundleEventi)
+      .innerJoin(eventi, eq(eventi.id, bundleEventi.eventoId))
+      .where(and(inArray(bundleEventi.bundleId, visibili.map((b) => b.id)), isNull(eventi.eliminatoIl)))
+      .groupBy(bundleEventi.bundleId);
+    const nPerBundle = new Map(conteggi.map((c) => [c.bundleId, c.n]));
     return visibili.map((b) => ({
       id: b.id, slug: b.slug, nome: b.nome, descrizione: b.descrizione, copertinaUrl: b.copertinaUrl, tipo: b.tipo,
       scontoPercentuale: b.scontoPercentuale, inizioVendita: b.inizioVendita, fineVendita: b.fineVendita,
-      inEvidenzaHome: b.inEvidenzaHome, stato: statoBundle(b),
+      inEvidenzaHome: b.inEvidenzaHome, stato: statoBundle(b), numeroEventi: nPerBundle.get(b.id) ?? 0,
     }));
   },
   async dettaglioPubblico(slug: string) {
