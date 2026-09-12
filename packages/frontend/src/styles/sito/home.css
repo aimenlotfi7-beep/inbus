@@ -34,15 +34,8 @@
 .hero-title .line2{ color:var(--ow-accent); }
 .hero-sub{ margin:0 0 var(--sp-6); max-width:46ch; font-size:var(--t-body); line-height:var(--lh-relaxed); color:var(--ow-muted); }
 
-/* Riga "Parti da" + pulsante: stesso filtro ?partenza della sezione eventi */
-.hero-cerca{ display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-3); margin:0 0 var(--sp-8); }
-.hero-cerca select{
-  flex:1 1 220px; max-width:380px; min-width:0; min-height:var(--control-h); padding:0 14px;
-  font-family:var(--font-sans); font-size:var(--t-body); color:var(--campo-testo);
-  background:var(--campo-sfondo); border:1px solid var(--btn-bordo); border-radius:var(--radius-sm); cursor:pointer;
-  color-scheme:dark;
-}
-.hero-cerca .btn{ min-height:var(--control-h); flex:0 0 auto; }
+/* Pulsante che porta a "Tutti gli eventi" (la ricerca per nome è nell'header) */
+.hero-azioni{ display:flex; flex-wrap:wrap; gap:var(--sp-3); margin:0 0 var(--sp-8); }
 
 /* Numeri veri (partenze attive, città) */
 .hero-stats{ display:flex; flex-wrap:wrap; gap:var(--sp-8); }
@@ -60,7 +53,7 @@
 }
 @media (max-width:480px){
   .hero{ padding-block:var(--sp-6) var(--sp-8); }
-  .hero-cerca select, .hero-cerca .btn{ flex:1 1 100%; width:100%; max-width:none; }
+  .hero-azioni .btn{ flex:1 1 100%; }
   .hero-stats{ gap:var(--sp-6); }
 }
 
@@ -107,26 +100,12 @@
   .filter-bar::-webkit-scrollbar{ display:none; }
 }
 
-/* ---------- FILTRI: partenza, date, prezzo, ordinamento ---------- */
-.filtri-extra{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:var(--sp-3); margin:0 0 var(--sp-6); }
-.filtro{ display:flex; flex-direction:column; gap:var(--sp-1); flex:0 1 auto; min-width:0; }
-.filtro > span{ font-size:var(--t-caption); font-weight:600; color:var(--campo-etichetta); }
-.filtro select, .filtro input{
-  width:100%; min-width:0; min-height:var(--control-h); padding:0 12px;
-  font-family:var(--font-sans); font-size:var(--t-body); color:var(--campo-testo);
-  background:var(--campo-sfondo); border:1px solid var(--btn-bordo); border-radius:var(--radius-sm); color-scheme:dark;
+/* ---------- RICERCA PER NOME ATTIVA (casella dell'header, ?q=…) ---------- */
+.ricerca-attiva{
+  display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-1) var(--sp-3); margin:0 0 var(--sp-6);
 }
-.filtro select{ cursor:pointer; }
-.filtro-partenza{ flex-basis:220px; }
-.filtro-data{ flex-basis:170px; }
-.filtro-prezzo{ flex-basis:160px; }
-.filtro-ordina{ flex-basis:190px; }
-.filtri-extra .btn-tertiary{ min-height:var(--control-h); }
-@media (max-width:640px){
-  .filtri-extra{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:var(--sp-2) var(--sp-3); }
-  .filtro-partenza, .filtro-ordina, .filtri-extra .btn-tertiary{ grid-column:1 / -1; }
-  .filtri-extra .btn-tertiary{ justify-self:start; }
-}
+.ricerca-attiva p{ margin:0; min-width:0; font-size:var(--t-small); color:var(--ow-muted); overflow-wrap:anywhere; }
+.ricerca-attiva strong{ color:var(--ow-paper); font-weight:600; }
 
 /* ---------- COME FUNZIONA ---------- */
 .how{

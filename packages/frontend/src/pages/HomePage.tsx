@@ -10,15 +10,15 @@ import { CardScheletro, EventoCard } from '../features/eventi/EventoCard';
 import { CheckoutModal } from '../features/checkout/CheckoutModal';
 import { Icona } from '../features/Icone';
 import { pagineApi } from '../api/pagine';
-import { intervalloPrezzoEvento } from '../api/prezzi';
 import { useSeoTags } from '../features/useSeoTags';
 import { plurale } from '../shared/formato';
 
-// Le chiavi dei filtri che vivono nell'URL: "Azzera filtri" le toglie
-// tutte insieme, in un solo aggiornamento (chiamare impostaFiltro più
-// volte di fila leggerebbe ogni volta lo stesso searchParams "vecchio").
-// `evento` (checkout aperto da link) non è un filtro e resta.
-const CHIAVI_FILTRI = ['partenza', 'dataDa', 'dataA', 'prezzoMax', 'categoria', 'genere', 'q', 'ordina'];
+// Le chiavi dei filtri che vivono nell'URL: "Mostra tutti" le toglie
+// tutte insieme, in un solo aggiornamento. `evento` (checkout aperto da
+// link) non è un filtro e resta. Niente filtri per città, date, prezzo o
+// ordinamento: il cliente cerca l'evento per nome dalla casella
+// dell'header (?q=…), decisione del proprietario.
+const CHIAVI_FILTRI = ['categoria', 'genere', 'q'];
 
 /** true da 901px in su: la vetrina dell'hero si monta solo lì, così
  *  sui telefoni le sue due immagini "eager" non si scaricano per niente. */
@@ -112,20 +112,7 @@ export function HomePage() {
   // Categoria (primo livello della cascata) e genere (secondo) sono
   // parametri separati apposta, così i due filtri non si accavallano.
   const categoriaAttiva = searchParams.get('categoria');
-  // Gli altri filtri, stesso schema: vivono nell'URL, non in uno stato
-  // "invisibile" che sparisce ricaricando la pagina o condividendo il link.
-  const partenzaAttiva = searchParams.get('partenza') ?? '';
-  const dataDa = searchParams.get('dataDa') ?? '';
-  const dataA = searchParams.get('dataA') ?? '';
-  const prezzoMax = searchParams.get('prezzoMax') ?? '';
-  // ?ordina=data (predefinito, crescente) oppure prezzo (minimo crescente). Mai alfabetico.
-  const ordina: 'data' | 'prezzo' = searchParams.get('ordina') === 'prezzo' ? 'prezzo' : 'data';
-  function impostaFiltro(chiave: string, valore: string) {
-    const nuovi = new URLSearchParams(searchParams);
-    if (valore) nuovi.set(chiave, valore); else nuovi.delete(chiave);
-    setSearchParams(nuovi, { replace: true });
-  }
-  const filtriAttivi = Boolean(partenzaAttiva || dataDa || dataA || prezzoMax || categoriaAttiva || genereAttivo !== 'Tutti' || ricercaTesto || ordina !== 'data');
+  const filtriAttivi = Boolean(categoriaAttiva || genereAttivo !== 'Tutti' || ricercaTesto);
   function azzeraFiltri() {
     const nuovi = new URLSearchParams(searchParams);
     CHIAVI_FILTRI.forEach((k) => nuovi.delete(k));
@@ -161,20 +148,6 @@ export function HomePage() {
   const eventiFiltrati = useMemo(() => {
     let lista = genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => e.genere === genereAttivo);
     if (categoriaAttiva) lista = lista.filter((e) => e.categoria === categoriaAttiva);
-    // "Da dove parto" è la domanda più importante per un servizio bus:
-    // conta solo sulle fermate attive, come le card.
-    if (partenzaAttiva) {
-      lista = lista.filter((e) => tragittiAttivi(e).some((tr) => tr.fermate.some((f) => f.attivo && f.citta === partenzaAttiva)));
-    }
-    if (dataDa) lista = lista.filter((e) => e.data >= dataDa);
-    if (dataA) lista = lista.filter((e) => e.data <= dataA);
-    if (prezzoMax) {
-      const soglia = Number(prezzoMax);
-      lista = lista.filter((e) => {
-        const intervallo = intervalloPrezzoEvento(e);
-        return intervallo !== null && intervallo.min <= soglia;
-      });
-    }
     // Normalizza per il confronto: minuscolo + senza accenti (così
     // "citta" trova anche "città") — sul testo cercato e sui campi.
     const normalizza = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -190,19 +163,9 @@ export function HomePage() {
         return parole.every((p) => testo.includes(p));
       });
     }
-    // Ordine cronologico sempre garantito, esplicitamente; per prezzo si
-    // riordina sopra (ordinamento stabile: a parità di prezzo resta la data).
-    const ordinati = [...lista].sort((a, b) => a.data.localeCompare(b.data));
-    if (ordina === 'prezzo') {
-      const minimo = (e: Evento) => intervalloPrezzoEvento(e)?.min ?? Number.POSITIVE_INFINITY;
-      ordinati.sort((a, b) => {
-        const pa = minimo(a); const pb = minimo(b);
-        if (pa === pb) return 0;
-        return pa < pb ? -1 : 1;
-      });
-    }
-    return ordinati;
-  }, [eventi, genereAttivo, categoriaAttiva, ricercaTesto, partenzaAttiva, dataDa, dataA, prezzoMax, ordina]);
+    // Ordine cronologico sempre garantito, esplicitamente. Mai alfabetico.
+    return [...lista].sort((a, b) => a.data.localeCompare(b.data));
+  }, [eventi, genereAttivo, categoriaAttiva, ricercaTesto]);
 
   // Al singolare solo se l'etichetta è quella predefinita — un testo
   // scritto a mano da Contenuti sito resta com'è.
@@ -221,14 +184,9 @@ export function HomePage() {
               <span className="line2">{t('hero_titolo_riga2', 'Vivi il concerto.')}</span>
             </h1>
             <p className="hero-sub">{t('hero_sottotitolo', 'Andata e ritorno in giornata, direttamente dalla tua città al palco del tuo artista preferito. Un solo biglietto, zero pensieri.')}</p>
-            <form className="hero-cerca" onSubmit={(e) => { e.preventDefault(); vaiAgliEventi(); }}>
-              <label className="sr-only" htmlFor="hero-partenza">Parti da</label>
-              <select id="hero-partenza" value={partenzaAttiva} onChange={(e) => impostaFiltro('partenza', e.target.value)}>
-                <option value="">Parti da — tutte le città</option>
-                {cittaPartenza.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <button type="submit" className="btn btn-primary">Vedi le partenze</button>
-            </form>
+            <div className="hero-azioni">
+              <a className="btn btn-primary btn-lg" href="#eventi" onClick={(e) => { e.preventDefault(); vaiAgliEventi(); }}>Vedi gli eventi</a>
+            </div>
             <div className="hero-stats">
               <div className="stat"><b>{caricamento ? '—' : numeroPartenze}</b><span>{etichettaPartenzeMostrata}</span></div>
               <div className="stat"><b>{caricamento ? '—' : cittaPartenza.length}</b><span>{t('hero_statistica2_etichetta', 'Città di partenza')}</span></div>
@@ -303,42 +261,13 @@ export function HomePage() {
           )}
         </div>
 
-        <div className="filtri-extra">
-          <label className="filtro filtro-partenza">
-            <span>Parti da</span>
-            <select value={partenzaAttiva} onChange={(e) => impostaFiltro('partenza', e.target.value)}>
-              <option value="">Tutte le città</option>
-              {cittaPartenza.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </label>
-          <label className="filtro filtro-data">
-            <span>Dal</span>
-            <input type="date" value={dataDa} onChange={(e) => impostaFiltro('dataDa', e.target.value)} />
-          </label>
-          <label className="filtro filtro-data">
-            <span>Al</span>
-            <input type="date" value={dataA} onChange={(e) => impostaFiltro('dataA', e.target.value)} />
-          </label>
-          <label className="filtro filtro-prezzo">
-            <span>Prezzo</span>
-            <select value={prezzoMax} onChange={(e) => impostaFiltro('prezzoMax', e.target.value)}>
-              <option value="">Qualsiasi</option>
-              <option value="30">Fino a 30 €</option>
-              <option value="60">Fino a 60 €</option>
-              <option value="100">Fino a 100 €</option>
-            </select>
-          </label>
-          <label className="filtro filtro-ordina">
-            <span>Ordina per</span>
-            <select value={ordina} onChange={(e) => impostaFiltro('ordina', e.target.value === 'prezzo' ? 'prezzo' : '')}>
-              <option value="data">Data</option>
-              <option value="prezzo">Prezzo più basso</option>
-            </select>
-          </label>
-          {filtriAttivi && (
-            <button type="button" className="btn btn-tertiary" onClick={azzeraFiltri}>Azzera filtri</button>
-          )}
-        </div>
+        {/* Senza risultati lo stato vuoto qui sotto ha già "Mostra tutti gli eventi" */}
+        {ricercaTesto && !caricamento && !errore && eventiFiltrati.length > 0 && (
+          <div className="ricerca-attiva">
+            <p>Risultati per <strong>«{ricercaTesto}»</strong></p>
+            <button type="button" className="btn btn-tertiary btn-sm" onClick={azzeraFiltri}>Mostra tutti</button>
+          </div>
+        )}
 
         {caricamento && (
           <div className="elenco-eventi" aria-busy="true" aria-label="Carico gli eventi…">
@@ -355,9 +284,9 @@ export function HomePage() {
         {!caricamento && !errore && eventiFiltrati.length === 0 && (
           filtriAttivi ? (
             <div className="stato-vuoto">
-              <h3>Nessun evento con questi filtri</h3>
-              <p>Prova a togliere un filtro o a cambiare città di partenza.</p>
-              <button type="button" className="btn btn-secondary" onClick={azzeraFiltri}>Azzera filtri</button>
+              <h3>{ricercaTesto ? 'Nessun evento trovato' : 'Nessun evento in questa categoria'}</h3>
+              <p>{ricercaTesto ? "Controlla come hai scritto il nome dell'artista o dell'evento, oppure guarda tutti gli eventi in programma." : 'Guarda tutti gli eventi in programma.'}</p>
+              <button type="button" className="btn btn-secondary" onClick={azzeraFiltri}>Mostra tutti gli eventi</button>
             </div>
           ) : (
             <div className="stato-vuoto">
