@@ -2,15 +2,22 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { clienteAuthApi, ErroreClienteAuth } from '../api/clienteAuth';
 import { salvaTokenCliente } from '../features/clienteSessione';
+import { AuthShell } from '../features/AuthShell';
+import { CampoTesto } from '../features/checkout/CampoTesto';
+import { CampoPassword } from '../features/CampoPassword';
+import { useSeoTags } from '../features/useSeoTags';
 import '../styles/account.css';
 
 export function AccediPage() {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errore, setErrore] = useState(searchParams.get('motivo') === 'scaduta' ? 'La tua sessione è scaduta — accedi di nuovo.' : '');
+  const [errore, setErrore] = useState('');
   const [caricamento, setCaricamento] = useState(false);
   const [inviandoVerifica, setInviandoVerifica] = useState(false);
+  // Esito del "rimanda email di conferma": prima era un alert() del
+  // browser, ora un messaggio che resta sulla pagina.
+  const [esitoVerifica, setEsitoVerifica] = useState('');
   const navigate = useNavigate();
   // Login "normale" (non da un checkout/altro flusso che chiede di
   // accedere per continuare) riporta alla home, non dentro l'account —
@@ -18,10 +25,18 @@ export function AccediPage() {
   // navigare il sito come chiunque altro, non finire dritto nella
   // sezione account (ci arriva cliccando il proprio nome, quando vuole).
   const dopo = searchParams.get('dopo') || '/';
+  const sessioneScaduta = searchParams.get('motivo') === 'scaduta';
+
+  useSeoTags({
+    title: 'Accedi — OnWay',
+    description: 'Entra nel tuo account OnWay per vedere i tuoi viaggi e prenotare più in fretta.',
+    url: `${window.location.origin}/accedi`,
+  });
 
   async function accedi(e: React.FormEvent) {
     e.preventDefault();
     setErrore('');
+    setEsitoVerifica('');
     setCaricamento(true);
     try {
       const { token } = await clienteAuthApi.login(email, password);
@@ -36,46 +51,53 @@ export function AccediPage() {
 
   async function rimandaVerifica() {
     setInviandoVerifica(true);
+    setEsitoVerifica('');
     try {
       await clienteAuthApi.rimandaVerifica(email);
-      alert('Se l\'email risulta registrata e non ancora confermata, ti abbiamo appena mandato un nuovo link.');
+      setEsitoVerifica("Se l'indirizzo risulta registrato e non ancora confermato, ti abbiamo appena mandato un nuovo link.");
     } finally {
       setInviandoVerifica(false);
     }
   }
 
   return (
-    <div className="pagina-auth">
-      <form onSubmit={accedi} className="box-auth">
-        <h1>Accedi</h1>
-        <p className="sottotitolo-auth">Entra nel tuo account OnWay per prenotare e vedere i tuoi viaggi.</p>
+    <AuthShell>
+      <h1>Accedi</h1>
+      <p className="auth-sottotitolo">Per vedere i tuoi viaggi e prenotare più in fretta.</p>
 
-        <label>Email</label>
-        <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      {sessioneScaduta && <p className="avviso avviso-attenzione auth-avviso">La sessione è scaduta, accedi di nuovo.</p>}
 
-        <label>Password</label>
-        <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        <p style={{ textAlign: 'right', margin: '-6px 0 4px' }}>
-          <Link to="/password-dimenticata" style={{ fontSize: 'var(--testo-md)' }}>Password dimenticata?</Link>
-        </p>
+      <form onSubmit={accedi}>
+        <CampoTesto
+          id="accedi-email" etichetta="Email" type="email" autoComplete="email" required
+          value={email} onChange={(e) => setEmail(e.target.value)}
+        />
+        <CampoPassword
+          id="accedi-password" etichetta="Password" autoComplete="current-password" required
+          value={password} onChange={(e) => setPassword(e.target.value)}
+          azione={<Link className="campo-etichetta-link" to="/password-dimenticata">Password dimenticata?</Link>}
+        />
 
         {errore && (
-          <div className="errore-auth">
+          <div className="avviso avviso-errore auth-avviso" role="alert">
             <p>{errore}</p>
             {errore.toLowerCase().includes('conferma') && (
-              <button type="button" onClick={rimandaVerifica} disabled={inviandoVerifica} className="link-auth">
-                {inviandoVerifica ? 'Invio...' : 'Rimanda email di conferma'}
+              <button type="button" className="btn btn-tertiary" onClick={rimandaVerifica} disabled={inviandoVerifica}>
+                {inviandoVerifica ? 'Invio in corso…' : 'Rimanda email di conferma'}
               </button>
             )}
           </div>
         )}
+        {esitoVerifica && <p className="avviso avviso-ok auth-avviso" role="status">{esitoVerifica}</p>}
 
-        <button type="submit" className="search-cta" disabled={caricamento}>{caricamento ? 'Accesso...' : 'Accedi'}</button>
-
-        <p className="sottotitolo-auth" style={{ marginTop: 18 }}>
-          Non hai ancora un account? <Link to={`/registrati?dopo=${encodeURIComponent(dopo)}`}>Registrati</Link>
-        </p>
+        <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={caricamento}>
+          {caricamento ? 'Accesso in corso…' : 'Accedi'}
+        </button>
       </form>
-    </div>
+
+      <p className="auth-link-riga">
+        Non hai un account? <Link to={`/registrati?dopo=${encodeURIComponent(dopo)}`}>Registrati</Link>
+      </p>
+    </AuthShell>
   );
 }

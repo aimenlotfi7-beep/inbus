@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { clienteAuthApi, ErroreClienteAuth } from '../api/clienteAuth';
 import { salvaTokenCliente } from '../features/clienteSessione';
+import { AuthShell } from '../features/AuthShell';
+import { Icona } from '../features/Icone';
 import '../styles/account.css';
 
 export function VerificaEmailPage() {
@@ -25,25 +27,26 @@ export function VerificaEmailPage() {
   }, [token, navigate]);
 
   return (
-    <div className="pagina-auth">
-      <div className="box-auth" style={{ textAlign: 'center' }}>
-        {stato === 'verificando' && <p className="sottotitolo-auth">Verifica in corso...</p>}
-        {stato === 'ok' && (
-          <>
-            <h1>Email confermata ✓</h1>
-            <p className="sottotitolo-auth">Ti stiamo portando alla tua area personale...</p>
-          </>
-        )}
-        {stato === 'errore' && (
-          <>
-            <h1>Verifica non riuscita</h1>
-            <p className="sottotitolo-auth">{messaggioErrore}</p>
-            <Link to="/registrati" className="search-cta" style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center' }}>
-              Registrati di nuovo
-            </Link>
-          </>
-        )}
-      </div>
-    </div>
+    <AuthShell>
+      {stato === 'verificando' && <p className="auth-sottotitolo" role="status">Verifica in corso…</p>}
+
+      {stato === 'ok' && (
+        <>
+          <h1>Email confermata</h1>
+          <p className="auth-esito" role="status">
+            <Icona nome="spunta" dimensione={20} strokeWidth={2.4} />
+            Ti stiamo portando nella tua area personale…
+          </p>
+        </>
+      )}
+
+      {stato === 'errore' && (
+        <>
+          <h1>Verifica non riuscita</h1>
+          <p className="avviso avviso-errore auth-avviso" role="alert">{messaggioErrore}</p>
+          <Link to="/registrati" className="btn btn-primary btn-lg btn-block">Registrati di nuovo</Link>
+        </>
+      )}
+    </AuthShell>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { LogoOnWay } from './LogoOnWay';
 import { Link } from 'react-router-dom';
 
@@ -7,15 +7,20 @@ export interface VoceMenuAccount {
   label: string;
 }
 
-/** Menu laterale unico per i tre account self-service (promoter,
- *  organizzatore, tour leader) — stesso meccanismo del gestionale:
- *  sidebar fissa su desktop, su mobile un pulsante ☰ apre un pannello
- *  a schermo intero con l'elenco verticale (niente fila orizzontale
- *  di tab che su schermi stretti si accorcia o va a capo in modo
- *  imprevedibile). Un solo componente invece di tre copie quasi
- *  identiche — un cambio di stile/comportamento vale per tutti. */
+/** Guscio unico dei quattro account (cliente, promoter, organizzatore,
+ *  tour leader): barra in alto, menu delle sezioni e contenuto.
+ *
+ *  Su desktop il menu è una colonna a sinistra. Su telefono NON è più
+ *  un pannello a schermo intero dietro un ☰: le sezioni stanno in una
+ *  riga di chip che scorre in orizzontale, sempre visibile sotto la
+ *  barra — si vede dove si è senza aprire niente, e si cambia sezione
+ *  con un tocco solo invece di tre.
+ *
+ *  Un solo componente invece di quattro copie quasi identiche: un
+ *  cambio di struttura vale per tutti. */
 export function AccountShell({
-  etichettaTipo, voci, voceAttiva, onCambiaVoce, nomeUtente, onLogout, children, contenutoLarghezzaPiena, temaChiaro,
+  etichettaTipo, voci, voceAttiva, onCambiaVoce, nomeUtente, onLogout, children,
+  contenutoLarghezzaPiena, temaChiaro, esciInSezione,
 }: {
   etichettaTipo: string;
   voci: VoceMenuAccount[];
@@ -39,39 +44,52 @@ export function AccountShell({
    *  sono scopati account.css e sito/account-cliente.css (tema
    *  scuro). Le due classi non convivono mai sullo stesso guscio. */
   temaChiaro?: boolean;
+  /** Chi ha una sezione "Profilo" ci mette dentro il pulsante "Esci"
+   *  (account cliente): su telefono, dove non c'è la colonna del menu,
+   *  il guscio allora non lo mostra due volte. Senza questo prop il
+   *  pulsante resta comunque raggiungibile sotto le chip. */
+  esciInSezione?: boolean;
 }) {
-  const [menuMobileAperto, setMenuMobileAperto] = useState(false);
-
-  function scegli(id: string) {
-    onCambiaVoce(id);
-    setMenuMobileAperto(false); // su mobile, scegliere una voce chiude subito il pannello
-  }
+  // Se la sezione attiva arriva dall'indirizzo (?sezione=privacy) la
+  // sua chip può stare fuori dallo schermo: la riportiamo in vista
+  // senza muovere la pagina in verticale.
+  const barraRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    barraRef.current?.querySelector('.account-tab-chip.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }, [voceAttiva]);
 
   return (
-    <div className={`account-shell${temaChiaro ? ' pagina-partner' : ' account-cliente'}`}>
-      {/* Barra in alto, a tutta larghezza — il nome sempre a sinistra,
-          il logo del sito (cliccabile, torna a navigare) sempre a
-          destra. Separata dalla sidebar sotto: quella resta solo per
-          le voci del menu. */}
+    <div className={`account-shell${temaChiaro ? ' pagina-partner' : ' account-cliente'}${esciInSezione ? ' esci-in-sezione' : ''}`}>
+      {/* Barra in alto, a tutta larghezza: il logo del sito a sinistra
+          (cliccabile, torna a navigare) e il nome di chi è collegato a
+          destra. Sotto, il menu — sidebar su desktop, chip su telefono. */}
       <div className="account-topbar">
         <Link to="/" className="account-topbar-logo" aria-label="Torna al sito"><LogoOnWay come="testo" /></Link>
         <span className="account-topbar-nome">{nomeUtente ?? etichettaTipo}</span>
       </div>
 
+      <nav className="account-tab-bar" aria-label="Sezioni" ref={barraRef}>
+        {voci.map((v) => (
+          <button
+            key={v.id} type="button"
+            className={`account-tab-chip${voceAttiva === v.id ? ' active' : ''}`}
+            aria-current={voceAttiva === v.id ? 'page' : undefined}
+            onClick={() => onCambiaVoce(v.id)}
+          >
+            {v.label}
+          </button>
+        ))}
+      </nav>
+
       <div className="account-corpo">
         <aside className="account-sidebar">
-          <button type="button" className="account-hamburger" aria-label="Apri il menu" onClick={() => setMenuMobileAperto(true)}>☰ Menu</button>
-
-          <nav className={`account-nav${menuMobileAperto ? ' aperto' : ''}`}>
-            <div className="account-nav-intestazione-mobile">
-              <span>Menu</span>
-              <button type="button" aria-label="Chiudi il menu" onClick={() => setMenuMobileAperto(false)}>✕</button>
-            </div>
+          <nav className="account-nav" aria-label="Sezioni">
             {voci.map((v) => (
               <button
                 key={v.id} type="button"
                 className={`account-nav-voce${voceAttiva === v.id ? ' active' : ''}`}
-                onClick={() => scegli(v.id)}
+                aria-current={voceAttiva === v.id ? 'page' : undefined}
+                onClick={() => onCambiaVoce(v.id)}
               >
                 {v.label}
               </button>

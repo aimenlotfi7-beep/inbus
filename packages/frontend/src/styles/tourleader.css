@@ -1,14 +1,29 @@
 /* ============================================================
-   tourleader.css — candidatura tour leader, registrazione
-   fornitore, risposta al preventivo (TourLeaderPage,
-   FornitoreRegistrazionePage, FornitorePreventivoPage)
+   tourleader.css — TOUR LEADER e FORNITORI
    ------------------------------------------------------------
-   Pagine pubbliche scure a colonna stretta. Tutto scopato sotto
-   .pagina-tourleader (wrapper messo dalle tre pagine): senza scope
-   main{max-width} e h1{uppercase} finivano su tutto il sito.
-   Reset, header, .logo, .btn*, .form-grid (griglia e misure dei
-   campi) ed .errore vengono da sito/base.css; palette da
-   onway-theme.css (.pagina-tourleader).
+   Tre blocchi, ognuno scopato sotto il suo wrapper (Vite mette
+   tutti i fogli in un solo bundle: senza scope main{max-width} e
+   h1{uppercase} finivano su tutto il sito):
+
+   1. .pagina-tourleader  candidatura tour leader, registrazione
+      fornitore, risposta al preventivo (TourLeaderPage,
+      FornitoreRegistrazionePage, FornitorePreventivoPage): pagine
+      pubbliche scure a colonna stretta. Palette da onway-theme.css.
+   2. .pagina-partner .tl-*  l'app del tour leader dentro AccountShell
+      (TourLeaderLayout: eventi, lista passeggeri, ricerca): tema
+      chiaro dei portali, colori SOLO dai token di .pagina-partner
+      (--dusk, --paper, --mist, --line…) invece della palette inline
+      di prima (#f3f4f6, #2563eb…).
+   3. .tl-scan  la scansione dei biglietti a schermo intero, scura
+      (TourLeaderScanPage). I testi dell'esito sono sopra la scala
+      tipografica di proposito: si leggono a un metro dal telefono.
+
+   Reset, header, .logo, .btn*, .campo*, .form-grid ed .errore
+   vengono da sito/base.css.
+   ============================================================ */
+
+/* ============================================================
+   1. PAGINE PUBBLICHE (candidatura, fornitori)
    ============================================================ */
 .pagina-tourleader{ min-height:100vh; }
 .pagina-tourleader .back-link{ color:var(--mist); font-size:var(--testo-base); text-decoration:none; }
@@ -38,3 +53,82 @@
 }
 .pagina-tourleader .success-box h2{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; text-transform:none; margin:0 0 12px; }
 .pagina-tourleader .success-box p{ color:var(--mist); font-size:var(--testo-base); }
+
+/* ============================================================
+   2. APP DEL TOUR LEADER (dentro AccountShell, tema chiaro)
+   ============================================================ */
+.pagina-partner .tl-intro{ margin:calc(var(--sp-4) * -1) 0 var(--sp-5); color:var(--mist); font-size:var(--t-small); line-height:var(--lh-normal); }
+.pagina-partner .tl-nota{ margin:0; color:var(--mist); font-size:var(--t-small); line-height:var(--lh-normal); }
+.pagina-partner .tl-errore{ margin:0 0 var(--sp-4); }
+/* Errore inline (stessa forma di .avviso in checkout.css), rosso ink */
+.pagina-partner .avviso-errore{ background:rgba(163,20,20,.06); border-color:rgba(163,20,20,.35); color:var(--ow-danger-ink); font-weight:600; }
+.pagina-partner .tl-indietro{ margin:0 0 var(--sp-2) calc(var(--sp-2) * -1); }
+
+.pagina-partner .tl-elenco{ display:flex; flex-direction:column; gap:var(--sp-3); }
+.pagina-partner .tl-card{
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); padding:var(--sp-4);
+}
+.pagina-partner .tl-card-titolo{ margin:0 0 var(--sp-1); font-size:var(--t-body); font-weight:700; color:var(--paper); }
+.pagina-partner .tl-card-riga{ margin:0; color:var(--mist); font-size:var(--t-caption); }
+.pagina-partner .tl-azioni{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-3); }
+.pagina-partner .tl-azioni-testata{
+  display:flex; justify-content:space-between; align-items:center; gap:var(--sp-3); flex-wrap:wrap; margin-bottom:var(--sp-3);
+}
+.pagina-partner .tl-riga{ display:flex; justify-content:space-between; align-items:center; gap:var(--sp-3); flex-wrap:wrap; }
+
+.pagina-partner .tl-ricerca{ max-width:420px; }
+.pagina-partner .tl-a-bordo{
+  display:inline-flex; align-items:center; gap:var(--sp-1); color:var(--ow-ok-ink); font-size:var(--t-caption); font-weight:700;
+}
+.pagina-partner .tl-contatore{ margin:0; font-size:var(--t-body); font-weight:600; color:var(--paper); }
+.pagina-partner .tl-contatore b.completo{ color:var(--ow-ok-ink); }
+
+/* Tabella passeggeri: scorre dentro il suo riquadro, mai la pagina */
+.pagina-partner .tl-tabella-box{ background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); overflow-x:auto; }
+.pagina-partner .tl-tabella{ width:100%; border-collapse:collapse; font-size:var(--t-small); color:var(--paper); }
+.pagina-partner .tl-tabella th{
+  padding:var(--sp-3); text-align:left; color:var(--mist); font-size:var(--t-label); font-weight:600; text-transform:uppercase; letter-spacing:.5px;
+}
+.pagina-partner .tl-tabella td{ padding:var(--sp-3); border-top:1px solid var(--line); vertical-align:top; }
+.pagina-partner .tl-tabella th:first-child{ width:72px; }
+.pagina-partner .tl-tabella tr.salito td{ background:rgba(87,211,154,.12); }
+.pagina-partner .tl-tabella .secondaria{ display:block; color:var(--mist); font-size:var(--t-caption); }
+.pagina-partner .tl-tabella a{ color:var(--ow-ink); }
+.pagina-partner .tl-check{ width:24px; height:24px; margin:10px; cursor:pointer; accent-color:var(--ow-ok-ink); }
+
+/* <dialog> di conferma (account.css) sul tema chiaro */
+.pagina-partner .modale-conferma{ background:var(--dusk); color:var(--paper); border-color:var(--line); box-shadow:0 30px 60px rgba(20,22,26,.25); }
+.pagina-partner .modale-conferma > form > p{ color:var(--mist); }
+.pagina-partner .modale-conferma > form > p b{ color:var(--paper); font-family:var(--font-sans); }
+.pagina-partner .modale-conferma::backdrop{ background:rgba(20,22,26,.55); }
+
+/* ============================================================
+   3. SCANSIONE A SCHERMO INTERO
+   ============================================================ */
+.tl-scan{
+  position:relative; min-height:100vh; min-height:100dvh; background:#000; color:var(--ow-paper); font-family:var(--font-sans);
+  --sup-focus:var(--ow-accent); --btn-testo:var(--ow-paper);
+}
+.tl-scan-barra{
+  display:flex; justify-content:space-between; align-items:center; gap:var(--sp-3);
+  min-height:56px; padding:0 var(--sp-3); background:var(--ow-night); border-bottom:1px solid var(--ow-line);
+}
+.tl-scan-barra .btn-tertiary{ color:var(--ow-muted); }
+.tl-scan-conteggio{ margin:0; font-weight:700; font-size:var(--t-body); }
+.tl-scan-conteggio span{ color:var(--ow-muted); font-weight:400; }
+.tl-scan-errore{ margin:var(--sp-5); text-align:center; }
+.tl-scan .avviso-errore{ background:rgba(255,138,138,.12); border-color:rgba(255,138,138,.45); color:var(--ow-danger); font-weight:600; }
+.tl-scan-video{ position:relative; }
+.tl-scan-video video{ width:100%; display:block; }
+.tl-scan-video canvas{ display:none; }
+.tl-scan-esito{
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--sp-3);
+  padding:var(--sp-5); text-align:center; color:var(--ow-paper);
+}
+.tl-scan-esito.ok{ background:var(--ow-ok-ink); }
+.tl-scan-esito.ko{ background:var(--ow-danger-ink); }
+.tl-scan-esito-testo{
+  display:flex; align-items:center; gap:var(--sp-3); margin:0;
+  font-size:36px; font-weight:800; letter-spacing:.02em; line-height:1.1; text-transform:uppercase;
+}
+.tl-scan-esito-nome{ margin:0; font-size:22px; font-weight:600; }

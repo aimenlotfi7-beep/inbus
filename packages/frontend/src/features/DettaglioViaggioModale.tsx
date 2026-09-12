@@ -1,17 +1,19 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { prenotazioniApi, type DettaglioPrenotazione } from '../api/prenotazioni';
 import { ticketApi, type Biglietto } from '../api/ticket';
 import { calcolaStatoPrenotazione } from './statoPrenotazione';
 import { PulsanteCondividi } from './PulsanteCondividi';
-import { formattaEuro } from '../shared/formato';
+import { ModaleRimborso } from './ModaleRimborso';
+import { Icona } from './Icone';
+import { formattaEuro, formattaData, plurale } from '../shared/formato';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+const formatoDataLunga = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
 /** La "travel card" — tutto quello che serve sapere su UN viaggio in
- *  una sola schermata: percorso, partecipanti, stato del pagamento con
- *  una mini-timeline, e le azioni possibili da qui (saldare, chattare,
- *  chiedere assistenza). Sostituisce l'idea di dover andare a cercare
- *  le informazioni in posti diversi. */
+ *  una sola schermata, con la stessa gerarchia della card in Panoramica:
+ *  stato, titolo, data, percorso, poi biglietto, pagamento, passeggeri
+ *  e le azioni possibili da qui (saldare, scrivere allo staff, chiedere
+ *  il rimborso). Su telefono è un foglio che sale dal basso. */
 export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
   pnr: string;
   email: string;
@@ -20,7 +22,10 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
 }) {
   const [dettaglio, setDettaglio] = useState<DettaglioPrenotazione | null>(null);
   const [biglietti, setBiglietti] = useState<Biglietto[]>([]);
+  const [rimborsoAperto, setRimborsoAperto] = useState(false);
+  const [esitoRimborso, setEsitoRimborso] = useState('');
   const idTitolo = useId();
+  const chiudiRef = useRef<HTMLButtonElement>(null);
   // Aggiornato ogni minuto — serve per far scorrere il conto alla
   // rovescia senza dover ricaricare la pagina.
   const [adesso, setAdesso] = useState(() => Date.now());
@@ -31,48 +36,40 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
 
   useEffect(() => {
     prenotazioniApi.dettaglioPerCliente(pnr, email).then(setDettaglio).catch(() => setDettaglio(null));
-    ticketApi.lista(pnr, email).then(setBiglietti);
+    ticketApi.lista(pnr, email).then(setBiglietti).catch(() => setBiglietti([]));
   }, [pnr, email]);
 
-  // Chi naviga solo da tastiera prima non aveva alcun modo di chiudere
-  // il popup — stesso comportamento del tasto ✕. In cima, prima di
-  // ogni return, perché gli hook non possono essere condizionali.
+  // Il fuoco va sul pulsante di chiusura all'apertura; Esc chiude — ma
+  // non mentre è aperta la finestra del rimborso, che gestisce da sé
+  // il suo Esc. In cima, prima di ogni return: gli hook non possono
+  // essere condizionali.
+  useEffect(() => { chiudiRef.current?.focus(); }, []);
   useEffect(() => {
     function allaPressione(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !rimborsoAperto) onClose();
     }
     window.addEventListener('keydown', allaPressione);
     return () => window.removeEventListener('keydown', allaPressione);
-  }, [onClose]);
+  }, [onClose, rimborsoAperto]);
 
-  async function richiediRimborso() {
-    const motivo = prompt('Vuoi aggiungere una nota per l\'amministrazione? (facoltativo, puoi lasciare vuoto)') ?? '';
-    try {
-      const r = await fetch(`${API_URL}/api/richieste-rimborso`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pnr, email, motivo: motivo || undefined }),
-      });
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).errore ?? 'Richiesta non riuscita.');
-      alert('Richiesta di rimborso inviata — verrà valutata al più presto.');
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Richiesta non riuscita, riprova.');
-    }
-  }
+  const pulsanteChiudi = (
+    <button ref={chiudiRef} type="button" className="btn-icona travel-close" onClick={onClose} aria-label="Chiudi">
+      <Icona nome="chiudi" dimensione={20} />
+    </button>
+  );
 
   if (!dettaglio) {
     return (
       <div className="travel-overlay" onClick={onClose}>
         <div className="travel-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Dettaglio viaggio">
-          <button className="travel-close" onClick={onClose} aria-label="Chiudi">✕</button>
-          <p style={{ color: 'var(--mist)', marginTop: 30 }}>Carico...</p>
+          {pulsanteChiudi}
+          <p className="travel-nota" role="status">Carico…</p>
         </div>
       </div>
     );
   }
 
   const ev = dettaglio.evento;
-
   const oggi = new Date().toISOString().slice(0, 10);
   const giorniAlViaggio = ev ? Math.ceil((new Date(ev.data).getTime() - Date.now()) / (24 * 3600 * 1000)) : null;
   const pagamentoCompleto = dettaglio.tipoPagamento === 'COMPLETO' || dettaglio.saldoPagato;
@@ -81,35 +78,29 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
   return (
     <div className="travel-overlay" onClick={onClose}>
       <div className="travel-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby={idTitolo}>
-        <button className="travel-close" onClick={onClose} aria-label="Chiudi">✕</button>
+        <div className="travel-testata">
+          <span className={`badge ${stato.classe}`}>{stato.etichetta}</span>
+          {pulsanteChiudi}
+        </div>
 
-        <span className={`badge ${stato.classe}`}>
-          {stato.chiave === 'confermata' ? '✓ ' : stato.chiave === 'acconto_scaduto' ? '⚠ ' : ''}{stato.etichetta}
-        </span>
-
-        <h1 id={idTitolo} style={{ margin: '10px 0 2px' }}>{ev?.artista ?? 'Evento'}</h1>
+        <h1 id={idTitolo}>{ev?.artista ?? 'Evento'}</h1>
         {ev && (
-          <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', margin: 0 }}>
-            {new Date(ev.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            {giorniAlViaggio !== null && ev.data >= oggi && (giorniAlViaggio === 0 ? ' · oggi!' : giorniAlViaggio === 1 ? ' · domani!' : ` · tra ${giorniAlViaggio} giorni`)}
+          <p className="travel-data">
+            {formatoDataLunga.format(new Date(ev.data))}
+            {giorniAlViaggio !== null && ev.data >= oggi && (giorniAlViaggio <= 0 ? ' · oggi' : giorniAlViaggio === 1 ? ' · domani' : ` · tra ${plurale(giorniAlViaggio, 'giorno', 'giorni')}`)}
           </p>
         )}
 
-        <div className="travel-route">
+        <p className="travel-route">
+          <Icona nome="pin" dimensione={18} />
           <b>{dettaglio.fermataCitta}</b>
-          {dettaglio.fermataOrario && <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{dettaglio.fermataOrario}</span>}
-          <span className="travel-arrow">→</span>
+          {dettaglio.fermataOrario && <span className="travel-ora">{dettaglio.fermataOrario}</span>}
+          <span className="travel-arrow" aria-hidden="true">→</span>
           <b>{ev?.citta}</b>
-        </div>
+        </p>
+        <p className="travel-nota">Codice prenotazione <span className="pnr-tag">{dettaglio.pnr}</span></p>
 
-        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>PNR <span className="pnr-tag">{dettaglio.pnr}</span></p>
-
-        <p className="section-label" style={{ marginTop: 18 }}>Partecipanti ({dettaglio.passeggeri})</p>
-        <div className="travel-partecipanti">
-          {dettaglio.partecipanti.map((p, i) => (
-            <span className="travel-partecipante-chip" key={i}>{p.nome} {p.cognome}</span>
-          ))}
-        </div>
+        {esitoRimborso && <p className="avviso avviso-ok travel-avviso" role="status">{esitoRimborso}</p>}
 
         {dettaglio.stato === 'CONFERMATA' && (() => {
           // Il biglietto arriva dopo lo smistamento sui bus per età, il
@@ -120,32 +111,24 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
           const msAllaDisponibilita = disponibileDal ? new Date(disponibileDal).getTime() - adesso : null;
           const busAssegnato = biglietti.find((b) => b.bus)?.bus ?? null;
           return (
-            <>
-              <p className="section-label" style={{ marginTop: 18 }}>I miei biglietti</p>
+            <section className="travel-sezione">
+              <h2 className="section-label">Biglietto</h2>
               {!pagamentoCompleto ? (
-                <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>
-                  I biglietti saranno disponibili dopo il saldo, il giorno prima della partenza.
-                </p>
+                <p className="travel-nota">I biglietti saranno disponibili dopo il saldo, il giorno prima della partenza.</p>
               ) : msAllaDisponibilita !== null && msAllaDisponibilita > 0 ? (
-                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '14px 16px' }}>
-                  <p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>
-                    Il biglietto con il tuo bus arriva via email il giorno prima della partenza, e da quel momento puoi scaricarlo anche da qui.
-                  </p>
-                  <p style={{ margin: '6px 0 0', fontSize: 'var(--testo-2xl)', fontWeight: 700 }}>
-                    {formattaConteggio(msAllaDisponibilita / 3600000)}
-                  </p>
-                  <p style={{ margin: '4px 0 0', fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>
-                    Prima dividiamo i passeggeri sui bus: per questo il bus non è ancora indicato.
-                  </p>
+                <div className="travel-riquadro">
+                  <p>Il biglietto con il tuo bus arriva via email il giorno prima della partenza, e da quel momento puoi scaricarlo anche da qui.</p>
+                  <p className="travel-conteggio">{formattaConteggio(msAllaDisponibilita / 3600000)}</p>
+                  <p className="travel-nota">Prima dividiamo i passeggeri sui bus: per questo il bus non è ancora indicato.</p>
                 </div>
               ) : biglietti.length > 0 && busAssegnato ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>Il tuo bus: <b>{busAssegnato}</b></p>
+                <div className="travel-biglietti">
+                  <p className="travel-bus"><Icona nome="bus" dimensione={18} />Il tuo bus: <b>{busAssegnato}</b></p>
                   {biglietti.map((b) => (
                     <div key={b.token} className="travel-biglietto-riga">
                       <span>{b.nome} {b.cognome}</span>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <a className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 10px', textDecoration: 'none' }} href={ticketApi.urlDownload(b.token)} target="_blank" rel="noreferrer">
+                      <div className="travel-biglietto-azioni">
+                        <a className="btn btn-secondary btn-sm" href={ticketApi.urlDownload(b.token)} target="_blank" rel="noreferrer">
                           Scarica
                         </a>
                         <PulsanteCondividi
@@ -159,40 +142,59 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
                   ))}
                 </div>
               ) : (
-                <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>
-                  Stiamo assegnando i posti sui bus: il biglietto arriva a breve via email e comparirà qui. Se non arriva entro qualche ora, scrivici in chat.
+                <p className="travel-nota">
+                  Stiamo assegnando i posti sui bus: il biglietto arriva a breve via email e comparirà qui. Se non arriva entro qualche ora, scrivici.
                 </p>
               )}
-            </>
+            </section>
           );
         })()}
 
-        <p className="section-label" style={{ marginTop: 18 }}>Pagamento</p>
-        <div className="travel-timeline">
-          <div className="travel-timeline-riga">✓ Prenotazione confermata</div>
-          {pagamentoCompleto ? (
-            <div className="travel-timeline-riga">✓ Pagamento completato — {formattaEuro(dettaglio.totale)}</div>
-          ) : (
-            <>
-              <div className="travel-timeline-riga">✓ Acconto ricevuto</div>
-              <div className="travel-timeline-riga" style={{ color: stato.chiave === 'acconto_scaduto' ? 'var(--pink)' : '#e0a95b' }}>
-                {stato.chiave === 'acconto_scaduto' ? '⚠ Termine per il saldo superato' : '⚠ Saldo da versare'}
-                {dettaglio.scadenzaSaldo ? ` ${stato.chiave === 'acconto_scaduto' ? 'il' : 'entro il'} ${new Date(dettaglio.scadenzaSaldo).toLocaleDateString('it-IT')}` : ''}
-              </div>
-            </>
-          )}
-        </div>
+        <section className="travel-sezione">
+          <h2 className="section-label">Pagamento</h2>
+          <ul className="travel-timeline">
+            <li><Icona nome="spunta" dimensione={18} strokeWidth={2.4} className="fatto" />Prenotazione confermata</li>
+            {pagamentoCompleto ? (
+              <li><Icona nome="spunta" dimensione={18} strokeWidth={2.4} className="fatto" />Pagamento completato: {formattaEuro(dettaglio.totale)}</li>
+            ) : (
+              <>
+                <li><Icona nome="spunta" dimensione={18} strokeWidth={2.4} className="fatto" />Acconto ricevuto</li>
+                <li>
+                  <Icona nome="info" dimensione={18} className={stato.chiave === 'acconto_scaduto' ? 'scaduto' : 'in-attesa'} />
+                  {stato.chiave === 'acconto_scaduto' ? 'Termine per il saldo superato' : 'Saldo da versare'}
+                  {dettaglio.scadenzaSaldo ? ` ${stato.chiave === 'acconto_scaduto' ? 'il' : 'entro il'} ${formattaData(dettaglio.scadenzaSaldo)}` : ''}
+                </li>
+              </>
+            )}
+          </ul>
+        </section>
+
+        <section className="travel-sezione">
+          <h2 className="section-label">{plurale(dettaglio.passeggeri, 'Passeggero', 'Passeggeri')}</h2>
+          <div className="travel-partecipanti">
+            {dettaglio.partecipanti.map((p, i) => (
+              <span className="travel-partecipante-chip" key={i}>{p.nome} {p.cognome}</span>
+            ))}
+          </div>
+        </section>
 
         {dettaglio.stato === 'CONFERMATA' && (
           <div className="travel-azioni">
             {!pagamentoCompleto && (
-              <a className="btn btn-primary" style={{ textAlign: 'center', textDecoration: 'none' }} href={`/completa-saldo/${dettaglio.pnr}`}>
-                Paga il saldo
-              </a>
+              <a className="btn btn-primary btn-block" href={`/completa-saldo/${dettaglio.pnr}`}>Paga il saldo</a>
             )}
-            <button className="btn btn-ghost" onClick={onVaiAllaChat}>💬 Hai bisogno di aiuto? Scrivi allo staff</button>
-            <button className="btn-mini" onClick={richiediRimborso}>Richiedi rimborso</button>
+            <button type="button" className="btn btn-secondary btn-block" onClick={onVaiAllaChat}>Scrivi allo staff</button>
+            <button type="button" className="btn btn-tertiary" onClick={() => setRimborsoAperto(true)}>Richiedi rimborso</button>
           </div>
+        )}
+
+        {rimborsoAperto && (
+          <ModaleRimborso
+            pnr={dettaglio.pnr}
+            email={email}
+            onChiudi={() => setRimborsoAperto(false)}
+            onInviata={() => setEsitoRimborso('Richiesta di rimborso inviata: ti rispondiamo via email appena è stata valutata.')}
+          />
         )}
       </div>
     </div>
@@ -206,7 +208,7 @@ function formattaConteggio(oreRimanenti: number): string {
   if (oreRimanenti <= 0) return 'Disponibile a breve';
   const giorni = Math.floor(oreRimanenti / 24);
   const oreResto = Math.floor(oreRimanenti % 24);
-  if (giorni > 0) return `${giorni} giorno${giorni === 1 ? '' : 'i'} e ${oreResto} or${oreResto === 1 ? 'a' : 'e'}`;
+  if (giorni > 0) return `${plurale(giorni, 'giorno', 'giorni')} e ${plurale(oreResto, 'ora', 'ore')}`;
   const minutiResto = Math.round((oreRimanenti - oreResto) * 60);
-  return `${oreResto} or${oreResto === 1 ? 'a' : 'e'} e ${minutiResto} minuti`;
+  return `${plurale(oreResto, 'ora', 'ore')} e ${plurale(minutiResto, 'minuto', 'minuti')}`;
 }

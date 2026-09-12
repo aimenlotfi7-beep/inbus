@@ -5,8 +5,6 @@ import type { PasseggeroBus } from '../api/eventi';
 import { TourLeaderLayout } from '../features/TourLeaderLayout';
 import { formattaData, formattaDataOra } from '../shared/formato';
 
-const colori = { testo: '#1f2430', tenue: '#6b7280', bordo: '#e3e5ea', primario: '#2563eb', errore: '#A31414', verde: '#15803d' };
-
 /** La lista dei passeggeri del bus del tour leader: una tabella con una
  *  casella per segnare chi è salito (la stessa spunta della scansione del
  *  biglietto) e il PDF da scaricare o stampare. È disponibile dal giorno
@@ -76,26 +74,21 @@ export function TourLeaderPasseggeriPage() {
     : passeggeri;
   const saliti = passeggeri.filter((p) => p.salito).length;
 
-  const pulsante = (primario: boolean) => ({
-    padding: '8px 14px', borderRadius: 8, fontSize: 'var(--testo-md)', fontWeight: 600, cursor: 'pointer',
-    border: primario ? 'none' : `1px solid ${colori.bordo}`, background: primario ? colori.primario : '#fff', color: primario ? '#fff' : colori.testo,
-  });
-
   return (
     <TourLeaderLayout vocedAttiva="eventi">
-      <button type="button" onClick={() => navigate('/scansione')} style={{ background: 'none', border: 'none', color: colori.primario, padding: 0, marginBottom: 10, cursor: 'pointer', fontSize: 'var(--testo-md)' }}>← I tuoi eventi</button>
-      <h1 style={{ fontSize: 'var(--testo-3xl)', fontWeight: 700, color: colori.testo, margin: '0 0 4px' }}>Passeggeri</h1>
-      <p style={{ color: colori.tenue, fontSize: 'var(--testo-base)', margin: '0 0 16px' }}>
+      <button type="button" className="btn btn-tertiary tl-indietro" onClick={() => navigate('/scansione')}>← I tuoi eventi</button>
+      <h1 className="page-title">Passeggeri</h1>
+      <p className="tl-intro">
         {bus ? `${bus.eventoArtista} · ${formattaData(bus.eventoData)} · Bus ${bus.riferimento}` : 'Il tuo bus'}
       </p>
 
-      {errore && <p role="alert" style={{ color: colori.errore, marginBottom: 12 }}>{errore}</p>}
-      {!dati && !errore && <p style={{ color: colori.tenue }}>Carico…</p>}
+      {errore && <p className="avviso avviso-errore tl-errore" role="alert">{errore}</p>}
+      {!dati && !errore && <p className="tl-nota" role="status">Carico…</p>}
 
       {dati && !dati.disponibile && (
-        <div style={{ background: '#fff', border: `1px solid ${colori.bordo}`, borderRadius: 12, padding: 16 }}>
-          <p style={{ margin: 0, fontWeight: 600, color: colori.testo }}>La lista non è ancora pronta</p>
-          <p style={{ margin: '6px 0 0', color: colori.tenue }}>
+        <div className="tl-card">
+          <p className="tl-card-titolo">La lista non è ancora pronta</p>
+          <p className="tl-nota">
             I passeggeri vengono smistati sui bus per età il giorno prima della partenza{dati.disponibileDal ? `: la lista sarà qui dal ${formattaDataOra(dati.disponibileDal)}` : ''}.
           </p>
         </div>
@@ -103,61 +96,62 @@ export function TourLeaderPasseggeriPage() {
 
       {dati?.disponibile && (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-            <p style={{ margin: 0, fontSize: 'var(--testo-lg)', fontWeight: 600, color: colori.testo }}>
-              Saliti <span style={{ color: saliti === passeggeri.length && passeggeri.length > 0 ? colori.verde : colori.testo }}>{saliti}</span> su {passeggeri.length}
+          <div className="tl-azioni-testata">
+            <p className="tl-contatore">
+              Saliti <b className={saliti === passeggeri.length && passeggeri.length > 0 ? 'completo' : undefined}>{saliti}</b> su {passeggeri.length}
             </p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" style={pulsante(false)} onClick={() => navigate(`/scansione/bus/${busId}`)}>Scansiona biglietti</button>
-              <button type="button" style={pulsante(true)} disabled={scaricando} onClick={scaricaPdf}>{scaricando ? 'Preparo il PDF…' : 'Scarica PDF'}</button>
+            <div className="tl-azioni">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(`/scansione/bus/${busId}`)}>Scansiona biglietti</button>
+              <button type="button" className="btn btn-primary btn-sm" disabled={scaricando} onClick={scaricaPdf}>{scaricando ? 'Preparo il PDF…' : 'Scarica PDF'}</button>
             </div>
           </div>
 
-          <input
-            type="search" value={ricerca} onChange={(e) => setRicerca(e.target.value)}
-            placeholder="Cerca per nome, PNR o fermata" aria-label="Cerca un passeggero"
-            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 8, border: `1px solid ${colori.bordo}`, fontSize: 'var(--testo-base)', marginBottom: 12 }}
-          />
+          <div className="campo">
+            <label className="campo-etichetta" htmlFor="tl-filtra">Cerca un passeggero</label>
+            <input
+              id="tl-filtra" className="campo-input" type="search" value={ricerca} onChange={(e) => setRicerca(e.target.value)}
+              placeholder="Nome, PNR o fermata" autoComplete="off"
+            />
+          </div>
 
           {passeggeri.length === 0 ? (
-            <p style={{ color: colori.tenue }}>Nessun passeggero su questo bus.</p>
+            <p className="tl-nota">Nessun passeggero su questo bus.</p>
           ) : (
-            <div style={{ background: '#fff', border: `1px solid ${colori.bordo}`, borderRadius: 12, overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--testo-base)', color: colori.testo }}>
+            <div className="tl-tabella-box">
+              <table className="tl-tabella">
                 <thead>
-                  <tr style={{ textAlign: 'left', color: colori.tenue, fontSize: 'var(--testo-sm)' }}>
-                    <th style={{ padding: '10px 12px', width: 64 }}>Salito</th>
-                    <th style={{ padding: '10px 12px' }}>Passeggero</th>
-                    <th style={{ padding: '10px 12px' }}>Fermata</th>
-                    <th style={{ padding: '10px 12px' }}>Telefono</th>
+                  <tr>
+                    <th>Salito</th>
+                    <th>Passeggero</th>
+                    <th>Fermata</th>
+                    <th>Telefono</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtrati.map((p) => (
-                    <tr key={p.id} style={{ borderTop: `1px solid ${colori.bordo}`, background: p.salito ? '#f0fdf4' : undefined }}>
-                      <td style={{ padding: '10px 12px' }}>
+                    <tr key={p.id} className={p.salito ? 'salito' : undefined}>
+                      <td>
                         <input
-                          type="checkbox" checked={p.salito} disabled={inSalvataggio === p.id}
+                          type="checkbox" className="tl-check" checked={p.salito} disabled={inSalvataggio === p.id}
                           onChange={() => alternaSalito(p)}
                           aria-label={`${p.nome} ${p.cognome} è salito`}
-                          style={{ width: 24, height: 24, cursor: 'pointer', accentColor: colori.verde }}
                         />
                       </td>
-                      <td style={{ padding: '10px 12px' }}>
-                        <span style={{ fontWeight: 600 }}>{p.cognome} {p.nome}</span>
-                        <span style={{ display: 'block', color: colori.tenue, fontSize: 'var(--testo-sm)' }}>{p.pnr}</span>
+                      <td>
+                        <b>{p.cognome} {p.nome}</b>
+                        <span className="secondaria">{p.pnr}</span>
                       </td>
-                      <td style={{ padding: '10px 12px' }}>
+                      <td>
                         {p.fermata}
-                        {p.orario && <span style={{ display: 'block', color: colori.tenue, fontSize: 'var(--testo-sm)' }}>{p.orario}</span>}
+                        {p.orario && <span className="secondaria">{p.orario}</span>}
                       </td>
-                      <td style={{ padding: '10px 12px' }}>
-                        {p.telefono ? <a href={`tel:${p.telefono}`} style={{ color: colori.primario }}>{p.telefono}</a> : <span style={{ color: colori.tenue }}>—</span>}
+                      <td>
+                        {p.telefono ? <a href={`tel:${p.telefono}`}>{p.telefono}</a> : <span className="secondaria">—</span>}
                       </td>
                     </tr>
                   ))}
                   {filtrati.length === 0 && (
-                    <tr><td colSpan={4} style={{ padding: '12px', color: colori.tenue }}>Nessun passeggero corrisponde alla ricerca.</td></tr>
+                    <tr><td colSpan={4}><span className="secondaria">Nessun passeggero corrisponde alla ricerca.</span></td></tr>
                   )}
                 </tbody>
               </table>

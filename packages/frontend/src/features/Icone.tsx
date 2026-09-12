@@ -4,7 +4,7 @@ import type { SVGProps } from 'react';
  *  libreria, come da regola del progetto): tratto in currentColor, 24×24,
  *  decorative (aria-hidden), il significato lo dà sempre il testo accanto.
  *  Sostituiscono le emoji 🚌 📍 📅 ✓ 🔒 nelle card e nelle pagine. */
-export type NomeIcona = 'calendario' | 'pin' | 'orologio' | 'bus' | 'spunta' | 'freccia' | 'lucchetto' | 'cerca' | 'chiudi' | 'utenti' | 'andata-ritorno' | 'info' | 'documento' | 'carrello' | 'menu';
+export type NomeIcona = 'calendario' | 'pin' | 'orologio' | 'bus' | 'spunta' | 'freccia' | 'lucchetto' | 'cerca' | 'chiudi' | 'utenti' | 'andata-ritorno' | 'info' | 'documento' | 'carrello' | 'menu' | 'messaggio';
 
 const TRACCIATI: Record<NomeIcona, React.ReactNode> = {
   calendario: (
@@ -87,6 +87,13 @@ const TRACCIATI: Record<NomeIcona, React.ReactNode> = {
   ),
   // Tre righe: il pulsante che apre il menu sui telefoni
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  // Fumetto: i messaggi con lo staff (account cliente)
+  messaggio: (
+    <>
+      <path d="M20 15a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z" />
+      <path d="M8 9h8M8 12.5h5" />
+    </>
+  ),
 };
 
 export function Icona({ nome, dimensione = 20, ...resto }: { nome: NomeIcona; dimensione?: number } & Omit<SVGProps<SVGSVGElement>, 'children'>) {

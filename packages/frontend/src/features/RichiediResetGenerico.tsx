@@ -1,13 +1,19 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AuthShell } from './AuthShell';
+import { CampoTesto } from './checkout/CampoTesto';
+import { Icona } from './Icone';
 
 /** Schermata "password dimenticata" generica — usata da tutti i tipi
- *  di account (cliente, admin, promoter, tour leader), ognuno passa
- *  solo la propria funzione di richiesta e il link per tornare indietro. */
-export function RichiediResetGenerico({ onRichiedi, linkIndietro, titoloExtra }: {
+ *  di account (cliente, promoter, organizzatore, tour leader): ognuno
+ *  passa la propria funzione di richiesta, il link per tornare indietro
+ *  e, se è un portale di lavoro, il tema chiaro. */
+export function RichiediResetGenerico({ onRichiedi, linkIndietro, titoloExtra, temaChiaro, etichettaTipo }: {
   onRichiedi: (email: string) => Promise<unknown>;
   linkIndietro: string;
   titoloExtra?: string;
+  temaChiaro?: boolean;
+  etichettaTipo?: string;
 }) {
   const [email, setEmail] = useState('');
   const [inviato, setInviato] = useState(false);
@@ -25,27 +31,33 @@ export function RichiediResetGenerico({ onRichiedi, linkIndietro, titoloExtra }:
   }
 
   return (
-    <div className="pagina-auth">
-      <form onSubmit={invia} className="box-auth">
-        <h1>Password dimenticata?</h1>
-        <p className="sottotitolo-auth">
-          {titoloExtra ? `${titoloExtra} — ` : ''}Scrivi la tua email: se corrisponde a un account, ti mandiamo un link per sceglierne una nuova.
-        </p>
+    <AuthShell temaChiaro={temaChiaro} etichettaTipo={etichettaTipo}>
+      <h1>Password dimenticata?</h1>
+      <p className="auth-sottotitolo">
+        {titoloExtra ? `${titoloExtra} — ` : ''}Scrivi la tua email: se corrisponde a un account, ti mandiamo un link
+        per sceglierne una nuova.
+      </p>
 
-        {inviato ? (
-          <p style={{ fontSize: 'var(--testo-base)' }}>✓ Controlla la posta (anche lo spam) — il link resta valido per un paio d'ore.</p>
-        ) : (
-          <>
-            <label>Email</label>
-            <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <button type="submit" className="search-cta" disabled={caricamento}>{caricamento ? 'Invio...' : 'Invia link'}</button>
-          </>
-        )}
-
-        <p className="sottotitolo-auth" style={{ marginTop: 18 }}>
-          <Link to={linkIndietro}>← Torna al login</Link>
+      {inviato ? (
+        <p className="auth-esito" role="status">
+          <Icona nome="spunta" dimensione={20} strokeWidth={2.4} />
+          Controlla la posta (anche lo spam): il link resta valido per un paio d'ore.
         </p>
-      </form>
-    </div>
+      ) : (
+        <form onSubmit={invia}>
+          <CampoTesto
+            id="reset-email" etichetta="Email" type="email" autoComplete="email" required
+            value={email} onChange={(e) => setEmail(e.target.value)}
+          />
+          <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={caricamento}>
+            {caricamento ? 'Invio in corso…' : 'Invia il link'}
+          </button>
+        </form>
+      )}
+
+      <p className="auth-link-riga">
+        <Link to={linkIndietro}>Torna all'accesso</Link>
+      </p>
+    </AuthShell>
   );
 }

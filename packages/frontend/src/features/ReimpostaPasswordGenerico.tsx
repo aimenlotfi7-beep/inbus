@@ -1,12 +1,20 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { erroreValidazionePassword } from './validazionePassword';
+import { AuthShell } from './AuthShell';
+import { CampoPassword } from './CampoPassword';
+import { Icona } from './Icone';
 
-export function ReimpostaPasswordGenerico({ onConferma, linkDopoSuccesso, etichettaDopoSuccesso, linkIndietro }: {
+/** "Scegli una nuova password" per tutti i tipi di account: il token
+ *  arriva dal link nell'email, la regola sulla password è una sola
+ *  (validazionePassword.ts). */
+export function ReimpostaPasswordGenerico({ onConferma, linkDopoSuccesso, etichettaDopoSuccesso, linkIndietro, temaChiaro, etichettaTipo }: {
   onConferma: (token: string, password: string) => Promise<unknown>;
   linkDopoSuccesso: string;
   etichettaDopoSuccesso: string;
   linkIndietro: string;
+  temaChiaro?: boolean;
+  etichettaTipo?: string;
 }) {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
@@ -34,29 +42,41 @@ export function ReimpostaPasswordGenerico({ onConferma, linkDopoSuccesso, etiche
   }
 
   return (
-    <div className="pagina-auth">
-      <div className="box-auth">
-        <h1>Reimposta password</h1>
-        {fatto ? (
-          <>
-            <p className="sottotitolo-auth">✓ Fatto — la tua password è stata cambiata.</p>
-            <button type="button" className="search-cta" onClick={() => navigate(linkDopoSuccesso)}>{etichettaDopoSuccesso}</button>
-          </>
-        ) : (
-          <form onSubmit={invia}>
-            <p className="sottotitolo-auth">Scegli una nuova password per il tuo account.</p>
-            <label>Nuova password</label>
-            <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            <label>Ripeti la password</label>
-            <input type="password" autoComplete="new-password" value={conferma} onChange={(e) => setConferma(e.target.value)} required />
-            {errore && <p className="errore-auth">{errore}</p>}
-            <button type="submit" className="search-cta" disabled={caricamento}>{caricamento ? 'Salvataggio...' : 'Salva nuova password'}</button>
-            <p className="sottotitolo-auth" style={{ marginTop: 18 }}>
-              <Link to={linkIndietro}>← Torna al login</Link>
-            </p>
-          </form>
-        )}
-      </div>
-    </div>
+    <AuthShell temaChiaro={temaChiaro} etichettaTipo={etichettaTipo}>
+      <h1>Reimposta la password</h1>
+
+      {fatto ? (
+        <>
+          <p className="auth-esito" role="status">
+            <Icona nome="spunta" dimensione={20} strokeWidth={2.4} />
+            Fatto: la tua password è stata cambiata.
+          </p>
+          <button type="button" className="btn btn-primary btn-lg btn-block" onClick={() => navigate(linkDopoSuccesso)}>
+            {etichettaDopoSuccesso}
+          </button>
+        </>
+      ) : (
+        <form onSubmit={invia}>
+          <p className="auth-sottotitolo">Scegli una nuova password per il tuo account.</p>
+          <CampoPassword
+            id="nuova-password" etichetta="Nuova password" autoComplete="new-password" required
+            aiuto="Almeno 8 caratteri"
+            value={password} onChange={(e) => setPassword(e.target.value)}
+          />
+          <CampoPassword
+            id="ripeti-password" etichetta="Ripeti la password" autoComplete="new-password" required
+            value={conferma} onChange={(e) => setConferma(e.target.value)}
+          />
+          {errore && <p className="avviso avviso-errore auth-avviso" role="alert">{errore}</p>}
+          <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={caricamento}>
+            {caricamento ? 'Salvataggio in corso…' : 'Salva la nuova password'}
+          </button>
+        </form>
+      )}
+
+      <p className="auth-link-riga">
+        <Link to={linkIndietro}>Torna all'accesso</Link>
+      </p>
+    </AuthShell>
   );
 }

@@ -7,7 +7,7 @@ export function ReimpostaPasswordPage() {
     <ReimpostaPasswordGenerico
       onConferma={clienteAuthApi.resetPassword}
       linkDopoSuccesso="/accedi"
-      etichettaDopoSuccesso="Vai al login"
+      etichettaDopoSuccesso="Vai all'accesso"
       linkIndietro="/accedi"
     />
   );

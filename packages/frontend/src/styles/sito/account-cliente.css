@@ -8,80 +8,82 @@
    "account-cliente" quando NON riceve temaChiaro, "pagina-partner"
    quando lo riceve, così i due fogli non si toccano mai.
 
-   Struttura in due righe: barra in alto a tutta larghezza (logo a
-   sinistra, nome a destra), sotto il corpo con la sidebar del menu
-   e il contenuto della sezione scelta. Il resto dell'account
+   Struttura: barra in alto a tutta larghezza (logo a sinistra, nome
+   a destra); sotto, su desktop, la colonna del menu (240px) e il
+   contenuto; su telefono (≤900px) una riga di chip scorrevole
+   sempre visibile al posto della colonna. Il resto dell'account
    (sezioni, viaggi, profilo…) è in account.css.
    ============================================================ */
-.account-cliente{ display:flex; flex-direction:column; min-height:100vh; background:var(--night); }
+.account-cliente{
+  --account-topbar-h:64px;
+  display:flex; flex-direction:column; min-height:100vh; background:var(--night); color:var(--paper);
+}
 .account-cliente .account-topbar{
-  display:flex; align-items:center; justify-content:space-between; gap:16px;
-  padding:14px clamp(16px,4vw,28px); border-bottom:1px solid var(--line);
+  display:flex; align-items:center; justify-content:space-between; gap:var(--sp-4);
+  min-height:var(--account-topbar-h); padding:0 var(--gutter); border-bottom:1px solid var(--line);
   position:sticky; top:0; z-index:10; background:rgba(14,17,22,.92); backdrop-filter:blur(10px);
 }
-.account-cliente .account-topbar-nome{ font-family:var(--font-sans); font-weight:600; font-size:var(--testo-lg); color:var(--paper); }
+.account-cliente .account-topbar-nome{
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-family:var(--font-sans); font-weight:600; font-size:var(--t-small); color:var(--paper);
+}
 .account-cliente .account-topbar-logo{ display:flex; align-items:center; flex-shrink:0; }
+.account-cliente .account-topbar-logo .logo{ font-size:var(--testo-6xl); }
 
 .account-cliente .account-corpo{ display:flex; flex:1; min-height:0; }
 .account-cliente .account-sidebar{
-  width:220px; flex-shrink:0; background:var(--night);
-  display:flex; flex-direction:column; padding:20px 14px;
-  position:sticky; top:57px; height:calc(100vh - 57px);
+  width:240px; flex-shrink:0; background:var(--night); border-right:1px solid var(--line);
+  display:flex; flex-direction:column; padding:var(--sp-5) var(--sp-3);
+  position:sticky; top:var(--account-topbar-h); height:calc(100vh - var(--account-topbar-h));
 }
-.account-cliente .account-hamburger{ display:none; }
-.account-cliente .account-nav{ display:flex; flex-direction:column; gap:3px; flex:1; }
+.account-cliente .account-nav{ display:flex; flex-direction:column; gap:2px; flex:1; overflow-y:auto; }
 .account-cliente .account-nav-voce{
-  padding:11px 14px; border-radius:var(--radius-sm); font-size:var(--testo-lg); font-weight:600;
-  color:var(--mist); text-decoration:none; cursor:pointer; border:none;
-  background:none; text-align:left; font-family:var(--font-sans); width:100%;
+  display:flex; align-items:center; min-height:var(--tap); padding:0 var(--sp-4); border-radius:var(--radius-sm);
+  font-family:var(--font-sans); font-size:var(--t-small); font-weight:600; text-align:left;
+  color:var(--mist); background:none; border:none; cursor:pointer; width:100%;
 }
-.account-cliente .account-nav-voce:hover{ background:var(--ow-accent-soft); color:var(--paper); }
-.account-cliente .account-nav-voce.active{ background:var(--ow-accent-soft); color:var(--ow-accent); }
-.account-cliente .account-nav-intestazione-mobile{ display:none; }
-.account-cliente .account-piede{ padding-top:14px; margin-top:10px; border-top:1px solid var(--line); }
-.account-cliente .account-piede button{ display:block; width:100%; text-align:center; }
-.account-cliente .account-main{ flex:1; min-width:0; padding:clamp(20px,5vw,44px) clamp(18px,5vw,32px) 80px; color:var(--paper); }
+.account-cliente .account-nav-voce:hover{ background:rgba(247,245,241,.06); color:var(--paper); }
+.account-cliente .account-nav-voce.active{ background:var(--ow-accent); color:var(--ow-ink); }
+.account-cliente .account-nav-voce.active:focus-visible{ outline-color:var(--ow-paper); }
+.account-cliente .account-piede{ padding-top:var(--sp-3); margin-top:var(--sp-3); border-top:1px solid var(--line); }
+.account-cliente .account-piede .btn{ width:100%; }
+.account-cliente .account-main{
+  flex:1; min-width:0; padding:var(--sp-8) var(--gutter) var(--sp-20); color:var(--paper);
+}
 
-/* Campi di form dentro le sezioni dell'account: scuri, si fondono
-   nella pagina (stessa ricetta di accesso/registrazione), non il
-   cartoncino bianco del checkout. Etichette come nel checkout:
-   caption, peso 600, non maiuscole. */
-.account-cliente .acc-sezione .field-label{
-  font-size:var(--t-caption); font-weight:600; text-transform:none; letter-spacing:0; color:var(--mist);
-  display:block; margin:14px 0 6px;
-}
-.account-cliente .acc-sezione input, .account-cliente .acc-sezione select{
-  width:100%; min-width:0; min-height:var(--control-h); padding:0 14px;
-  font-family:var(--font-sans); font-size:var(--t-body); font-weight:500; color:var(--paper);
-  background:var(--night); border:1px solid var(--line); border-radius:var(--radius-sm); box-sizing:border-box;
-}
-.account-cliente .acc-sezione input:focus-visible, .account-cliente .acc-sezione select:focus-visible{ outline:2px solid var(--ow-accent); outline-offset:1px; }
-.account-cliente .acc-sezione input:disabled{ opacity:.6; cursor:not-allowed; }
-.account-cliente .acc-sezione input::placeholder{ color:var(--mist); }
+/* Riga di chip: solo su telefono e tablet */
+.account-cliente .account-tab-bar{ display:none; }
 
 @media (max-width:900px){
+  .account-cliente{ --account-topbar-h:56px; }
+  .account-cliente .account-topbar-logo .logo{ font-size:var(--testo-5xl); }
   .account-cliente .account-corpo{ flex-direction:column; }
-  .account-cliente .account-sidebar{ width:100%; height:auto; position:relative; padding:10px 16px; }
-  .account-cliente .account-hamburger{
-    display:block; width:100%; text-align:left;
-    background:none; border:1px solid var(--line); border-radius:var(--radius-sm);
-    color:var(--paper); font-size:var(--testo-lg); font-weight:600; padding:10px 12px; cursor:pointer;
-    font-family:var(--font-sans); min-height:var(--tap);
+
+  .account-cliente .account-tab-bar{
+    display:flex; gap:var(--sp-2); overflow-x:auto; overscroll-behavior-x:contain;
+    scroll-snap-type:x proximity; scroll-padding-inline:var(--gutter); scrollbar-width:none;
+    padding:var(--sp-2) var(--gutter); border-bottom:1px solid var(--line);
+    position:sticky; top:var(--account-topbar-h); z-index:9; background:var(--night);
+  }
+  .account-cliente .account-tab-bar::-webkit-scrollbar{ display:none; }
+  .account-cliente .account-tab-chip{
+    flex:0 0 auto; scroll-snap-align:start; display:inline-flex; align-items:center;
+    min-height:var(--tap); padding:0 var(--sp-4); border-radius:var(--radius-pill);
+    border:1px solid var(--line); background:transparent; color:var(--mist); cursor:pointer; white-space:nowrap;
+    font-family:var(--font-sans); font-size:var(--t-caption); font-weight:600;
+  }
+  .account-cliente .account-tab-chip:hover{ color:var(--paper); border-color:var(--btn-bordo); }
+  .account-cliente .account-tab-chip.active{ background:var(--ow-accent); border-color:var(--ow-accent); color:var(--ow-ink); }
+  .account-cliente .account-tab-chip.active:focus-visible{ outline-color:var(--ow-paper); }
+
+  /* La colonna sparisce: resta solo "Esci" (se la pagina non lo
+     mette già nella sua sezione Profilo) */
+  .account-cliente .account-sidebar{
+    width:100%; height:auto; position:static; border-right:none; padding:var(--sp-3) var(--gutter) 0;
   }
   .account-cliente .account-nav{ display:none; }
-  .account-cliente .account-nav.aperto{
-    display:flex; flex-direction:column; gap:4px;
-    position:fixed; inset:0; z-index:30; background:var(--night);
-    padding:max(20px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-    overflow-y:auto;
-  }
-  .account-cliente .account-nav-intestazione-mobile{
-    display:flex; align-items:center; justify-content:space-between;
-    padding-bottom:12px; margin-bottom:8px; border-bottom:1px solid var(--line);
-    font-weight:700; color:var(--paper); font-size:var(--testo-lg);
-  }
-  .account-cliente .account-nav-intestazione-mobile button{ background:none; border:none; color:var(--paper); font-size:var(--testo-2xl); cursor:pointer; padding:4px 8px; min-width:var(--tap); min-height:var(--tap); }
-  .account-cliente .account-nav-voce{ font-size:var(--testo-lg); padding:13px 14px; }
-  .account-cliente .account-piede{ margin-top:10px; }
-  .account-cliente .account-topbar-nome{ font-size:var(--testo-md); }
+  .account-cliente .account-piede{ margin:0; padding:0; border-top:none; }
+  .account-cliente.esci-in-sezione .account-sidebar{ display:none; }
+
+  .account-cliente .account-main{ padding:var(--sp-5) var(--gutter) var(--sp-16); }
 }

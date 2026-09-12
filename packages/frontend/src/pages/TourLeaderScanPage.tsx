@@ -2,18 +2,21 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import jsQR from 'jsqr';
 import { controlloAccessiApi, type EsitoScansione, tokenTourLeader } from '../api/tourLeaderAuth';
+import { Icona } from '../features/Icone';
+import '../styles/account.css';
+import '../styles/tourleader.css';
 
 const TESTO_ESITO: Record<EsitoScansione['esito'], string> = {
-  valido: '✓ VALIDO',
-  gia_a_bordo: '✓ GIÀ A BORDO',
-  bus_sbagliato: '✕ BUS SBAGLIATO',
-  non_valido: '✕ NON VALIDO',
+  valido: 'Valido',
+  gia_a_bordo: 'Già a bordo',
+  bus_sbagliato: 'Bus sbagliato',
+  non_valido: 'Non valido',
 };
-const COLORE_ESITO: Record<EsitoScansione['esito'], string> = {
-  valido: '#16a34a',
-  gia_a_bordo: '#16a34a',
-  bus_sbagliato: 'var(--ow-danger-ink, #A31414)',
-  non_valido: 'var(--ow-danger-ink, #A31414)',
+const ESITO_POSITIVO: Record<EsitoScansione['esito'], boolean> = {
+  valido: true,
+  gia_a_bordo: true,
+  bus_sbagliato: false,
+  non_valido: false,
 };
 
 /** Pagina di scansione — inquadra il QR del biglietto con la fotocamera
@@ -53,7 +56,7 @@ export function TourLeaderScanPage() {
         }
         ciclo();
       } catch {
-        setErrore('Impossibile accedere alla fotocamera — controlla di aver dato il permesso al browser.');
+        setErrore('Impossibile accedere alla fotocamera: controlla di aver dato il permesso al browser.');
       }
     }
 
@@ -107,33 +110,32 @@ export function TourLeaderScanPage() {
     }, 2200);
   }
 
+  const positivo = risultato ? ESITO_POSITIVO[risultato.esito] : false;
+
   return (
-    <div style={{ minHeight: '100vh', background: '#000', color: '#fff', position: 'relative', fontFamily: "'Poppins',sans-serif" }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: '#14121f' }}>
-        <button onClick={() => navigate('/scansione')} style={{ background: 'none', border: 'none', color: '#a99fc2', fontSize: 'var(--testo-base)', cursor: 'pointer', fontFamily: 'inherit' }}>← Bus</button>
+    <div className="tl-scan">
+      <div className="tl-scan-barra">
+        <button type="button" className="btn btn-tertiary" onClick={() => navigate('/scansione')}>← Eventi</button>
         {contatore && (
-          <p style={{ margin: 0, fontWeight: 700, fontSize: 'var(--testo-lg)' }}>
-            {contatore.saliti} / {contatore.totale} <span style={{ color: '#a99fc2', fontWeight: 400 }}>saliti — Bus {contatore.riferimento}</span>
+          <p className="tl-scan-conteggio">
+            {contatore.saliti} / {contatore.totale} <span>saliti · Bus {contatore.riferimento}</span>
           </p>
         )}
       </div>
 
-      {errore && <p style={{ color: 'var(--ow-danger-ink, #A31414)', padding: 20, textAlign: 'center' }}>{errore}</p>}
+      {errore && <p className="avviso avviso-errore tl-scan-errore" role="alert">{errore}</p>}
 
-      <div style={{ position: 'relative' }}>
-        <video ref={videoRef} playsInline muted style={{ width: '100%', display: 'block' }} />
-        <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <div className="tl-scan-video">
+        <video ref={videoRef} playsInline muted />
+        <canvas ref={canvasRef} />
 
         {risultato && (
-          <div
-            style={{
-              position: 'absolute', inset: 0, background: COLORE_ESITO[risultato.esito],
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              fontFamily: "'Poppins',sans-serif",
-            }}
-          >
-            <p style={{ fontSize: 36, fontWeight: 800, margin: 0, textAlign: 'center' }}>{TESTO_ESITO[risultato.esito]}</p>
-            {'nome' in risultato && <p style={{ fontSize: 22, marginTop: 10 }}>{risultato.nome}</p>}
+          <div className={`tl-scan-esito ${positivo ? 'ok' : 'ko'}`} role="status" aria-live="assertive">
+            <p className="tl-scan-esito-testo">
+              <Icona nome={positivo ? 'spunta' : 'chiudi'} dimensione={40} strokeWidth={3} />
+              {TESTO_ESITO[risultato.esito]}
+            </p>
+            {'nome' in risultato && <p className="tl-scan-esito-nome">{risultato.nome}</p>}
           </div>
         )}
       </div>

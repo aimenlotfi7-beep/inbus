@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { clienteAuthApi, ErroreClienteAuth } from '../api/clienteAuth';
+import { AuthShell } from '../features/AuthShell';
+import { CampoTesto } from '../features/checkout/CampoTesto';
+import { CampoPassword } from '../features/CampoPassword';
+import { useSeoTags } from '../features/useSeoTags';
 import '../styles/account.css';
 
 export function RegistratiPage() {
@@ -17,6 +21,12 @@ export function RegistratiPage() {
   const [caricamento, setCaricamento] = useState(false);
   const [inviata, setInviata] = useState(false);
   const dopo = searchParams.get('dopo') || '/'; // stessa scelta di AccediPage.tsx — dopo la registrazione, torna al sito normale
+
+  useSeoTags({
+    title: 'Crea il tuo account — OnWay',
+    description: 'Crea il tuo account OnWay: prenoti più in fretta, ritrovi i tuoi viaggi e il tuo credito.',
+    url: `${window.location.origin}/registrati`,
+  });
 
   async function registrati(e: React.FormEvent) {
     e.preventDefault();
@@ -38,70 +48,79 @@ export function RegistratiPage() {
 
   if (inviata) {
     return (
-      <div className="pagina-auth">
-        <div className="box-auth">
-          <h1>Controlla la tua email</h1>
-          <p className="sottotitolo-auth">
-            Ti abbiamo mandato un link a <b>{email}</b> — cliccalo per confermare il tuo indirizzo e attivare
-            l'account. Se non lo vedi, controlla anche nello spam.
-          </p>
-          <Link to={`/accedi?dopo=${encodeURIComponent(dopo)}`} className="search-cta" style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center' }}>
-            Vai alla pagina di accesso
-          </Link>
-        </div>
-      </div>
+      <AuthShell>
+        <h1>Controlla la tua email</h1>
+        <p className="auth-sottotitolo">
+          Ti abbiamo mandato un link a <b>{email}</b>: cliccalo per confermare il tuo indirizzo e attivare
+          l'account. Se non lo vedi, guarda anche nello spam.
+        </p>
+        <Link to={`/accedi?dopo=${encodeURIComponent(dopo)}`} className="btn btn-primary btn-lg btn-block">
+          Vai all'accesso
+        </Link>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="pagina-auth">
-      <form onSubmit={registrati} className="box-auth">
-        <h1>Crea il tuo account</h1>
-        <p className="sottotitolo-auth">Serve per prenotare, vedere i tuoi viaggi e il tuo credito fedeltà.</p>
-        {searchParams.get('ref') && (
-          <p style={{ background: 'rgba(255,180,80,.15)', border: '1px solid rgba(255,180,80,.4)', borderRadius: 8, padding: '10px 14px', fontSize: 'var(--testo-md)', marginBottom: 4 }}>
-            Sei stato invitato da un amico — completa la registrazione e ti aspetta un piccolo bonus di benvenuto sul tuo credito fedeltà.
-          </p>
-        )}
+    <AuthShell>
+      <h1>Crea il tuo account</h1>
+      <p className="auth-sottotitolo">Serve per prenotare, ritrovare i tuoi viaggi e il tuo credito.</p>
 
-        <div className="due-colonne-auth">
-          <div>
-            <label>Nome</label>
-            <input autoComplete="given-name" value={nome} onChange={(e) => setNome(e.target.value)} required />
-          </div>
-          <div>
-            <label>Cognome</label>
-            <input autoComplete="family-name" value={cognome} onChange={(e) => setCognome(e.target.value)} required />
-          </div>
+      {searchParams.get('ref') && (
+        <p className="avviso avviso-ok auth-avviso">
+          Sei stato invitato da un amico: completa la registrazione e ti aspetta un bonus di benvenuto sul credito.
+        </p>
+      )}
+
+      <form onSubmit={registrati}>
+        <div className="auth-due-colonne">
+          <CampoTesto
+            id="reg-nome" etichetta="Nome" autoComplete="given-name" required
+            value={nome} onChange={(e) => setNome(e.target.value)}
+          />
+          <CampoTesto
+            id="reg-cognome" etichetta="Cognome" autoComplete="family-name" required
+            value={cognome} onChange={(e) => setCognome(e.target.value)}
+          />
         </div>
 
-        <label>Email</label>
-        <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <CampoTesto
+          id="reg-email" etichetta="Email" type="email" autoComplete="email" required
+          value={email} onChange={(e) => setEmail(e.target.value)}
+        />
+        <CampoTesto
+          id="reg-telefono" etichetta="Telefono (facoltativo)" type="tel" autoComplete="tel"
+          value={telefono} onChange={(e) => setTelefono(e.target.value)}
+        />
+        <CampoTesto
+          id="reg-nascita" etichetta="Data di nascita" type="date" autoComplete="bday" required
+          aiuto="Serve per organizzare i gruppi sul bus"
+          value={dataNascita} onChange={(e) => setDataNascita(e.target.value)}
+        />
+        <CampoTesto
+          id="reg-citta" etichetta="Città (facoltativa)" autoComplete="address-level2"
+          value={citta} onChange={(e) => setCitta(e.target.value)}
+        />
+        <CampoPassword
+          id="reg-password" etichetta="Password" autoComplete="new-password" required
+          aiuto="Almeno 8 caratteri"
+          value={password} onChange={(e) => setPassword(e.target.value)}
+        />
+        <CampoPassword
+          id="reg-conferma" etichetta="Conferma password" autoComplete="new-password" required
+          value={confermaPassword} onChange={(e) => setConfermaPassword(e.target.value)}
+        />
 
-        <label>Telefono (facoltativo)</label>
-        <input type="tel" autoComplete="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+        {errore && <p className="avviso avviso-errore auth-avviso" role="alert">{errore}</p>}
 
-        <label>Città (facoltativo)</label>
-        <input type="text" autoComplete="address-level2" value={citta} onChange={(e) => setCitta(e.target.value)} />
-
-        <label>Data di nascita</label>
-        <input type="date" autoComplete="bday" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} required />
-        <p className="sottotitolo-auth" style={{ fontSize: 'var(--testo-md)', marginTop: -6 }}>Serve per organizzare al meglio i gruppi sui bus quando prenoti in più persone.</p>
-
-        <label>Password (almeno 8 caratteri)</label>
-        <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-
-        <label>Conferma password</label>
-        <input type="password" autoComplete="new-password" value={confermaPassword} onChange={(e) => setConfermaPassword(e.target.value)} required />
-
-        {errore && <div className="errore-auth"><p>{errore}</p></div>}
-
-        <button type="submit" className="search-cta" disabled={caricamento}>{caricamento ? 'Invio...' : 'Registrati'}</button>
-
-        <p className="sottotitolo-auth" style={{ marginTop: 18 }}>
-          Hai già un account? <Link to={`/accedi?dopo=${encodeURIComponent(dopo)}`}>Accedi</Link>
-        </p>
+        <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={caricamento}>
+          {caricamento ? 'Creazione in corso…' : "Crea l'account"}
+        </button>
       </form>
-    </div>
+
+      <p className="auth-link-riga">
+        Hai già un account? <Link to={`/accedi?dopo=${encodeURIComponent(dopo)}`}>Accedi</Link>
+      </p>
+    </AuthShell>
   );
 }

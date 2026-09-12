@@ -68,8 +68,8 @@ export function TourLeaderPage() {
               <label>Telefono <input type="text" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></label>
               <label>Data di nascita <input type="date" value={form.dataNascita} onChange={(e) => setForm({ ...form, dataNascita: e.target.value })} /></label>
               <label>Città <input type="text" value={form.citta} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>
-              <label>Lingue parlate <input type="text" placeholder="Italiano, Inglese..." value={form.lingue} onChange={(e) => setForm({ ...form, lingue: e.target.value })} /></label>
-              <label>Disponibilità <input type="text" placeholder="es. weekend, tutta l'estate..." value={form.disponibilita} onChange={(e) => setForm({ ...form, disponibilita: e.target.value })} /></label>
+              <label>Lingue parlate <input type="text" placeholder="Italiano, inglese…" value={form.lingue} onChange={(e) => setForm({ ...form, lingue: e.target.value })} /></label>
+              <label>Disponibilità <input type="text" placeholder="Es. weekend, tutta l'estate…" value={form.disponibilita} onChange={(e) => setForm({ ...form, disponibilita: e.target.value })} /></label>
               <label className="full">Esperienza pregressa come tour leader / accompagnatore <textarea value={form.esperienza} onChange={(e) => setForm({ ...form, esperienza: e.target.value })} /></label>
               <label className="full">Altro che vuoi dirci <textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
             </div>
@@ -80,7 +80,7 @@ export function TourLeaderPage() {
 
         {inviato && (
           <div className="success-box">
-            <h2>Candidatura ricevuta 🎉</h2>
+            <h2>Candidatura ricevuta</h2>
             <p>Grazie! Il nostro staff esaminerà il tuo profilo e ti ricontatterà appena ci sarà un viaggio adatto a te.</p>
           </div>
         )}

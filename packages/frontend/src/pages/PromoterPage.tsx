@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
-import { LogoOnWay } from '../features/LogoOnWay';
 import { Link } from 'react-router-dom';
 import { AccountShell } from '../features/AccountShell';
+import { AuthShell } from '../features/AuthShell';
+import { CampoTesto } from '../features/checkout/CampoTesto';
+import { CampoPassword } from '../features/CampoPassword';
+import '../styles/account.css';
 import '../styles/promoter.css';
 import { promoterApi, type Promoter, type CouponPromoter } from '../api/promoter';
 import { eventiApi } from '../api/eventi';
 import type { Evento } from '../api/types';
 import { ErroreApi } from '../api/client';
 import { CookieBanner } from '../features/CookieBanner';
-import { formattaEuro } from '../shared/formato';
+import { formattaEuro, formattaData, plurale } from '../shared/formato';
 
 const CHIAVE_TOKEN = 'inbus_promoter_token';
 
@@ -21,15 +24,20 @@ export function PromoterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errore, setErrore] = useState('');
+  const [caricamento, setCaricamento] = useState(false);
 
-  async function accedi() {
+  async function accedi(e: React.FormEvent) {
+    e.preventDefault();
     setErrore('');
+    setCaricamento(true);
     try {
       const { token } = await promoterApi.login(email, password);
       localStorage.setItem(CHIAVE_TOKEN, token);
       setLoggato(true);
-    } catch (e) {
-      setErrore(e instanceof ErroreApi ? e.message : 'Impossibile contattare il server');
+    } catch (err) {
+      setErrore(err instanceof ErroreApi ? err.message : 'Impossibile contattare il server.');
+    } finally {
+      setCaricamento(false);
     }
   }
   function esci() {
@@ -38,35 +46,35 @@ export function PromoterPage() {
   }
 
   // Una volta autenticato, AreaPromoter porta il proprio layout intero
-  // (AccountShell — menu laterale, gestisce già mobile) — la vecchia
-  // intestazione qui sotto vale solo PRIMA di accedere (login), dove
-  // un menu non avrebbe senso (non c'è ancora nulla da navigare).
+  // (AccountShell); prima di accedere c'è solo il riquadro di accesso,
+  // lo stesso guscio delle pagine di accesso del sito in tema chiaro.
   if (loggato) return <AreaPromoter onErroreSessione={esci} />;
 
   return (
-    <div className="pagina-partner">
-      <header>
-        <div className="logo"><LogoOnWay come="testo" /><small>promoter</small></div>
-        <Link className="back-link" to="/">← Torna al sito</Link>
-      </header>
+    <AuthShell temaChiaro etichettaTipo="promoter">
+      <h1>Area promoter</h1>
+      <p className="auth-sottotitolo">
+        Accedi con email e password ricevute dallo staff OnWay per generare i link dei tuoi eventi e vedere le vendite.
+      </p>
 
-      <main>
-        <h1 className="page-title">Area Promoter</h1>
-        <p className="page-sub">Accedi per generare i link dei tuoi eventi e vedere le vendite generate.</p>
+      <form onSubmit={accedi}>
+        <CampoTesto
+          id="promoter-email" etichetta="Email" type="email" autoComplete="email" required
+          value={email} onChange={(e) => setEmail(e.target.value)}
+        />
+        <CampoPassword
+          id="promoter-password" etichetta="Password" autoComplete="current-password" required
+          value={password} onChange={(e) => setPassword(e.target.value)}
+          azione={<Link className="campo-etichetta-link" to="/promoter/password-dimenticata">Password dimenticata?</Link>}
+        />
 
-        {!loggato && (
-          <div className="login-box">
-            <p>Inserisci email e password che ti ha fornito lo staff OnWay.</p>
-            <input type="email" placeholder="La tua email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <input type="text" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && accedi()} />
-            <button className="btn btn-primary" onClick={accedi}>Accedi</button>
-            <p className="errore">{errore}</p>
-            <p style={{ marginTop: 10 }}><Link to="/promoter/password-dimenticata" style={{ fontSize: 'var(--testo-md)' }}>Password dimenticata?</Link></p>
-          </div>
-        )}
-      </main>
-    </div>
+        {errore && <p className="avviso avviso-errore auth-avviso" role="alert">{errore}</p>}
+
+        <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={caricamento}>
+          {caricamento ? 'Accesso in corso…' : 'Accedi'}
+        </button>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -75,20 +83,22 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
   const [stats, setStats] = useState<{ numeroPrenotazioni: number; fatturato: number; commissione: number } | null>(null);
   const [statsPerEvento, setStatsPerEvento] = useState<Record<string, { numeroPrenotazioni: number; fatturato: number; commissione: number }>>({});
   const [eventi, setEventi] = useState<Evento[]>([]);
-  const [eventoRevenue, setEventoRevenue] = useState<string | null>(null);
+  const [eventoIncasso, setEventoIncasso] = useState<string | null>(null);
   const [toast, setToast] = useState('');
   const [voce, setVoce] = useState<'panoramica' | 'link' | 'coupon'>('panoramica');
 
   useEffect(() => {
     promoterApi.me().then(setPromoter).catch(onErroreSessione);
-    promoterApi.meStatistiche().then(setStats);
-    promoterApi.meStatistichePerEvento().then(setStatsPerEvento);
-    eventiApi.list().then(setEventi);
+    promoterApi.meStatistiche().then(setStats).catch(() => {});
+    promoterApi.meStatistichePerEvento().then(setStatsPerEvento).catch(() => {});
+    // Solo eventi futuri e visibili sul sito: un link per un evento già
+    // passato o nascosto porterebbe a una pagina che non vende.
+    eventiApi.list({ soloFuturi: true, soloVisibili: true }).then(setEventi).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function copiaLink(link: string) {
-    navigator.clipboard.writeText(link).then(() => mostraToast('Link copiato'));
+    navigator.clipboard.writeText(link).then(() => mostraToast('Link copiato')).catch(() => {});
   }
   function mostraToast(msg: string) {
     setToast(msg);
@@ -100,15 +110,15 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
     onErroreSessione();
   }
 
-  if (!promoter || !stats) return <p style={{ color: 'var(--mist)' }}>Carico...</p>;
+  if (!promoter || !stats) return <div className="pagina-partner partner-caricamento"><p>Carico…</p></div>;
 
-  // Calcolata dal server (shared/commissionePromoter.ts): non e' piu'
-  // sempre "fatturato x un'unica percentuale", un coupon puo' avere un
+  // Calcolata dal server (shared/commissionePromoter.ts): non è più
+  // sempre "fatturato × un'unica percentuale", un coupon può avere un
   // compenso proprio.
   const commissione = stats.commissione;
   const eventiOrdinati = eventi.slice().sort((a, b) => a.data.localeCompare(b.data));
-
-  const statoEventoRevenue = eventoRevenue ? statsPerEvento[eventoRevenue] : null;
+  const eventiConVendite = eventiOrdinati.filter((ev) => statsPerEvento[ev.id]);
+  const statoEventoIncasso = eventoIncasso ? statsPerEvento[eventoIncasso] : null;
 
   return (
     <AccountShell
@@ -122,29 +132,33 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
     >
       {voce === 'panoramica' && (
         <>
-          <h1 className="page-title" style={{ marginBottom: 20 }}>Panoramica</h1>
+          <h1 className="page-title">Panoramica</h1>
           <div className="stats-row">
             <div className="stat-box"><b>{stats.numeroPrenotazioni}</b><span>Vendite generate</span></div>
-            <div className="stat-box"><b>{formattaEuro(stats.fatturato)}</b><span>Fatturato generato</span></div>
+            <div className="stat-box"><b>{formattaEuro(stats.fatturato)}</b><span>Incasso generato</span></div>
             <div className="stat-box"><b>{formattaEuro(commissione)}</b><span>Commissione maturata ({promoter.commissionePercentuale}%)</span></div>
           </div>
 
-          <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-2xl)', margin: '24px 0 14px' }}>Revenue per evento</h2>
-          <div className="mini-tabs" style={{ flexWrap: 'wrap', marginBottom: 14 }}>
-            {eventiOrdinati.filter((ev) => statsPerEvento[ev.id]).map((ev) => (
-              <button key={ev.id} type="button" className={`mini-tab${eventoRevenue === ev.id ? ' active' : ''}`} onClick={() => setEventoRevenue(ev.id)}>
-                {ev.artista}
-              </button>
-            ))}
-            {!eventiOrdinati.some((ev) => statsPerEvento[ev.id]) && (
-              <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>Nessuna vendita ancora — appena arriva la prima, comparirà qui divisa per evento.</p>
-            )}
-          </div>
-          {statoEventoRevenue && (
-            <div className="stats-row" style={{ marginBottom: 24 }}>
-              <div className="stat-box"><b>{statoEventoRevenue.numeroPrenotazioni}</b><span>Vendite su questo evento</span></div>
-              <div className="stat-box"><b>{formattaEuro(statoEventoRevenue.fatturato)}</b><span>Fatturato su questo evento</span></div>
-              <div className="stat-box"><b>{formattaEuro(statoEventoRevenue.commissione)}</b><span>Tua commissione su questo evento</span></div>
+          <h2 className="partner-sezione-titolo">Incasso per evento</h2>
+          {eventiConVendite.length > 0 ? (
+            <div className="mini-tabs partner-tabs">
+              {eventiConVendite.map((ev) => (
+                <button key={ev.id} type="button" className={`mini-tab${eventoIncasso === ev.id ? ' active' : ''}`} aria-pressed={eventoIncasso === ev.id} onClick={() => setEventoIncasso(ev.id)}>
+                  {ev.artista}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="stato-vuoto">
+              <h3>Nessuna vendita ancora</h3>
+              <p>Appena arriva la prima, la trovi qui divisa per evento.</p>
+            </div>
+          )}
+          {statoEventoIncasso && (
+            <div className="stats-row">
+              <div className="stat-box"><b>{statoEventoIncasso.numeroPrenotazioni}</b><span>Vendite su questo evento</span></div>
+              <div className="stat-box"><b>{formattaEuro(statoEventoIncasso.fatturato)}</b><span>Incasso su questo evento</span></div>
+              <div className="stat-box"><b>{formattaEuro(statoEventoIncasso.commissione)}</b><span>Tua commissione su questo evento</span></div>
             </div>
           )}
         </>
@@ -152,13 +166,14 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
 
       {voce === 'link' && (
         <>
-          <h1 className="page-title" style={{ marginBottom: 6 }}>I tuoi link</h1>
-          <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 20 }}>
-            Un link per ogni evento — copialo e condividilo dove vuoi. Decidi tu quali pubblicizzare.
-          </p>
+          <h1 className="page-title">I tuoi link</h1>
+          <p className="page-sub">Un link per ogni evento in vendita: copialo e condividilo dove vuoi. Decidi tu quali pubblicizzare.</p>
 
           {!eventiOrdinati.length && (
-            <div className="empty-box">Non ci sono eventi ancora.</div>
+            <div className="stato-vuoto">
+              <h3>Nessun evento in vendita</h3>
+              <p>Quando OnWay pubblica un nuovo evento, il suo link compare qui.</p>
+            </div>
           )}
 
           {eventiOrdinati.map((ev) => <CardLinkPromoter key={ev.id} evento={ev} onCopia={copiaLink} />)}
@@ -167,14 +182,12 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
 
       {voce === 'coupon' && (
         <>
-          <h1 className="page-title" style={{ marginBottom: 20 }}>Codici sconto</h1>
+          <h1 className="page-title">Codici sconto</h1>
           <SezioneCodiciSconto />
         </>
       )}
 
-      <div className="toast" style={{ position: 'fixed', bottom: 26, left: '50%', transform: 'translateX(-50%)', background: 'var(--paper)', color: 'var(--ink)', padding: '12px 20px', borderRadius: 10, fontSize: 'var(--testo-base)', fontWeight: 600, opacity: toast ? 1 : 0, pointerEvents: 'none', transition: 'opacity .25s ease', zIndex: 999 }}>
-        {toast}
-      </div>
+      <div className={`toast${toast ? ' show' : ''}`} role="status" aria-live="polite">{toast}</div>
       <CookieBanner />
     </AccountShell>
   );
@@ -198,8 +211,8 @@ function CardLinkPromoter({ evento, onCopia }: { evento: Evento; onCopia: (link:
         <p>{evento.luogo}, {evento.citta} · {fmtDataBreve(evento.data)}</p>
       </div>
       <div className="link-azione">
-        <input type="text" readOnly value={link ?? 'Genero il link...'} />
-        <button className="btn btn-ghost" disabled={!link} onClick={() => link && onCopia(link)}>Copia link</button>
+        <input type="text" readOnly value={link ?? 'Genero il link…'} aria-label={`Link per ${evento.artista}`} />
+        <button type="button" className="btn btn-secondary" disabled={!link} onClick={() => link && onCopia(link)}>Copia link</button>
       </div>
     </div>
   );
@@ -216,15 +229,19 @@ function SezioneCodiciSconto() {
     promoterApi.meCoupon().then(setCoupon).catch(() => setCoupon([]));
   }, []);
 
-  if (coupon === null) return null;
-  if (coupon.length === 0) return null; // nessun codice assegnato: nessuna sezione da mostrare
+  if (coupon === null) return <p className="page-sub">Carico…</p>;
+  if (coupon.length === 0) {
+    return (
+      <div className="stato-vuoto">
+        <h3>Nessun codice sconto assegnato</h3>
+        <p>Se ti serve un codice da far usare ai tuoi contatti, chiedilo allo staff OnWay.</p>
+      </div>
+    );
+  }
 
   return (
     <>
-      <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-2xl)', margin: '24px 0 14px' }}>I tuoi codici sconto</h2>
-      <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginTop: -8, marginBottom: 16 }}>
-        Condividi il codice — chi lo usa ha uno sconto, tu una commissione.
-      </p>
+      <p className="page-sub">Condividi il codice: chi lo usa ha uno sconto, tu una commissione.</p>
       {coupon.map((c) => {
         const scadenza = c.validoAl ? new Date(c.validoAl) : null;
         const scaduto = scadenza ? scadenza < new Date() : false;
@@ -239,9 +256,9 @@ function SezioneCodiciSconto() {
                 Sconto: {c.scontoTipo === 'PERCENTUALE' ? `${c.scontoValore}%` : formattaEuro(c.scontoValore)}
                 {' · '}Il tuo compenso: <b>{compensoTesto}</b>
               </p>
-              <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>
-                Usato {c.usiAttuali}{c.usiMax ? ` / ${c.usiMax}` : ''} volt{c.usiAttuali === 1 ? 'a' : 'e'}
-                {scadenza && ` · ${scaduto ? 'Scaduto il' : 'Valido fino al'} ${scadenza.toLocaleDateString('it-IT')}`}
+              <p>
+                Usato {c.usiMax ? `${c.usiAttuali} / ${plurale(c.usiMax, 'volta', 'volte')}` : plurale(c.usiAttuali, 'volta', 'volte')}
+                {scadenza && ` · ${scaduto ? 'Scaduto il' : 'Valido fino al'} ${formattaData(scadenza)}`}
                 {!c.attivo && ' · Disattivato'}
               </p>
             </div>

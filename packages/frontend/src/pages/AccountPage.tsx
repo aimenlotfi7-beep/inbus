@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import '../styles/account.css';
 import { AccountShell } from '../features/AccountShell';
@@ -9,12 +9,17 @@ import { chatApi, type ConversazioneConMessaggi } from '../api/chat';
 import type { Prenotazione, Evento } from '../api/types';
 import { CookieBanner, LinkPreferenzeCookie } from '../features/CookieBanner';
 import { clienteLoggato, logoutCliente } from '../features/clienteSessione';
-import { clienteAuthApi, type DatiCliente } from '../api/clienteAuth';
+import { clienteAuthApi, ErroreClienteAuth, type DatiCliente } from '../api/clienteAuth';
 import { ErroreApi } from '../api/client';
 import { listaAttesaApi, type MiaIscrizione } from '../api/listaAttesa';
 import { DettaglioViaggioModale } from '../features/DettaglioViaggioModale';
+import { ModaleRimborso } from '../features/ModaleRimborso';
 import { calcolaStatoPrenotazione } from '../features/statoPrenotazione';
-import { formattaEuro } from '../shared/formato';
+import { formattaEuro, formattaData, plurale } from '../shared/formato';
+import { Icona } from '../features/Icone';
+import { CampoTesto } from '../features/checkout/CampoTesto';
+import { CampoPassword } from '../features/CampoPassword';
+import { useSeoTags } from '../features/useSeoTags';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -27,9 +32,23 @@ interface MovimentoCredito {
   creatoIl: string;
 }
 
+/** "sab 17 ott": la data di un viaggio si legge a colpo d'occhio, senza
+ *  l'anno che qui non serve mai (i viaggi sono sempre a pochi mesi). */
+const formatoDataBreve = new Intl.DateTimeFormat('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
+function dataBreve(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : formatoDataBreve.format(d);
+}
+
+/** Giorni interi che mancano a una data (0 = oggi). */
+function giorniAllaData(iso: string): number {
+  return Math.ceil((new Date(iso).getTime() - Date.now()) / (24 * 3600 * 1000));
+}
+
 export function AccountPage() {
   const [email, setEmail] = useState('');
   const [nomeCliente, setNomeCliente] = useState('');
+  const [nomeProprio, setNomeProprio] = useState('');
   const [caricandoSessione, setCaricandoSessione] = useState(true);
   const navigate = useNavigate();
   // La sezione attiva vive nell'indirizzo (?sezione=profilo), non solo
@@ -44,11 +63,17 @@ export function AccountPage() {
     setSearchParams(nuova === 'dashboard' ? {} : { sezione: nuova });
   }
   // Quale prenotazione mostrare nella "travel card" — condiviso tra
-  // dashboard e l'elenco viaggi, così un click apre la stessa cosa da
+  // panoramica ed elenco viaggi, così un click apre la stessa cosa da
   // qualsiasi punto ci si trovi.
   const [pnrAperto, setPnrAperto] = useState<string | null>(null);
 
-  // Prima Dashboard e Viaggi lo scaricavano OGNUNA per conto proprio
+  useSeoTags({
+    title: 'Il mio account — OnWay',
+    description: 'I tuoi viaggi, il tuo credito e i tuoi dati OnWay in un posto solo.',
+    url: `${window.location.origin}/account`,
+  });
+
+  // Prima Panoramica e Viaggi lo scaricavano OGNUNA per conto proprio
   // (stessa lista di prenotazioni, stesso giro "un evento per volta" a
   // recuperare i dettagli) — ogni volta che si passava dall'una
   // all'altra, si rifaceva tutto da capo. Un solo posto, condiviso da
@@ -76,7 +101,11 @@ export function AccountPage() {
       return;
     }
     clienteAuthApi.me()
-      .then((dati) => { setEmail(dati.email); setNomeCliente([dati.nome, dati.cognome].filter(Boolean).join(' ')); })
+      .then((dati) => {
+        setEmail(dati.email);
+        setNomeProprio(dati.nome ?? '');
+        setNomeCliente([dati.nome, dati.cognome].filter(Boolean).join(' '));
+      })
       .catch(() => { logoutCliente(); navigate('/accedi?dopo=' + encodeURIComponent('/account')); })
       .finally(() => setCaricandoSessione(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,14 +117,14 @@ export function AccountPage() {
   }
 
   const vociMenu: { id: Sezione; label: string }[] = [
-    { id: 'dashboard', label: 'Il mio centro' },
+    { id: 'dashboard', label: 'Panoramica' },
     { id: 'viaggi', label: 'I miei viaggi' },
     { id: 'lista-attesa', label: 'Lista d\'attesa' },
-    { id: 'credito', label: 'Credito fedeltà' },
+    { id: 'credito', label: 'Credito' },
     { id: 'invita', label: 'Invita un amico' },
     { id: 'chat', label: 'Messaggi' },
-    { id: 'profilo', label: 'Il mio profilo' },
-    { id: 'privacy', label: 'Preferenze Privacy' },
+    { id: 'profilo', label: 'Profilo' },
+    { id: 'privacy', label: 'Privacy' },
   ];
 
   if (caricandoSessione) return null; // evita un lampo della pagina prima del reindirizzamento
@@ -103,18 +132,18 @@ export function AccountPage() {
   return (
     <>
       <AccountShell
-        etichettaTipo="il mio account" nomeUtente={nomeCliente || email} onLogout={esci}
+        etichettaTipo="il mio account" nomeUtente={nomeCliente || email} onLogout={esci} esciInSezione
         voci={vociMenu} voceAttiva={sezione} onCambiaVoce={(v) => setSezione(v as Sezione)}
       >
         <div className="account-content">
-          {sezione === 'dashboard' && <SezioneDashboard email={email} viaggi={viaggi} eventiPerId={eventiPerId} onNavigare={setSezione} onAprireViaggio={setPnrAperto} />}
-          {sezione === 'profilo' && <SezioneProfilo email={email} />}
+          {sezione === 'dashboard' && <SezionePanoramica nome={nomeProprio} email={email} viaggi={viaggi} eventiPerId={eventiPerId} onNavigare={setSezione} onAprireViaggio={setPnrAperto} />}
+          {sezione === 'profilo' && <SezioneProfilo email={email} onEsci={esci} />}
           {sezione === 'viaggi' && <SezioneViaggi email={email} viaggi={viaggi} eventiPerId={eventiPerId} onAprireViaggio={setPnrAperto} />}
           {sezione === 'lista-attesa' && <SezioneListaAttesa email={email} />}
           {sezione === 'credito' && <SezioneCredito email={email} />}
           {sezione === 'invita' && <SezioneInvitaAmico />}
           {sezione === 'privacy' && <SezionePrivacy email={email} />}
-          {sezione === 'chat' && <SezioneChat email={email} />}
+          {sezione === 'chat' && <SezioneChat email={email} nome={nomeCliente} />}
         </div>
       </AccountShell>
 
@@ -131,135 +160,281 @@ export function AccountPage() {
   );
 }
 
-function SezioneProfilo({ email }: { email: string }) {
-  const navigate = useNavigate();
-  const [dati, setDati] = useState<DatiCliente | null>(null);
-  const [nome, setNome] = useState('');
-  const [cognome, setCognome] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [citta, setCitta] = useState('');
-  const [dataNascita, setDataNascita] = useState('');
-  const [salvando, setSalvando] = useState(false);
-  const [messaggio, setMessaggio] = useState('');
-  const [erroreSalva, setErroreSalva] = useState('');
+/* ============================================================
+   PANORAMICA
+   ============================================================ */
 
-  const [zonaEliminaAperta, setZonaEliminaAperta] = useState(false);
-  const [passwordElimina, setPasswordElimina] = useState('');
-  const [eliminando, setEliminando] = useState(false);
-  const [erroreElimina, setErroreElimina] = useState('');
+/** La prima cosa che si vede entrando: se c'è un viaggio in programma è
+ *  anche la prima cosa in assoluto, senza doverla cercare. */
+function SezionePanoramica({ nome, email, viaggi, eventiPerId, onNavigare, onAprireViaggio }: {
+  nome: string;
+  email: string;
+  viaggi: Prenotazione[] | null;
+  eventiPerId: Record<string, Evento>;
+  onNavigare: (s: Sezione) => void;
+  onAprireViaggio: (pnr: string) => void;
+}) {
+  const [messaggiNonLetti, setMessaggiNonLetti] = useState(0);
+  const [inListaAttesa, setInListaAttesa] = useState(0);
 
   useEffect(() => {
-    clienteAuthApi.me().then((d) => {
-      setDati(d);
-      setNome(d.nome ?? ''); setCognome(d.cognome ?? ''); setTelefono(d.telefono ?? ''); setCitta(d.citta ?? '');
-      setDataNascita(d.dataNascita ? d.dataNascita.slice(0, 10) : '');
-    });
-  }, []);
+    if (!email) return;
+    chatApi.storicoCliente(email).then((conv) => {
+      const attiva = conv.find((c) => c.stato !== 'CHIUSA');
+      setMessaggiNonLetti(attiva?.messaggi.filter((m) => m.autore === 'ADMIN').length ?? 0);
+    }).catch(() => {});
+    listaAttesaApi.mieIscrizioni(email).then((l) => setInListaAttesa(l.length)).catch(() => {});
+  }, [email]);
 
-  async function salva(e: React.FormEvent) {
-    e.preventDefault();
-    setErroreSalva(''); setMessaggio(''); setSalvando(true);
-    try {
-      await clienteAuthApi.aggiornaProfilo({ nome, cognome, telefono: telefono || undefined, citta: citta || undefined, dataNascita });
-      setMessaggio('Dati salvati.');
-      setTimeout(() => setMessaggio(''), 3000);
-    } catch (err) {
-      setErroreSalva(err instanceof ErroreApi ? err.message : 'Errore di rete — riprova.');
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  async function eliminaAccount(e: React.FormEvent) {
-    e.preventDefault();
-    setErroreElimina(''); setEliminando(true);
-    try {
-      await clienteAuthApi.eliminaAccount(passwordElimina);
-      logoutCliente();
-      navigate('/');
-    } catch (err) {
-      setErroreElimina(err instanceof ErroreApi ? err.message : 'Errore di rete — riprova.');
-      setEliminando(false);
-    }
-  }
-
-  if (!dati) return <section className="acc-sezione"><h1>Il mio profilo</h1><p style={{ color: 'var(--mist)' }}>Carico...</p></section>;
+  // Il prossimo viaggio si ricava dai dati già arrivati dal padre
+  // (viaggi + eventiPerId, condivisi con la sezione Viaggi) invece di
+  // un giro proprio a recuperare di nuovo gli stessi dettagli evento.
+  const oggi = new Date().toISOString().slice(0, 10);
+  const futuri = (viaggi ?? [])
+    .filter((p) => p.stato === 'CONFERMATA')
+    .map((p) => ({ p, ev: eventiPerId[p.eventoId] }))
+    .filter((c): c is { p: Prenotazione; ev: Evento } => !!c.ev && c.ev.data >= oggi)
+    .sort((a, b) => a.ev.data.localeCompare(b.ev.data));
+  const prossimo = futuri[0] ?? null;
 
   return (
     <section className="acc-sezione">
-      <h1>Il mio profilo</h1>
+      <h1>Ciao{nome ? `, ${nome}` : ''}</h1>
 
-      <form onSubmit={salva} className="panel-box">
-        <h2>I miei dati</h2>
-        <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
-          Sei collegato con l'indirizzo <b style={{ color: 'var(--paper)' }}>{email}</b> — non modificabile da qui.
-        </p>
+      {viaggi === null && <p className="acc-caricamento">Carico…</p>}
 
-        <div className="due-colonne-auth">
-          <div>
-            <label className="field-label">Nome</label>
-            <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} required />
-          </div>
-          <div>
-            <label className="field-label">Cognome</label>
-            <input type="text" value={cognome} onChange={(e) => setCognome(e.target.value)} required />
-          </div>
+      {viaggi !== null && prossimo && <CardProssimoViaggio dati={prossimo} onApri={() => onAprireViaggio(prossimo.p.pnr)} onScrivi={() => onNavigare('chat')} />}
+
+      {viaggi !== null && !prossimo && (
+        <div className="stato-vuoto">
+          <h3>Non hai viaggi in programma</h3>
+          <p>Scegli un evento, prenota il tuo posto sul bus e lo ritrovi qui con tutti i dettagli.</p>
+          <Link className="btn btn-primary" to="/">Scopri gli eventi</Link>
         </div>
-        <div className="due-colonne-auth">
-          <div>
-            <label className="field-label">Telefono</label>
-            <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-          </div>
-          <div>
-            <label className="field-label">Città</label>
-            <input type="text" value={citta} onChange={(e) => setCitta(e.target.value)} />
-          </div>
-        </div>
-        <label className="field-label">Data di nascita</label>
-        <input type="date" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} required style={{ maxWidth: 200 }} />
+      )}
 
-        {erroreSalva && <p className="errore">{erroreSalva}</p>}
-        {messaggio && <p style={{ color: 'var(--green)', fontSize: 'var(--testo-md)', marginTop: 8 }}>{messaggio}</p>}
-        <button type="submit" className="btn btn-primary" style={{ marginTop: 14, width: 'auto' }} disabled={salvando}>
-          {salvando ? 'Salvo...' : 'Salva le modifiche'}
+      <div className="acc-tessere">
+        <button type="button" className="acc-tessera" onClick={() => onNavigare('viaggi')}>
+          <Icona nome="bus" dimensione={22} /><span>I miei viaggi</span>
         </button>
-      </form>
-
-      <div className="panel-box" style={{ marginTop: 22, borderColor: '#c0392b' }}>
-        <h2 style={{ color: '#e74c3c' }}>Elimina il mio account</h2>
-        <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
-          I tuoi dati personali (nome, telefono, città) vengono rimossi e non potrai più accedere. Le prenotazioni
-          già fatte restano nello storico per motivi contabili, ma non saranno più collegate a un account attivo.
-          <b style={{ color: 'var(--paper)' }}> Questa azione non si può annullare.</b>
-        </p>
-
-        {!zonaEliminaAperta ? (
-          <button type="button" className="btn btn-ghost" style={{ borderColor: '#c0392b', color: '#e74c3c' }} onClick={() => setZonaEliminaAperta(true)}>
-            Elimina il mio account
-          </button>
-        ) : (
-          <form onSubmit={eliminaAccount}>
-            <label className="field-label">Conferma la tua password per procedere</label>
-            <input type="password" value={passwordElimina} onChange={(e) => setPasswordElimina(e.target.value)} required autoFocus />
-            {erroreElimina && <p className="errore">{erroreElimina}</p>}
-            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-              <button type="submit" className="btn" style={{ width: 'auto', background: '#c0392b', color: '#fff' }} disabled={eliminando}>
-                {eliminando ? 'Elimino...' : 'Conferma eliminazione'}
-              </button>
-              <button type="button" className="btn btn-ghost" style={{ width: 'auto' }} onClick={() => { setZonaEliminaAperta(false); setPasswordElimina(''); setErroreElimina(''); }}>
-                Annulla
-              </button>
-            </div>
-          </form>
-        )}
+        <button type="button" className="acc-tessera" onClick={() => onNavigare('lista-attesa')}>
+          <Icona nome="orologio" dimensione={22} /><span>Lista d'attesa{inListaAttesa > 0 ? ` (${inListaAttesa})` : ''}</span>
+        </button>
+        <button type="button" className="acc-tessera" onClick={() => onNavigare('chat')}>
+          <Icona nome="messaggio" dimensione={22} /><span>Messaggi{messaggiNonLetti > 0 ? ` (${messaggiNonLetti})` : ''}</span>
+        </button>
+        <button type="button" className="acc-tessera" onClick={() => onNavigare('profilo')}>
+          <Icona nome="utenti" dimensione={22} /><span>Profilo</span>
+        </button>
+        <Link className="acc-tessera" to="/faq">
+          <Icona nome="info" dimensione={22} /><span>Aiuto</span>
+        </Link>
       </div>
     </section>
   );
 }
 
-/** Il credito fedeltà, in una sua sezione dedicata — diviso tra quanto
- *  maturato in totale (guadagnato dai viaggi) e quanto già usato, non
- *  solo il saldo attuale come prima. */
+function CardProssimoViaggio({ dati, onApri, onScrivi }: {
+  dati: { p: Prenotazione; ev: Evento };
+  onApri: () => void;
+  onScrivi: () => void;
+}) {
+  const { p, ev } = dati;
+  const giorni = giorniAllaData(ev.data);
+  const copertina = ev.immagini[0]?.url;
+  const kicker = giorni <= 0 ? 'Oggi si parte!' : giorni === 1 ? 'Domani si parte!' : 'Il tuo prossimo viaggio';
+  const stato = calcolaStatoPrenotazione(p);
+  const pagamentoCompleto = p.tipoPagamento === 'COMPLETO' || p.saldoPagato;
+
+  return (
+    <article className="prossimo-viaggio">
+      {copertina && (
+        <div className="prossimo-viaggio-media">
+          <img src={copertina} alt="" width={240} height={300} loading="lazy" decoding="async" />
+        </div>
+      )}
+      <div className="prossimo-viaggio-corpo">
+        <p className="prossimo-viaggio-kicker">{kicker}</p>
+        <h2>{ev.artista}</h2>
+        <p className="acc-riga">
+          {dataBreve(ev.data)} · {p.fermataCitta}{p.fermataOrario ? ` ${p.fermataOrario}` : ''} → {ev.citta}
+        </p>
+        {giorni > 1 && <span className="chip-conto">tra {plurale(giorni, 'giorno', 'giorni')}</span>}
+
+        <ul className="viaggio-timeline">
+          <li>
+            <Icona nome="spunta" dimensione={18} strokeWidth={2.4} className="fatto" />
+            <span>Prenotazione confermata</span>
+          </li>
+          <li>
+            {pagamentoCompleto ? (
+              <>
+                <Icona nome="spunta" dimensione={18} strokeWidth={2.4} className="fatto" />
+                <span>Pagamento completato</span>
+              </>
+            ) : (
+              <>
+                <Icona nome="info" dimensione={18} className={stato.chiave === 'acconto_scaduto' ? 'scaduto' : 'in-attesa'} />
+                <span>
+                  {stato.chiave === 'acconto_scaduto' ? 'Termine per il saldo superato' : 'Saldo da versare'}
+                  {p.scadenzaSaldo ? ` ${stato.chiave === 'acconto_scaduto' ? 'il' : 'entro il'} ${formattaData(p.scadenzaSaldo)}` : ''}
+                </span>
+              </>
+            )}
+          </li>
+          <li>
+            <Icona nome="bus" dimensione={18} className="in-attesa" />
+            <span>Bus e biglietto il giorno prima della partenza</span>
+          </li>
+        </ul>
+
+        <div className="prossimo-viaggio-azioni">
+          <button type="button" className="btn btn-primary" onClick={onApri}>Apri il viaggio</button>
+          <button type="button" className="btn btn-secondary" onClick={onScrivi}>Scrivi allo staff</button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+/* ============================================================
+   I MIEI VIAGGI
+   ============================================================ */
+
+function SezioneViaggi({ email, viaggi, eventiPerId, onAprireViaggio }: {
+  email: string;
+  viaggi: Prenotazione[] | null;
+  eventiPerId: Record<string, Evento>;
+  onAprireViaggio: (pnr: string) => void;
+}) {
+  const [tab, setTab] = useState<'prossimi' | 'passati'>('prossimi');
+  const [rimborsoPnr, setRimborsoPnr] = useState<string | null>(null);
+  const [esito, setEsito] = useState('');
+
+  const oggi = new Date().toISOString().slice(0, 10);
+  const viaggiFiltrati = (viaggi ?? []).filter((p) => {
+    const ev = eventiPerId[p.eventoId];
+    if (!ev) return tab === 'prossimi';
+    return tab === 'passati' ? ev.data < oggi : ev.data >= oggi;
+  });
+
+  return (
+    <section className="acc-sezione">
+      <h1>I miei viaggi</h1>
+
+      <div className="mini-tabs-acc" role="tablist" aria-label="Quali viaggi mostrare">
+        <button type="button" role="tab" aria-selected={tab === 'prossimi'} className={`mini-tab-acc${tab === 'prossimi' ? ' active' : ''}`} onClick={() => setTab('prossimi')}>Prossimi</button>
+        <button type="button" role="tab" aria-selected={tab === 'passati'} className={`mini-tab-acc${tab === 'passati' ? ' active' : ''}`} onClick={() => setTab('passati')}>Passati</button>
+      </div>
+
+      {esito && <p className="avviso avviso-ok acc-avviso" role="status">{esito}</p>}
+
+      {viaggi === null && <p className="acc-caricamento">Carico…</p>}
+
+      {viaggi !== null && !viaggiFiltrati.length && (
+        <div className="stato-vuoto">
+          <h3>{tab === 'passati' ? 'Nessun viaggio passato' : 'Nessun viaggio in programma'}</h3>
+          <p>
+            {tab === 'passati'
+              ? 'Qui finiscono i viaggi già fatti, con il loro riepilogo.'
+              : 'Quando prenoti un posto sul bus, il viaggio compare qui con fermata, orario e stato del pagamento.'}
+          </p>
+          {tab === 'prossimi' && <Link className="btn btn-primary" to="/">Scopri gli eventi</Link>}
+        </div>
+      )}
+
+      {viaggiFiltrati.map((p) => {
+        const ev = eventiPerId[p.eventoId];
+        const stato = calcolaStatoPrenotazione(p);
+        const copertina = ev?.immagini[0]?.url;
+        return (
+          <article className="viaggio-card" key={p.id}>
+            <div className="viaggio-media">
+              {copertina && <img src={copertina} alt="" width={96} height={120} loading="lazy" decoding="async" />}
+            </div>
+
+            <div className="viaggio-main">
+              <h3>{ev?.artista ?? 'Evento'}</h3>
+              <p className="acc-riga">{ev ? `${dataBreve(ev.data)} · ${ev.citta}` : 'Dettagli dell\'evento non disponibili'}</p>
+              <p className="acc-riga">
+                <Icona nome="pin" dimensione={14} />
+                {p.fermataCitta}{p.fermataOrario ? ` · ore ${p.fermataOrario}` : ''}
+              </p>
+              <p className="acc-riga">
+                {plurale(p.passeggeri, 'passeggero', 'passeggeri')} · <span className="pnr-tag">PNR {p.pnr}</span>
+              </p>
+            </div>
+
+            <div className="viaggio-right">
+              <span className={`badge ${stato.classe}`}>{stato.etichetta}</span>
+              <span className="totale">{formattaEuro(p.totale)}</span>
+              <div className="viaggio-azioni">
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => onAprireViaggio(p.pnr)}>Dettagli</button>
+                {p.stato === 'CONFERMATA' && (
+                  <button type="button" className="btn btn-tertiary btn-sm" onClick={() => setRimborsoPnr(p.pnr)}>Richiedi rimborso</button>
+                )}
+              </div>
+            </div>
+          </article>
+        );
+      })}
+
+      {rimborsoPnr && (
+        <ModaleRimborso
+          pnr={rimborsoPnr}
+          email={email}
+          onChiudi={() => setRimborsoPnr(null)}
+          onInviata={() => setEsito('Richiesta di rimborso inviata: ti rispondiamo via email appena è stata valutata.')}
+        />
+      )}
+    </section>
+  );
+}
+
+/* ============================================================
+   LISTA D'ATTESA
+   ============================================================ */
+
+function SezioneListaAttesa({ email }: { email: string }) {
+  const [iscrizioni, setIscrizioni] = useState<MiaIscrizione[] | null>(null);
+
+  useEffect(() => { listaAttesaApi.mieIscrizioni(email).then(setIscrizioni).catch(() => setIscrizioni([])); }, [email]);
+
+  return (
+    <section className="acc-sezione">
+      <h1>Lista d'attesa</h1>
+
+      {iscrizioni === null && <p className="acc-caricamento">Carico…</p>}
+
+      {iscrizioni?.length === 0 && (
+        <div className="stato-vuoto">
+          <h3>Non sei in lista d'attesa</h3>
+          <p>Quando un evento è esaurito puoi metterti in lista: ti avvisiamo appena si libera un posto.</p>
+          <Link className="btn btn-primary" to="/">Guarda gli eventi</Link>
+        </div>
+      )}
+
+      {iscrizioni?.map((i) => (
+        <div className="pannello" key={i.id}>
+          <h2>{i.evento?.artista ?? 'Evento'}</h2>
+          {i.evento && <p className="acc-riga">{i.evento.luogo}, {i.evento.citta} · {formattaData(i.evento.data)}</p>}
+          <p className="acc-riga">{plurale(i.passeggeri, 'passeggero', 'passeggeri')}</p>
+          <div className="riga-elenco">
+            <span className="badge attenzione">In lista d'attesa</span>
+            <span className="acc-riga">Posizione {i.posizione}</span>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/* ============================================================
+   CREDITO
+   ============================================================ */
+
+/** Il credito, diviso tra quanto maturato in totale (guadagnato dai
+ *  viaggi) e quanto già usato, non solo il saldo attuale. */
 function SezioneCredito({ email }: { email: string }) {
   const [disponibile, setDisponibile] = useState<number | null>(null);
   const [movimenti, setMovimenti] = useState<MovimentoCredito[] | null>(null);
@@ -282,63 +457,64 @@ function SezioneCredito({ email }: { email: string }) {
 
   return (
     <section className="acc-sezione">
-      <h1>Credito fedeltà</h1>
+      <h1>Credito</h1>
 
-      <div className="panel-box" style={{ background: 'rgba(72,214,140,.1)', borderColor: 'var(--green)' }}>
+      <div className="pannello pannello-credito">
         <h2>Disponibile ora</h2>
-        <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-6xl)', color: 'var(--green)', margin: '4px 0' }}>
-          {formattaEuro(disponibile ?? 0)}
-        </p>
-        <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>
-          Maturato dai tuoi viaggi — spendibile su qualsiasi prenotazione futura, non scade mai.
-        </p>
+        <p className="numero-grande">{formattaEuro(disponibile ?? 0)}</p>
+        <p className="acc-riga">Maturato dai tuoi viaggi: lo spendi su qualsiasi prenotazione futura e non scade.</p>
       </div>
 
-      <div className="stats-row" style={{ margin: '18px 0' }}>
-        <div className="stat-box"><b style={{ color: 'var(--green)' }}>+{formattaEuro(totaleMaturato)}</b><span>Credito maturato (totale)</span></div>
-        <div className="stat-box"><b>-{formattaEuro(totaleUtilizzato)}</b><span>Credito utilizzato (totale)</span></div>
+      <div className="acc-due-colonne">
+        <div className="pannello">
+          <h2>Maturato in totale</h2>
+          <p className="numero-grande">{formattaEuro(totaleMaturato)}</p>
+        </div>
+        <div className="pannello">
+          <h2>Già utilizzato</h2>
+          <p className="numero-grande">{formattaEuro(totaleUtilizzato)}</p>
+        </div>
       </div>
 
-      {movimenti === null && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
+      {movimenti === null && <p className="acc-caricamento">Carico…</p>}
+
+      {movimenti?.length === 0 && (
+        <div className="stato-vuoto">
+          <h3>Nessun movimento</h3>
+          <p>Il credito matura dopo il tuo primo viaggio pagato per intero.</p>
+        </div>
+      )}
 
       {maturati.length > 0 && (
-        <>
-          <p className="section-label" style={{ marginTop: 18 }}>Maturato</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {maturati.map((m) => (
-              <div key={m.id} className="viaggio-card" style={{ padding: '10px 14px' }}>
-                <div className="viaggio-main">
-                  <p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>{m.motivo}</p>
-                  <p style={{ margin: 0, fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>{new Date(m.creatoIl).toLocaleDateString('it-IT')}</p>
-                </div>
-                <b style={{ color: 'var(--green)' }}>+{formattaEuro(m.importo)}</b>
-              </div>
-            ))}
-          </div>
-        </>
+        <div className="pannello">
+          <h2>Maturato</h2>
+          {maturati.map((m) => (
+            <div className="riga-elenco" key={m.id}>
+              <span>{m.motivo}<span className="quando">{formattaData(m.creatoIl)}</span></span>
+              <b className="importo-piu">+{formattaEuro(m.importo)}</b>
+            </div>
+          ))}
+        </div>
       )}
 
       {utilizzati.length > 0 && (
-        <>
-          <p className="section-label" style={{ marginTop: 18 }}>Utilizzato</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {utilizzati.map((m) => (
-              <div key={m.id} className="viaggio-card" style={{ padding: '10px 14px' }}>
-                <div className="viaggio-main">
-                  <p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>{m.motivo}</p>
-                  <p style={{ margin: 0, fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>{new Date(m.creatoIl).toLocaleDateString('it-IT')}</p>
-                </div>
-                <b>-{formattaEuro(Math.abs(Number(m.importo)))}</b>
-              </div>
-            ))}
-          </div>
-        </>
+        <div className="pannello">
+          <h2>Utilizzato</h2>
+          {utilizzati.map((m) => (
+            <div className="riga-elenco" key={m.id}>
+              <span>{m.motivo}<span className="quando">{formattaData(m.creatoIl)}</span></span>
+              <b>−{formattaEuro(Math.abs(Number(m.importo)))}</b>
+            </div>
+          ))}
+        </div>
       )}
-
-      {movimenti?.length === 0 && <p className="testo-intro">Nessun movimento ancora — matura dopo il tuo primo viaggio pagato per intero.</p>}
     </section>
   );
 }
+
+/* ============================================================
+   INVITA UN AMICO
+   ============================================================ */
 
 function SezioneInvitaAmico() {
   const [dati, setDati] = useState<{ codice: string; invitati: { nome: string; completato: boolean }[] } | null>(null);
@@ -354,7 +530,7 @@ function SezioneInvitaAmico() {
     navigator.clipboard.writeText(link).then(() => {
       setCopiato(true);
       setTimeout(() => setCopiato(false), 2200);
-    });
+    }).catch(() => {});
   }
 
   const inSospeso = dati?.invitati.filter((i) => !i.completato) ?? [];
@@ -363,98 +539,367 @@ function SezioneInvitaAmico() {
   return (
     <section className="acc-sezione">
       <h1>Invita un amico</h1>
-      <p className="testo-intro" style={{ marginBottom: 18 }}>
-        Condividi il tuo link — quando un amico si registra e completa la sua prima prenotazione, un bonus finisce sul credito fedeltà di entrambi.
+      <p className="testo-intro">
+        Condividi il tuo link: quando un amico si registra e completa la sua prima prenotazione, un bonus finisce sul
+        credito di tutti e due.
       </p>
 
-      {!dati && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
+      {!dati && <p className="acc-caricamento">Carico…</p>}
 
       {dati && (
         <>
-          <div className="panel-box">
+          <div className="pannello">
             <h2>Il tuo link</h2>
-            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              <input type="text" readOnly value={link} onClick={(e) => (e.target as HTMLInputElement).select()} style={{ flex: '1 1 260px', fontSize: 'var(--testo-md)' }} />
-              <button type="button" className="btn btn-primary" onClick={copia} style={{ flexShrink: 0 }}>{copiato ? '✓ Copiato' : 'Copia link'}</button>
+            <div className="invito-riga">
+              <input
+                type="text" readOnly value={link} aria-label="Il tuo link di invito"
+                className="campo-input" onClick={(e) => (e.target as HTMLInputElement).select()}
+              />
+              <button type="button" className="btn btn-primary" onClick={copia}>
+                {copiato ? <><Icona nome="spunta" dimensione={16} strokeWidth={2.4} />Copiato</> : 'Copia il link'}
+              </button>
             </div>
-            <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginTop: 10 }}>
-              Oppure condividi solo il codice: <b style={{ letterSpacing: 1 }}>{dati.codice}</b>
-            </p>
+            <p className="acc-riga">Oppure condividi solo il codice: <b className="codice-invito">{dati.codice}</b></p>
           </div>
 
-          <div className="stats-row" style={{ margin: '18px 0' }}>
-            <div className="stat-box"><b>{inSospeso.length}</b><span>Inviti in sospeso</span></div>
-            <div className="stat-box"><b style={{ color: 'var(--green)' }}>{completati.length}</b><span>Inviti completati</span></div>
+          <div className="acc-due-colonne">
+            <div className="pannello">
+              <h2>Inviti in sospeso</h2>
+              <p className="numero-grande">{inSospeso.length}</p>
+            </div>
+            <div className="pannello">
+              <h2>Inviti completati</h2>
+              <p className="numero-grande">{completati.length}</p>
+            </div>
           </div>
 
           {inSospeso.length > 0 && (
-            <>
-              <p className="section-label" style={{ marginTop: 18 }}>In sospeso</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {inSospeso.map((i, idx) => (
-                  <div key={idx} className="viaggio-card" style={{ padding: '10px 14px' }}>
-                    <div className="viaggio-main"><p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>{i.nome}</p></div>
-                    <span style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>Registrato, non ha ancora prenotato</span>
-                  </div>
-                ))}
-              </div>
-            </>
+            <div className="pannello">
+              <h2>In sospeso</h2>
+              {inSospeso.map((i, idx) => (
+                <div className="riga-elenco" key={idx}>
+                  <span>{i.nome}</span>
+                  <span className="quando">Registrato, non ha ancora prenotato</span>
+                </div>
+              ))}
+            </div>
           )}
 
           {completati.length > 0 && (
-            <>
-              <p className="section-label" style={{ marginTop: 18 }}>Completati</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {completati.map((i, idx) => (
-                  <div key={idx} className="viaggio-card" style={{ padding: '10px 14px' }}>
-                    <div className="viaggio-main"><p style={{ margin: 0, fontSize: 'var(--testo-base)' }}>{i.nome}</p></div>
-                    <b style={{ color: 'var(--green)' }}>✓ Bonus ricevuto</b>
-                  </div>
-                ))}
-              </div>
-            </>
+            <div className="pannello">
+              <h2>Completati</h2>
+              {completati.map((i, idx) => (
+                <div className="riga-elenco" key={idx}>
+                  <span>{i.nome}</span>
+                  <b className="importo-piu"><Icona nome="spunta" dimensione={16} strokeWidth={2.4} />Bonus ricevuto</b>
+                </div>
+              ))}
+            </div>
           )}
 
-          {dati.invitati.length === 0 && <p className="testo-intro">Nessun invito ancora — condividi il tuo link per iniziare.</p>}
+          {dati.invitati.length === 0 && (
+            <div className="stato-vuoto">
+              <h3>Nessun invito ancora</h3>
+              <p>Condividi il link qui sopra per iniziare.</p>
+            </div>
+          )}
         </>
       )}
     </section>
   );
 }
 
-/** Un blocco di consenso in stile "ACCONSENTO / NON ACCONSENTO" — lo
- *  stesso pattern usato da Vivaticket e altre piattaforme di
- *  biglietteria: due pulsanti mutuamente esclusivi, nessuno dei due
- *  preselezionato di default finché il cliente non ha scelto davvero
- *  (mai dare per scontato un consenso). */
+/* ============================================================
+   MESSAGGI
+   ============================================================ */
+
+function SezioneChat({ email, nome }: { email: string; nome: string }) {
+  const [conversazioni, setConversazioni] = useState<ConversazioneConMessaggi[] | null>(null);
+  const [eventi, setEventi] = useState<Evento[]>([]);
+  const [eventoScelto, setEventoScelto] = useState('');
+  const [testo, setTesto] = useState('');
+  const [errore, setErrore] = useState('');
+  const [invio, setInvio] = useState(false);
+
+  function ricarica() { chatApi.storicoCliente(email).then(setConversazioni).catch(() => {}); }
+  useEffect(ricarica, [email]);
+  useEffect(() => { eventiApi.list().then(setEventi).catch(() => {}); }, []);
+
+  // Aggiornamento automatico — così se lo staff risponde non serve
+  // ricaricare la pagina per vederlo.
+  useEffect(() => {
+    const id = setInterval(ricarica, 4000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email]);
+
+  // La conversazione attiva è la più recente che non sia chiusa — se
+  // l'ultima è stata chiusa dallo staff, il prossimo messaggio ne apre
+  // una nuova (per questo serve scegliere di nuovo l'evento).
+  const attiva = conversazioni?.find((c) => c.stato !== 'CHIUSA') ?? null;
+  const chiuse = conversazioni?.filter((c) => c.stato === 'CHIUSA') ?? [];
+
+  async function invia() {
+    if (!testo.trim()) return;
+    const eventoId = attiva?.eventoId ?? eventoScelto;
+    if (!eventoId) { setErrore("Scegli prima l'evento su cui hai una domanda."); return; }
+    setErrore('');
+    setInvio(true);
+    try {
+      // Da loggato il nome lo sappiamo già: non lo chiediamo di nuovo.
+      await chatApi.inviaCliente({ eventoId, nome: nome || email, email, testo });
+      setTesto('');
+      ricarica();
+    } catch (e) {
+      setErrore(e instanceof ErroreApi ? e.message : 'Messaggio non inviato: controlla la connessione e riprova.');
+    } finally {
+      setInvio(false);
+    }
+  }
+
+  return (
+    <section className="acc-sezione">
+      <h1>Messaggi</h1>
+      <p className="testo-intro">Scrivi allo staff OnWay: rispondiamo qui e ti avvisiamo via email.</p>
+
+      <div className="acc-chat-box">
+        {!attiva && (
+          <div className="acc-chat-scelta">
+            <div className="campo">
+              <label className="campo-etichetta" htmlFor="acc-chat-evento">Su quale evento hai una domanda?</label>
+              <select id="acc-chat-evento" className="campo-input" value={eventoScelto} onChange={(e) => setEventoScelto(e.target.value)}>
+                <option value="">Scegli l'evento…</option>
+                {eventi.map((ev) => <option key={ev.id} value={ev.id}>{ev.artista} — {ev.citta}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
+
+        <div className="acc-chat-messaggi">
+          {conversazioni === null && <p className="acc-caricamento">Carico…</p>}
+          {conversazioni?.length === 0 && <p className="acc-caricamento">Nessun messaggio ancora: scrivi la tua prima domanda qui sotto.</p>}
+          {attiva?.messaggi.map((m) => (
+            <div className={`chat-bubble-mini ${m.autore.toLowerCase()}`} key={m.id}>
+              {m.testo}
+              <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff OnWay'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="acc-chat-input-row">
+          <label className="sr-only" htmlFor="acc-chat-testo">Scrivi un messaggio</label>
+          <input
+            id="acc-chat-testo" className="campo-input" value={testo} placeholder="Scrivi un messaggio…"
+            onChange={(e) => setTesto(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); invia(); } }}
+          />
+          <button type="button" className="btn btn-primary" onClick={invia} disabled={invio}>Invia</button>
+        </div>
+      </div>
+
+      {errore && <p className="avviso avviso-errore acc-avviso" role="alert">{errore}</p>}
+
+      {chiuse.length > 0 && (
+        <div className="acc-chat-storico">
+          <p className="section-label">Conversazioni precedenti</p>
+          {chiuse.map((c) => (
+            <details key={c.id} className="acc-dettagli">
+              <summary>{formattaData(c.creataIl)} — {plurale(c.messaggi.length, 'messaggio', 'messaggi')}</summary>
+              <div className="acc-chat-messaggi">
+                {c.messaggi.map((m) => (
+                  <div key={m.id} className={`chat-bubble-mini ${m.autore.toLowerCase()}`}>
+                    {m.testo}
+                    <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff OnWay'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ============================================================
+   PROFILO
+   ============================================================ */
+
+function SezioneProfilo({ email, onEsci }: { email: string; onEsci: () => void }) {
+  const [dati, setDati] = useState<DatiCliente | null>(null);
+  const [nome, setNome] = useState('');
+  const [cognome, setCognome] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [citta, setCitta] = useState('');
+  const [dataNascita, setDataNascita] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [messaggio, setMessaggio] = useState('');
+  const [erroreSalva, setErroreSalva] = useState('');
+  const [eliminaAperta, setEliminaAperta] = useState(false);
+
+  useEffect(() => {
+    clienteAuthApi.me().then((d) => {
+      setDati(d);
+      setNome(d.nome ?? ''); setCognome(d.cognome ?? ''); setTelefono(d.telefono ?? ''); setCitta(d.citta ?? '');
+      setDataNascita(d.dataNascita ? d.dataNascita.slice(0, 10) : '');
+    }).catch(() => {});
+  }, []);
+
+  async function salva(e: React.FormEvent) {
+    e.preventDefault();
+    setErroreSalva(''); setMessaggio(''); setSalvando(true);
+    try {
+      await clienteAuthApi.aggiornaProfilo({ nome, cognome, telefono: telefono || undefined, citta: citta || undefined, dataNascita });
+      setMessaggio('Dati salvati.');
+      setTimeout(() => setMessaggio(''), 4000);
+    } catch (err) {
+      // aggiornaProfilo lancia ErroreClienteAuth (con il messaggio del
+      // server): prima si controllava ErroreApi e il messaggio vero non
+      // arrivava mai.
+      setErroreSalva(err instanceof ErroreClienteAuth ? err.message : 'Salvataggio non riuscito: controlla la connessione e riprova.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  if (!dati) return <section className="acc-sezione"><h1>Profilo</h1><p className="acc-caricamento">Carico…</p></section>;
+
+  return (
+    <section className="acc-sezione">
+      <h1>Profilo</h1>
+
+      <form onSubmit={salva} className="pannello">
+        <h2>I tuoi dati</h2>
+        <p className="acc-riga">Sei collegato con <b>{email}</b>: l'indirizzo non si cambia da qui.</p>
+
+        <div className="acc-due-colonne">
+          <CampoTesto id="profilo-nome" etichetta="Nome" required value={nome} onChange={(e) => setNome(e.target.value)} />
+          <CampoTesto id="profilo-cognome" etichetta="Cognome" required value={cognome} onChange={(e) => setCognome(e.target.value)} />
+        </div>
+        <div className="acc-due-colonne">
+          <CampoTesto id="profilo-telefono" etichetta="Telefono" type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+          <CampoTesto id="profilo-citta" etichetta="Città" value={citta} onChange={(e) => setCitta(e.target.value)} />
+        </div>
+        <CampoTesto
+          id="profilo-nascita" etichetta="Data di nascita" type="date" required className="campo-stretto"
+          aiuto="Serve per organizzare i gruppi sul bus"
+          value={dataNascita} onChange={(e) => setDataNascita(e.target.value)}
+        />
+
+        {erroreSalva && <p className="avviso avviso-errore" role="alert">{erroreSalva}</p>}
+        {messaggio && <p className="avviso avviso-ok" role="status">{messaggio}</p>}
+
+        <div className="acc-azioni">
+          <button type="submit" className="btn btn-primary" disabled={salvando}>
+            {salvando ? 'Salvataggio…' : 'Salva le modifiche'}
+          </button>
+        </div>
+      </form>
+
+      <div className="pannello pannello-pericolo">
+        <h2>Elimina l'account</h2>
+        <p className="acc-riga">
+          I tuoi dati personali (nome, telefono, città) vengono rimossi e non potrai più accedere. Le prenotazioni
+          già fatte restano nello storico per motivi contabili, ma non saranno più collegate a un account attivo.
+          <b> Questa azione non si può annullare.</b>
+        </p>
+        <div className="acc-azioni">
+          <button type="button" className="btn btn-danger" onClick={() => setEliminaAperta(true)}>Elimina l'account</button>
+        </div>
+      </div>
+
+      {/* Su telefono la colonna del menu non c'è: "Esci" vive qui. */}
+      <div className="account-esci-mobile">
+        <button type="button" className="btn btn-ghost btn-block" onClick={onEsci}>Esci</button>
+      </div>
+
+      {eliminaAperta && <ModaleEliminaAccount onChiudi={() => setEliminaAperta(false)} />}
+    </section>
+  );
+}
+
+/** La conferma dell'eliminazione in un <dialog>: serve la password,
+ *  perché è l'unica azione dell'account che non si può annullare. */
+function ModaleEliminaAccount({ onChiudi }: { onChiudi: () => void }) {
+  const navigate = useNavigate();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [password, setPassword] = useState('');
+  const [eliminando, setEliminando] = useState(false);
+  const [errore, setErrore] = useState('');
+
+  useEffect(() => {
+    const d = dialogRef.current;
+    if (d && !d.open) d.showModal();
+  }, []);
+
+  async function elimina(e: React.FormEvent) {
+    e.preventDefault();
+    setErrore(''); setEliminando(true);
+    try {
+      await clienteAuthApi.eliminaAccount(password);
+      logoutCliente();
+      navigate('/');
+    } catch (err) {
+      setErrore(err instanceof Error ? err.message : 'Eliminazione non riuscita: riprova.');
+      setEliminando(false);
+    }
+  }
+
+  return (
+    <dialog ref={dialogRef} className="modale-conferma" aria-labelledby="elimina-titolo" onClose={onChiudi}>
+      <form onSubmit={elimina}>
+        <h2 id="elimina-titolo">Elimina l'account</h2>
+        <p>Conferma la tua password per procedere. Dopo questa operazione non potrai più accedere.</p>
+
+        <CampoPassword
+          id="elimina-password" etichetta="La tua password" autoComplete="current-password" required autoFocus
+          value={password} onChange={(e) => setPassword(e.target.value)}
+        />
+
+        {errore && <p className="avviso avviso-errore" role="alert">{errore}</p>}
+
+        <div className="modale-conferma-azioni">
+          <button type="submit" className="btn btn-danger" disabled={eliminando}>
+            {eliminando ? 'Eliminazione…' : 'Elimina definitivamente'}
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => dialogRef.current?.close()}>Annulla</button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+/* ============================================================
+   PRIVACY
+   ============================================================ */
+
+/** Un blocco di consenso "Acconsento / Non acconsento": due pulsanti
+ *  mutuamente esclusivi, nessuno preselezionato finché il cliente non
+ *  ha scelto davvero (mai dare per scontato un consenso). */
 function BloccoConsenso({ titolo, descrizione, valore, onScegli, salvando }: {
   titolo: string; descrizione: string; valore: boolean | null; onScegli: (v: boolean) => void; salvando: boolean;
 }) {
   return (
-    <div className="panel-box">
+    <div className="pannello">
       <h2>{titolo}</h2>
-      <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', marginBottom: 10 }}>{descrizione}</p>
-      <div style={{ display: 'flex', gap: 10 }}>
+      <p className="acc-riga">{descrizione}</p>
+      <div className="acc-azioni">
         <button
-          type="button"
-          disabled={salvando}
+          type="button" disabled={salvando} aria-pressed={valore === true}
           onClick={() => onScegli(true)}
-          className={`btn ${valore === true ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: 'var(--testo-md)' }}
+          className={`btn btn-sm ${valore === true ? 'btn-primary' : 'btn-secondary'}`}
         >
-          {valore === true ? '✓ ' : ''}Acconsento
+          Acconsento
         </button>
         <button
-          type="button"
-          disabled={salvando}
+          type="button" disabled={salvando} aria-pressed={valore === false}
           onClick={() => onScegli(false)}
-          className={`btn ${valore === false ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ fontSize: 'var(--testo-md)' }}
+          className={`btn btn-sm ${valore === false ? 'btn-primary' : 'btn-secondary'}`}
         >
-          {valore === false ? '✓ ' : ''}Non acconsento
+          Non acconsento
         </button>
       </div>
-      {valore === null && <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 8 }}>Non hai ancora scelto.</p>}
+      {valore === null && <p className="acc-riga">Non hai ancora scelto.</p>}
     </div>
   );
 }
@@ -462,32 +907,34 @@ function BloccoConsenso({ titolo, descrizione, valore, onScegli, salvando }: {
 function SezionePrivacy({ email }: { email: string }) {
   const [preferenze, setPreferenze] = useState<PreferenzePrivacy | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [errore, setErrore] = useState('');
 
-  useEffect(() => {
-    utentiApi.preferenzePrivacy(email).then(setPreferenze);
-  }, [email]);
+  useEffect(() => { utentiApi.preferenzePrivacy(email).then(setPreferenze).catch(() => {}); }, [email]);
 
   async function aggiorna(campo: keyof PreferenzePrivacy, valore: boolean) {
     setSalvando(true);
+    setErrore('');
     try {
       const nuove = await utentiApi.aggiornaPreferenzePrivacy(email, { [campo]: valore });
       setPreferenze(nuove);
     } catch {
-      alert('Salvataggio non riuscito, riprova.');
+      setErrore('Salvataggio non riuscito: controlla la connessione e riprova.');
     } finally {
       setSalvando(false);
     }
   }
 
-  if (!preferenze) return <section className="acc-sezione"><h1>Preferenze Privacy</h1><p>Carico...</p></section>;
+  if (!preferenze) return <section className="acc-sezione"><h1>Privacy</h1><p className="acc-caricamento">Carico…</p></section>;
 
   return (
     <section className="acc-sezione">
-      <h1>Preferenze Privacy</h1>
-      <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', marginBottom: 18 }}>
-        Rivedi o cambia in qualsiasi momento come usiamo i tuoi dati. Leggi anche la nostra{' '}
-        <Link to="/pagina/privacy" style={{ color: 'var(--paper)', textDecoration: 'underline' }}>informativa completa sulla privacy</Link>.
+      <h1>Privacy</h1>
+      <p className="testo-intro">
+        Rivedi o cambia in qualsiasi momento come usiamo i tuoi dati. Leggi anche la{' '}
+        <Link to="/pagina/privacy">informativa completa sulla privacy</Link>.
       </p>
+
+      {errore && <p className="avviso avviso-errore acc-avviso" role="alert">{errore}</p>}
 
       <BloccoConsenso
         titolo="Informativa sulla privacy"
@@ -511,339 +958,11 @@ function SezionePrivacy({ email }: { email: string }) {
         salvando={salvando}
       />
 
-      <div className="panel-box">
+      <div className="pannello">
         <h2>Cookie</h2>
-        <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', marginBottom: 10 }}>
-          Puoi rivedere o cambiare in qualsiasi momento quali cookie hai accettato su questo dispositivo.
-        </p>
-        <LinkPreferenzeCookie />
+        <p className="acc-riga">Puoi rivedere o cambiare in qualsiasi momento quali cookie hai accettato su questo dispositivo.</p>
+        <div className="acc-azioni"><LinkPreferenzeCookie /></div>
       </div>
-    </section>
-  );
-}
-
-/** Il "centro di controllo" — prima cosa che il cliente vede entrando
- *  nella sua area: se ha un viaggio futuro, è la prima cosa in
- *  assoluto che vede, non deve andarselo a cercare. */
-function SezioneDashboard({ email, viaggi, eventiPerId, onNavigare, onAprireViaggio }: {
-  email: string;
-  viaggi: Prenotazione[] | null;
-  eventiPerId: Record<string, Evento>;
-  onNavigare: (s: Sezione) => void;
-  onAprireViaggio: (pnr: string) => void;
-}) {
-  const [nome, setNome] = useState('');
-  const [messaggiNonLetti, setMessaggiNonLetti] = useState(0);
-  const [inListaAttesa, setInListaAttesa] = useState(0);
-
-  useEffect(() => {
-    clienteAuthApi.me().then((d) => setNome(d.nome ?? ''));
-    chatApi.storicoCliente(email).then((conv) => {
-      const attiva = conv.find((c) => c.stato !== 'CHIUSA');
-      setMessaggiNonLetti(attiva?.messaggi.filter((m) => m.autore === 'ADMIN').length ?? 0);
-    });
-    listaAttesaApi.mieIscrizioni(email).then((l) => setInListaAttesa(l.length)).catch(() => {});
-  }, [email]);
-
-  // Il "prossimo evento" ora si ricava dai dati già arrivati dal padre
-  // (viaggi + eventiPerId, condivisi con la sezione Viaggi) invece di
-  // un giro proprio a recuperare di nuovo gli stessi dettagli evento.
-  const oggi = new Date().toISOString().slice(0, 10);
-  const confermati = viaggi?.filter((p) => p.stato === 'CONFERMATA') ?? [];
-  const futuri = confermati
-    .map((p) => ({ p, ev: eventiPerId[p.eventoId] }))
-    .filter((c): c is { p: Prenotazione; ev: Evento } => !!c.ev && c.ev.data >= oggi)
-    .sort((a, b) => a.ev.data.localeCompare(b.ev.data));
-  const eventoProssimo = futuri[0]?.ev ?? null;
-
-  const prenotazioneProssima = eventoProssimo ? viaggi?.find((p) => p.eventoId === eventoProssimo.id && p.stato === 'CONFERMATA') : null;
-
-  const giorniAlViaggio = eventoProssimo ? Math.ceil((new Date(eventoProssimo.data).getTime() - Date.now()) / (24 * 3600 * 1000)) : null;
-
-  return (
-    <section className="acc-sezione">
-      <h1>Ciao{nome ? `, ${nome}` : ''}!</h1>
-
-      {viaggi === null && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
-
-      {viaggi !== null && eventoProssimo && prenotazioneProssima && (
-        <div className="panel-box" style={{ background: 'linear-gradient(135deg, rgba(255,212,0,.14), rgba(255,212,0,.04))', borderColor: 'var(--pink)' }}>
-          {giorniAlViaggio === 0 ? (
-            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-3xl)', color: 'var(--pink)', margin: '0 0 6px' }}>Il tuo viaggio è oggi!</p>
-          ) : giorniAlViaggio === 1 ? (
-            <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-3xl)', color: 'var(--pink)', margin: '0 0 6px' }}>Domani si parte!</p>
-          ) : (
-            <p style={{ textTransform: 'uppercase', fontSize: 'var(--testo-xs)', letterSpacing: 1, color: 'var(--mist)', margin: '0 0 6px' }}>Il tuo prossimo viaggio</p>
-          )}
-          <h2 style={{ margin: '0 0 4px' }}>{eventoProssimo.artista}</h2>
-          <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', margin: '0 0 14px' }}>
-            {prenotazioneProssima.fermataCitta}
-            {prenotazioneProssima.fermataOrario && ` · ore ${prenotazioneProssima.fermataOrario}`}
-            {' → '}{eventoProssimo.citta}
-            {giorniAlViaggio !== null && giorniAlViaggio > 1 && ` · tra ${giorniAlViaggio} giorni`}
-          </p>
-
-          {/* Entro il giorno prima, un promemoria pratico invece della
-              solita mini-timeline sullo stato del pagamento — quello
-              non serve più a ridosso della partenza, quello che serve
-              è sapere cosa fare. */}
-          {giorniAlViaggio !== null && giorniAlViaggio <= 1 && giorniAlViaggio >= 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, fontSize: 'var(--testo-md)' }}>
-              <p style={{ margin: '0 0 4px', fontWeight: 600 }}>Ricordati:</p>
-              <span>• Arrivare in anticipo rispetto all'orario di partenza</span>
-              <span>• Avere un documento d'identità con te</span>
-              <span>• Avere la prenotazione a portata di mano (basta questa pagina)</span>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, fontSize: 'var(--testo-md)' }}>
-              <span>✓ Prenotazione confermata</span>
-              {prenotazioneProssima.tipoPagamento === 'COMPLETO' || prenotazioneProssima.saldoPagato ? (
-                <span>✓ Pagamento completato</span>
-              ) : (
-                <>
-                  <span>✓ Acconto ricevuto</span>
-                  <span style={{ color: calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? 'var(--pink)' : 'var(--amber, #e0a95b)' }}>
-                    {calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? '⚠ Termine per il saldo superato' : '⚠ Saldo da versare'}
-                    {prenotazioneProssima.scadenzaSaldo ? ` ${calcolaStatoPrenotazione(prenotazioneProssima).chiave === 'acconto_scaduto' ? 'il' : 'entro il'} ${new Date(prenotazioneProssima.scadenzaSaldo).toLocaleDateString('it-IT')}` : ''}
-                  </span>
-                </>
-              )}
-            </div>
-          )}
-
-          {giorniAlViaggio === 0 && prenotazioneProssima.fermataIndirizzo ? (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <a
-                className="btn btn-primary"
-                style={{ textDecoration: 'none', textAlign: 'center' }}
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(prenotazioneProssima.fermataIndirizzo)}`}
-                target="_blank" rel="noreferrer"
-              >
-                🗺️ Apri mappa
-              </a>
-              <button className="btn btn-ghost" onClick={() => onNavigare('chat')}>💬 Chat</button>
-              <a className="btn btn-ghost" href="/faq">🛟 Assistenza</a>
-            </div>
-          ) : (
-            <button className="btn btn-primary" onClick={() => onAprireViaggio(prenotazioneProssima.pnr)}>Apri il viaggio</button>
-          )}
-        </div>
-      )}
-
-      {viaggi !== null && !eventoProssimo && (
-        <div className="panel-box">
-          <p style={{ margin: '0 0 12px' }}>Non hai ancora un viaggio in programma.</p>
-          <Link className="btn btn-primary" to="/">Scopri gli eventi</Link>
-        </div>
-      )}
-
-      <div className="acc-dashboard-grid">
-        <button className="acc-dashboard-tile" onClick={() => onNavigare('viaggi')}>
-          <span>Le mie prenotazioni</span>
-        </button>
-        <button className="acc-dashboard-tile" onClick={() => onNavigare('lista-attesa')}>
-          <span>Lista d'attesa{inListaAttesa > 0 ? ` (${inListaAttesa})` : ''}</span>
-        </button>
-        <button className="acc-dashboard-tile" onClick={() => onNavigare('chat')}>
-          <span>Messaggi{messaggiNonLetti > 0 ? ` (${messaggiNonLetti})` : ''}</span>
-        </button>
-        <button className="acc-dashboard-tile" onClick={() => onNavigare('profilo')}>
-          <span>Il mio profilo</span>
-        </button>
-        <a className="acc-dashboard-tile" href="/faq">
-          <span>Assistenza</span>
-        </a>
-      </div>
-    </section>
-  );
-}
-
-function SezioneListaAttesa({ email }: { email: string }) {
-  const [iscrizioni, setIscrizioni] = useState<MiaIscrizione[] | null>(null);
-
-  useEffect(() => { listaAttesaApi.mieIscrizioni(email).then(setIscrizioni); }, [email]);
-
-  return (
-    <section className="acc-sezione">
-      <h1>Lista d'attesa</h1>
-      {iscrizioni === null && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
-      {iscrizioni?.length === 0 && <div className="empty-box">Non sei in lista d'attesa per nessun evento al momento.</div>}
-      {iscrizioni?.map((i) => (
-        <div className="viaggio-card" key={i.id}>
-          <div className="viaggio-main">
-            <h3>{i.evento?.artista ?? 'Evento'}</h3>
-            <p>{i.evento ? `${i.evento.luogo}, ${i.evento.citta} · ${new Date(i.evento.data).toLocaleDateString('it-IT')}` : ''}</p>
-            <p>{i.passeggeri} passegger{i.passeggeri > 1 ? 'i' : 'o'}</p>
-          </div>
-          <div className="viaggio-right">
-            <span className="badge attenzione">Sei in lista d'attesa</span>
-            <span style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>Posizione #{i.posizione}</span>
-          </div>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function SezioneViaggi({ email, viaggi, eventiPerId, onAprireViaggio }: {
-  email: string;
-  viaggi: Prenotazione[] | null;
-  eventiPerId: Record<string, Evento>;
-  onAprireViaggio: (pnr: string) => void;
-}) {
-  const [tab, setTab] = useState<'prossimi' | 'passati'>('prossimi');
-
-  async function richiediRimborso(pnr: string) {
-    const motivo = prompt('Vuoi aggiungere una nota per l\'amministrazione? (facoltativo, puoi lasciare vuoto)') ?? '';
-    try {
-      await fetch(`${API_URL}/api/richieste-rimborso`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pnr, email, motivo: motivo || undefined }),
-      }).then(async (r) => {
-        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).errore ?? 'Richiesta non riuscita.');
-      });
-      alert('Richiesta di rimborso inviata — verrà valutata al più presto.');
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Richiesta non riuscita, riprova.');
-    }
-  }
-
-  const oggi = new Date().toISOString().slice(0, 10);
-  const viaggiFiltrati = (viaggi ?? []).filter((p) => {
-    const ev = eventiPerId[p.eventoId];
-    if (!ev) return tab === 'prossimi';
-    return tab === 'passati' ? ev.data < oggi : ev.data >= oggi;
-  });
-
-  return (
-    <section className="acc-sezione">
-      <h1>I miei viaggi</h1>
-      <div className="mini-tabs-acc">
-        <button className={`mini-tab-acc${tab === 'prossimi' ? ' active' : ''}`} onClick={() => setTab('prossimi')}>Prossimi viaggi</button>
-        <button className={`mini-tab-acc${tab === 'passati' ? ' active' : ''}`} onClick={() => setTab('passati')}>Viaggi passati</button>
-      </div>
-
-      {viaggi === null && <p style={{ color: 'var(--mist)' }}>Carico...</p>}
-      {viaggi !== null && !viaggiFiltrati.length && (
-        <div className="empty-box">{tab === 'passati' ? 'Non hai ancora viaggi passati.' : 'Non risultano prenotazioni future con questa email.'}</div>
-      )}
-
-      {viaggiFiltrati.map((p) => {
-        const ev = eventiPerId[p.eventoId];
-        return (
-          <div className="viaggio-card" key={p.id} onClick={() => onAprireViaggio(p.pnr)} style={{ cursor: 'pointer' }}>
-            <div className="viaggio-main">
-              <span className="tag">{ev?.genere}</span>
-              <h3>{ev?.artista ?? 'Evento'}</h3>
-              <p>{ev ? `${ev.luogo}, ${ev.citta}` : ''}</p>
-              <p>{p.passeggeri} passegger{p.passeggeri > 1 ? 'i' : 'o'} · <span className="pnr-tag">PNR {p.pnr}</span></p>
-              <div className="viaggio-riepilogo">
-                <div className="riepilogo-riga">
-                  <span className="riepilogo-label">Fermata</span>
-                  <span>{p.fermataCitta}{p.fermataOrario ? ` · ore ${p.fermataOrario}` : ''}</span>
-                </div>
-              </div>
-            </div>
-            <div className="viaggio-right">
-              <span className={`badge ${calcolaStatoPrenotazione(p).classe}`}>{calcolaStatoPrenotazione(p).etichetta}</span>
-              <span className="totale">{formattaEuro(p.totale)}</span>
-              {p.stato === 'CONFERMATA' && (
-                <div className="viaggio-azioni">
-                  <button className="btn-mini" onClick={(e) => { e.stopPropagation(); richiediRimborso(p.pnr); }}>Richiedi rimborso</button>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </section>
-  );
-}
-
-function SezioneChat({ email }: { email: string }) {
-  const [conversazioni, setConversazioni] = useState<ConversazioneConMessaggi[] | null>(null);
-  const [eventi, setEventi] = useState<Evento[]>([]);
-  const [eventoScelto, setEventoScelto] = useState('');
-  const [testo, setTesto] = useState('');
-  const [nome, setNome] = useState('');
-
-  function ricarica() { chatApi.storicoCliente(email).then(setConversazioni); }
-  useEffect(ricarica, [email]);
-  useEffect(() => { eventiApi.list().then(setEventi); }, []);
-
-  // Aggiornamento automatico — così se lo staff risponde non serve
-  // ricaricare la pagina per vederlo.
-  useEffect(() => {
-    const id = setInterval(ricarica, 4000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email]);
-
-  // La conversazione attiva è la più recente che non sia chiusa — se
-  // l'ultima è stata chiusa dallo staff, il prossimo messaggio ne apre
-  // una nuova (per questo serve scegliere di nuovo l'evento).
-  const attiva = conversazioni?.find((c) => c.stato !== 'CHIUSA') ?? null;
-  const chiuse = conversazioni?.filter((c) => c.stato === 'CHIUSA') ?? [];
-
-  async function invia() {
-    if (!testo.trim()) return;
-    const eventoId = attiva?.eventoId ?? eventoScelto;
-    if (!eventoId) { alert("Scegli l'evento su cui hai una domanda."); return; }
-    await chatApi.inviaCliente({ eventoId, nome: nome || email, email, testo });
-    setTesto('');
-    ricarica();
-  }
-
-  return (
-    <section className="acc-sezione">
-      <h1>Chat con lo staff OnWay</h1>
-      <div className="acc-chat-box">
-        {!attiva && (
-          <div id="accChatEventoScelta">
-            <select value={eventoScelto} onChange={(e) => setEventoScelto(e.target.value)}>
-              <option value="">Scegli l'evento...</option>
-              {eventi.map((ev) => <option key={ev.id} value={ev.id}>{ev.artista} — {ev.citta}</option>)}
-            </select>
-            <input placeholder="Il tuo nome" value={nome} onChange={(e) => setNome(e.target.value)} />
-          </div>
-        )}
-        <div id="accChatMessages">
-          {conversazioni === null && <p style={{ color: 'var(--mist)', padding: 16 }}>Carico...</p>}
-          {conversazioni?.length === 0 && <p style={{ color: 'var(--mist)', padding: 16 }}>Nessun messaggio ancora. Scrivi la tua prima domanda qui sotto.</p>}
-          {attiva?.messaggi.map((m) => (
-            <div className={`chat-bubble-mini ${m.autore.toLowerCase()}`} key={m.id}>
-              {m.testo}
-              <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff OnWay'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
-            </div>
-          ))}
-        </div>
-        <div className="acc-chat-input-row">
-          <input value={testo} onChange={(e) => setTesto(e.target.value)} placeholder="Scrivi un messaggio..." onKeyDown={(e) => e.key === 'Enter' && invia()} />
-          <button className="btn btn-primary" onClick={invia}>Invia</button>
-        </div>
-      </div>
-
-      {chiuse.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <p className="section-label">Conversazioni precedenti</p>
-          {chiuse.map((c) => (
-            <details key={c.id} style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 10, padding: '10px 14px', marginBottom: 8 }}>
-              <summary style={{ cursor: 'pointer', fontSize: 'var(--testo-md)' }}>
-                {new Date(c.creataIl).toLocaleDateString('it-IT')} — {c.messaggi.length} messaggi
-              </summary>
-              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {c.messaggi.map((m) => (
-                  <div key={m.id} className={`chat-bubble-mini ${m.autore.toLowerCase()}`}>
-                    {m.testo}
-                    <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff OnWay'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
-                  </div>
-                ))}
-              </div>
-            </details>
-          ))}
-        </div>
-      )}
     </section>
   );
 }

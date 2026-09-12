@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { controlloAccessiApi, type RisultatoRicerca, tokenTourLeader } from '../api/tourLeaderAuth';
 import { TourLeaderLayout } from '../features/TourLeaderLayout';
+import { Icona } from '../features/Icone';
 
 export function TourLeaderCercaPage() {
   const [query, setQuery] = useState('');
   const [risultati, setRisultati] = useState<RisultatoRicerca[] | null>(null);
   const [cercando, setCercando] = useState(false);
   const [checkinInCorso, setCheckinInCorso] = useState<string | null>(null);
+  const [daConfermare, setDaConfermare] = useState<RisultatoRicerca | null>(null);
+  const [errore, setErrore] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,19 +21,20 @@ export function TourLeaderCercaPage() {
     if (query.trim().length < 2) { setRisultati(null); return; }
     setCercando(true);
     const id = setTimeout(() => {
-      controlloAccessiApi.cerca(query).then(setRisultati).finally(() => setCercando(false));
+      controlloAccessiApi.cerca(query).then(setRisultati).catch(() => setRisultati([])).finally(() => setCercando(false));
     }, 300);
     return () => clearTimeout(id);
   }, [query]);
 
   async function faiCheckin(r: RisultatoRicerca) {
-    if (!confirm(`Confermare la salita di ${r.nome} ${r.cognome}?`)) return;
+    setDaConfermare(null);
+    setErrore('');
     setCheckinInCorso(r.partecipanteId);
     try {
       await controlloAccessiApi.checkinManuale(r.partecipanteId);
       setRisultati((prev) => prev?.map((x) => x.partecipanteId === r.partecipanteId ? { ...x, giaSalito: true } : x) ?? null);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Check-in non riuscito.');
+      setErrore(`Check-in di ${r.nome} ${r.cognome} non riuscito: ${e instanceof Error ? e.message : 'controlla la connessione e riprova.'}`);
     } finally {
       setCheckinInCorso(null);
     }
@@ -38,44 +42,81 @@ export function TourLeaderCercaPage() {
 
   return (
     <TourLeaderLayout vocedAttiva="cerca">
-      <h1 style={{ fontSize: 'var(--testo-3xl)', fontWeight: 700, color: '#1f2430', margin: '0 0 4px' }}>Cerca passeggero</h1>
-      <p style={{ color: '#6b7280', fontSize: 'var(--testo-base)', marginBottom: 20 }}>Nome, cognome o PNR — su tutti i tuoi eventi insieme.</p>
+      <h1 className="page-title">Cerca passeggero</h1>
+      <p className="tl-intro">Nome, cognome o codice di prenotazione, su tutti i tuoi eventi insieme.</p>
 
-      <input
-        type="text"
-        autoFocus
-        placeholder="es. Mario Rossi, o IB4X7K2..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        style={{ width: '100%', maxWidth: 400, padding: '11px 14px', borderRadius: 10, border: '1px solid #e3e5ea', background: '#fff', color: '#1f2430', fontSize: 'var(--testo-lg)', marginBottom: 20 }}
-      />
+      <div className="campo tl-ricerca">
+        <label className="campo-etichetta" htmlFor="tl-cerca">Cerca</label>
+        <input
+          id="tl-cerca" className="campo-input" type="search" autoFocus autoComplete="off"
+          placeholder="Es. Mario Rossi, o IB4X7K2"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
 
-      {cercando && <p style={{ color: '#6b7280', fontSize: 'var(--testo-md)' }}>Cerco...</p>}
+      {errore && <p className="avviso avviso-errore tl-errore" role="alert">{errore}</p>}
+      {cercando && <p className="tl-nota" role="status">Cerco…</p>}
       {!cercando && query.trim().length >= 2 && risultati?.length === 0 && (
-        <p style={{ color: '#6b7280', fontSize: 'var(--testo-md)' }}>Nessun passeggero trovato con questi dati, sui tuoi eventi.</p>
+        <p className="tl-nota">Nessun passeggero trovato con questi dati, sui tuoi eventi.</p>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="tl-elenco">
         {risultati?.map((r) => (
-          <div key={r.partecipanteId} style={{ background: '#fff', border: '1px solid #e3e5ea', borderRadius: 10, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div key={r.partecipanteId} className="tl-card tl-riga">
             <div>
-              <p style={{ fontWeight: 600, fontSize: 'var(--testo-lg)', margin: 0, color: '#1f2430' }}>{r.nome} {r.cognome}</p>
-              <p style={{ color: '#6b7280', fontSize: 'var(--testo-md)', margin: '2px 0 0' }}>PNR {r.pnr} · da {r.fermataCitta}</p>
+              <p className="tl-card-titolo">{r.nome} {r.cognome}</p>
+              <p className="tl-card-riga">PNR {r.pnr} · da {r.fermataCitta}</p>
             </div>
             {r.giaSalito ? (
-              <span style={{ color: '#16a34a', fontSize: 'var(--testo-md)', fontWeight: 600 }}>✓ Già a bordo</span>
+              <span className="tl-a-bordo"><Icona nome="spunta" dimensione={16} strokeWidth={2.4} />Già a bordo</span>
             ) : (
               <button
-                onClick={() => faiCheckin(r)}
+                type="button" className="btn btn-primary btn-sm"
+                onClick={() => setDaConfermare(r)}
                 disabled={checkinInCorso === r.partecipanteId}
-                style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontSize: 'var(--testo-md)', fontWeight: 600, cursor: 'pointer' }}
               >
-                {checkinInCorso === r.partecipanteId ? '...' : 'Check-in'}
+                {checkinInCorso === r.partecipanteId ? 'Check-in…' : 'Check-in'}
               </button>
             )}
           </div>
         ))}
       </div>
+
+      {daConfermare && (
+        <ConfermaCheckin
+          risultato={daConfermare}
+          onConferma={() => faiCheckin(daConfermare)}
+          onAnnulla={() => setDaConfermare(null)}
+        />
+      )}
     </TourLeaderLayout>
+  );
+}
+
+/** Conferma della salita a mano, in un <dialog> al posto di
+ *  window.confirm: il nome si legge bene e il pulsante è grande. */
+function ConfermaCheckin({ risultato, onConferma, onAnnulla }: {
+  risultato: RisultatoRicerca;
+  onConferma: () => void;
+  onAnnulla: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = dialogRef.current;
+    if (d && !d.open) d.showModal();
+  }, []);
+
+  return (
+    <dialog ref={dialogRef} className="modale-conferma" aria-labelledby="conferma-checkin-titolo" onClose={onAnnulla}>
+      <form method="dialog" onSubmit={(e) => { e.preventDefault(); onConferma(); }}>
+        <h2 id="conferma-checkin-titolo">Confermi la salita?</h2>
+        <p><b>{risultato.nome} {risultato.cognome}</b> · PNR {risultato.pnr} · da {risultato.fermataCitta}</p>
+        <div className="modale-conferma-azioni">
+          <button type="submit" className="btn btn-primary">Conferma la salita</button>
+          <button type="button" className="btn btn-secondary" onClick={() => dialogRef.current?.close()}>Annulla</button>
+        </div>
+      </form>
+    </dialog>
   );
 }

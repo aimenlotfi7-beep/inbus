@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { nomeTourLeader, logoutTourLeader } from '../api/tourLeaderAuth';
 import { AccountShell } from './AccountShell';
+import '../styles/account.css';
 import '../styles/promoter.css';
+import '../styles/tourleader.css';
 
 const ROTTA_PER_VOCE: Record<string, string> = {
   cerca: '/scansione/cerca',

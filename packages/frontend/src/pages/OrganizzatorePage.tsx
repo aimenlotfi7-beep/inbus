@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
-import { LogoOnWay } from '../features/LogoOnWay';
 import { Link } from 'react-router-dom';
 import { AccountShell, type VoceMenuAccount } from '../features/AccountShell';
+import { AuthShell } from '../features/AuthShell';
+import { CampoTesto } from '../features/checkout/CampoTesto';
+import { CampoPassword } from '../features/CampoPassword';
+import '../styles/account.css';
 import '../styles/promoter.css';
 import { organizzatoriApi, type Organizzatore, type EventoAssegnato, type StatisticheGenerali, type StatisticaEvento, type StatisticaBundle } from '../api/organizzatori';
 import { ErroreApi } from '../api/client';
 import { CookieBanner } from '../features/CookieBanner';
-import { formattaEuro } from '../shared/formato';
+import { formattaEuro, plurale } from '../shared/formato';
 
 const CHIAVE_TOKEN = 'inbus_organizzatore_token';
 
@@ -19,15 +22,20 @@ export function OrganizzatorePage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errore, setErrore] = useState('');
+  const [caricamento, setCaricamento] = useState(false);
 
-  async function accedi() {
+  async function accedi(e: React.FormEvent) {
+    e.preventDefault();
     setErrore('');
+    setCaricamento(true);
     try {
       const { token } = await organizzatoriApi.login(email, password);
       localStorage.setItem(CHIAVE_TOKEN, token);
       setLoggato(true);
-    } catch (e) {
-      setErrore(e instanceof ErroreApi ? e.message : 'Impossibile contattare il server');
+    } catch (err) {
+      setErrore(err instanceof ErroreApi ? err.message : 'Impossibile contattare il server.');
+    } finally {
+      setCaricamento(false);
     }
   }
   function esci() {
@@ -38,30 +46,33 @@ export function OrganizzatorePage() {
   if (loggato) return <AreaOrganizzatore onErroreSessione={esci} />;
 
   return (
-    <div className="pagina-partner">
-      <header>
-        <div className="logo"><LogoOnWay come="testo" /><small>organizzatore</small></div>
-        <Link className="back-link" to="/">← Torna al sito</Link>
-      </header>
+    <>
+      <AuthShell temaChiaro etichettaTipo="organizzatore">
+        <h1>Area organizzatore</h1>
+        <p className="auth-sottotitolo">
+          Accedi con email e password ricevute dallo staff OnWay per vedere gli eventi che ti sono stati associati.
+        </p>
 
-      <main>
-        <h1 className="page-title">Area Organizzatore</h1>
-        <p className="page-sub">Accedi per vedere gli eventi che OnWay ti ha associato.</p>
+        <form onSubmit={accedi}>
+          <CampoTesto
+            id="org-email" etichetta="Email" type="email" autoComplete="email" required
+            value={email} onChange={(e) => setEmail(e.target.value)}
+          />
+          <CampoPassword
+            id="org-password" etichetta="Password" autoComplete="current-password" required
+            value={password} onChange={(e) => setPassword(e.target.value)}
+            azione={<Link className="campo-etichetta-link" to="/organizzatore/password-dimenticata">Password dimenticata?</Link>}
+          />
 
-        {!loggato && (
-          <div className="login-box">
-            <p>Inserisci email e password che ti ha fornito lo staff OnWay.</p>
-            <input type="email" placeholder="La tua email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && accedi()} />
-            <button className="btn btn-primary" onClick={accedi}>Accedi</button>
-            <p className="errore">{errore}</p>
-            <p style={{ marginTop: 10 }}><Link to="/organizzatore/password-dimenticata" style={{ fontSize: 'var(--testo-md)' }}>Password dimenticata?</Link></p>
-          </div>
-        )}
-      </main>
+          {errore && <p className="avviso avviso-errore auth-avviso" role="alert">{errore}</p>}
+
+          <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={caricamento}>
+            {caricamento ? 'Accesso in corso…' : 'Accedi'}
+          </button>
+        </form>
+      </AuthShell>
       <CookieBanner />
-    </div>
+    </>
   );
 }
 
@@ -75,9 +86,9 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
 
   useEffect(() => {
     organizzatoriApi.me().then(setOrganizzatore).catch(onErroreSessione);
-    organizzatoriApi.meEventi().then(setEventi);
-    organizzatoriApi.meStatistiche().then(setGenerali);
-    organizzatoriApi.meStatistichePerEvento().then(setPerEvento);
+    organizzatoriApi.meEventi().then(setEventi).catch(() => setEventi([]));
+    organizzatoriApi.meStatistiche().then(setGenerali).catch(() => {});
+    organizzatoriApi.meStatistichePerEvento().then(setPerEvento).catch(() => {});
     organizzatoriApi.meStatistichePerBundle().then(setPerBundle).catch(() => setPerBundle([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -87,7 +98,7 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
     onErroreSessione();
   }
 
-  if (!organizzatore || !eventi) return <p style={{ color: 'var(--mist)' }}>Carico...</p>;
+  if (!organizzatore || !eventi) return <div className="pagina-partner partner-caricamento"><p>Carico…</p></div>;
 
   const eventiOrdinati = eventi.slice().sort((a, b) => a.data.localeCompare(b.data));
 
@@ -98,6 +109,13 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
   const voci: VoceMenuAccount[] = [{ id: 'panoramica', label: 'Panoramica' }, { id: 'eventi', label: 'I tuoi eventi' }];
   if (perBundle.length > 0) voci.push({ id: 'bundle', label: 'I tuoi bundle' });
 
+  const statoVuotoEventi = (
+    <div className="stato-vuoto">
+      <h3>Nessun evento associato</h3>
+      <p>Contatta OnWay per farti assegnare i tuoi eventi: compariranno qui con viaggiatori e incassi.</p>
+    </div>
+  );
+
   return (
     <AccountShell
       etichettaTipo="organizzatore" nomeUtente={organizzatore.nome} onLogout={esci} temaChiaro
@@ -105,27 +123,26 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
     >
       {voce === 'panoramica' && (
         <>
-          <h1 className="page-title" style={{ marginBottom: 20 }}>Panoramica</h1>
+          <h1 className="page-title">Panoramica</h1>
           {generali && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 22 }}>
-              <div className="stat-box"><b>{generali.eventiAttivi}</b><span>Eventi attivi</span></div>
-              <div className="stat-box"><b>{generali.viaggiatori}</b><span>Viaggiatori</span></div>
-              <div className="stat-box"><b>{formattaEuro(generali.fatturato)}</b><span>Fatturato</span></div>
-              <div className="stat-box"><b>{formattaEuro(generali.quotaOrganizzatore)}</b><span>Tua quota</span></div>
-            </div>
+            <section className="pannello partner-pannello">
+              <h2>I tuoi numeri</h2>
+              <div className="stats-griglia">
+                <div className="stat-box"><b>{generali.eventiAttivi}</b><span>Eventi attivi</span></div>
+                <div className="stat-box"><b>{generali.viaggiatori}</b><span>Viaggiatori</span></div>
+                <div className="stat-box"><b>{formattaEuro(generali.fatturato)}</b><span>Incasso</span></div>
+                <div className="stat-box"><b>{formattaEuro(generali.quotaOrganizzatore)}</b><span>Tua quota</span></div>
+              </div>
+            </section>
           )}
-          {!eventiOrdinati.length && (
-            <div className="empty-box">Non hai ancora nessun evento associato — contatta OnWay per farti assegnare i tuoi eventi.</div>
-          )}
+          {!eventiOrdinati.length && statoVuotoEventi}
         </>
       )}
 
       {voce === 'eventi' && (
         <>
-          <h1 className="page-title" style={{ marginBottom: 20 }}>I tuoi eventi</h1>
-          {!eventiOrdinati.length && (
-            <div className="empty-box">Non hai ancora nessun evento associato — contatta OnWay per farti assegnare i tuoi eventi.</div>
-          )}
+          <h1 className="page-title">I tuoi eventi</h1>
+          {!eventiOrdinati.length && statoVuotoEventi}
           {eventiOrdinati.map((ev) => {
             const s = statoPerEvento(ev.id);
             return (
@@ -134,8 +151,8 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
                   <h3>{ev.artista}</h3>
                   <p>{ev.luogo}, {ev.citta} · {fmtDataBreve(ev.data)}</p>
                   {s && (
-                    <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginTop: 4 }}>
-                      {s.viaggiatori} viaggiator{s.viaggiatori === 1 ? 'e' : 'i'} · {formattaEuro(s.fatturato)} fatturato · tua quota {formattaEuro(s.quotaOrganizzatore)}
+                    <p className="partner-dettaglio">
+                      {plurale(s.viaggiatori, 'viaggiatore', 'viaggiatori')} · {formattaEuro(s.fatturato)} di incasso · tua quota {formattaEuro(s.quotaOrganizzatore)}
                     </p>
                   )}
                 </div>
@@ -147,16 +164,16 @@ function AreaOrganizzatore({ onErroreSessione }: { onErroreSessione: () => void 
 
       {voce === 'bundle' && perBundle.length > 0 && (
         <>
-          <h1 className="page-title" style={{ marginBottom: 6 }}>I tuoi bundle</h1>
-          <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 20 }}>
-            Gli stessi acquisti contano anche sotto ogni evento — questa è una vista in più, non una somma a parte.
+          <h1 className="page-title">I tuoi bundle</h1>
+          <p className="page-sub">
+            Gli stessi acquisti contano anche sotto ogni evento: questa è una vista in più, non una somma a parte.
           </p>
           {perBundle.map((b) => (
             <div className="evento-link-card" key={b.bundleId}>
               <div>
-                <h3>{b.bundleNome} <span style={{ fontSize: 'var(--testo-sm)', opacity: .7, fontWeight: 400 }}>bundle</span></h3>
-                <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginTop: 4 }}>
-                  {b.numeroOrdini} ordin{b.numeroOrdini === 1 ? 'e' : 'i'} · {b.viaggiatori} viaggiator{b.viaggiatori === 1 ? 'e' : 'i'} · {formattaEuro(b.fatturato)} fatturato (sconto applicato {formattaEuro(b.scontoApplicato)}) · tua quota {formattaEuro(b.quotaOrganizzatore)}
+                <h3>{b.bundleNome} <span className="partner-etichetta">bundle</span></h3>
+                <p className="partner-dettaglio">
+                  {plurale(b.numeroOrdini, 'ordine', 'ordini')} · {plurale(b.viaggiatori, 'viaggiatore', 'viaggiatori')} · {formattaEuro(b.fatturato)} di incasso (sconto applicato {formattaEuro(b.scontoApplicato)}) · tua quota {formattaEuro(b.quotaOrganizzatore)}
                 </p>
               </div>
             </div>

@@ -3,130 +3,417 @@
    ------------------------------------------------------------
    Tutto scopato, così non tocca il resto del sito (Vite mette
    tutti i fogli in un solo bundle):
+     .pagina-auth      guscio AuthShell: accedi, registrati, password
+                       dimenticata, reimposta password, verifica email
+                       (anche dei partner: .pagina-auth.pagina-partner
+                       prende la palette chiara di promoter.css)
      .account-cliente  AccountShell del cliente (AccountPage) —
                        mai .pagina-partner, che ha il suo promoter.css
-     .pagina-auth      accedi, registrati, password dimenticata,
-                       reimposta password, verifica email
      .travel-card      dettaglio prenotazione (DettaglioViaggioModale),
                        aperto FUORI dal guscio: classi proprie
-   Reset, header, .btn*, .errore, .panel-box, .section-label,
-   .testo-intro e i token vengono da sito/base.css; il guscio
-   (.account-topbar, .account-sidebar…) da sito/account-cliente.css.
+     .modale-conferma  <dialog> di conferma (rimborso, elimina account):
+                       possono aprirsi dentro o fuori dal guscio
+     .saldo-modal      modale del saldo (superficie chiara)
+   Reset, .btn*, .campo*, .errore, .section-label, .testo-intro e i
+   token vengono da sito/base.css; .avviso da sito/checkout.css;
+   .pannello da sito/evento.css; .stato-vuoto da sito/card.css; il
+   guscio (.account-topbar, .account-sidebar, chip) da
+   sito/account-cliente.css.
    ============================================================ */
 
-/* ---------- CONTENUTO ACCOUNT (a piena larghezza, senza sidebar) ---------- */
-.account-cliente .account-content{ max-width:1100px; margin:0 auto; padding:clamp(20px,4vw,40px); }
-.account-cliente .account-content h1{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:var(--testo-4xl); margin:0 0 22px; }
+/* ============================================================
+   CAMPI CONDIVISI (password con "Mostra", link accanto
+   all'etichetta, avviso di errore). Servono sia all'accesso sia
+   all'account e ai <dialog>: scopati sui tre contenitori.
+   ============================================================ */
+:is(.pagina-auth, .account-cliente, .modale-conferma) .campo-etichetta-riga{
+  display:flex; align-items:baseline; justify-content:space-between; gap:var(--sp-3);
+}
+:is(.pagina-auth, .account-cliente, .modale-conferma) .campo-etichetta-link{
+  font-size:var(--t-caption); font-weight:600; color:var(--sup-testo);
+  text-decoration:underline; text-underline-offset:3px;
+  /* area di tocco alta 44px senza spostare l'etichetta */
+  padding-block:12px; margin-block:-12px;
+}
+/* Su fondo scuro i controlli nativi (calendario della data, freccia
+   del select) vanno in versione scura, altrimenti spariscono. */
+:is(.pagina-auth:not(.pagina-partner), .account-cliente, .modale-conferma) .campo-input{ color-scheme:dark; }
+.pagina-partner .modale-conferma .campo-input{ color-scheme:light; }
+:is(.pagina-auth, .account-cliente, .modale-conferma) .campo-password{ position:relative; }
+:is(.pagina-auth, .account-cliente, .modale-conferma) .campo-password .campo-input{ padding-right:96px; }
+:is(.pagina-auth, .account-cliente, .modale-conferma) .campo-password-azione{
+  position:absolute; top:50%; right:2px; transform:translateY(-50%);
+  min-width:var(--tap); min-height:var(--tap); padding:0 var(--sp-3);
+  font-size:var(--t-caption);
+}
+:is(.pagina-auth, .account-cliente, .modale-conferma) .campo-password-azione:hover{ transform:translateY(-50%); }
 
-/* ---------- SEZIONE EVENTI = IL SITO VERO E PROPRIO, A PIENA LARGHEZZA ---------- */
-.account-cliente .acc-sezione-sito{ width:100%; height:calc(100vh - 65px); }
-.account-cliente #siteFrame{ width:100%; height:100%; border:none; display:block; }
+/* Errore dal server: stessa forma di .avviso-attenzione/.avviso-ok
+   (checkout.css), rosso del contesto. */
+:is(.pagina-auth, .account-cliente, .modale-conferma, .travel-card) .avviso-errore{
+  background:rgba(255,138,138,.12); border-color:rgba(255,138,138,.45); color:var(--sup-errore); font-weight:600;
+}
+.pagina-auth.pagina-partner .avviso-errore{ background:rgba(163,20,20,.06); border-color:rgba(163,20,20,.35); }
+:is(.pagina-auth, .account-cliente, .modale-conferma) .avviso p{ margin:0; }
+:is(.pagina-auth, .account-cliente, .travel-card) .avviso-ok{ color:var(--ow-ok); }
+.pagina-auth.pagina-partner .avviso-ok{ color:var(--ow-ok-ink); }
+:is(.pagina-auth, .account-cliente) .avviso-attenzione{ color:var(--ow-warn); }
+.pagina-auth.pagina-partner .avviso-attenzione{ color:var(--ow-warn-ink); }
+
+/* ============================================================
+   PAGINE DI ACCESSO (AuthShell)
+   ============================================================ */
+.pagina-auth{
+  min-height:100vh; min-height:100dvh; display:flex; flex-direction:column;
+  background:var(--night); color:var(--sup-testo); font-family:var(--font-sans);
+}
+.pagina-auth .auth-testata{
+  display:flex; align-items:center; justify-content:space-between; gap:var(--sp-4);
+  padding:var(--sp-3) var(--gutter); min-height:var(--header-h);
+}
+.pagina-auth .auth-logo{ display:inline-flex; align-items:center; gap:var(--sp-2); color:var(--sup-testo); text-decoration:none; }
+.pagina-auth .auth-logo .logo{ font-size:var(--testo-6xl); }
+.pagina-auth .auth-logo small{
+  font-family:var(--font-mono); font-size:var(--t-label); letter-spacing:.12em; text-transform:uppercase; color:var(--sup-testo-2);
+}
+.pagina-auth .auth-testata .btn-tertiary{ text-decoration:none; }
+
+/* Il corpo: il riquadro parte dall'alto su telefono (con la tastiera
+   aperta centrarlo lo spingeva sotto), si centra su schermi ampi. */
+.pagina-auth .auth-corpo{
+  flex:1; display:flex; justify-content:center; align-items:flex-start;
+  max-width:none; margin:0; padding:var(--sp-6) var(--gutter) var(--sp-8);
+}
+@media (min-width:641px){
+  .pagina-auth .auth-corpo{ align-items:center; padding-block:var(--sp-8) var(--sp-12); }
+}
+.pagina-auth .box-auth{
+  width:100%; max-width:440px;
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius-lg);
+  padding:var(--sp-8);
+}
+@media (max-width:480px){
+  .pagina-auth .box-auth{ padding:var(--sp-6) var(--sp-5); }
+}
+.pagina-auth .box-auth h1{
+  margin:0 0 var(--sp-2); font-family:var(--font-sans); font-size:var(--t-h2); font-weight:800;
+  letter-spacing:-.02em; line-height:var(--lh-tight); text-transform:none; color:var(--sup-testo);
+}
+.pagina-auth .auth-sottotitolo{
+  margin:0 0 var(--sp-6); color:var(--sup-testo-2); font-size:var(--t-small); line-height:var(--lh-relaxed);
+}
+.pagina-auth .auth-sottotitolo b{ color:var(--sup-testo); overflow-wrap:anywhere; }
+.pagina-auth .auth-avviso{ margin:0 0 var(--sp-4); }
+.pagina-auth .auth-avviso .btn-tertiary{ margin-top:var(--sp-1); padding-inline:0; color:inherit; text-decoration:underline; text-underline-offset:3px; }
+.pagina-auth form .btn-lg{ margin-top:var(--sp-2); }
+.pagina-auth .box-auth > .btn-lg{ margin-top:var(--sp-2); }
+
+/* Nome e cognome affiancati da 480px in su */
+.pagina-auth .auth-due-colonne{ display:grid; grid-template-columns:1fr; column-gap:var(--sp-3); }
+@media (min-width:480px){
+  .pagina-auth .auth-due-colonne{ grid-template-columns:1fr 1fr; }
+}
+
+/* Esito (email inviata, password cambiata, email confermata) */
+.pagina-auth .auth-esito{
+  display:flex; align-items:flex-start; gap:var(--sp-3); margin:0 0 var(--sp-5);
+  font-size:var(--t-small); line-height:var(--lh-normal); color:var(--sup-testo);
+}
+.pagina-auth .auth-esito svg{
+  flex-shrink:0; box-sizing:content-box; padding:4px; border-radius:50%; background:var(--ow-ok); color:var(--ow-ink);
+}
+
+/* Link secondari sotto il riquadro, in caption */
+.pagina-auth .auth-link-riga{
+  margin:var(--sp-5) 0 0; text-align:center; font-size:var(--t-caption); color:var(--sup-testo-2);
+}
+.pagina-auth .auth-link-riga a,
+.pagina-auth .auth-piede a{
+  color:var(--sup-testo); font-weight:600; text-decoration:underline; text-underline-offset:3px;
+  display:inline-block; padding-block:var(--sp-2);
+}
+.pagina-auth .auth-piede{
+  padding:0 var(--gutter) var(--sp-6); text-align:center; font-size:var(--t-caption); color:var(--sup-testo-2);
+}
+.pagina-auth .auth-piede p{ margin:0; }
+
+/* ============================================================
+   CONTENUTO ACCOUNT CLIENTE
+   ============================================================ */
+.account-cliente .account-content{ max-width:960px; margin:0 auto; }
+.account-cliente .account-content h1{
+  font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; line-height:var(--lh-tight);
+  font-size:var(--t-h2); margin:0 0 var(--sp-5); text-transform:none;
+}
+.account-cliente .acc-sezione{ display:flex; flex-direction:column; gap:var(--sp-4); }
+.account-cliente .acc-sezione > h1{ margin-bottom:var(--sp-1); }
+.account-cliente .acc-sezione > .testo-intro{ margin:0; }
+.account-cliente .acc-caricamento{ margin:0; color:var(--mist); font-size:var(--t-small); }
+.account-cliente .acc-avviso{ margin:0; }
+.account-cliente .acc-riga{ margin:0; font-size:var(--t-small); line-height:var(--lh-normal); color:var(--mist); overflow-wrap:anywhere; }
+.account-cliente .acc-riga b{ color:var(--paper); }
+.account-cliente .acc-riga svg{ vertical-align:-2px; margin-right:var(--sp-1); }
+.account-cliente .acc-azioni{ display:flex; flex-wrap:wrap; gap:var(--sp-2); }
+.account-cliente .testo-intro a{ color:var(--paper); text-decoration:underline; text-underline-offset:3px; font-weight:600; }
+
+/* Pannelli (.pannello da evento.css): campi senza margine in più,
+   numeri grandi, varianti credito e zona pericolosa */
+.account-cliente .pannello{ min-width:0; }
+.account-cliente .pannello .campo{ margin-bottom:0; }
+.account-cliente .numero-grande{
+  margin:0; font-family:var(--font-sans); font-size:var(--t-h2); font-weight:800; letter-spacing:-.02em; line-height:1.1;
+}
+.account-cliente .pannello-credito{ border-color:rgba(87,211,154,.45); }
+.account-cliente .pannello-credito .numero-grande{ color:var(--ow-ok); }
+.account-cliente .pannello-pericolo{ border-color:var(--btn-danger-bordo); }
+.account-cliente .pannello-pericolo h2{ color:var(--ow-danger); }
+.account-cliente .importo-piu{ color:var(--ow-ok); }
+.account-cliente .importo-piu svg{ vertical-align:-3px; margin-right:var(--sp-1); }
+
+.account-cliente .acc-due-colonne{ display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-4); }
+.account-cliente .pannello .acc-due-colonne{ gap:var(--sp-3); }
+@media (max-width:640px){
+  .account-cliente .acc-due-colonne{ grid-template-columns:1fr; gap:var(--sp-3); }
+}
+.account-cliente .campo-stretto{ max-width:240px; }
+
+/* Righe di elenco dentro un pannello (movimenti, inviti) */
+.account-cliente .riga-elenco{
+  display:flex; justify-content:space-between; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  padding-top:var(--sp-3); border-top:1px solid var(--line); font-size:var(--t-small);
+}
+.account-cliente h2 + .riga-elenco{ border-top:none; padding-top:0; }
+.account-cliente .riga-elenco .quando{ display:block; font-size:var(--t-caption); color:var(--mist); }
+.account-cliente .riga-elenco b{ white-space:nowrap; }
+
+/* Stato vuoto (card.css): su una pagina lunga non serve tanta aria */
+.account-cliente .stato-vuoto{ padding:var(--sp-10) var(--sp-4); }
+
+/* "Esci" in fondo al Profilo: solo su telefono, dove non c'è la
+   colonna del menu (su desktop sta nella sidebar). */
+.account-cliente .account-esci-mobile{ display:none; }
+@media (max-width:900px){
+  .account-cliente .account-esci-mobile{ display:block; padding-top:var(--sp-2); }
+}
+
+/* ---------- PANORAMICA: prossimo viaggio ---------- */
+.account-cliente .prossimo-viaggio{
+  display:grid; grid-template-columns:132px minmax(0,1fr); gap:var(--sp-5); align-items:start;
+  background:var(--ow-surface); border:1px solid var(--ow-accent-line); border-radius:var(--radius-lg);
+  padding:var(--sp-5);
+}
+.account-cliente .prossimo-viaggio:not(:has(.prossimo-viaggio-media)){ grid-template-columns:minmax(0,1fr); }
+.account-cliente .prossimo-viaggio-media{
+  width:100%; aspect-ratio:4/5; border-radius:var(--radius); overflow:hidden; background:var(--ow-surface-2);
+}
+.account-cliente .prossimo-viaggio-media img{ width:100%; height:100%; object-fit:cover; }
+.account-cliente .prossimo-viaggio-corpo{ min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:var(--sp-2); }
+.account-cliente .prossimo-viaggio-kicker{
+  margin:0; font-family:var(--font-mono); font-size:var(--t-label); text-transform:uppercase; letter-spacing:1px; color:var(--mist);
+}
+.account-cliente .prossimo-viaggio h2{
+  margin:0; font-family:var(--font-sans); font-size:var(--t-h3); font-weight:800; letter-spacing:-.02em; line-height:var(--lh-snug);
+  text-transform:none; overflow-wrap:anywhere;
+}
+.account-cliente .chip-conto{
+  display:inline-flex; align-items:center; min-height:28px; padding:0 var(--sp-3); border-radius:var(--radius-pill);
+  background:var(--ow-accent); color:var(--ow-ink); font-size:var(--t-caption); font-weight:700;
+}
+.account-cliente .prossimo-viaggio-azioni{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-2); }
+@media (max-width:640px){
+  .account-cliente .prossimo-viaggio{ grid-template-columns:88px minmax(0,1fr); gap:var(--sp-4); padding:var(--sp-4); }
+  .account-cliente .prossimo-viaggio-azioni{ width:100%; }
+  .account-cliente .prossimo-viaggio-azioni .btn{ flex:1 1 auto; }
+}
+
+/* Mini-timeline dello stato (anche nella travel card): icona colorata,
+   testo sempre del colore normale — il significato lo dà il testo. */
+:is(.account-cliente .viaggio-timeline, .travel-timeline){
+  list-style:none; margin:var(--sp-1) 0 0; padding:0; display:flex; flex-direction:column; gap:var(--sp-2);
+  font-size:var(--t-caption); line-height:var(--lh-normal);
+}
+:is(.account-cliente .viaggio-timeline, .travel-timeline) li{ display:flex; align-items:flex-start; gap:var(--sp-2); }
+:is(.account-cliente .viaggio-timeline, .travel-timeline) svg{ flex-shrink:0; margin-top:1px; }
+:is(.account-cliente, .travel-card) svg.fatto{ color:var(--ow-ok); }
+:is(.account-cliente, .travel-card) svg.in-attesa{ color:var(--ow-warn); }
+:is(.account-cliente, .travel-card) svg.scaduto{ color:var(--ow-danger); }
+
+/* ---------- PANORAMICA: tessere ---------- */
+.account-cliente .acc-tessere{ display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:var(--sp-3); margin-top:var(--sp-2); }
+.account-cliente .acc-tessera{
+  display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; gap:var(--sp-3);
+  min-height:96px; padding:var(--sp-4); background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
+  color:var(--paper); font-family:var(--font-sans); font-size:var(--t-small); font-weight:600; text-align:left; text-decoration:none;
+  cursor:pointer; transition:border-color .15s ease, transform .15s ease;
+}
+.account-cliente .acc-tessera svg{ color:var(--ow-accent); }
+.account-cliente .acc-tessera:hover{ border-color:var(--ow-accent-line); transform:translateY(-2px); }
+@media (max-width:480px){
+  .account-cliente .acc-tessere{ grid-template-columns:1fr 1fr; gap:var(--sp-2); }
+  .account-cliente .acc-tessera{ min-height:84px; padding:var(--sp-3); }
+}
 
 /* ---------- MINI-TAB (Prossimi / Passati): attivo = giallo pieno, testo ink ---------- */
-.account-cliente .mini-tabs-acc{ display:flex; gap:8px; margin-bottom:18px; }
+.account-cliente .mini-tabs-acc{ display:flex; gap:var(--sp-2); flex-wrap:wrap; }
 .account-cliente .mini-tab-acc{
-  font-family:var(--font-mono); font-size:var(--testo-sm); padding:8px 16px; border-radius:var(--radius-pill);
-  border:1px solid var(--line); color:var(--ow-muted); background:transparent; cursor:pointer;
+  min-height:var(--control-h-sm); padding:0 var(--sp-4); border-radius:var(--radius-pill);
+  border:1px solid var(--line); color:var(--mist); background:transparent; cursor:pointer;
+  font-family:var(--font-sans); font-size:var(--t-caption); font-weight:600;
 }
+.account-cliente .mini-tab-acc:hover{ color:var(--paper); border-color:var(--btn-bordo); }
 .account-cliente .mini-tab-acc.active{ background:var(--ow-accent); border-color:var(--ow-accent); color:var(--ow-ink); font-weight:700; }
 .account-cliente .mini-tab-acc.active:focus-visible{ outline-color:var(--ow-ink); }
 
-/* ---------- VIAGGI ---------- */
+/* ---------- I MIEI VIAGGI (card in formato lista) ---------- */
 .account-cliente .viaggio-card{
-  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
-  padding:20px; margin-bottom:14px; display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  display:grid; grid-template-columns:96px minmax(0,1fr) auto; gap:var(--sp-4); align-items:start;
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); padding:var(--sp-4);
 }
-.account-cliente .viaggio-main{ flex:1; min-width:240px; }
-.account-cliente .viaggio-card .tag{
-  font-family:var(--font-mono); font-size:var(--testo-xs); text-transform:uppercase; color:var(--amber); letter-spacing:1px;
+.account-cliente .viaggio-media{ width:96px; height:120px; border-radius:var(--radius-sm); overflow:hidden; background:var(--ow-surface-2); }
+.account-cliente .viaggio-media img{ width:100%; height:100%; object-fit:cover; }
+.account-cliente .viaggio-main{ min-width:0; display:flex; flex-direction:column; gap:var(--sp-1); }
+.account-cliente .viaggio-card h3{
+  margin:0 0 var(--sp-1); font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--t-h4);
+  line-height:var(--lh-snug); text-transform:none; overflow-wrap:anywhere;
 }
-.account-cliente .viaggio-card h3{ margin:6px 0 4px; font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:var(--testo-3xl); display:flex; align-items:center; gap:10px; }
-.account-cliente .viaggio-chat-btn{
-  background:transparent; border:1px solid var(--line); color:var(--paper); border-radius:50%;
-  width:28px; height:28px; font-size:var(--testo-md); cursor:pointer; flex-shrink:0;
+.account-cliente .viaggio-right{ display:flex; flex-direction:column; align-items:flex-end; gap:var(--sp-2); text-align:right; }
+.account-cliente .viaggio-right .totale{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--t-h4); color:var(--paper); white-space:nowrap; }
+.account-cliente .viaggio-azioni{ display:flex; flex-direction:column; align-items:flex-end; gap:var(--sp-1); }
+@media (max-width:640px){
+  .account-cliente .viaggio-card{ grid-template-columns:72px minmax(0,1fr); gap:var(--sp-3); padding:var(--sp-3); }
+  .account-cliente .viaggio-media{ width:72px; height:90px; }
+  .account-cliente .viaggio-right{
+    grid-column:1 / -1; flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:space-between; text-align:left;
+    padding-top:var(--sp-3); border-top:1px solid var(--line);
+  }
+  .account-cliente .viaggio-azioni{ flex-direction:row; flex-wrap:wrap; align-items:center; width:100%; }
+  .account-cliente .viaggio-azioni .btn-secondary{ flex:1 1 auto; }
 }
-.account-cliente .viaggio-chat-btn:hover{ border-color:var(--ow-accent); background:var(--ow-accent-soft); }
-.account-cliente .viaggio-card p{ margin:2px 0; color:var(--mist); font-size:var(--testo-md); }
-.account-cliente .viaggio-right{ text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:8px; min-width:140px; }
-.account-cliente .viaggio-right .totale{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--testo-3xl); color:var(--ow-accent); }
 
 /* Bollini di stato (anche nella travel card): colore + testo */
-:is(.account-cliente, .travel-card) .badge{ padding:4px 12px; border-radius:var(--radius-pill); font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:.5px; }
+:is(.account-cliente, .travel-card) .badge{
+  display:inline-flex; align-items:center; padding:4px 12px; border-radius:var(--radius-pill);
+  font-size:var(--t-label); font-weight:700; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap;
+}
 :is(.account-cliente, .travel-card) :is(.badge.confermata, .badge.pagato){ background:rgba(87,211,154,.16); color:var(--ow-ok); }
 :is(.account-cliente, .travel-card) :is(.badge.cancellata, .badge.scaduto){ background:rgba(255,138,138,.16); color:var(--ow-danger); }
 :is(.account-cliente, .travel-card) :is(.badge.acconto_versato, .badge.attenzione){ background:rgba(255,180,61,.16); color:var(--ow-warn); }
-:is(.account-cliente, .travel-card) .pnr-tag{ font-family:var(--font-mono); font-size:var(--testo-sm); color:var(--mist); }
+:is(.account-cliente, .travel-card) .pnr-tag{ font-family:var(--font-mono); font-size:var(--t-label); color:var(--mist); letter-spacing:.5px; }
 
-.account-cliente .viaggio-azioni{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
-/* .btn-mini è .btn-sm secondario (base.css); qui solo la variante in evidenza */
-:is(.account-cliente, .travel-card) .btn-mini.evidenzia{ border-color:var(--ow-accent); color:var(--ow-accent); }
+/* ---------- INVITA UN AMICO ---------- */
+.account-cliente .invito-riga{ display:flex; gap:var(--sp-2); flex-wrap:wrap; }
+.account-cliente .invito-riga .campo-input{ flex:1 1 240px; font-size:var(--t-small); }
+.account-cliente .invito-riga .btn{ flex-shrink:0; min-height:var(--control-h); }
+.account-cliente .codice-invito{ font-family:var(--font-mono); letter-spacing:1px; }
 
-.account-cliente .viaggio-riepilogo{
-  margin-top:14px; padding-top:14px; border-top:1px solid var(--line);
-  display:flex; flex-direction:column; gap:8px;
-}
-.account-cliente .riepilogo-riga{ display:flex; flex-direction:column; gap:2px; font-size:var(--testo-md); color:var(--paper); }
-.account-cliente .riepilogo-label{ font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:.5px; color:var(--mist); }
-.account-cliente .riepilogo-riga a{ color:var(--ow-paper); text-decoration:underline; font-weight:700; }
-
-.account-cliente .empty-box{
-  background:var(--dusk); border:1px dashed var(--line); border-radius:var(--radius);
-  padding:40px; text-align:center; color:var(--mist);
-}
-
-/* ---------- PROFILO ---------- */
-.account-cliente .form-grid-account{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.account-cliente .form-grid-account label{ display:flex; flex-direction:column; gap:5px; font-size:var(--t-caption); font-weight:600; color:var(--mist); }
-.account-cliente .form-grid-account label.full{ grid-column:1/-1; }
-.account-cliente .form-grid-account input{
-  min-height:var(--control-h); padding:0 14px; font-family:var(--font-sans); font-size:var(--t-body); color:var(--paper);
-  background:var(--night); border:1px solid var(--line); border-radius:var(--radius-sm);
-}
-@media (max-width:640px){ .account-cliente .form-grid-account{ grid-template-columns:1fr; } }
-
-.account-cliente .notifica-riga{
-  display:flex; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:var(--testo-md);
-}
-.account-cliente .notifica-riga:last-child{ border-bottom:none; }
-.account-cliente .notifica-riga .quando{ color:var(--mist); font-size:var(--testo-sm); white-space:nowrap; }
-
-/* ---------- CHAT CLIENTE ---------- */
+/* ---------- MESSAGGI ---------- */
 .account-cliente .acc-chat-box{
   background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
   display:flex; flex-direction:column; height:60vh; min-height:420px; overflow:hidden;
 }
-.account-cliente #accChatEventoScelta{ padding:14px; border-bottom:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap; }
-.account-cliente #accChatEventoScelta select{
-  flex:1; min-width:200px; min-height:var(--control-h); background:var(--night); border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 14px; color:var(--paper);
-}
-.account-cliente #accChatMessages{ flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
-.account-cliente .chat-cliente-messages{ display:flex; flex-direction:column; gap:10px; max-height:320px; overflow-y:auto; margin-bottom:14px; }
+.account-cliente .acc-chat-scelta{ padding:var(--sp-4); border-bottom:1px solid var(--line); }
+.account-cliente .acc-chat-scelta .campo{ margin:0; }
+.account-cliente .acc-chat-messaggi{ flex:1; overflow-y:auto; padding:var(--sp-4); display:flex; flex-direction:column; gap:var(--sp-3); }
 /* Bolle: la bolla del cliente era gialla con testo bianco (1,5:1) */
-.account-cliente .chat-bubble-mini{ max-width:78%; padding:9px 13px; border-radius:var(--radius); font-size:var(--testo-md); line-height:1.5; }
-.account-cliente .chat-bubble-mini.cliente{ background:var(--ow-ink); color:var(--ow-paper); align-self:flex-end; border-bottom-right-radius:2px; }
-.account-cliente .chat-bubble-mini.admin{ background:var(--ow-surface); color:var(--ow-paper); align-self:flex-start; border-bottom-left-radius:2px; }
-.account-cliente .chat-bubble-mini .meta{ font-size:var(--testo-2xs); opacity:.7; margin-top:4px; }
-.account-cliente .acc-chat-input-row{ display:flex; gap:8px; padding:12px; border-top:1px solid var(--line); }
-.account-cliente .acc-chat-input-row input{
-  flex:1; min-width:0; min-height:var(--tap); background:var(--night); border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 14px; color:var(--paper); font-size:var(--t-body);
+.account-cliente .chat-bubble-mini{ max-width:78%; padding:var(--sp-2) var(--sp-3); border-radius:var(--radius); font-size:var(--t-small); line-height:var(--lh-normal); overflow-wrap:anywhere; }
+.account-cliente .chat-bubble-mini.cliente{ background:var(--ow-paper); color:var(--ow-ink); align-self:flex-end; border-bottom-right-radius:2px; }
+.account-cliente .chat-bubble-mini.admin{ background:var(--ow-surface-2); color:var(--ow-paper); align-self:flex-start; border-bottom-left-radius:2px; }
+.account-cliente .chat-bubble-mini .meta{ font-size:var(--testo-xs); opacity:.75; margin-top:var(--sp-1); }
+.account-cliente .acc-chat-input-row{ display:flex; gap:var(--sp-2); padding:var(--sp-3); border-top:1px solid var(--line); }
+.account-cliente .acc-chat-input-row .campo-input{ flex:1; min-width:0; }
+.account-cliente .acc-chat-input-row .btn{ flex-shrink:0; min-height:var(--control-h); }
+.account-cliente .acc-chat-storico{ margin-top:var(--sp-2); }
+.account-cliente .acc-dettagli{
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius-sm); margin-bottom:var(--sp-2);
 }
-.account-cliente .acc-chat-input-row button{ flex-shrink:0; }
-
-/* ---------- EVENTI DA ACQUISTARE ---------- */
-.account-cliente .acc-eventi-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:18px; }
-.account-cliente .acc-evento-card{ background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
-.account-cliente .acc-evento-cover{ height:120px; background:linear-gradient(135deg, var(--ow-surface-2), #2C3444); background-size:cover; background-position:center; }
-.account-cliente .acc-evento-body{ padding:16px; }
-.account-cliente .acc-evento-body .tag{
-  font-family:var(--font-mono); font-size:var(--testo-2xs); text-transform:uppercase; color:var(--amber); letter-spacing:1px;
+.account-cliente .acc-dettagli summary{
+  cursor:pointer; min-height:var(--tap); display:flex; align-items:center; padding:0 var(--sp-4); font-size:var(--t-small);
 }
-.account-cliente .acc-evento-body h3{ margin:6px 0 4px; font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:var(--testo-2xl); }
-.account-cliente .acc-evento-body p{ margin:0 0 12px; color:var(--mist); font-size:var(--testo-md); }
-.account-cliente .acc-evento-foot{ display:flex; align-items:center; justify-content:space-between; }
-.account-cliente .acc-evento-foot b{ font-family:var(--font-mono); font-size:var(--testo-lg); }
-.account-cliente .acc-evento-foot a.btn{ min-height:var(--control-h-sm); padding:0 var(--sp-4); font-size:var(--t-caption); }
+@media (max-width:640px){
+  .account-cliente .acc-chat-box{ height:auto; min-height:0; }
+  .account-cliente .acc-chat-messaggi{ min-height:280px; max-height:55vh; }
+}
 
-/* ---------- MODALE SALDO (superficie chiara, vedi base.css) ---------- */
+/* ============================================================
+   DIALOG DI CONFERMA (rimborso, elimina account)
+   Superficie scura come il sito; <dialog> nativo con showModal:
+   Esc, fuoco e sfondo li gestisce il browser.
+   ============================================================ */
+.modale-conferma{
+  width:min(440px, calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow-y:auto;
+  padding:var(--sp-6); background:var(--ow-surface); color:var(--ow-paper);
+  border:1px solid var(--ow-line); border-radius:var(--radius-lg); box-shadow:0 30px 60px rgba(0,0,0,.5);
+}
+.modale-conferma::backdrop{ background:rgba(0,0,0,.72); }
+.modale-conferma h2{
+  margin:0 0 var(--sp-2); font-family:var(--font-sans); font-size:var(--t-h3); font-weight:800; letter-spacing:-.01em; text-transform:none;
+}
+.modale-conferma > form > p{ margin:0 0 var(--sp-4); font-size:var(--t-small); line-height:var(--lh-normal); color:var(--ow-muted); }
+.modale-conferma > form > p b{ color:var(--ow-paper); font-family:var(--font-mono); }
+.modale-conferma .avviso{ margin:0 0 var(--sp-4); }
+.modale-conferma-azioni{ display:flex; flex-wrap:wrap; gap:var(--sp-2); }
+.modale-conferma-azioni .btn{ flex:1 1 auto; }
+
+/* ============================================================
+   TRAVEL CARD (dettaglio prenotazione)
+   Aperta fuori dal guscio (sorella di AccountShell in AccountPage):
+   classi proprie, non hanno bisogno del prefisso. Superficie scura.
+   ============================================================ */
+.travel-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:var(--z-modale);
+  display:flex; align-items:flex-end; justify-content:center;
+}
+.travel-card{
+  background:var(--night); color:var(--ow-paper); border:1px solid var(--line); border-radius:20px 20px 0 0;
+  width:100%; max-width:520px; max-height:92vh; overflow-y:auto; padding:var(--sp-5) var(--sp-5) var(--sp-8);
+  animation:travelCardUp .25s ease;
+}
+@keyframes travelCardUp{ from{ transform:translateY(30px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+@media (min-width:641px){
+  .travel-overlay{ align-items:center; }
+  .travel-card{ border-radius:20px; margin:20px; padding:var(--sp-6) var(--sp-6) var(--sp-8); }
+}
+.travel-testata{ display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); }
+.travel-card h1{
+  margin:var(--sp-3) 0 var(--sp-1); font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em;
+  font-size:var(--t-h2); line-height:var(--lh-tight); text-transform:none; overflow-wrap:anywhere;
+}
+.travel-data{ margin:0; color:var(--mist); font-size:var(--t-small); }
+.travel-data::first-letter{ text-transform:uppercase; }
+.travel-route{
+  display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2); margin:var(--sp-4) 0 var(--sp-1);
+  font-size:var(--t-small); color:var(--paper);
+}
+.travel-route svg{ color:var(--ow-accent); flex-shrink:0; }
+.travel-route b{ font-size:var(--t-body); }
+.travel-ora{ color:var(--mist); font-size:var(--t-caption); }
+.travel-arrow{ color:var(--mist); }
+.travel-nota{ margin:0; color:var(--mist); font-size:var(--t-caption); line-height:var(--lh-normal); }
+.travel-avviso{ margin:var(--sp-4) 0 0; }
+.travel-sezione{ margin-top:var(--sp-6); }
+.travel-sezione .section-label{ margin:0 0 var(--sp-2); font-weight:400; }
+.travel-riquadro{ background:var(--ow-surface); border:1px solid var(--line); border-radius:var(--radius-sm); padding:var(--sp-4); }
+.travel-riquadro p{ margin:0; font-size:var(--t-small); line-height:var(--lh-normal); }
+.travel-riquadro .travel-nota{ margin-top:var(--sp-1); }
+.travel-conteggio{ margin-top:var(--sp-2) !important; font-size:var(--t-h4) !important; font-weight:700; }
+.travel-biglietti{ display:flex; flex-direction:column; gap:var(--sp-2); }
+.travel-bus{ display:flex; align-items:center; gap:var(--sp-2); margin:0; font-size:var(--t-small); }
+.travel-bus svg{ color:var(--ow-accent); }
+.travel-partecipanti{ display:flex; flex-wrap:wrap; gap:var(--sp-2); }
+.travel-partecipante-chip{
+  background:var(--ow-surface); border:1px solid var(--ow-line); border-radius:var(--radius-pill); padding:var(--sp-1) var(--sp-3); font-size:var(--t-caption);
+}
+.travel-azioni{ display:flex; flex-direction:column; gap:var(--sp-2); margin-top:var(--sp-6); }
+.travel-biglietto-riga{
+  display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); flex-wrap:wrap;
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius-sm); padding:var(--sp-2) var(--sp-3); font-size:var(--t-caption);
+}
+.travel-biglietto-azioni{ display:flex; gap:var(--sp-2); }
+.travel-biglietto-azioni .btn{ min-height:var(--control-h-sm); padding:0 var(--sp-3); font-size:var(--t-caption); }
+
+/* ============================================================
+   MODALE SALDO (superficie chiara, vedi base.css)
+   ============================================================ */
 .saldo-modal{
   background:var(--ow-paper); color:var(--ow-ink); border-radius:18px; padding:28px; width:100%; max-width:420px; position:relative;
 }
@@ -144,101 +431,3 @@
 }
 .saldo-modal .payment-option.active{ border-color:var(--ow-ink); box-shadow:inset 0 0 0 1px var(--ow-ink); }
 .saldo-modal .errore{ color:var(--ow-danger-ink); font-size:var(--testo-sm); min-height:16px; margin-top:8px; }
-
-/* ---------- RIFINITURE TELEFONI ---------- */
-@media (max-width:640px){
-  .account-cliente .account-content{ padding:16px; }
-  .account-cliente .viaggio-card{ flex-direction:column; }
-  .account-cliente .viaggio-right{ align-items:flex-start; text-align:left; width:100%; }
-  .account-cliente .viaggio-azioni{ width:100%; }
-  .account-cliente .btn-mini{ width:100%; }
-  .account-cliente .acc-sezione-sito{ height:calc(100vh - 58px); }
-  .account-cliente .mini-tabs-acc{ flex-wrap:wrap; }
-  .account-cliente .form-grid-account{ gap:10px; }
-}
-
-/* ---------- ACCESSO / REGISTRAZIONE / PASSWORD / VERIFICA EMAIL ---------- */
-.pagina-auth{
-  min-height:100vh; display:flex; align-items:center; justify-content:center;
-  background:var(--night); padding:20px;
-}
-.pagina-auth .box-auth{
-  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
-  padding:32px; width:100%; max-width:400px;
-}
-.pagina-auth .box-auth h1{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:var(--testo-4xl); margin:0 0 8px; }
-.pagina-auth .sottotitolo-auth{ color:var(--mist); font-size:var(--testo-base); margin:0 0 20px; line-height:1.5; }
-.pagina-auth .box-auth label{ display:block; font-size:var(--t-caption); font-weight:600; color:var(--mist); margin:14px 0 6px; }
-.pagina-auth .box-auth input{
-  width:100%; min-height:var(--control-h); padding:0 14px; border-radius:var(--radius-sm); border:1px solid var(--line);
-  background:var(--night); color:var(--paper); font-size:var(--t-body); font-family:var(--font-sans);
-}
-/* Usata anche nel profilo dell'account */
-:is(.pagina-auth, .account-cliente) .due-colonne-auth{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.pagina-auth .errore-auth{ background:rgba(255,138,138,.1); border:1px solid rgba(255,138,138,.3); border-radius:var(--radius-sm); padding:10px 14px; margin-top:16px; }
-.pagina-auth .errore-auth p{ color:var(--ow-danger); font-weight:600; font-size:var(--testo-md); margin:0; }
-.pagina-auth .link-auth{ background:none; border:none; color:var(--paper); font-size:var(--testo-md); text-decoration:underline; cursor:pointer; padding:6px 0 0; display:block; }
-.pagina-auth .box-auth .search-cta{ margin-top:22px; }
-
-/* ---------- DASHBOARD (centro di controllo) ---------- */
-.account-cliente .acc-dashboard-grid{
-  display:grid; grid-template-columns:repeat(auto-fill, minmax(140px,1fr)); gap:12px; margin-top:22px;
-}
-.account-cliente .acc-dashboard-tile{
-  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
-  background:var(--dusk); border:1px solid var(--line); border-radius:14px; padding:20px 10px;
-  color:var(--paper); font-size:var(--testo-md); text-align:center; cursor:pointer; text-decoration:none;
-  transition:border-color .15s ease, transform .15s ease;
-}
-.account-cliente .acc-dashboard-tile:hover{ border-color:var(--ow-accent-line); transform:translateY(-2px); }
-.account-cliente .acc-dashboard-tile-icona{ font-size:var(--testo-5xl); }
-@media (max-width:640px){
-  .account-cliente .acc-dashboard-grid{ grid-template-columns:repeat(3, 1fr); gap:8px; }
-  .account-cliente .acc-dashboard-tile{ padding:14px 6px; font-size:var(--testo-sm); }
-  .account-cliente .acc-dashboard-tile-icona{ font-size:var(--testo-4xl); }
-}
-
-/* ---------- TRAVEL CARD (dettaglio prenotazione) ----------
-   Aperta fuori dal guscio (sorella di AccountShell in AccountPage):
-   classi proprie, non hanno bisogno del prefisso. Superficie scura. */
-.travel-overlay{
-  position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:var(--z-modale);
-  display:flex; align-items:flex-end; justify-content:center;
-}
-.travel-card{
-  background:var(--night); border:1px solid var(--line); border-radius:20px 20px 0 0;
-  width:100%; max-width:520px; max-height:92vh; overflow-y:auto; padding:26px 22px 30px;
-  animation:travelCardUp .25s ease;
-}
-@keyframes travelCardUp{ from{ transform:translateY(30px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
-@media (min-width:641px){
-  .travel-overlay{ align-items:center; }
-  .travel-card{ border-radius:20px; margin:20px; }
-}
-.travel-card h1{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:var(--testo-4xl); }
-.travel-close{
-  background:none; border:none; color:var(--mist); font-size:var(--testo-4xl); cursor:pointer;
-  float:right; line-height:1; padding:4px; min-width:var(--tap); min-height:var(--tap);
-}
-.travel-route{
-  display:flex; align-items:center; gap:10px; font-size:var(--testo-base); margin:14px 0; color:var(--paper);
-}
-.travel-route b{ font-size:var(--testo-lg); }
-.travel-arrow{ color:var(--mist); }
-.travel-timeline{ display:flex; flex-direction:column; gap:9px; margin:16px 0; font-size:var(--testo-base); }
-.travel-timeline-riga{ display:flex; align-items:center; gap:8px; }
-.travel-partecipanti{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.travel-partecipante-chip{
-  background:var(--ow-surface); border:1px solid var(--ow-line); border-radius:var(--radius-pill); padding:4px 12px; font-size:var(--testo-md);
-}
-.travel-azioni{ display:flex; flex-direction:column; gap:10px; margin-top:20px; }
-.travel-biglietto-riga{
-  display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
-  background:var(--dusk); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-size:var(--testo-md);
-}
-
-/* ---------- CREDITO (statistiche in riga) ---------- */
-.account-cliente .stats-row{ display:flex; gap:14px; flex-wrap:wrap; }
-.account-cliente .stat-box{ background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); padding:16px 20px; flex:1; min-width:150px; box-shadow:none; }
-.account-cliente .stat-box b{ display:block; font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--testo-3xl); }
-.account-cliente .stat-box span{ font-size:var(--testo-xs); color:var(--mist); text-transform:uppercase; letter-spacing:.5px; }
