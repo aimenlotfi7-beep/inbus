@@ -5,6 +5,7 @@ import { eventiApi } from '../../api/eventi';
 import { applicaScontoOfferta, prezzoMinimoEvento } from '../../api/prezzi';
 import { CheckoutForm, type OffertaCheckout } from '../checkout/CheckoutForm';
 import { EtichettaPosti } from '../checkout/SceltaFermata';
+import { ElencoFermate } from '../checkout/ElencoFermate';
 import { PulsanteCondividi } from '../PulsanteCondividi';
 import { EventiCorrelati } from '../EventiCorrelati';
 import { Icona } from '../Icone';
@@ -52,11 +53,6 @@ function righeDelTragitto(t: Tragitto): RigaPartenza[] {
   }));
 }
 
-/** In ordine di città, come le card nel modulo (SceltaFermata): chi
- *  cerca la propria città la trova nello stesso posto nei due elenchi. */
-function perCitta(righe: RigaPartenza[]): RigaPartenza[] {
-  return [...righe].sort((a, b) => a.citta.localeCompare(b.citta, 'it'));
-}
 
 /** Scheletro mostrato mentre l'evento arriva: copertina grigia e righe. */
 export function EventoScheletro() {
@@ -91,6 +87,8 @@ export function EventoDettaglio({ evento, offerta }: { evento: Evento; offerta?:
   const idFoglio = useId();
   const [foglioAperto, setFoglioAperto] = useState(false);
   const [fermataPreselezionata, setFermataPreselezionata] = useState<string | undefined>(undefined);
+  // Cresce a ogni "Scegli", anche sulla stessa fermata (vedi CheckoutForm).
+  const [richiestaPreselezione, setRichiestaPreselezione] = useState(0);
   const chiudiFoglioRef = useRef<HTMLButtonElement>(null);
   const foglioRef = useRef<HTMLDivElement>(null);
   const barraPrenotaRef = useRef<HTMLButtonElement>(null);
@@ -181,6 +179,7 @@ export function EventoDettaglio({ evento, offerta }: { evento: Evento; offerta?:
 
   function scegliPartenza(fermataId: string) {
     setFermataPreselezionata(fermataId);
+    setRichiestaPreselezione((n) => n + 1);
     if (mobile) setFoglioAperto(true);
   }
 
@@ -205,21 +204,32 @@ export function EventoDettaglio({ evento, offerta }: { evento: Evento; offerta?:
   // Partenze: una riga per fermata attiva di ogni tragitto attivo; con più
   // servizi, raggruppate con un titoletto per servizio.
   const gruppiPartenze: { titolo: string | null; righe: RigaPartenza[] }[] = [];
+  // L'ordine (per orario), la ricerca e le regioni li decide ElencoFermate.
   if (multiServizio) {
     const liberi = evento.tragitti.filter((t) => t.attivo && !t.servizioId).flatMap(righeDelTragitto);
-    if (liberi.length) gruppiPartenze.push({ titolo: null, righe: perCitta(liberi) });
+    if (liberi.length) gruppiPartenze.push({ titolo: null, righe: liberi });
     for (const s of evento.servizi) {
       const righe = s.tragitti.filter((t) => t.attivo).flatMap(righeDelTragitto);
-      if (righe.length) gruppiPartenze.push({ titolo: s.nome, righe: perCitta(righe) });
+      if (righe.length) gruppiPartenze.push({ titolo: s.nome, righe });
     }
   } else {
-    gruppiPartenze.push({ titolo: null, righe: perCitta(attivi.flatMap(righeDelTragitto)) });
+    gruppiPartenze.push({ titolo: null, righe: attivi.flatMap(righeDelTragitto) });
   }
   const mappaOpzioni = new Map((opzioni ?? []).map((o) => [o.fermataId, o]));
+  // Regione e coordinate arrivano con le opzioni (dal server); con più
+  // servizi le opzioni non si caricano qui e l'elenco resta senza regioni.
+  const datiRiga = (r: RigaPartenza) => {
+    const opz = mappaOpzioni.get(r.fermataId);
+    return { citta: r.citta, indirizzo: r.indirizzo, orario: r.orario, regione: opz?.fermataRegione ?? null, lat: opz?.fermataLat ?? null, lng: opz?.fermataLng ?? null };
+  };
+  const prezzoRiga = (r: RigaPartenza) => {
+    const base = mappaOpzioni.get(r.fermataId)?.prezzoEffettivo ?? r.prezzo;
+    return base !== null && offerta ? applicaScontoOfferta(base, offerta.scontoPercentuale) : base;
+  };
   const cePartenze = gruppiPartenze.some((g) => g.righe.length > 0);
   const ceInfoPratiche = !!(puntoArrivo || evento.cosaIncluso || evento.requisitiNote);
 
-  const modulo = <CheckoutForm evento={evento} offerta={offerta} fermataPreselezionata={fermataPreselezionata} onChiudi={mobile ? () => setFoglioAperto(false) : undefined} />;
+  const modulo = <CheckoutForm evento={evento} offerta={offerta} fermataPreselezionata={fermataPreselezionata} richiestaPreselezione={richiestaPreselezione} onChiudi={mobile ? () => setFoglioAperto(false) : undefined} />;
 
   return (
     <div className="evento-griglia">
@@ -271,38 +281,47 @@ export function EventoDettaglio({ evento, offerta }: { evento: Evento; offerta?:
             {gruppiPartenze.map((g, gi) => (
               <div key={g.titolo ?? gi}>
                 {g.titolo && <h3 className="partenze-gruppo">{g.titolo}</h3>}
-                <ul className="partenze-elenco">
-                  {g.righe.map((r) => {
+                <ElencoFermate
+                  voci={g.righe}
+                  dati={datiRiga}
+                  chiave={(r) => r.fermataId}
+                  prezzo={prezzoRiga}
+                  selezionata={fermataPreselezionata}
+                  tagElenco="ul"
+                  tagVoce="li"
+                  classeElenco="partenze-elenco"
+                  renderVoce={(r, { compatta, distanza }) => {
                     const opz = mappaOpzioni.get(r.fermataId);
                     const prezzoBase = opz?.prezzoEffettivo ?? r.prezzo;
-                    const prezzoMostrato = prezzoBase !== null && offerta ? applicaScontoOfferta(prezzoBase, offerta.scontoPercentuale) : prezzoBase;
+                    const prezzoMostrato = prezzoRiga(r);
                     // Finché la disponibilità non è arrivata (o con più
                     // servizi, dove non si carica) la riga resta cliccabile.
                     const rigaPrenotabile = prenotabile && (opzioni === null || !!opz);
                     return (
-                      <li key={r.fermataId}>
-                        <button type="button" className="partenza-riga" disabled={!rigaPrenotabile} onClick={() => scegliPartenza(r.fermataId)}>
-                          <span className="partenza-info">
-                            <span className="partenza-citta">{r.citta}</span>
-                            {r.indirizzo && <span className="partenza-indirizzo">{r.indirizzo}</span>}
+                      <button type="button" className={`partenza-riga${compatta ? ' compatta' : ''}`} disabled={!rigaPrenotabile} onClick={() => scegliPartenza(r.fermataId)}>
+                        <span className="partenza-info">
+                          <span className="partenza-citta">
+                            {r.citta}
+                            {distanza && <small className="fermata-distanza"> · {distanza}</small>}
                           </span>
-                          <span className="partenza-orari">
-                            <Icona nome="orologio" dimensione={14} />
-                            <span>{r.orario ? `Andata ${r.orario}` : 'Orario da definire'}{r.orarioRitorno ? ` · Ritorno ${r.orarioRitorno}` : ''}</span>
-                          </span>
-                          <span className="partenza-prezzo">
-                            {prezzoMostrato !== null ? <b>{prezzoBreve(prezzoMostrato)}</b> : <small>Prezzo da definire</small>}
-                            {offerta && prezzoBase !== null && <small>invece di {prezzoBreve(prezzoBase)}</small>}
-                            {opz
-                              ? <EtichettaPosti posti={opz.postiDisponibili} />
-                              : (opzioni !== null && prenotabile) ? <small>Non ancora prenotabile</small> : null}
-                          </span>
-                          {rigaPrenotabile && <span className="partenza-cta">Scegli<Icona nome="freccia" dimensione={14} /></span>}
-                        </button>
-                      </li>
+                          {!compatta && r.indirizzo && <span className="partenza-indirizzo">{r.indirizzo}</span>}
+                        </span>
+                        <span className="partenza-orari">
+                          <Icona nome="orologio" dimensione={14} />
+                          <span>{r.orario ? `Andata ${r.orario}` : 'Orario da definire'}{!compatta && r.orarioRitorno ? ` · Ritorno ${r.orarioRitorno}` : ''}</span>
+                        </span>
+                        <span className="partenza-prezzo">
+                          {prezzoMostrato !== null ? <b>{prezzoBreve(prezzoMostrato)}</b> : <small>Prezzo da definire</small>}
+                          {offerta && prezzoBase !== null && <small>invece di {prezzoBreve(prezzoBase)}</small>}
+                          {opz
+                            ? <EtichettaPosti posti={opz.postiDisponibili} />
+                            : (opzioni !== null && prenotabile) ? <small>Non ancora prenotabile</small> : null}
+                        </span>
+                        {rigaPrenotabile && <span className="partenza-cta">Scegli<Icona nome="freccia" dimensione={14} /></span>}
+                      </button>
                     );
-                  })}
-                </ul>
+                  }}
+                />
               </div>
             ))}
           </section>

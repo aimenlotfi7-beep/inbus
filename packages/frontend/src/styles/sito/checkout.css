@@ -152,6 +152,47 @@
 .fermata-orari{ display:flex; align-items:center; gap:6px; }
 .fermata-orari svg{ flex-shrink:0; }
 .fermata-opzione .fermata-posti{ grid-column:1 / -1; }
+.fermata-distanza{ font-size:var(--t-caption); font-weight:500; color:var(--sup-testo-2); }
+/* Elenco lungo: card su due righe (città e prezzo, andata e posti); indirizzo e
+   ritorno compaiono solo sulla fermata scelta. */
+.fermata-opzione.compatta{ min-height:48px; padding:var(--sp-2) var(--sp-3); }
+.fermata-opzione.compatta .fermata-orari{ grid-column:1; }
+.fermata-opzione.compatta .fermata-posti{ grid-column:2; text-align:right; }
+/* Fermata già scelta con "Scegli" nella pagina: solo quella, con "Cambia fermata" */
+.fermata-scelta{ display:flex; flex-direction:column; gap:var(--sp-2); align-items:stretch; }
+.fermata-scelta > .btn{ align-self:flex-start; }
+.fermata-scelta-card{ cursor:default; }
+.fermata-scelta-card:hover{ border-color:var(--sup-testo); }
+
+/* ---------- ELENCO LUNGO DI FERMATE (ElencoFermate.tsx) ----------
+   Pagina evento (fondo scuro) e modulo (fondo chiaro): i colori arrivano
+   dai token di contesto --sup-*. Ricerca, "Usa la mia posizione", regioni
+   chiuse in <details>. */
+.elenco-fermate{ display:flex; flex-direction:column; gap:var(--sp-3); min-width:0; }
+.elenco-fermate-strumenti{ display:flex; flex-direction:column; gap:var(--sp-1); }
+.elenco-fermate-riga{ display:flex; flex-wrap:wrap; gap:var(--sp-2); align-items:center; }
+.elenco-fermate-riga .campo-input{ flex:1 1 200px; min-width:0; }
+.elenco-fermate-riga .btn{ flex:0 0 auto; min-height:var(--control-h); }
+.elenco-fermate-riga .btn svg{ margin-right:var(--sp-1); }
+.elenco-fermate-conteggio{ margin:0; font-size:var(--t-caption); color:var(--sup-testo-2); }
+.elenco-fermate-titolo{
+  margin:var(--sp-1) 0 var(--sp-2); font-family:var(--font-mono); font-size:var(--t-label); font-weight:700;
+  letter-spacing:1px; text-transform:uppercase; color:var(--sup-testo-2);
+}
+.elenco-fermate-regioni{ display:flex; flex-direction:column; gap:var(--sp-2); }
+.elenco-fermate-regione{ border:1px solid var(--sup-bordo); border-radius:var(--radius); }
+.elenco-fermate-regione > summary{
+  display:flex; align-items:center; gap:var(--sp-3); min-height:52px; padding:var(--sp-2) var(--sp-4);
+  list-style:none; cursor:pointer; border-radius:var(--radius);
+}
+.elenco-fermate-regione > summary::-webkit-details-marker{ display:none; }
+.elenco-fermate-regione > summary:focus-visible{ outline:3px solid var(--sup-focus); outline-offset:2px; }
+.elenco-fermate-regione-nome{ font-weight:700; font-size:var(--t-body); color:var(--sup-testo); min-width:0; overflow-wrap:anywhere; }
+.elenco-fermate-regione-meta{ margin-left:auto; font-size:var(--t-caption); color:var(--sup-testo-2); white-space:nowrap; }
+.elenco-fermate-regione-freccia{ flex-shrink:0; color:var(--sup-testo-2); transition:transform .15s ease; }
+.elenco-fermate-regione[open] > summary .elenco-fermate-regione-freccia{ transform:rotate(90deg); }
+.elenco-fermate-regione > :not(summary){ padding:0 var(--sp-2) var(--sp-2); }
+@media (prefers-reduced-motion:reduce){ .elenco-fermate-regione-freccia{ transition:none; } }
 .opzione-radio{ display:flex; flex-direction:column; gap:2px; }
 .opzione-radio b{ font-size:var(--t-body); }
 .opzione-radio span{ font-size:var(--t-caption); color:var(--sup-testo-2); }

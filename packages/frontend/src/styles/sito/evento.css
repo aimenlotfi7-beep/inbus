@@ -109,6 +109,8 @@
   .partenza-riga:not(:disabled):hover{ border-color:var(--ow-accent-line); background:var(--ow-surface-2); }
 }
 .partenza-riga:disabled{ cursor:default; opacity:.7; }
+/* Elenco lungo (dentro una regione o tra i risultati della ricerca): più bassa */
+.partenza-riga.compatta{ min-height:48px; padding-block:var(--sp-2); }
 .partenza-info{ grid-area:info; min-width:0; display:flex; flex-direction:column; gap:2px; }
 .partenza-citta{ font-weight:700; font-size:var(--t-body); overflow-wrap:anywhere; }
 .partenza-indirizzo{ font-size:var(--t-caption); color:var(--ow-muted); overflow-wrap:anywhere; }

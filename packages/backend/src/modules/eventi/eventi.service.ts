@@ -954,6 +954,11 @@ export const eventiService = {
       // raggruppare il menu a tendina sul sito, come le fermate
       // e i fornitori nel gestionale.
       fermataRegione: string | null;
+      // Coordinate (della fermata o dell'anagrafica), per "Usa la mia posizione" sul sito:
+      // la distanza si calcola nel browser, la posizione del cliente non
+      // arriva mai al server. Null se la fermata non è in anagrafica.
+      fermataLat: number | null;
+      fermataLng: number | null;
     }> = [];
 
     // Una sola query per TUTTE le fermate con una soglia minima
@@ -980,9 +985,14 @@ export const eventiService = {
     // all'anagrafica, di tutti i tragitti mostrati — non una per fermata.
     const idAnagraficaUsati = [...new Set(tragittiDaMostrare.flatMap((t) => t.fermate.map((f) => f.fermataAnagraficaId).filter((id): id is string => !!id)))];
     const regionePerAnagrafica = new Map<string, string | null>();
+    const coordinatePerAnagrafica = new Map<string, { lat: number | null; lng: number | null }>();
     if (idAnagraficaUsati.length > 0) {
-      const righe = await db.select({ id: fermateAnagrafica.id, regione: fermateAnagrafica.regione }).from(fermateAnagrafica).where(inArray(fermateAnagrafica.id, idAnagraficaUsati));
-      for (const r of righe) regionePerAnagrafica.set(r.id, r.regione);
+      const righe = await db.select({ id: fermateAnagrafica.id, regione: fermateAnagrafica.regione, lat: fermateAnagrafica.lat, lng: fermateAnagrafica.lng })
+        .from(fermateAnagrafica).where(inArray(fermateAnagrafica.id, idAnagraficaUsati));
+      for (const r of righe) {
+        regionePerAnagrafica.set(r.id, r.regione);
+        coordinatePerAnagrafica.set(r.id, { lat: r.lat, lng: r.lng });
+      }
     }
 
     for (const tragitto of tragittiDaMostrare) {
@@ -1016,6 +1026,9 @@ export const eventiService = {
           sogliaMinima: f.sogliaMinima,
           partecipantiAttuali,
           fermataRegione: f.fermataAnagraficaId ? regionePerAnagrafica.get(f.fermataAnagraficaId) ?? null : null,
+          // Prima le coordinate della fermata stessa, poi quelle dell'anagrafica.
+          fermataLat: f.lat ?? (f.fermataAnagraficaId ? coordinatePerAnagrafica.get(f.fermataAnagraficaId)?.lat ?? null : null),
+          fermataLng: f.lng ?? (f.fermataAnagraficaId ? coordinatePerAnagrafica.get(f.fermataAnagraficaId)?.lng ?? null : null),
         });
       }
     }

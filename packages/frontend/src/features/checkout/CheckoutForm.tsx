@@ -10,7 +10,7 @@ import { applicaScontoOfferta } from '../../api/prezzi';
 import { clienteAuthApi } from '../../api/clienteAuth';
 import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
 import { useCarrello } from '../carrello/CarrelloContext';
-import { SceltaFermata } from './SceltaFermata';
+import { EtichettaPosti, SceltaFermata } from './SceltaFermata';
 import { Stepper } from './Stepper';
 import { CampoTesto } from './CampoTesto';
 import { provenienzaDaUrl } from './provenienza';
@@ -59,9 +59,12 @@ function oggiIso(): string {
  * tocca "Scegli" su una partenza — il modulo seleziona quella fermata e
  * torna al passo 1.
  */
-export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaColori, fermataPreselezionata }: {
+export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaColori, fermataPreselezionata, richiestaPreselezione }: {
   evento: Evento; offerta?: OffertaCheckout; onChiudi?: () => void; publicWidgetId?: string;
   fermataPreselezionata?: string;
+  /** Cambia a ogni "Scegli" della pagina, anche sulla stessa fermata:
+   *  così dopo "Cambia fermata" un nuovo "Scegli" richiude l'elenco. */
+  richiestaPreselezione?: number;
   // Se il checkout arriva da una White Label con un suo tema, questi
   // colori sovrascrivono quelli del sito per TUTTO il modulo. Facoltativo:
   // senza, il checkout resta quello del sito OnWay.
@@ -123,6 +126,9 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   }, [step]);
   const [opzioni, setOpzioni] = useState<OpzionePartenza[]>([]);
   const [fermataId, setFermataId] = useState('');
+  // Fermata già scelta con "Scegli" nella pagina: il passo 1 mostra solo
+  // quella, con "Cambia fermata"; l'elenco completo si apre su richiesta.
+  const [elencoFermateAperto, setElencoFermateAperto] = useState(!fermataPreselezionata);
   const [erroreFermata, setErroreFermata] = useState('');
   const [passeggeri, setPasseggeri] = useState(1);
 
@@ -177,6 +183,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   // suo servizio, se serve) e resta al passo 1.
   useEffect(() => {
     if (!fermataPreselezionata) return;
+    setElencoFermateAperto(false);
     if (multiServizio) {
       const servizio = evento.servizi.find((s) => s.tragitti.some((t) => t.fermate.some((f) => f.id === fermataPreselezionata)));
       if (servizio && servizio.id !== servizioScelto?.id) {
@@ -193,7 +200,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
       preselezioneInAttesa.current = fermataPreselezionata;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fermataPreselezionata]);
+  }, [fermataPreselezionata, richiestaPreselezione]);
 
   useEffect(() => {
     setPartecipanti((prev) => {
@@ -583,7 +590,27 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 </p>
               )}
 
-              <SceltaFermata opzioni={opzioni} valore={fermataId} onSeleziona={scegliFermata} offerta={offerta} />
+              {!elencoFermateAperto && opzioneScelta ? (
+                <div className="fermata-scelta">
+                  <p className="campo-etichetta">Fermata di partenza</p>
+                  <div className="fermata-opzione selezionata fermata-scelta-card">
+                    <span className="fermata-citta">{opzioneScelta.fermataCitta}</span>
+                    <span className="fermata-prezzo">
+                      {formattaEuro(prezzoUnitario, { senzaDecimali: Number.isInteger(prezzoUnitario) })}
+                    </span>
+                    {opzioneScelta.fermataIndirizzo && <span className="fermata-indirizzo">{opzioneScelta.fermataIndirizzo}</span>}
+                    <span className="fermata-orari">
+                      <Icona nome="orologio" dimensione={14} />
+                      {opzioneScelta.fermataOrario ? `Andata ${opzioneScelta.fermataOrario}` : 'Orario da definire'}
+                      {opzioneScelta.orarioRitorno && ` · Ritorno ${opzioneScelta.orarioRitorno}`}
+                    </span>
+                    <EtichettaPosti posti={opzioneScelta.postiDisponibili} />
+                  </div>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setElencoFermateAperto(true)}>Cambia fermata</button>
+                </div>
+              ) : (
+                <SceltaFermata opzioni={opzioni} valore={fermataId} onSeleziona={scegliFermata} offerta={offerta} />
+              )}
               {erroreFermata && <p className="campo-errore" role="alert">{erroreFermata}</p>}
               {opzioneScelta?.sogliaMinima != null && (
                 <p className="avviso avviso-neutro">

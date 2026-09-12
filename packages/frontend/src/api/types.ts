@@ -101,6 +101,9 @@ export interface OpzionePartenza {
   sogliaMinima: number | null;
   partecipantiAttuali: number | null;
   fermataRegione: string | null;
+  /** Dall'anagrafica fermate; null se la fermata non è collegata. Per "Usa la mia posizione". */
+  fermataLat?: number | null;
+  fermataLng?: number | null;
 }
 
 export interface Prenotazione {
