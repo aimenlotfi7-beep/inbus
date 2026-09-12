@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom';
 import { LogoOnWay } from './features/LogoOnWay';
 
 /** Header semplificato (solo logo, senza nav/burger) + lo stesso footer
- *  del sito — struttura reale usata da faq.html e pagina.html nella V18. */
+ *  del sito — struttura reale usata da faq.html e pagina.html nella V18.
+ *  Il wrapper .pagina-editoriale è lo scope di faq.css e pagina.css:
+ *  senza, le loro regole su main/h1 finivano su tutto il sito. */
 export function PublicPageLayout({ children }: { children: ReactNode }) {
   return (
-    <>
+    <div className="pagina-editoriale">
       <header>
         <LogoOnWay />
       </header>
@@ -57,6 +59,6 @@ export function PublicPageLayout({ children }: { children: ReactNode }) {
           <span>© 2026 OnWay — tutti i marchi citati sono di proprietà dei rispettivi titolari.</span>
         </div>
       </footer>
-    </>
+    </div>
   );
 }

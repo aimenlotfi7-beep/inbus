@@ -1,61 +1,40 @@
+/* ============================================================
+   tourleader.css — candidatura tour leader, registrazione
+   fornitore, risposta al preventivo (TourLeaderPage,
+   FornitoreRegistrazionePage, FornitorePreventivoPage)
+   ------------------------------------------------------------
+   Pagine pubbliche scure a colonna stretta. Tutto scopato sotto
+   .pagina-tourleader (wrapper messo dalle tre pagine): senza scope
+   main{max-width} e h1{uppercase} finivano su tutto il sito.
+   Reset, header, .logo, .btn*, .form-grid (griglia e misure dei
+   campi) ed .errore vengono da sito/base.css; palette da
+   onway-theme.css (.pagina-tourleader).
+   ============================================================ */
+.pagina-tourleader{ min-height:100vh; }
+.pagina-tourleader .back-link{ color:var(--mist); font-size:var(--testo-base); text-decoration:none; }
+.pagina-tourleader .back-link:hover{ color:var(--paper); }
 
-  /* Niente più :root locale — eredita dal tema globale (sito.css, poi
-     onway-theme.css), come da istruzioni di rebrand. */
-  *{box-sizing:border-box;}
-  body{margin:0; background:var(--night); color:var(--paper); font-family:'Poppins',sans-serif;}
-  a{color:inherit;}
-  .hidden{display:none !important;}
-  header{display:flex; align-items:center; justify-content:space-between; padding:18px clamp(20px,5vw,64px); border-bottom:1px solid var(--line);}
-  .logo{font-family:'Poppins',sans-serif; font-size:var(--testo-4xl);}
-  /* Era per il vecchio markup IN<span>BUS</span> - stesso problema
-     gia' corretto altrove: "span" come selettore intercetta anche gli
-     span interni del nuovo logo (.logo-on/.logo-ay), dipingendoli di
-     giallo invece di lasciarli nel colore giusto. */
-  .back-link{color:var(--mist); font-size:var(--testo-base); text-decoration:none;}
-  .back-link:hover{color:var(--paper);}
+.pagina-tourleader main{ max-width:640px; margin:0 auto; padding:clamp(30px,6vw,56px) 20px 80px; }
+.pagina-tourleader h1{ font-family:var(--font-sans); text-transform:uppercase; font-size:clamp(26px,4vw,34px); margin:0 0 10px; }
+.pagina-tourleader .sub{ color:var(--mist); font-size:var(--testo-base); margin:0 0 26px; line-height:1.6; }
+.pagina-tourleader .evento-context{
+  background:var(--dusk); border:1px solid var(--ow-accent-line); border-radius:var(--radius); padding:14px 18px;
+  font-size:var(--testo-base); margin-bottom:26px; color:var(--paper);
+}
 
-  main{max-width:640px; margin:0 auto; padding:clamp(30px,6vw,56px) 20px 80px;}
-  h1{font-family:'Poppins',sans-serif; text-transform:uppercase; font-size:clamp(26px,4vw,34px); margin:0 0 10px;}
-  .sub{color:var(--mist); font-size:var(--testo-base); margin:0 0 26px; line-height:1.6;}
-  .evento-context{
-    background:var(--dusk); border:1px solid var(--pink-dim,#ff3d7a55); border-radius:12px; padding:14px 18px;
-    font-size:var(--testo-base); margin-bottom:26px; color:var(--paper);
-  }
+/* Campi: griglia e misure da base.css; qui solo lo sfondo dei campi
+   (card, non fondo pagina) */
+.pagina-tourleader .form-grid input, .pagina-tourleader .form-grid textarea{ background:var(--dusk); }
 
-  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:8px;}
-  .form-grid label{
-    display:flex; flex-direction:column; gap:6px; font-size:var(--testo-xs); color:var(--mist);
-    text-transform:uppercase; letter-spacing:.5px; grid-column:span 1;
-  }
-  .form-grid label.full{grid-column:1 / -1;}
-  .form-grid input, .form-grid textarea{
-    font-family:'Poppins',sans-serif; font-size:var(--testo-base); color:var(--paper);
-    background:var(--dusk); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
-  }
-  .form-grid textarea{min-height:70px; resize:vertical;}
-  @media (max-width:600px){ .form-grid{grid-template-columns:1fr;} }
+/* Il pulsante d'invio (class="btn-primary" da solo nel markup):
+   grande, a tutta larghezza */
+.pagina-tourleader .btn-primary{
+  width:100%; margin-top:16px; min-height:52px; padding:0 22px; font-size:var(--testo-lg); font-weight:700;
+}
 
-  .btn-primary{
-    background:var(--pink); color:var(--night); font-family:'Poppins',sans-serif; font-weight:700;
-    font-size:var(--testo-lg); padding:14px 22px; border-radius:999px; border:none; cursor:pointer; margin-top:16px; width:100%;
-  }
-  .btn-primary:hover{filter:brightness(1.05);}
-  .errore{color:var(--ow-danger); font-size:var(--testo-md); min-height:18px; margin-top:8px;}
-
-  .success-box{
-    background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
-    padding:40px; text-align:center;
-  }
-  .success-box h2{font-family:'Poppins',sans-serif; text-transform:uppercase; margin:0 0 12px;}
-  .success-box p{color:var(--mist); font-size:var(--testo-base);}
-
-  /* Sotto i 768px la sidebar (210px fissi) diventa una barra
-     orizzontale in alto invece di rubare larghezza al contenuto —
-     l'uso reale di questa app è quasi sempre da telefono, sul bus. */
-  @media (max-width:768px){
-    .tourleader-shell{ flex-direction:column; }
-    .tourleader-aside{ width:100% !important; flex-direction:row !important; align-items:center; padding:10px 14px !important; flex-wrap:wrap; gap:8px; }
-    .tourleader-nav{ flex-direction:row !important; flex:none !important; gap:4px !important; }
-    .tourleader-piede{ padding:0 !important; border-top:none !important; margin:0 0 0 auto !important; display:flex; align-items:center; gap:8px; }
-    .tourleader-piede p{ display:none; }
-  }
+.pagina-tourleader .success-box{
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
+  padding:40px; text-align:center;
+}
+.pagina-tourleader .success-box h2{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; text-transform:none; margin:0 0 12px; }
+.pagina-tourleader .success-box p{ color:var(--mist); font-size:var(--testo-base); }

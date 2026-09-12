@@ -66,6 +66,15 @@ export function CookieBanner() {
     return () => window.removeEventListener('inbus-consenso-cookie-cambiato', aggiornaVisibilita);
   }, []);
 
+  // Finché il banner è visibile il <body> porta la classe
+  // "con-cookie-banner": il CSS (sito/evento.css) nasconde la barra
+  // fissa "Acquista ora" della pagina evento, che altrimenti finiva
+  // sotto il banner. Tolta quando il banner si chiude o si smonta.
+  useEffect(() => {
+    document.body.classList.toggle('con-cookie-banner', visibile);
+    return () => { document.body.classList.remove('con-cookie-banner'); };
+  }, [visibile]);
+
   if (!visibile) return null;
 
   function accettaTutti() {

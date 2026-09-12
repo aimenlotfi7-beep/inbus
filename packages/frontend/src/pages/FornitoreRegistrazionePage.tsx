@@ -61,7 +61,8 @@ export function FornitoreRegistrazionePage() {
   }
 
   return (
-    <>
+    // .pagina-tourleader è lo scope di tourleader.css (vedi quel file)
+    <div className="pagina-tourleader">
       <header>
         <div className="logo"><LogoOnWay come="testo" /></div>
         <Link className="back-link" to="/">← Torna al sito</Link>
@@ -101,6 +102,6 @@ export function FornitoreRegistrazionePage() {
         )}
       </main>
       <CookieBanner />
-    </>
+    </div>
   );
 }

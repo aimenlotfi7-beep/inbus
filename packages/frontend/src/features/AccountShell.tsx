@@ -35,7 +35,9 @@ export function AccountShell({
    *  su sfondo chiaro), e applicata anche all'account cliente (che
    *  invece eredita i colori scuri del sito) rendeva il testo scuro
    *  su sfondo scuro, illeggibile. Di default false: il cliente non
-   *  la passa, resta sui colori del sito. */
+   *  la passa e riceve invece "account-cliente", la classe sotto cui
+   *  sono scopati account.css e sito/account-cliente.css (tema
+   *  scuro). Le due classi non convivono mai sullo stesso guscio. */
   temaChiaro?: boolean;
 }) {
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
@@ -46,7 +48,7 @@ export function AccountShell({
   }
 
   return (
-    <div className={`account-shell${temaChiaro ? ' pagina-partner' : ''}`}>
+    <div className={`account-shell${temaChiaro ? ' pagina-partner' : ' account-cliente'}`}>
       {/* Barra in alto, a tutta larghezza — il nome sempre a sinistra,
           il logo del sito (cliccabile, torna a navigare) sempre a
           destra. Separata dalla sidebar sotto: quella resta solo per

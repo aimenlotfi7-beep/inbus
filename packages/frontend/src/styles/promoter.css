@@ -1,151 +1,144 @@
+/* ============================================================
+   promoter.css — PORTALI PARTNER: promoter, organizzatore, tour leader
+   ------------------------------------------------------------
+   Tema CHIARO (strumenti di lavoro diurni): solo l'intestazione e la
+   sidebar restano scure, come nel gestionale. Tutto scopato sotto
+   .pagina-partner (PromoterPage, OrganizzatorePage, le pagine
+   password dei partner, AccountShell con temaChiaro): Vite mette
+   tutti i fogli in un solo bundle e senza scope queste regole
+   finivano sul sito pubblico.
 
-  /* Stessa identica palette del gestionale vero — sfondo chiaro, carte
-     bianche, blu come colore d'azione principale, Poppins come font.
-     Solo l'intestazione resta scura, come la sidebar del gestionale
-     (stesso principio: un'unica zona scura per l'identità visiva, il
-     resto chiaro e leggibile).
+   La palette è rimappata in onway-theme.css (.pagina-partner{
+   --night:… --sidebar-bg:… }): qui solo struttura e componenti.
+   Reset, header (layout), .btn*, .errore e i campi base vengono da
+   sito/base.css; base.css imposta anche il contesto CHIARO su
+   .pagina-partner (pulsanti e campi con testo/contorno ink) e lo
+   riporta al buio su header, topbar e sidebar.
+   ============================================================ */
+.pagina-partner{
+  background:var(--night); color:var(--paper); font-family:var(--font-sans);
+  min-height:100vh;
+}
+/* Su superficie chiara il giallo non può fare da testo: link = ink sottolineato */
+.pagina-partner a:not(.btn){ color:var(--ow-ink); text-decoration:underline; }
 
-     ATTENZIONE: legate a .pagina-partner (non più :root globale) di
-     proposito — altri fogli di stile (es. sito.css, il sito pubblico
-     scuro) definiscono le STESSE variabili con valori diversi, e in
-     un'unica app tutto finisce mescolato: usare :root qui rischiava di
-     far vincere l'ultimo foglio caricato, "rubando" i colori sbagliati
-     al portale. Con una classe dedicata questo non può più succedere. */
-  .pagina-partner{
-    --night:#f3f4f6; --dusk:#ffffff; --dusk-2:#eef0f3;
-    --paper:#1f2430; --ink:#ffffff; --mist:#6b7280; --line:#e3e5ea;
-    --pink:#dc2626; --pink-dim:#dc262633; --amber:#f59e0b; --blue:#2563eb; --green:#16a34a;
-    --sidebar-bg:#14121f; --sidebar-text:#e7e5f0; --sidebar-mist:#a99fc2;
-    --radius:12px;
-    background:var(--night); color:var(--paper); font-family:'Poppins',sans-serif;
-    min-height:100vh;
+/* Intestazione scura, come la sidebar del gestionale (sticky e
+   altezza dalla base) */
+.pagina-partner header{
+  gap:16px; background:var(--sidebar-bg); color:var(--sidebar-text); border-bottom-color:rgba(247,245,241,.1);
+}
+.pagina-partner .logo{ font-size:var(--testo-4xl); color:var(--sidebar-text); }
+.pagina-partner .back-link{ font-size:var(--testo-base); color:var(--ow-muted); text-decoration:none; }
+.pagina-partner .back-link:hover{ color:var(--ow-paper); }
+
+.pagina-partner main{ max-width:820px; margin:0 auto; padding:clamp(24px,5vw,56px) clamp(20px,5vw,32px) 80px; }
+.pagina-partner h1.page-title{
+  font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; text-transform:none;
+  font-size:clamp(22px,4vw,28px); margin:0 0 8px;
+}
+.pagina-partner .page-sub{ color:var(--mist); font-size:var(--testo-base); margin:0 0 28px; }
+
+/* ---------- LOGIN ---------- */
+.pagina-partner .login-box{
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
+  padding:36px; max-width:400px; margin:20px auto; text-align:center;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.pagina-partner .login-box p{ color:var(--mist); font-size:var(--testo-base); margin:14px 0 18px; }
+.pagina-partner .login-box input{
+  width:100%; min-height:var(--control-h); padding:0 14px; border-radius:var(--radius-sm); border:1px solid var(--ow-line-ink);
+  background:#FFFFFF; color:var(--ow-ink); font-size:var(--t-body); margin-bottom:14px; font-family:var(--font-sans);
+}
+.pagina-partner .login-box .btn{ width:100%; }
+
+/* ---------- STATISTICHE ---------- */
+.pagina-partner .stats-row{ display:flex; gap:14px; flex-wrap:wrap; margin-bottom:26px; }
+.pagina-partner .stat-box{ background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); padding:16px 20px; flex:1; min-width:150px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+.pagina-partner .stat-box b{ display:block; font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--testo-4xl); color:var(--ow-ink); }
+.pagina-partner .stat-box span{ font-size:var(--testo-sm); color:var(--mist); text-transform:uppercase; letter-spacing:.5px; }
+
+.pagina-partner .evento-link-card{
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
+  padding:18px 20px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
+}
+.pagina-partner .evento-link-card h3{ margin:0 0 4px; font-family:var(--font-sans); font-weight:600; font-size:var(--testo-xl); }
+.pagina-partner .evento-link-card p{ margin:0; color:var(--mist); font-size:var(--testo-md); }
+.pagina-partner .link-azione{ display:flex; gap:8px; align-items:center; }
+.pagina-partner .link-azione input{
+  background:#FFFFFF; border:1px solid var(--ow-line-ink); border-radius:var(--radius-sm); min-height:var(--control-h-sm); padding:0 10px; color:var(--ow-ink);
+  font-size:var(--t-body); width:220px; font-family:var(--font-mono);
+}
+
+/* Tab (Revenue per evento): attivo = giallo pieno, testo ink */
+.pagina-partner .mini-tabs{ display:flex; gap:8px; flex-wrap:wrap; }
+.pagina-partner .mini-tab{
+  background:#FFFFFF; border:1px solid var(--ow-line-ink); border-radius:var(--radius-pill); padding:9px 16px;
+  font-size:var(--testo-md); color:var(--ow-muted-ink); cursor:pointer; font-family:var(--font-sans); opacity:.75;
+}
+.pagina-partner .mini-tab.active{ background:var(--ow-accent); border-color:var(--ow-accent); color:var(--ow-ink); font-weight:700; opacity:1; }
+.pagina-partner .mini-tab.active:focus-visible{ outline-color:var(--ow-ink); }
+
+.pagina-partner .empty-box{ background:var(--dusk); border:1px dashed var(--line); border-radius:var(--radius); padding:34px; text-align:center; color:var(--mist); }
+
+/* ---------------------------------------------------------------
+   MENU ACCOUNT (una volta autenticati) — stesso meccanismo del
+   gestionale: sidebar fissa su desktop, su mobile un pulsante ☰ apre
+   un pannello a schermo intero. Un solo componente (AccountShell)
+   per i tre account partner, qui lo stile chiaro.
+   ------------------------------------------------------------- */
+.account-shell.pagina-partner{ display:flex; flex-direction:column; min-height:100vh; }
+.pagina-partner .account-topbar{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:14px clamp(16px,4vw,28px); border-bottom:1px solid rgba(255,255,255,.1);
+  background:var(--sidebar-bg); position:sticky; top:0; z-index:10;
+}
+.pagina-partner .account-topbar-nome{ font-family:var(--font-sans); font-weight:600; font-size:var(--testo-base); color:var(--sidebar-text); }
+.pagina-partner .account-topbar-logo{ display:flex; align-items:center; flex-shrink:0; color:var(--sidebar-text); }
+
+.pagina-partner .account-corpo{ display:flex; flex:1; min-height:0; }
+.pagina-partner .account-sidebar{
+  width:220px; flex-shrink:0; background:var(--sidebar-bg);
+  display:flex; flex-direction:column; padding:20px 14px;
+  position:sticky; top:57px; height:calc(100vh - 57px);
+}
+.pagina-partner .account-hamburger{ display:none; }
+.pagina-partner .account-nav{ display:flex; flex-direction:column; gap:3px; flex:1; }
+.pagina-partner .account-nav-voce{
+  padding:11px 14px; border-radius:var(--radius-sm); font-size:var(--testo-base); font-weight:500;
+  color:var(--sidebar-mist); text-decoration:none; cursor:pointer; border:none;
+  background:none; text-align:left; font-family:var(--font-sans); width:100%;
+}
+.pagina-partner .account-nav-voce:hover{ color:var(--sidebar-text); background:var(--ow-accent-soft); }
+.pagina-partner .account-nav-voce.active{ background:var(--ow-accent); color:var(--ow-ink); font-weight:700; }
+.pagina-partner .account-nav-intestazione-mobile{ display:none; }
+.pagina-partner .account-piede{ padding-top:14px; margin-top:10px; border-top:1px solid rgba(255,255,255,.1); }
+.pagina-partner .account-piede button{ display:block; width:100%; text-align:center; }
+.pagina-partner .account-main{ flex:1; min-width:0; padding:clamp(20px,5vw,44px) clamp(18px,5vw,32px) 80px; }
+
+@media (max-width:900px){
+  .pagina-partner .account-corpo{ flex-direction:column; }
+  .pagina-partner .account-sidebar{ width:100%; height:auto; position:relative; padding:10px 16px; }
+  .pagina-partner .account-hamburger{
+    display:block; width:100%; text-align:left;
+    background:none; border:1px solid rgba(255,255,255,.15); border-radius:var(--radius-sm);
+    color:var(--sidebar-text); font-size:var(--testo-base); font-weight:600; padding:10px 12px; cursor:pointer;
+    font-family:var(--font-sans); min-height:var(--tap);
   }
-  .pagina-partner *{box-sizing:border-box;}
-  .pagina-partner a{color:inherit; text-decoration:none;}
-
-  header{
-    display:flex; align-items:center; justify-content:space-between; gap:16px;
-    padding:16px clamp(20px,5vw,64px); border-bottom:1px solid rgba(255,255,255,.1);
-    background:var(--sidebar-bg); color:var(--sidebar-text); position:sticky; top:0; z-index:10;
+  .pagina-partner .account-nav{ display:none; }
+  .pagina-partner .account-nav.aperto{
+    display:flex; flex-direction:column; gap:4px;
+    position:fixed; inset:0; z-index:30; background:var(--sidebar-bg);
+    padding:max(20px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    overflow-y:auto;
   }
-  .logo{font-family:'Poppins',sans-serif; font-weight:800; font-size:var(--testo-3xl); display:flex; align-items:baseline; gap:4px;}
-  .logo small{font-size:var(--testo-xs); color:var(--sidebar-mist); margin-left:8px; text-transform:uppercase; letter-spacing:1px;}
-  .back-link{font-size:var(--testo-base); color:var(--sidebar-mist);}
-  .back-link:hover{color:var(--sidebar-text);}
-  .btn{font-family:'Poppins',sans-serif; font-weight:600; font-size:var(--testo-base); padding:10px 18px; border-radius:8px; border:1px solid transparent; cursor:pointer;}
-  .btn-ghost{border-color:var(--line); color:var(--paper); background:transparent;}
-  .btn-ghost:hover{border-color:var(--mist);}
-  .btn-primary{background:var(--blue); color:#fff; width:100%; font-size:var(--testo-lg); padding:14px;}
-
-  main{max-width:820px; margin:0 auto; padding:clamp(24px,5vw,56px) clamp(20px,5vw,32px) 80px;}
-  h1.page-title{font-family:'Poppins',sans-serif; font-weight:700; font-size:clamp(22px,4vw,28px); margin:0 0 8px;}
-  .page-sub{color:var(--mist); font-size:var(--testo-base); margin:0 0 28px;}
-
-  .login-box{
-    background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
-    padding:36px; max-width:400px; margin:20px auto; text-align:center;
-    box-shadow:0 1px 3px rgba(0,0,0,.06);
+  .pagina-partner .account-nav-intestazione-mobile{
+    display:flex; align-items:center; justify-content:space-between;
+    padding-bottom:12px; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,.1);
+    font-weight:700; color:var(--sidebar-text); font-size:var(--testo-lg);
   }
-  .login-box p{color:var(--mist); font-size:var(--testo-base); margin:14px 0 18px;}
-  .login-box input{
-    width:100%; padding:12px 14px; border-radius:8px; border:1px solid var(--line);
-    background:var(--night); color:var(--paper); font-size:var(--testo-base); margin-bottom:14px; font-family:'Poppins',sans-serif;
-  }
-  .errore{color:var(--pink); font-size:var(--testo-md); min-height:16px;}
-
-  .stats-row{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:26px;}
-  .stat-box{background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); padding:16px 20px; flex:1; min-width:150px; box-shadow:0 1px 3px rgba(0,0,0,.04);}
-  .stat-box b{display:block; font-family:'Poppins',sans-serif; font-weight:700; font-size:var(--testo-4xl); color:var(--blue);}
-  .stat-box span{font-size:var(--testo-sm); color:var(--mist); text-transform:uppercase; letter-spacing:.5px;}
-
-  .evento-link-card{
-    background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
-    padding:18px 20px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;
-    box-shadow:0 1px 3px rgba(0,0,0,.04);
-  }
-  .evento-link-card h3{margin:0 0 4px; font-family:'Poppins',sans-serif; font-weight:600; font-size:var(--testo-xl);}
-  .evento-link-card p{margin:0; color:var(--mist); font-size:var(--testo-md);}
-  .link-azione{display:flex; gap:8px; align-items:center;}
-  .link-azione input{
-    background:var(--night); border:1px solid var(--line); border-radius:8px; padding:9px 10px; color:var(--paper);
-    font-size:var(--testo-sm); width:220px; font-family:monospace;
-  }
-
-  /* Tab (Revenue per evento) — stessa forma delle mini-tab del gestionale. */
-  .mini-tabs{display:flex; gap:8px; flex-wrap:wrap;}
-  .mini-tab{
-    background:var(--dusk); border:1px solid var(--line); border-radius:999px; padding:7px 16px;
-    font-size:var(--testo-md); color:var(--mist); cursor:pointer; font-family:'Poppins',sans-serif;
-  }
-  .mini-tab.active{background:var(--blue); border-color:var(--blue); color:#fff; font-weight:600;}
-
-  .empty-box{background:var(--dusk); border:1px dashed var(--line); border-radius:var(--radius); padding:34px; text-align:center; color:var(--mist);}
-  .hidden{display:none !important;}
-
-  /* ---------------------------------------------------------------
-     MENU ACCOUNT (una volta autenticati) — stesso identico meccanismo
-     del gestionale: sidebar fissa su desktop, su mobile un pulsante ☰
-     apre un pannello a schermo intero con l'elenco verticale. Un solo
-     componente (AccountShell) per i tre account (promoter/
-     organizzatore/tour leader), qui lo stile.
-
-     Struttura in due righe: barra in alto a tutta larghezza (nome
-     sempre a sinistra, logo del sito sempre a destra — cliccandolo si
-     torna a navigare), sotto il corpo con la sidebar del menu e il
-     contenuto della sezione scelta.
-     ------------------------------------------------------------- */
-  .account-shell{display:flex; flex-direction:column; min-height:100vh;}
-  .account-topbar{
-    display:flex; align-items:center; justify-content:space-between; gap:16px;
-    padding:14px clamp(16px,4vw,28px); border-bottom:1px solid rgba(255,255,255,.1);
-    background:var(--sidebar-bg); position:sticky; top:0; z-index:10;
-  }
-  .account-topbar-nome{font-family:'Poppins',sans-serif; font-weight:600; font-size:var(--testo-base); color:var(--sidebar-text);}
-  .account-topbar-logo{display:flex; align-items:center; flex-shrink:0; color:var(--sidebar-text);}
-
-  .account-corpo{display:flex; flex:1; min-height:0;}
-  .account-sidebar{
-    width:220px; flex-shrink:0; background:var(--sidebar-bg);
-    display:flex; flex-direction:column; padding:20px 14px;
-    position:sticky; top:57px; height:calc(100vh - 57px);
-  }
-  .account-hamburger{display:none;}
-  .account-nav{display:flex; flex-direction:column; gap:3px; flex:1;}
-  .account-nav-voce{
-    padding:11px 14px; border-radius:8px; font-size:var(--testo-base); font-weight:500;
-    color:var(--sidebar-mist); text-decoration:none; cursor:pointer; border:none;
-    background:none; text-align:left; font-family:'Poppins',sans-serif; width:100%;
-  }
-  .account-nav-voce:hover{color:var(--sidebar-text);}
-  .account-nav-voce.active{background:rgba(37,99,235,.25); color:#fff; font-weight:600;}
-  .account-nav-intestazione-mobile{display:none;}
-  .account-piede{padding-top:14px; margin-top:10px; border-top:1px solid rgba(255,255,255,.1);}
-  .account-piede button{display:block; width:100%; text-align:center;}
-  .account-main{flex:1; min-width:0; padding:clamp(20px,5vw,44px) clamp(18px,5vw,32px) 80px;}
-
-  @media (max-width:860px){
-    .account-corpo{flex-direction:column;}
-    .account-sidebar{width:100%; height:auto; position:relative; padding:10px 16px;}
-    .account-hamburger{
-      display:block; width:100%; text-align:left;
-      background:none; border:1px solid rgba(255,255,255,.15); border-radius:8px;
-      color:var(--sidebar-text); font-size:var(--testo-base); font-weight:600; padding:10px 12px; cursor:pointer;
-      font-family:'Poppins',sans-serif;
-    }
-    .account-nav{display:none;}
-    .account-nav.aperto{
-      display:flex; flex-direction:column; gap:4px;
-      position:fixed; inset:0; z-index:30; background:var(--sidebar-bg);
-      padding:max(20px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-      overflow-y:auto;
-    }
-    .account-nav-intestazione-mobile{
-      display:flex; align-items:center; justify-content:space-between;
-      padding-bottom:12px; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,.1);
-      font-weight:700; color:var(--sidebar-text); font-size:var(--testo-lg);
-    }
-    .account-nav-intestazione-mobile button{background:none; border:none; color:var(--sidebar-text); font-size:var(--testo-2xl); cursor:pointer; padding:4px 8px;}
-    .account-nav-voce{font-size:var(--testo-lg); padding:13px 14px;}
-    .account-piede{margin-top:10px;}
-    .account-topbar-nome{font-size:var(--testo-md);}
-  }
+  .pagina-partner .account-nav-intestazione-mobile button{ background:none; border:none; color:var(--sidebar-text); font-size:var(--testo-2xl); cursor:pointer; padding:4px 8px; min-width:var(--tap); min-height:var(--tap); }
+  .pagina-partner .account-nav-voce{ font-size:var(--testo-lg); padding:13px 14px; }
+  .pagina-partner .account-piede{ margin-top:10px; }
+  .pagina-partner .account-topbar-nome{ font-size:var(--testo-md); }
+}

@@ -1,0 +1,70 @@
+/* ============================================================
+   OnWay — sito pubblico · CARD EVENTO, CAROSELLI, GRIGLIA
+   ============================================================ */
+
+.grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(270px,1fr)); gap:22px; }
+
+/* ---------- CAROSELLO "EVENTI CONSIGLIATI" ---------- */
+.carosello-wrap{ position:relative; }
+.carosello{
+  display:flex; gap:20px; overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:8px;
+  scrollbar-width:none;
+}
+.carosello::-webkit-scrollbar{ display:none; }
+.carosello .card{ flex:0 0 auto; width:280px; scroll-snap-align:start; }
+/* Card più piccole per le sezioni con tanti eventi */
+.carosello-compatto .card{ width:180px; }
+.carosello-frecce{ display:flex; gap:8px; }
+.carosello-frecce button{
+  width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:transparent;
+  color:var(--paper); font-size:var(--testo-3xl); cursor:pointer; line-height:1;
+}
+.carosello-frecce button:hover{ border-color:var(--ow-accent); background:var(--ow-accent-soft); }
+@media (max-width:640px){ .carosello-frecce{ display:none; } }
+
+/* ---------- CARD ---------- */
+.card{
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
+  overflow:hidden; display:flex; flex-direction:column;
+  transition:transform .2s ease, border-color .2s ease;
+}
+.card:hover{ transform:translateY(-5px); border-color:var(--ow-accent-line); }
+.card-visual{
+  aspect-ratio:1080/1350; position:relative; overflow:hidden;
+  background:linear-gradient(135deg, var(--ow-surface-2), #2C3444);
+  background-size:cover; background-position:center;
+  display:flex; align-items:flex-end; padding:14px;
+}
+.card-visual::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(14,17,22,0) 40%, rgba(14,17,22,.55) 100%);
+  pointer-events:none;
+}
+.card-visual .tag{
+  position:relative; z-index:1;
+  font-family:var(--font-mono); font-size:var(--testo-xs); letter-spacing:1px; text-transform:uppercase;
+  background:rgba(14,17,22,.8); padding:5px 10px; border-radius:var(--radius-pill); color:var(--ow-accent);
+}
+.card-visual .beam{
+  position:absolute; inset:0; opacity:.5;
+  background:repeating-linear-gradient(100deg, transparent 0 22px, rgba(255,212,0,.14) 22px 24px);
+}
+.card-body{ padding:18px 18px 20px; display:flex; flex-direction:column; gap:10px; flex:1; }
+.card-body h3{ font-family:var(--font-sans); font-weight:800; font-size:var(--testo-3xl); margin:0; text-transform:uppercase; letter-spacing:.3px; }
+.card-meta{ display:flex; justify-content:space-between; font-size:var(--testo-md); color:var(--mist); }
+/* Stato: colore + testo, mai solo colore */
+.posti-basso{ color:var(--ow-warn); font-weight:600; }
+.card-foot{
+  margin-top:auto; display:flex; align-items:center; justify-content:space-between;
+  padding-top:12px; border-top:1px solid var(--line);
+}
+/* La card è già interamente un <Link>: il .card-cta dentro è uno
+   <span> che non riceve il focus. Non è un pulsante ma un'etichetta,
+   per non promettere un'interazione che non ha. */
+.card-cta{
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:var(--testo-md); font-weight:700; color:var(--ow-accent); background:none;
+  padding:0; border:none; white-space:nowrap;
+  transition:color .15s ease;
+}
+.card-cta:hover{ color:var(--ow-accent-press); }

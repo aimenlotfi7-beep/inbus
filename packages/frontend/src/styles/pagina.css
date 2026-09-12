@@ -1,36 +1,21 @@
+/* ============================================================
+   pagina.css — pagine editoriali del CMS (chi siamo, termini,
+   privacy, cookie, contatti) e FAQ
+   ------------------------------------------------------------
+   Dentro PublicPageLayout, quindi scopato sotto .pagina-editoriale:
+   senza scope main{max-width} finiva su tutto il sito. Reset,
+   header, .logo e footer vengono da sito/base.css e
+   sito/header.css; qui la colonna di lettura e la centratura del
+   footer a 1100px. I link nel testo del CMS sono in onway-theme.css.
+   ============================================================ */
+.pagina-editoriale main{ max-width:var(--container-narrow); margin:0 auto; padding:clamp(30px,6vw,60px) 20px 80px; }
+.pagina-editoriale h1{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:clamp(28px,4vw,38px); margin:0 0 30px; }
+.pagina-editoriale .contenuto{ color:var(--mist); font-size:var(--testo-xl); line-height:1.8; }
+.pagina-editoriale .contenuto h3{ color:var(--paper); font-family:var(--font-sans); font-size:var(--testo-2xl); margin:28px 0 10px; }
+.pagina-editoriale .contenuto h3:first-child{ margin-top:0; }
+.pagina-editoriale .contenuto p{ margin:0 0 14px; }
 
-  /* Niente più :root locale — eredita dal tema globale (sito.css, poi
-     onway-theme.css), stesso motivo di account.css. */
-  *{box-sizing:border-box;}
-  body{margin:0; background:var(--night); color:var(--paper); font-family:'Poppins',sans-serif;}
-  a{color:inherit; text-decoration:none;}
-  header{display:flex; align-items:center; justify-content:space-between; padding:18px clamp(20px,5vw,64px); border-bottom:1px solid var(--line);}
-  .logo{font-family:'Poppins',sans-serif; font-size:var(--testo-4xl); cursor:pointer;}
-  main{max-width:760px; margin:0 auto; padding:clamp(30px,6vw,60px) 20px 80px;}
-  h1{font-family:'Poppins',sans-serif; font-size:clamp(28px,4vw,38px); margin:0 0 30px;}
-  .contenuto{color:var(--mist); font-size:var(--testo-xl); line-height:1.8;}
-  .contenuto h3{color:var(--paper); font-family:'Poppins',sans-serif; font-size:var(--testo-2xl); margin:28px 0 10px;}
-  .contenuto h3:first-child{margin-top:0;}
-  .contenuto p{margin:0 0 14px;}
-
-  /* ---------- FOOTER (identico al sito, sempre visibile) ---------- */
-  footer{padding:60px clamp(20px,5vw,64px) 30px; background:#0A0C10;}
-  .footer-grid{
-    display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap:40px; padding-bottom:44px; border-bottom:1px solid var(--line);
-    max-width:1100px; margin:0 auto;
-  }
-  @media (max-width:760px){.footer-grid{grid-template-columns:1fr 1fr;}}
-  .footer-grid h5{font-size:var(--testo-sm); text-transform:uppercase; letter-spacing:1.5px; color:var(--mist); margin:0 0 16px;}
-  .footer-grid ul{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px; font-size:var(--testo-base);}
-  .footer-grid ul a:hover{color:var(--pink);}
-  .footer-bottom{
-    display:flex; justify-content:space-between; align-items:center; padding-top:26px; flex-wrap:wrap; gap:12px;
-    color:var(--mist); font-size:var(--testo-md); max-width:1100px; margin:0 auto;
-  }
-  .payment-trust-row{
-    display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-top:20px; margin-top:20px;
-    border-top:1px solid var(--line); color:var(--mist); font-size:var(--testo-sm); max-width:1100px; margin-left:auto; margin-right:auto;
-  }
-  .payment-badge{
-    background:var(--dusk-2); border:1px solid var(--line); border-radius:999px; padding:5px 12px; color:var(--paper); font-size:var(--testo-sm);
-  }
+/* Footer identico al sito, ma centrato a 1100px */
+.pagina-editoriale .footer-grid, .pagina-editoriale .footer-bottom, .pagina-editoriale .payment-trust-row{
+  max-width:1100px; margin-left:auto; margin-right:auto;
+}

@@ -1,272 +1,208 @@
+/* ============================================================
+   account.css — ACCOUNT CLIENTE e pagine di accesso
+   ------------------------------------------------------------
+   Tutto scopato, così non tocca il resto del sito (Vite mette
+   tutti i fogli in un solo bundle):
+     .account-cliente  AccountShell del cliente (AccountPage) —
+                       mai .pagina-partner, che ha il suo promoter.css
+     .pagina-auth      accedi, registrati, password dimenticata,
+                       reimposta password, verifica email
+     .travel-card      dettaglio prenotazione (DettaglioViaggioModale),
+                       aperto FUORI dal guscio: classi proprie
+   Reset, header, .btn*, .errore, .panel-box, .section-label,
+   .testo-intro e i token vengono da sito/base.css; il guscio
+   (.account-topbar, .account-sidebar…) da sito/account-cliente.css.
+   ============================================================ */
 
-  /* Niente più :root locale con una copia della palette — eredita
-     quella vera dal tema globale (sito.css, poi onway-theme.css sopra
-     quella), caricati prima di questo foglio. Un :root qui vinceva la
-     cascata su tutte le stesse variabili, tenendo l'area account
-     sempre alla vecchia palette qualunque tema si applicasse sopra. */
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{background:var(--night); color:var(--paper); font-family:'Poppins',sans-serif; -webkit-font-smoothing:antialiased;}
-  a{color:inherit; text-decoration:none;}
-  .hidden{display:none !important;}
+/* ---------- CONTENUTO ACCOUNT (a piena larghezza, senza sidebar) ---------- */
+.account-cliente .account-content{ max-width:1100px; margin:0 auto; padding:clamp(20px,4vw,40px); }
+.account-cliente .account-content h1{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:var(--testo-4xl); margin:0 0 22px; }
 
-  header{
-    display:flex; align-items:center; justify-content:space-between; gap:16px;
-    padding:16px clamp(20px,5vw,64px); border-bottom:1px solid var(--line);
-    background:rgba(16,14,28,.85); backdrop-filter:blur(10px);
-  }
-  .logo{font-family:'Poppins',sans-serif; font-size:var(--testo-3xl); display:flex; align-items:baseline; gap:4px;}
-  .back-link{font-size:var(--testo-base); color:var(--mist);}
-  .back-link:hover{color:var(--paper);}
-  .btn{
-    font-family:'Poppins',sans-serif; font-weight:600; font-size:var(--testo-base);
-    padding:10px 18px; border-radius:999px; border:1px solid transparent; cursor:pointer;
-  }
-  .btn-ghost{border-color:var(--line); color:var(--paper); background:transparent;}
-  .btn-ghost:hover{border-color:var(--mist);}
-  .btn-primary{background:var(--pink); color:var(--night);}
-  .btn-primary:hover{filter:brightness(1.05);}
-  .btn-danger{background:transparent; border-color:var(--ow-danger); color:var(--ow-danger); font-size:var(--testo-sm); padding:8px 14px;}
-  .errore{color:var(--ow-danger); font-size:var(--testo-md); min-height:16px;}
+/* ---------- SEZIONE EVENTI = IL SITO VERO E PROPRIO, A PIENA LARGHEZZA ---------- */
+.account-cliente .acc-sezione-sito{ width:100%; height:calc(100vh - 65px); }
+.account-cliente #siteFrame{ width:100%; height:100%; border:none; display:block; }
 
-  /* ---------- LOGIN ---------- */
-  .login-wrap{max-width:800px; margin:0 auto; padding:clamp(24px,5vw,56px) clamp(20px,5vw,32px);}
-  .login-box{
-    background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
-    padding:36px; max-width:400px; margin:20px auto; text-align:center;
-  }
-  .login-box p{color:var(--mist); font-size:var(--testo-base); margin:14px 0 18px;}
-  .login-box input{
-    width:100%; padding:12px 14px; border-radius:8px; border:1px solid var(--line);
-    background:var(--night); color:var(--paper); font-size:var(--testo-base); margin-bottom:14px; font-family:'Poppins',sans-serif;
-  }
-  .login-box .btn{width:100%; padding:12px; font-size:var(--testo-base);}
+/* ---------- MINI-TAB (Prossimi / Passati): attivo = giallo pieno, testo ink ---------- */
+.account-cliente .mini-tabs-acc{ display:flex; gap:8px; margin-bottom:18px; }
+.account-cliente .mini-tab-acc{
+  font-family:var(--font-mono); font-size:var(--testo-sm); padding:8px 16px; border-radius:var(--radius-pill);
+  border:1px solid var(--line); color:var(--ow-muted); background:transparent; cursor:pointer;
+}
+.account-cliente .mini-tab-acc.active{ background:var(--ow-accent); border-color:var(--ow-accent); color:var(--ow-ink); font-weight:700; }
+.account-cliente .mini-tab-acc.active:focus-visible{ outline-color:var(--ow-ink); }
 
-  /* ---------- MENU "MY INBUS" (dropdown nell'header, a destra) ---------- */
-  .header-right{display:flex; align-items:center; gap:12px;}
-  .my-inbus-wrap{position:relative;}
-  .my-inbus-btn{
-    background:transparent; border:1px solid var(--line); color:var(--paper); font-family:'Poppins',sans-serif;
-    font-weight:600; font-size:var(--testo-md); padding:9px 16px; border-radius:999px; cursor:pointer; display:flex; align-items:center; gap:6px;
-  }
-  .my-inbus-btn:hover{border-color:var(--pink);}
-  .my-inbus-btn .caret{font-size:var(--testo-2xs); transition:transform .15s ease;}
-  .my-inbus-wrap.open .caret{transform:rotate(180deg);}
-  .my-inbus-dropdown{
-    position:absolute; top:calc(100% + 10px); right:0; background:var(--dusk); border:1px solid var(--line); border-radius:12px;
-    padding:10px; min-width:230px; box-shadow:0 20px 40px rgba(0,0,0,.4); z-index:50; display:flex; flex-direction:column; gap:2px;
-  }
-  .dropdown-chi{font-size:var(--testo-sm); color:var(--mist); padding:8px 10px 12px; border-bottom:1px solid var(--line); margin-bottom:6px;}
-  .dropdown-chi b{color:var(--paper); display:block; margin-top:2px; word-break:break-all; font-size:var(--testo-md);}
-  .acc-nav-btn{
-    display:flex; align-items:center; gap:8px; text-align:left; width:100%;
-    font-family:'Poppins',sans-serif; font-size:var(--testo-base); font-weight:600;
-    padding:10px 12px; border-radius:8px; border:none; background:transparent; color:var(--mist); cursor:pointer;
-  }
-  .acc-nav-btn.active, .acc-nav-btn:hover{background:rgba(255,212,0,.1); color:var(--paper);}
-  .acc-nav-btn.active{color:var(--pink);}
-  .acc-badge{
-    margin-left:auto; background:var(--pink); color:var(--night); font-size:var(--testo-2xs); font-weight:700;
-    border-radius:999px; padding:1px 7px;
-  }
+/* ---------- VIAGGI ---------- */
+.account-cliente .viaggio-card{
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
+  padding:20px; margin-bottom:14px; display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;
+}
+.account-cliente .viaggio-main{ flex:1; min-width:240px; }
+.account-cliente .viaggio-card .tag{
+  font-family:var(--font-mono); font-size:var(--testo-xs); text-transform:uppercase; color:var(--amber); letter-spacing:1px;
+}
+.account-cliente .viaggio-card h3{ margin:6px 0 4px; font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:var(--testo-3xl); display:flex; align-items:center; gap:10px; }
+.account-cliente .viaggio-chat-btn{
+  background:transparent; border:1px solid var(--line); color:var(--paper); border-radius:50%;
+  width:28px; height:28px; font-size:var(--testo-md); cursor:pointer; flex-shrink:0;
+}
+.account-cliente .viaggio-chat-btn:hover{ border-color:var(--ow-accent); background:var(--ow-accent-soft); }
+.account-cliente .viaggio-card p{ margin:2px 0; color:var(--mist); font-size:var(--testo-md); }
+.account-cliente .viaggio-right{ text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:8px; min-width:140px; }
+.account-cliente .viaggio-right .totale{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--testo-3xl); color:var(--ow-accent); }
 
-  /* ---------- CONTENUTO ACCOUNT (a piena larghezza, senza sidebar) ---------- */
-  .account-content{max-width:1100px; margin:0 auto; padding:clamp(20px,4vw,40px);}
-  .account-content h1{font-family:'Poppins',sans-serif; font-size:var(--testo-4xl); margin:0 0 22px;}
+/* Bollini di stato (anche nella travel card): colore + testo */
+:is(.account-cliente, .travel-card) .badge{ padding:4px 12px; border-radius:var(--radius-pill); font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:.5px; }
+:is(.account-cliente, .travel-card) :is(.badge.confermata, .badge.pagato){ background:rgba(87,211,154,.16); color:var(--ow-ok); }
+:is(.account-cliente, .travel-card) :is(.badge.cancellata, .badge.scaduto){ background:rgba(255,138,138,.16); color:var(--ow-danger); }
+:is(.account-cliente, .travel-card) :is(.badge.acconto_versato, .badge.attenzione){ background:rgba(255,180,61,.16); color:var(--ow-warn); }
+:is(.account-cliente, .travel-card) .pnr-tag{ font-family:var(--font-mono); font-size:var(--testo-sm); color:var(--mist); }
 
-  /* ---------- SEZIONE EVENTI = IL SITO VERO E PROPRIO, A PIENA LARGHEZZA ---------- */
-  .acc-sezione-sito{width:100%; height:calc(100vh - 65px);}
-  #siteFrame{width:100%; height:100%; border:none; display:block;}
+.account-cliente .viaggio-azioni{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+/* .btn-mini è .btn-sm secondario (base.css); qui solo la variante in evidenza */
+:is(.account-cliente, .travel-card) .btn-mini.evidenzia{ border-color:var(--ow-accent); color:var(--ow-accent); }
 
-  /* ---------- MINI-TAB (Prossimi / Passati) ---------- */
-  .mini-tabs-acc{display:flex; gap:8px; margin-bottom:18px;}
-  .mini-tab-acc{
-    font-family:'Space Mono',monospace; font-size:var(--testo-sm); padding:8px 16px; border-radius:999px;
-    border:1px solid var(--line); color:var(--mist); background:transparent; cursor:pointer;
-  }
-  .mini-tab-acc.active{border-color:var(--pink); color:var(--paper); background:rgba(255,212,0,.08);}
+.account-cliente .viaggio-riepilogo{
+  margin-top:14px; padding-top:14px; border-top:1px solid var(--line);
+  display:flex; flex-direction:column; gap:8px;
+}
+.account-cliente .riepilogo-riga{ display:flex; flex-direction:column; gap:2px; font-size:var(--testo-md); color:var(--paper); }
+.account-cliente .riepilogo-label{ font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:.5px; color:var(--mist); }
+.account-cliente .riepilogo-riga a{ color:var(--ow-paper); text-decoration:underline; font-weight:700; }
 
-  /* ---------- VIAGGI ---------- */
-  .viaggio-card{
-    background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
-    padding:20px; margin-bottom:14px; display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;
-  }
-  .viaggio-main{flex:1; min-width:240px;}
-  .viaggio-card .tag{
-    font-family:'Space Mono',monospace; font-size:var(--testo-xs); text-transform:uppercase; color:var(--amber); letter-spacing:1px;
-  }
-  .viaggio-card h3{margin:6px 0 4px; font-family:'Poppins',sans-serif; font-weight:400; font-size:var(--testo-3xl); display:flex; align-items:center; gap:10px;}
-  .viaggio-chat-btn{
-    background:transparent; border:1px solid var(--line); color:var(--paper); border-radius:50%;
-    width:28px; height:28px; font-size:var(--testo-md); cursor:pointer; flex-shrink:0;
-  }
-  .viaggio-chat-btn:hover{border-color:var(--pink); background:rgba(255,212,0,.1);}
-  .viaggio-card p{margin:2px 0; color:var(--mist); font-size:var(--testo-md);}
-  .viaggio-right{text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:8px; min-width:140px;}
-  .viaggio-right .totale{font-family:'Poppins',sans-serif; font-size:var(--testo-3xl); color:var(--pink);}
-  .badge{padding:4px 12px; border-radius:999px; font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:.5px;}
-  .badge.confermata, .badge.pagato{background:rgba(72,214,140,.15); color:#5be0a0;}
-  .badge.cancellata, .badge.scaduto{background:rgba(255,138,138,.15); color:var(--ow-danger);}
-  .badge.acconto_versato{background:rgba(255,179,71,.15); color:var(--amber);}
-  .pnr-tag{font-family:'Space Mono',monospace; font-size:var(--testo-sm); color:var(--mist);}
+.account-cliente .empty-box{
+  background:var(--dusk); border:1px dashed var(--line); border-radius:var(--radius);
+  padding:40px; text-align:center; color:var(--mist);
+}
 
-  .viaggio-azioni{display:flex; flex-direction:column; gap:8px; margin-top:8px;}
-  .btn-mini{
-    font-family:'Poppins',sans-serif; font-weight:600; font-size:var(--testo-sm);
-    padding:8px 14px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--paper); cursor:pointer;
-  }
-  .btn-mini:hover{border-color:var(--mist);}
-  .btn-mini.evidenzia{border-color:var(--pink); color:var(--pink);}
+/* ---------- PROFILO ---------- */
+.account-cliente .form-grid-account{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.account-cliente .form-grid-account label{ display:flex; flex-direction:column; gap:5px; font-size:var(--t-caption); font-weight:600; color:var(--mist); }
+.account-cliente .form-grid-account label.full{ grid-column:1/-1; }
+.account-cliente .form-grid-account input{
+  min-height:var(--control-h); padding:0 14px; font-family:var(--font-sans); font-size:var(--t-body); color:var(--paper);
+  background:var(--night); border:1px solid var(--line); border-radius:var(--radius-sm);
+}
+@media (max-width:640px){ .account-cliente .form-grid-account{ grid-template-columns:1fr; } }
 
-  .viaggio-riepilogo{
-    margin-top:14px; padding-top:14px; border-top:1px solid var(--line);
-    display:flex; flex-direction:column; gap:8px;
-  }
-  .riepilogo-riga{display:flex; flex-direction:column; gap:2px; font-size:var(--testo-md); color:var(--paper);}
-  .riepilogo-label{font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:.5px; color:var(--mist);}
-  .riepilogo-riga a{color:var(--pink); text-decoration:underline;}
+.account-cliente .notifica-riga{
+  display:flex; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:var(--testo-md);
+}
+.account-cliente .notifica-riga:last-child{ border-bottom:none; }
+.account-cliente .notifica-riga .quando{ color:var(--mist); font-size:var(--testo-sm); white-space:nowrap; }
 
-  .empty-box{
-    background:var(--dusk); border:1px dashed var(--line); border-radius:var(--radius);
-    padding:40px; text-align:center; color:var(--mist);
-  }
+/* ---------- CHAT CLIENTE ---------- */
+.account-cliente .acc-chat-box{
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
+  display:flex; flex-direction:column; height:60vh; min-height:420px; overflow:hidden;
+}
+.account-cliente #accChatEventoScelta{ padding:14px; border-bottom:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap; }
+.account-cliente #accChatEventoScelta select{
+  flex:1; min-width:200px; min-height:var(--control-h); background:var(--night); border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 14px; color:var(--paper);
+}
+.account-cliente #accChatMessages{ flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+.account-cliente .chat-cliente-messages{ display:flex; flex-direction:column; gap:10px; max-height:320px; overflow-y:auto; margin-bottom:14px; }
+/* Bolle: la bolla del cliente era gialla con testo bianco (1,5:1) */
+.account-cliente .chat-bubble-mini{ max-width:78%; padding:9px 13px; border-radius:var(--radius); font-size:var(--testo-md); line-height:1.5; }
+.account-cliente .chat-bubble-mini.cliente{ background:var(--ow-ink); color:var(--ow-paper); align-self:flex-end; border-bottom-right-radius:2px; }
+.account-cliente .chat-bubble-mini.admin{ background:var(--ow-surface); color:var(--ow-paper); align-self:flex-start; border-bottom-left-radius:2px; }
+.account-cliente .chat-bubble-mini .meta{ font-size:var(--testo-2xs); opacity:.7; margin-top:4px; }
+.account-cliente .acc-chat-input-row{ display:flex; gap:8px; padding:12px; border-top:1px solid var(--line); }
+.account-cliente .acc-chat-input-row input{
+  flex:1; min-width:0; min-height:var(--tap); background:var(--night); border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 14px; color:var(--paper); font-size:var(--t-body);
+}
+.account-cliente .acc-chat-input-row button{ flex-shrink:0; }
 
-  /* ---------- PROFILO ---------- */
-  .panel-box{
-    background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); padding:22px; margin-bottom:24px;
-  }
-  .panel-box h2{font-family:'Poppins',sans-serif; font-size:var(--testo-xl); margin:0 0 16px;}
-  .form-grid-account{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-  .form-grid-account label{display:flex; flex-direction:column; gap:5px; font-size:var(--testo-xs); color:var(--mist); text-transform:uppercase; letter-spacing:.5px;}
-  .form-grid-account label.full{grid-column:1/-1;}
-  .form-grid-account input{
-    font-family:'Poppins',sans-serif; font-size:var(--testo-base); color:var(--paper);
-    background:var(--night); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
-  }
-  @media (max-width:600px){ .form-grid-account{grid-template-columns:1fr;} }
+/* ---------- EVENTI DA ACQUISTARE ---------- */
+.account-cliente .acc-eventi-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:18px; }
+.account-cliente .acc-evento-card{ background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
+.account-cliente .acc-evento-cover{ height:120px; background:linear-gradient(135deg, var(--ow-surface-2), #2C3444); background-size:cover; background-position:center; }
+.account-cliente .acc-evento-body{ padding:16px; }
+.account-cliente .acc-evento-body .tag{
+  font-family:var(--font-mono); font-size:var(--testo-2xs); text-transform:uppercase; color:var(--amber); letter-spacing:1px;
+}
+.account-cliente .acc-evento-body h3{ margin:6px 0 4px; font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:var(--testo-2xl); }
+.account-cliente .acc-evento-body p{ margin:0 0 12px; color:var(--mist); font-size:var(--testo-md); }
+.account-cliente .acc-evento-foot{ display:flex; align-items:center; justify-content:space-between; }
+.account-cliente .acc-evento-foot b{ font-family:var(--font-mono); font-size:var(--testo-lg); }
+.account-cliente .acc-evento-foot a.btn{ min-height:var(--control-h-sm); padding:0 var(--sp-4); font-size:var(--t-caption); }
 
-  .notifica-riga{
-    display:flex; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:var(--testo-md);
-  }
-  .notifica-riga:last-child{border-bottom:none;}
-  .notifica-riga .quando{color:var(--mist); font-size:var(--testo-sm); white-space:nowrap;}
+/* ---------- MODALE SALDO (superficie chiara, vedi base.css) ---------- */
+.saldo-modal{
+  background:var(--ow-paper); color:var(--ow-ink); border-radius:18px; padding:28px; width:100%; max-width:420px; position:relative;
+}
+.saldo-modal h3{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; margin:0 0 16px; }
+.saldo-modal .modal-close{ position:absolute; top:16px; right:16px; background:none; border:none; color:var(--ow-ink); font-size:var(--testo-2xl); cursor:pointer; min-width:var(--tap); min-height:var(--tap); }
+.saldo-modal .field-label{ font-size:var(--t-caption); font-weight:600; color:var(--ow-muted-ink); display:block; margin:14px 0 6px; }
+.saldo-modal input[type=text]{
+  width:100%; min-height:var(--control-h); padding:0 14px; font-family:var(--font-sans); font-size:var(--t-body); font-weight:600; color:var(--ow-ink);
+  background:#fff; border:1px solid var(--ow-line-ink); border-radius:var(--radius-sm);
+}
+.saldo-modal .payment-methods{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+.saldo-modal .payment-option{
+  display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--ow-line-ink);
+  border-radius:10px; padding:10px 12px; cursor:pointer; font-size:var(--testo-md);
+}
+.saldo-modal .payment-option.active{ border-color:var(--ow-ink); box-shadow:inset 0 0 0 1px var(--ow-ink); }
+.saldo-modal .errore{ color:var(--ow-danger-ink); font-size:var(--testo-sm); min-height:16px; margin-top:8px; }
 
-  /* ---------- CHAT CLIENTE ---------- */
-  .acc-chat-box{
-    background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
-    display:flex; flex-direction:column; height:60vh; min-height:420px; overflow:hidden;
-  }
-  #accChatEventoScelta{padding:14px; border-bottom:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap;}
-  #accChatEventoScelta select{
-    flex:1; min-width:200px; background:var(--night); border:1px solid var(--line); border-radius:8px; padding:9px 12px; color:var(--paper);
-  }
-  #accChatMessages{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px;}
-  .chat-bubble-mini{max-width:78%; padding:9px 13px; border-radius:12px; font-size:var(--testo-md); line-height:1.5;}
-  .chat-bubble-mini.cliente{background:var(--pink); color:#fff; align-self:flex-end; border-bottom-right-radius:2px;}
-  .chat-bubble-mini.admin{background:var(--night); color:var(--paper); align-self:flex-start; border-bottom-left-radius:2px;}
-  .chat-bubble-mini .meta{font-size:var(--testo-2xs); opacity:.7; margin-top:4px;}
-  .acc-chat-input-row{display:flex; gap:8px; padding:12px; border-top:1px solid var(--line);}
-  .acc-chat-input-row input{
-    flex:1; min-width:0; background:var(--night); border:1px solid var(--line); border-radius:8px; padding:10px 12px; color:var(--paper);
-  }
-  .acc-chat-input-row button{flex-shrink:0; padding:10px 18px !important;}
+/* ---------- RIFINITURE TELEFONI ---------- */
+@media (max-width:640px){
+  .account-cliente .account-content{ padding:16px; }
+  .account-cliente .viaggio-card{ flex-direction:column; }
+  .account-cliente .viaggio-right{ align-items:flex-start; text-align:left; width:100%; }
+  .account-cliente .viaggio-azioni{ width:100%; }
+  .account-cliente .btn-mini{ width:100%; }
+  .account-cliente .acc-sezione-sito{ height:calc(100vh - 58px); }
+  .account-cliente .mini-tabs-acc{ flex-wrap:wrap; }
+  .account-cliente .form-grid-account{ gap:10px; }
+}
 
-  /* ---------- EVENTI DA ACQUISTARE ---------- */
-  .acc-eventi-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:18px;}
-  .acc-evento-card{background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;}
-  .acc-evento-cover{height:120px; background:linear-gradient(135deg, var(--dusk-2), #3a2050); background-size:cover; background-position:center;}
-  .acc-evento-body{padding:16px;}
-  .acc-evento-body .tag{
-    font-family:'Space Mono',monospace; font-size:var(--testo-2xs); text-transform:uppercase; color:var(--amber); letter-spacing:1px;
-  }
-  .acc-evento-body h3{margin:6px 0 4px; font-family:'Poppins',sans-serif; font-weight:400; font-size:var(--testo-2xl);}
-  .acc-evento-body p{margin:0 0 12px; color:var(--mist); font-size:var(--testo-md);}
-  .acc-evento-foot{display:flex; align-items:center; justify-content:space-between;}
-  .acc-evento-foot b{font-family:'Space Mono',monospace; font-size:var(--testo-lg);}
-  .acc-evento-foot a.btn{padding:8px 16px; font-size:var(--testo-md);}
-
-  /* ---------- MODALE SALDO ---------- */
-  .modal-overlay{
-    position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; z-index:1000; padding:20px;
-  }
-  .modal-overlay.show{display:flex;}
-  .saldo-modal{
-    background:var(--paper); color:var(--ink); border-radius:18px; padding:28px; width:100%; max-width:420px; position:relative;
-  }
-  .saldo-modal h3{font-family:'Poppins',sans-serif; margin:0 0 16px;}
-  .saldo-modal .modal-close{position:absolute; top:16px; right:16px; background:none; border:none; color:var(--ink); font-size:var(--testo-2xl); cursor:pointer;}
-  .saldo-modal .field-label{font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:1px; color:var(--ow-muted-ink); font-weight:700; display:block; margin:14px 0 6px;}
-  .saldo-modal input[type=text]{
-    width:100%; font-family:'Poppins',sans-serif; font-size:var(--testo-base); font-weight:600; color:var(--ink);
-    background:#fff; border:1px solid var(--ow-line-ink); border-radius:8px; padding:10px 12px;
-  }
-  .saldo-modal .payment-methods{display:flex; flex-direction:column; gap:8px; margin-top:8px;}
-  .saldo-modal .payment-option{
-    display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--ow-line-ink);
-    border-radius:10px; padding:10px 12px; cursor:pointer; font-size:var(--testo-md);
-  }
-  .saldo-modal .payment-option.active{border-color:var(--pink);}
-  .saldo-modal .errore{color:var(--ow-danger-ink); font-size:var(--testo-sm); min-height:16px; margin-top:8px;}
-  /* ---------- RIFINITURE SMARTPHONE ---------- */
-  @media (max-width:600px){
-    header{padding:12px 14px;}
-    .logo{font-size:var(--testo-2xl);}
-    .my-inbus-btn{padding:8px 12px; font-size:var(--testo-sm);}
-    .my-inbus-dropdown{right:-14px; min-width:200px;}
-    .account-content{padding:16px;}
-    .viaggio-card{flex-direction:column;}
-    .viaggio-right{align-items:flex-start; text-align:left; width:100%;}
-    .viaggio-azioni{width:100%;}
-    .btn-mini{width:100%; text-align:center;}
-    .acc-sezione-sito{height:calc(100vh - 58px);}
-    .mini-tabs-acc{flex-wrap:wrap;}
-    .form-grid-account{gap:10px;}
-  }
-
-/* ---------- ACCESSO / REGISTRAZIONE / VERIFICA EMAIL ---------- */
+/* ---------- ACCESSO / REGISTRAZIONE / PASSWORD / VERIFICA EMAIL ---------- */
 .pagina-auth{
   min-height:100vh; display:flex; align-items:center; justify-content:center;
   background:var(--night); padding:20px;
 }
-.box-auth{
+.pagina-auth .box-auth{
   background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
   padding:32px; width:100%; max-width:400px;
 }
-.box-auth h1{font-family:'Poppins',sans-serif; font-size:var(--testo-4xl); margin:0 0 8px;}
-.sottotitolo-auth{color:var(--mist); font-size:var(--testo-base); margin:0 0 20px; line-height:1.5;}
-.box-auth label{display:block; font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:.5px; color:var(--mist); margin:14px 0 6px;}
-.box-auth input{
-  width:100%; padding:11px 12px; border-radius:8px; border:1px solid var(--line);
-  background:var(--night); color:var(--paper); font-size:var(--testo-lg); font-family:'Poppins',sans-serif;
+.pagina-auth .box-auth h1{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:var(--testo-4xl); margin:0 0 8px; }
+.pagina-auth .sottotitolo-auth{ color:var(--mist); font-size:var(--testo-base); margin:0 0 20px; line-height:1.5; }
+.pagina-auth .box-auth label{ display:block; font-size:var(--t-caption); font-weight:600; color:var(--mist); margin:14px 0 6px; }
+.pagina-auth .box-auth input{
+  width:100%; min-height:var(--control-h); padding:0 14px; border-radius:var(--radius-sm); border:1px solid var(--line);
+  background:var(--night); color:var(--paper); font-size:var(--t-body); font-family:var(--font-sans);
 }
-.due-colonne-auth{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-.errore-auth{background:rgba(255,138,138,.1); border:1px solid rgba(255,138,138,.3); border-radius:8px; padding:10px 14px; margin-top:16px;}
-.errore-auth p{color:var(--ow-danger); font-size:var(--testo-md); margin:0;}
-.link-auth{background:none; border:none; color:var(--blue); font-size:var(--testo-md); text-decoration:underline; cursor:pointer; padding:6px 0 0; display:block;}
-.box-auth .search-cta{width:100%; margin-top:22px; border:none; cursor:pointer;}
+/* Usata anche nel profilo dell'account */
+:is(.pagina-auth, .account-cliente) .due-colonne-auth{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.pagina-auth .errore-auth{ background:rgba(255,138,138,.1); border:1px solid rgba(255,138,138,.3); border-radius:var(--radius-sm); padding:10px 14px; margin-top:16px; }
+.pagina-auth .errore-auth p{ color:var(--ow-danger); font-weight:600; font-size:var(--testo-md); margin:0; }
+.pagina-auth .link-auth{ background:none; border:none; color:var(--paper); font-size:var(--testo-md); text-decoration:underline; cursor:pointer; padding:6px 0 0; display:block; }
+.pagina-auth .box-auth .search-cta{ margin-top:22px; }
 
 /* ---------- DASHBOARD (centro di controllo) ---------- */
-.acc-dashboard-grid{
+.account-cliente .acc-dashboard-grid{
   display:grid; grid-template-columns:repeat(auto-fill, minmax(140px,1fr)); gap:12px; margin-top:22px;
 }
-.acc-dashboard-tile{
+.account-cliente .acc-dashboard-tile{
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
   background:var(--dusk); border:1px solid var(--line); border-radius:14px; padding:20px 10px;
   color:var(--paper); font-size:var(--testo-md); text-align:center; cursor:pointer; text-decoration:none;
   transition:border-color .15s ease, transform .15s ease;
 }
-.acc-dashboard-tile:hover{border-color:var(--pink); transform:translateY(-2px);}
-.acc-dashboard-tile-icona{font-size:var(--testo-5xl);}
-.badge.attenzione{background:rgba(224,169,91,.15); color:#e0a95b;}
+.account-cliente .acc-dashboard-tile:hover{ border-color:var(--ow-accent-line); transform:translateY(-2px); }
+.account-cliente .acc-dashboard-tile-icona{ font-size:var(--testo-5xl); }
 @media (max-width:640px){
-  .acc-dashboard-grid{grid-template-columns:repeat(3, 1fr); gap:8px;}
-  .acc-dashboard-tile{padding:14px 6px; font-size:var(--testo-sm);}
-  .acc-dashboard-tile-icona{font-size:var(--testo-4xl);}
+  .account-cliente .acc-dashboard-grid{ grid-template-columns:repeat(3, 1fr); gap:8px; }
+  .account-cliente .acc-dashboard-tile{ padding:14px 6px; font-size:var(--testo-sm); }
+  .account-cliente .acc-dashboard-tile-icona{ font-size:var(--testo-4xl); }
 }
 
-/* ---------- TRAVEL CARD (dettaglio prenotazione) ---------- */
+/* ---------- TRAVEL CARD (dettaglio prenotazione) ----------
+   Aperta fuori dal guscio (sorella di AccountShell in AccountPage):
+   classi proprie, non hanno bisogno del prefisso. Superficie scura. */
 .travel-overlay{
-  position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000;
+  position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:var(--z-modale);
   display:flex; align-items:flex-end; justify-content:center;
 }
 .travel-card{
@@ -274,35 +210,35 @@
   width:100%; max-width:520px; max-height:92vh; overflow-y:auto; padding:26px 22px 30px;
   animation:travelCardUp .25s ease;
 }
-@keyframes travelCardUp{ from{transform:translateY(30px); opacity:0;} to{transform:translateY(0); opacity:1;} }
-@media (min-width:640px){
-  .travel-overlay{align-items:center;}
-  .travel-card{border-radius:20px; margin:20px;}
+@keyframes travelCardUp{ from{ transform:translateY(30px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+@media (min-width:641px){
+  .travel-overlay{ align-items:center; }
+  .travel-card{ border-radius:20px; margin:20px; }
 }
+.travel-card h1{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:var(--testo-4xl); }
 .travel-close{
   background:none; border:none; color:var(--mist); font-size:var(--testo-4xl); cursor:pointer;
-  float:right; line-height:1; padding:4px;
+  float:right; line-height:1; padding:4px; min-width:var(--tap); min-height:var(--tap);
 }
 .travel-route{
   display:flex; align-items:center; gap:10px; font-size:var(--testo-base); margin:14px 0; color:var(--paper);
 }
-.travel-route b{font-size:var(--testo-lg);}
-.travel-arrow{color:var(--mist);}
-.travel-timeline{display:flex; flex-direction:column; gap:9px; margin:16px 0; font-size:var(--testo-base);}
-.travel-timeline-riga{display:flex; align-items:center; gap:8px;}
-.travel-partecipanti{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+.travel-route b{ font-size:var(--testo-lg); }
+.travel-arrow{ color:var(--mist); }
+.travel-timeline{ display:flex; flex-direction:column; gap:9px; margin:16px 0; font-size:var(--testo-base); }
+.travel-timeline-riga{ display:flex; align-items:center; gap:8px; }
+.travel-partecipanti{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .travel-partecipante-chip{
-  background:var(--dusk); border:1px solid var(--line); border-radius:999px; padding:4px 12px; font-size:var(--testo-md);
+  background:var(--ow-surface); border:1px solid var(--ow-line); border-radius:var(--radius-pill); padding:4px 12px; font-size:var(--testo-md);
 }
-.travel-azioni{display:flex; flex-direction:column; gap:10px; margin-top:20px;}
-
+.travel-azioni{ display:flex; flex-direction:column; gap:10px; margin-top:20px; }
 .travel-biglietto-riga{
   display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
   background:var(--dusk); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-size:var(--testo-md);
 }
 
 /* ---------- CREDITO (statistiche in riga) ---------- */
-.stats-row{display:flex; gap:14px; flex-wrap:wrap;}
-.stat-box{background:var(--dusk); border:1px solid var(--line); border-radius:12px; padding:16px 20px; flex:1; min-width:150px;}
-.stat-box b{display:block; font-family:'Poppins',sans-serif; font-size:var(--testo-3xl);}
-.stat-box span{font-size:var(--testo-xs); color:var(--mist); text-transform:uppercase; letter-spacing:.5px;}
+.account-cliente .stats-row{ display:flex; gap:14px; flex-wrap:wrap; }
+.account-cliente .stat-box{ background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); padding:16px 20px; flex:1; min-width:150px; box-shadow:none; }
+.account-cliente .stat-box b{ display:block; font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--testo-3xl); }
+.account-cliente .stat-box span{ font-size:var(--testo-xs); color:var(--mist); text-transform:uppercase; letter-spacing:.5px; }

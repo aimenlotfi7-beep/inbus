@@ -1,0 +1,164 @@
+/* ============================================================
+   OnWay — sito pubblico · CHECKOUT
+   Modulo a step (fermata+passeggeri → dati → pagamento), modale,
+   riepilogo, servizi, mini-tab. Superficie CHIARA: .checkout-modal
+   e .checkout-form impostano il contesto chiaro (base.css), quindi
+   qui il giallo non fa mai da testo: interattivo = ink sottolineato.
+   ============================================================ */
+
+/* ---------- MODALE (Prenota + pagamento) ---------- */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.65); display:none;
+  align-items:center; justify-content:center; z-index:var(--z-modale); padding:20px;
+}
+.modal-overlay.show{ display:flex; }
+.checkout-modal{
+  background:var(--paper); color:var(--ink); border-radius:18px;
+  padding:28px; width:100%; max-width:440px; max-height:90vh; overflow-y:auto;
+  position:relative; box-shadow:0 30px 60px -20px rgba(0,0,0,.6);
+}
+.checkout-modal h3, .checkout-form h3{ font-family:var(--font-sans); font-weight:800; text-transform:uppercase; margin:0 0 16px; letter-spacing:.5px; }
+.modal-close{
+  position:absolute; top:16px; right:16px; background:none; border:none; color:var(--ink);
+  font-size:var(--testo-2xl); cursor:pointer; opacity:.6; z-index:5;
+}
+.modal-close:hover{ opacity:1; }
+.checkout-summary{
+  background:#fff; border:1px solid var(--ow-line-ink); border-radius:10px;
+  padding:12px 14px; margin-bottom:14px; font-size:var(--testo-md); color:var(--ow-muted-ink); line-height:1.6;
+}
+.checkout-summary b{ color:var(--ink); }
+
+/* ---------- MODALE A DUE COLONNE ---------- */
+.checkout-modal-wide{ max-width:960px; padding:0; overflow:hidden; }
+.checkout-columns{ display:grid; grid-template-columns:.85fr 1.15fr; max-height:90vh; }
+.checkout-col-info{
+  background:var(--night); color:var(--paper); padding:32px; overflow-y:auto;
+  border-radius:18px 0 0 18px;
+}
+.checkout-col-info .tag{
+  font-family:var(--font-mono); font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:1px;
+  background:var(--ow-accent-soft); color:var(--ow-ink); padding:5px 10px; border-radius:var(--radius-pill);
+}
+.checkout-cover{
+  width:100%; height:190px; border-radius:var(--radius); background:linear-gradient(135deg, var(--ow-surface-2), #2C3444);
+  background-size:cover; background-position:center; margin-bottom:18px;
+}
+.checkout-col-info h2{ font-family:var(--font-sans); font-weight:800; text-transform:uppercase; margin:14px 0 8px; font-size:var(--testo-4xl); }
+.checkout-col-info .meta-info{ color:var(--mist); font-size:var(--testo-lg); margin:0 0 4px; }
+#checkoutDocumenti{ margin-top:20px; padding-top:16px; border-top:1px solid var(--line); }
+#checkoutDocumenti a{ display:block; color:var(--ow-ink); text-decoration:underline; font-weight:700; font-size:var(--testo-md); margin-bottom:8px; }
+.checkout-col-form{ background:var(--paper); color:var(--ink); padding:32px; overflow-y:auto; max-height:90vh; }
+
+@media (max-width:640px){
+  .modal-overlay{ padding:12px; align-items:flex-start; padding-top:24px; }
+  .checkout-columns{ grid-template-columns:1fr; max-height:none; }
+  .checkout-col-info{ border-radius:18px 18px 0 0; max-height:none; }
+  .checkout-col-form{ max-height:none; }
+  .checkout-modal{ padding:20px; max-height:none; }
+}
+
+/* ---------- CAMPI DEL MODULO ----------
+   Etichette: caption (13px), peso 600, non maiuscole. Campi: stesse
+   misure di .campo-input (48px, 16px per non far zoomare iOS). */
+.checkout-modal .field-label, .checkout-form .field-label{
+  font-size:var(--t-caption); font-weight:600; text-transform:none; letter-spacing:0; color:var(--ow-muted-ink);
+  display:block; margin:14px 0 6px;
+}
+/* Le caselle di spunta (usa credito, evento del bundle) restano
+   native: escluse dalle misure dei campi di testo. */
+.checkout-modal select, .checkout-modal input:not([type="checkbox"]):not([type="radio"]),
+.checkout-form select, .checkout-form input:not([type="checkbox"]):not([type="radio"]){
+  width:100%; min-width:0; min-height:var(--control-h); padding:0 14px;
+  font-family:var(--font-sans); font-size:var(--t-body); font-weight:600; color:var(--ink);
+  background:#fff; border:1px solid var(--ow-line-ink); border-radius:var(--radius-sm); box-sizing:border-box;
+}
+.checkout-modal .hint, .checkout-form .hint{ color:var(--ow-muted-ink); font-size:var(--testo-xs); margin:6px 0 0; }
+.checkout-modal .hint a, .checkout-form .hint a{ color:var(--ow-ink); text-decoration:underline; font-weight:700; }
+.checkout-modal .qty-row, .checkout-form .qty-row{ display:flex; align-items:center; justify-content:space-between; margin-top:14px; }
+.qty-control{ display:flex; align-items:center; gap:10px; }
+.qty-control button{
+  width:var(--tap); height:var(--tap); border-radius:50%; border:1px solid var(--ow-line-ink); background:#fff;
+  font-size:var(--testo-2xl); cursor:pointer; line-height:1; color:var(--ink);
+}
+.payment-methods{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+.payment-option{
+  display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--ow-line-ink);
+  border-radius:10px; padding:10px 12px; cursor:pointer; font-size:var(--testo-md); transition:border-color .15s ease;
+}
+.payment-option.active{ border-color:var(--ow-ink); box-shadow:inset 0 0 0 1px var(--ow-ink); }
+.payment-option input{ accent-color:var(--ow-ink); }
+.card-fields.hidden{ display:none; }
+.checkout-modal .errore, .checkout-form .errore{ color:var(--ow-danger-ink); font-weight:600; font-size:var(--testo-md); min-height:16px; margin-top:8px; }
+.codice-con-azione{ display:flex; gap:8px; }
+.codice-con-azione input{ flex:1; }
+/* Pulsante secondario dentro il modulo: cartoncino bianco, compatto */
+.checkout-modal .btn-ghost, .checkout-form .btn-ghost{
+  background:#fff; border:1px solid var(--ow-line-ink); color:var(--ink); font-size:var(--testo-md);
+  padding:0 var(--sp-4); border-radius:var(--radius-sm); cursor:pointer; white-space:nowrap;
+}
+
+/* ---------- STEPPER ----------
+   Etichette a 12px su desktop; su schermi stretti si vede SOLO
+   l'etichetta dello step attivo (13px, senza pallino), gli altri
+   step mostrano solo il pallino. */
+.checkout-stepper{
+  display:flex; align-items:center; gap:6px; margin:2px 0 24px;
+  overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:2px;
+}
+.checkout-stepper::-webkit-scrollbar{ display:none; }
+.checkout-step-dot{
+  display:flex; align-items:center; gap:6px; font-size:var(--t-label); color:var(--ow-muted-ink); font-weight:600; flex-shrink:0; white-space:nowrap;
+}
+/* Il pallino tondo col numero: selettore sulla SUA classe, non su
+   "span" (l'altro span nello step è l'etichetta di testo). */
+.checkout-step-numero{
+  width:24px; height:24px; border-radius:50%; border:1.5px solid var(--ow-line-ink); display:flex; align-items:center;
+  justify-content:center; font-size:var(--t-label); color:var(--ow-muted-ink); flex-shrink:0;
+}
+.checkout-step-dot.active{ color:var(--ink); }
+.checkout-step-dot.active .checkout-step-numero{ border-color:var(--ow-ink); color:var(--ow-ink); background:var(--ow-accent); }
+.checkout-step-dot.completato{ color:var(--ink); }
+/* Completato: ink con spunta chiara (mai bianco su giallo, 1,5:1) */
+.checkout-step-dot.completato .checkout-step-numero{ background:var(--ow-ink); border-color:var(--ow-ink); color:var(--ow-paper); }
+.checkout-step-dot:not(:last-child)::after{ content:''; width:14px; height:1px; background:var(--ow-line-ink); margin-left:2px; }
+
+@media (max-width:640px){
+  .checkout-step-dot .checkout-step-etichetta{ display:none; }
+  .checkout-step-dot.active .checkout-step-numero{ display:none; }
+  .checkout-step-dot.active .checkout-step-etichetta{ display:inline; font-size:var(--t-caption); }
+  .checkout-stepper{ gap:8px; }
+}
+
+/* ---------- RIEPILOGO PERSISTENTE E NAVIGAZIONE TRA GLI STEP ---------- */
+.checkout-riepilogo-persistente{
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+  background:var(--ow-paper-2); border:1px solid var(--ow-line-ink); border-radius:10px; padding:10px 14px; margin-bottom:20px;
+}
+/* Con tanti passeggeri è solo quest'area a scorrere: riepilogo sopra
+   e pulsanti sotto restano sempre fermi e visibili. */
+.checkout-passeggeri-scorrevole{ max-height:280px; overflow-y:auto; padding-right:6px; margin-right:-6px; }
+.checkout-riepilogo-persistente b{ font-size:var(--testo-lg); }
+.checkout-riepilogo-riga{ font-size:var(--testo-xs); color:var(--ow-muted-ink); display:block; margin-top:2px; }
+.checkout-riepilogo-totale{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--testo-2xl); white-space:nowrap; }
+.checkout-step-nav{
+  display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-top:auto; padding-top:18px;
+}
+.checkout-step-nav .btn, .checkout-step-nav button{ white-space:nowrap; }
+
+/* ---------- SCELTA VIAGGIO (quando l'evento ne ha più di uno) ---------- */
+.checkout-servizio-card{
+  display:flex; flex-direction:column; gap:4px; text-align:left;
+  background:#fff; border:1px solid var(--ow-line-ink); border-radius:var(--radius); padding:16px 18px; cursor:pointer;
+  transition:border-color .15s ease;
+}
+.checkout-servizio-card:hover{ border-color:var(--ow-ink); }
+.checkout-servizio-card b{ font-size:var(--testo-lg); }
+.checkout-servizio-card span{ font-size:var(--testo-md); opacity:.7; }
+
+/* ---------- METODO DI PAGAMENTO (mini-tab) ---------- */
+.mini-tab{
+  background:#fff; border:1px solid var(--ow-line-ink); border-radius:var(--radius-pill); padding:9px 16px;
+  font-size:var(--testo-md); color:var(--ink); cursor:pointer; opacity:.75;
+}
+.mini-tab.active{ background:var(--ow-ink); border-color:var(--ow-ink); color:var(--ow-paper); opacity:1; font-weight:600; }

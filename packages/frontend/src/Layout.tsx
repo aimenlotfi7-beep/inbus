@@ -133,7 +133,7 @@ export function Layout({ children }: { children: ReactNode }) {
             {numeroArticoli > 0 && <span className="carrello-badge">{numeroArticoli}</span>}
           </Link>
           <Link className="btn btn-ghost desktop-only" to={loggato ? '/account' : '/accedi'}>{etichettaAccount}</Link>
-          <button className="burger" onClick={() => setMenuMobileAperto(!menuMobileAperto)}>☰</button>
+          <button type="button" className="burger" aria-label="Apri il menu" aria-expanded={menuMobileAperto} onClick={() => setMenuMobileAperto(!menuMobileAperto)}>☰</button>
         </div>
       </header>
 

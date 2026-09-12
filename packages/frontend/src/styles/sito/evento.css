@@ -1,0 +1,142 @@
+/* ============================================================
+   OnWay — sito pubblico · PAGINA EVENTO / OFFERTA / TOUR / BUNDLE
+   Colonna sinistra: immagine + informazioni. Colonna destra: la
+   card chiara del checkout (superficie chiara: vedi base.css).
+   Qui anche il percorso del bus, l'accordion e la barra fissa
+   "Acquista ora" su mobile.
+   ============================================================ */
+
+.evento-pagina-corpo{ display:grid; grid-template-columns:.85fr 1.15fr; gap:44px; align-items:start; }
+.evento-pagina-hero{
+  width:100%; aspect-ratio:1080/1350; background-size:cover; background-position:center;
+  border-radius:var(--radius-lg); position:relative; overflow:hidden; margin-bottom:20px;
+}
+.evento-pagina-hero.senza-foto{ background:linear-gradient(135deg, #1B2130, var(--night)); }
+.evento-pagina-hero .tag{ position:absolute; top:14px; left:14px; }
+.evento-pagina-info h1{ font-family:var(--font-sans); font-weight:800; text-transform:uppercase; font-size:var(--testo-5xl); margin:0 0 10px; }
+.evento-pagina-info .meta-riga{ color:var(--mist); font-size:var(--testo-lg); margin:0 0 4px; }
+.evento-pagina-info .sezione-info{
+  background:var(--dusk-2); border:1px solid rgba(255,255,255,.08); border-radius:14px;
+  padding:20px; margin-top:22px; white-space:pre-line; font-size:var(--testo-lg); line-height:1.6; color:var(--mist);
+  scroll-margin-top:calc(var(--header-h) + 8px); /* l'header appiccicoso non copre l'inizio quando si salta con l'ancoraggio */
+}
+.evento-pagina-info .sezione-info h4{
+  font-family:var(--font-sans); font-size:var(--testo-md); text-transform:uppercase; letter-spacing:.5px;
+  color:var(--paper); margin:0 0 10px;
+}
+.evento-pagina-info .galleria{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:8px; margin-top:20px;
+}
+.evento-pagina-info .galleria img{ width:100%; height:70px; object-fit:cover; border-radius:var(--radius-sm); }
+
+/* Card del checkout: chiara, appiccicosa sotto l'header */
+.evento-pagina-checkout{
+  background:var(--paper); color:var(--ink); border-radius:18px; padding:30px;
+  position:sticky; top:calc(var(--header-h) + 24px); min-height:440px; display:flex; flex-direction:column;
+}
+.checkout-form{ display:flex; flex-direction:column; flex:1; width:100%; box-sizing:border-box; }
+
+/* Riepilogo compatto (prezzo + Prenota) al posto del modulo intero:
+   solo su cellulare, e solo finché non lo si apre. */
+.checkout-riepilogo-chiuso{
+  display:none; width:100%; align-items:center; justify-content:space-between;
+  background:none; border:none; padding:0; font-size:var(--testo-lg); cursor:pointer;
+}
+.checkout-riepilogo-chiuso b{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--testo-3xl); }
+.checkout-riepilogo-cta{
+  background:var(--ow-accent); color:var(--ow-ink); font-weight:700; padding:11px 22px; border-radius:var(--radius-pill); font-size:var(--testo-lg);
+}
+.checkout-form-wrap{ display:block; }
+
+/* Barra fissa in fondo allo schermo: nascosta di base, appare solo
+   nel media query mobile e solo mentre il modulo è chiuso (React). */
+.barra-prenota-fissa-mobile{ display:none; }
+
+/* Pulsanti "salta a": solo su cellulare */
+.salti-rapidi-mobile{ display:none; }
+
+@media (max-width:900px){
+  .evento-pagina-corpo{ grid-template-columns:1fr; gap:24px; padding-bottom:70px; }
+  /* Chiuso: il contenitore intero sparisce, la barra fissa in fondo
+     fa da sola "prezzo + Prenota". Si apre toccando quella barra. */
+  .evento-pagina-checkout{ display:none; }
+  .evento-pagina-checkout.aperta-mobile{ display:block; position:static; padding:30px; min-height:440px; }
+  .evento-pagina-hero{ aspect-ratio:1080/1350; max-width:320px; }
+  .salti-rapidi-mobile{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  .salti-rapidi-mobile .btn{ min-height:var(--control-h-sm); padding:0 var(--sp-4); font-size:var(--t-caption); text-decoration:none; }
+
+  /* Su mobile il riepilogo-chiuso inline NON si vede: c'è già la
+     barra fissa che fa lo stesso lavoro, sempre sotto il pollice. */
+  .checkout-riepilogo-chiuso{ display:none; }
+  .checkout-form-wrap{ display:none; }
+  .evento-pagina-checkout.aperta-mobile .checkout-riepilogo-chiuso{ display:none; }
+  .evento-pagina-checkout.aperta-mobile .checkout-form-wrap{ display:block; }
+
+  .barra-prenota-fissa-mobile{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    position:fixed; left:0; right:0; bottom:0; z-index:var(--z-barra);
+    background:var(--paper); color:var(--ink); padding:14px 18px;
+    padding-bottom:calc(14px + env(safe-area-inset-bottom)); /* iPhone con barra home */
+    box-shadow:0 -4px 18px rgba(0,0,0,.25);
+  }
+  .barra-prenota-fissa-mobile b{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--testo-2xl); }
+  .barra-prenota-fissa-mobile button{
+    background:var(--ow-accent); color:var(--ow-ink); font-weight:800; padding:12px 26px; border-radius:var(--radius-pill);
+    border:none; font-size:var(--testo-lg); cursor:pointer; white-space:nowrap; min-height:var(--tap);
+  }
+}
+/* Finché il banner cookie è aperto (body.con-cookie-banner, messo da
+   CookieBanner.tsx) la barra "Acquista ora" resta nascosta: altrimenti
+   finiva sotto il banner. Più specifica della regola nel media query. */
+body.con-cookie-banner .barra-prenota-fissa-mobile{ display:none; }
+
+/* ---------- PERCORSO BUS (popup "il percorso del tuo bus") ----------
+   Classi proprie, non riusa .travel-* di account.css. Superficie
+   scura dentro il checkout chiaro: base.css la riporta al contesto
+   scuro (.percorso-popup-card). */
+.percorso-popup-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:var(--z-modale);
+  display:flex; align-items:center; justify-content:center; padding:20px;
+}
+.percorso-popup-card{
+  background:var(--night); border:1px solid var(--line); border-radius:var(--radius-lg);
+  width:100%; max-width:480px; max-height:85vh; overflow-y:auto; padding:26px 22px; color:var(--paper);
+}
+.percorso-popup-close{
+  background:none; border:none; color:var(--mist); font-size:var(--testo-3xl); cursor:pointer; float:right; line-height:1; padding:4px;
+}
+.percorso-bus-blocco{ margin-top:24px; }
+.percorso-bus-blocco h4{
+  font-family:var(--font-sans); font-size:var(--testo-md); text-transform:uppercase; letter-spacing:.5px;
+  color:var(--paper); margin:0 0 12px;
+}
+.percorso-tappe{ position:relative; padding-left:22px; }
+.percorso-tappa{ position:relative; padding-bottom:18px; }
+.percorso-tappa:last-child{ padding-bottom:0; }
+/* La fermata scelta dal cliente, in risalto SOLO sul contenuto: la
+   riga contiene anche il puntino posizionato in assoluto, spostarla
+   disallineerebbe la linea dei puntini. */
+.percorso-tappa.evidenziata .percorso-tappa-corpo{
+  background:var(--ow-accent-soft); border:1px solid var(--ow-accent); border-radius:var(--radius-sm); padding:8px 12px;
+}
+.percorso-tappa-puntino{
+  position:absolute; left:-22px; top:4px; width:10px; height:10px; border-radius:50%;
+  background:var(--ow-accent); border:2px solid var(--ow-night);
+}
+.percorso-tappa-puntino.arrivo{ background:var(--blue, #5b8dff); }
+.percorso-tappa:not(:last-child)::before{
+  content:''; position:absolute; left:-18px; top:14px; bottom:-4px; width:1px; background:rgba(255,255,255,.15);
+}
+.percorso-tappa-corpo{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:var(--testo-lg); color:var(--paper); }
+.percorso-tappa-corpo b{ font-size:var(--testo-lg); color:var(--paper); }
+.percorso-orario{ color:var(--mist); font-size:var(--testo-md); }
+.percorso-posti{ font-size:var(--testo-xs); padding:2px 9px; border-radius:var(--radius-pill); font-weight:600; }
+/* Stati: colore + etichetta testuale, mai solo colore */
+.percorso-posti.disponibile{ background:rgba(87,211,154,.16); color:var(--ow-ok); }
+.percorso-posti.pochi{ background:rgba(255,180,61,.16); color:var(--ow-warn); }
+.percorso-posti.esaurito{ background:rgba(255,138,138,.16); color:var(--ow-danger); }
+
+/* ---------- ACCORDION EVENTO (Descrizione/Informazioni/Partenze) ---------- */
+.accordion-evento{ margin-top:22px; }
+.accordion-evento-pulsanti{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.accordion-evento-pulsanti .btn.active{ background:var(--ow-accent); border-color:var(--ow-accent); color:var(--ow-ink); }
