@@ -92,6 +92,10 @@ export function EventoDettaglio({ evento, offerta }: { evento: Evento; offerta?:
   const [foglioAperto, setFoglioAperto] = useState(false);
   const [fermataPreselezionata, setFermataPreselezionata] = useState<string | undefined>(undefined);
   const chiudiFoglioRef = useRef<HTMLButtonElement>(null);
+  const foglioRef = useRef<HTMLDivElement>(null);
+  const barraPrenotaRef = useRef<HTMLButtonElement>(null);
+  /** Chi ha aperto il foglio (una riga "Scegli"): ci torna il focus alla chiusura. */
+  const apertoDaRef = useRef<HTMLElement | null>(null);
 
   // Disponibilità per fermata (dal server, con i limiti per fermata):
   // caricata una volta, solo se l'evento non ha più servizi — in quel
@@ -110,17 +114,37 @@ export function EventoDettaglio({ evento, offerta }: { evento: Evento; offerta?:
   }, [evento.id]);
 
   // Foglio mobile: blocca lo scorrimento della pagina, Esc chiude, il
-  // focus va sul pulsante "Chiudi". Se la finestra si allarga, si chiude.
+  // focus va sul pulsante "Chiudi" e Tab resta dentro il foglio. Alla
+  // chiusura il focus torna a chi l'ha aperto (riga "Scegli") o al
+  // pulsante della barra, che si rimonta proprio alla chiusura. Se la
+  // finestra si allarga, si chiude.
   useEffect(() => {
     if (!foglioAperto) return;
+    const attivo = document.activeElement;
+    apertoDaRef.current = attivo instanceof HTMLElement && attivo !== document.body ? attivo : null;
     const precedente = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const allaPressione = (e: KeyboardEvent) => { if (e.key === 'Escape') setFoglioAperto(false); };
+    const allaPressione = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setFoglioAperto(false); return; }
+      const foglio = foglioRef.current;
+      if (e.key !== 'Tab' || !foglio) return;
+      const focusabili = [...foglio.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+        .filter((el) => el.getClientRects().length > 0);
+      if (focusabili.length === 0) return;
+      const primo = focusabili[0];
+      const ultimo = focusabili[focusabili.length - 1];
+      const dentro = foglio.contains(document.activeElement);
+      if (e.shiftKey && (!dentro || document.activeElement === primo)) { e.preventDefault(); ultimo.focus(); }
+      else if (!e.shiftKey && (!dentro || document.activeElement === ultimo)) { e.preventDefault(); primo.focus(); }
+    };
     window.addEventListener('keydown', allaPressione);
     chiudiFoglioRef.current?.focus();
     return () => {
       document.body.style.overflow = precedente;
       window.removeEventListener('keydown', allaPressione);
+      const daChi = apertoDaRef.current;
+      if (daChi?.isConnected) daChi.focus();
+      else barraPrenotaRef.current?.focus();
     };
   }, [foglioAperto]);
   useEffect(() => { if (!mobile) setFoglioAperto(false); }, [mobile]);
@@ -375,11 +399,11 @@ export function EventoDettaglio({ evento, offerta }: { evento: Evento; offerta?:
           <p className="barra-prenota-prezzo">
             {prezzoMinimoMostrato !== null ? <><b>da {prezzoBreve(prezzoMinimoMostrato)}</b><span>a persona</span></> : <span>Vedi le partenze</span>}
           </p>
-          <button type="button" className="btn btn-primary" onClick={() => setFoglioAperto(true)}>{etichettaPrenota}</button>
+          <button ref={barraPrenotaRef} type="button" className="btn btn-primary" onClick={() => setFoglioAperto(true)}>{etichettaPrenota}</button>
         </div>
       )}
       {mobile && foglioAperto && (
-        <div className="foglio-prenota superficie-chiara" role="dialog" aria-modal="true" aria-labelledby={idFoglio}>
+        <div ref={foglioRef} className="foglio-prenota superficie-chiara" role="dialog" aria-modal="true" aria-labelledby={idFoglio}>
           <div className="foglio-prenota-testata">
             <h2 id={idFoglio}>{etichettaPrenota}</h2>
             <button ref={chiudiFoglioRef} type="button" className="btn-icona" aria-label="Chiudi" onClick={() => setFoglioAperto(false)}><Icona nome="chiudi" /></button>

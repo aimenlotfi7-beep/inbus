@@ -12,6 +12,7 @@ import { Icona } from '../features/Icone';
 import { pagineApi } from '../api/pagine';
 import { useSeoTags } from '../features/useSeoTags';
 import { plurale } from '../shared/formato';
+import { comportamentoScorrimento } from '../shared/movimento';
 
 // Le chiavi dei filtri che vivono nell'URL: "Mostra tutti" le toglie
 // tutte insieme, in un solo aggiornamento. `evento` (checkout aperto da
@@ -34,7 +35,7 @@ function useDesktop(): boolean {
 }
 
 function vaiAgliEventi() {
-  document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('eventi')?.scrollIntoView({ behavior: comportamentoScorrimento() });
 }
 
 export function HomePage() {
@@ -47,7 +48,7 @@ export function HomePage() {
 
   const caroselloRef = useRef<HTMLDivElement>(null);
   function scorriCarosello(direzione: 1 | -1) {
-    caroselloRef.current?.scrollBy({ left: direzione * 600, behavior: 'smooth' });
+    caroselloRef.current?.scrollBy({ left: direzione * 600, behavior: comportamentoScorrimento() });
   }
 
   const [bundleEvidenza, setBundleEvidenza] = useState<BundlePubblico[]>([]);
@@ -195,6 +196,8 @@ export function HomePage() {
 
           {desktop && vetrina.length > 0 && (
             <div className="hero-vetrina">
+              {/* Le card hanno titoli h3: senza questo h2 si salterebbe un livello dopo l'h1. */}
+              <h2 className="sr-only">In primo piano</h2>
               {vetrina.map((ev) => <EventoCard key={ev.id} evento={ev} formato="griglia" priorita />)}
             </div>
           )}

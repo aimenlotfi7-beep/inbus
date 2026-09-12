@@ -10,6 +10,7 @@ import { clienteAuthApi } from './api/clienteAuth';
 import { inizializzaMetaPixel } from './features/metaPixel';
 import { inizializzaGA4, tracciaPaginaGA4 } from './features/googleAnalytics';
 import { plurale } from './shared/formato';
+import { comportamentoScorrimento } from './shared/movimento';
 
 const VOCI_MENU = [
   { to: '/#eventi', ancora: 'eventi', testo: 'Eventi' },
@@ -60,7 +61,7 @@ export function Layout({ children }: { children: ReactNode }) {
     e.preventDefault();
     (e.currentTarget.querySelector('input') as HTMLInputElement | null)?.blur();
     if (inHomepage) {
-      document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('eventi')?.scrollIntoView({ behavior: comportamentoScorrimento() });
       return;
     }
     const q = testoLocale.trim();
@@ -114,7 +115,7 @@ export function Layout({ children }: { children: ReactNode }) {
     if (!destinazione) return;
     e.preventDefault();
     navigate({ pathname: '/', search: location.search, hash: `#${ancora}` }, { replace: true });
-    destinazione.scrollIntoView({ behavior: 'smooth' });
+    destinazione.scrollIntoView({ behavior: comportamentoScorrimento() });
   }
 
   /** Etichetta, lente e campo: gli stessi nella barra desktop e nella riga mobile. */

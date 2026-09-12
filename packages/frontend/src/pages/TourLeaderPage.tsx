@@ -7,8 +7,14 @@ import { eventiApi } from '../api/eventi';
 import type { Evento } from '../api/types';
 import { ErroreApi } from '../api/client';
 import { CookieBanner } from '../features/CookieBanner';
+import { useSeoTags } from '../features/useSeoTags';
 
 export function TourLeaderPage() {
+  useSeoTags({
+    title: 'Candidati come tour leader — OnWay',
+    description: 'Accompagna i gruppi OnWay in viaggio verso concerti ed eventi: invia la tua candidatura come tour leader.',
+    url: `${window.location.origin}/tour-leader`,
+  });
   const [searchParams] = useSearchParams();
   const eventoId = searchParams.get('evento');
   const [eventoRif, setEventoRif] = useState<Evento | null>(null);
@@ -49,7 +55,7 @@ export function TourLeaderPage() {
       </header>
 
       <main>
-        <h1>Candidati come Tour Leader</h1>
+        <h1>Candidati come tour leader</h1>
         <p className="sub">Accompagni i nostri gruppi durante il viaggio: gestisci l'imbarco, sei il punto di riferimento per i passeggeri e per l'autista. Raccontaci qualcosa di te, ti ricontatteremo anche per i prossimi viaggi.</p>
 
         {eventoRif && (

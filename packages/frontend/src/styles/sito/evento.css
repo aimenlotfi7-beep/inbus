@@ -123,6 +123,14 @@
   transition:background .15s ease;
 }
 @media (hover:hover){ .partenza-riga:not(:disabled):hover .partenza-cta{ background:var(--ow-accent-press); } }
+/* Telefono: orari e disponibilità possono andare a capo. Senza, a 320px
+   "Andata 13:00 · Ritorno 01:00" finiva sotto il pulsante "Scegli" e
+   "Esaurito · lista d'attesa" stringeva l'indirizzo a una parola per riga. */
+@media (max-width:640px){
+  .partenza-orari{ min-width:0; white-space:normal; }
+  .partenza-prezzo{ max-width:7.5rem; }
+  .partenza-prezzo .fermata-posti, .partenza-prezzo small{ white-space:normal; }
+}
 /* Disponibilità: colore + testo, mai solo colore (anche in SceltaFermata) */
 .fermata-posti{ font-size:var(--t-caption); font-weight:600; white-space:nowrap; }
 .fermata-posti.ok{ color:var(--tinta-ok); }

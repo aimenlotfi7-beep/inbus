@@ -88,8 +88,11 @@
 .bundle-partenza-titolo span{ font-weight:500; color:var(--sup-testo-2); }
 /* SelettoreFermata: il campo prende le misure di .campo (base.css);
    a destra lascia spazio al pulsante che apre l'elenco. */
-.bundle-fermata input{ padding-right:40px; }
-.bundle-fermata button{ min-width:32px; min-height:32px; color:var(--sup-testo); }
+.bundle-fermata input{ padding-right:48px; }
+.bundle-fermata button{ color:var(--sup-testo); }
+/* Solo il pulsante accanto al campo (le voci dell'elenco stanno più in
+   profondità): area di tocco di 44px. */
+.bundle-fermata > div > button{ min-width:var(--tap); min-height:var(--tap); }
 
 /* ---------- ESITO (widget) ---------- */
 .bundle-esito{ max-width:560px; margin:0 auto; }

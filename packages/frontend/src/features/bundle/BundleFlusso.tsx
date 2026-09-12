@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { BundlePubblicoDettaglio, EventoDelBundle } from '../../api/bundle';
 import { formattaDataOraIt } from '../../api/bundle';
 import type { Evento, OpzionePartenza } from '../../api/types';
-import { ErroreApi } from '../../api/client';
 import { clienteAuthApi } from '../../api/clienteAuth';
 import { clienteLoggato } from '../clienteSessione';
 import { SelettoreFermata } from '../checkout/SelettoreFermata';
@@ -14,6 +13,8 @@ import { Icona } from '../Icone';
 import { tracciaInizioPrenotazione } from '../metaPixel';
 import { tracciaInizioCheckoutGA4 } from '../googleAnalytics';
 import { formattaEuro, plurale } from '../../shared/formato';
+import { testoErrore } from '../../shared/errori';
+import { comportamentoScorrimento } from '../../shared/movimento';
 
 type Passo = 'eventi' | 'configura' | 'dati';
 interface SceltaEvento { servizioId?: string; fermataId?: string }
@@ -124,15 +125,20 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
   // Cambiando passo, il focus va sul titolo del passo: chi usa la
   // tastiera o uno screen reader non resta su un pulsante sparito.
   const titoloPassoRef = useRef<HTMLHeadingElement>(null);
-  const primoRender = useRef(true);
+  // Confronto con il passo precedente, non "primo render": in sviluppo
+  // (StrictMode) l'effetto parte due volte all'apertura e il focus
+  // finiva sul titolo, facendo scorrere la pagina fino al pannello.
+  const passoPrecedente = useRef(passo);
   useEffect(() => {
-    if (primoRender.current) { primoRender.current = false; return; }
+    if (passoPrecedente.current === passo) return;
+    passoPrecedente.current = passo;
     titoloPassoRef.current?.focus();
   }, [passo]);
 
   const minEv = bundle.minEventi ?? 1;
   const maxEv = bundle.maxEventi ?? Infinity;
-  const testoQuantiEventi = bundle.maxEventi ? `da ${minEv} a ${bundle.maxEventi}` : `almeno ${minEv}`;
+  // Con plurale(): "almeno 1 eventi" non deve mai comparire.
+  const testoQuantiEventi = bundle.maxEventi ? `da ${minEv} a ${bundle.maxEventi} eventi` : `almeno ${plurale(minEv, 'evento', 'eventi')}`;
 
   function opzioneScelta(eventoId: string): OpzionePartenza | undefined {
     const sc = scelte[eventoId]; if (!sc?.fermataId) return undefined;
@@ -173,7 +179,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
     for (const { evento } of righeRiepilogo) { const e = erroreFermata(evento.id); if (e) nuovi[`fermata-${evento.id}`] = e; }
     setErrori(nuovi);
     const primo = righeRiepilogo.find((r) => nuovi[`fermata-${r.evento.id}`]);
-    if (primo) { document.getElementById(`${prefisso}-partenza-${primo.evento.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    if (primo) { document.getElementById(`${prefisso}-partenza-${primo.evento.id}`)?.scrollIntoView({ behavior: comportamentoScorrimento(), block: 'center' }); return; }
     setPasso('dati');
   }
 
@@ -231,7 +237,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
       });
       if (esito?.pnr) setFatto(esito.pnr);
     } catch (err) {
-      setErroreInvio(err instanceof ErroreApi ? err.message : 'Operazione non riuscita, riprova.');
+      setErroreInvio(testoErrore(err));
     } finally { setInviando(false); }
   }
 
@@ -239,7 +245,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
   const vociStepper = libero ? ['Eventi', 'Passeggeri e partenze', 'I tuoi dati'] : ['Passeggeri e partenze', 'I tuoi dati'];
   const passoAttivo = (libero ? ['eventi', 'configura', 'dati'] : ['configura', 'dati']).indexOf(passo);
   const composizione = libero
-    ? `Scegli ${testoQuantiEventi} eventi tra ${bundle.eventi.length}`
+    ? `Scegli ${testoQuantiEventi} tra ${bundle.eventi.length}`
     : `${plurale(bundle.eventi.length, 'evento incluso', 'eventi inclusi')}`;
 
   if (fatto) {
@@ -337,7 +343,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                 {/* ---------- Passo: eventi (solo bundle libero) ---------- */}
                 {passo === 'eventi' && (
                   <div className="checkout-passo">
-                    <h3 ref={titoloPassoRef} tabIndex={-1}>Scegli {testoQuantiEventi} eventi</h3>
+                    <h3 ref={titoloPassoRef} tabIndex={-1}>Scegli {testoQuantiEventi}</h3>
                     <fieldset className="bundle-eventi" aria-describedby={errori.eventi ? `${prefisso}-eventi-errore` : `${prefisso}-eventi-conteggio`}>
                       <legend className="sr-only">Eventi del bundle</legend>
                       {bundle.eventi.map((ev) => (
@@ -419,8 +425,9 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                             {completo && (!multi || sc.servizioId) && (conPosti ? (
                               conPosti.length > 0 ? (
                                 <div className="campo bundle-fermata">
-                                  <span className="campo-etichetta">Fermata di partenza</span>
+                                  <label className="campo-etichetta" htmlFor={`${idTitolo}-fermata`}>Fermata di partenza</label>
                                   <SelettoreFermata
+                                    id={`${idTitolo}-fermata`}
                                     opzioni={conPosti}
                                     valore={sc.fermataId ?? ''}
                                     onSeleziona={(fermataId) => {

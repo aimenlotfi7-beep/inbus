@@ -174,7 +174,7 @@
 }
 .esito{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:var(--sp-4); padding:var(--sp-6) 0 var(--sp-2); }
 .esito .esito-icona{ width:72px; height:72px; }
-.esito h1{ margin:0; font-family:var(--font-sans); font-size:var(--t-h1); font-weight:800; letter-spacing:-.02em; text-transform:none; }
+.esito :is(h1, h2){ margin:0; font-family:var(--font-sans); font-size:var(--t-h1); font-weight:800; letter-spacing:-.02em; text-transform:none; }
 .esito-codici{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--sp-1); font-size:var(--t-body); }
 .esito-codici b{ font-family:var(--font-mono); letter-spacing:.5px; }
 .esito p{ margin:0; max-width:52ch; font-size:var(--t-small); line-height:var(--lh-relaxed); color:var(--sup-testo-2); }

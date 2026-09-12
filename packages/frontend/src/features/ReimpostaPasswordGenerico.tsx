@@ -4,6 +4,8 @@ import { erroreValidazionePassword } from './validazionePassword';
 import { AuthShell } from './AuthShell';
 import { CampoPassword } from './CampoPassword';
 import { Icona } from './Icone';
+import { useSeoTags } from './useSeoTags';
+import { testoErrore } from '../shared/errori';
 
 /** "Scegli una nuova password" per tutti i tipi di account: il token
  *  arriva dal link nell'email, la regola sulla password è una sola
@@ -16,6 +18,12 @@ export function ReimpostaPasswordGenerico({ onConferma, linkDopoSuccesso, etiche
   temaChiaro?: boolean;
   etichettaTipo?: string;
 }) {
+  // Il percorso contiene il token del link: fuori da og:url e canonical.
+  useSeoTags({
+    title: 'Reimposta la password — OnWay',
+    description: 'Scegli una nuova password per il tuo account OnWay.',
+    url: `${window.location.origin}${linkIndietro}`,
+  });
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -35,7 +43,7 @@ export function ReimpostaPasswordGenerico({ onConferma, linkDopoSuccesso, etiche
       await onConferma(token, password);
       setFatto(true);
     } catch (e) {
-      setErrore(e instanceof Error ? e.message : 'Link scaduto o non valido — richiedine uno nuovo.');
+      setErrore(testoErrore(e));
     } finally {
       setCaricamento(false);
     }

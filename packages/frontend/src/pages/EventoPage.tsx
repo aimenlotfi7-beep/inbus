@@ -56,7 +56,7 @@ export function EventoPage() {
 
   return (
     <Layout>
-      <div className="container evento-pagina">
+      <main className="container evento-pagina">
         {stato === 'caricamento' && <EventoScheletro />}
 
         {stato === 'non-trovato' && (
@@ -76,7 +76,7 @@ export function EventoPage() {
         )}
 
         {stato === 'pronto' && evento && <EventoDettaglio evento={evento} />}
-      </div>
+      </main>
     </Layout>
   );
 }

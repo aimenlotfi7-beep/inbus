@@ -54,7 +54,9 @@ export function BundlePage() {
             bundle={bundle}
             caricaEvento={(ev) => eventiApi.getBySlug(ev.slug)}
             caricaOpzioni={(eventoId, servizioId) => eventiApi.opzioniPartenza(eventoId, servizioId)}
-            testoConferma="Vai al carrello"
+            // Come nel checkout evento: tra un passo e l'altro "Continua"
+            // (il carrello è il passo "Riepilogo").
+            testoConferma="Continua"
             onConferma={async ({ righe, passeggeri, cliente, partecipanti }) => {
               carrello.impostaBundle(
                 { id: bundle.id, nome: bundle.nome, scontoPercentuale: Number(bundle.scontoPercentuale), ammetteOfferte: bundle.ammetteOfferte, ammetteCredito: bundle.ammetteCredito, ammettePromoter: bundle.ammettePromoter, ammetteAcconto: bundle.ammetteAcconto, ...(bundle.ammettePromoter && promoterCodice && { promoterCodice }), ...utm },

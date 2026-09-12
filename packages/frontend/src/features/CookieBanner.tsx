@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 const CHIAVE_CONSENSO = 'inbus_consenso_cookie';
@@ -75,6 +75,18 @@ export function CookieBanner() {
     return () => { document.body.classList.remove('con-cookie-banner'); };
   }, [visibile]);
 
+  // Passando da un livello all'altro il pulsante premuto sparisce: il
+  // focus va al primo interruttore e, con "Indietro", di nuovo su
+  // "Personalizza" (solo dopo un'azione, mai all'apertura della pagina).
+  const primoInterruttoreRef = useRef<HTMLInputElement>(null);
+  const personalizzaRef = useRef<HTMLButtonElement>(null);
+  const tornaAPersonalizza = useRef(false);
+  useEffect(() => {
+    if (!tornaAPersonalizza.current) return;
+    if (personalizzaAperto) primoInterruttoreRef.current?.focus();
+    else personalizzaRef.current?.focus();
+  }, [personalizzaAperto]);
+
   if (!visibile) return null;
 
   function accettaTutti() {
@@ -91,7 +103,7 @@ export function CookieBanner() {
   }
 
   return (
-    <div className="cookie-banner">
+    <div className="cookie-banner" role="region" aria-label="Consenso ai cookie">
       {!personalizzaAperto ? (
         <>
           <p>
@@ -100,7 +112,7 @@ export function CookieBanner() {
           </p>
           <div className="cookie-banner-azioni">
             <button className="btn btn-ghost" onClick={rifiutaTutti}>Rifiuta tutti</button>
-            <button className="btn btn-ghost" onClick={() => setPersonalizzaAperto(true)}>Personalizza</button>
+            <button ref={personalizzaRef} className="btn btn-ghost" onClick={() => { tornaAPersonalizza.current = true; setPersonalizzaAperto(true); }}>Personalizza</button>
             <button className="btn btn-primary" onClick={accettaTutti}>Accetta tutti</button>
           </div>
         </>
@@ -124,11 +136,13 @@ export function CookieBanner() {
                   <b>{c.nome}</b>
                   <label className="cookie-toggle">
                     <input
+                      ref={c.chiave === CATEGORIE[0].chiave ? primoInterruttoreRef : undefined}
                       type="checkbox"
                       checked={scelte[c.chiave]}
                       onChange={(e) => setScelte((s) => ({ ...s, [c.chiave]: e.target.checked }))}
                     />
-                    <span className="cookie-toggle-slider" />
+                    <span className="cookie-toggle-slider" aria-hidden="true" />
+                    <span className="sr-only">Cookie {c.nome.toLowerCase()}</span>
                   </label>
                 </div>
                 <p>{c.descrizione}</p>

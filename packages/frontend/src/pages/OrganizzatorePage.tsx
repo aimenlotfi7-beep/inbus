@@ -9,6 +9,7 @@ import '../styles/promoter.css';
 import { organizzatoriApi, type Organizzatore, type EventoAssegnato, type StatisticheGenerali, type StatisticaEvento, type StatisticaBundle } from '../api/organizzatori';
 import { ErroreApi } from '../api/client';
 import { CookieBanner } from '../features/CookieBanner';
+import { useSeoTags } from '../features/useSeoTags';
 import { formattaEuro, plurale } from '../shared/formato';
 
 const CHIAVE_TOKEN = 'inbus_organizzatore_token';
@@ -18,6 +19,11 @@ function fmtDataBreve(iso: string) {
 }
 
 export function OrganizzatorePage() {
+  useSeoTags({
+    title: 'Area organizzatore — OnWay',
+    description: 'Accedi all\'area organizzatore OnWay: i tuoi eventi e le vendite in un posto solo.',
+    url: `${window.location.origin}/organizzatore`,
+  });
   const [loggato, setLoggato] = useState(() => !!localStorage.getItem(CHIAVE_TOKEN));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -1,16 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { OpzionePartenza } from '../../api/types';
 
 /** Campo "cerca la tua fermata" — vuoto di default (non ne sceglie una
  *  a caso), scrivendo filtra per città, un pulsante apre comunque
  *  l'elenco completo (in ordine alfabetico) per chi preferisce
- *  scorrere invece di scrivere. */
-export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }: {
+ *  scorrere invece di scrivere. `id` va sul campo: chi lo usa ci
+ *  collega la sua etichetta (<label htmlFor>). Esc chiude l'elenco. */
+export function SelettoreFermata({ id, opzioni, valore, onSeleziona, testoOpzione }: {
+  id?: string;
   opzioni: OpzionePartenza[];
   valore: string;
   onSeleziona: (fermataId: string) => void;
   testoOpzione: (o: OpzionePartenza) => string;
 }) {
+  const idElenco = useId();
   // Ordinate per regione (alfabetico, "Senza regione" sempre in
   // fondo) e poi per città dentro ogni regione — come Fornitori e
   // Fermate nel gestionale, per lo stesso identico motivo: con molte
@@ -51,28 +54,40 @@ export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }:
   }
 
   return (
-    <div ref={contenitoreRef} style={{ position: 'relative' }}>
+    <div
+      ref={contenitoreRef}
+      style={{ position: 'relative' }}
+      onKeyDown={(e) => { if (e.key === 'Escape' && aperto) { e.preventDefault(); e.stopPropagation(); setAperto(false); } }}
+      // Con Tab fuori dal campo e dall'elenco, l'elenco si chiude (il clic
+      // fuori lo chiudeva già, la tastiera no).
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setAperto(false); }}
+    >
       <input
+        id={id}
         type="text"
-        placeholder="Seleziona una fermata..."
+        placeholder="Cerca la tua città…"
+        autoComplete="off"
         value={testo}
         onChange={(e) => { setTesto(e.target.value); setAperto(true); }}
         onFocus={() => setAperto(true)}
       />
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => setAperto((v) => !v)}
         aria-label="Mostra tutte le fermate"
+        aria-expanded={aperto}
+        aria-controls={aperto ? idElenco : undefined}
         style={{
-          position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-          background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--testo-md)', opacity: .6, padding: 4,
+          position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)',
+          background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--testo-md)', padding: 0,
         }}
       >
-        ▾
+        <span aria-hidden="true">▾</span>
       </button>
 
       {aperto && (
-        <div style={{
+        <div id={idElenco} style={{
           position: 'absolute', zIndex: 20, top: '100%', left: 0, right: 0, marginTop: 4,
           background: '#fff', border: '1px solid #e5ded0', borderRadius: 10, maxHeight: 260, overflowY: 'auto',
           boxShadow: '0 6px 18px rgba(0,0,0,.12)',
@@ -96,6 +111,10 @@ export function SelettoreFermata({ opzioni, valore, onSeleziona, testoOpzione }:
                 )}
                 <button
                   type="button"
+                  // Il clic non sposta il fuoco: altrimenti (Safari non dà
+                  // il fuoco ai pulsanti) il campo perdeva il fuoco, l'elenco
+                  // si chiudeva e la scelta andava persa.
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => scegli(o)}
                   style={{
                     display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 'var(--testo-base)',

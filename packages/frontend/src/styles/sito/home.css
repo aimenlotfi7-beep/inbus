@@ -88,7 +88,10 @@
 }
 .chip:hover{ border-color:var(--ow-accent); background:var(--ow-accent-soft); }
 .chip.active{ background:var(--ow-accent); border-color:var(--ow-accent); color:var(--ow-ink); }
-.chip.active:focus-visible{ outline-color:var(--ow-ink); }
+/* L'anello sta fuori dal chip, sul fondo scuro: carta (con ink spariva). */
+.chip.active:focus-visible{ outline-color:var(--ow-paper); }
+/* Sugli schermi touch il chip arriva all'area di tocco di 44px */
+@media (pointer:coarse){ .chip{ min-height:var(--tap); } }
 .chip:disabled{ cursor:default; }
 /* Sui telefoni i chip scorrono in orizzontale, fino ai bordi dello
    schermo (margine negativo = gutter del contenitore). */

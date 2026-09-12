@@ -26,7 +26,10 @@
    1. PAGINE PUBBLICHE (candidatura, fornitori)
    ============================================================ */
 .pagina-tourleader{ min-height:100vh; }
-.pagina-tourleader .back-link{ color:var(--mist); font-size:var(--testo-base); text-decoration:none; }
+.pagina-tourleader .back-link{
+  display:inline-flex; align-items:center; min-height:var(--tap); /* area di tocco di 44px */
+  color:var(--mist); font-size:var(--testo-base); text-decoration:none;
+}
 .pagina-tourleader .back-link:hover{ color:var(--paper); }
 
 .pagina-tourleader main{ max-width:640px; margin:0 auto; padding:clamp(30px,6vw,56px) 20px 80px; }

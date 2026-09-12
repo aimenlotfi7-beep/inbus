@@ -7,6 +7,7 @@ import { CampoTesto } from '../features/checkout/CampoTesto';
 import { formattaDataCard } from '../features/eventi/EventoCard';
 import { Icona } from '../features/Icone';
 import { formattaEuro } from '../shared/formato';
+import { MESSAGGIO_CONNESSIONE, testoErrore } from '../shared/errori';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -59,7 +60,7 @@ export function CompletaSaldoPage() {
       if (!r.ok) throw new Error(d.errore ?? 'Codice non valido.');
       setCouponVerificato(d);
     } catch (e) {
-      setCouponErrore(e instanceof Error ? e.message : 'Codice non valido.');
+      setCouponErrore(e instanceof TypeError ? MESSAGGIO_CONNESSIONE : e instanceof Error ? e.message : 'Codice non valido.');
     } finally {
       setVerificandoCoupon(false);
     }
@@ -73,7 +74,7 @@ export function CompletaSaldoPage() {
       await prenotazioniApi.saldaResto(pnr, email, couponVerificato ? couponCodice.trim() : undefined);
       setStato('completato');
     } catch (e) {
-      setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
+      setMessaggioErrore(testoErrore(e));
       setStato('pronto');
     }
   }
@@ -83,7 +84,7 @@ export function CompletaSaldoPage() {
 
   return (
     <Layout>
-      <div className="container-form pagina-modulo">
+      <main className="container-form pagina-modulo">
         <div className="pagina-modulo-testata">
           <h1>Completa il saldo</h1>
           {dati && stato !== 'completato' && <p>{dati.artista} · prenotazione {dati.pnr}</p>}
@@ -165,7 +166,7 @@ export function CompletaSaldoPage() {
             )}
           </div>
         )}
-      </div>
+      </main>
     </Layout>
   );
 }

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { testoErrore } from '../shared/errori';
 import { AuthShell } from './AuthShell';
 import { CampoTesto } from './checkout/CampoTesto';
 import { Icona } from './Icone';
+import { useSeoTags } from './useSeoTags';
 
 /** Schermata "password dimenticata" generica — usata da tutti i tipi
  *  di account (cliente, promoter, organizzatore, tour leader): ognuno
@@ -15,16 +17,26 @@ export function RichiediResetGenerico({ onRichiedi, linkIndietro, titoloExtra, t
   temaChiaro?: boolean;
   etichettaTipo?: string;
 }) {
+  useSeoTags({
+    title: 'Password dimenticata — OnWay',
+    description: 'Ricevi via email il link per scegliere una nuova password.',
+    url: `${window.location.origin}${window.location.pathname}`,
+  });
   const [email, setEmail] = useState('');
   const [inviato, setInviato] = useState(false);
   const [caricamento, setCaricamento] = useState(false);
+  const [errore, setErrore] = useState('');
 
   async function invia(e: React.FormEvent) {
     e.preventDefault();
+    setErrore('');
     setCaricamento(true);
     try {
       await onRichiedi(email);
       setInviato(true);
+    } catch (err) {
+      // Prima un errore restava muto: il pulsante tornava attivo e basta.
+      setErrore(testoErrore(err));
     } finally {
       setCaricamento(false);
     }
@@ -49,6 +61,7 @@ export function RichiediResetGenerico({ onRichiedi, linkIndietro, titoloExtra, t
             id="reset-email" etichetta="Email" type="email" autoComplete="email" required
             value={email} onChange={(e) => setEmail(e.target.value)}
           />
+          {errore && <p className="avviso avviso-errore auth-avviso" role="alert">{errore}</p>}
           <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={caricamento}>
             {caricamento ? 'Invio in corso…' : 'Invia il link'}
           </button>

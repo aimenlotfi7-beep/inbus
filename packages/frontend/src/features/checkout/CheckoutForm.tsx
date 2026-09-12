@@ -7,7 +7,6 @@ import { prenotazioniApi } from '../../api/prenotazioni';
 import { whiteLabelApi } from '../../api/whiteLabel';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import { applicaScontoOfferta } from '../../api/prezzi';
-import { ErroreApi } from '../../api/client';
 import { clienteAuthApi } from '../../api/clienteAuth';
 import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
 import { useCarrello } from '../carrello/CarrelloContext';
@@ -18,6 +17,7 @@ import { provenienzaDaUrl } from './provenienza';
 import { tracciaInizioPrenotazione, tracciaAcquisto, leggiCookieMeta } from '../metaPixel';
 import { tracciaInizioCheckoutGA4, tracciaAcquistoGA4, tracciaAcquistoGoogleAds } from '../googleAnalytics';
 import { formattaEuro, plurale } from '../../shared/formato';
+import { MESSAGGIO_CONNESSIONE, testoErrore } from '../../shared/errori';
 import { Icona } from '../Icone';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
@@ -191,12 +191,24 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
     });
   }, []);
 
-  // Esc chiude il popup del percorso.
+  // Popup del percorso: all'apertura il focus va su "Chiudi", Esc chiude
+  // e il focus torna a "Vedi il percorso". L'ascoltatore è in cattura e
+  // ferma l'evento: dentro il foglio mobile Esc chiudeva anche il foglio.
+  const percorsoApriRef = useRef<HTMLButtonElement>(null);
+  const percorsoChiudiRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!percorsoAperto) return;
-    const allaPressione = (e: KeyboardEvent) => { if (e.key === 'Escape') setPercorsoAperto(false); };
-    window.addEventListener('keydown', allaPressione);
-    return () => window.removeEventListener('keydown', allaPressione);
+    percorsoChiudiRef.current?.focus();
+    const allaPressione = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setPercorsoAperto(false);
+    };
+    window.addEventListener('keydown', allaPressione, true);
+    return () => {
+      window.removeEventListener('keydown', allaPressione, true);
+      percorsoApriRef.current?.focus();
+    };
   }, [percorsoAperto]);
 
   function scegliFermata(id: string) {
@@ -331,7 +343,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
       if (!r.ok) throw new Error(dati.errore ?? 'Codice non valido.');
       setCouponVerificato(dati);
     } catch (e) {
-      setCouponErrore(e instanceof Error ? e.message : 'Codice non valido.');
+      setCouponErrore(e instanceof TypeError ? MESSAGGIO_CONNESSIONE : e instanceof Error ? e.message : 'Codice non valido.');
     } finally {
       setVerificandoCoupon(false);
     }
@@ -383,7 +395,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
       }
       setStato('confermato');
     } catch (e) {
-      setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
+      setMessaggioErrore(testoErrore(e));
       setStato('errore');
       setAzioneInCorso(null);
     }
@@ -404,7 +416,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
       });
       setStato('confermato-attesa');
     } catch (e) {
-      setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
+      setMessaggioErrore(testoErrore(e));
       setStato('errore');
       setAzioneInCorso(null);
     }
@@ -479,7 +491,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
           <p className="riepilogo-artista">{evento.artista}</p>
           <p className="riepilogo-riga"><Icona nome="bus" dimensione={16} /><span>{partiRiepilogo.join(' · ')}</span></p>
           {opzioneScelta && (
-            <button type="button" className="btn btn-tertiary btn-sm riepilogo-percorso" onClick={() => setPercorsoAperto(true)}>Vedi il percorso</button>
+            <button ref={percorsoApriRef} type="button" className="btn btn-tertiary btn-sm riepilogo-percorso" onClick={() => setPercorsoAperto(true)}>Vedi il percorso</button>
           )}
         </div>
         {opzioneScelta && <p className="riepilogo-totale">{formattaEuro(step === 3 ? totaleConCredito : totale)}</p>}
@@ -490,7 +502,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
           <div className="percorso-popup-card" role="dialog" aria-modal="true" aria-labelledby={idPercorso} onClick={(e) => e.stopPropagation()}>
             <div className="percorso-popup-testata">
               <h3 id={idPercorso}>Il percorso del tuo bus</h3>
-              <button type="button" className="btn-icona" aria-label="Chiudi" onClick={() => setPercorsoAperto(false)}><Icona nome="chiudi" /></button>
+              <button ref={percorsoChiudiRef} type="button" className="btn-icona" aria-label="Chiudi" onClick={() => setPercorsoAperto(false)}><Icona nome="chiudi" /></button>
             </div>
             <PercorsoBus evento={evento} soloTragittoId={opzioneScelta.tragittoId} fermataEvidenziataId={opzioneScelta.fermataId} />
           </div>

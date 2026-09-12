@@ -16,6 +16,7 @@ import { ReimpostaPasswordPage } from './pages/ReimpostaPasswordPage';
 import { RegistratiPage } from './pages/RegistratiPage';
 import { VerificaEmailPage } from './pages/VerificaEmailPage';
 import { NonTrovataPage } from './pages/NonTrovataPage';
+import { comportamentoScorrimento } from './shared/movimento';
 
 /** React.lazy vuole un export default: le pagine hanno export con nome. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -61,7 +62,7 @@ export function App() {
   useEffect(() => {
     if (!location.hash) return;
     const id = setTimeout(() => {
-      document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: 'smooth' });
+      document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: comportamentoScorrimento() });
     }, 80);
     return () => clearTimeout(id);
   }, [location.pathname, location.hash]);
@@ -69,7 +70,9 @@ export function App() {
   return (
     <Suspense fallback={<p className="caricamento" role="status">Carico…</p>}>
       <Routes>
-        <Route path="/" element={<Layout><HomePage /></Layout>} />
+        {/* <main> qui e non dentro HomePage: l'account cliente ("Scopri eventi")
+            mostra la home dentro il proprio <main>, e non vanno annidati. */}
+        <Route path="/" element={<Layout><main><HomePage /></main></Layout>} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/carrello" element={<Layout><CarrelloPage /></Layout>} />
         <Route path="/faq" element={<PaginaPage chiaveFissa="faq" />} />

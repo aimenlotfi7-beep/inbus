@@ -280,8 +280,11 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
   background:var(--ow-accent-press); color:var(--ow-ink);
   transform:translateY(-2px); box-shadow:0 10px 24px rgba(255,212,0,.22);
 }
-/* Su superficie gialla il contorno giallo sparirebbe: passa a ink. */
-.btn-primary:focus-visible, .search-cta:focus-visible{ outline-color:var(--ow-ink); }
+/* L'anello sta 2px FUORI dal pulsante, sulla superficie intorno: un
+   anello giallo accanto al giallo si confonde, quindi prende il colore
+   del testo del contesto (carta su scuro, ink su chiaro). Con ink fisso
+   spariva su tutte le superfici scure (barra "Prenota", accesso, menu). */
+.btn-primary:focus-visible, .search-cta:focus-visible{ outline-color:var(--sup-testo); }
 
 /* Secondario: contorno, testo del contesto */
 .btn-secondary, .btn-ghost, .btn-mini, .search-cta-secondaria{
@@ -356,6 +359,8 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
   background:var(--campo-sfondo); border:1px solid var(--campo-bordo); border-radius:var(--radius-sm);
 }
 .form-grid textarea{ min-height:70px; padding-block:var(--sp-3); resize:vertical; }
+/* Senza questa riga il segnaposto restava il grigio del browser (3,7:1 sul fondo scuro). */
+.form-grid input::placeholder, .form-grid textarea::placeholder{ color:var(--campo-placeholder); }
 @media (max-width:640px){ .form-grid{ grid-template-columns:1fr; } }
 
 /* Messaggio d'errore generico (le pagine usano <p className="errore">) */
@@ -424,11 +429,13 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
 }
 .cookie-toggle input:checked + .cookie-toggle-slider{ background:var(--ow-accent); }
 .cookie-toggle input:checked + .cookie-toggle-slider::before{ transform:translateX(16px); }
+/* L'input è invisibile: l'anello del focus va sull'interruttore disegnato. */
+.cookie-toggle input:focus-visible + .cookie-toggle-slider{ outline:3px solid var(--sup-focus); outline-offset:2px; }
 
 @media (max-width:480px){
   .cookie-banner{ left:10px; right:10px; bottom:10px; padding:16px; }
   .cookie-banner-azioni{ flex-direction:column-reverse; }
-  .cookie-banner-azioni .btn{ width:100%; }
+  .cookie-banner-azioni .btn{ width:100%; min-height:var(--tap); }
 }
 .link-preferenze-cookie{
   background:none; border:none; color:var(--mist); font-size:var(--testo-md); text-decoration:underline; cursor:pointer; padding:0;

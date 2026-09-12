@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { variazioniApi, type InfoVariazione } from '../api/variazioni';
 import { ErroreApi } from '../api/client';
 import { Layout } from '../Layout';
+import { testoErrore } from '../shared/errori';
 
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'fatto' | 'non-trovato' | 'errore';
 
@@ -33,7 +34,7 @@ export function VariazionePage() {
       setRispostaScelta(risposta);
       setStato('fatto');
     } catch (e) {
-      setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
+      setMessaggioErrore(testoErrore(e));
       setStato('pronto');
     }
   }
@@ -42,7 +43,7 @@ export function VariazionePage() {
 
   return (
     <Layout>
-      <div className="container-form pagina-modulo">
+      <main className="container-form pagina-modulo">
         <div className="pagina-modulo-testata">
           <h1>Una variazione al tuo viaggio</h1>
           {dati && <p>Prenotazione {dati.pnr}</p>}
@@ -94,7 +95,7 @@ export function VariazionePage() {
             )}
           </div>
         )}
-      </div>
+      </main>
     </Layout>
   );
 }

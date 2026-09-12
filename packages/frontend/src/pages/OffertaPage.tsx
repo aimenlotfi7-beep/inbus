@@ -60,7 +60,7 @@ export function OffertaPage() {
 
   return (
     <Layout>
-      <div className="container evento-pagina">
+      <main className="container evento-pagina">
         {stato === 'caricamento' && <EventoScheletro />}
 
         {stato === 'non-trovata' && (
@@ -80,7 +80,7 @@ export function OffertaPage() {
         )}
 
         {stato === 'pronto' && evento && offerta && <EventoDettaglio evento={evento} offerta={offerta} />}
-      </div>
+      </main>
     </Layout>
   );
 }

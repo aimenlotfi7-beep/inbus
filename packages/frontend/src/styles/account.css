@@ -77,6 +77,14 @@
   font-family:var(--font-mono); font-size:var(--t-label); letter-spacing:.12em; text-transform:uppercase; color:var(--sup-testo-2);
 }
 .pagina-auth .auth-testata .btn-tertiary{ text-decoration:none; }
+/* A 320px "OnWay ORGANIZZATORE" + "Torna al sito" non ci stavano: il
+   pulsante usciva dallo schermo. Spazi più stretti e, se ancora non
+   basta, il pulsante va a capo invece di essere tagliato. */
+@media (max-width:480px){
+  .pagina-auth .auth-testata{ flex-wrap:wrap; gap:var(--sp-2); }
+  .pagina-auth .auth-logo small{ letter-spacing:.06em; }
+  .pagina-auth .auth-testata .btn-tertiary{ padding-inline:var(--sp-1); }
+}
 
 /* Il corpo: il riquadro parte dall'alto su telefono (con la tastiera
    aperta centrarlo lo spingeva sotto), si centra su schermi ampi. */
@@ -130,7 +138,8 @@
 .pagina-auth .auth-link-riga a,
 .pagina-auth .auth-piede a{
   color:var(--sup-testo); font-weight:600; text-decoration:underline; text-underline-offset:3px;
-  display:inline-block; padding-block:var(--sp-2);
+  /* area di tocco di 44px; il margine negativo lascia la riga dov'era */
+  display:inline-block; padding-block:var(--sp-3); margin-block:calc(var(--sp-1) * -1);
 }
 .pagina-auth .auth-piede{
   padding:0 var(--gutter) var(--sp-6); text-align:center; font-size:var(--t-caption); color:var(--sup-testo-2);
@@ -263,7 +272,8 @@
 }
 .account-cliente .mini-tab-acc:hover{ color:var(--paper); border-color:var(--btn-bordo); }
 .account-cliente .mini-tab-acc.active{ background:var(--ow-accent); border-color:var(--ow-accent); color:var(--ow-ink); font-weight:700; }
-.account-cliente .mini-tab-acc.active:focus-visible{ outline-color:var(--ow-ink); }
+/* L'anello sta fuori dal chip, sul fondo scuro: carta, come le voci del menu. */
+.account-cliente .mini-tab-acc.active:focus-visible{ outline-color:var(--ow-paper); }
 
 /* ---------- I MIEI VIAGGI (card in formato lista) ---------- */
 .account-cliente .viaggio-card{

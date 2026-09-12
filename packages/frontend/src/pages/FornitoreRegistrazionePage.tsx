@@ -6,6 +6,7 @@ import { fornitoriApi, type CampoExtraConfig } from '../api/fornitori';
 import { geocodifica } from '../admin/shared/geo';
 import { ErroreApi } from '../api/client';
 import { CookieBanner } from '../features/CookieBanner';
+import { useSeoTags } from '../features/useSeoTags';
 
 /** Autoregistrazione pubblica di un fornitore (agenzia/noleggio bus) —
  *  nasce sempre IN_ATTESA lato server, un admin la approva da
@@ -13,6 +14,11 @@ import { CookieBanner } from '../features/CookieBanner';
  *  extra (in fondo, se configurati) sono facoltativi e definiti
  *  altrove — testo semplice, etichetta+valore. */
 export function FornitoreRegistrazionePage() {
+  useSeoTags({
+    title: 'Diventa fornitore — OnWay',
+    description: 'Agenzie e noleggi bus: registrati come fornitore OnWay e ricevi le richieste di preventivo per i viaggi vicino a te.',
+    url: `${window.location.origin}/fornitore/registrati`,
+  });
   const [campiExtraConfig, setCampiExtraConfig] = useState<CampoExtraConfig[]>([]);
   const [form, setForm] = useState({
     nome: '', partitaIva: '', referente: '', telefono: '', email: '', indirizzo: '',
@@ -90,7 +96,7 @@ export function FornitoreRegistrazionePage() {
               Leggi l'<Link to="/pagina/privacy" target="_blank" rel="noopener" style={{ color: 'inherit', textDecoration: 'underline' }}>informativa privacy</Link>.
             </p>
             <p className="errore">{errore}</p>
-            <button type="button" className="btn-primary" disabled={inviando} onClick={invia}>{inviando ? 'Invio...' : 'Registrati'}</button>
+            <button type="button" className="btn-primary" disabled={inviando} onClick={invia}>{inviando ? 'Invio…' : 'Registrati'}</button>
           </form>
         )}
 

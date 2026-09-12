@@ -6,6 +6,7 @@ import { preventiviApi, type DatiPubbliciPreventivo } from '../api/preventivi';
 import { ErroreApi } from '../api/client';
 import { formattaEuro } from '../shared/formato';
 import { CookieBanner } from '../features/CookieBanner';
+import { useSeoTags } from '../features/useSeoTags';
 
 /** Pagina pubblica raggiunta dal link nella mail di richiesta
  *  preventivo — nessun accesso richiesto, il token stesso è la
@@ -25,6 +26,13 @@ export function FornitorePreventivoPage() {
   const [inviando, setInviando] = useState(false);
   const [inviato, setInviato] = useState(false);
   const [errore, setErrore] = useState('');
+
+  // Il link contiene il token personale: non finisce in og:url/canonical.
+  useSeoTags({
+    title: `${dati?.perCambioPercorso ? 'Nuovo preventivo' : 'Richiesta preventivo'} — OnWay`,
+    description: 'Rispondi alla richiesta di preventivo OnWay per il viaggio indicato.',
+    url: `${window.location.origin}/fornitore/preventivo`,
+  });
 
   useEffect(() => {
     if (!token) return;
@@ -71,7 +79,7 @@ export function FornitorePreventivoPage() {
       <main>
         <h1>{dati?.perCambioPercorso ? 'Nuovo preventivo: percorso cambiato' : 'Richiesta preventivo'}</h1>
 
-        {caricando && <p className="sub">Carico...</p>}
+        {caricando && <p className="sub" role="status">Carico la richiesta…</p>}
         {erroreCaricamento && <p className="errore">{erroreCaricamento}</p>}
 
         {dati?.perCambioPercorso && !dati.giaRisposto && !inviato && (
@@ -117,7 +125,7 @@ export function FornitorePreventivoPage() {
               <label className="full">Allega il tuo preventivo (facoltativo) <input type="file" accept="application/pdf,image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
             </div>
             <p className="errore">{errore}</p>
-            <button type="button" className="btn-primary" disabled={inviando} onClick={invia}>{inviando ? 'Invio...' : 'Invia preventivo'}</button>
+            <button type="button" className="btn-primary" disabled={inviando} onClick={invia}>{inviando ? 'Invio…' : 'Invia preventivo'}</button>
             <p className="sub" style={{ marginTop: 12, fontSize: 'var(--testo-md)' }}>Attenzione: una volta inviata, la risposta non potrà più essere modificata da qui — per correzioni, contatta direttamente chi ti ha scritto.</p>
           </form>
         )}

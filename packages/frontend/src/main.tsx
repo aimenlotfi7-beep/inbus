@@ -13,7 +13,12 @@ import { CarrelloProvider } from './features/carrello/CarrelloContext';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
+    {/* v7_relativeSplatPath attivato subito (toglie un avviso in console):
+        nessuna rotta usa link relativi dentro la rotta "*", non cambia
+        nulla. v7_startTransition NO: la ricerca dell'header è un campo
+        controllato dall'indirizzo (?q=) e con gli aggiornamenti in
+        transizione le lettere digitate potrebbero sparire e ricomparire. */}
+    <BrowserRouter future={{ v7_relativeSplatPath: true }}>
       <CarrelloProvider>
         <App />
       </CarrelloProvider>

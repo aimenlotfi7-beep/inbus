@@ -43,7 +43,16 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
   // non mentre è aperta la finestra del rimborso, che gestisce da sé
   // il suo Esc. In cima, prima di ogni return: gli hook non possono
   // essere condizionali.
-  useEffect(() => { chiudiRef.current?.focus(); }, []);
+  // Quando il dettaglio arriva il riquadro "Carico…" è sostituito da
+  // quello completo e il pulsante di prima sparisce: il fuoco va di nuovo
+  // su "Chiudi". Alla chiusura torna a chi ha aperto la scheda.
+  // (Prima si ricorda chi aveva il fuoco, poi lo si sposta.)
+  useEffect(() => {
+    const apertoDa = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => { if (apertoDa?.isConnected) apertoDa.focus(); };
+  }, []);
+  const caricato = !!dettaglio;
+  useEffect(() => { chiudiRef.current?.focus(); }, [caricato]);
   useEffect(() => {
     function allaPressione(e: KeyboardEvent) {
       if (e.key === 'Escape' && !rimborsoAperto) onClose();

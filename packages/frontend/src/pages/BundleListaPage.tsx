@@ -16,7 +16,7 @@ export function BundleListaPage() {
   });
 
   return (
-    <div className="container pagina-elenco">
+    <main className="container pagina-elenco">
       <div className="section-head">
         <div>
           <h1 className="section-title">Bundle</h1>
@@ -29,15 +29,19 @@ export function BundleListaPage() {
         </div>
       ) : lista.length === 0 ? (
         <div className="stato-vuoto">
-          <h3>Nessun bundle disponibile al momento</h3>
+          <h2>Nessun bundle disponibile al momento</h2>
           <p>I bundle escono quando ci sono più date da combinare: intanto guarda gli eventi in programma.</p>
           <Link className="btn btn-secondary" to="/#eventi">Vedi tutti gli eventi</Link>
         </div>
       ) : (
-        <div className="griglia-eventi">
-          {lista.map((b, i) => <BundleCard key={b.id} bundle={b} priorita={i < 2} />)}
-        </div>
+        <>
+          {/* Le card hanno titoli h3: senza questo h2 si salterebbe un livello. */}
+          <h2 className="sr-only">Bundle disponibili</h2>
+          <div className="griglia-eventi">
+            {lista.map((b, i) => <BundleCard key={b.id} bundle={b} priorita={i < 2} />)}
+          </div>
+        </>
       )}
-    </div>
+    </main>
   );
 }

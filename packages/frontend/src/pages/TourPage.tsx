@@ -30,7 +30,7 @@ export function TourPage() {
 
   return (
     <Layout>
-      <div className="container-narrow tour-pagina">
+      <main className="container-narrow tour-pagina">
         {stato === 'caricamento' && <p className="testo-intro">Carico il tour…</p>}
         {stato === 'non-trovato' && (
           <div className="stato-vuoto">
@@ -80,7 +80,7 @@ export function TourPage() {
             </section>
           </>
         )}
-      </div>
+      </main>
     </Layout>
   );
 }

@@ -4,12 +4,19 @@ import { tourLeaderAuthApi } from '../api/tourLeaderAuth';
 import { AuthShell } from '../features/AuthShell';
 import { CampoTesto } from '../features/checkout/CampoTesto';
 import { CampoPassword } from '../features/CampoPassword';
+import { useSeoTags } from '../features/useSeoTags';
+import { testoErrore } from '../shared/errori';
 import '../styles/account.css';
 import '../styles/promoter.css';
 
 /** Accesso del tour leader — separato da quello dell'amministratore:
  *  porta solo all'app di controllo dei biglietti, non al gestionale. */
 export function TourLeaderLoginPage() {
+  useSeoTags({
+    title: 'Accesso tour leader — OnWay',
+    description: 'Accedi per aprire la lista dei passeggeri e il controllo dei biglietti del tuo bus.',
+    url: `${window.location.origin}/scansione/accedi`,
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errore, setErrore] = useState('');
@@ -24,7 +31,7 @@ export function TourLeaderLoginPage() {
       await tourLeaderAuthApi.login(email, password);
       navigate('/scansione');
     } catch (err) {
-      setErrore(err instanceof Error ? err.message : 'Accesso non riuscito.');
+      setErrore(testoErrore(err));
     } finally {
       setCaricamento(false);
     }

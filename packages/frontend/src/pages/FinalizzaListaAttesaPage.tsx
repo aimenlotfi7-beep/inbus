@@ -9,6 +9,7 @@ import { SceltaFermata } from '../features/checkout/SceltaFermata';
 import { formattaDataCard } from '../features/eventi/EventoCard';
 import { Icona } from '../features/Icone';
 import { formattaEuro, plurale } from '../shared/formato';
+import { testoErrore } from '../shared/errori';
 
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'errore' | 'non-trovato';
 
@@ -62,7 +63,7 @@ export function FinalizzaListaAttesaPage() {
       setPnr(r.pnr);
       setStato('confermato');
     } catch (e) {
-      setMessaggioErrore(e instanceof ErroreApi ? e.message : 'Errore imprevisto, riprova.');
+      setMessaggioErrore(testoErrore(e));
       setStato('errore');
       setAzioneInCorso(null);
     }
@@ -70,7 +71,7 @@ export function FinalizzaListaAttesaPage() {
 
   return (
     <Layout>
-      <div className="container-form pagina-modulo">
+      <main className="container-form pagina-modulo">
         <div className="pagina-modulo-testata">
           <h1>Completa la tua prenotazione</h1>
           {dati && stato !== 'confermato' && <p>Si è liberato un posto: scegli la fermata e conferma.</p>}
@@ -98,7 +99,7 @@ export function FinalizzaListaAttesaPage() {
             {stato === 'confermato' ? (
               <div className="esito">
                 <span className="esito-icona" aria-hidden="true"><Icona nome="spunta" dimensione={40} strokeWidth={2.4} /></span>
-                <h1>Prenotazione confermata</h1>
+                <h2>Prenotazione confermata</h2>
                 <p>Il tuo codice è <b>{pnr}</b>. Ti abbiamo mandato la conferma a <b>{dati.email}</b>; il biglietto con il numero del bus arriva via email prima della partenza.</p>
               </div>
             ) : (
@@ -136,7 +137,7 @@ export function FinalizzaListaAttesaPage() {
             )}
           </div>
         )}
-      </div>
+      </main>
     </Layout>
   );
 }

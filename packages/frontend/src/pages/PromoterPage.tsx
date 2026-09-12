@@ -11,6 +11,7 @@ import { eventiApi } from '../api/eventi';
 import type { Evento } from '../api/types';
 import { ErroreApi } from '../api/client';
 import { CookieBanner } from '../features/CookieBanner';
+import { useSeoTags } from '../features/useSeoTags';
 import { formattaEuro, formattaData, plurale } from '../shared/formato';
 
 const CHIAVE_TOKEN = 'inbus_promoter_token';
@@ -20,6 +21,11 @@ function fmtDataBreve(iso: string) {
 }
 
 export function PromoterPage() {
+  useSeoTags({
+    title: 'Area promoter — OnWay',
+    description: 'Accedi all\'area promoter OnWay: i link dei tuoi eventi, i coupon e le vendite.',
+    url: `${window.location.origin}/promoter`,
+  });
   const [loggato, setLoggato] = useState(() => !!localStorage.getItem(CHIAVE_TOKEN));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -199,6 +199,6 @@
   display:flex; flex-direction:column; align-items:center; gap:var(--sp-3); text-align:center;
   padding:var(--sp-12) var(--sp-4); border:1px dashed var(--btn-bordo); border-radius:var(--radius);
 }
-.stato-vuoto h3{ margin:0; font-family:var(--font-sans); font-size:var(--t-h3); font-weight:800; text-transform:none; }
+.stato-vuoto :is(h2, h3){ margin:0; font-family:var(--font-sans); font-size:var(--t-h3); font-weight:800; text-transform:none; }
 .stato-vuoto p{ margin:0; color:var(--ow-muted); max-width:44ch; font-size:var(--t-small); line-height:var(--lh-normal); }
 .stato-vuoto .btn{ margin-top:var(--sp-2); }

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { MESSAGGIO_CONNESSIONE } from '../shared/errori';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -39,7 +40,8 @@ export function ModaleRimborso({ pnr, email, onChiudi, onInviata }: {
       onInviata();
       onChiudi();
     } catch (err) {
-      setErrore(err instanceof Error ? err.message : 'Richiesta non riuscita, riprova.');
+      // TypeError = la richiesta non è partita (rete): il suo testo è inglese.
+      setErrore(err instanceof TypeError ? MESSAGGIO_CONNESSIONE : err instanceof Error ? err.message : 'Richiesta non riuscita, riprova.');
       setInvio(false);
     }
   }

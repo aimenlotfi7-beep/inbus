@@ -13,6 +13,7 @@ import { ACCONTO_PREDEFINITO_EUR } from '../features/checkout/CheckoutForm';
 import { formattaDataCard, inizialiDi } from '../features/eventi/EventoCard';
 import { Icona } from '../features/Icone';
 import { formattaData, formattaEuro, plurale } from '../shared/formato';
+import { MESSAGGIO_CONNESSIONE, testoErrore } from '../shared/errori';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 /** Giorni prima della partenza entro cui va saldato il resto — stesso
@@ -94,7 +95,7 @@ export function CarrelloPage() {
       if (!r.ok) throw new Error(dati.errore ?? 'Codice non valido.');
       setCouponVerificato(dati);
     } catch (e) {
-      setCouponErrore(e instanceof Error ? e.message : 'Codice non valido.');
+      setCouponErrore(e instanceof TypeError ? MESSAGGIO_CONNESSIONE : e instanceof Error ? e.message : 'Codice non valido.');
     } finally {
       setVerificandoCoupon(false);
     }
@@ -164,7 +165,7 @@ export function CarrelloPage() {
       if (e instanceof ErroreApi && e.status === 409) {
         setErrore(`${e.message} Accedi con quella email, oppure torna all'evento e cambia l'indirizzo nel passo «I tuoi dati».`);
       } else {
-        setErrore(e instanceof Error ? e.message : 'Prenotazione non riuscita. Riprova.');
+        setErrore(testoErrore(e));
       }
     } finally {
       setInviando(false);
@@ -173,7 +174,7 @@ export function CarrelloPage() {
 
   if (esito) {
     return (
-      <div className="container-form carrello">
+      <main className="container-form carrello">
         <div className="pannello-chiaro superficie-chiara">
           <div className="esito">
             <span className="esito-icona" aria-hidden="true"><Icona nome="spunta" dimensione={40} strokeWidth={2.4} /></span>
@@ -196,12 +197,12 @@ export function CarrelloPage() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="container-form carrello">
+    <main className="container-form carrello">
       <div className="carrello-testata">
         <Stepper voci={['Fermata e posti', 'I tuoi dati', 'Riepilogo']} attivo={2} />
         <h1>Riepilogo</h1>
@@ -211,7 +212,7 @@ export function CarrelloPage() {
       <div className="pannello-chiaro superficie-chiara">
         {articoli.length === 0 ? (
           <div className="stato-vuoto">
-            <h3>Il carrello è vuoto</h3>
+            <h2>Il carrello è vuoto</h2>
             <p>Scegli un evento e la tua fermata di partenza: il riepilogo compare qui.</p>
             <Link className="btn btn-primary" to="/#eventi">Scopri gli eventi</Link>
           </div>
@@ -311,7 +312,7 @@ export function CarrelloPage() {
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }
 
