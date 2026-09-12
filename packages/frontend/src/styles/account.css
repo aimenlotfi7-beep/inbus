@@ -228,10 +228,15 @@
   display:inline-flex; align-items:center; min-height:28px; padding:0 var(--sp-3); border-radius:var(--radius-pill);
   background:var(--ow-accent); color:var(--ow-ink); font-size:var(--t-caption); font-weight:700;
 }
-.account-cliente .prossimo-viaggio-azioni{ display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-2); }
+/* I pulsanti sono figli diretti della card (non del corpo): sul computer
+   stanno nella colonna del testo, sotto; sul telefono su tutta la larghezza. */
+.account-cliente .prossimo-viaggio{ row-gap:var(--sp-4); }
+.account-cliente .prossimo-viaggio-azioni{ grid-column:2; display:flex; flex-wrap:wrap; gap:var(--sp-2); min-width:0; }
+.account-cliente .prossimo-viaggio:not(:has(.prossimo-viaggio-media)) .prossimo-viaggio-azioni{ grid-column:1; }
+.account-cliente .prossimo-viaggio-azioni .btn{ max-width:100%; white-space:normal; text-align:center; }
 @media (max-width:640px){
   .account-cliente .prossimo-viaggio{ grid-template-columns:88px minmax(0,1fr); gap:var(--sp-4); padding:var(--sp-4); }
-  .account-cliente .prossimo-viaggio-azioni{ width:100%; }
+  .account-cliente .prossimo-viaggio-azioni{ grid-column:1 / -1; }
   .account-cliente .prossimo-viaggio-azioni .btn{ flex:1 1 auto; }
 }
 

@@ -305,10 +305,14 @@ function CardProssimoViaggio({ dati, onApri, onScrivi }: {
           </li>
         </ul>
         )}
+      </div>
 
-        {/* Il giorno della partenza: prima di tutto come arrivare alla
-            fermata, poi chat e assistenza a portata di pollice. */}
-        {giorni <= 0 && p.fermataIndirizzo ? (
+      {/* Fuori da .prossimo-viaggio-corpo: su telefono i pulsanti prendono
+          tutta la larghezza della card, non la colonna accanto alla foto
+          (a 390px "Apri la mappa della fermata" usciva dalla card).
+          Il giorno della partenza: prima di tutto come arrivare alla
+          fermata, poi chat e assistenza a portata di pollice. */}
+      {giorni <= 0 && p.fermataIndirizzo ? (
           <div className="prossimo-viaggio-azioni">
             <a
               className="btn btn-primary"
@@ -332,7 +336,6 @@ function CardProssimoViaggio({ dati, onApri, onScrivi }: {
             <button type="button" className="btn btn-secondary" onClick={onScrivi}>Scrivi allo staff</button>
           </div>
         )}
-      </div>
     </article>
   );
 }
