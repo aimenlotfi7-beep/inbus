@@ -1,121 +1,259 @@
 /* ============================================================
-   OnWay — sito pubblico · PAGINA EVENTO / OFFERTA / TOUR / BUNDLE
-   Colonna sinistra: immagine + informazioni. Colonna destra: la
-   card chiara del checkout (superficie chiara: vedi base.css).
-   Qui anche il percorso del bus, l'accordion e la barra fissa
-   "Acquista ora" su mobile.
+   OnWay — sito pubblico · PAGINA EVENTO / OFFERTA
+   ------------------------------------------------------------
+   Componente: src/features/evento/EventoDettaglio.tsx (usato da
+   EventoPage e OffertaPage). Due colonne da 901px in su (contenuto +
+   pannello di prenotazione appiccicoso, 420px); una colonna sotto,
+   dove il modulo vive in un foglio a schermo intero aperto dalla
+   barra fissa "Prenota". Qui anche il popup del percorso del bus,
+   i pulsanti-icona (44×44) e, in fondo, le poche classi storiche
+   che la pagina bundle (BundleFlusso.tsx) usa ancora.
+   I colori degli stati (posti, avvisi) passano dai token --tinta-*:
+   versione chiara del colore su fondo scuro, versione "ink" sulle
+   superfici chiare (pannello, foglio, modulo).
    ============================================================ */
 
-.evento-pagina-corpo{ display:grid; grid-template-columns:.85fr 1.15fr; gap:44px; align-items:start; }
-.evento-pagina-hero{
-  width:100%; aspect-ratio:1080/1350; background-size:cover; background-position:center;
-  border-radius:var(--radius-lg); position:relative; overflow:hidden; margin-bottom:20px;
+:root{
+  --tinta-ok:     var(--ow-ok);
+  --tinta-warn:   var(--ow-warn);
+  --tinta-danger: var(--ow-danger);
 }
-.evento-pagina-hero.senza-foto{ background:linear-gradient(135deg, #1B2130, var(--night)); }
-.evento-pagina-hero .tag{ position:absolute; top:14px; left:14px; }
-.evento-pagina-info h1{ font-family:var(--font-sans); font-weight:800; text-transform:uppercase; font-size:var(--testo-5xl); margin:0 0 10px; }
-.evento-pagina-info .meta-riga{ color:var(--mist); font-size:var(--testo-lg); margin:0 0 4px; }
-.evento-pagina-info .sezione-info{
-  background:var(--dusk-2); border:1px solid rgba(255,255,255,.08); border-radius:14px;
-  padding:20px; margin-top:22px; white-space:pre-line; font-size:var(--testo-lg); line-height:1.6; color:var(--mist);
-  scroll-margin-top:calc(var(--header-h) + 8px); /* l'header appiccicoso non copre l'inizio quando si salta con l'ancoraggio */
+.superficie-chiara, .checkout-form, .checkout-modal, .pannello-chiaro, .prenota-pannello{
+  --tinta-ok:     var(--ow-ok-ink);
+  --tinta-warn:   var(--ow-warn-ink);
+  --tinta-danger: var(--ow-danger-ink);
 }
-.evento-pagina-info .sezione-info h4{
-  font-family:var(--font-sans); font-size:var(--testo-md); text-transform:uppercase; letter-spacing:.5px;
-  color:var(--paper); margin:0 0 10px;
-}
-.evento-pagina-info .galleria{
-  display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:8px; margin-top:20px;
-}
-.evento-pagina-info .galleria img{ width:100%; height:70px; object-fit:cover; border-radius:var(--radius-sm); }
 
-/* Card del checkout: chiara, appiccicosa sotto l'header */
-.evento-pagina-checkout{
-  background:var(--paper); color:var(--ink); border-radius:18px; padding:30px;
-  position:sticky; top:calc(var(--header-h) + 24px); min-height:440px; display:flex; flex-direction:column;
+/* ---------- STRUTTURA ---------- */
+.evento-pagina{ padding-block:var(--sp-6) var(--section-y); }
+.evento-griglia{ display:grid; grid-template-columns:minmax(0,1fr); gap:var(--sp-8); align-items:start; }
+.evento-principale{ min-width:0; display:flex; flex-direction:column; gap:var(--sp-8); }
+.evento-principale > *{ min-width:0; }
+.evento-lato{ display:none; min-width:0; }
+@media (min-width:901px){
+  .evento-griglia{ grid-template-columns:minmax(0,1fr) 420px; gap:var(--sp-10); }
+  .evento-lato{ display:block; }
 }
-.checkout-form{ display:flex; flex-direction:column; flex:1; width:100%; box-sizing:border-box; }
-
-/* Riepilogo compatto (prezzo + Prenota) al posto del modulo intero:
-   solo su cellulare, e solo finché non lo si apre. */
-.checkout-riepilogo-chiuso{
-  display:none; width:100%; align-items:center; justify-content:space-between;
-  background:none; border:none; padding:0; font-size:var(--testo-lg); cursor:pointer;
-}
-.checkout-riepilogo-chiuso b{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--testo-3xl); }
-.checkout-riepilogo-cta{
-  background:var(--ow-accent); color:var(--ow-ink); font-weight:700; padding:11px 22px; border-radius:var(--radius-pill); font-size:var(--testo-lg);
-}
-.checkout-form-wrap{ display:block; }
-
-/* Barra fissa in fondo allo schermo: nascosta di base, appare solo
-   nel media query mobile e solo mentre il modulo è chiuso (React). */
-.barra-prenota-fissa-mobile{ display:none; }
-
-/* Pulsanti "salta a": solo su cellulare */
-.salti-rapidi-mobile{ display:none; }
-
 @media (max-width:900px){
-  .evento-pagina-corpo{ grid-template-columns:1fr; gap:24px; padding-bottom:70px; }
-  /* Chiuso: il contenitore intero sparisce, la barra fissa in fondo
-     fa da sola "prezzo + Prenota". Si apre toccando quella barra. */
-  .evento-pagina-checkout{ display:none; }
-  .evento-pagina-checkout.aperta-mobile{ display:block; position:static; padding:30px; min-height:440px; }
-  .evento-pagina-hero{ aspect-ratio:1080/1350; max-width:320px; }
-  .salti-rapidi-mobile{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
-  .salti-rapidi-mobile .btn{ min-height:var(--control-h-sm); padding:0 var(--sp-4); font-size:var(--t-caption); text-decoration:none; }
-
-  /* Su mobile il riepilogo-chiuso inline NON si vede: c'è già la
-     barra fissa che fa lo stesso lavoro, sempre sotto il pollice. */
-  .checkout-riepilogo-chiuso{ display:none; }
-  .checkout-form-wrap{ display:none; }
-  .evento-pagina-checkout.aperta-mobile .checkout-riepilogo-chiuso{ display:none; }
-  .evento-pagina-checkout.aperta-mobile .checkout-form-wrap{ display:block; }
-
-  .barra-prenota-fissa-mobile{
-    display:flex; align-items:center; justify-content:space-between; gap:14px;
-    position:fixed; left:0; right:0; bottom:0; z-index:var(--z-barra);
-    background:var(--paper); color:var(--ink); padding:14px 18px;
-    padding-bottom:calc(14px + env(safe-area-inset-bottom)); /* iPhone con barra home */
-    box-shadow:0 -4px 18px rgba(0,0,0,.25);
-  }
-  .barra-prenota-fissa-mobile b{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.02em; font-size:var(--testo-2xl); }
-  .barra-prenota-fissa-mobile button{
-    background:var(--ow-accent); color:var(--ow-ink); font-weight:800; padding:12px 26px; border-radius:var(--radius-pill);
-    border:none; font-size:var(--testo-lg); cursor:pointer; white-space:nowrap; min-height:var(--tap);
-  }
+  /* Spazio per la barra fissa "Prenota" in fondo allo schermo */
+  .evento-pagina{ padding-bottom:calc(var(--section-y) + 88px); }
+  .evento-principale{ gap:var(--sp-6); }
 }
-/* Finché il banner cookie è aperto (body.con-cookie-banner, messo da
-   CookieBanner.tsx) la barra "Acquista ora" resta nascosta: altrimenti
-   finiva sotto il banner. Più specifica della regola nel media query. */
-body.con-cookie-banner .barra-prenota-fissa-mobile{ display:none; }
+
+/* ---------- COPERTINA ---------- */
+.evento-cover{
+  position:relative; width:100%; aspect-ratio:3/2; max-height:440px; overflow:hidden;
+  border-radius:var(--radius-lg); background:var(--ow-surface-2);
+}
+.evento-cover img{ width:100%; height:100%; object-fit:cover; }
+.evento-cover-segnaposto{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:var(--sp-6); text-align:center;
+  background:linear-gradient(135deg, #2C3444 0%, var(--ow-surface-2) 55%, #1B2130 100%);
+  font-family:var(--font-sans); font-weight:800; font-size:var(--t-h2); letter-spacing:-.02em; color:rgba(247,245,241,.6); user-select:none;
+}
+.evento-cover-genere{
+  position:absolute; top:var(--sp-3); left:var(--sp-3); display:inline-flex; align-items:center; min-height:26px; padding:0 10px;
+  border-radius:var(--radius-pill); background:rgba(14,17,22,.8); backdrop-filter:blur(4px); color:var(--ow-paper);
+  font-family:var(--font-mono); font-size:var(--t-label); font-weight:700; letter-spacing:.5px; text-transform:uppercase; white-space:nowrap;
+}
+.evento-cover-condividi{ position:absolute; top:var(--sp-3); right:var(--sp-3); }
+/* PulsanteCondividi porta le sue misure in linea (38px): qui serve l'area toccabile piena. */
+.evento-cover-condividi > button{ width:var(--tap) !important; height:var(--tap) !important; }
+
+/* ---------- TITOLO, INFORMAZIONI, STATO, PREZZO ---------- */
+.evento-testata{ display:flex; flex-direction:column; align-items:flex-start; gap:var(--sp-3); }
+.evento-testata h1{
+  margin:0; font-family:var(--font-sans); font-size:var(--t-h1); font-weight:800; letter-spacing:-.02em;
+  line-height:var(--lh-tight); text-transform:none;
+}
+.evento-meta{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--sp-2); }
+.evento-meta li{ display:flex; align-items:flex-start; gap:var(--sp-2); font-size:var(--t-body); color:var(--ow-paper); }
+.evento-meta svg{ flex-shrink:0; margin-top:2px; color:var(--ow-muted); }
+.evento-stato .badge-stato{ position:static; }
+.badge-stato.chiuso{ color:var(--ow-muted); }
+.banner-offerta{
+  margin:0; padding:var(--sp-3) var(--sp-4); border-radius:var(--radius-sm);
+  background:rgba(87,211,154,.14); border:1px solid rgba(87,211,154,.45); color:var(--ow-ok);
+  font-size:var(--t-small); font-weight:600;
+}
+.evento-prezzo{ margin:var(--sp-1) 0 0; display:flex; flex-direction:column; gap:2px; }
+.evento-prezzo b{ font-size:var(--t-h2); font-weight:800; letter-spacing:-.02em; line-height:1.1; }
+.evento-prezzo span{ font-size:var(--t-caption); color:var(--ow-muted); }
+.evento-prova-sociale{ margin:0; font-size:var(--t-caption); color:var(--ow-muted); }
+
+/* ---------- SEZIONI DELLA COLONNA SINISTRA ---------- */
+.evento-sezione{ scroll-margin-top:calc(var(--header-h) + var(--sp-4)); }
+.evento-sezione-testata{ margin-bottom:var(--sp-4); }
+.evento-sezione h2{
+  margin:0; font-family:var(--font-sans); font-size:var(--t-h3); font-weight:800; letter-spacing:-.01em; text-transform:none;
+}
+.evento-sezione-sub{ margin:var(--sp-1) 0 0; font-size:var(--t-caption); color:var(--ow-muted); }
+
+/* Partenze: una riga-pulsante per fermata. Desktop: città e indirizzo |
+   orari | prezzo e posti | "Scegli". Telefono: due colonne su due righe. */
+.partenze-gruppo{
+  margin:var(--sp-4) 0 var(--sp-2); font-family:var(--font-mono); font-size:var(--t-label); font-weight:700;
+  letter-spacing:1px; text-transform:uppercase; color:var(--ow-muted);
+}
+.partenze-elenco{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--sp-2); }
+.partenza-riga{
+  display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"info prezzo" "orari cta";
+  gap:var(--sp-2) var(--sp-4); align-items:center; width:100%; min-height:56px; padding:var(--sp-3) var(--sp-4);
+  text-align:left; background:var(--ow-surface); border:1px solid var(--ow-line); border-radius:var(--radius);
+  color:inherit; font:inherit; cursor:pointer; transition:border-color .15s ease, background .15s ease;
+}
+@media (min-width:641px){
+  .partenza-riga{ grid-template-columns:minmax(0,1fr) auto auto auto; grid-template-areas:"info orari prezzo cta"; gap:var(--sp-5); }
+}
+@media (hover:hover){
+  .partenza-riga:not(:disabled):hover{ border-color:var(--ow-accent-line); background:var(--ow-surface-2); }
+}
+.partenza-riga:disabled{ cursor:default; opacity:.7; }
+.partenza-info{ grid-area:info; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.partenza-citta{ font-weight:700; font-size:var(--t-body); overflow-wrap:anywhere; }
+.partenza-indirizzo{ font-size:var(--t-caption); color:var(--ow-muted); overflow-wrap:anywhere; }
+.partenza-orari{ grid-area:orari; display:flex; align-items:center; gap:6px; font-size:var(--t-caption); color:var(--ow-muted); white-space:nowrap; }
+.partenza-orari svg{ flex-shrink:0; }
+.partenza-prezzo{ grid-area:prezzo; display:flex; flex-direction:column; align-items:flex-end; gap:2px; text-align:right; }
+.partenza-prezzo b{ font-size:var(--t-h4); font-weight:800; white-space:nowrap; }
+.partenza-prezzo small{ font-size:var(--t-label); color:var(--ow-muted); white-space:nowrap; }
+.partenza-cta{
+  grid-area:cta; justify-self:end; display:inline-flex; align-items:center; gap:4px; min-height:32px; padding:0 var(--sp-3);
+  border-radius:var(--radius-pill); background:var(--ow-accent); color:var(--ow-ink); font-size:var(--t-caption); font-weight:700; white-space:nowrap;
+  transition:background .15s ease;
+}
+@media (hover:hover){ .partenza-riga:not(:disabled):hover .partenza-cta{ background:var(--ow-accent-press); } }
+/* Disponibilità: colore + testo, mai solo colore (anche in SceltaFermata) */
+.fermata-posti{ font-size:var(--t-caption); font-weight:600; white-space:nowrap; }
+.fermata-posti.ok{ color:var(--tinta-ok); }
+.fermata-posti.pochi{ color:var(--tinta-warn); }
+.fermata-posti.esaurito{ color:var(--tinta-danger); }
+
+/* Informazioni pratiche: pannello scuro con righe icona + testo */
+.pannello{
+  background:var(--ow-surface); border:1px solid var(--ow-line); border-radius:var(--radius); padding:var(--sp-5);
+  display:flex; flex-direction:column; gap:var(--sp-3);
+}
+.pannello h2{ margin:0 0 var(--sp-1); font-family:var(--font-sans); font-size:var(--t-h4); font-weight:800; text-transform:none; }
+.pannello-riga{ display:flex; gap:var(--sp-3); align-items:flex-start; margin:0; font-size:var(--t-small); line-height:var(--lh-normal); color:var(--ow-paper); }
+.pannello-riga svg{ flex-shrink:0; margin-top:2px; color:var(--ow-accent); }
+.pannello-riga .testo{ min-width:0; white-space:pre-line; overflow-wrap:anywhere; }
+.pannello-riga b{ display:block; font-weight:700; }
+.pannello-riga a, .evento-termini a{ text-decoration:underline; text-underline-offset:3px; font-weight:600; }
+.evento-termini{ margin:0; display:flex; align-items:center; gap:var(--sp-2); font-size:var(--t-caption); color:var(--ow-muted); }
+
+/* Descrizione: prosa, troncata a 8 righe finché non si apre */
+.evento-descrizione p{
+  margin:0; max-width:70ch; white-space:pre-line; font-size:var(--t-body); line-height:var(--lh-relaxed); color:var(--ow-muted);
+  overflow-wrap:anywhere;
+}
+.evento-descrizione p.tronca{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:8; overflow:hidden; }
+.evento-descrizione .btn-tertiary{ margin-top:var(--sp-2); padding-inline:0; }
+
+/* Galleria: miniature 3:2 e foto grande in un <dialog> */
+.evento-galleria{ display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:var(--sp-2); }
+.evento-galleria button{
+  display:block; width:100%; padding:0; border:0; aspect-ratio:3/2; overflow:hidden;
+  background:var(--ow-surface-2); border-radius:var(--radius-sm); cursor:pointer;
+}
+.evento-galleria img{ width:100%; height:100%; object-fit:cover; transition:transform .2s ease; }
+@media (hover:hover){ .evento-galleria button:hover img{ transform:scale(1.04); } }
+.galleria-dialog{
+  padding:0; border:0; background:transparent; color:var(--ow-paper);
+  max-width:min(96vw, 1200px); max-height:96vh; overflow:visible;
+}
+.galleria-dialog::backdrop{ background:rgba(0,0,0,.82); }
+.galleria-dialog-corpo{ display:flex; flex-direction:column; align-items:center; gap:var(--sp-3); }
+.galleria-dialog img{ max-width:96vw; max-height:82vh; width:auto; height:auto; border-radius:var(--radius); object-fit:contain; }
+
+/* I correlati dentro la colonna: niente padding di sezione in più */
+.evento-principale .events-section{ padding-block:var(--sp-2) 0; }
+
+/* ---------- PANNELLO DI PRENOTAZIONE (superficie chiara) ----------
+   .pannello-chiaro: la stessa carta usata dal carrello e dalle pagine
+   di saldo, lista d'attesa e variazione (nel markup va con
+   .superficie-chiara, che dà i colori del contesto — base.css). */
+.pannello-chiaro, .prenota-pannello{
+  background:var(--ow-paper); color:var(--ow-ink); border-radius:var(--radius-lg); padding:var(--sp-6);
+}
+.evento-lato .prenota-pannello{
+  position:sticky; top:calc(var(--header-h) + var(--sp-4));
+  max-height:calc(100vh - var(--header-h) - var(--sp-8)); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin;
+}
+.prenota-titolo{ margin:0 0 var(--sp-4); font-family:var(--font-sans); font-size:var(--t-h4); font-weight:800; text-transform:none; }
+@media (max-width:480px){
+  .pannello-chiaro, .prenota-pannello{ padding:var(--sp-4); border-radius:var(--radius); }
+}
+
+/* ---------- PULSANTE-ICONA 44×44 (chiudi foglio, popup, galleria) ---------- */
+.btn-icona{
+  display:inline-flex; align-items:center; justify-content:center; width:var(--tap); height:var(--tap); padding:0; flex-shrink:0;
+  border-radius:50%; border:1px solid var(--btn-bordo); background:transparent; color:var(--btn-testo); cursor:pointer;
+  transition:border-color .15s ease, background .15s ease;
+}
+.btn-icona:hover{ border-color:var(--btn-bordo-hover); background:var(--btn-sfondo-hover); }
+
+/* ---------- TELEFONI: barra fissa e foglio a schermo intero ---------- */
+.barra-prenota{
+  position:fixed; left:0; right:0; bottom:0; z-index:var(--z-barra);
+  display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); min-height:64px;
+  padding:var(--sp-2) var(--gutter); padding-bottom:calc(var(--sp-2) + env(safe-area-inset-bottom));
+  background:rgba(14,17,22,.96); backdrop-filter:blur(10px); border-top:1px solid var(--ow-line); box-shadow:0 -8px 24px rgba(0,0,0,.35);
+}
+.barra-prenota-prezzo{ margin:0; display:flex; flex-direction:column; line-height:1.15; min-width:0; }
+.barra-prenota-prezzo b{ font-size:var(--t-h4); font-weight:800; white-space:nowrap; }
+.barra-prenota-prezzo span{ font-size:var(--t-caption); color:var(--ow-muted); }
+.barra-prenota .btn{ flex:0 0 auto; min-height:var(--control-h); padding-inline:var(--sp-6); }
+@media (min-width:901px){ .barra-prenota{ display:none; } }
+/* Finché il banner cookie è aperto (body.con-cookie-banner, da
+   CookieBanner.tsx) la barra resta nascosta: altrimenti ci finiva sotto. */
+body.con-cookie-banner .barra-prenota{ display:none; }
+
+.foglio-prenota{
+  position:fixed; inset:0; z-index:var(--z-modale); background:var(--ow-paper); color:var(--ow-ink);
+  overflow:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+}
+.foglio-prenota-testata{
+  position:sticky; top:0; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3);
+  padding:var(--sp-2) var(--gutter); padding-top:calc(var(--sp-2) + env(safe-area-inset-top));
+  background:var(--ow-paper); border-bottom:1px solid var(--ow-line-ink);
+}
+.foglio-prenota-testata h2{ margin:0; font-family:var(--font-sans); font-size:var(--t-h4); font-weight:800; text-transform:none; }
+.foglio-prenota-corpo{ padding:var(--sp-4) var(--gutter) calc(var(--sp-10) + env(safe-area-inset-bottom)); }
+
+/* ---------- SCHELETRO (caricamento) — i keyframes sono in card.css ---------- */
+.evento-scheletro .evento-principale{ gap:var(--sp-3); }
+.scheletro-cover{ aspect-ratio:3/2; max-height:440px; border-radius:var(--radius-lg); background:var(--ow-surface-2); margin-bottom:var(--sp-4); }
+.scheletro-riga{ display:block; height:14px; border-radius:var(--radius-sm); background:var(--ow-surface-2); }
+.scheletro-riga.titolo{ height:36px; width:60%; }
+.scheletro-riga.media{ width:45%; }
+.scheletro-riga.corta{ width:30%; }
+.scheletro-riga.lunga{ width:85%; }
+.scheletro-pannello{ height:440px; border-radius:var(--radius-lg); background:var(--ow-surface); }
+.scheletro-cover, .scheletro-riga, .scheletro-pannello{ animation:scheletro-pulsa 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion:reduce){
+  .scheletro-cover, .scheletro-riga, .scheletro-pannello{ animation:none; opacity:.75; }
+}
 
 /* ---------- PERCORSO BUS (popup "il percorso del tuo bus") ----------
-   Classi proprie, non riusa .travel-* di account.css. Superficie
-   scura dentro il checkout chiaro: base.css la riporta al contesto
-   scuro (.percorso-popup-card). */
+   Superficie scura dentro il modulo chiaro: base.css la riporta al
+   contesto scuro (.percorso-popup-card). */
 .percorso-popup-overlay{
   position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:var(--z-modale);
-  display:flex; align-items:center; justify-content:center; padding:20px;
+  display:flex; align-items:center; justify-content:center; padding:var(--sp-5);
 }
 .percorso-popup-card{
-  background:var(--night); border:1px solid var(--line); border-radius:var(--radius-lg);
-  width:100%; max-width:480px; max-height:85vh; overflow-y:auto; padding:26px 22px; color:var(--paper);
+  background:var(--ow-night); border:1px solid var(--ow-line); border-radius:var(--radius-lg);
+  width:100%; max-width:480px; max-height:85vh; overflow-y:auto; padding:var(--sp-5); color:var(--ow-paper);
 }
-.percorso-popup-close{
-  background:none; border:none; color:var(--mist); font-size:var(--testo-3xl); cursor:pointer; float:right; line-height:1; padding:4px;
-}
-.percorso-bus-blocco{ margin-top:24px; }
-.percorso-bus-blocco h4{
-  font-family:var(--font-sans); font-size:var(--testo-md); text-transform:uppercase; letter-spacing:.5px;
-  color:var(--paper); margin:0 0 12px;
-}
+.percorso-popup-testata{ display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); }
+.percorso-popup-testata h3{ margin:0; font-family:var(--font-sans); font-size:var(--t-h4); font-weight:800; text-transform:none; }
+.percorso-bus-blocco{ margin-top:var(--sp-4); }
 .percorso-tappe{ position:relative; padding-left:22px; }
 .percorso-tappa{ position:relative; padding-bottom:18px; }
 .percorso-tappa:last-child{ padding-bottom:0; }
-/* La fermata scelta dal cliente, in risalto SOLO sul contenuto: la
-   riga contiene anche il puntino posizionato in assoluto, spostarla
-   disallineerebbe la linea dei puntini. */
+/* La fermata scelta, in risalto SOLO sul contenuto: il puntino è
+   posizionato in assoluto e non deve spostarsi. */
 .percorso-tappa.evidenziata .percorso-tappa-corpo{
   background:var(--ow-accent-soft); border:1px solid var(--ow-accent); border-radius:var(--radius-sm); padding:8px 12px;
 }
@@ -123,20 +261,40 @@ body.con-cookie-banner .barra-prenota-fissa-mobile{ display:none; }
   position:absolute; left:-22px; top:4px; width:10px; height:10px; border-radius:50%;
   background:var(--ow-accent); border:2px solid var(--ow-night);
 }
-.percorso-tappa-puntino.arrivo{ background:var(--blue, #5b8dff); }
+.percorso-tappa-puntino.arrivo{ background:var(--ow-paper); }
 .percorso-tappa:not(:last-child)::before{
   content:''; position:absolute; left:-18px; top:14px; bottom:-4px; width:1px; background:rgba(255,255,255,.15);
 }
-.percorso-tappa-corpo{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:var(--testo-lg); color:var(--paper); }
-.percorso-tappa-corpo b{ font-size:var(--testo-lg); color:var(--paper); }
-.percorso-orario{ color:var(--mist); font-size:var(--testo-md); }
-.percorso-posti{ font-size:var(--testo-xs); padding:2px 9px; border-radius:var(--radius-pill); font-weight:600; }
-/* Stati: colore + etichetta testuale, mai solo colore */
+.percorso-tappa-corpo{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:var(--t-small); color:var(--ow-paper); }
+.percorso-tappa-corpo b{ font-size:var(--t-small); color:var(--ow-paper); }
+.percorso-orario{ color:var(--ow-muted); font-size:var(--t-caption); }
+.percorso-posti{ font-size:var(--t-label); padding:2px 9px; border-radius:var(--radius-pill); font-weight:600; }
 .percorso-posti.disponibile{ background:rgba(87,211,154,.16); color:var(--ow-ok); }
 .percorso-posti.pochi{ background:rgba(255,180,61,.16); color:var(--ow-warn); }
 .percorso-posti.esaurito{ background:rgba(255,138,138,.16); color:var(--ow-danger); }
 
-/* ---------- ACCORDION EVENTO (Descrizione/Informazioni/Partenze) ---------- */
-.accordion-evento{ margin-top:22px; }
-.accordion-evento-pulsanti{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
-.accordion-evento-pulsanti .btn.active{ background:var(--ow-accent); border-color:var(--ow-accent); color:var(--ow-ink); }
+/* ---------- COMPATIBILITÀ: pagina bundle (BundleFlusso.tsx) ----------
+   Usa ancora le classi della vecchia pagina evento. Restano qui,
+   ridotte all'essenziale, finché quel flusso non viene ridisegnato. */
+.evento-pagina-corpo{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); gap:var(--sp-10); align-items:start; }
+.evento-pagina-info{ min-width:0; }
+.evento-pagina-hero{
+  position:relative; width:100%; aspect-ratio:3/2; background-color:var(--ow-surface-2); background-size:cover; background-position:center;
+  border-radius:var(--radius-lg); overflow:hidden; margin-bottom:var(--sp-5);
+}
+.evento-pagina-hero.senza-foto{ background:linear-gradient(135deg, #1B2130, var(--ow-night)); }
+.evento-pagina-hero .tag{
+  position:absolute; top:var(--sp-3); left:var(--sp-3); display:inline-flex; align-items:center; min-height:26px; padding:0 10px;
+  border-radius:var(--radius-pill); background:rgba(14,17,22,.8); color:var(--ow-paper);
+  font-family:var(--font-mono); font-size:var(--t-label); font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+}
+.evento-pagina-info h1{ margin:0 0 var(--sp-2); font-family:var(--font-sans); font-size:var(--t-h1); font-weight:800; letter-spacing:-.02em; text-transform:none; }
+.evento-pagina-info .meta-riga{ margin:0 0 var(--sp-1); color:var(--ow-muted); font-size:var(--t-small); }
+.evento-pagina-checkout{
+  background:var(--ow-paper); color:var(--ow-ink); border-radius:var(--radius-lg); padding:var(--sp-6);
+  position:sticky; top:calc(var(--header-h) + var(--sp-4));
+}
+@media (max-width:900px){
+  .evento-pagina-corpo{ grid-template-columns:1fr; gap:var(--sp-6); }
+  .evento-pagina-checkout{ position:static; }
+}

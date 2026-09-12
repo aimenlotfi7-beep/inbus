@@ -5,10 +5,16 @@ import { eventiApi } from '../api/eventi';
 import { ErroreApi } from '../api/client';
 import type { OpzionePartenza } from '../api/types';
 import { Layout } from '../Layout';
-import { formattaEuro } from '../shared/formato';
+import { SceltaFermata } from '../features/checkout/SceltaFermata';
+import { formattaDataCard } from '../features/eventi/EventoCard';
+import { Icona } from '../features/Icone';
+import { formattaEuro, plurale } from '../shared/formato';
 
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'errore' | 'non-trovato';
 
+/** /finalizza/:token — dal link della lista d'attesa: si è liberato un
+ *  posto, il cliente sceglie la fermata e conferma. Solo le fermate con
+ *  posti: qui non c'è più una lista d'attesa a cui iscriversi. */
 export function FinalizzaListaAttesaPage() {
   const { token } = useParams<{ token: string }>();
   const [stato, setStato] = useState<Stato>('caricamento');
@@ -18,9 +24,11 @@ export function FinalizzaListaAttesaPage() {
   const [messaggioErrore, setMessaggioErrore] = useState('');
   const [pnr, setPnr] = useState('');
   const [azioneInCorso, setAzioneInCorso] = useState<'acquista' | 'acconto' | null>(null);
+  const [tentativo, setTentativo] = useState(0);
 
   useEffect(() => {
     if (!token) return;
+    setStato('caricamento');
     listaAttesaApi.getByToken(token)
       .then(async (d) => {
         setDati(d);
@@ -32,13 +40,15 @@ export function FinalizzaListaAttesaPage() {
         setStato('pronto');
       })
       .catch((e) => setStato(e instanceof ErroreApi && e.status === 404 ? 'non-trovato' : 'errore'));
-  }, [token]);
+  }, [token, tentativo]);
 
-  const opzioneScelta = opzioni.find((o) => o.fermataId === fermataId);
+  const disponibili = opzioni.filter((o) => o.postiDisponibili > 0);
+  const opzioneScelta = disponibili.find((o) => o.fermataId === fermataId);
   const totale = dati && opzioneScelta ? opzioneScelta.prezzoEffettivo * dati.passeggeri : 0;
+  const invio = stato === 'invio';
 
   async function conferma(tipoPagamento: 'COMPLETO' | 'ACCONTO') {
-    if (!token || !opzioneScelta) return;
+    if (!token || !opzioneScelta) { setMessaggioErrore('Scegli una fermata di partenza per continuare'); return; }
     setStato('invio');
     setAzioneInCorso(tipoPagamento === 'COMPLETO' ? 'acquista' : 'acconto');
     setMessaggioErrore('');
@@ -60,61 +70,66 @@ export function FinalizzaListaAttesaPage() {
 
   return (
     <Layout>
-      <div style={{ maxWidth: 480, margin: '60px auto 100px', padding: '0 20px' }}>
-        {stato === 'caricamento' && <p>Carico...</p>}
+      <div className="container-form pagina-modulo">
+        <div className="pagina-modulo-testata">
+          <h1>Completa la tua prenotazione</h1>
+          {dati && stato !== 'confermato' && <p>Si è liberato un posto: scegli la fermata e conferma.</p>}
+        </div>
+
+        {stato === 'caricamento' && <p className="testo-intro" aria-live="polite">Carico la prenotazione…</p>}
 
         {stato === 'non-trovato' && (
-          <div className="checkout-summary">
-            Questo link non è valido, è scaduto, oppure la prenotazione è già stata completata in precedenza.
+          <div className="stato-vuoto">
+            <h3>Link non valido</h3>
+            <p>Questo link è scaduto, oppure la prenotazione è già stata completata.</p>
           </div>
         )}
 
         {!dati && stato === 'errore' && (
-          <div className="checkout-summary">
-            Non riusciamo a caricare questa pagina in questo momento — potrebbe essere un problema temporaneo di connessione. <a href="" onClick={(e) => { e.preventDefault(); window.location.reload(); }}>Riprova</a>.
+          <div className="stato-vuoto" role="alert">
+            <h3>Non riesco a caricare la pagina</h3>
+            <p>Potrebbe essere un problema temporaneo di connessione.</p>
+            <button type="button" className="btn btn-secondary" onClick={() => setTentativo((n) => n + 1)}>Riprova</button>
           </div>
         )}
 
-        {(dati && stato !== 'non-trovato') && (
-          <div className="evento-pagina-checkout" style={{ position: 'static' }}>
+        {dati && stato !== 'non-trovato' && (
+          <div className="pannello-chiaro superficie-chiara">
             {stato === 'confermato' ? (
-              <>
-                <h3>Prenotazione confermata 🎉</h3>
-                <div className="checkout-summary">Il tuo PNR è <b>{pnr}</b>. I biglietti arriveranno all'email <b>{dati.email}</b>.</div>
-              </>
+              <div className="esito">
+                <span className="esito-icona" aria-hidden="true"><Icona nome="spunta" dimensione={40} strokeWidth={2.4} /></span>
+                <h1>Prenotazione confermata</h1>
+                <p>Il tuo codice è <b>{pnr}</b>. Ti abbiamo mandato la conferma a <b>{dati.email}</b>; il biglietto con il numero del bus arriva via email prima della partenza.</p>
+              </div>
             ) : (
               <>
-                <h3>Completa la tua prenotazione</h3>
-                <p style={{ fontSize: 'var(--testo-base)', color: 'var(--mist)', margin: '0 0 4px' }}>
-                  {dati.artista} — {dati.luogo}, {dati.citta}{dati.data ? ` · ${new Date(dati.data).toLocaleDateString('it-IT')}` : ''}
-                </p>
-                <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>
-                  {dati.nome} {dati.cognome} · {dati.email} · {dati.passeggeri} passeggero/i
-                </p>
+                <div className="blocco">
+                  <p><b>{dati.artista}</b> · {dati.luogo}, {dati.citta}{dati.data ? ` · ${formattaDataCard(dati.data)}` : ''}</p>
+                  <p className="checkout-nota">{dati.nome} {dati.cognome} · {dati.email} · {plurale(dati.passeggeri, 'passeggero', 'passeggeri')}</p>
+                </div>
 
-                {opzioni.filter((o) => o.postiDisponibili > 0).length === 0 ? (
-                  <p className="errore">Purtroppo i posti si sono di nuovo esauriti nel frattempo. Ci scusiamo per il disagio.</p>
+                {disponibili.length === 0 ? (
+                  <p className="avviso avviso-attenzione">Purtroppo i posti si sono esauriti di nuovo nel frattempo. Ci scusiamo per il disagio.</p>
                 ) : (
                   <>
-                    <label className="field-label">Fermata di partenza</label>
-                    <select value={fermataId} onChange={(e) => setFermataId(e.target.value)}>
-                      {opzioni.filter((o) => o.postiDisponibili > 0).map((o) => (
-                        <option key={o.fermataId} value={o.fermataId}>
-                          {o.fermataCitta} ({o.fermataOrario || 'orario da definire'}) — {formattaEuro(o.prezzoEffettivo)}
-                        </option>
-                      ))}
-                    </select>
+                    <SceltaFermata opzioni={disponibili} valore={fermataId} onSeleziona={(id) => { setFermataId(id); setMessaggioErrore(''); }} />
 
-                    <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: 'var(--testo-4xl)', margin: '18px 0 6px' }}>{formattaEuro(totale)}</p>
+                    <div className="blocco">
+                      <p className="checkout-nota">Totale per {plurale(dati.passeggeri, 'passeggero', 'passeggeri')}</p>
+                      <p className="importo-grande">{formattaEuro(totale)}</p>
+                    </div>
 
-                    {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
+                    {messaggioErrore && <p className="campo-errore" role="alert">{messaggioErrore}</p>}
+                    <p className="checkout-nota">Non paghi ora online: la prenotazione viene registrata e concordiamo il pagamento con te.</p>
 
-                    <button className="search-cta" style={{ opacity: stato === 'invio' ? .5 : 1 }} disabled={stato === 'invio'} onClick={() => conferma('COMPLETO')}>
-                      {azioneInCorso === 'acquista' ? 'Invio...' : 'Acquista'}
-                    </button>
-                    <button className="search-cta-secondaria" style={{ opacity: stato === 'invio' ? .5 : 1 }} disabled={stato === 'invio'} onClick={() => conferma('ACCONTO')}>
-                      {azioneInCorso === 'acconto' ? 'Invio...' : 'Prenota con acconto'}
-                    </button>
+                    <div className="checkout-azioni">
+                      <button type="button" className="btn btn-primary btn-lg btn-block" disabled={invio} onClick={() => conferma('COMPLETO')}>
+                        {azioneInCorso === 'acquista' ? 'Invio…' : 'Conferma la prenotazione'}
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-lg btn-block" disabled={invio} onClick={() => conferma('ACCONTO')}>
+                        {azioneInCorso === 'acconto' ? 'Invio…' : 'Conferma con acconto'}
+                      </button>
+                    </div>
                   </>
                 )}
               </>

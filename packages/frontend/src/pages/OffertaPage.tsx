@@ -1,36 +1,37 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { offerteApi } from '../api/offerte';
+import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
 import { prezzoMinimoEvento, applicaScontoOfferta } from '../api/prezzi';
 import type { OffertaCheckout } from '../features/checkout/CheckoutForm';
-import { CheckoutForm } from '../features/checkout/CheckoutForm';
+import { EventoDettaglio, EventoScheletro } from '../features/evento/EventoDettaglio';
 import { useSeoTags } from '../features/useSeoTags';
 import { Layout } from '../Layout';
-import { formattaEuro } from '../shared/formato';
 
-type Stato = 'caricamento' | 'pronto' | 'non-trovata';
+type Stato = 'caricamento' | 'pronto' | 'non-trovata' | 'errore';
 
+/** /offerta/:slug — la stessa pagina dell'evento (EventoDettaglio) con
+ *  il banner dell'offerta e i prezzi scontati; barra e foglio mobile
+ *  compresi. */
 export function OffertaPage() {
   const { slug } = useParams<{ slug: string }>();
   const [stato, setStato] = useState<Stato>('caricamento');
   const [evento, setEvento] = useState<Evento | null>(null);
   const [offerta, setOfferta] = useState<OffertaCheckout | null>(null);
-  const [errore, setErrore] = useState('');
+  const [tentativo, setTentativo] = useState(0);
 
   useEffect(() => {
     if (!slug) return;
+    setStato('caricamento');
     offerteApi.getBySlug(slug)
       .then((r) => {
         setEvento(r.evento);
         setOfferta({ id: r.offerta.id, nome: r.offerta.nome, scontoPercentuale: Number(r.offerta.scontoPercentuale) });
         setStato('pronto');
       })
-      .catch((e) => {
-        setErrore(e?.message || "Questo link non è (più) valido.");
-        setStato('non-trovata');
-      });
-  }, [slug]);
+      .catch((e) => setStato(e instanceof ErroreApi && e.status !== 0 && e.status < 500 ? 'non-trovata' : 'errore'));
+  }, [slug, tentativo]);
 
   const prezzoMinimo = evento ? prezzoMinimoEvento(evento) : null;
   const copertina = evento?.immagini[0]?.url;
@@ -38,7 +39,7 @@ export function OffertaPage() {
   useSeoTags({
     title: evento && offerta ? `${evento.artista} — ${offerta.nome} | OnWay` : 'Offerta | OnWay',
     description: evento && offerta
-      ? `Offerta speciale "${offerta.nome}": -${offerta.scontoPercentuale.toFixed(0)}% sul bus per ${evento.artista} a ${evento.citta}. Prenota il tuo posto con OnWay.`
+      ? `Offerta "${offerta.nome}": −${offerta.scontoPercentuale.toFixed(0)}% sul bus per ${evento.artista} a ${evento.citta}. Prenota il tuo posto con OnWay.`
       : 'Offerta speciale OnWay.',
     image: copertina,
     url: window.location.href,
@@ -59,58 +60,26 @@ export function OffertaPage() {
 
   return (
     <Layout>
-      <div style={{ maxWidth: 1100, margin: '32px auto 80px', padding: '0 20px' }}>
-        {stato === 'caricamento' && <p>Carico l'offerta...</p>}
+      <div className="container evento-pagina">
+        {stato === 'caricamento' && <EventoScheletro />}
 
         {stato === 'non-trovata' && (
-          <div className="checkout-summary">
-            {errore} Puoi comunque vedere tutti gli eventi disponibili in <a href="/">home page</a>.
+          <div className="stato-vuoto">
+            <h3>Offerta non disponibile</h3>
+            <p>Questo link non è più valido: l'offerta è scaduta o è stata ritirata. Gli eventi restano prenotabili al prezzo normale.</p>
+            <Link className="btn btn-primary" to="/#eventi">Vedi tutti gli eventi</Link>
           </div>
         )}
 
-        {stato === 'pronto' && evento && offerta && (
-          <div className="evento-pagina-corpo">
-            <div className="evento-pagina-info">
-              <div className={`evento-pagina-hero${copertina ? '' : ' senza-foto'}`} style={copertina ? { backgroundImage: `url(${copertina})` } : undefined}>
-                <span className="tag">🎉 {offerta.nome}</span>
-              </div>
-
-              <h1>{evento.artista}</h1>
-              <p className="meta-riga">📍 {evento.luogo}, {evento.citta}</p>
-              <p className="meta-riga">📅 {new Date(evento.data).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-
-              <p style={{ background: 'rgba(91,224,160,.15)', border: '1px solid rgba(91,224,160,.4)', borderRadius: 8, padding: '8px 12px', fontSize: 'var(--testo-md)', display: 'inline-block', marginTop: 10 }}>
-                -{offerta.scontoPercentuale.toFixed(0)}% su tutte le fermate
-              </p>
-
-              {prezzoMinimo !== null && (
-                <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-4xl)', marginTop: 14 }}>
-                  da {formattaEuro(applicaScontoOfferta(prezzoMinimo, offerta.scontoPercentuale))}
-                  <span style={{ fontSize: 'var(--testo-md)', opacity: .7 }}> invece di {formattaEuro(prezzoMinimo)}</span>
-                </p>
-              )}
-
-              {evento.descrizione && (
-                <div className="sezione-info">
-                  <h4>Informazioni</h4>
-                  {evento.descrizione}
-                </div>
-              )}
-
-              {evento.immagini.length > 1 && (
-                <div className="galleria">
-                  {evento.immagini.slice(1).map((img) => (
-                    <img key={img.id} src={img.url} alt={`${evento.artista} — foto`} loading="lazy" />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="evento-pagina-checkout">
-              <CheckoutForm evento={evento} offerta={offerta} />
-            </div>
+        {stato === 'errore' && (
+          <div className="stato-vuoto" role="alert">
+            <h3>Non riesco a caricare l'offerta</h3>
+            <p>Potrebbe essere un problema temporaneo di connessione.</p>
+            <button type="button" className="btn btn-secondary" onClick={() => setTentativo((n) => n + 1)}>Riprova</button>
           </div>
         )}
+
+        {stato === 'pronto' && evento && offerta && <EventoDettaglio evento={evento} offerta={offerta} />}
       </div>
     </Layout>
   );

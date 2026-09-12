@@ -1,38 +1,54 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useCarrello } from '../features/carrello/CarrelloContext';
+import { useCarrello, type ArticoloCarrello } from '../features/carrello/CarrelloContext';
 import { tracciaAcquisto, leggiCookieMeta } from '../features/metaPixel';
 import { tracciaAcquistoGA4, tracciaAcquistoGoogleAds } from '../features/googleAnalytics';
 import { clienteAuthApi, type DatiCliente } from '../api/clienteAuth';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { clienteLoggato } from '../features/clienteSessione';
 import { ErroreApi } from '../api/client';
-import { formattaEuro } from '../shared/formato';
+import { useSeoTags } from '../features/useSeoTags';
+import { Stepper } from '../features/checkout/Stepper';
+import { ACCONTO_PREDEFINITO_EUR } from '../features/checkout/CheckoutForm';
+import { formattaDataCard, inizialiDi } from '../features/eventi/EventoCard';
+import { Icona } from '../features/Icone';
+import { formattaData, formattaEuro, plurale } from '../shared/formato';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+/** Giorni prima della partenza entro cui va saldato il resto — stesso
+ *  default del server (GIORNI_SCADENZA_SALDO). Solo per mostrare la
+ *  data: la scadenza vera la scrive il server sulla prenotazione. */
+const GIORNI_SCADENZA_SALDO = 15;
 
-/** Il carrello — stessa identica veste grafica del checkout esistente
- *  (.checkout-form per etichette/campi, .checkout-summary per i box di
- *  riepilogo: niente stile nuovo inventato, niente ".ticket" che è
- *  pensato per un contesto diverso e qui stonava). Elenco articoli già
- *  compilati nella tab di prenotazione, e in fondo solo l'ultimo pezzo
- *  che prima stava nello step 3 del checkout: credito, coupon, metodo
- *  di pagamento.
- *
- *  Due passi (non più tutto insieme, come richiesto): 1) riepilogo con
- *  codici sconto e credito — il totale sta SEMPRE sotto gli articoli e
- *  si aggiorna subito quando si spunta il credito o si applica un
- *  coupon (prima non succedeva affatto: il coupon veniva solo salvato
- *  come testo, mai controllato finché non si completava l'ordine
- *  davvero); 2) solo dopo, la scelta del metodo di pagamento e i dati
- *  specifici (carta, o la conferma per Apple/Google Pay). */
+/** La scadenza del saldo più vicina tra gli articoli, se è nel futuro. */
+function scadenzaSaldo(articoli: ArticoloCarrello[]): Date | null {
+  const tempi = articoli
+    .map((a) => new Date(a.eventoData).getTime() - GIORNI_SCADENZA_SALDO * 24 * 3600 * 1000)
+    .filter((t) => Number.isFinite(t));
+  if (!tempi.length) return null;
+  const prima = Math.min(...tempi);
+  return prima > Date.now() ? new Date(prima) : null;
+}
+
+interface Esito { righe: { pnr: string; artista: string }[]; email: string; ospite: boolean; passeggeri: number; }
+
+/** Il carrello: il terzo passo della prenotazione ("Riepilogo"), un solo
+ *  passo — articoli, totali, codice sconto, come pagare, blocco legale e
+ *  il pulsante finale con l'importo dentro. Da ospite l'identità viene
+ *  dal primo articolo (raccolta nel passo "I tuoi dati"). */
 export function CarrelloPage() {
+  useSeoTags({
+    title: 'Il tuo carrello — OnWay',
+    description: 'Controlla i dati e conferma la prenotazione del tuo bus.',
+    url: `${window.location.origin}/carrello`,
+  });
   const { articoli, rimuovi, svuota, totaleStimato, bundle, scontoBundleStimato } = useCarrello();
+  const prefisso = useId();
   const [cliente, setCliente] = useState<DatiCliente | null>(null);
   const [inviando, setInviando] = useState(false);
   const [errore, setErrore] = useState('');
-  const [fatto, setFatto] = useState<{ pnr: string }[] | null>(null);
-  const [step, setStep] = useState<'riepilogo' | 'pagamento'>('riepilogo');
+  const [datiMancanti, setDatiMancanti] = useState(false);
+  const [esito, setEsito] = useState<Esito | null>(null);
 
   const [tipoPagamento, setTipoPagamento] = useState<'COMPLETO' | 'ACCONTO'>('COMPLETO');
   const [usaCredito, setUsaCredito] = useState(false);
@@ -41,21 +57,26 @@ export function CarrelloPage() {
   const [verificandoCoupon, setVerificandoCoupon] = useState(false);
   const [couponErrore, setCouponErrore] = useState('');
 
+  const loggato = clienteLoggato();
   useEffect(() => {
     if (clienteLoggato()) clienteAuthApi.me().then(setCliente).catch(() => {});
   }, []);
 
   const creditoDisponibile = cliente ? Number(cliente.creditoDisponibile) : 0;
   const totaleDopoBundle = totaleStimato - scontoBundleStimato;
-
-  // Coupon e credito valgono solo pagando tutto subito (già così prima,
-  // solo dichiarato in un testo — ora il totale lo rispetta DAVVERO
-  // invece di restare fermo). L'ordine conta: prima il coupon, poi il
-  // credito sul resto — mai sotto zero.
+  // Coupon e credito valgono solo pagando tutto ora. Prima il coupon,
+  // poi il credito sul resto, mai sotto zero (il server ricalcola).
   const scontoCoupon = tipoPagamento === 'COMPLETO' ? (couponVerificato?.sconto ?? 0) : 0;
   const dopoCoupon = Math.max(0, totaleDopoBundle - scontoCoupon);
   const creditoApplicato = tipoPagamento === 'COMPLETO' && usaCredito ? Math.min(creditoDisponibile, dopoCoupon) : 0;
   const totaleFinale = Math.max(0, dopoCoupon - creditoApplicato);
+  const accontoTotale = articoli.reduce((s, a) => s + (a.accontoEur ?? ACCONTO_PREDEFINITO_EUR) * a.passeggeri, 0);
+  const ammetteAcconto = !bundle || bundle.ammetteAcconto;
+  const scadenza = scadenzaSaldo(articoli);
+  const importoImpegno = tipoPagamento === 'COMPLETO' ? totaleFinale : accontoTotale;
+  const ceSconti = !!bundle || scontoCoupon > 0 || creditoApplicato > 0;
+  const passeggeriTotali = articoli.reduce((s, a) => s + a.passeggeri, 0);
+  const linkPrimoEvento = articoli[0]?.eventoSlug ? `/eventi/${articoli[0].eventoSlug}` : '/#eventi';
 
   async function verificaCoupon() {
     if (!couponCodice.trim() || articoli.length === 0) return;
@@ -66,39 +87,30 @@ export function CarrelloPage() {
       const r = await fetch(`${API_URL}/api/coupon/valida`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Approssimazione dichiarata (vedi nota sotto il totale): un
-        // carrello può avere eventi diversi, ma la verifica VERA,
-        // riga per riga, avviene comunque lato server al momento di
-        // completare l'ordine — questa è solo un'anteprima.
+        // Anteprima: la verifica vera, riga per riga, la fa il server alla conferma.
         body: JSON.stringify({ codice: couponCodice.trim(), importo: totaleDopoBundle, eventoId: articoli[0]?.eventoId, ...(cliente?.email && { emailCliente: cliente.email }) }),
       });
       const dati = await r.json();
-      if (!r.ok) throw new Error(dati.errore ?? 'Coupon non valido.');
+      if (!r.ok) throw new Error(dati.errore ?? 'Codice non valido.');
       setCouponVerificato(dati);
     } catch (e) {
-      setCouponErrore(e instanceof Error ? e.message : 'Coupon non valido.');
+      setCouponErrore(e instanceof Error ? e.message : 'Codice non valido.');
     } finally {
       setVerificandoCoupon(false);
     }
   }
 
-  async function completaAcquisto() {
-    // Da ospite l'identità viene dal primo articolo (raccolta già nel
-    // checkout, step "I tuoi dati") — non dall'account, che non c'è.
-    if (!clienteLoggato() && (!articoli[0]?.cliente.dataNascita)) {
-      setErrore('Mancano dei dati per completare l\'ordine — torna indietro e ricontrolla il passo "I tuoi dati".');
-      return;
-    }
-    setInviando(true);
+  async function confermaPrenotazione() {
     setErrore('');
-    // Un solo eventId per l'intero ordine (non uno per articolo) — la
-    // Conversions API lato server lo prende dal primo articolo che lo
-    // porta e manda UN evento Purchase con il totale, non uno per riga.
+    setDatiMancanti(false);
+    if (!loggato && !articoli[0]?.cliente.dataNascita) { setDatiMancanti(true); return; }
+    setInviando(true);
+    // Un solo eventId per l'intero ordine: la Conversions API manda UN
+    // evento Purchase con il totale, non uno per riga.
     const metaEventId = crypto.randomUUID();
     const { fbp, fbc } = leggiCookieMeta();
     const righe = articoli.map((a) => {
-      // Un bundle ha una provenienza sola per tutto l'ordine; altrimenti vale
-      // quella di ogni articolo, letta quando è entrato nel carrello.
+      // Un bundle ha una provenienza sola; altrimenti vale quella di ogni articolo.
       const provenienza = bundle ?? a;
       return {
         eventoId: a.eventoId,
@@ -123,7 +135,7 @@ export function CarrelloPage() {
       };
     });
     try {
-      const risultato = clienteLoggato()
+      const risultato = loggato
         ? await prenotazioniApi.creaOrdine(righe, bundle?.id)
         : await prenotazioniApi.creaOrdineOspite({
             email: articoli[0].cliente.email,
@@ -135,189 +147,202 @@ export function CarrelloPage() {
             articoli: righe,
             bundleId: bundle?.id,
           });
-      setFatto(risultato.prenotazioni.map((p) => ({ pnr: p.pnr })));
-      tracciaAcquisto(totaleStimato - scontoBundleStimato, metaEventId);
-      tracciaAcquistoGA4(totaleStimato - scontoBundleStimato, metaEventId, bundle?.nome);
-      tracciaAcquistoGoogleAds(totaleStimato - scontoBundleStimato, metaEventId);
+      setEsito({
+        righe: risultato.prenotazioni.map((p) => ({ pnr: p.pnr, artista: articoli.find((a) => a.eventoId === p.eventoId)?.eventoArtista ?? 'Prenotazione' })),
+        email: loggato ? (cliente?.email ?? articoli[0].cliente.email) : articoli[0].cliente.email,
+        ospite: !loggato,
+        passeggeri: passeggeriTotali,
+      });
+      tracciaAcquisto(totaleDopoBundle, metaEventId);
+      tracciaAcquistoGA4(totaleDopoBundle, metaEventId, bundle?.nome);
+      tracciaAcquistoGoogleAds(totaleDopoBundle, metaEventId);
       svuota();
+      window.scrollTo(0, 0);
     } catch (e) {
-      // Caso specifico: l'email inserita da ospite appartiene già a un
-      // account vero — non si può procedere "a nome" di qualcun altro
-      // solo conoscendone l'email. Messaggio chiaro invece del generico,
-      // con la strada giusta da seguire (accedere, non riprovare).
+      // L'email inserita da ospite appartiene già a un account con
+      // password: non si può procedere a nome di qualcun altro.
       if (e instanceof ErroreApi && e.status === 409) {
-        setErrore(e.message + ' Torna al passo precedente per modificare l\'email, oppure accedi con quella email.');
+        setErrore(`${e.message} Accedi con quella email, oppure torna all'evento e cambia l'indirizzo nel passo «I tuoi dati».`);
       } else {
-        setErrore(e instanceof Error ? e.message : 'Acquisto non riuscito. Riprova.');
+        setErrore(e instanceof Error ? e.message : 'Prenotazione non riuscita. Riprova.');
       }
     } finally {
       setInviando(false);
     }
   }
 
-  if (fatto) {
+  if (esito) {
     return (
-      <div style={{ maxWidth: 480, margin: '60px auto', padding: '0 20px', textAlign: 'center' }}>
-        <h3>Ordine completato 🎉</h3>
-        <div className="checkout-summary">
-          Hai prenotato {fatto.length} biglietto{fatto.length === 1 ? '' : 'i'} — trovi tutto nel tuo account, con i PDF pronti da scaricare.
-        </div>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginTop: 16 }}>
-          <Link className="btn btn-primary" to="/account">Vai ai miei biglietti</Link>
-          <Link className="btn btn-ghost" to="/">Torna al sito</Link>
+      <div className="container-form carrello">
+        <div className="pannello-chiaro superficie-chiara">
+          <div className="esito">
+            <span className="esito-icona" aria-hidden="true"><Icona nome="spunta" dimensione={40} strokeWidth={2.4} /></span>
+            <h1>Prenotazione confermata</h1>
+            <p>Hai prenotato {plurale(esito.passeggeri, 'posto', 'posti')}.</p>
+            <ul className="esito-codici">
+              {esito.righe.map((r) => <li key={r.pnr}>{r.artista} · codice <b>{r.pnr}</b></li>)}
+            </ul>
+            <p>Ti abbiamo mandato la conferma a <b>{esito.email}</b>. Il biglietto con il numero del bus arriva via email prima della partenza.</p>
+            {esito.ospite && <p>Nella stessa email trovi il link per impostare la password e vedere i tuoi viaggi.</p>}
+            <div className="esito-azioni">
+              {loggato ? (
+                <>
+                  <Link className="btn btn-primary" to="/account">Vai ai miei viaggi</Link>
+                  <Link className="btn btn-secondary" to="/#eventi">Torna agli eventi</Link>
+                </>
+              ) : (
+                <Link className="btn btn-primary" to="/#eventi">Torna agli eventi</Link>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 480, margin: '40px auto', padding: '0 20px' }}>
-      <div className="checkout-form">
-        <h3>Il tuo carrello</h3>
+    <div className="container-form carrello">
+      <div className="carrello-testata">
+        <Stepper voci={['Fermata e posti', 'I tuoi dati', 'Riepilogo']} attivo={2} />
+        <h1>Riepilogo</h1>
+        <p>Controlla i dati e conferma la prenotazione.</p>
+      </div>
 
-        {articoli.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '50px 0' }}>
-            <p style={{ color: 'var(--mist)', marginBottom: 16 }}>Il carrello è vuoto.</p>
+      <div className="pannello-chiaro superficie-chiara">
+        {articoli.length === 0 ? (
+          <div className="stato-vuoto">
+            <h3>Il carrello è vuoto</h3>
+            <p>Scegli un evento e la tua fermata di partenza: il riepilogo compare qui.</p>
             <Link className="btn btn-primary" to="/#eventi">Scopri gli eventi</Link>
           </div>
-        )}
-
-        {articoli.length > 0 && (
+        ) : (
           <>
-            {articoli.map((a) => (
-              <div key={a.id} className="checkout-summary" style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                <div>
-                  <b>{a.eventoArtista}</b>
-                  <p style={{ margin: '4px 0 0' }}>
-                    {a.fermataCitta}{a.fermataOrario ? ` — ore ${a.fermataOrario}` : ''} · {new Date(a.eventoData).toLocaleDateString('it-IT')}
-                  </p>
-                  <p style={{ margin: '4px 0 0' }}>
-                    {a.passeggeri} {a.passeggeri === 1 ? 'passeggero' : 'passeggeri'}: {a.cliente.nome} {a.cliente.cognome}
-                    {a.partecipanti.length > 0 && `, ${a.partecipanti.map((p) => `${p.nome} ${p.cognome}`).join(', ')}`}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
-                  <b>{formattaEuro(a.prezzoStimato * a.passeggeri)}</b>
-                  {step === 'riepilogo' && (
-                    <button type="button" className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '4px 10px', fontSize: 'var(--testo-xs)', color: '#c0392b' }} onClick={() => rimuovi(a.id)}>
-                      Rimuovi
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+            <ul className="articoli">
+              {articoli.map((a) => <Articolo key={a.id} articolo={a} onRimuovi={() => rimuovi(a.id)} />)}
+            </ul>
 
-            {/* Il totale sta SEMPRE qui, subito sotto gli articoli, in
-                ENTRAMBI i passi — non più solo alla fine dopo aver
-                scorso tutto. Si aggiorna DAVVERO quando si spunta il
-                credito o si applica un coupon (prima il coupon veniva
-                solo salvato come testo, senza che il totale mostrato
-                cambiasse mai — solo una nota diceva "verrà ricalcolato
-                dal server", ora lo fa già qui, in anteprima). */}
-            <div className="checkout-summary" style={{ marginTop: 14 }}>
-              {bundle && (
+            {bundle && (
+              <p className="totali-nota">
+                <b>Bundle {bundle.nome}</b>: si acquista tutto insieme, togliendo un evento lo sconto non si applica più.
+                {bundle.promoterCodice && <> Codice promoter applicato: <b>{bundle.promoterCodice}</b>.</>}
+              </p>
+            )}
+
+            <div className="totali" aria-live="polite">
+              {ceSconti && <p className="totali-riga"><span>Subtotale</span><span>{formattaEuro(totaleStimato)}</span></p>}
+              {bundle && <p className="totali-riga sconto"><span>Sconto bundle (−{bundle.scontoPercentuale}%)</span><span>− {formattaEuro(scontoBundleStimato)}</span></p>}
+              {scontoCoupon > 0 && <p className="totali-riga sconto"><span>Coupon {couponCodice}</span><span>− {formattaEuro(scontoCoupon)}</span></p>}
+              {creditoApplicato > 0 && <p className="totali-riga sconto"><span>Credito</span><span>− {formattaEuro(creditoApplicato)}</span></p>}
+              <p className="totali-riga totale"><span>Totale</span><span>{formattaEuro(tipoPagamento === 'COMPLETO' ? totaleFinale : totaleDopoBundle)}</span></p>
+              {tipoPagamento === 'ACCONTO' && (
                 <>
-                  <b>Bundle: {bundle.nome}</b>
-                  <p style={{ fontSize: 'var(--testo-sm)', opacity: .7, margin: '4px 0 10px' }}>Il bundle si acquista tutto insieme: togliendo o aggiungendo un evento, lo sconto non si applica più.</p>
-                  {bundle.promoterCodice && <p style={{ fontSize: 'var(--testo-sm)', opacity: .7, margin: '0 0 8px' }}>Codice promoter applicato: <b>{bundle.promoterCodice}</b></p>}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--testo-base)' }}><span>Subtotale</span><span>{formattaEuro(totaleStimato)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--testo-base)' }}><span>Sconto bundle (−{bundle.scontoPercentuale}%)</span><span>− {formattaEuro(scontoBundleStimato)}</span></div>
+                  <p className="totali-riga acconto"><span>Acconto da versare ora</span><span>{formattaEuro(accontoTotale)}</span></p>
+                  <p className="totali-nota">{scadenza ? `Saldo entro il ${formattaData(scadenza)}.` : 'Il resto da saldare più avanti, prima della partenza.'}</p>
                 </>
               )}
-              {scontoCoupon > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--testo-base)', color: 'var(--verde, #2e7d32)' }}><span>Coupon "{couponCodice}"</span><span>− {formattaEuro(scontoCoupon)}</span></div>
-              )}
-              {creditoApplicato > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--testo-base)', color: 'var(--verde, #2e7d32)' }}><span>Credito fedeltà</span><span>− {formattaEuro(creditoApplicato)}</span></div>
-              )}
-              <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-4xl)', margin: '10px 0 4px' }}>
-                {tipoPagamento === 'ACCONTO' ? 'Totale stimato' : 'Totale'}: {formattaEuro(tipoPagamento === 'COMPLETO' ? totaleFinale : totaleDopoBundle)}
-              </p>
-              <p style={{ fontSize: 'var(--testo-xs)', opacity: .65 }}>
-                {tipoPagamento === 'ACCONTO'
-                  ? 'Con l\'acconto verserai solo una parte ora per ciascun articolo, non questo totale — coupon e credito non si applicano in questa modalità.'
-                  : 'Il totale definitivo viene comunque verificato di nuovo dal server al momento di completare l\'ordine.'}
-              </p>
+              <p className="totali-nota">Prezzi stimati: il totale definitivo lo ricalcola il server alla conferma.</p>
             </div>
 
-            {step === 'riepilogo' ? (
-              <>
-                {creditoDisponibile > 0 && (!bundle || bundle.ammetteCredito) && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--testo-md)', margin: '14px 0 10px', cursor: tipoPagamento === 'COMPLETO' ? 'pointer' : 'default', opacity: tipoPagamento === 'COMPLETO' ? 1 : .5 }}>
-                    <input type="checkbox" checked={usaCredito} onChange={(e) => setUsaCredito(e.target.checked)} style={{ width: 'auto' }} disabled={tipoPagamento !== 'COMPLETO'} />
-                    Usa il tuo credito fedeltà ({formattaEuro(creditoDisponibile)} disponibili)
-                  </label>
-                )}
+            {creditoDisponibile > 0 && (!bundle || bundle.ammetteCredito) && (
+              <label className="scelta-check">
+                <input type="checkbox" checked={usaCredito} onChange={(e) => setUsaCredito(e.target.checked)} disabled={tipoPagamento !== 'COMPLETO'} />
+                Usa il tuo credito ({formattaEuro(creditoDisponibile)} disponibili)
+              </label>
+            )}
 
-                {(!bundle || bundle.ammetteOfferte) && (<>
-                <label className="field-label">Hai un codice coupon?</label>
-                <div style={{ display: 'flex', gap: 8 }}>
+            {(!bundle || bundle.ammetteOfferte) && (
+              <div className="campo">
+                <label className="campo-etichetta" htmlFor={`${prefisso}-coupon`}>Codice sconto (facoltativo)</label>
+                <div className="coupon-riga">
                   <input
-                    type="text"
+                    id={`${prefisso}-coupon`} className="campo-input" type="text" autoComplete="off"
                     value={couponCodice}
                     onChange={(e) => { setCouponCodice(e.target.value.toUpperCase()); setCouponVerificato(null); setCouponErrore(''); }}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), verificaCoupon())}
-                    placeholder="Facoltativo"
-                    style={{ textTransform: 'uppercase', flex: 1, opacity: tipoPagamento === 'COMPLETO' ? 1 : .5 }}
                     disabled={tipoPagamento !== 'COMPLETO' || !!couponVerificato}
+                    aria-invalid={couponErrore ? true : undefined}
+                    aria-describedby={couponErrore ? `${prefisso}-coupon-errore` : `${prefisso}-coupon-aiuto`}
                   />
-                  <button type="button" className="btn btn-ghost" style={{ whiteSpace: 'nowrap' }} onClick={verificaCoupon} disabled={tipoPagamento !== 'COMPLETO' || !couponCodice.trim() || verificandoCoupon || !!couponVerificato}>
-                    {verificandoCoupon ? '...' : couponVerificato ? '✓ Applicato' : 'Applica'}
+                  <button type="button" className="btn btn-secondary" onClick={verificaCoupon} disabled={tipoPagamento !== 'COMPLETO' || !couponCodice.trim() || verificandoCoupon || !!couponVerificato}>
+                    {verificandoCoupon ? 'Verifico…' : couponVerificato ? <><Icona nome="spunta" dimensione={16} /> Applicato</> : 'Applica'}
                   </button>
                 </div>
-                {couponErrore && <p style={{ color: '#c0392b', fontSize: 'var(--testo-sm)', marginTop: 6 }}>{couponErrore}</p>}
-                <p style={{ fontSize: 'var(--testo-sm)', opacity: .65, marginTop: 6 }}>
-                  Coupon e credito si applicano solo pagando tutto subito — con l'acconto potrai usarli quando salderai il resto.
-                </p>
-                </>)}
-
-                <p className="section-label" style={{ marginTop: 18 }}>Come vuoi pagare?</p>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                  <button type="button" className={`mini-tab${tipoPagamento === 'COMPLETO' ? ' active' : ''}`} onClick={() => setTipoPagamento('COMPLETO')}>Tutto subito</button>
-                  {(!bundle || bundle.ammetteAcconto) && <button type="button" className={`mini-tab${tipoPagamento === 'ACCONTO' ? ' active' : ''}`} onClick={() => setTipoPagamento('ACCONTO')}>Solo acconto</button>}
-                </div>
-                {tipoPagamento === 'ACCONTO' && (
-                  <p style={{ fontSize: 'var(--testo-sm)', opacity: .7, marginTop: 6 }}>
-                    Verserai solo l'acconto per ciascun articolo ora, e salderai il resto entro la scadenza indicata via email.
-                  </p>
-                )}
-
-                <button className="search-cta" style={{ marginTop: 16 }} onClick={() => setStep('pagamento')}>
-                  Avanti →
-                </button>
-              </>
-            ) : (
-              <>
-                <button type="button" className="search-cta-secondaria" style={{ marginTop: 14, marginBottom: 14 }} onClick={() => setStep('riepilogo')}>← Indietro</button>
-
-                <p className="section-label">Pagamento</p>
-                {/* Nessun sistema di pagamento collegato ancora: niente
-                    campi carta finti (non venivano né controllati né
-                    inviati, ma il browser poteva proporre di compilarli
-                    con una carta vera). L'ordine si registra come "Da
-                    concordare" finché non si collega un fornitore. */}
-                <p style={{ fontSize: 'var(--testo-md)', opacity: .75 }}>
-                  Il pagamento online non è ancora attivo: la prenotazione viene registrata e il pagamento si concorda a parte.
-                </p>
-
-                {errore && <p className="errore">{errore}</p>}
-
-                <button className="search-cta" style={{ marginTop: 14, opacity: inviando ? .5 : 1 }} disabled={inviando} onClick={completaAcquisto}>
-                  {inviando ? 'Invio...' : 'Completa l\'acquisto'}
-                </button>
-                {/* La nota sulla privacy sta PRIMA di essere già stato
-                    scritto "fatto" — un segnale di fiducia funziona
-                    prima della decisione, non dopo (era sotto il
-                    pulsante, chi confermava in fretta non la vedeva
-                    mai prima di cliccare). */}
-                <p style={{ fontSize: 'var(--testo-xs)', opacity: .6, marginTop: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                  🔒 I tuoi dati sono trattati in modo riservato, secondo la nostra informativa privacy.
-                </p>
-              </>
+                {couponErrore && <p className="campo-errore" id={`${prefisso}-coupon-errore`} role="alert">{couponErrore}</p>}
+                <p className="campo-aiuto" id={`${prefisso}-coupon-aiuto`}>Codice e credito valgono solo pagando tutto ora. Con l'acconto li puoi usare quando saldi il resto.</p>
+              </div>
             )}
+
+            <fieldset className="opzioni-radio">
+              <legend>Come vuoi pagare?</legend>
+              <label className={`opzione-radio${tipoPagamento === 'COMPLETO' ? ' selezionata' : ''}`}>
+                <input type="radio" name={`${prefisso}-pagamento`} value="COMPLETO" checked={tipoPagamento === 'COMPLETO'} onChange={() => setTipoPagamento('COMPLETO')} />
+                <b>Tutto ora — {formattaEuro(totaleFinale)}</b>
+              </label>
+              {ammetteAcconto && (
+                <label className={`opzione-radio${tipoPagamento === 'ACCONTO' ? ' selezionata' : ''}`}>
+                  <input type="radio" name={`${prefisso}-pagamento`} value="ACCONTO" checked={tipoPagamento === 'ACCONTO'} onChange={() => setTipoPagamento('ACCONTO')} />
+                  <b>Solo l'acconto — {formattaEuro(accontoTotale)} ora</b>
+                  <span>Il resto prima della partenza{scadenza ? `, entro il ${formattaData(scadenza)}` : ''}</span>
+                </label>
+              )}
+            </fieldset>
+            {/* Nessun sistema di pagamento collegato: niente campi carta,
+                l'ordine si registra come "Da concordare". */}
+            <p className="checkout-nota">Non paghi ora online: dopo la conferma ti contattiamo per il pagamento.</p>
+
+            {errore && <p className="campo-errore" role="alert">{errore}</p>}
+            {datiMancanti && (
+              <p className="campo-errore" role="alert">
+                Manca la data di nascita: <Link to={linkPrimoEvento}>torna all'evento</Link> e completa il passo «I tuoi dati».
+              </p>
+            )}
+
+            <div className="blocco-legale">
+              <p>Confermando ti impegni a pagare <b>{formattaEuro(importoImpegno)}</b> secondo le modalità che ti comunicheremo via email.</p>
+              <p>Per i viaggi con data fissa non vale il diritto di recesso di 14 giorni: leggi la <Link to="/pagina/termini">politica di cancellazione</Link>.</p>
+            </div>
+            <button type="button" className="btn btn-primary btn-lg btn-block" disabled={inviando} onClick={confermaPrenotazione}>
+              {inviando ? 'Invio…' : `Conferma la prenotazione · ${formattaEuro(importoImpegno)}`}
+            </button>
+            <p className="riga-fiducia">
+              <Icona nome="lucchetto" dimensione={16} />
+              <span>I tuoi dati sono trattati in modo riservato, secondo la nostra <Link to="/pagina/privacy">informativa privacy</Link>.</span>
+            </p>
           </>
         )}
       </div>
     </div>
+  );
+}
+
+/** Un articolo del carrello. Se manca qualche campo (carrello salvato
+ *  prima dei nuovi dati) mostra quello che c'è. */
+function Articolo({ articolo: a, onRimuovi }: { articolo: ArticoloCarrello; onRimuovi: () => void }) {
+  const linkEvento = a.eventoSlug ? `/eventi/${a.eventoSlug}` : null;
+  const nomi = [`${a.cliente.nome} ${a.cliente.cognome}`.trim(), ...a.partecipanti.map((p) => `${p.nome} ${p.cognome}`.trim())].filter(Boolean);
+  const fermata = [
+    `${a.fermataCitta}${a.fermataIndirizzo ? `, ${a.fermataIndirizzo}` : ''}`,
+    a.fermataOrario ? `andata ${a.fermataOrario}` : null,
+    a.orarioRitorno ? `ritorno ${a.orarioRitorno}` : null,
+  ].filter(Boolean).join(' · ');
+  return (
+    <li className="articolo">
+      <div className="articolo-media">
+        {a.eventoImmagine
+          ? <img src={a.eventoImmagine} alt="" width={72} height={90} loading="lazy" decoding="async" />
+          : <div className="card-segnaposto" aria-hidden="true">{inizialiDi(a.eventoArtista)}</div>}
+      </div>
+      <div className="articolo-testo">
+        <p className="articolo-titolo">{linkEvento ? <Link to={linkEvento}>{a.eventoArtista}</Link> : a.eventoArtista}</p>
+        <p className="articolo-riga">{formattaDataCard(a.eventoData)}{a.eventoCitta ? ` · ${a.eventoCitta}` : ''}</p>
+        <p className="articolo-riga">{fermata}</p>
+        <p className="articolo-riga">{plurale(a.passeggeri, 'passeggero', 'passeggeri')}: {nomi.join(', ')}</p>
+      </div>
+      <p className="articolo-prezzo">{formattaEuro(a.prezzoStimato * a.passeggeri)}</p>
+      <div className="articolo-azioni">
+        {linkEvento && <Link className="btn btn-tertiary" to={linkEvento}>Modifica</Link>}
+        <button type="button" className="btn btn-tertiary pericolo" onClick={onRimuovi}>Rimuovi</button>
+      </div>
+    </li>
   );
 }

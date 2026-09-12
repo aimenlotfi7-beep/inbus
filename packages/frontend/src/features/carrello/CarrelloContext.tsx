@@ -28,6 +28,19 @@ export interface ArticoloCarrello {
   utmMedium?: string;
   utmCampaign?: string;
   utmContent?: string;
+  /** Quello che serve al carrello per mostrare l'articolo per bene:
+   *  miniatura, luogo, indirizzo della fermata, orari e il link per
+   *  tornare all'evento. Tutti facoltativi: un carrello salvato prima
+   *  di questi campi li ha vuoti e il carrello mostra quello che c'è. */
+  eventoSlug?: string;
+  eventoImmagine?: string;
+  eventoCitta?: string;
+  eventoLuogo?: string;
+  fermataIndirizzo?: string;
+  orarioRitorno?: string | null;
+  arrivoOrario?: string | null;
+  /** Acconto a passeggero dell'evento (null = il default del server). */
+  accontoEur?: number | null;
 }
 
 /** Se il carrello è l'acquisto di un bundle: quale, e le sue regole

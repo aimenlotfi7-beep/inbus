@@ -3,14 +3,14 @@ import { useParams, Link } from 'react-router-dom';
 import { tourApi, type TourPubblico } from '../api/tour';
 import { useSeoTags } from '../features/useSeoTags';
 import { Layout } from '../Layout';
-import { formattaEuro } from '../shared/formato';
+import { CardBase, formattaDataCard, inizialiDi } from '../features/eventi/EventoCard';
+import { Icona } from '../features/Icone';
+import { plurale } from '../shared/formato';
 
-/** Pagina di un Tour (più date dello stesso spettacolo): copertina e
- *  nome a sinistra come per un evento, a destra le date a scorrimento
- *  verticale (confermato in conversazione: niente calendario a
- *  griglia). Ogni data porta DIRETTAMENTE alla sua pagina evento
- *  normale — nessun flusso di prenotazione qui dentro, è solo un
- *  indice. */
+/** Pagina di un Tour (più date dello stesso spettacolo): copertina 3:2,
+ *  nome, descrizione e sotto le date come card in formato lista. Ogni
+ *  data porta DIRETTAMENTE alla sua pagina evento normale — nessun
+ *  flusso di prenotazione qui dentro, è solo un indice. */
 export function TourPage() {
   const { slug } = useParams<{ slug: string }>();
   const [tour, setTour] = useState<TourPubblico | null>(null);
@@ -23,64 +23,62 @@ export function TourPage() {
 
   useSeoTags({
     title: tour ? `${tour.nome} — OnWay` : 'Tour — OnWay',
-    description: tour ? (tour.descrizione?.trim() || `${tour.eventi.length} date disponibili per ${tour.nome}.`) : 'Più date, un solo spettacolo.',
+    description: tour ? (tour.descrizione?.trim() || `${plurale(tour.eventi.length, 'data disponibile', 'date disponibili')} per ${tour.nome}.`) : 'Più date, un solo spettacolo.',
     image: tour?.copertinaUrl ?? undefined,
     url: window.location.href,
   });
 
   return (
     <Layout>
-      <div style={{ maxWidth: 1100, margin: '32px auto 80px', padding: '0 20px' }}>
-        {stato === 'caricamento' && <p>Carico...</p>}
+      <div className="container-narrow tour-pagina">
+        {stato === 'caricamento' && <p className="testo-intro">Carico il tour…</p>}
         {stato === 'non-trovato' && (
-          <div className="checkout-summary">Questo tour non è (più) disponibile. Vedi <Link to="/">tutti gli eventi</Link>.</div>
+          <div className="stato-vuoto">
+            <h3>Questo tour non è più disponibile</h3>
+            <p>Le date potrebbero essere passate o non essere più in vendita.</p>
+            <Link className="btn btn-secondary" to="/#eventi">Vedi tutti gli eventi</Link>
+          </div>
         )}
 
         {stato === 'pronto' && tour && (
-          <div className="evento-pagina-corpo">
-            <div className="evento-pagina-info">
-              <div className={`evento-pagina-hero${tour.copertinaUrl ? '' : ' senza-foto'}`} style={tour.copertinaUrl ? { backgroundImage: `url(${tour.copertinaUrl})` } : undefined}>
-                <span className="tag">{tour.eventi.length} date</span>
-              </div>
-              <h1>{tour.nome}</h1>
-              <p className="meta-riga">Scegli la data che preferisci — la prenotazione funziona come per un evento normale.</p>
-              {tour.descrizione && <p style={{ marginTop: 14, whiteSpace: 'pre-line' }}>{tour.descrizione}</p>}
+          <>
+            <div className="tour-copertina">
+              {tour.copertinaUrl ? (
+                <img src={tour.copertinaUrl} alt={tour.nome} width={1200} height={800} loading="eager" {...{ fetchpriority: 'high' }} />
+              ) : (
+                <div className="card-segnaposto" aria-hidden="true">{inizialiDi(tour.nome)}</div>
+              )}
             </div>
+            <p className="eyebrow">Tour · {plurale(tour.eventi.length, 'data', 'date')}</p>
+            <h1>{tour.nome}</h1>
+            {tour.descrizione && <p className="tour-descrizione">{tour.descrizione}</p>}
 
-            <div className="evento-pagina-checkout aperta-mobile">
-              <div className="checkout-form" style={{ maxHeight: 640, overflowY: 'auto' }}>
-                <h3 style={{ marginBottom: 12 }}>Tutte le date</h3>
-                {tour.eventi.length === 0 && <p className="testo-intro">Nessuna data disponibile al momento.</p>}
-                {tour.eventi.map((d) => (
-                  <Link
-                    key={d.id}
-                    to={`/eventi/${d.slug}`}
-                    style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
-                      padding: '14px 12px', borderBottom: '1px solid var(--line)', color: 'inherit', textDecoration: 'none',
-                    }}
-                  >
-                    <span>
-                      <b style={{ display: 'block', fontSize: 'var(--testo-lg)' }}>
-                        {new Date(d.data).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'long', year: 'numeric' })}
-                      </b>
-                      <span style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>{d.luogo}, {d.citta}</span>
+            <section className="tour-date" aria-labelledby="tour-date-titolo">
+              <h2 className="section-title" id="tour-date-titolo">Tutte le date</h2>
+              {tour.eventi.length === 0 && <p className="testo-intro">Nessuna data disponibile al momento.</p>}
+              {tour.eventi.map((d) => (
+                <CardBase
+                  key={d.id}
+                  formato="lista"
+                  href={`/eventi/${d.slug}`}
+                  immagine={d.immagineUrl}
+                  alt={`${d.artista} — ${d.luogo}, ${d.citta}`}
+                  iniziali={inizialiDi(d.citta)}
+                  kicker={formattaDataCard(d.data)}
+                  titolo={d.citta}
+                  righe={(
+                    <span className="card-riga">
+                      <Icona nome="pin" dimensione={16} />
+                      <span>{d.luogo}</span>
                     </span>
-                    <span style={{ textAlign: 'right', flexShrink: 0 }}>
-                      {!d.vendibile ? (
-                        <span style={{ fontSize: 'var(--testo-md)', color: 'var(--pink)' }}>Non disponibile</span>
-                      ) : (
-                        <>
-                          {d.prezzoMinimo !== null && <span style={{ display: 'block', fontWeight: 700 }}>da {formattaEuro(d.prezzoMinimo, { senzaDecimali: true })}</span>}
-                          <span className="card-cta" style={{ fontSize: 'var(--testo-md)' }}>Prenota</span>
-                        </>
-                      )}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
+                  )}
+                  prezzo={d.vendibile && d.prezzoMinimo !== null ? { min: d.prezzoMinimo, max: d.prezzoMinimo } : null}
+                  nota={d.vendibile ? null : 'Non disponibile'}
+                  cta={d.vendibile ? 'Prenota' : 'Dettagli'}
+                />
+              ))}
+            </section>
+          </>
         )}
       </div>
     </Layout>

@@ -1,70 +1,204 @@
 /* ============================================================
-   OnWay — sito pubblico · CARD EVENTO, CAROSELLI, GRIGLIA
+   OnWay — sito pubblico · CARD (evento, tour, bundle), GRIGLIE,
+   CAROSELLO, SCHELETRI
+   ------------------------------------------------------------
+   Un solo componente (CardBase in src/features/eventi/EventoCard.tsx)
+   serve evento, tour e bundle. Tre formati, decisi dalla classe:
+     .card-griglia   verticale, immagine 4:5 (predefinito)
+     .card-lista     orizzontale: media 96×120 + testo (telefono,
+                     date della pagina Tour)
+     .card-adattiva  lista sotto i 640px, griglia sopra — solo CSS,
+                     nessun JS: le regole di .card-lista sono
+                     ripetute per .card-adattiva nel media query.
+   Contenitori:
+     .griglia-eventi griglia fluida (4 colonne a 1200, 3 a ~900,
+                     2 a ~560); .grid è il suo alias storico, usato
+                     ancora da EventiCorrelati.tsx
+     .carosello      riga scorrevole con snap, card da 280px,
+                     frecce (44×44) da 901px in su
+     .elenco-eventi  griglia da 641px, colonna con gap 12 sotto
+   Colori dai token di base.css; niente font-size in px.
    ============================================================ */
 
-.grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(270px,1fr)); gap:22px; }
-
-/* ---------- CAROSELLO "EVENTI CONSIGLIATI" ---------- */
-.carosello-wrap{ position:relative; }
-.carosello{
-  display:flex; gap:20px; overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:8px;
-  scrollbar-width:none;
-}
-.carosello::-webkit-scrollbar{ display:none; }
-.carosello .card{ flex:0 0 auto; width:280px; scroll-snap-align:start; }
-/* Card più piccole per le sezioni con tanti eventi */
-.carosello-compatto .card{ width:180px; }
-.carosello-frecce{ display:flex; gap:8px; }
-.carosello-frecce button{
-  width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:transparent;
-  color:var(--paper); font-size:var(--testo-3xl); cursor:pointer; line-height:1;
-}
-.carosello-frecce button:hover{ border-color:var(--ow-accent); background:var(--ow-accent-soft); }
-@media (max-width:640px){ .carosello-frecce{ display:none; } }
-
-/* ---------- CARD ---------- */
+/* ---------- CARD: guscio ---------- */
 .card{
-  background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius);
-  overflow:hidden; display:flex; flex-direction:column;
+  position:relative; display:flex; flex-direction:column; min-width:0;
+  background:var(--ow-surface); border:1px solid var(--ow-line); border-radius:var(--radius);
+  overflow:hidden; color:inherit; text-decoration:none;
   transition:transform .2s ease, border-color .2s ease;
 }
-.card:hover{ transform:translateY(-5px); border-color:var(--ow-accent-line); }
-.card-visual{
-  aspect-ratio:1080/1350; position:relative; overflow:hidden;
-  background:linear-gradient(135deg, var(--ow-surface-2), #2C3444);
-  background-size:cover; background-position:center;
-  display:flex; align-items:flex-end; padding:14px;
+@media (hover:hover){
+  .card:hover{ border-color:var(--ow-accent-line); transform:translateY(-2px); }
 }
-.card-visual::after{
-  content:''; position:absolute; inset:0;
-  background:linear-gradient(180deg, rgba(14,17,22,0) 40%, rgba(14,17,22,.55) 100%);
-  pointer-events:none;
+.card:focus-visible{ outline:3px solid var(--sup-focus); outline-offset:2px; }
+
+/* ---------- CARD: media (immagine o segnaposto) ---------- */
+.card-media{
+  position:relative; aspect-ratio:4/5; overflow:hidden; flex-shrink:0;
+  background:var(--ow-surface-2);
 }
-.card-visual .tag{
-  position:relative; z-index:1;
-  font-family:var(--font-mono); font-size:var(--testo-xs); letter-spacing:1px; text-transform:uppercase;
-  background:rgba(14,17,22,.8); padding:5px 10px; border-radius:var(--radius-pill); color:var(--ow-accent);
+.card-media img{ width:100%; height:100%; object-fit:cover; display:block; transition:filter .2s ease; }
+/* Esaurita: immagine smorzata, ma la card resta cliccabile (lista d'attesa) */
+.card.esaurita .card-media img{ filter:saturate(.6); }
+/* Senza immagine: gradiente e iniziali dell'artista, mai un vuoto */
+.card-segnaposto{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg, #2C3444 0%, var(--ow-surface-2) 55%, #1B2130 100%);
+  font-family:var(--font-sans); font-weight:800; font-size:var(--t-h1); letter-spacing:-.02em;
+  color:rgba(247,245,241,.55); user-select:none;
 }
-.card-visual .beam{
-  position:absolute; inset:0; opacity:.5;
-  background:repeating-linear-gradient(100deg, transparent 0 22px, rgba(255,212,0,.14) 22px 24px);
+
+/* Badge di stato sull'immagine, in alto a sinistra. Colore + testo,
+   mai solo colore; il giallo non c'entra (rosso/ambra/verde). */
+.badge-stato{
+  position:absolute; top:var(--sp-3); left:var(--sp-3); z-index:1;
+  display:inline-flex; align-items:center; min-height:26px; padding:0 10px;
+  border-radius:var(--radius-pill); background:rgba(14,17,22,.8); backdrop-filter:blur(4px);
+  font-family:var(--font-mono); font-size:var(--t-label); font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+  white-space:nowrap;
 }
-.card-body{ padding:18px 18px 20px; display:flex; flex-direction:column; gap:10px; flex:1; }
-.card-body h3{ font-family:var(--font-sans); font-weight:800; font-size:var(--testo-3xl); margin:0; text-transform:uppercase; letter-spacing:.3px; }
-.card-meta{ display:flex; justify-content:space-between; font-size:var(--testo-md); color:var(--mist); }
-/* Stato: colore + testo, mai solo colore */
-.posti-basso{ color:var(--ow-warn); font-weight:600; }
-.card-foot{
-  margin-top:auto; display:flex; align-items:center; justify-content:space-between;
-  padding-top:12px; border-top:1px solid var(--line);
+.badge-stato.esaurito{ color:var(--ow-danger); }
+.badge-stato.pochi{ color:var(--ow-warn); }
+.badge-stato.nuovi{ color:var(--ow-ok); }
+
+/* ---------- CARD: corpo ---------- */
+.card-corpo{ display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-4); flex:1; min-width:0; }
+.card-kicker{
+  margin:0; font-family:var(--font-mono); font-size:var(--t-label); letter-spacing:1px; text-transform:uppercase;
+  color:var(--ow-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-/* La card è già interamente un <Link>: il .card-cta dentro è uno
-   <span> che non riceve il focus. Non è un pulsante ma un'etichetta,
-   per non promettere un'interazione che non ha. */
+.card-titolo{
+  margin:0; font-family:var(--font-sans); font-size:var(--t-h4); font-weight:800; line-height:1.25; letter-spacing:-.01em;
+  text-transform:none; text-wrap:pretty; color:var(--ow-paper);
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden;
+}
+.card-righe{ display:flex; flex-direction:column; gap:var(--sp-1); min-width:0; }
+.card-riga{
+  display:flex; align-items:flex-start; gap:var(--sp-2); min-width:0;
+  font-size:var(--t-caption); line-height:1.4; color:var(--ow-muted);
+}
+.card-riga > svg{ flex-shrink:0; width:16px; height:16px; margin-top:1px; }
+.card-riga > span{ min-width:0; overflow-wrap:anywhere; }
+/* "Parte da…" è l'informazione che conta di più per un servizio bus */
+.card-partenze{ color:var(--ow-paper); }
+
+/* ---------- CARD: piede (prezzo + etichetta d'azione) ---------- */
+/* flex-wrap: in una card stretta (vetrina dell'hero, griglia a 4
+   colonne con "Lista d'attesa") la pillola scende sotto il prezzo
+   invece di coprirlo. */
+.card-piede{
+  margin-top:auto; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--sp-2) var(--sp-3);
+  padding-top:var(--sp-3); border-top:1px solid var(--ow-line);
+}
+.card-prezzo{ display:flex; flex-direction:column; line-height:1.2; min-width:0; }
+.card-prezzo b{ font-size:var(--t-body); font-weight:800; color:var(--ow-paper); white-space:nowrap; }
+.card-prezzo small{ font-size:var(--t-caption); color:var(--ow-muted); white-space:nowrap; }
+/* La card è già tutta un <Link>: la CTA è uno <span>, non un pulsante.
+   Pillola gialla con testo ink (il giallo riempie, non scrive). */
 .card-cta{
-  display:inline-flex; align-items:center; justify-content:center;
-  font-size:var(--testo-md); font-weight:700; color:var(--ow-accent); background:none;
-  padding:0; border:none; white-space:nowrap;
-  transition:color .15s ease;
+  margin-left:auto; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;
+  min-height:32px; padding:0 var(--sp-3); border-radius:var(--radius-pill);
+  background:var(--ow-accent); color:var(--ow-ink); font-size:var(--t-caption); font-weight:700; white-space:nowrap;
+  transition:background .15s ease;
 }
-.card-cta:hover{ color:var(--ow-accent-press); }
+.card-cta > svg{ width:14px; height:14px; }
+@media (hover:hover){ .card:hover .card-cta{ background:var(--ow-accent-press); } }
+
+/* ---------- FORMATO LISTA ----------
+   Media 96×120 a sinistra, testo a destra: kicker, titolo (2 righe),
+   "data · città" su una riga (il nome del luogo si nasconde),
+   partenze, piede. Stesse regole ripetute sotto per .card-adattiva
+   nel media query dei telefoni. */
+.card-lista{
+  display:grid; grid-template-columns:96px minmax(0,1fr); gap:var(--sp-3); padding:var(--sp-3); align-items:stretch;
+}
+.card-lista .card-media{ width:96px; height:120px; aspect-ratio:auto; border-radius:var(--radius-sm); align-self:start; }
+.card-lista .card-corpo{ padding:0; gap:var(--sp-1); min-height:120px; }
+.card-lista .card-titolo{ -webkit-line-clamp:2; }
+.card-lista .card-righe{ flex-direction:row; flex-wrap:wrap; gap:2px var(--sp-2); margin-top:2px; }
+.card-lista .card-luogo > svg{ display:none; }
+.card-lista .card-data + .card-luogo::before{ content:'·'; color:var(--ow-muted); }
+.card-lista .card-luogo-nome{ display:none; }
+.card-lista .card-partenze{ flex-basis:100%; }
+.card-lista .card-piede{ padding-top:var(--sp-2); border-top:0; }
+.card-lista .badge-stato{ top:6px; left:6px; min-height:22px; padding:0 8px; letter-spacing:.3px; }
+
+@media (max-width:640px){
+  .card-adattiva{
+    display:grid; grid-template-columns:96px minmax(0,1fr); gap:var(--sp-3); padding:var(--sp-3); align-items:stretch;
+  }
+  .card-adattiva .card-media{ width:96px; height:120px; aspect-ratio:auto; border-radius:var(--radius-sm); align-self:start; }
+  .card-adattiva .card-corpo{ padding:0; gap:var(--sp-1); min-height:120px; }
+  .card-adattiva .card-titolo{ -webkit-line-clamp:2; }
+  .card-adattiva .card-righe{ flex-direction:row; flex-wrap:wrap; gap:2px var(--sp-2); margin-top:2px; }
+  .card-adattiva .card-luogo > svg{ display:none; }
+  .card-adattiva .card-data + .card-luogo::before{ content:'·'; color:var(--ow-muted); }
+  .card-adattiva .card-luogo-nome{ display:none; }
+  .card-adattiva .card-partenze{ flex-basis:100%; }
+  .card-adattiva .card-piede{ padding-top:var(--sp-2); border-top:0; }
+  .card-adattiva .badge-stato{ top:6px; left:6px; min-height:22px; padding:0 8px; letter-spacing:.3px; }
+}
+
+/* ---------- GRIGLIA ---------- */
+.griglia-eventi, .grid{
+  display:grid; gap:var(--sp-5); grid-template-columns:repeat(auto-fill, minmax(240px,1fr));
+}
+@media (max-width:480px){ .griglia-eventi, .grid{ gap:var(--sp-3); } }
+
+/* ---------- ELENCO ADATTIVO (risultati in home) ---------- */
+.elenco-eventi{ display:grid; gap:var(--sp-5); grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); }
+@media (max-width:640px){ .elenco-eventi{ display:flex; flex-direction:column; gap:var(--sp-3); } }
+
+/* ---------- CAROSELLO ("In evidenza") ----------
+   Margine negativo + padding uguale: l'anello di focus e il
+   sollevamento al passaggio del mouse non vengono tagliati
+   dall'overflow, e i bordi restano allineati alla sezione. */
+.carosello-wrap{ position:relative; }
+.carosello{
+  display:flex; gap:var(--sp-5); overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none;
+  margin:-6px; padding:6px 6px 10px; scroll-padding-inline:6px;
+}
+.carosello::-webkit-scrollbar{ display:none; }
+.carosello > .card{ flex:0 0 280px; width:280px; scroll-snap-align:start; }
+.carosello-frecce{ display:none; gap:var(--sp-2); }
+@media (min-width:901px){ .carosello-frecce{ display:flex; } }
+.carosello-frecce button{
+  width:44px; height:44px; padding:0; border-radius:50%; border:1px solid var(--btn-bordo); background:transparent;
+  color:var(--ow-paper); cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+  transition:border-color .15s ease, background .15s ease;
+}
+.carosello-frecce button:hover{ border-color:var(--ow-accent); background:var(--ow-accent-soft); }
+.carosello-frecce button svg{ width:20px; height:20px; }
+.carosello-frecce button:first-child svg{ transform:scaleX(-1); }
+
+/* ---------- SCHELETRO (caricamento) ---------- */
+.card-scheletro{
+  display:flex; flex-direction:column; background:var(--ow-surface); border:1px solid var(--ow-line);
+  border-radius:var(--radius); overflow:hidden;
+}
+.card-scheletro-media{ aspect-ratio:4/5; background:var(--ow-surface-2); }
+.card-scheletro-corpo{ display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-4); }
+.card-scheletro-riga{ height:12px; border-radius:var(--radius-sm); background:var(--ow-surface-2); }
+.card-scheletro-riga:nth-child(1){ width:40%; }
+.card-scheletro-riga:nth-child(2){ width:90%; height:18px; }
+.card-scheletro-riga:nth-child(3){ width:65%; }
+.card-scheletro-riga:nth-child(4){ width:50%; }
+.card-scheletro-media, .card-scheletro-riga{ animation:scheletro-pulsa 1.4s ease-in-out infinite; }
+@keyframes scheletro-pulsa{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+@media (prefers-reduced-motion:reduce){
+  .card-scheletro-media, .card-scheletro-riga{ animation:none; opacity:.75; }
+}
+@media (max-width:640px){
+  .elenco-eventi .card-scheletro{ display:grid; grid-template-columns:96px minmax(0,1fr); gap:var(--sp-3); padding:var(--sp-3); }
+  .elenco-eventi .card-scheletro-media{ width:96px; height:120px; aspect-ratio:auto; border-radius:var(--radius-sm); }
+  .elenco-eventi .card-scheletro-corpo{ padding:0; }
+}
+
+/* ---------- STATO VUOTO / ERRORE ---------- */
+.stato-vuoto{
+  display:flex; flex-direction:column; align-items:center; gap:var(--sp-3); text-align:center;
+  padding:var(--sp-12) var(--sp-4); border:1px dashed var(--btn-bordo); border-radius:var(--radius);
+}
+.stato-vuoto h3{ margin:0; font-family:var(--font-sans); font-size:var(--t-h3); font-weight:800; text-transform:none; }
+.stato-vuoto p{ margin:0; color:var(--ow-muted); max-width:44ch; font-size:var(--t-small); line-height:var(--lh-normal); }
+.stato-vuoto .btn{ margin-top:var(--sp-2); }

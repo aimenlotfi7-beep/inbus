@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PercorsoBus } from '../PercorsoBus';
 import type { Evento, OpzionePartenza, Servizio } from '../../api/types';
@@ -11,13 +11,20 @@ import { ErroreApi } from '../../api/client';
 import { clienteAuthApi } from '../../api/clienteAuth';
 import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
 import { useCarrello } from '../carrello/CarrelloContext';
-import { SelettoreFermata } from './SelettoreFermata';
+import { SceltaFermata } from './SceltaFermata';
+import { Stepper } from './Stepper';
+import { CampoTesto } from './CampoTesto';
 import { provenienzaDaUrl } from './provenienza';
 import { tracciaInizioPrenotazione, tracciaAcquisto, leggiCookieMeta } from '../metaPixel';
 import { tracciaInizioCheckoutGA4, tracciaAcquistoGA4, tracciaAcquistoGoogleAds } from '../googleAnalytics';
-import { formattaEuro } from '../../shared/formato';
+import { formattaEuro, plurale } from '../../shared/formato';
+import { Icona } from '../Icone';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** Acconto a passeggero quando l'evento non ne ha uno suo (stesso
+ *  default del server, ACCONTO_FISSO_EUR). Solo per mostrarlo. */
+export const ACCONTO_PREDEFINITO_EUR = 10;
 
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'confermato-attesa' | 'errore';
 interface Partecipante { nome: string; cognome: string; }
@@ -28,38 +35,52 @@ interface Partecipante { nome: string; cognome: string; }
  *  per fermata. */
 export interface OffertaCheckout { id: string; nome: string; scontoPercentuale: number; }
 
+/** "sab 17 ott" — nel fuso di Roma, come le card. */
+export function formattaDataBreve(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function oggiIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /**
- * Modulo di prenotazione a step (come la creazione evento nel
- * gestionale): 1) fermata+passeggeri, 2) dati richiedente e
- * partecipanti, 3) pagamento — usato sia dentro il popup della home
- * (CheckoutModal) sia direttamente nella pagina dedicata dell'evento.
+ * Modulo di prenotazione a passi: 1) fermata e posti, 2) i tuoi dati,
+ * 3) riepilogo — che sul sito è la pagina del carrello (/carrello), nel
+ * widget White Label (publicWidgetId) il pagamento qui dentro. Lo
+ * montano la pagina evento/offerta (pannello a destra su desktop,
+ * foglio a schermo intero sui telefoni), il popup della home e il widget.
+ *
+ * fermataPreselezionata: la pagina evento la passa quando il cliente
+ * tocca "Scegli" su una partenza — il modulo seleziona quella fermata e
+ * torna al passo 1.
  */
-export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaColori }: {
+export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaColori, fermataPreselezionata }: {
   evento: Evento; offerta?: OffertaCheckout; onChiudi?: () => void; publicWidgetId?: string;
+  fermataPreselezionata?: string;
   // Se il checkout arriva da una White Label con un suo tema, questi
-  // colori sovrascrivono quelli del sito per TUTTO il modulo — non
-  // solo la vetrina/anteprima come prima, anche lo stepper, i
-  // pulsanti, i pallini. Facoltativo: senza, il checkout resta uguale
-  // a sempre (i colori standard del sito OnWay).
+  // colori sovrascrivono quelli del sito per TUTTO il modulo. Facoltativo:
+  // senza, il checkout resta quello del sito OnWay.
   temaColori?: { sfondo: string; superficie: string; testoPrincipale: string; testoSecondario: string; cta: string; testoCta: string; bordi: string };
 }) {
   const [stato, setStato] = useState<Stato>('caricamento');
   // Quale pulsante specifico è stato premuto — 'invio' da solo non basta,
-  // altrimenti "Acquista" e "Prenota" si accenderebbero insieme (era
-  // proprio questo il bug: entrambi mostravano "Invio..." a prescindere
-  // da quale avesse premuto davvero il cliente).
+  // altrimenti "Conferma" e "Conferma con acconto" si accenderebbero insieme.
   const [azioneInCorso, setAzioneInCorso] = useState<'acquista' | 'prenota' | 'lista-attesa' | null>(null);
-  // Se l'evento ha più di un servizio, prima bisogna sceglierne uno —
-  // diventa a tutti gli effetti un quarto step, prima degli altri tre.
-  // Con zero o un solo servizio, si passa dritti come sempre.
+  // Se l'evento ha più di un servizio, prima bisogna sceglierne uno: un
+  // passo in più, davanti agli altri. Con zero o un servizio si va dritti.
   const multiServizio = evento.servizi.length >= 2;
   const navigate = useNavigate();
   const { aggiungi: aggiungiAlCarrello } = useCarrello();
   const [percorsoAperto, setPercorsoAperto] = useState(false);
+  const prefisso = useId();
+  const loggato = clienteLoggato();
 
   // Le variabili CSS del tema White Label, se presente — sovrascritte
-  // qui (non nel foglio di stile) così restano scoped a QUESTO modulo
-  // soltanto, senza toccare il resto della pagina che lo ospita.
+  // qui (non nel foglio di stile) così restano scoped a QUESTO modulo.
   const styleTema: React.CSSProperties | undefined = temaColori ? {
     '--paper': temaColori.superficie,
     '--ink': temaColori.testoPrincipale,
@@ -74,17 +95,17 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [opzioni, setOpzioni] = useState<OpzionePartenza[]>([]);
   const [fermataId, setFermataId] = useState('');
+  const [erroreFermata, setErroreFermata] = useState('');
   const [passeggeri, setPasseggeri] = useState(1);
 
-  // Modulo richiedente — si autocompila se l'email corrisponde a una
-  // prenotazione precedente, ma resta sempre modificabile.
+  // Modulo richiedente — si compila da solo dall'account, se c'è, ma
+  // resta modificabile.
   const [email, setEmail] = useState('');
   const [nome, setNome] = useState('');
   const [cognome, setCognome] = useState('');
   const [telefono, setTelefono] = useState('');
-  // Solo per chi acquista senza account (D1b) — chi è già loggato le
-  // ha già sul proprio profilo, non le ripete qui (vedi useEffect
-  // sotto: restano vuote finché non servono davvero).
+  // Solo per chi prenota senza account: chi è loggato le ha già sul
+  // profilo e non le ripete qui.
   const [citta, setCitta] = useState('');
   const [dataNascita, setDataNascita] = useState('');
   const [creditoDisponibile, setCreditoDisponibile] = useState(0);
@@ -94,27 +115,57 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   const [couponErrore, setCouponErrore] = useState('');
   const [verificandoCoupon, setVerificandoCoupon] = useState(false);
 
-  // Un modulo nome+cognome per ogni passeggero OLTRE al richiedente.
+  // Un nome+cognome per ogni passeggero OLTRE al richiedente.
   const [partecipanti, setPartecipanti] = useState<Partecipante[]>([]);
+  // Errori dei campi del passo 2, per chiave ('email', 'p0-nome', …).
+  const [errori, setErrori] = useState<Record<string, string>>({});
 
   const [messaggioErrore, setMessaggioErrore] = useState('');
   const [pnrConfermato, setPnrConfermato] = useState('');
-  // Nessun gateway di pagamento collegato ancora (serve un fornitore tipo
-  // Stripe): niente scelta del metodo né campi carta, l'ordine si registra
-  // come "Da concordare".
+  // Fermata da selezionare appena arrivano le opzioni (preselezione
+  // arrivata prima del caricamento, o che richiede un altro servizio).
+  const preselezioneInAttesa = useRef<string | null>(null);
 
   useEffect(() => {
-    // Se serve ancora scegliere il servizio, non c'è ancora nulla da
-    // caricare — si aspetta la scelta.
     if (multiServizio && !servizioScelto) { setStato('pronto'); return; }
     setStato('caricamento');
     eventiApi.opzioniPartenza(evento.id, servizioScelto?.id).then((o) => {
       setOpzioni(o);
-      // Nessuna fermata preselezionata di default — il cliente sceglie
-      // lui, il campo parte vuoto con "Seleziona una fermata".
+      const inAttesa = preselezioneInAttesa.current;
+      if (inAttesa && o.some((x) => x.fermataId === inAttesa)) {
+        preselezioneInAttesa.current = null;
+        setFermataId(inAttesa);
+        setErroreFermata('');
+        setStep(1);
+      }
       setStato('pronto');
+    }).catch(() => {
+      setMessaggioErrore('Non riusciamo a caricare le fermate in questo momento. Riprova tra poco.');
+      setStato('errore');
     });
   }, [evento.id, servizioScelto?.id, multiServizio]);
+
+  // "Scegli" su una partenza della pagina: seleziona quella fermata (e il
+  // suo servizio, se serve) e resta al passo 1.
+  useEffect(() => {
+    if (!fermataPreselezionata) return;
+    if (multiServizio) {
+      const servizio = evento.servizi.find((s) => s.tragitti.some((t) => t.fermate.some((f) => f.id === fermataPreselezionata)));
+      if (servizio && servizio.id !== servizioScelto?.id) {
+        preselezioneInAttesa.current = fermataPreselezionata;
+        setServizioScelto(servizio);
+        setStep(1);
+        return;
+      }
+    }
+    if (opzioni.some((o) => o.fermataId === fermataPreselezionata)) {
+      scegliFermata(fermataPreselezionata);
+      setStep(1);
+    } else {
+      preselezioneInAttesa.current = fermataPreselezionata;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fermataPreselezionata]);
 
   useEffect(() => {
     setPartecipanti((prev) => {
@@ -125,9 +176,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
     });
   }, [passeggeri]);
 
-  // Non c'è più bisogno di "indovinare" i dati digitando l'email: se il
-  // cliente è già loggato (obbligatorio per prenotare), li prendiamo
-  // direttamente dal suo account vero.
+  // Dati dal proprio account, se il cliente è loggato.
   useEffect(() => {
     if (!clienteLoggato()) return;
     clienteAuthApi.me().then((dati) => {
@@ -137,49 +186,135 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
       if (dati.telefono) setTelefono(dati.telefono);
       setCreditoDisponibile(Number(dati.creditoDisponibile));
     }).catch(() => {
-      // Il token non è più valido — lo togliamo, il modulo mostrerà
-      // l'invito ad accedere di nuovo.
+      // Il token non è più valido — lo togliamo, il modulo mostra l'invito ad accedere.
       logoutCliente();
     });
   }, []);
 
+  // Esc chiude il popup del percorso.
+  useEffect(() => {
+    if (!percorsoAperto) return;
+    const allaPressione = (e: KeyboardEvent) => { if (e.key === 'Escape') setPercorsoAperto(false); };
+    window.addEventListener('keydown', allaPressione);
+    return () => window.removeEventListener('keydown', allaPressione);
+  }, [percorsoAperto]);
+
+  function scegliFermata(id: string) {
+    setFermataId(id);
+    setErroreFermata('');
+    const scelta = opzioni.find((o) => o.fermataId === id);
+    if (scelta) { tracciaInizioPrenotazione(scelta.prezzoEffettivo * passeggeri); tracciaInizioCheckoutGA4(scelta.prezzoEffettivo * passeggeri, evento.artista); }
+  }
+
   function aggiornaPartecipante(idx: number, campo: keyof Partecipante, valore: string) {
     setPartecipanti((prev) => prev.map((p, i) => i === idx ? { ...p, [campo]: valore } : p));
+    togliErrore(`p${idx}-${campo}`);
+  }
+
+  function togliErrore(chiave: string) {
+    setErrori((prev) => {
+      if (!(chiave in prev)) return prev;
+      const nuovi = { ...prev };
+      delete nuovi[chiave];
+      return nuovi;
+    });
   }
 
   const opzioneScelta = opzioni.find((o) => o.fermataId === fermataId);
-  // L'arrivo (destinazione + orario) vive sul TRAGITTO, non più
-  // sull'evento/servizio — diversi tragitti dello stesso evento
-  // possono avere destinazioni diverse. Prima di sapere quale fermata
-  // sceglie il cliente non c'è un tragitto certo da mostrare, quindi
-  // niente arrivo finché non sceglie — mostrarne uno a caso sarebbe
-  // fuorviante se l'evento ne avesse più di uno diverso.
+  // L'arrivo (destinazione + orario) vive sul TRAGITTO: si mostra solo
+  // quando la fermata è scelta, così è quello giusto.
   const tragittoScelto = opzioneScelta
     ? [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === opzioneScelta.tragittoId)
     : undefined;
-  // Con i limiti per fermata, una singola fermata può esaurirsi da sola
-  // anche se il resto del bus ha ancora posti — vanno distinti i due casi
-  // per mostrare il messaggio giusto e proporre la lista d'attesa solo
-  // quando serve davvero.
   const tutteEsaurite = opzioni.length === 0 || opzioni.every((o) => o.postiDisponibili === 0);
   const fermataEsaurita = !!opzioneScelta && opzioneScelta.postiDisponibili === 0;
   const prezzoUnitario = opzioneScelta
     ? (offerta ? applicaScontoOfferta(opzioneScelta.prezzoEffettivo, offerta.scontoPercentuale) : opzioneScelta.prezzoEffettivo)
     : 0;
   const totale = opzioneScelta ? prezzoUnitario * passeggeri : 0;
-  // Il credito si applica solo all'acquisto completo (non all'acconto),
-  // mai oltre il totale — coerente con la stessa regola applicata dal
-  // server (che comunque la ricontrolla per conto suo, non ci si fida
-  // di questo calcolo lato cliente per l'importo vero addebitato).
+  // Il credito vale solo pagando tutto, mai oltre il totale (il server
+  // ricontrolla per conto suo: questo è solo quello che si mostra).
   const creditoApplicato = usaCredito ? Math.min(creditoDisponibile, totale) : 0;
   const totaleConCredito = totale - creditoApplicato;
-  // Da ospite serve anche città e data di nascita (mai richieste finora
-  // qui: chi era loggato le aveva già sull'account) — chi è loggato non
-  // deve ripeterle, città è comunque facoltativa anche da ospite.
-  const moduloRichiedenteCompleto = Boolean(
-    email && nome && cognome && telefono && (clienteLoggato() || dataNascita)
-  );
-  const partecipantiCompleti = partecipanti.every((p) => p.nome.trim() && p.cognome.trim());
+  const accontoUnitario = evento.accontoEur ? Number(evento.accontoEur) : ACCONTO_PREDEFINITO_EUR;
+
+  // ---------- Validazione del passo 2 ----------
+  function erroreCampo(chiave: string): string | null {
+    switch (chiave) {
+      case 'email':
+        if (!email.trim()) return "Inserisci l'email";
+        return REGEX_EMAIL.test(email.trim()) ? null : "Controlla l'indirizzo email: manca la @ o il dominio";
+      case 'telefono': return telefono.trim() ? null : 'Inserisci il telefono';
+      case 'dataNascita': return dataNascita ? null : 'Inserisci la data di nascita';
+      case 'nome': return nome.trim() ? null : 'Inserisci il nome';
+      case 'cognome': return cognome.trim() ? null : 'Inserisci il cognome';
+      default: {
+        const m = chiave.match(/^p(\d+)-(nome|cognome)$/);
+        if (!m) return null;
+        const p = partecipanti[Number(m[1])];
+        if (!p) return null;
+        return p[m[2] as keyof Partecipante].trim() ? null : (m[2] === 'nome' ? 'Inserisci il nome' : 'Inserisci il cognome');
+      }
+    }
+  }
+  function validaCampo(chiave: string) {
+    const e = erroreCampo(chiave);
+    setErrori((prev) => {
+      const nuovi = { ...prev };
+      if (e) nuovi[chiave] = e; else delete nuovi[chiave];
+      return nuovi;
+    });
+  }
+  function validaPasso2(): boolean {
+    const chiavi = ['email', 'telefono', ...(loggato ? [] : ['dataNascita']), 'nome', 'cognome', ...partecipanti.flatMap((_, i) => [`p${i}-nome`, `p${i}-cognome`])];
+    const nuovi: Record<string, string> = {};
+    for (const k of chiavi) { const e = erroreCampo(k); if (e) nuovi[k] = e; }
+    setErrori(nuovi);
+    const primo = chiavi.find((k) => nuovi[k]);
+    if (primo) { document.getElementById(`${prefisso}-${primo}`)?.focus(); return false; }
+    return true;
+  }
+
+  function continuaPasso1() {
+    if (!opzioneScelta) { setErroreFermata('Scegli una fermata di partenza per continuare'); return; }
+    setStep(2);
+  }
+
+  function continuaPasso2() {
+    if (!validaPasso2()) return;
+    if (!publicWidgetId && opzioneScelta) {
+      // Sul sito il pagamento non avviene qui: l'articolo, già completo
+      // (fermata, passeggeri coi nomi, dati del richiedente), va nel
+      // carrello e si passa subito lì. Nel widget White Label resta tutto
+      // qui, al passo 3.
+      aggiungiAlCarrello({
+        eventoId: evento.id,
+        eventoArtista: evento.artista,
+        eventoData: evento.data,
+        eventoSlug: evento.slug,
+        eventoImmagine: evento.immagini[0]?.url,
+        eventoCitta: evento.citta,
+        eventoLuogo: evento.luogo,
+        tragittoId: opzioneScelta.tragittoId,
+        fermataId: opzioneScelta.fermataId,
+        fermataCitta: opzioneScelta.fermataCitta,
+        fermataIndirizzo: opzioneScelta.fermataIndirizzo || undefined,
+        fermataOrario: opzioneScelta.fermataOrario,
+        orarioRitorno: opzioneScelta.orarioRitorno,
+        arrivoOrario: tragittoScelto?.arrivoOrario ?? null,
+        accontoEur: evento.accontoEur ? Number(evento.accontoEur) : null,
+        prezzoStimato: opzioneScelta.prezzoEffettivo,
+        passeggeri,
+        offertaId: offerta?.id,
+        cliente: { email: email.trim(), nome: nome.trim(), cognome: cognome.trim(), telefono: telefono.trim(), citta: citta.trim() || undefined, dataNascita: dataNascita || undefined },
+        partecipanti: partecipanti.map((p) => ({ nome: p.nome.trim(), cognome: p.cognome.trim() })),
+        ...provenienzaDaUrl(),
+      });
+      navigate('/carrello');
+    } else {
+      setStep(3);
+    }
+  }
 
   async function verificaCoupon() {
     if (!couponCodice.trim() || !opzioneScelta) return;
@@ -193,10 +328,10 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
         body: JSON.stringify({ codice: couponCodice.trim(), importo: totale, eventoId: evento.id, ...(email && { emailCliente: email }) }),
       });
       const dati = await r.json();
-      if (!r.ok) throw new Error(dati.errore ?? 'Coupon non valido.');
+      if (!r.ok) throw new Error(dati.errore ?? 'Codice non valido.');
       setCouponVerificato(dati);
     } catch (e) {
-      setCouponErrore(e instanceof Error ? e.message : 'Coupon non valido.');
+      setCouponErrore(e instanceof Error ? e.message : 'Codice non valido.');
     } finally {
       setVerificandoCoupon(false);
     }
@@ -209,10 +344,8 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
     setMessaggioErrore('');
     try {
       const { promoterCodice, utmSource, utmMedium, utmCampaign, utmContent } = provenienzaDaUrl();
-      // Il pixel di INBUS traccia SEMPRE (anche dal widget White
-      // Label) — in più, se l'organizzatore ha impostato il suo pixel
-      // (WidgetPubblicoPage lo inizializza insieme al nostro), lo
-      // stesso evento arriva anche a lui: due ad account, una vendita.
+      // Il pixel di INBUS traccia sempre (anche dal widget White Label);
+      // se l'organizzatore ha il suo pixel, lo stesso evento arriva anche a lui.
       const metaEventId = crypto.randomUUID();
       const { fbp, fbc } = leggiCookieMeta();
       const payloadPrenotazione = {
@@ -222,7 +355,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
         passeggeri,
         tipoPagamento,
         metodoPagamento: 'DA_CONCORDARE' as const, // nessun pagamento online reale ancora: non registrare "Carta"
-        cliente: { email, nome, cognome, telefono },
+        cliente: { email: email.trim(), nome: nome.trim(), cognome: cognome.trim(), telefono: telefono.trim() },
         partecipanti,
         ...(promoterCodice && { promoterCodice }),
         ...(offerta && { offertaId: offerta.id }),
@@ -236,17 +369,14 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
         ...(fbp && { metaFbp: fbp }),
         ...(fbc && { metaFbc: fbc }),
       };
-      // Dentro il widget White Label la prenotazione passa da un
-      // endpoint diverso (stessa identica logica lato server — stesso
-      // calcolo prezzo, stesso blocco posti — solo con l'aggiunta
-      // dell'attribuzione del canale di vendita sopra), non dal
-      // normale endpoint del sito.
+      // Dentro il widget White Label la prenotazione passa da un endpoint
+      // diverso (stessa logica lato server, più l'attribuzione del canale).
       const prenotazione = publicWidgetId
         ? await whiteLabelApi.prenota(publicWidgetId, payloadPrenotazione)
         : await prenotazioniApi.crea(payloadPrenotazione);
       setPnrConfermato(prenotazione.pnr);
       if (metaEventId) {
-        const valoreEuro = opzioneScelta.prezzoEffettivo * passeggeri; // stima lato client — il valore vero e' quello calcolato dal server per la Conversions API, questo serve solo al Pixel nel browser
+        const valoreEuro = opzioneScelta.prezzoEffettivo * passeggeri; // stima lato client: il valore vero lo calcola il server per la Conversions API
         tracciaAcquisto(valoreEuro, metaEventId);
         tracciaAcquistoGA4(valoreEuro, prenotazione.pnr, evento.artista);
         tracciaAcquistoGoogleAds(valoreEuro, prenotazione.pnr);
@@ -269,7 +399,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
         tragittoId: opzioneScelta?.tragittoId,
         fermataId: opzioneScelta?.fermataId,
         passeggeri,
-        cliente: { email, nome, cognome, telefono },
+        cliente: { email: email.trim(), nome: nome.trim(), cognome: cognome.trim(), telefono: telefono.trim() },
         partecipanti,
       });
       setStato('confermato-attesa');
@@ -280,25 +410,30 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
     }
   }
 
+  // ---------- Esiti ----------
   if (stato === 'confermato') {
     return (
-      <div className="checkout-form" style={styleTema}>
-        <h3>Prenotazione confermata 🎉</h3>
-        <div className="checkout-summary">Il tuo PNR è <b>{pnrConfermato}</b>. I biglietti arriveranno all'email <b>{email}</b>.</div>
-        {onChiudi && <button className="search-cta" onClick={onChiudi}>Chiudi</button>}
+      <div className="checkout-form checkout-esito" style={styleTema}>
+        <span className="esito-icona" aria-hidden="true"><Icona nome="spunta" dimensione={32} strokeWidth={2.4} /></span>
+        <h3>Prenotazione confermata</h3>
+        <p>
+          Il tuo codice è <b>{pnrConfermato}</b>. Ti abbiamo mandato la conferma a <b>{email}</b>; il biglietto con il
+          numero del bus arriva via email prima della partenza.
+        </p>
+        {onChiudi && <button type="button" className="btn btn-primary btn-block" onClick={onChiudi}>Chiudi</button>}
       </div>
     );
   }
 
   if (stato === 'confermato-attesa') {
     return (
-      <div className="checkout-form" style={styleTema}>
-        <h3>Sei in lista d'attesa 📩</h3>
-        <div className="checkout-summary">
+      <div className="checkout-form checkout-esito" style={styleTema}>
+        <h3>Sei in lista d'attesa</h3>
+        <p>
           Ti scriveremo a <b>{email}</b> appena si libera un posto per <b>{evento.artista}</b>, con un link per
           completare subito la prenotazione.
-        </div>
-        {onChiudi && <button className="search-cta" onClick={onChiudi}>Chiudi</button>}
+        </p>
+        {onChiudi && <button type="button" className="btn btn-primary btn-block" onClick={onChiudi}>Chiudi</button>}
       </div>
     );
   }
@@ -307,438 +442,319 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   // (il server rifiuta comunque ogni prenotazione). Vale anche nel widget.
   if (evento.venditeFermate) {
     return (
-      <div className="checkout-form" style={styleTema}>
+      <div className="checkout-form checkout-esito" style={styleTema}>
         <h3>Prenotazioni chiuse</h3>
-        <div className="checkout-summary">Le prenotazioni per <b>{evento.artista}</b> sono chiuse.</div>
-        {onChiudi && <button className="search-cta" onClick={onChiudi}>Chiudi</button>}
+        <p>Le prenotazioni per <b>{evento.artista}</b> sono chiuse.</p>
+        {onChiudi && <button type="button" className="btn btn-secondary btn-block" onClick={onChiudi}>Chiudi</button>}
       </div>
     );
   }
 
+  // ---------- Stepper e riepilogo ----------
+  const vociStepper = [...(multiServizio ? ['Servizio'] : []), 'Fermata e posti', 'I tuoi dati', publicWidgetId ? 'Pagamento' : 'Riepilogo'];
+  const passoAttivo = (multiServizio ? (servizioScelto ? step : 0) : step - 1);
+  const partiRiepilogo: string[] = [formattaDataBreve(evento.data)];
+  if (multiServizio && servizioScelto) partiRiepilogo.push(servizioScelto.nome);
+  if (opzioneScelta) {
+    partiRiepilogo.push(
+      `${opzioneScelta.fermataCitta}${opzioneScelta.fermataOrario ? ` ${opzioneScelta.fermataOrario}` : ''} → ${evento.citta}${tragittoScelto?.arrivoOrario ? ` ${tragittoScelto.arrivoOrario}` : ''}`,
+    );
+  }
+  partiRiepilogo.push(plurale(passeggeri, 'passeggero', 'passeggeri'));
+  const idPercorso = `${prefisso}-percorso`;
+  const idPasseggeri = `${prefisso}-passeggeri`;
+  const invio = stato === 'invio';
+
   return (
     <div className="checkout-form" style={styleTema}>
-      <h3>Prenota</h3>
-
       {offerta && (
-        <p style={{ background: '#e8f7ea', border: '1px solid #b6e3bb', borderRadius: 8, padding: '10px 12px', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
-          🎉 Offerta "{offerta.nome}": -{offerta.scontoPercentuale.toFixed(0)}% su tutte le fermate.
-        </p>
+        <p className="avviso avviso-ok">Offerta {offerta.nome}: −{offerta.scontoPercentuale.toFixed(0)}% su tutte le fermate.</p>
       )}
 
-      {stato === 'caricamento' && <p>Carico le fermate disponibili...</p>}
+      <Stepper voci={vociStepper} attivo={passoAttivo} />
 
-      {stato !== 'caricamento' && (
+      {/* Riepilogo sempre visibile, in ogni passo: cosa si sta per prenotare. */}
+      <div className="riepilogo">
+        <div className="riepilogo-testo">
+          <p className="riepilogo-artista">{evento.artista}</p>
+          <p className="riepilogo-riga"><Icona nome="bus" dimensione={16} /><span>{partiRiepilogo.join(' · ')}</span></p>
+          {opzioneScelta && (
+            <button type="button" className="btn btn-tertiary btn-sm riepilogo-percorso" onClick={() => setPercorsoAperto(true)}>Vedi il percorso</button>
+          )}
+        </div>
+        {opzioneScelta && <p className="riepilogo-totale">{formattaEuro(step === 3 ? totaleConCredito : totale)}</p>}
+      </div>
+
+      {percorsoAperto && opzioneScelta && (
+        <div className="percorso-popup-overlay" onClick={() => setPercorsoAperto(false)}>
+          <div className="percorso-popup-card" role="dialog" aria-modal="true" aria-labelledby={idPercorso} onClick={(e) => e.stopPropagation()}>
+            <div className="percorso-popup-testata">
+              <h3 id={idPercorso}>Il percorso del tuo bus</h3>
+              <button type="button" className="btn-icona" aria-label="Chiudi" onClick={() => setPercorsoAperto(false)}><Icona nome="chiudi" /></button>
+            </div>
+            <PercorsoBus evento={evento} soloTragittoId={opzioneScelta.tragittoId} fermataEvidenziataId={opzioneScelta.fermataId} />
+          </div>
+        </div>
+      )}
+
+      {stato === 'caricamento' && <p className="campo-aiuto" aria-live="polite">Carico le fermate disponibili…</p>}
+      {stato === 'errore' && step === 1 && messaggioErrore && <p className="campo-errore" role="alert">{messaggioErrore}</p>}
+
+      {multiServizio && !servizioScelto && (
+        <div className="servizi">
+          <p className="campo-aiuto">Questo evento ha più opzioni di servizio: scegli quella che preferisci.</p>
+          {evento.servizi.map((v) => {
+            const orariDistinti = [...new Set(v.tragitti.map((t) => t.arrivoOrario).filter((o): o is string => !!o))];
+            const arrivoComune = orariDistinti.length === 1 ? orariDistinti[0] : null;
+            return (
+              <button key={v.id} type="button" className="servizio-card" onClick={() => setServizioScelto(v)}>
+                <b>{v.nome}</b>
+                {arrivoComune && <span>Arrivo previsto alle {arrivoComune}</span>}
+                <Icona nome="freccia" dimensione={18} />
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {stato !== 'caricamento' && (!multiServizio || servizioScelto) && (
         <>
-          <div className="checkout-stepper">
-            {(multiServizio
-              ? [{ numero: 0, label: 'Servizio' }, { numero: 1, label: 'Fermata' }, { numero: 2, label: 'Dati' }, { numero: 3, label: 'Pagamento' }]
-              : [{ numero: 1, label: 'Fermata' }, { numero: 2, label: 'Dati' }, { numero: 3, label: 'Pagamento' }]
-            ).map((s) => {
-              const stepAttuale = multiServizio ? (servizioScelto ? step : 0) : step;
-              return (
-                <div key={s.numero} className={`checkout-step-dot${stepAttuale === s.numero ? ' active' : stepAttuale > s.numero ? ' completato' : ''}`}>
-                  <span className="checkout-step-numero">{s.numero + (multiServizio ? 1 : 0)}</span> <span className="checkout-step-etichetta">{s.label}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Riepilogo sempre visibile, in ogni step — evento, data,
-              fermata (appena scelta), passeggeri, totale via via che si
-              conosce: il cliente non deve mai perdere di vista cosa sta
-              per comprare. */}
-          <div className="checkout-riepilogo-persistente">
-            <div>
-              <b>{evento.artista}</b>
-              {tragittoScelto?.arrivoOrario && (
-                <span style={{ fontWeight: 400, fontSize: 'var(--testo-sm)', marginLeft: 8, color: 'var(--mist)' }}>
-                  Arrivo {tragittoScelto.arrivoOrario}
-                </span>
-              )}
-              <span className="checkout-riepilogo-riga">
-                {new Date(evento.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
-                {servizioScelto && ` · ${servizioScelto.nome}`}
-                {servizioScelto || !multiServizio ? <> · 👥 {passeggeri}</> : ''}
-                {opzioneScelta && (
-                  <button
-                    type="button"
-                    className="mini-tab active"
-                    style={{ marginLeft: 8, padding: '3px 10px', fontSize: 'var(--testo-xs)', display: 'inline-flex', alignItems: 'center', gap: 4, verticalAlign: 'middle' }}
-                    onClick={() => setPercorsoAperto(true)}
-                  >
-                    🗺️ Tragitto
-                  </button>
-                )}
-              </span>
-            </div>
-            {opzioneScelta && <div className="checkout-riepilogo-totale">{formattaEuro(step === 3 ? totaleConCredito : totale)}</div>}
-          </div>
-
-          {/* Il tragitto completo della fermata scelta, con lei
-              evidenziata — così il cliente vede subito tutte le altre
-              tappe di quel percorso, non solo la propria. */}
-          {percorsoAperto && opzioneScelta && (
-            <div className="percorso-popup-overlay" onClick={() => setPercorsoAperto(false)}>
-              <div className="percorso-popup-card" onClick={(e) => e.stopPropagation()}>
-                <button className="percorso-popup-close" onClick={() => setPercorsoAperto(false)}>✕</button>
-                <h3 style={{ marginTop: 0 }}>Il percorso del tuo bus</h3>
-                <PercorsoBus evento={evento} soloTragittoId={opzioneScelta.tragittoId} fermataEvidenziataId={opzioneScelta.fermataId} />
-              </div>
-            </div>
-          )}
-
-          {multiServizio && !servizioScelto && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <p style={{ fontSize: 'var(--testo-base)', opacity: .75, marginTop: -6 }}>Questo evento ha più opzioni di servizio — scegli quella che preferisci.</p>
-              {evento.servizi.map((v) => {
-                const orariDistinti = [...new Set(v.tragitti.map((t) => t.arrivoOrario).filter((o): o is string => !!o))];
-                const arrivoComune = orariDistinti.length === 1 ? orariDistinti[0] : null;
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    className="checkout-servizio-card"
-                    onClick={() => setServizioScelto(v)}
-                  >
-                    <b>{v.nome}</b>
-                    {arrivoComune && <span>Arrivo previsto alle {arrivoComune}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {(!multiServizio || servizioScelto) && (
-          <>
           {step === 1 && (
-            <>
+            <div className="checkout-passo">
               {multiServizio && (
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', marginBottom: 12, padding: '5px 10px' }} onClick={() => setServizioScelto(null)}>
-                  ← Cambia servizio
-                </button>
+                <button type="button" className="btn btn-tertiary btn-sm" onClick={() => { setServizioScelto(null); setFermataId(''); }}>Cambia servizio</button>
               )}
               {tutteEsaurite && (
-                <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
-                  Al momento non ci sono posti disponibili. Puoi comunque compilare i tuoi dati e iscriverti alla
-                  lista d'attesa: ti avviseremo via email non appena si libera un posto.
+                <p className="avviso avviso-attenzione">
+                  Al momento non ci sono posti disponibili. Puoi comunque lasciare i tuoi dati e iscriverti alla lista
+                  d'attesa: ti avvisiamo via email appena si libera un posto.
                 </p>
               )}
               {!tutteEsaurite && fermataEsaurita && (
-                <p style={{ background: '#fff4e0', border: '1px solid #f0d9a8', borderRadius: 8, padding: '10px 12px', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
-                  I posti da questa fermata sono esauriti. Scegli un'altra fermata, oppure iscriviti alla lista
-                  d'attesa apposta per questa: ti avviseremo se si libera un posto qui.
+                <p className="avviso avviso-attenzione">
+                  I posti da questa fermata sono esauriti. Scegli un'altra fermata, oppure iscriviti alla lista d'attesa
+                  per questa: ti avvisiamo se si libera un posto qui.
                 </p>
               )}
 
-              <label className="field-label">Fermata di partenza</label>
-              <SelettoreFermata
-                opzioni={opzioni}
-                valore={fermataId}
-                onSeleziona={(id) => {
-                  setFermataId(id);
-                  const scelta = opzioni.find((o) => o.fermataId === id);
-                  if (scelta) { tracciaInizioPrenotazione(scelta.prezzoEffettivo * passeggeri); tracciaInizioCheckoutGA4(scelta.prezzoEffettivo * passeggeri, evento.artista); }
-                }}
-                testoOpzione={(o) => {
-                  const prezzoMostrato = offerta ? applicaScontoOfferta(o.prezzoEffettivo, offerta.scontoPercentuale) : o.prezzoEffettivo;
-                  return `${o.fermataCitta} (${o.fermataOrario || 'orario da definire'}) — ${formattaEuro(prezzoMostrato)}`
-                    + (offerta ? ` (invece di ${formattaEuro(o.prezzoEffettivo)})` : '')
-                    + (o.postiDisponibili === 0 ? ' — ESAURITO, lista d\'attesa' : '');
-                }}
-              />
+              <SceltaFermata opzioni={opzioni} valore={fermataId} onSeleziona={scegliFermata} offerta={offerta} />
+              {erroreFermata && <p className="campo-errore" role="alert">{erroreFermata}</p>}
               {opzioneScelta?.sogliaMinima != null && (
-                <p className="checkout-nota" style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginTop: -8, marginBottom: 12 }}>
-                  Questa fermata richiede almeno {opzioneScelta.sogliaMinima} partecipanti confermati per essere garantita
-                  {opzioneScelta.partecipantiAttuali != null && <> — al momento ce ne sono {opzioneScelta.partecipantiAttuali}</>}.
-                  Se non si raggiunge la soglia, ti avviseremo e potrai scegliere se accettare un'alternativa o essere rimborsato.
+                <p className="avviso avviso-neutro">
+                  Questa fermata parte con almeno {opzioneScelta.sogliaMinima} partecipanti
+                  {opzioneScelta.partecipantiAttuali != null && <> (oggi {opzioneScelta.partecipantiAttuali})</>}.
+                  Se non si raggiunge, ti avvisiamo e puoi scegliere un'alternativa o il rimborso.
                 </p>
               )}
 
-              <label className="field-label" htmlFor="checkout-passeggeri">Passeggeri</label>
-              <div className="qty-control">
-                <button type="button" onClick={() => setPasseggeri((p) => Math.max(1, p - 1))} aria-label="Togli passeggero">−</button>
-                <input
-                  id="checkout-passeggeri"
-                  type="text"
-                  inputMode="numeric"
-                  style={{ width: 56, textAlign: 'center', padding: '10px 4px' }}
-                  value={passeggeri}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/\D/g, '');
-                    if (v === '') { setPasseggeri(1); return; }
-                    setPasseggeri(Math.min(20, Math.max(1, Number(v))));
-                  }}
-                  onFocus={(e) => e.target.select()}
-                />
-                <button type="button" onClick={() => setPasseggeri((p) => Math.min(20, p + 1))} aria-label="Aggiungi passeggero">+</button>
+              <div className="campo">
+                <span className="campo-etichetta" id={idPasseggeri}>Passeggeri</span>
+                <div className="qty-control" role="group" aria-labelledby={idPasseggeri}>
+                  <button type="button" onClick={() => setPasseggeri((p) => Math.max(1, p - 1))} aria-label="Togli un passeggero" disabled={passeggeri <= 1}>−</button>
+                  <input
+                    className="qty-input"
+                    type="text"
+                    inputMode="numeric"
+                    aria-label="Numero di passeggeri"
+                    value={passeggeri}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, '');
+                      if (v === '') { setPasseggeri(1); return; }
+                      setPasseggeri(Math.min(20, Math.max(1, Number(v))));
+                    }}
+                    onFocus={(e) => e.target.select()}
+                  />
+                  <button type="button" onClick={() => setPasseggeri((p) => Math.min(20, p + 1))} aria-label="Aggiungi un passeggero" disabled={passeggeri >= 20}>+</button>
+                  <span className="sr-only" aria-live="polite">{plurale(passeggeri, 'passeggero', 'passeggeri')}</span>
+                </div>
               </div>
 
-              <div className="checkout-step-nav">
-                <span />
-                <button className="search-cta" style={{ width: 'auto', margin: 0, padding: '12px 28px', opacity: opzioneScelta ? 1 : .5 }} disabled={!opzioneScelta} onClick={() => setStep(2)}>
-                  Avanti →
-                </button>
+              <div className="checkout-nav">
+                <button type="button" className="btn btn-primary btn-lg btn-block" onClick={continuaPasso1}>Continua</button>
               </div>
-            </>
+            </div>
           )}
 
           {step === 2 && (
-            <>
-              {publicWidgetId && !clienteLoggato() ? (
-                // Il widget White Label paga qui dentro, allo step 3,
-                // con l'endpoint autenticato di sempre — per quello
-                // resta necessario un account vero, il modulo ospite
-                // (sotto) è pensato solo per il sito principale, dove
-                // il pagamento avviene invece nel carrello con il
-                // nuovo endpoint ospite.
-                <div style={{ textAlign: 'center', padding: '20px 10px' }}>
-                  <p className="field-label" style={{ marginBottom: 10 }}>Serve un account per prenotare</p>
-                  <p style={{ fontSize: 'var(--testo-md)', opacity: .75, marginBottom: 18 }}>
-                    Ti serve solo un minuto — dopo aver effettuato l'accesso, tornerai qui a completare la
-                    prenotazione con la fermata e i passeggeri già scelti.
-                  </p>
-                  <a href={`/accedi?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="search-cta" style={{ display: 'block', textDecoration: 'none', textAlign: 'center', marginBottom: 10 }}>
-                    Accedi
-                  </a>
-                  <a href={`/registrati?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="search-cta-secondaria" style={{ display: 'block', textDecoration: 'none', textAlign: 'center' }}>
-                    Registrati
-                  </a>
+            publicWidgetId && !loggato ? (
+              // Il widget White Label paga qui dentro con l'endpoint
+              // autenticato: serve un account vero. Il modulo ospite è
+              // pensato per il sito, dove il pagamento avviene nel carrello.
+              <div className="checkout-passo checkout-accesso">
+                <p className="campo-etichetta">Serve un account per prenotare</p>
+                <p className="campo-aiuto">
+                  Ci vuole un minuto: dopo l'accesso torni qui con la fermata e i passeggeri già scelti.
+                </p>
+                <a href={`/accedi?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="btn btn-primary btn-lg btn-block">Accedi</a>
+                <a href={`/registrati?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="btn btn-secondary btn-lg btn-block">Registrati</a>
+                <div className="checkout-nav">
+                  <button type="button" className="btn btn-tertiary" onClick={() => setStep(1)}>Indietro</button>
                 </div>
-              ) : (
-                <>
-                  {!clienteLoggato() && (
-                    <p style={{ fontSize: 'var(--testo-md)', textAlign: 'right', marginTop: -4, marginBottom: 10 }}>
-                      Hai già un account? <a href={`/accedi?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`}>Accedi</a>
-                    </p>
-                  )}
+              </div>
+            ) : (
+              <form className="checkout-passo" noValidate onSubmit={(e) => { e.preventDefault(); continuaPasso2(); }}>
+                {!loggato && (
+                  <p className="campo-aiuto checkout-accedi">
+                    Hai già un account? <a href={`/accedi?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`}>Accedi</a>
+                  </p>
+                )}
 
-                  <label className="field-label" htmlFor="checkout-email">Email</label>
-                  <input
-                    id="checkout-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                    disabled={clienteLoggato()} style={clienteLoggato() ? { opacity: .6 } : undefined}
-                  />
-                  <p className="hint">I biglietti verranno inviati a questa email.</p>
-
-                  <label className="field-label" htmlFor="checkout-telefono">Telefono</label>
-                  <input
-                    id="checkout-telefono" type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)}
-                    disabled={clienteLoggato()} style={clienteLoggato() ? { opacity: .6 } : undefined}
-                  />
-
-                  {/* Città e data di nascita — solo da ospite: chi è già
-                      loggato le ha già sul proprio account, non ha senso
-                      ripeterle qui. La data di nascita resta obbligatoria
-                      anche da ospite: serve al riordino per fasce d'età
-                      nei bus, non è rimandabile solo perché non si è fatto
-                      un account vero. */}
-                  {!clienteLoggato() && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      <div>
-                        <label className="field-label" htmlFor="checkout-citta">Città (facoltativa)</label>
-                        <input id="checkout-citta" type="text" autoComplete="address-level2" value={citta} onChange={(e) => setCitta(e.target.value)} />
-                      </div>
-                      <div>
-                        <label className="field-label" htmlFor="checkout-data-nascita">Data di nascita</label>
-                        <input id="checkout-data-nascita" type="date" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} required />
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="field-label" style={{ marginTop: 18, marginBottom: 6 }}>Lista passeggeri</p>
-                  <div className="checkout-passeggeri-scorrevole">
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-                      <label className="sr-only" htmlFor="checkout-nome-1">Nome passeggero 1</label>
-                      <input id="checkout-nome-1" placeholder="Nome passeggero 1" autoComplete="given-name" value={nome} onChange={(e) => setNome(e.target.value)} />
-                      <label className="sr-only" htmlFor="checkout-cognome-1">Cognome passeggero 1</label>
-                      <input id="checkout-cognome-1" placeholder="Cognome" autoComplete="family-name" value={cognome} onChange={(e) => setCognome(e.target.value)} />
-                    </div>
-                    {partecipanti.map((p, idx) => (
-                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-                        <label className="sr-only" htmlFor={`checkout-nome-${idx + 2}`}>{`Nome passeggero ${idx + 2}`}</label>
-                        <input id={`checkout-nome-${idx + 2}`} placeholder={`Nome passeggero ${idx + 2}`} value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} />
-                        <label className="sr-only" htmlFor={`checkout-cognome-${idx + 2}`}>{`Cognome passeggero ${idx + 2}`}</label>
-                        <input id={`checkout-cognome-${idx + 2}`} placeholder="Cognome" value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} />
-                      </div>
-                    ))}
+                <CampoTesto
+                  id={`${prefisso}-email`} etichetta="Email" type="email" autoComplete="email" inputMode="email" required
+                  value={email} onChange={(e) => { setEmail(e.target.value); togliErrore('email'); }} onBlur={() => validaCampo('email')}
+                  disabled={loggato} aiuto={loggato ? 'Dal tuo account' : 'Qui arrivano conferma e biglietto'} errore={errori.email}
+                />
+                <CampoTesto
+                  id={`${prefisso}-telefono`} etichetta="Telefono" type="tel" autoComplete="tel" inputMode="tel" required
+                  value={telefono} onChange={(e) => { setTelefono(e.target.value); togliErrore('telefono'); }} onBlur={() => validaCampo('telefono')}
+                  aiuto="Per avvisarti il giorno del viaggio" errore={errori.telefono}
+                />
+                {/* Data di nascita e città solo da ospite: chi è loggato le ha
+                    già sull'account. La data resta obbligatoria: serve a
+                    comporre i gruppi sul bus. */}
+                {!loggato && (
+                  <div className="campi-affiancati">
+                    <CampoTesto
+                      id={`${prefisso}-dataNascita`} etichetta="Data di nascita" type="date" autoComplete="bday" required
+                      min="1900-01-01" max={oggiIso()}
+                      value={dataNascita} onChange={(e) => { setDataNascita(e.target.value); togliErrore('dataNascita'); }} onBlur={() => validaCampo('dataNascita')}
+                      aiuto="Serve per organizzare i gruppi sul bus" errore={errori.dataNascita}
+                    />
+                    <CampoTesto
+                      id={`${prefisso}-citta`} etichetta="Città (facoltativa)" type="text" autoComplete="address-level2"
+                      value={citta} onChange={(e) => setCitta(e.target.value)}
+                    />
                   </div>
+                )}
 
-                  <div className="checkout-step-nav">
-                    <button className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '12px 24px' }} onClick={() => setStep(1)}>← Indietro</button>
-                    <button
-                      className="search-cta"
-                      style={{ width: 'auto', margin: 0, padding: '12px 28px', opacity: (moduloRichiedenteCompleto && partecipantiCompleti) ? 1 : .5 }}
-                      disabled={!moduloRichiedenteCompleto || !partecipantiCompleti}
-                      onClick={() => {
-                        // Sul sito principale il pagamento non avviene
-                        // più qui nella tab — l'articolo, con tutti i
-                        // dati già compilati (fermata, passeggeri con i
-                        // loro nomi veri, dati del richiedente), va dritto
-                        // nel carrello, e si passa subito lì a
-                        // completarlo. Nella White Label invece resta
-                        // tutto come prima: un solo prodotto, pagamento
-                        // diretto in questa stessa tab (vedi 'else').
-                        if (!publicWidgetId && opzioneScelta) {
-                          aggiungiAlCarrello({
-                            eventoId: evento.id,
-                            eventoArtista: evento.artista,
-                            eventoData: evento.data,
-                            tragittoId: opzioneScelta.tragittoId,
-                            fermataId: opzioneScelta.fermataId,
-                            fermataCitta: opzioneScelta.fermataCitta,
-                            fermataOrario: opzioneScelta.fermataOrario,
-                            prezzoStimato: opzioneScelta.prezzoEffettivo,
-                            passeggeri,
-                            offertaId: offerta?.id,
-                            cliente: { email, nome, cognome, telefono, citta: citta || undefined, dataNascita: dataNascita || undefined },
-                            partecipanti,
-                            ...provenienzaDaUrl(),
-                          });
-                          navigate('/carrello');
-                        } else {
-                          setStep(3);
-                        }
-                      }}
-                    >
-                      {publicWidgetId ? 'Avanti →' : 'Acquista ora →'}
-                    </button>
+                <fieldset className="passeggero">
+                  <legend className="campo-etichetta">Passeggero 1 (tu)</legend>
+                  <div className="campi-affiancati">
+                    <CampoTesto
+                      id={`${prefisso}-nome`} etichetta="Nome" type="text" autoComplete="given-name" required
+                      value={nome} onChange={(e) => { setNome(e.target.value); togliErrore('nome'); }} onBlur={() => validaCampo('nome')} errore={errori.nome}
+                    />
+                    <CampoTesto
+                      id={`${prefisso}-cognome`} etichetta="Cognome" type="text" autoComplete="family-name" required
+                      value={cognome} onChange={(e) => { setCognome(e.target.value); togliErrore('cognome'); }} onBlur={() => validaCampo('cognome')} errore={errori.cognome}
+                    />
                   </div>
-                </>
-              )}
-            </>
+                </fieldset>
+                {partecipanti.map((p, idx) => (
+                  <fieldset key={idx} className="passeggero">
+                    <legend className="campo-etichetta">Passeggero {idx + 2}</legend>
+                    <div className="campi-affiancati">
+                      <CampoTesto
+                        id={`${prefisso}-p${idx}-nome`} etichetta="Nome" type="text" required
+                        value={p.nome} onChange={(e) => aggiornaPartecipante(idx, 'nome', e.target.value)} onBlur={() => validaCampo(`p${idx}-nome`)} errore={errori[`p${idx}-nome`]}
+                      />
+                      <CampoTesto
+                        id={`${prefisso}-p${idx}-cognome`} etichetta="Cognome" type="text" required
+                        value={p.cognome} onChange={(e) => aggiornaPartecipante(idx, 'cognome', e.target.value)} onBlur={() => validaCampo(`p${idx}-cognome`)} errore={errori[`p${idx}-cognome`]}
+                      />
+                    </div>
+                  </fieldset>
+                ))}
+
+                <div className="checkout-nav">
+                  <button type="button" className="btn btn-tertiary" onClick={() => setStep(1)}>Indietro</button>
+                  <button type="submit" className="btn btn-primary btn-lg">Continua</button>
+                </div>
+              </form>
+            )
           )}
 
           {step === 3 && (
-            <>
-              {messaggioErrore && <p className="errore">{messaggioErrore}</p>}
+            <div className="checkout-passo">
+              {messaggioErrore && <p className="campo-errore" role="alert">{messaggioErrore}</p>}
 
               {fermataEsaurita ? (
                 <>
-                  <p style={{ fontSize: 'var(--testo-base)', marginBottom: 14 }}>
-                    Confermi l'iscrizione alla lista d'attesa per <b>{passeggeri}</b> passeggero/i su "{evento.artista}"{opzioneScelta ? ` da ${opzioneScelta.fermataCitta}` : ''}?
+                  <p>
+                    Confermi l'iscrizione alla lista d'attesa per {plurale(passeggeri, 'passeggero', 'passeggeri')} a
+                    "{evento.artista}"{opzioneScelta ? ` da ${opzioneScelta.fermataCitta}` : ''}?
                   </p>
-                  <button
-                    className="search-cta"
-                    style={{ opacity: stato === 'invio' ? .5 : 1 }}
-                    disabled={stato === 'invio'}
-                    onClick={iscrivitiListaAttesa}
-                  >
-                    {azioneInCorso === 'lista-attesa' ? 'Invio...' : "Iscriviti alla lista d'attesa"}
+                  <button type="button" className="btn btn-primary btn-lg btn-block" disabled={invio} onClick={iscrivitiListaAttesa}>
+                    {azioneInCorso === 'lista-attesa' ? 'Invio…' : "Iscriviti alla lista d'attesa"}
                   </button>
                 </>
               ) : (
                 <>
-                  <div style={{ background: '#faf7f0', border: '1px solid #e5ded0', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 'var(--testo-md)' }}>
-                    <p style={{ margin: '0 0 4px', fontWeight: 700 }}>{evento.artista}</p>
-                    <p style={{ margin: 0, opacity: .75 }}>
-                      {opzioneScelta?.fermataCitta}{opzioneScelta?.fermataOrario ? ` — ore ${opzioneScelta.fermataOrario}` : ''} · {passeggeri} {passeggeri === 1 ? 'passeggero' : 'passeggeri'}
+                  <div className="riepilogo-card">
+                    <p className="riepilogo-artista">{evento.artista}</p>
+                    <p className="campo-aiuto">
+                      {opzioneScelta?.fermataCitta}{opzioneScelta?.fermataOrario ? ` · andata ${opzioneScelta.fermataOrario}` : ''}
+                      {opzioneScelta?.orarioRitorno ? ` · ritorno ${opzioneScelta.orarioRitorno}` : ''} · {plurale(passeggeri, 'passeggero', 'passeggeri')}
                     </p>
                   </div>
 
-                  <p style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 'var(--testo-4xl)', margin: '0 0 6px' }}>
+                  <p className="importo-grande">
                     {creditoApplicato > 0 ? (
-                      <>
-                        <span style={{ textDecoration: 'line-through', opacity: .5, fontSize: 'var(--testo-xl)', marginRight: 8 }}>{formattaEuro(totale)}</span>
-                        {formattaEuro(totaleConCredito)}
-                      </>
-                    ) : (
-                      <>{formattaEuro(totale)}</>
-                    )}
+                      <><s className="importo-prima">{formattaEuro(totale)}</s> {formattaEuro(totaleConCredito)}</>
+                    ) : formattaEuro(totale)}
                   </p>
-                  <p style={{ fontSize: 'var(--testo-sm)', opacity: .7, marginTop: -4 }}>I biglietti arriveranno via email al richiedente.</p>
 
                   {creditoDisponibile > 0 && (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--testo-md)', margin: '10px 0', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={usaCredito} onChange={(e) => setUsaCredito(e.target.checked)} style={{ width: 'auto' }} />
-                      Usa il tuo credito fedeltà ({formattaEuro(creditoDisponibile)} disponibili)
+                    <label className="scelta-check">
+                      <input type="checkbox" checked={usaCredito} onChange={(e) => setUsaCredito(e.target.checked)} />
+                      Usa il tuo credito ({formattaEuro(creditoDisponibile)} disponibili)
                     </label>
                   )}
 
-                  <div style={{ margin: '10px 0' }}>
-                    <label className="field-label" htmlFor="checkout-coupon">Hai un codice coupon?</label>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                  <div className="campo">
+                    <label className="campo-etichetta" htmlFor={`${prefisso}-coupon`}>Codice sconto (facoltativo)</label>
+                    <div className="coupon-riga">
                       <input
-                        id="checkout-coupon"
-                        type="text"
+                        id={`${prefisso}-coupon`} className="campo-input" type="text" autoComplete="off"
                         value={couponCodice}
                         onChange={(e) => { setCouponCodice(e.target.value.toUpperCase()); setCouponVerificato(null); setCouponErrore(''); }}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), verificaCoupon())}
-                        placeholder="Facoltativo"
-                        style={{ textTransform: 'uppercase', flex: 1 }}
                         disabled={!!couponVerificato}
+                        aria-invalid={couponErrore ? true : undefined}
+                        aria-describedby={couponErrore ? `${prefisso}-coupon-errore` : `${prefisso}-coupon-aiuto`}
                       />
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        style={{ whiteSpace: 'nowrap' }}
-                        onClick={verificaCoupon}
-                        disabled={!couponCodice.trim() || verificandoCoupon || !!couponVerificato}
-                      >
-                        {verificandoCoupon ? '...' : couponVerificato ? '✓ Applicato' : 'Applica'}
+                      <button type="button" className="btn btn-secondary" onClick={verificaCoupon} disabled={!couponCodice.trim() || verificandoCoupon || !!couponVerificato}>
+                        {verificandoCoupon ? 'Verifico…' : couponVerificato ? <><Icona nome="spunta" dimensione={16} /> Applicato</> : 'Applica'}
                       </button>
                     </div>
-                    {couponErrore && <p style={{ color: '#c0392b', fontSize: 'var(--testo-sm)', marginTop: 6 }}>{couponErrore}</p>}
+                    {couponErrore && <p className="campo-errore" id={`${prefisso}-coupon-errore`} role="alert">{couponErrore}</p>}
                     {couponVerificato && (
-                      <p style={{ fontSize: 'var(--testo-md)', marginTop: 6 }}>
-                        Sconto: <b>-{formattaEuro(couponVerificato.sconto)}</b> — nuovo totale (pagando tutto subito): <b>{formattaEuro(Math.max(0, totale - couponVerificato.sconto))}</b>
+                      <p className="campo-aiuto">
+                        Sconto di <b>{formattaEuro(couponVerificato.sconto)}</b>: pagando tutto ora il totale è <b>{formattaEuro(Math.max(0, totale - couponVerificato.sconto))}</b>.
                       </p>
                     )}
-                    <p style={{ fontSize: 'var(--testo-sm)', opacity: .65, marginTop: 6 }}>
-                      Il coupon si applica solo pagando tutto subito ("Acquista"). Se prenoti con acconto, potrai
-                      usarlo quando salderai il resto.
+                    <p className="campo-aiuto" id={`${prefisso}-coupon-aiuto`}>Il codice vale solo pagando tutto ora. Con l'acconto puoi usarlo quando saldi il resto.</p>
+                  </div>
+
+                  {/* Nessun sistema di pagamento collegato: niente campi carta,
+                      l'ordine si registra come "Da concordare". */}
+                  <p className="checkout-nota">Non paghi ora online: la prenotazione viene registrata e concordiamo il pagamento con te.</p>
+
+                  <div className="checkout-azioni">
+                    <button type="button" className="btn btn-primary btn-lg btn-block" disabled={invio} onClick={() => confermaPrenotazione('COMPLETO')}>
+                      {azioneInCorso === 'acquista' ? 'Invio…' : 'Conferma la prenotazione'}
+                    </button>
+                    <p className="checkout-nota-btn">Importo intero: {formattaEuro(totaleConCredito)}</p>
+                    <button type="button" className="btn btn-secondary btn-lg btn-block" disabled={invio} onClick={() => confermaPrenotazione('ACCONTO')}>
+                      {azioneInCorso === 'prenota' ? 'Invio…' : 'Conferma con acconto'}
+                    </button>
+                    <p className="checkout-nota-btn">
+                      Acconto di {formattaEuro(accontoUnitario)} a passeggero ({formattaEuro(accontoUnitario * passeggeri)} in tutto ora),
+                      il resto entro 15 giorni prima della partenza.
                     </p>
                   </div>
 
-                  <p className="section-label" style={{ marginTop: 18 }}>Pagamento</p>
-
-                  {/* Nessun sistema di pagamento collegato ancora: niente
-                      campi carta finti (non venivano né controllati né
-                      inviati, ma il browser poteva proporre di compilarli
-                      con una carta vera). L'ordine si registra come "Da
-                      concordare" finché non si collega un fornitore. */}
-                  <p style={{ fontSize: 'var(--testo-md)', opacity: .75, marginBottom: 14 }}>
-                    Il pagamento online non è ancora attivo: la prenotazione viene registrata e il pagamento si concorda a parte.
-                  </p>
-
-                  <button
-                    className="search-cta"
-                    style={{ marginTop: 10, opacity: stato === 'invio' ? .5 : 1 }}
-                    disabled={stato === 'invio'}
-                    onClick={() => confermaPrenotazione('COMPLETO')}
-                  >
-                    {azioneInCorso === 'acquista' ? 'Invio...' : 'Acquista'}
-                  </button>
-                  <p style={{ fontSize: 'var(--testo-xs)', opacity: .6, marginTop: 4, textAlign: 'center' }}>Pagamento completo, subito</p>
-
-                  <button
-                    className="search-cta-secondaria"
-                    style={{ marginTop: 12, opacity: stato === 'invio' ? .5 : 1 }}
-                    disabled={stato === 'invio'}
-                    onClick={() => confermaPrenotazione('ACCONTO')}
-                  >
-                    {azioneInCorso === 'prenota' ? 'Invio...' : 'Prenota'}
-                  </button>
-                  {/* Prima questa spiegazione stava sotto ENTRAMBI i
-                      pulsanti, non chiaramente legata a "Prenota" — chi
-                      legge veloce poteva pensare non impegnasse a nulla.
-                      Ora è la prima cosa sotto il pulsante giusto. */}
-                  <p style={{ fontSize: 'var(--testo-xs)', opacity: .65, marginTop: 6, textAlign: 'center' }}>
-                    Acconto di {formattaEuro(evento.accontoEur ?? 10)} a passeggero
-                    ({formattaEuro(Number(evento.accontoEur ?? 10) * passeggeri)} totali ora) — salderai il resto entro
-                    15 giorni prima della partenza.
-                  </p>
-                  <p style={{ fontSize: 'var(--testo-xs)', opacity: .6, marginTop: 10, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                    🔒 I tuoi dati sono trattati in modo riservato, secondo la nostra informativa privacy.
+                  <p className="riga-fiducia">
+                    <Icona nome="lucchetto" dimensione={16} />
+                    <span>I tuoi dati sono trattati in modo riservato, secondo la nostra <a href="/pagina/privacy" target="_blank" rel="noopener">informativa privacy</a>.</span>
                   </p>
                 </>
               )}
 
-              <div className="checkout-step-nav">
-                <button className="search-cta-secondaria" style={{ width: 'auto', margin: 0, padding: '12px 24px' }} onClick={() => setStep(1)}>← Indietro</button>
-                <span />
+              <div className="checkout-nav">
+                <button type="button" className="btn btn-tertiary" onClick={() => setStep(2)}>Indietro</button>
               </div>
-            </>
-          )}
-          </>
+            </div>
           )}
         </>
       )}
