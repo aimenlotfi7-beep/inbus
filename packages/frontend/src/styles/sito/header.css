@@ -1,12 +1,20 @@
 /* ============================================================
-   OnWay — sito pubblico · HEADER, NAVIGAZIONE, FOOTER
+   OnWay — sito pubblico · HEADER, MENU, FOOTER
    ------------------------------------------------------------
-   Header appiccicoso alto --header-h (72px desktop, 64px sotto i
-   640px): menu mobile e fascia categorie si agganciano sotto con
-   lo stesso token. Il logotipo (.logo) è in onway-theme.css.
+   Componenti: src/Layout.tsx (header, ricerca, menu mobile) e
+   src/features/Footer.tsx (piè di pagina, lo montano Layout e
+   PublicPageLayout). Header appiccicoso alto --header-h (72px,
+   64px sotto i 640px): il menu mobile si aggancia sotto con lo
+   stesso token. Il logotipo (.logo) è in onway-theme.css.
+   Desktop pieno da 901px; sotto, logo · lente · carrello · menu.
+   In fondo: fallback delle pagine caricate a richiesta
+   (.caricamento) e pagina 404.
    ============================================================ */
 
-/* ---------- HEADER ---------- */
+/* ---------- HEADER SEMPLICE (tag nudo) ----------
+   Lo usano le pagine con un'intestazione propria (candidatura tour
+   leader, fornitori): logo a sinistra, un link a destra. L'header
+   del sito ha la classe .header-sito qui sotto, che lo ridefinisce. */
 header{
   position:sticky; top:0; z-index:var(--z-header);
   display:flex; align-items:center; justify-content:space-between;
@@ -15,124 +23,160 @@ header{
   backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line);
 }
-.header-sinistra{ display:flex; align-items:center; gap:40px; }
-nav.links{ display:flex; gap:32px; font-size:var(--testo-lg); color:var(--mist); }
-nav.links a:hover{ color:var(--paper); }
-.nav-actions{ display:flex; align-items:center; gap:14px; }
-.carrello-icona{
-  position:relative; display:inline-flex; align-items:center; justify-content:center;
-  min-width:var(--tap); min-height:var(--tap); padding:0; color:var(--paper);
+@media (max-width:480px){ header{ padding:0 16px; } }
+
+/* ---------- HEADER DEL SITO ---------- */
+.header-sito{
+  display:block; padding:0; min-height:0;
+  background:rgba(14,17,22,.92); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--ow-line);
 }
+.header-sito .container{ max-width:none; }
+.header-riga{
+  /* meno 1px: il bordo inferiore dell'header, così il totale resta --header-h */
+  display:flex; align-items:center; gap:var(--sp-6); min-height:calc(var(--header-h) - 1px);
+}
+.header-sito .logo{ flex-shrink:0; }
+
+.header-nav{ display:flex; align-items:center; gap:var(--sp-1); flex-shrink:0; }
+.header-nav a{
+  display:inline-flex; align-items:center; min-height:var(--tap); padding:0 var(--sp-3); border-radius:var(--radius-pill);
+  font-size:var(--t-small); font-weight:600; color:var(--ow-muted); white-space:nowrap;
+  transition:color .15s ease, background .15s ease;
+}
+.header-nav a:hover{ color:var(--ow-paper); background:rgba(247,245,241,.06); }
+
+/* Ricerca: campo a pillola con la lente dentro. Su desktop sta a
+   destra, prima delle azioni, e si stringe da 360 fino a 200px. */
+.header-ricerca{
+  position:relative; display:flex; align-items:center;
+  flex:0 1 360px; min-width:200px; margin-left:auto;
+}
+.header-ricerca-lente{
+  position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--ow-muted); pointer-events:none;
+}
+.header-ricerca input{
+  width:100%; min-width:0; min-height:var(--control-h-sm); padding:0 var(--sp-4) 0 40px;
+  font-family:var(--font-sans); font-size:var(--t-body); font-weight:500; color:var(--ow-paper);
+  background:rgba(247,245,241,.08); border:1px solid var(--ow-line); border-radius:var(--radius-pill);
+  -webkit-appearance:none; appearance:none;
+  transition:border-color .15s ease, background .15s ease;
+}
+.header-ricerca input::placeholder{ color:var(--ow-muted); opacity:1; }
+.header-ricerca input:hover{ border-color:rgba(247,245,241,.28); }
+.header-ricerca input:focus-visible{ outline:3px solid var(--ow-accent); outline-offset:2px; border-color:transparent; background:rgba(247,245,241,.12); }
+
+.header-azioni{ display:flex; align-items:center; gap:var(--sp-2); flex-shrink:0; }
+
+/* Pulsanti-icona 44×44: lente (solo mobile), carrello, menu */
+.header-icona, .carrello-icona, .burger{
+  position:relative; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+  width:var(--tap); height:var(--tap); padding:0; margin:0;
+  background:none; border:0; border-radius:50%; color:var(--ow-paper); cursor:pointer;
+  transition:background .15s ease;
+}
+.header-icona:hover, .carrello-icona:hover, .burger:hover{ background:rgba(247,245,241,.08); }
+.header-icona{ display:none; }
+.burger{ display:none; }
+/* Il numero sopra il carrello: piccolo apposta, non toccarne le misure
+   con regole generiche (vedi CLAUDE.md). */
 .carrello-badge{
   position:absolute; top:5px; right:5px; background:var(--ow-accent); color:var(--ow-ink);
   font-size:var(--testo-2xs); font-weight:700; line-height:1;
   min-width:16px; height:16px; border-radius:var(--radius-pill); display:flex; align-items:center; justify-content:center; padding:0 3px;
 }
-.burger{
-  display:none; align-items:center; justify-content:center;
-  min-width:var(--tap); min-height:var(--tap); padding:0; margin:0;
-  background:none; border:none; color:var(--paper); font-size:var(--testo-4xl); line-height:1; cursor:pointer;
+
+/* Account: pulsante secondario piccolo; un nome lungo si tronca */
+.header-account{ max-width:200px; }
+.header-account span{ overflow:hidden; text-overflow:ellipsis; }
+
+@media (max-width:1100px) and (min-width:901px){
+  .header-riga{ gap:var(--sp-4); }
+  .header-nav a{ padding:0 var(--sp-2); }
+  .header-account{ max-width:150px; }
 }
+
+/* Riga di ricerca sotto l'header (solo mobile, dalla lente) */
+.header-ricerca-mobile{ display:none; }
 
 @media (max-width:900px){
-  nav.links{ display:none; }
-  .btn-ghost.desktop-only{ display:none; }
-  .burger{ display:inline-flex; }
+  .header-riga{ gap:var(--sp-2); }
+  .header-nav, .header-riga > .header-ricerca, .header-account{ display:none; }
+  .header-azioni{ margin-left:auto; gap:0; }
+  .header-icona, .burger{ display:inline-flex; }
+  .header-ricerca-mobile{ display:block; padding-bottom:var(--sp-3); }
+  .header-ricerca-mobile form{ display:flex; align-items:center; gap:var(--sp-2); }
+  .header-ricerca-mobile .header-ricerca{ flex:1 1 auto; min-width:0; margin:0; }
+  .header-ricerca-mobile .header-ricerca input{ min-height:var(--tap); }
+  .header-ricerca-mobile .btn-tertiary{ flex-shrink:0; }
 }
+
+/* ---------- MENU MOBILE ----------
+   Pannello sotto l'header, sopra il contenuto e sopra la barra fissa
+   "Prenota" (--z-menu > --z-barra): chi l'ha aperto vuole navigare. */
 .mobile-nav{
-  display:none; flex-direction:column; gap:2px; padding:8px 20px 20px;
-  background:rgba(14,17,22,.97); backdrop-filter:blur(10px);
-  border-bottom:1px solid var(--line); position:sticky; top:var(--header-h);
-  /* Più alto della barra fissa "Acquista ora" (--z-barra): con
-     entrambi visibili (pagina evento, mobile, menu aperto) il menu
-     ha la priorità — chi l'ha aperto vuole navigare via. */
-  z-index:var(--z-menu);
+  position:fixed; left:0; right:0; top:var(--header-h); z-index:var(--z-menu);
+  display:flex; flex-direction:column; gap:var(--sp-1);
+  max-height:calc(100dvh - var(--header-h)); overflow-y:auto; overscroll-behavior:contain;
+  padding:var(--sp-2) var(--gutter) var(--sp-6);
+  background:var(--ow-night); border-bottom:1px solid var(--ow-line); box-shadow:0 24px 48px rgba(0,0,0,.45);
 }
-.mobile-nav.open{ display:flex; }
-.mobile-nav a{ padding:13px 10px; border-radius:var(--radius-sm); font-size:var(--testo-xl); color:var(--paper); }
-.mobile-nav a:active{ background:var(--ow-accent-soft); }
+.mobile-nav[hidden]{ display:none; }
+.mobile-nav a:not(.btn){
+  display:flex; align-items:center; min-height:52px; padding:0 var(--sp-3); border-radius:var(--radius-sm);
+  font-size:var(--t-body); font-weight:600; color:var(--ow-paper);
+}
+.mobile-nav a:not(.btn):hover, .mobile-nav a:not(.btn):active{ background:rgba(247,245,241,.06); }
+.mobile-nav .btn{ margin-top:var(--sp-3); }
 @media (min-width:901px){ .mobile-nav{ display:none !important; } }
 
-/* ---------- RICERCA E CATEGORIE (dentro l'header) ----------
-   La ricerca sta nello spazio centrale tra il menu e le azioni a
-   destra; le categorie accanto, su desktop. La ricerca ha la
-   precedenza quando lo spazio stringe (flex-basis più larga, le
-   categorie possono scorrere): il placeholder non si taglia più. */
-.header-centro{ display:flex; align-items:center; gap:14px; flex:1; min-width:0; justify-content:center; }
-.header-ricerca{
-  display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.08); color:var(--paper);
-  border:1px solid var(--line); border-radius:var(--radius-pill); padding:0 16px; min-height:var(--control-h-sm);
-  flex:1 1 260px; min-width:0; max-width:340px;
-}
-.header-ricerca:focus-within{ border-color:var(--ow-accent-line); }
-.header-ricerca button{
-  display:flex; background:none; border:none; padding:0; margin:0; color:var(--paper); opacity:.65; cursor:pointer; flex-shrink:0;
-}
-.header-ricerca button:hover{ opacity:1; }
-.header-ricerca input{
-  flex:1; min-width:0; width:auto; border:none; outline:none; background:transparent; font-family:var(--font-sans);
-  font-size:var(--t-body); font-weight:500; color:var(--paper);
-}
-.header-ricerca input:focus-visible{ outline:none; }
-.header-ricerca input::placeholder{ color:var(--mist); }
-
-.categoria-chip{
-  flex-shrink:0; white-space:nowrap; display:inline-flex; align-items:center; min-height:var(--control-h-sm);
-  background:var(--ow-surface-2); border:1px solid rgba(247,245,241,.16); border-radius:var(--radius-pill);
-  padding:0 16px; font-size:var(--testo-md); font-family:var(--font-sans); font-weight:600; color:var(--paper); cursor:pointer;
-  transition:border-color .15s ease, background .15s ease;
-}
-.categoria-chip:hover{ border-color:var(--ow-accent); }
-.categoria-chip.active{ background:var(--ow-accent); border-color:var(--ow-accent); color:var(--ow-ink); }
-.categoria-chip.active:focus-visible{ outline-color:var(--ow-ink); }
-
-/* Categorie su desktop: accanto alla ricerca, scorrono in
-   orizzontale solo se sono troppe. Nascoste su mobile: lì c'è la
-   fascia apposta subito sotto l'header. */
-.header-categorie-desktop{
-  display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; flex:0 1 auto; min-width:0; max-width:340px; padding-bottom:2px;
-}
-.header-categorie-desktop::-webkit-scrollbar{ display:none; }
-@media (max-width:900px){ .header-categorie-desktop{ display:none; } }
-
-/* Categorie su mobile: fascia propria SOTTO l'header, sfondo
-   trasparente, sparisce scorrendo verso il basso (torna scorrendo
-   verso l'alto). Nascosta su desktop. */
-.header-categorie-mobile{
-  display:none; gap:8px; overflow-x:auto; scrollbar-width:none;
-  padding:12px clamp(20px,5vw,64px); background:transparent;
-  position:sticky; top:var(--header-h); z-index:calc(var(--z-header) - 10);
-  transition:transform .25s ease, opacity .25s ease;
-}
-.header-categorie-mobile::-webkit-scrollbar{ display:none; }
-.header-categorie-mobile.nascosta{ transform:translateY(-120%); opacity:0; }
-@media (max-width:900px){ .header-categorie-mobile{ display:flex; } }
-
 /* ---------- FOOTER ---------- */
-footer{ padding:70px clamp(20px,5vw,64px) 30px; background:#0A0C10; }
+.footer-sito{
+  padding-block:var(--sp-16) var(--sp-8);
+  background:#0A0C10; border-top:1px solid var(--ow-line);
+}
 .footer-grid{
-  display:grid; grid-template-columns:1.4fr repeat(3, 1fr); gap:40px; padding-bottom:44px; border-bottom:1px solid var(--line);
+  display:grid; grid-template-columns:minmax(0,1.6fr) repeat(4, minmax(0,1fr)); gap:var(--sp-8);
+  padding-bottom:var(--sp-10); border-bottom:1px solid var(--ow-line);
 }
-@media (max-width:900px){ .footer-grid{ grid-template-columns:1fr 1fr; } }
-.footer-grid h5{ font-size:var(--testo-md); text-transform:uppercase; letter-spacing:1.5px; color:var(--mist); margin:0 0 16px; }
-.footer-grid ul{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:var(--sp-1); font-size:var(--testo-lg); }
-.footer-grid ul a{ display:inline-block; padding-block:var(--sp-2); }
-.footer-grid ul a:hover{ color:var(--ow-accent); }
+.footer-marchio p{ margin:var(--sp-4) 0 0; max-width:32ch; color:var(--ow-muted); font-size:var(--t-small); line-height:var(--lh-relaxed); }
+.footer-titolo{
+  margin:0 0 var(--sp-2); font-family:var(--font-mono); font-size:var(--t-label); font-weight:700;
+  letter-spacing:1px; text-transform:uppercase; color:var(--ow-muted);
+}
+.footer-grid ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+.footer-grid ul a, .footer-grid .link-preferenze-cookie{
+  display:inline-block; padding-block:var(--sp-2);
+  font-family:var(--font-sans); font-size:var(--t-small); color:var(--ow-paper); text-decoration:none; text-align:left;
+}
+.footer-grid ul a:hover, .footer-grid .link-preferenze-cookie:hover{ text-decoration:underline; text-underline-offset:3px; }
 .footer-bottom{
-  display:flex; justify-content:space-between; align-items:center; padding-top:26px; flex-wrap:wrap; gap:12px;
-  color:var(--mist); font-size:var(--testo-md);
+  display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--sp-2) var(--sp-4);
+  padding-top:var(--sp-6); color:var(--ow-muted); font-size:var(--t-caption);
 }
-.payment-trust-row{
-  display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-top:20px; margin-top:20px;
-  border-top:1px solid var(--line); color:var(--mist); font-size:var(--testo-md);
+@media (max-width:900px){
+  .footer-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); gap:var(--sp-8) var(--sp-6); }
+  .footer-marchio{ grid-column:1 / -1; }
 }
-.payment-badge{
-  background:var(--ow-surface-2); border:1px solid var(--line); border-radius:var(--radius-pill); padding:5px 12px; color:var(--paper); font-size:var(--testo-md);
+@media (max-width:480px){
+  .footer-sito{ padding-block:var(--sp-12) var(--sp-6); }
+  .footer-grid{ grid-template-columns:minmax(0,1fr); gap:var(--sp-6); }
 }
 
-/* ---------- RIFINITURE TELEFONI STRETTI ---------- */
-@media (max-width:480px){
-  header{ padding:0 16px; }
-  .footer-grid{ grid-template-columns:1fr; gap:28px; }
-  footer{ padding:50px 16px 24px; }
+/* ---------- PAGINE CARICATE A RICHIESTA ----------
+   Fallback di <Suspense> in App.tsx mentre arriva il pezzo di codice
+   della pagina (account, aree partner, pagine CMS…). */
+.caricamento{
+  margin:0; padding:var(--sp-16) var(--gutter); text-align:center;
+  color:var(--ow-muted); font-size:var(--t-small);
 }
+
+/* ---------- PAGINA 404 (NonTrovataPage.tsx) ---------- */
+.pagina-non-trovata{ padding-block:var(--section-y); }
+.pagina-non-trovata .stato-vuoto{ padding:var(--sp-16) var(--sp-6); gap:var(--sp-4); }
+.pagina-non-trovata h1{
+  margin:0; font-family:var(--font-sans); font-size:var(--t-h1); font-weight:800; letter-spacing:-.02em; text-transform:none;
+}
+.pagina-non-trovata .stato-vuoto p{ font-size:var(--t-body); }
+.stato-vuoto-azioni{ display:flex; flex-wrap:wrap; justify-content:center; gap:var(--sp-3); margin-top:var(--sp-2); }
+.stato-vuoto-azioni .btn{ margin-top:0; }

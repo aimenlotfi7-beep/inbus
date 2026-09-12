@@ -1,11 +1,37 @@
 /* ============================================================
-   faq.css — pagina FAQ (PaginaPage con chiave "faq")
+   faq.css — FAQ (PaginaPage con chiave "faq")
    ------------------------------------------------------------
-   Dentro PublicPageLayout, quindi scopato sotto .pagina-editoriale.
-   Colonna di lettura (main, h1) e footer centrato sono in
-   pagina.css, caricato insieme a questo. Reset, header, .logo e
-   footer vengono da sito/base.css e sito/header.css.
+   Ogni domanda è un <details class="faq-voce"> con <summary> alto
+   almeno 48px e la freccia (Icona "freccia") che ruota all'apertura.
+   Scopato sotto .pagina-editoriale; colonna e titolo in pagina.css.
    ============================================================ */
-.pagina-editoriale .faq-item{ background:var(--dusk); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; margin-bottom:12px; }
-.pagina-editoriale .faq-item h3{ margin:0 0 8px; font-size:var(--testo-xl); font-weight:700; color:var(--paper); }
-.pagina-editoriale .faq-item p{ margin:0; color:var(--mist); font-size:var(--testo-lg); line-height:1.7; }
+.pagina-editoriale .faq-elenco{ display:flex; flex-direction:column; gap:var(--sp-3); max-width:70ch; }
+.pagina-editoriale .faq-voce{
+  background:var(--ow-surface); border:1px solid var(--ow-line); border-radius:var(--radius);
+  transition:border-color .15s ease;
+}
+.pagina-editoriale .faq-voce[open]{ border-color:rgba(247,245,241,.24); }
+.pagina-editoriale .faq-voce summary{
+  display:flex; align-items:center; justify-content:space-between; gap:var(--sp-4);
+  min-height:var(--control-h); padding:var(--sp-3) var(--sp-5); list-style:none; cursor:pointer;
+  border-radius:var(--radius); font-size:var(--t-body); font-weight:700; line-height:var(--lh-snug); color:var(--ow-paper);
+}
+.pagina-editoriale .faq-voce summary::-webkit-details-marker{ display:none; }
+.pagina-editoriale .faq-voce summary::marker{ content:''; }
+.pagina-editoriale .faq-voce summary:hover{ background:rgba(247,245,241,.04); }
+.pagina-editoriale .faq-voce summary:focus-visible{ outline:3px solid var(--ow-accent); outline-offset:2px; }
+.pagina-editoriale .faq-domanda{ min-width:0; overflow-wrap:anywhere; }
+.pagina-editoriale .faq-freccia{ flex-shrink:0; color:var(--ow-muted); transform:rotate(90deg); transition:transform .2s ease; }
+.pagina-editoriale .faq-voce[open] .faq-freccia{ transform:rotate(-90deg); color:var(--ow-accent); }
+.pagina-editoriale .faq-risposta{
+  padding:0 var(--sp-5) var(--sp-5); color:var(--ow-muted); font-size:var(--t-body); line-height:var(--lh-relaxed);
+  overflow-wrap:anywhere;
+}
+.pagina-editoriale .faq-risposta p{ margin:0 0 var(--sp-3); }
+.pagina-editoriale .faq-risposta > :last-child{ margin-bottom:0; }
+.pagina-editoriale .faq-risposta a{ color:var(--ow-accent); text-decoration:underline; text-underline-offset:3px; }
+.pagina-editoriale .faq-risposta ul{ margin:0 0 var(--sp-3); padding-left:var(--sp-6); }
+@media (max-width:480px){
+  .pagina-editoriale .faq-voce summary{ padding-inline:var(--sp-4); }
+  .pagina-editoriale .faq-risposta{ padding-inline:var(--sp-4); }
+}

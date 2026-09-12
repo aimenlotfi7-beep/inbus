@@ -1,64 +1,25 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 import { LogoOnWay } from './features/LogoOnWay';
+import { Footer } from './features/Footer';
+import { CookieBanner } from './features/CookieBanner';
 
-/** Header semplificato (solo logo, senza nav/burger) + lo stesso footer
- *  del sito — struttura reale usata da faq.html e pagina.html nella V18.
- *  Il wrapper .pagina-editoriale è lo scope di faq.css e pagina.css:
- *  senza, le loro regole su main/h1 finivano su tutto il sito. */
+/** Guscio ridotto (solo logo) con lo stesso piè di pagina e lo stesso
+ *  banner cookie del sito. Resta per compatibilità: le pagine
+ *  editoriali (PaginaPage) oggi usano il Layout completo. Il wrapper
+ *  .pagina-editoriale è lo scope di faq.css e pagina.css. */
 export function PublicPageLayout({ children }: { children: ReactNode }) {
   return (
     <div className="pagina-editoriale">
-      <header>
-        <LogoOnWay />
+      <header className="header-sito">
+        <div className="container header-riga">
+          <LogoOnWay />
+        </div>
       </header>
 
       {children}
 
-      <footer id="assistenza">
-        <div className="footer-grid">
-          <div>
-            <LogoOnWay come="testo" />
-            <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', maxWidth: '32ch', marginTop: 14 }}>Non vendiamo un viaggio. Portiamo le persone verso un'esperienza.</p>
-          </div>
-          <div>
-            <h5>Naviga</h5>
-            <ul>
-              <li><Link to="/#eventi">Eventi</Link></li>
-              <li><Link to="/#come-funziona">Come funziona</Link></li>
-              <li><Link to="/pagina/chisiamo">Chi siamo</Link></li>
-              <li><Link to="/tour-leader">Lavora con noi</Link></li>
-              <li><Link to="/promoter">Area Promoter</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h5>Assistenza</h5>
-            <ul>
-              <li><Link to="/faq">FAQ</Link></li>
-              <li><Link to="/pagina/termini">Regolamento di viaggio</Link></li>
-              <li><Link to="/pagina/contatti">Contattaci</Link></li>
-              <li><Link to="/account">Traccia la prenotazione</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h5>Legale</h5>
-            <ul>
-              <li><Link to="/pagina/termini">Termini e condizioni</Link></li>
-              <li><Link to="/pagina/privacy">Privacy</Link></li>
-              <li><Link to="/pagina/cookie">Cookie</Link></li>
-            </ul>
-          </div>
-        </div>
-        <div className="payment-trust-row">
-          <span>Pagamenti sicuri accettati:</span>
-          <span className="payment-badge">Carta</span>
-          <span className="payment-badge">PayPal</span>
-          <span className="payment-badge">Satispay</span>
-        </div>
-        <div className="footer-bottom">
-          <span>© 2026 OnWay — tutti i marchi citati sono di proprietà dei rispettivi titolari.</span>
-        </div>
-      </footer>
+      <Footer />
+      <CookieBanner />
     </div>
   );
 }

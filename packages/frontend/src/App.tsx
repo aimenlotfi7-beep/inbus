@@ -1,107 +1,112 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect, type ComponentType } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Layout } from './Layout';
+// Nel pacchetto principale: le pagine del percorso d'acquisto e l'accesso.
 import { HomePage } from './pages/HomePage';
-import { AccountPage } from './pages/AccountPage';
 import { CarrelloPage } from './pages/CarrelloPage';
-import { PaginaPage } from './pages/PaginaPage';
-import { PromoterPage } from './pages/PromoterPage';
-import { PromoterPasswordDimenticataPage } from './pages/PromoterPasswordDimenticataPage';
-import { PromoterReimpostaPasswordPage } from './pages/PromoterReimpostaPasswordPage';
-import { OrganizzatorePage } from './pages/OrganizzatorePage';
-import { OrganizzatorePasswordDimenticataPage } from './pages/OrganizzatorePasswordDimenticataPage';
-import { OrganizzatoreReimpostaPasswordPage } from './pages/OrganizzatoreReimpostaPasswordPage';
-import { TourLeaderPage } from './pages/TourLeaderPage';
-import { FornitoreRegistrazionePage } from './pages/FornitoreRegistrazionePage';
-import { FornitorePreventivoPage } from './pages/FornitorePreventivoPage';
 import { BundleListaPage } from './pages/BundleListaPage';
 import { BundlePage } from './pages/BundlePage';
 import { TourPage } from './pages/TourPage';
 import { PromoterRedirectPage } from './pages/PromoterRedirectPage';
-import { FinalizzaListaAttesaPage } from './pages/FinalizzaListaAttesaPage';
-import { VariazionePage } from './pages/VariazionePage';
-import { CompletaSaldoPage } from './pages/CompletaSaldoPage';
 import { OffertaPage } from './pages/OffertaPage';
 import { EventoPage } from './pages/EventoPage';
-import { WidgetPubblicoPage } from './pages/WidgetPubblicoPage';
-import { TourLeaderLoginPage } from './pages/TourLeaderLoginPage';
-import { TourLeaderCercaPage } from './pages/TourLeaderCercaPage';
-import { TourLeaderPasswordDimenticataPage } from './pages/TourLeaderPasswordDimenticataPage';
-import { TourLeaderReimpostaPasswordPage } from './pages/TourLeaderReimpostaPasswordPage';
-import { TourLeaderBusListPage } from './pages/TourLeaderBusListPage';
-import { TourLeaderScanPage } from './pages/TourLeaderScanPage';
-import { TourLeaderPasseggeriPage } from './pages/TourLeaderPasseggeriPage';
 import { AccediPage } from './pages/AccediPage';
 import { PasswordDimenticataPage } from './pages/PasswordDimenticataPage';
 import { ReimpostaPasswordPage } from './pages/ReimpostaPasswordPage';
 import { RegistratiPage } from './pages/RegistratiPage';
 import { VerificaEmailPage } from './pages/VerificaEmailPage';
+import { NonTrovataPage } from './pages/NonTrovataPage';
+
+/** React.lazy vuole un export default: le pagine hanno export con nome. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function aRichiesta<M extends Record<string, ComponentType<any>>>(carica: () => Promise<M>, nome: keyof M) {
+  return lazy(() => carica().then((m) => ({ default: m[nome] })));
+}
+
+// Caricate a richiesta: aree riservate, partner, tour leader, fornitori,
+// widget, pagine CMS e pagine raggiunte da un link email.
+const AccountPage = aRichiesta(() => import('./pages/AccountPage'), 'AccountPage');
+const PaginaPage = aRichiesta(() => import('./pages/PaginaPage'), 'PaginaPage');
+const PromoterPage = aRichiesta(() => import('./pages/PromoterPage'), 'PromoterPage');
+const PromoterPasswordDimenticataPage = aRichiesta(() => import('./pages/PromoterPasswordDimenticataPage'), 'PromoterPasswordDimenticataPage');
+const PromoterReimpostaPasswordPage = aRichiesta(() => import('./pages/PromoterReimpostaPasswordPage'), 'PromoterReimpostaPasswordPage');
+const OrganizzatorePage = aRichiesta(() => import('./pages/OrganizzatorePage'), 'OrganizzatorePage');
+const OrganizzatorePasswordDimenticataPage = aRichiesta(() => import('./pages/OrganizzatorePasswordDimenticataPage'), 'OrganizzatorePasswordDimenticataPage');
+const OrganizzatoreReimpostaPasswordPage = aRichiesta(() => import('./pages/OrganizzatoreReimpostaPasswordPage'), 'OrganizzatoreReimpostaPasswordPage');
+const TourLeaderPage = aRichiesta(() => import('./pages/TourLeaderPage'), 'TourLeaderPage');
+const FornitoreRegistrazionePage = aRichiesta(() => import('./pages/FornitoreRegistrazionePage'), 'FornitoreRegistrazionePage');
+const FornitorePreventivoPage = aRichiesta(() => import('./pages/FornitorePreventivoPage'), 'FornitorePreventivoPage');
+const FinalizzaListaAttesaPage = aRichiesta(() => import('./pages/FinalizzaListaAttesaPage'), 'FinalizzaListaAttesaPage');
+const VariazionePage = aRichiesta(() => import('./pages/VariazionePage'), 'VariazionePage');
+const CompletaSaldoPage = aRichiesta(() => import('./pages/CompletaSaldoPage'), 'CompletaSaldoPage');
+const WidgetPubblicoPage = aRichiesta(() => import('./pages/WidgetPubblicoPage'), 'WidgetPubblicoPage');
+const TourLeaderLoginPage = aRichiesta(() => import('./pages/TourLeaderLoginPage'), 'TourLeaderLoginPage');
+const TourLeaderCercaPage = aRichiesta(() => import('./pages/TourLeaderCercaPage'), 'TourLeaderCercaPage');
+const TourLeaderPasswordDimenticataPage = aRichiesta(() => import('./pages/TourLeaderPasswordDimenticataPage'), 'TourLeaderPasswordDimenticataPage');
+const TourLeaderReimpostaPasswordPage = aRichiesta(() => import('./pages/TourLeaderReimpostaPasswordPage'), 'TourLeaderReimpostaPasswordPage');
+const TourLeaderBusListPage = aRichiesta(() => import('./pages/TourLeaderBusListPage'), 'TourLeaderBusListPage');
+const TourLeaderScanPage = aRichiesta(() => import('./pages/TourLeaderScanPage'), 'TourLeaderScanPage');
+const TourLeaderPasseggeriPage = aRichiesta(() => import('./pages/TourLeaderPasseggeriPage'), 'TourLeaderPasseggeriPage');
 
 export function App() {
   const location = useLocation();
-  // React Router, di suo, NON riporta mai lo scroll in cima quando
-  // cambi pagina (a differenza dei siti "tradizionali") — se eri
-  // scorso in basso sulla pagina precedente, la nuova pagina si apre
-  // restando a quella stessa altezza, invece che dall'inizio.
+  // React Router, di suo, NON riporta lo scroll in cima quando cambi
+  // pagina: la nuova pagina si aprirebbe alla stessa altezza della precedente.
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
-  // React Router NON gestisce da solo lo scorrimento a un'ancora
-  // (es. "/#consigliati") quando resti sulla stessa pagina — cliccare
-  // un link del genere dalla homepage stessa, senza cambiare rotta,
-  // non faceva assolutamente nulla (il comportamento nativo del
-  // browser scatta solo al caricamento di una pagina vera, non con la
-  // navigazione "finta" a schede singole di un sito come questo).
+  // React Router NON gestisce da solo lo scorrimento a un'ancora (es.
+  // "/#eventi"). Il piccolo ritardo dà tempo alla pagina di comparire.
   useEffect(() => {
     if (!location.hash) return;
-    // Il piccolo ritardo dà tempo al contenuto della pagina di essere
-    // già renderizzato (altrimenti l'elemento con quell'id potrebbe
-    // non esistere ancora nel DOM nell'istante esatto in cui gira
-    // questo effetto, subito dopo il cambio di rotta).
     const id = setTimeout(() => {
       document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: 'smooth' });
     }, 80);
     return () => clearTimeout(id);
   }, [location.pathname, location.hash]);
+
   return (
-    <Routes>
-      <Route path="/" element={<Layout><HomePage /></Layout>} />
-      <Route path="/account" element={<AccountPage />} />
-      <Route path="/carrello" element={<Layout><CarrelloPage /></Layout>} />
-      <Route path="/faq" element={<PaginaPage chiaveFissa="faq" />} />
-      <Route path="/pagina/:chiave" element={<PaginaPage />} />
-      <Route path="/promoter" element={<PromoterPage />} />
-      <Route path="/promoter/password-dimenticata" element={<PromoterPasswordDimenticataPage />} />
-      <Route path="/promoter/reimposta-password/:token" element={<PromoterReimpostaPasswordPage />} />
-      <Route path="/organizzatore" element={<OrganizzatorePage />} />
-      <Route path="/organizzatore/password-dimenticata" element={<OrganizzatorePasswordDimenticataPage />} />
-      <Route path="/organizzatore/reimposta-password/:token" element={<OrganizzatoreReimpostaPasswordPage />} />
-      <Route path="/tour-leader" element={<TourLeaderPage />} />
-      <Route path="/fornitore/registrati" element={<FornitoreRegistrazionePage />} />
-      <Route path="/fornitore/preventivo/:token" element={<FornitorePreventivoPage />} />
-      <Route path="/finalizza/:token" element={<FinalizzaListaAttesaPage />} />
-      <Route path="/variazione/:token" element={<VariazionePage />} />
-      <Route path="/completa-saldo/:pnr" element={<CompletaSaldoPage />} />
-      <Route path="/offerta/:slug" element={<OffertaPage />} />
-      <Route path="/eventi/:slug" element={<EventoPage key={location.pathname} />} />
-      <Route path="/bundle" element={<Layout><BundleListaPage /></Layout>} />
-      <Route path="/bundle/:slug" element={<BundlePage key={location.pathname} />} />
-      <Route path="/tour/:slug" element={<TourPage key={location.pathname} />} />
-      <Route path="/p/:codice" element={<PromoterRedirectPage />} />
-      <Route path="/w/:publicWidgetId" element={<WidgetPubblicoPage />} />
-      <Route path="/scansione/accedi" element={<TourLeaderLoginPage />} />
-      <Route path="/scansione/password-dimenticata" element={<TourLeaderPasswordDimenticataPage />} />
-      <Route path="/scansione/reimposta-password/:token" element={<TourLeaderReimpostaPasswordPage />} />
-      <Route path="/scansione" element={<TourLeaderBusListPage />} />
-      <Route path="/scansione/cerca" element={<TourLeaderCercaPage />} />
-      <Route path="/scansione/bus/:busId" element={<TourLeaderScanPage />} />
-      <Route path="/scansione/bus/:busId/passeggeri" element={<TourLeaderPasseggeriPage />} />
-      <Route path="/accedi" element={<AccediPage />} />
-      <Route path="/password-dimenticata" element={<PasswordDimenticataPage />} />
-      <Route path="/reimposta-password/:token" element={<ReimpostaPasswordPage />} />
-      <Route path="/registrati" element={<RegistratiPage />} />
-      <Route path="/verifica-email/:token" element={<VerificaEmailPage />} />
-    </Routes>
+    <Suspense fallback={<p className="caricamento" role="status">Carico…</p>}>
+      <Routes>
+        <Route path="/" element={<Layout><HomePage /></Layout>} />
+        <Route path="/account" element={<AccountPage />} />
+        <Route path="/carrello" element={<Layout><CarrelloPage /></Layout>} />
+        <Route path="/faq" element={<PaginaPage chiaveFissa="faq" />} />
+        <Route path="/pagina/:chiave" element={<PaginaPage />} />
+        <Route path="/promoter" element={<PromoterPage />} />
+        <Route path="/promoter/password-dimenticata" element={<PromoterPasswordDimenticataPage />} />
+        <Route path="/promoter/reimposta-password/:token" element={<PromoterReimpostaPasswordPage />} />
+        <Route path="/organizzatore" element={<OrganizzatorePage />} />
+        <Route path="/organizzatore/password-dimenticata" element={<OrganizzatorePasswordDimenticataPage />} />
+        <Route path="/organizzatore/reimposta-password/:token" element={<OrganizzatoreReimpostaPasswordPage />} />
+        <Route path="/tour-leader" element={<TourLeaderPage />} />
+        <Route path="/fornitore/registrati" element={<FornitoreRegistrazionePage />} />
+        <Route path="/fornitore/preventivo/:token" element={<FornitorePreventivoPage />} />
+        <Route path="/finalizza/:token" element={<FinalizzaListaAttesaPage />} />
+        <Route path="/variazione/:token" element={<VariazionePage />} />
+        <Route path="/completa-saldo/:pnr" element={<CompletaSaldoPage />} />
+        <Route path="/offerta/:slug" element={<OffertaPage />} />
+        <Route path="/eventi/:slug" element={<EventoPage key={location.pathname} />} />
+        <Route path="/bundle" element={<Layout><BundleListaPage /></Layout>} />
+        <Route path="/bundle/:slug" element={<BundlePage key={location.pathname} />} />
+        <Route path="/tour/:slug" element={<TourPage key={location.pathname} />} />
+        <Route path="/p/:codice" element={<PromoterRedirectPage />} />
+        <Route path="/w/:publicWidgetId" element={<WidgetPubblicoPage />} />
+        <Route path="/scansione/accedi" element={<TourLeaderLoginPage />} />
+        <Route path="/scansione/password-dimenticata" element={<TourLeaderPasswordDimenticataPage />} />
+        <Route path="/scansione/reimposta-password/:token" element={<TourLeaderReimpostaPasswordPage />} />
+        <Route path="/scansione" element={<TourLeaderBusListPage />} />
+        <Route path="/scansione/cerca" element={<TourLeaderCercaPage />} />
+        <Route path="/scansione/bus/:busId" element={<TourLeaderScanPage />} />
+        <Route path="/scansione/bus/:busId/passeggeri" element={<TourLeaderPasseggeriPage />} />
+        <Route path="/accedi" element={<AccediPage />} />
+        <Route path="/password-dimenticata" element={<PasswordDimenticataPage />} />
+        <Route path="/reimposta-password/:token" element={<ReimpostaPasswordPage />} />
+        <Route path="/registrati" element={<RegistratiPage />} />
+        <Route path="/verifica-email/:token" element={<VerificaEmailPage />} />
+        <Route path="*" element={<NonTrovataPage />} />
+      </Routes>
+    </Suspense>
   );
 }

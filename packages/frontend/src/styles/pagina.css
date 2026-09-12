@@ -2,20 +2,58 @@
    pagina.css — pagine editoriali del CMS (chi siamo, termini,
    privacy, cookie, contatti) e FAQ
    ------------------------------------------------------------
-   Dentro PublicPageLayout, quindi scopato sotto .pagina-editoriale:
-   senza scope main{max-width} finiva su tutto il sito. Reset,
-   header, .logo e footer vengono da sito/base.css e
-   sito/header.css; qui la colonna di lettura e la centratura del
-   footer a 1100px. I link nel testo del CMS sono in onway-theme.css.
+   Componente: src/pages/PaginaPage.tsx, dentro il Layout del sito:
+   <main class="container-narrow pagina-editoriale">. Tutto è
+   scopato sotto .pagina-editoriale. Header, footer, .btn* e
+   .stato-vuoto vengono da sito/*.css; fondo e link gialli del testo
+   CMS da onway-theme.css. La FAQ (accordion) è in faq.css.
    ============================================================ */
-.pagina-editoriale main{ max-width:var(--container-narrow); margin:0 auto; padding:clamp(30px,6vw,60px) 20px 80px; }
-.pagina-editoriale h1{ font-family:var(--font-sans); font-weight:800; letter-spacing:-.03em; font-size:clamp(28px,4vw,38px); margin:0 0 30px; }
-.pagina-editoriale .contenuto{ color:var(--mist); font-size:var(--testo-xl); line-height:1.8; }
-.pagina-editoriale .contenuto h3{ color:var(--paper); font-family:var(--font-sans); font-size:var(--testo-2xl); margin:28px 0 10px; }
-.pagina-editoriale .contenuto h3:first-child{ margin-top:0; }
-.pagina-editoriale .contenuto p{ margin:0 0 14px; }
-
-/* Footer identico al sito, ma centrato a 1100px */
-.pagina-editoriale .footer-grid, .pagina-editoriale .footer-bottom, .pagina-editoriale .payment-trust-row{
-  max-width:1100px; margin-left:auto; margin-right:auto;
+.pagina-editoriale{ padding-block:var(--sp-10) var(--section-y); }
+.pagina-editoriale h1{
+  margin:0 0 var(--sp-8); font-family:var(--font-sans); font-size:var(--t-h1); font-weight:800;
+  letter-spacing:-.02em; line-height:var(--lh-tight); text-transform:none;
 }
+.pagina-editoriale .caricamento{ padding-inline:0; }
+.pagina-editoriale .stato-vuoto p{ font-size:var(--t-body); }
+
+/* Testo del CMS: colonna di lettura a 70 caratteri */
+.pagina-editoriale .contenuto{
+  max-width:70ch; color:var(--ow-muted); font-size:var(--t-body); line-height:var(--lh-relaxed);
+  overflow-wrap:anywhere;
+}
+.pagina-editoriale .contenuto > :first-child{ margin-top:0; }
+.pagina-editoriale .contenuto p{ margin:0 0 var(--sp-4); }
+.pagina-editoriale .contenuto .lede{ font-size:var(--testo-2xl); line-height:var(--lh-normal); color:var(--ow-paper); margin-bottom:var(--sp-8); }
+.pagina-editoriale .contenuto h2{
+  margin:var(--sp-10) 0 var(--sp-3); font-family:var(--font-sans); font-size:var(--t-h3); font-weight:800;
+  letter-spacing:-.01em; color:var(--ow-paper); text-transform:none;
+}
+.pagina-editoriale .contenuto h3{
+  margin:var(--sp-6) 0 var(--sp-2); font-family:var(--font-sans); font-size:var(--t-h4); font-weight:700;
+  color:var(--ow-paper); text-transform:none;
+}
+.pagina-editoriale .contenuto strong, .pagina-editoriale .contenuto b{ color:var(--ow-paper); font-weight:600; }
+.pagina-editoriale .contenuto ul, .pagina-editoriale .contenuto ol{ margin:0 0 var(--sp-4); padding-left:var(--sp-6); }
+.pagina-editoriale .contenuto li{ margin-bottom:var(--sp-2); }
+.pagina-editoriale .contenuto li::marker{ color:var(--ow-accent); }
+.pagina-editoriale .contenuto a{ text-underline-offset:3px; }
+
+/* Pagine legali: definizioni e tabelle (finalità e basi giuridiche,
+   tempi di conservazione, elenco dei cookie). La tabella scorre dentro il
+   suo contenitore sui telefoni, senza allargare la pagina. */
+.pagina-editoriale .contenuto .def{ line-height:1.9; }
+.pagina-editoriale .contenuto .scroll{
+  overflow-x:auto; margin:0 0 var(--sp-6); border:1px solid var(--ow-line); border-radius:var(--radius);
+}
+.pagina-editoriale .contenuto table{
+  width:100%; min-width:480px; border-collapse:collapse; font-size:var(--t-small); line-height:var(--lh-normal);
+  overflow-wrap:normal;
+}
+.pagina-editoriale .contenuto th, .pagina-editoriale .contenuto td{
+  padding:var(--sp-3); text-align:left; vertical-align:top; border-bottom:1px solid var(--ow-line);
+}
+.pagina-editoriale .contenuto th{
+  font-size:var(--t-caption); font-weight:600; color:var(--ow-paper); background:var(--ow-surface);
+}
+.pagina-editoriale .contenuto tr:last-child td{ border-bottom:0; }
+.pagina-editoriale .contenuto td:first-child{ color:var(--ow-paper); }

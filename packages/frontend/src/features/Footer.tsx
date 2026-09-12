@@ -9,47 +9,47 @@ import { LinkPreferenzeCookie } from './CookieBanner';
  *  collegato, prometterlo qui sarebbe falso. */
 export function Footer() {
   return (
-    <footer id="assistenza">
+    <footer className="footer-sito" id="assistenza">
       <div className="container">
         <div className="footer-grid">
           <div className="footer-marchio">
             <LogoOnWay come="testo" />
             <p>Non vendiamo un viaggio. Portiamo le persone verso un'esperienza.</p>
           </div>
-          <div>
-            <h5>Eventi</h5>
+          <nav aria-labelledby="footer-eventi">
+            <h2 className="footer-titolo" id="footer-eventi">Eventi</h2>
             <ul>
               <li><Link to="/#eventi">Tutti gli eventi</Link></li>
               <li><Link to="/bundle">Bundle</Link></li>
               <li><Link to="/#come-funziona">Come funziona</Link></li>
             </ul>
-          </div>
-          <div>
-            <h5>Assistenza</h5>
+          </nav>
+          <nav aria-labelledby="footer-assistenza">
+            <h2 className="footer-titolo" id="footer-assistenza">Assistenza</h2>
             <ul>
               <li><Link to="/faq">FAQ</Link></li>
               <li><Link to="/pagina/contatti">Contattaci</Link></li>
               <li><Link to="/account">I miei viaggi</Link></li>
             </ul>
-          </div>
-          <div>
-            <h5>OnWay</h5>
+          </nav>
+          <nav aria-labelledby="footer-onway">
+            <h2 className="footer-titolo" id="footer-onway">OnWay</h2>
             <ul>
               <li><Link to="/pagina/chisiamo">Chi siamo</Link></li>
               <li><Link to="/tour-leader">Lavora con noi</Link></li>
               <li><Link to="/promoter">Area promoter</Link></li>
               <li><Link to="/organizzatore">Area organizzatore</Link></li>
             </ul>
-          </div>
-          <div>
-            <h5>Legale</h5>
+          </nav>
+          <nav aria-labelledby="footer-legale">
+            <h2 className="footer-titolo" id="footer-legale">Legale</h2>
             <ul>
               <li><Link to="/pagina/termini">Termini e condizioni</Link></li>
               <li><Link to="/pagina/privacy">Privacy</Link></li>
               <li><Link to="/pagina/cookie">Cookie</Link></li>
               <li><LinkPreferenzeCookie /></li>
             </ul>
-          </div>
+          </nav>
         </div>
         <div className="footer-bottom">
           <span>© 2026 OnWay</span>

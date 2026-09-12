@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { promoterApi } from '../api/promoter';
+import { Layout } from '../Layout';
 
 /** /p/:codice — il link che un promoter condivide. Non è una pagina
  *  vera: risolve il codice opaco (mai il suo nome/codice leggibile, e
@@ -15,15 +16,23 @@ export function PromoterRedirectPage() {
   useEffect(() => {
     if (!codice) return;
     promoterApi.risolviLink(codice)
-      .then((r) => navigate(`/eventi/${r.eventoSlug}?promo=${codice}`, { replace: true }))
+      .then((r) => navigate(`/eventi/${r.eventoSlug}?promo=${encodeURIComponent(codice)}`, { replace: true }))
       .catch(() => setErroreVisibile(true));
   }, [codice, navigate]);
 
-  if (!erroreVisibile) return null; // reindirizza troppo in fretta perché serva un vero "caricamento"
+  if (!erroreVisibile) return <p className="caricamento" role="status">Ti porto all'evento…</p>;
 
   return (
-    <div style={{ maxWidth: 480, margin: '80px auto', padding: '0 20px', textAlign: 'center' }}>
-      <p>Questo link non è (più) valido. Vai su <a href="/">onway.it</a> per vedere tutti gli eventi.</p>
-    </div>
+    <Layout>
+      <main className="container-narrow pagina-non-trovata">
+        <div className="stato-vuoto" role="alert">
+          <h1>Link non valido</h1>
+          <p>Questo link non è valido o è scaduto. Gli eventi in programma li trovi tutti in home.</p>
+          <div className="stato-vuoto-azioni">
+            <Link className="btn btn-primary btn-lg" to="/#eventi">Vai agli eventi</Link>
+          </div>
+        </div>
+      </main>
+    </Layout>
   );
 }

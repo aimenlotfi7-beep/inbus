@@ -1,216 +1,211 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { CookieBanner, LinkPreferenzeCookie } from './features/CookieBanner';
+import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { CookieBanner } from './features/CookieBanner';
 import { clienteLoggato } from './features/clienteSessione';
 import { useCarrello } from './features/carrello/CarrelloContext';
-import { categorieEventoApi, type CategoriaEvento } from './api/categorieEvento';
 import { LogoOnWay } from './features/LogoOnWay';
+import { Footer } from './features/Footer';
+import { Icona } from './features/Icone';
 import { clienteAuthApi } from './api/clienteAuth';
 import { inizializzaMetaPixel } from './features/metaPixel';
 import { inizializzaGA4, tracciaPaginaGA4 } from './features/googleAnalytics';
+import { plurale } from './shared/formato';
 
+const VOCI_MENU = [
+  { to: '/#eventi', ancora: 'eventi', testo: 'Eventi' },
+  { to: '/bundle', ancora: null, testo: 'Bundle' },
+  { to: '/#come-funziona', ancora: 'come-funziona', testo: 'Come funziona' },
+];
+
+/** Il guscio del sito pubblico: header (logo, menu, ricerca, carrello,
+ *  account), menu mobile, piè di pagina e banner cookie. Le categorie
+ *  degli eventi NON stanno qui: vivono solo nella sezione "Tutti gli
+ *  eventi" della home. */
 export function Layout({ children }: { children: ReactNode }) {
   useEffect(() => { inizializzaMetaPixel(); inizializzaGA4(); }, []);
-  const [menuMobileAperto, setMenuMobileAperto] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const inHomepage = location.pathname === '/';
+  const { numeroArticoli } = useCarrello();
+
+  // Solo il nome (o "Il mio account" finché non è ancora arrivato, o se
+  // manca): cliccandolo si va sempre in /account, cambia solo l'etichetta.
   const loggato = clienteLoggato();
-  // Solo il nome (o "Il mio account" finché non è ancora arrivato, o
-  // se manca) — cliccandolo si va comunque sempre in /account, cambia
-  // solo l'etichetta. Un'unica chiamata leggera, non su ogni pagina
-  // sotto /account (Layout non viene mai renderizzato lì).
   const [nomeCliente, setNomeCliente] = useState<string | null>(null);
   useEffect(() => {
     if (!loggato) { setNomeCliente(null); return; }
     clienteAuthApi.me().then((c) => setNomeCliente(c.nome)).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggato]);
   const etichettaAccount = loggato ? (nomeCliente || 'Il mio account') : 'Accedi';
-  const { numeroArticoli } = useCarrello();
-  const location = useLocation();
-  const inHomepage = location.pathname === '/';
-  // Ogni cambio di pagina — gtag non lo fa da solo in una SPA (vedi
-  // googleAnalytics.ts). Il Pixel invece traccia PageView una volta
-  // sola all'avvio: e' cosi' che funziona il suo modello, non serve
-  // ripeterlo qui.
+  const linkAccount = loggato ? '/account' : '/accedi';
+
+  // Ogni cambio di pagina: gtag non lo fa da solo in una SPA (vedi
+  // googleAnalytics.ts). Il Pixel traccia PageView una volta sola all'avvio.
   useEffect(() => { tracciaPaginaGA4(location.pathname + location.search, document.title); }, [location.pathname, location.search]);
-  // La ricerca vive nell'URL (?q=...), non in uno stato locale — così
-  // header (qui) e homepage possono leggerla e scriverla entrambe,
-  // senza doverla far viaggiare come prop tra due componenti che
-  // altrimenti non si parlerebbero (Layout avvolge OGNI pagina,
-  // HomePage è solo una di quelle).
+
+  // ---------- Ricerca ----------
+  // In home vive nell'URL (?q=…) e filtra mentre si scrive: la legge la
+  // HomePage. Nelle altre pagine resta locale finché non si preme invio,
+  // poi porta alla home con la ricerca già applicata.
   const [searchParams, setSearchParams] = useSearchParams();
-  const testoRicerca = searchParams.get('q') ?? '';
-  // Le categorie non sono più fisse — arrivano dal gestionale, dove se
-  // ne possono aggiungere quante se ne vogliono. Il pulsante "Tutti" è
-  // sempre il primo, aggiunto qui, non fa parte dell'elenco vero.
-  const [categorie, setCategorie] = useState<CategoriaEvento[]>([]);
-  useEffect(() => { categorieEventoApi.list().then(setCategorie); }, []);
-  const categoriaAttiva = searchParams.get('categoria');
-  function impostaCategoria(nome: string) {
+  const [testoLocale, setTestoLocale] = useState('');
+  const testoRicerca = inHomepage ? (searchParams.get('q') ?? '') : testoLocale;
+  function scriviRicerca(valore: string) {
+    if (!inHomepage) { setTestoLocale(valore); return; }
     const nuovi = new URLSearchParams(searchParams);
-    if (nome === 'Tutti') {
-      // "Tutti" deve azzerare DAVVERO ogni filtro — se restasse attivo
-      // anche il filtro genere separato (più in basso nella pagina),
-      // il risultato sembrerebbe ancora filtrato nonostante "Tutti"
-      // fosse selezionato.
-      nuovi.delete('categoria');
-      nuovi.delete('genere');
-    } else {
-      nuovi.set('categoria', nome);
-      nuovi.delete('genere');
-    }
+    if (valore) nuovi.set('q', valore); else nuovi.delete('q');
     setSearchParams(nuovi, { replace: true });
-    document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' });
+  }
+  function inviaRicerca(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    (e.currentTarget.querySelector('input') as HTMLInputElement | null)?.blur();
+    if (inHomepage) {
+      document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+    const q = testoLocale.trim();
+    setTestoLocale('');
+    setRicercaMobileAperta(false);
+    navigate(q ? `/?q=${encodeURIComponent(q)}#eventi` : '/#eventi');
   }
 
-  // Su mobile la fascia delle categorie si nasconde scorrendo verso il
-  // basso (per non rubare spazio mentre si legge), e ricompare
-  // scorrendo verso l'alto — comportamento richiesto solo lì: su
-  // desktop resta sempre ferma, non serve nasconderla.
-  const [categorieNascoste, setCategorieNascoste] = useState(false);
-  const ultimoScrollY = useRef(0);
+  const idRicerca = useId();
+  const idRicercaMobile = useId();
+  const [ricercaMobileAperta, setRicercaMobileAperta] = useState(false);
+  const lenteRef = useRef<HTMLButtonElement>(null);
+  const inputMobileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (ricercaMobileAperta) inputMobileRef.current?.focus(); }, [ricercaMobileAperta]);
+  function chiudiRicercaMobile(svuota: boolean) {
+    if (svuota) scriviRicerca('');
+    setRicercaMobileAperta(false);
+    lenteRef.current?.focus();
+  }
+
+  // ---------- Menu mobile ----------
+  const idMenu = useId();
+  const [menuAperto, setMenuAperto] = useState(false);
+  const burgerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { setMenuAperto(false); }, [location.pathname, location.hash]);
   useEffect(() => {
-    function alloScroll() {
-      const y = window.scrollY;
-      setCategorieNascoste(y > ultimoScrollY.current && y > 80);
-      ultimoScrollY.current = y;
-    }
-    window.addEventListener('scroll', alloScroll, { passive: true });
-    return () => window.removeEventListener('scroll', alloScroll);
-  }, []);
+    if (!menuAperto) return;
+    const allaPressione = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setMenuAperto(false);
+      burgerRef.current?.focus();
+    };
+    // Se la finestra si allarga oltre i 900px il menu non si vede più:
+    // lo chiudo, così non ricompare riaprendo la finestra stretta.
+    const mq = window.matchMedia('(min-width: 901px)');
+    const allaModifica = () => { if (mq.matches) setMenuAperto(false); };
+    window.addEventListener('keydown', allaPressione);
+    mq.addEventListener('change', allaModifica);
+    return () => {
+      window.removeEventListener('keydown', allaPressione);
+      mq.removeEventListener('change', allaModifica);
+    };
+  }, [menuAperto]);
+
+  /** Link a un'ancora della home ("/#eventi"): se sono già in home e
+   *  l'ancora non cambia, React Router non scorre. Qui scorro io. */
+  function vaiAllAncora(e: MouseEvent<HTMLAnchorElement>, ancora: string | null) {
+    setMenuAperto(false);
+    if (!ancora || !inHomepage) return;
+    const destinazione = document.getElementById(ancora);
+    if (!destinazione) return;
+    e.preventDefault();
+    navigate({ pathname: '/', search: location.search, hash: `#${ancora}` }, { replace: true });
+    destinazione.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  /** Etichetta, lente e campo: gli stessi nella barra desktop e nella riga mobile. */
+  const campoRicerca = (id: string, ref?: React.Ref<HTMLInputElement>, onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void) => (
+    <>
+      <label className="sr-only" htmlFor={id}>Cerca un evento</label>
+      <Icona nome="cerca" dimensione={18} className="header-ricerca-lente" />
+      <input
+        ref={ref}
+        id={id}
+        type="search"
+        enterKeyHint="search"
+        autoComplete="off"
+        placeholder="Cerca artista, evento o città"
+        value={testoRicerca}
+        onChange={(e) => scriviRicerca(e.target.value)}
+        onKeyDown={onKeyDown}
+      />
+    </>
+  );
 
   return (
     <>
-      <header>
-        <div className="header-sinistra">
+      <header className="header-sito">
+        <div className="container header-riga">
           <LogoOnWay />
-          <nav className="links">
-            <Link to="/#consigliati">Eventi Consigliati</Link>
-            <Link to="/bundle">Bundle</Link>
+
+          <nav className="header-nav" aria-label="Principale">
+            {VOCI_MENU.map((v) => <Link key={v.to} to={v.to} onClick={(e) => vaiAllAncora(e, v.ancora)}>{v.testo}</Link>)}
           </nav>
+
+          <form className="header-ricerca" role="search" onSubmit={inviaRicerca}>
+            {campoRicerca(idRicerca)}
+          </form>
+
+          <div className="header-azioni">
+            <button
+              ref={lenteRef}
+              type="button"
+              className="header-icona"
+              aria-label="Cerca"
+              aria-expanded={ricercaMobileAperta}
+              aria-controls={idRicercaMobile}
+              onClick={() => { setMenuAperto(false); setRicercaMobileAperta((v) => !v); }}
+            >
+              <Icona nome="cerca" dimensione={22} />
+            </button>
+            <Link className="carrello-icona" to="/carrello" aria-label={numeroArticoli > 0 ? `Carrello, ${plurale(numeroArticoli, 'posto', 'posti')}` : 'Carrello'}>
+              <Icona nome="carrello" dimensione={22} />
+              {numeroArticoli > 0 && <span className="carrello-badge" aria-hidden="true">{numeroArticoli}</span>}
+            </Link>
+            <Link className="btn btn-secondary btn-sm header-account" to={linkAccount}><span>{etichettaAccount}</span></Link>
+            <button
+              ref={burgerRef}
+              type="button"
+              className="burger"
+              aria-label={menuAperto ? 'Chiudi il menu' : 'Apri il menu'}
+              aria-expanded={menuAperto}
+              aria-controls={idMenu}
+              onClick={() => { setRicercaMobileAperta(false); setMenuAperto((v) => !v); }}
+            >
+              <Icona nome={menuAperto ? 'chiudi' : 'menu'} dimensione={24} />
+            </button>
+          </div>
         </div>
 
-        {inHomepage && (
-          <div className="header-centro">
-            <form
-              className="header-ricerca"
-              onSubmit={(e) => { e.preventDefault(); document.getElementById('eventi')?.scrollIntoView({ behavior: 'smooth' }); }}
-            >
-              <button type="submit" aria-label="Cerca">
-                <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
-              </button>
-              <input
-                type="text"
-                placeholder="Cerca artista, evento o città..."
-                value={testoRicerca}
-                onChange={(e) => {
-                  const nuovi = new URLSearchParams(searchParams);
-                  if (e.target.value) nuovi.set('q', e.target.value); else nuovi.delete('q');
-                  setSearchParams(nuovi, { replace: true });
-                }}
-              />
+        {ricercaMobileAperta && (
+          <div className="container header-ricerca-mobile" id={idRicercaMobile}>
+            <form role="search" onSubmit={inviaRicerca}>
+              <div className="header-ricerca">
+                {campoRicerca(`${idRicercaMobile}-campo`, inputMobileRef, (e) => {
+                  // Esc chiude la riga; preventDefault evita che il campo
+                  // "search" si svuoti da solo.
+                  if (e.key === 'Escape') { e.preventDefault(); chiudiRicercaMobile(false); }
+                })}
+              </div>
+              <button type="button" className="btn btn-tertiary" onClick={() => chiudiRicercaMobile(true)}>Annulla</button>
             </form>
-            {/* Categorie desktop — dentro l'header stesso, accanto alla
-                ricerca. Su mobile questa copia resta nascosta (vedi
-                CSS): lì le categorie stanno in una fascia propria
-                subito sotto, mai dentro questa riga col carrello. */}
-            <div className="header-categorie-desktop">
-              <button type="button" className={`categoria-chip${!categoriaAttiva ? ' active' : ''}`} onClick={() => impostaCategoria('Tutti')}>Tutti</button>
-              {categorie.map((c) => (
-                <button key={c.id} type="button" className={`categoria-chip${categoriaAttiva === c.nome ? ' active' : ''}`} onClick={() => impostaCategoria(c.nome)}>
-                  {c.nome}
-                </button>
-              ))}
-            </div>
           </div>
         )}
-
-        <div className="nav-actions">
-          <Link className="carrello-icona" to="/carrello" aria-label="Carrello">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-            </svg>
-            {numeroArticoli > 0 && <span className="carrello-badge">{numeroArticoli}</span>}
-          </Link>
-          <Link className="btn btn-ghost desktop-only" to={loggato ? '/account' : '/accedi'}>{etichettaAccount}</Link>
-          <button type="button" className="burger" aria-label="Apri il menu" aria-expanded={menuMobileAperto} onClick={() => setMenuMobileAperto(!menuMobileAperto)}>☰</button>
-        </div>
       </header>
 
-      {/* Categorie mobile — fascia propria, FUORI dall'header (mai
-          insieme al carrello/ricerca), sfondo trasparente, sparisce
-          scorrendo verso il basso. Su desktop questa copia resta
-          nascosta (vedi CSS): lì le categorie sono già nell'header
-          sopra. */}
-      {inHomepage && (
-        <div className={`header-categorie-mobile${categorieNascoste ? ' nascosta' : ''}`}>
-          <button type="button" className={`categoria-chip${!categoriaAttiva ? ' active' : ''}`} onClick={() => impostaCategoria('Tutti')}>Tutti</button>
-          {categorie.map((c) => (
-            <button key={c.id} type="button" className={`categoria-chip${categoriaAttiva === c.nome ? ' active' : ''}`} onClick={() => impostaCategoria(c.nome)}>
-              {c.nome}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className={`mobile-nav${menuMobileAperto ? ' open' : ''}`}>
-        {!loggato && (
-          <>
-            <Link to="/#consigliati" onClick={() => setMenuMobileAperto(false)}>Eventi Consigliati</Link>
-            <Link to="/bundle" onClick={() => setMenuMobileAperto(false)}>Bundle</Link>
-          </>
-        )}
-        <Link className="btn btn-primary" to={loggato ? '/account' : '/accedi'} style={{ textAlign: 'center', marginTop: 10 }} onClick={() => setMenuMobileAperto(false)}>{etichettaAccount}</Link>
-      </div>
+      <nav className="mobile-nav" id={idMenu} aria-label="Menu" hidden={!menuAperto}>
+        {VOCI_MENU.map((v) => <Link key={v.to} to={v.to} onClick={(e) => vaiAllAncora(e, v.ancora)}>{v.testo}</Link>)}
+        <Link to="/faq" onClick={() => setMenuAperto(false)}>FAQ</Link>
+        <Link className="btn btn-primary btn-lg btn-block" to={linkAccount} onClick={() => setMenuAperto(false)}>{etichettaAccount}</Link>
+      </nav>
 
       {children}
 
-      <footer id="assistenza">
-        <div className="footer-grid">
-          <div>
-            <LogoOnWay come="testo" />
-            <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-base)', maxWidth: '32ch', marginTop: 14 }}>Non vendiamo un viaggio. Portiamo le persone verso un'esperienza.</p>
-          </div>
-          <div>
-            <h5>Naviga</h5>
-            <ul>
-              <li><Link to="/#eventi">Eventi</Link></li>
-              <li><Link to="/bundle">Bundle</Link></li>
-              <li><Link to="/#come-funziona">Come funziona</Link></li>
-              <li><Link to="/pagina/chisiamo">Chi siamo</Link></li>
-              <li><Link to="/tour-leader">Lavora con noi</Link></li>
-              <li><Link to="/promoter">Area Promoter</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h5>Assistenza</h5>
-            <ul>
-              <li><Link to="/faq">FAQ</Link></li>
-              <li><Link to="/pagina/contatti">Contattaci</Link></li>
-              <li><Link to="/account">Traccia la prenotazione</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h5>Legale</h5>
-            <ul>
-              <li><Link to="/pagina/termini">Termini e condizioni</Link></li>
-              <li><Link to="/pagina/privacy">Privacy</Link></li>
-              <li><Link to="/pagina/cookie">Cookie</Link></li>
-            </ul>
-          </div>
-        </div>
-        <div className="payment-trust-row">
-          <span>Pagamenti sicuri accettati:</span>
-          <span className="payment-badge">Carta</span>
-          <span className="payment-badge">PayPal</span>
-          <span className="payment-badge">Satispay</span>
-        </div>
-        <div className="footer-bottom">
-          <span>© 2026 OnWay</span>
-          <LinkPreferenzeCookie />
-        </div>
-      </footer>
-
+      <Footer />
       <CookieBanner />
     </>
   );

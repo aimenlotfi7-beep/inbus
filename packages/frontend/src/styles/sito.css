@@ -11,6 +11,7 @@
      card.css            card evento, caroselli, griglia
      evento.css          pagina evento, percorso bus, accordion, barra mobile
      checkout.css        modulo, stepper, riepilogo, servizi, mini-tab, modale
+     bundle.css          pagina bundle (BundleFlusso), anche nel widget
      account-cliente.css guscio AccountShell del cliente (tema scuro)
    Dopo questo file main.tsx carica onway-theme.css (logotipo e
    rimappature dei portali); i fogli d'area li importano le pagine.
@@ -21,4 +22,5 @@
 @import './sito/card.css';
 @import './sito/evento.css';
 @import './sito/checkout.css';
+@import './sito/bundle.css';
 @import './sito/account-cliente.css';
