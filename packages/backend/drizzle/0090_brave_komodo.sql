@@ -1,0 +1,1 @@
+ALTER TABLE "prenotazioni" ADD COLUMN "totale_previsto" numeric(10, 2);

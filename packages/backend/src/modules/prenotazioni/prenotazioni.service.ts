@@ -116,6 +116,10 @@ function verificaCouponUsato(ordine: CouponOrdine | null) {
  *  stata fatta la prenotazione, altrimenti a chi ha prenotato con uno
  *  sconto verrebbe chiesto il saldo pieno, senza sconto, per errore. */
 async function calcolaTotaleReale(p: typeof prenotazioni.$inferSelect) {
+  // Prenotazioni da settembre 2026: il prezzo intero fissato all'acquisto
+  // (deciso dal proprietario), non quello di oggi della fermata.
+  if (p.totalePrevisto !== null) return Number(p.totalePrevisto);
+  // Prenotazioni più vecchie: prezzo attuale della fermata, come prima.
   const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
   const [tragitto] = await db.select().from(tragitti).where(eq(tragitti.id, p.tragittoId)).limit(1);
   const [fermata] = await db.select().from(fermate).where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.tragittoId, p.tragittoId))).limit(1);
@@ -344,6 +348,8 @@ async function creaRigaInterna(
       referenteTelefono: tragitto.referenteTelefono,
       passeggeri: input.passeggeri,
       totale: (input.tipoPagamento === 'ACCONTO' ? acconto : totale - creditoUsato).toFixed(2),
+      // Il prezzo intero di adesso: il saldo di un acconto si calcola da qui.
+      totalePrevisto: totale.toFixed(2),
       sconto: sconto.toFixed(2),
       ...(scontoBundle != null && { scontoBundle: scontoBundle.toFixed(2) }),
       creditoUsato: creditoUsato.toFixed(2),
@@ -839,7 +845,7 @@ export const prenotazioniService = {
       const [riga] = await tx
         .update(prenotazioni)
         .set({
-          saldoPagato: true, saldoPagatoIl: new Date(), totale: totaleReale.toFixed(2),
+          saldoPagato: true, saldoPagatoIl: new Date(), totale: totaleReale.toFixed(2), totalePrevisto: totaleReale.toFixed(2),
           ...(conCoupon && { couponCodice: conCoupon.codice, sconto: conCoupon.sconto }),
           ...(conCoupon?.promoterCodice && { promoterCodice: conCoupon.promoterCodice }),
         })

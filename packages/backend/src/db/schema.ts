@@ -799,6 +799,12 @@ export const prenotazioni = pgTable('prenotazioni', {
   referenteTelefono: text('referente_telefono'),
   passeggeri: integer('passeggeri').notNull(),
   totale: numeric('totale', { precision: 10, scale: 2 }).notNull(),
+  // Il prezzo intero della prenotazione (sconti compresi, credito escluso),
+  // fissato al momento dell'acquisto: il saldo di un acconto si calcola da
+  // qui, non dal prezzo di oggi della fermata. Vuoto per le prenotazioni
+  // fatte prima di settembre 2026: per quelle resta il calcolo sul prezzo
+  // attuale.
+  totalePrevisto: numeric('totale_previsto', { precision: 10, scale: 2 }),
   sconto: numeric('sconto', { precision: 10, scale: 2 }).notNull().default('0'),
   // Quota dello sconto bundle caduta su QUESTA riga (già dentro
   // 'totale'): così commissioni promoter, statistiche per evento e

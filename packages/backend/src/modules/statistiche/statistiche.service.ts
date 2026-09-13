@@ -63,6 +63,7 @@ async function leggiPrenotazioni(condizione: SQL | undefined): Promise<Prenotazi
     utenteId: prenotazioni.utenteId,
     passeggeri: prenotazioni.passeggeri,
     totale: prenotazioni.totale,
+    totalePrevisto: prenotazioni.totalePrevisto,
     sconto: prenotazioni.sconto,
     scontoBundle: prenotazioni.scontoBundle,
     couponCodice: prenotazioni.couponCodice,
@@ -82,8 +83,14 @@ async function leggiPrenotazioni(condizione: SQL | undefined): Promise<Prenotazi
   }).from(prenotazioni)
     .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
     .where(and(eq(prenotazioni.stato, 'CONFERMATA'), eventoValido, condizione));
-  const previsti = await totaliPrevisti(righe.filter((r) => r.tipoPagamento === 'ACCONTO' && !r.saldoPagato));
-  return righe.map((r) => ({ ...r, totale: previsti.get(r.id) ?? Number(r.totale), pagato: Number(r.totale) }));
+  // Il prezzo intero salvato all'acquisto (da settembre 2026); per le
+  // prenotazioni più vecchie si ricalcola come al saldo.
+  const previsti = await totaliPrevisti(righe.filter((r) => r.tipoPagamento === 'ACCONTO' && !r.saldoPagato && r.totalePrevisto === null));
+  return righe.map(({ totalePrevisto, ...r }) => ({
+    ...r,
+    totale: r.tipoPagamento === 'ACCONTO' && !r.saldoPagato && totalePrevisto !== null ? Number(totalePrevisto) : previsti.get(r.id) ?? Number(r.totale),
+    pagato: Number(r.totale),
+  }));
 }
 
 /** Un acconto non ancora saldato ha in `totale` solo l'acconto; quando il
