@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { comunicazioniApi, type Comunicazione } from '../../../api/comunicazioni';
-import { ErroreApi } from '../../../api/client';
 import type { Evento } from '../../../api/types';
+import { conferma } from '../../shared/conferma';
+import { notifica } from '../../shared/notifiche';
+import { motivoErrore } from '../../shared/errori';
+import { formattaDataOra, plurale } from '../../../shared/formato';
 
 export function ComunicazioniTab({ evento }: { evento: Evento }) {
   const [storico, setStorico] = useState<Comunicazione[]>([]);
@@ -19,7 +22,6 @@ export function ComunicazioniTab({ evento }: { evento: Evento }) {
   const [calcolando, setCalcolando] = useState(false);
   const [inviando, setInviando] = useState(false);
   const [errore, setErrore] = useState('');
-  const [fatto, setFatto] = useState(false);
 
   function ricaricaStorico() {
     setCaricamentoStorico(true);
@@ -60,19 +62,29 @@ export function ComunicazioniTab({ evento }: { evento: Evento }) {
     if (!oggetto.trim() || !corpo.trim()) { setErrore('Scrivi oggetto e testo prima di inviare.'); return; }
     const canali: ('EMAIL' | 'CHAT')[] = [...(canaleEmail ? ['EMAIL' as const] : []), ...(canaleChat ? ['CHAT' as const] : [])];
     if (canali.length === 0) { setErrore('Scegli almeno un canale di invio.'); return; }
-    if (!confirm(`Inviare questa comunicazione a ${numeroDestinatari ?? '?'} client${numeroDestinatari === 1 ? 'e' : 'i'}?`)) return;
+    const ok = await conferma({
+      titolo: `Inviare la comunicazione a ${plurale(numeroDestinatari ?? 0, 'cliente', 'clienti')}?`,
+      testo: `Parte subito ${canali.length === 2 ? 'via email e in chat' : canali[0] === 'EMAIL' ? 'via email' : 'in chat'}: non si può annullare.`,
+      conferma: 'Invia',
+    });
+    if (!ok) return;
 
     setInviando(true);
     setErrore('');
     try {
-      await comunicazioniApi.invia(evento.id, { servizioIds, tragittoId: tragittoId || undefined, fermataId: fermataId || undefined, oggetto, corpo, canali });
+      const esito = await comunicazioniApi.invia(evento.id, { servizioIds, tragittoId: tragittoId || undefined, fermataId: fermataId || undefined, oggetto, corpo, canali });
       setOggetto('');
       setCorpo('');
-      setFatto(true);
-      setTimeout(() => setFatto(false), 3000);
       ricaricaStorico();
+      // Dice sempre se qualcosa non è partito: prima "inviata" anche senza email.
+      const problemi = [
+        esito.emailNonInviate > 0 ? `${plurale(esito.emailNonInviate, 'email non è partita', 'email non sono partite')}` : '',
+        esito.chatNonInviate > 0 ? `${plurale(esito.chatNonInviate, 'messaggio in chat non è stato salvato', 'messaggi in chat non sono stati salvati')}` : '',
+      ].filter(Boolean);
+      if (problemi.length > 0) notifica(`Comunicazione registrata, ma ${problemi.join(' e ')}.`, 'errore');
+      else notifica(`Comunicazione inviata a ${plurale(esito.numeroDestinatari, 'cliente', 'clienti')}.`, 'successo');
     } catch (e) {
-      setErrore(e instanceof ErroreApi ? e.message : 'Invio non riuscito, riprova.');
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     } finally {
       setInviando(false);
     }
@@ -116,7 +128,7 @@ export function ComunicazioniTab({ evento }: { evento: Evento }) {
         )}
 
         <p style={{ fontSize: 'var(--testo-md)', marginTop: 14, fontWeight: 600 }}>
-          {calcolando ? 'Calcolo...' : `${numeroDestinatari ?? 0} destinatari${numeroDestinatari === 1 ? 'o' : ''}`}
+          {calcolando ? 'Calcolo…' : plurale(numeroDestinatari ?? 0, 'destinatario', 'destinatari')}
         </p>
       </div>
 
@@ -133,21 +145,20 @@ export function ComunicazioniTab({ evento }: { evento: Evento }) {
           </label>
         </div>
         {errore && <p style={{ color: 'var(--pink)', fontSize: 'var(--testo-md)', marginBottom: 10 }}>{errore}</p>}
-        {fatto && <p style={{ color: 'var(--green)', fontSize: 'var(--testo-md)', marginBottom: 10 }}>✓ Comunicazione inviata.</p>}
         <button className="btn btn-primary" onClick={invia} disabled={inviando || numeroDestinatari === 0}>
-          {inviando ? 'Invio...' : `Invia a ${numeroDestinatari ?? 0} client${numeroDestinatari === 1 ? 'e' : 'i'}`}
+          {inviando ? 'Invio…' : `Invia a ${plurale(numeroDestinatari ?? 0, 'cliente', 'clienti')}`}
         </button>
       </div>
 
       <div className="section-card">
         <p className="section-label" style={{ marginBottom: 10 }}>Storico comunicazioni</p>
-        {caricamentoStorico && <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>Carico...</p>}
+        {caricamentoStorico && <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>Carico…</p>}
         {!caricamentoStorico && storico.length === 0 && <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>Nessuna comunicazione inviata ancora per questo evento.</p>}
         {storico.map((c) => (
           <div key={c.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--line)' }}>
             <p style={{ fontWeight: 600, fontSize: 'var(--testo-base)', margin: 0 }}>{c.oggetto}</p>
             <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', margin: '2px 0 0' }}>
-              {new Date(c.creataIl).toLocaleString('it-IT')} · {c.numeroDestinatari} destinatari · {c.canali.join(' + ')}
+              {formattaDataOra(c.creataIl)} · {plurale(c.numeroDestinatari, 'destinatario', 'destinatari')} · {c.canali.map((x) => (x === 'EMAIL' ? 'email' : 'chat')).join(' e ')}
             </p>
           </div>
         ))}

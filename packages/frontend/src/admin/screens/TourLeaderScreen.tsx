@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { notifica } from '../shared/notifiche';
+import { conferma } from '../shared/conferma';
+import { motivoErrore } from '../shared/errori';
 import { tourLeaderApi, type TourLeader, type CandidaturaInput } from '../../api/tourleader';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
@@ -23,7 +25,7 @@ export function TourLeaderScreen() {
   const [ricerca, setRicerca] = useState('');
   const [linkCopiato, setLinkCopiato] = useState(false);
   const [formAperto, setFormAperto] = useState(false);
-  const [credenzialiGenerate, setCredenzialiGenerate] = useState<{ nomeCompleto: string; email: string; password: string } | null>(null);
+  const [linkNonInviato, setLinkNonInviato] = useState<{ nomeCompleto: string; link: string } | null>(null);
   const [form, setForm] = useState(VUOTO);
 
   function ricarica() { tourLeaderApi.list().then(setLista); }
@@ -55,13 +57,25 @@ export function TourLeaderScreen() {
     ricarica();
   }
 
+  /** Email al tour leader con il link per scegliere la password: nessuna
+   *  password in chiaro da comunicare a mano. */
   async function attivaAccesso(t: TourLeader) {
-    if (!confirm(`Generare (o rigenerare) le credenziali di accesso alla scansione per ${t.nome} ${t.cognome}? Se ne aveva già, quelle vecchie smettono di funzionare.`)) return;
+    const nomeCompleto = `${t.nome} ${t.cognome}`;
+    const ok = await conferma({
+      titolo: `Mandare a ${nomeCompleto} il link per la password?`,
+      testo: `Riceve a ${t.email} un'email con il link per scegliere la password della scansione, valido 72 ore.${t.passwordAttiva ? ' La password attuale resta valida finché non ne sceglie una nuova.' : ''}`,
+      conferma: 'Manda il link',
+    });
+    if (!ok) return;
     try {
-      const { email, password } = await tourLeaderApi.attivaAccesso(t.id);
-      setCredenzialiGenerate({ nomeCompleto: `${t.nome} ${t.cognome}`, email, password });
+      const esito = await tourLeaderApi.attivaAccesso(t.id);
+      if (esito.emailInviata) notifica(`Link per la password inviato a ${esito.email}.`, 'successo');
+      else {
+        notifica(`L'email a ${esito.email} non è partita: manda tu il link.`, 'errore');
+        setLinkNonInviato({ nomeCompleto, link: esito.link });
+      }
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: errore di rete.');
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     }
   }
 
@@ -151,7 +165,7 @@ export function TourLeaderScreen() {
             etichetta: 'Accesso scansione',
             render: (t) => (
               <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '4px 10px' }} onClick={() => attivaAccesso(t)}>
-                {t.passwordAttiva ? 'Rigenera credenziali' : 'Attiva accesso'}
+                {t.passwordAttiva ? 'Manda link per nuova password' : 'Manda link per la password'}
               </button>
             ),
           },
@@ -159,15 +173,12 @@ export function TourLeaderScreen() {
         onElimina={elimina}
       />
 
-      {credenzialiGenerate && (
-        <Modale titolo={`Credenziali per ${credenzialiGenerate.nomeCompleto}`} onClose={() => setCredenzialiGenerate(null)}>
+      {linkNonInviato && (
+        <Modale titolo={`Link per ${linkNonInviato.nomeCompleto}`} onClose={() => setLinkNonInviato(null)}>
           <p className="testo-intro" style={{ marginBottom: 16 }}>
-            Comunicale tu stesso (via messaggio/email) — non verranno mostrate di nuovo: solo di generarne di nuove,
-            se le perdi.
+            L'email non è partita: manda tu questo link (per messaggio). Serve a scegliere la password ed è valido 72 ore.
           </p>
-          <CampoCopiabile etichetta="Pagina di accesso" valore={`${window.location.origin}/scansione/accedi`} link />
-          <CampoCopiabile etichetta="Email" valore={credenzialiGenerate.email} />
-          <CampoCopiabile etichetta="Password" valore={credenzialiGenerate.password} />
+          <CampoCopiabile etichetta="Link per scegliere la password" valore={linkNonInviato.link} link />
         </Modale>
       )}
     </div>

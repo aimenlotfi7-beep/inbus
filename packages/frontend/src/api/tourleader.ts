@@ -28,7 +28,8 @@ export const tourLeaderApi = {
   update: (id: string, input: Partial<Pick<TourLeader, 'stato' | 'note'>>) =>
     api.put<TourLeader>(`/api/tour-leader/${id}`, input),
   remove: (id: string) => api.delete<void>(`/api/tour-leader/${id}`),
-  attivaAccesso: (id: string) => api.post<{ email: string; password: string }>(`/api/tour-leader-auth/${id}/attiva-accesso`),
+  /** Manda al tour leader l'email con il link per scegliere la password. */
+  attivaAccesso: (id: string) => api.post<{ email: string; emailInviata: boolean; link: string }>(`/api/tour-leader-auth/${id}/attiva-accesso`),
 
   // Pubblico: il form di autocandidatura, nessun login richiesto
   candidatura: (input: CandidaturaInput) => api.post<TourLeader>('/api/tour-leader/candidatura', input),

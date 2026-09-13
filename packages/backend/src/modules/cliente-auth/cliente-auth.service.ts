@@ -209,9 +209,9 @@ export const clienteAuthService = {
    *  serve solo quando ancora non c'è). Se il cliente non imposta mai
    *  la password, i suoi ordini restano comunque intatti e raggiungibili
    *  con "traccia la tua prenotazione" — non è un passaggio bloccante. */
-  async invitaAImpostarePassword(utenteId: string) {
+  async invitaAImpostarePassword(utenteId: string): Promise<boolean> {
     const [u] = await db.select().from(utenti).where(eq(utenti.id, utenteId)).limit(1);
-    if (!u) return;
+    if (!u) return false;
 
     const token = generaToken();
     const scadenza = new Date(Date.now() + ORE_VALIDITA_TOKEN_VERIFICA * 60 * 60 * 1000);
@@ -222,7 +222,8 @@ export const clienteAuthService = {
     const { oggetto, html } = await templateEmailService.renderizza('benvenuto_ospite', {
       nome: u.nome ?? '', link, ore_validita: String(ORE_VALIDITA_TOKEN_VERIFICA),
     });
-    await inviaEmail({ a: u.email, oggetto, html });
+    const { inviata } = await inviaEmail({ a: u.email, oggetto, html });
+    return inviata;
   },
 
   /** Rimanda l'email di verifica — utile se il cliente non la trova più
@@ -263,7 +264,10 @@ export const clienteAuthService = {
       throw new NonAutorizzato('Link scaduto o non valido — richiedine uno nuovo.');
     }
     const passwordHash = await bcrypt.hash(nuovaPassword, 10);
-    await db.update(utenti).set({ passwordHash, tokenResetPassword: null, tokenResetPasswordScadenza: null }).where(eq(utenti.id, u.id));
+    // Il link è arrivato nella sua casella: l'email è confermata. Senza,
+    // chi comprava da ospite impostava la password e poi al login si
+    // sentiva dire "devi prima confermare la tua email".
+    await db.update(utenti).set({ passwordHash, emailVerificata: true, tokenResetPassword: null, tokenResetPasswordScadenza: null }).where(eq(utenti.id, u.id));
   },
 
   emettiToken(utenteId: string, email: string) {

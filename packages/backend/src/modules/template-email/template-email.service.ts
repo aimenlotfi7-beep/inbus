@@ -61,13 +61,14 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
         <li><b>PNR:</b> {{pnr}}</li>
         <li><b>Partenza da:</b> {{fermata}} alle {{orario}}</li>
         <li><b>Passeggeri:</b> {{passeggeri}}</li>
-        <li><b>Totale:</b> €{{totale}} (acconto — il saldo va completato entro la scadenza indicata via email)</li>
+        <li><b>Acconto:</b> {{importo}}</li>
+        <li><b>Saldo da completare entro il:</b> {{scadenza}}</li>
       </ul>
       <p>Puoi completare il saldo in qualsiasi momento da <a href="{{link_saldo}}">questa pagina</a>, con già tutti i tuoi dati e la cifra da versare pronti.</p>
       <p>Dopo il saldo, il biglietto con il bus su cui viaggerai ti arriverà via email il giorno prima della partenza: da quel momento potrai scaricarlo anche dalla tua area personale.</p>
       <p>A presto!</p>
     `,
-    segnaposto: ['nome', 'pnr', 'fermata', 'orario', 'passeggeri', 'totale', 'evento', 'link_saldo'],
+    segnaposto: ['nome', 'pnr', 'fermata', 'orario', 'passeggeri', 'importo', 'scadenza', 'evento', 'link_saldo'],
   },
   {
     chiave: 'conferma_pagamento',
@@ -109,10 +110,10 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
     oggetto: 'Completa il saldo per {{evento}}',
     corpo: `
       <p>Ciao {{nome}},</p>
-      <p>La partenza per <b>{{evento}}</b> si avvicina: manca il saldo di <b>€{{differenza}}</b> sulla tua prenotazione <b>{{pnr}}</b>.</p>
+      <p>La partenza per <b>{{evento}}</b> si avvicina: manca il saldo di <b>{{importo}}</b> sulla tua prenotazione <b>{{pnr}}</b>, da completare entro il <b>{{scadenza}}</b>.</p>
       <p><a href="{{link}}">Completa il pagamento</a></p>
     `,
-    segnaposto: ['nome', 'evento', 'differenza', 'pnr', 'link'],
+    segnaposto: ['nome', 'evento', 'importo', 'scadenza', 'pnr', 'link'],
   },
   {
     chiave: 'lista_attesa_promossa',
@@ -120,7 +121,7 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
     oggetto: 'Ci sono posti per {{evento}}!',
     corpo: `
       <p>Ciao {{nome}},</p>
-      <p>Si sono liberati posti per <b>{{evento}}</b>. Completa la tua prenotazione entro le prossime ore, prima che si esauriscano di nuovo:</p>
+      <p>Si sono liberati posti per <b>{{evento}}</b>. Completa la tua prenotazione appena puoi: i posti vanno a chi prenota per primo.</p>
       <p><a href="{{link}}">Completa la prenotazione</a></p>
     `,
     segnaposto: ['nome', 'evento', 'link'],
@@ -238,6 +239,37 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
     segnaposto: ['nome', 'evento', 'data', 'tragitto', 'bus', 'link'],
   },
   {
+    chiave: 'invito_tour_leader',
+    nome: 'Invito al tour leader a scegliere la password (accesso alla scansione)',
+    oggetto: 'Il tuo accesso alla scansione OnWay',
+    corpo: `
+      <p>Ciao {{nome}},</p>
+      <p>Da oggi puoi accedere all'app di scansione dei biglietti OnWay. Scegli la tua password da qui:</p>
+      <p><a href="{{link}}">Scegli la password</a></p>
+      <p>Il link resta valido per {{ore_validita}} ore. Poi accedi con la tua email e la password scelta da <a href="{{link_accesso}}">{{link_accesso}}</a>.</p>
+    `,
+    segnaposto: ['nome', 'link', 'ore_validita', 'link_accesso'],
+  },
+  {
+    chiave: 'voucher',
+    nome: 'Voucher personale inviato al cliente',
+    oggetto: 'Il tuo voucher {{codice}}',
+    corpo: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+        <p>Ciao {{nome}},</p>
+        <p>Ti abbiamo riservato un voucher personale: usalo alla tua prossima prenotazione.</p>
+        <div style="background:#f6f1e7; border-radius:10px; padding:20px; text-align:center; margin:20px 0;">
+          <p style="font-size:12px; color:#888; margin:0 0 6px; text-transform:uppercase; letter-spacing:1px;">Il tuo codice</p>
+          <p style="font-family:monospace; font-size:24px; font-weight:700; margin:0; letter-spacing:2px;">{{codice}}</p>
+        </div>
+        <p><b>Sconto:</b> {{sconto}}</p>
+        <p>{{scadenza}}</p>
+        <p style="color:#888; font-size:13px;">Questo voucher è personale, associato alla tua email: non condividerlo, non sarebbe valido per nessun altro.</p>
+      </div>
+    `,
+    segnaposto: ['nome', 'codice', 'sconto', 'scadenza'],
+  },
+  {
     chiave: 'prenotazione_cancellata',
     nome: "Prenotazione cancellata dall'organizzazione",
     oggetto: 'La tua prenotazione è stata cancellata — {{evento}}',
@@ -312,6 +344,40 @@ const VECCHIO_CORPO_CONFERMA_ACCONTO_BIGLIETTO_A_SALDO = `
       <p>Puoi completare il saldo in qualsiasi momento da <a href="{{link_saldo}}">questa pagina</a>, con già tutti i tuoi dati e la cifra da versare pronti.</p>
       <p>A presto!</p>
     `;
+/** Testi di base di prima che le email scrivessero la scadenza del saldo e
+ *  l'importo come "96,00 €" (settembre 2026). */
+const VECCHIO_CORPO_CONFERMA_ACCONTO_SENZA_SCADENZA = `
+      <p>Ciao {{nome}},</p>
+      <p>La tua prenotazione è confermata! Ecco i dettagli:</p>
+      <ul>
+        <li><b>PNR:</b> {{pnr}}</li>
+        <li><b>Partenza da:</b> {{fermata}} alle {{orario}}</li>
+        <li><b>Passeggeri:</b> {{passeggeri}}</li>
+        <li><b>Totale:</b> €{{totale}} (acconto — il saldo va completato entro la scadenza indicata via email)</li>
+      </ul>
+      <p>Puoi completare il saldo in qualsiasi momento da <a href="{{link_saldo}}">questa pagina</a>, con già tutti i tuoi dati e la cifra da versare pronti.</p>
+      <p>Dopo il saldo, il biglietto con il bus su cui viaggerai ti arriverà via email il giorno prima della partenza: da quel momento potrai scaricarlo anche dalla tua area personale.</p>
+      <p>A presto!</p>
+    `;
+const VECCHIO_CORPO_PROMEMORIA_SALDO = `
+      <p>Ciao {{nome}},</p>
+      <p>La partenza per <b>{{evento}}</b> si avvicina: manca il saldo di <b>€{{differenza}}</b> sulla tua prenotazione <b>{{pnr}}</b>.</p>
+      <p><a href="{{link}}">Completa il pagamento</a></p>
+    `;
+/** I testi scritti dalla migrazione 0056 (una riga, senza spazi), rimasti
+ *  sul database dove nessuno li ha modificati: neanche questi dicevano la
+ *  scadenza del saldo. */
+const SEED_OGGETTO_CONFERMA_ACCONTO = 'Prenotazione confermata — PNR {{pnr}}';
+const SEED_CORPO_CONFERMA_ACCONTO = '<p>Ciao {{nome}},</p><p>La tua prenotazione per <strong>{{evento}}</strong> è confermata.</p><p>PNR: <strong>{{pnr}}</strong><br>Fermata: {{fermata}}, ore {{orario}}<br>Passeggeri: {{passeggeri}}<br>Totale: {{totale}} €</p><p>Puoi saldare il resto quando vuoi da qui: <a href="{{link_saldo}}">{{link_saldo}}</a></p>';
+const SEED_OGGETTO_PROMEMORIA_SALDO = 'Ricordati di saldare la tua prenotazione';
+const SEED_CORPO_PROMEMORIA_SALDO = '<p>Ciao {{nome}},</p><p>Ti ricordiamo che manca il saldo per <strong>{{evento}}</strong> (PNR {{pnr}}) — restano {{differenza}} € da pagare.</p><p>Puoi saldare da qui: <a href="{{link}}">{{link}}</a></p>';
+
+/** Prometteva una scadenza ("entro le prossime ore") che il link non ha. */
+const VECCHIO_CORPO_LISTA_ATTESA_PROMOSSA = `
+      <p>Ciao {{nome}},</p>
+      <p>Si sono liberati posti per <b>{{evento}}</b>. Completa la tua prenotazione entro le prossime ore, prima che si esauriscano di nuovo:</p>
+      <p><a href="{{link}}">Completa la prenotazione</a></p>
+    `;
 const VECCHIO_OGGETTO_TICKET = 'Il tuo biglietto — PNR {{pnr}}';
 const VECCHIO_CORPO_TICKET = `
       <p>Ciao,</p>
@@ -333,6 +399,11 @@ const VECCHIO_CORPO_BUNDLE_CONFERMA = `
 const AGGIORNAMENTI_TESTO_BASE: { chiave: string; vecchioOggetto?: string; vecchioCorpo: string }[] = [
   { chiave: 'conferma_acconto', vecchioCorpo: VECCHIO_CORPO_CONFERMA_ACCONTO },
   { chiave: 'conferma_acconto', vecchioCorpo: VECCHIO_CORPO_CONFERMA_ACCONTO_BIGLIETTO_A_SALDO },
+  { chiave: 'conferma_acconto', vecchioCorpo: VECCHIO_CORPO_CONFERMA_ACCONTO_SENZA_SCADENZA },
+  { chiave: 'promemoria_saldo', vecchioCorpo: VECCHIO_CORPO_PROMEMORIA_SALDO },
+  { chiave: 'conferma_acconto', vecchioOggetto: SEED_OGGETTO_CONFERMA_ACCONTO, vecchioCorpo: SEED_CORPO_CONFERMA_ACCONTO },
+  { chiave: 'promemoria_saldo', vecchioOggetto: SEED_OGGETTO_PROMEMORIA_SALDO, vecchioCorpo: SEED_CORPO_PROMEMORIA_SALDO },
+  { chiave: 'lista_attesa_promossa', vecchioCorpo: VECCHIO_CORPO_LISTA_ATTESA_PROMOSSA },
   { chiave: 'preventivo_non_scelto', vecchioOggetto: VECCHIO_OGGETTO_PREVENTIVO_NON_SCELTO, vecchioCorpo: VECCHIO_CORPO_PREVENTIVO_NON_SCELTO },
   { chiave: 'ticket', vecchioOggetto: VECCHIO_OGGETTO_TICKET, vecchioCorpo: VECCHIO_CORPO_TICKET },
   { chiave: 'bundle_conferma', vecchioCorpo: VECCHIO_CORPO_BUNDLE_CONFERMA },

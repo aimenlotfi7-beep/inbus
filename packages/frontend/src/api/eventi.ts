@@ -188,14 +188,17 @@ export const eventiApi = {
   creaLinea: (id: string, input: LineaInput) => api.post<EsitoCreaLinea>(`/api/eventi/${id}/linee`, input),
   aggiungiBusALinea: (lineaId: string, input: BusDiLineaInput) =>
     api.post<{ id: string; tourLeaderAvvisato: boolean | null }>(`/api/eventi/linee/${lineaId}/bus`, input),
-  aggiornaPercorsoLinea: (eventoId: string, lineaId: string, fermateIds: string[]) => api.put<{ ok: true }>(`/api/eventi/${eventoId}/linee/${lineaId}/percorso`, { fermateIds }),
+  aggiornaPercorsoLinea: (eventoId: string, lineaId: string, fermateIds: string[]) => api.put<{ ok: true } & EsitoAvvisiClienti>(`/api/eventi/${eventoId}/linee/${lineaId}/percorso`, { fermateIds }),
+  /** Chi verrebbe avvisato: con fermateIds cambiando il percorso, senza eliminando la linea. */
+  anteprimaModificaLinea: (lineaId: string, fermateIds?: string[]) =>
+    api.post<AnteprimaVariazioniTragitto>(`/api/eventi/linee/${lineaId}/anteprima-modifica`, fermateIds ? { fermateIds } : {}),
   aggiornaBusDiLinea: (busId: string, input: Partial<BusDiLineaInput>) =>
     api.put<{ ok: true; tourLeaderAvvisato: boolean | null }>(`/api/eventi/linee/bus/${busId}`, input),
   listaLinee: (tragittoId: string) => api.get<Linea[]>(`/api/eventi/tragitti/${tragittoId}/linee`),
   // Elimina la linea e i suoi bus: i passeggeri assegnati tornano senza bus
   // e li riprende lo smistamento. 409 se i posti del tragitto scenderebbero
   // sotto quelli venduti.
-  eliminaLinea: (lineaId: string) => api.delete<{ ok: true }>(`/api/eventi/linee/${lineaId}`),
+  eliminaLinea: (lineaId: string) => api.delete<{ ok: true } & EsitoAvvisiClienti>(`/api/eventi/linee/${lineaId}`),
   // Conferma una linea da confermare (creata in automatico): dati del primo
   // bus e fermate, come creaLinea. 409 se nel frattempo è sparita perché non
   // serviva più, o è già confermata.

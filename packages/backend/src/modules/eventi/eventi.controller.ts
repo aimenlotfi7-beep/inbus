@@ -112,9 +112,14 @@ export const eventiController = {
     res.status(201).json({ id: busId, tourLeaderAvvisato });
   },
   async aggiornaPercorsoLinea(req: Request, res: Response) {
-    await eventiService.aggiornaPercorsoLinea(req.params.id, req.params.lineaId, req.body.fermateIds);
+    const avvisi = await eventiService.aggiornaPercorsoLinea(req.params.id, req.params.lineaId, req.body.fermateIds);
     await smistamentoService.smistaSubitoPerLinea(req.params.lineaId);
-    res.json({ ok: true });
+    res.json({ ok: true, ...avvisi });
+  },
+  /** Chi verrebbe avvisato cambiando il percorso (body.fermateIds) o eliminando la linea (senza fermateIds). */
+  async anteprimaModificaLinea(req: Request, res: Response) {
+    const fermateIds = Array.isArray(req.body?.fermateIds) ? (req.body.fermateIds as unknown[]).filter((x): x is string => typeof x === 'string') : null;
+    res.json(await eventiService.anteprimaModificaLinea(req.params.lineaId, fermateIds));
   },
   async aggiornaBusDiLinea(req: Request, res: Response) {
     const { tourLeaderAvvisato } = await eventiService.aggiornaBusDiLinea(req.params.busId, req.body);
@@ -128,9 +133,9 @@ export const eventiController = {
   /** Elimina la linea e i suoi bus: i passeggeri assegnati tornano senza
    *  bus e li riprende lo smistamento automatico. */
   async eliminaLinea(req: Request, res: Response) {
-    const { tragittoId } = await eventiService.eliminaLinea(req.params.lineaId);
+    const { tragittoId, clientiAvvisati, emailNonInviate } = await eventiService.eliminaLinea(req.params.lineaId);
     await lineeDaConfermareService.allineaSubito(tragittoId);
-    res.json({ ok: true });
+    res.json({ ok: true, clientiAvvisati, emailNonInviate });
   },
   /** Come verrebbero riempiti i bus del tragitto, senza scritture. */
   async anteprimaSmistamento(req: Request, res: Response) {

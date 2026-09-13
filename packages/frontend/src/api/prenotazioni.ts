@@ -22,6 +22,13 @@ export interface CreaPrenotazionePayload {
   partecipanti: { nome: string; cognome: string }[];
 }
 
+/** Esito di un ordine: quante email di conferma non sono partite (il sito lo dice). */
+export interface EsitoOrdine {
+  ordine: { id: string; totale: string };
+  prenotazioni: Prenotazione[];
+  emailConfermaNonInviate: number;
+}
+
 export interface DifferenzaSaldo {
   pnr: string;
   eventoId: string;
@@ -46,15 +53,15 @@ export const prenotazioniApi = {
    *  articolo ha la stessa forma di una prenotazione singola (il
    *  server la ricalcola e la valida esattamente allo stesso modo). */
   creaOrdine: (articoli: CreaPrenotazionePayload[], bundleId?: string) =>
-    apiConToken('inbus_cliente_token').post<{ ordine: { id: string; totale: string }; prenotazioni: Prenotazione[] }>('/api/prenotazioni/ordine', { articoli, ...(bundleId && { bundleId }) }),
+    apiConToken('inbus_cliente_token').post<EsitoOrdine>('/api/prenotazioni/ordine', { articoli, ...(bundleId && { bundleId }) }),
   /** D1(b) — stesso ordine di creaOrdine sopra, ma senza sessione: chi
    *  acquista fornisce la propria identità nel corpo della richiesta
    *  invece che nel token. Il server crea/riusa l'account "implicito"
    *  da solo. */
   creaOrdineOspite: (input: { email: string; nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: string; articoli: CreaPrenotazionePayload[]; bundleId?: string }) =>
-    api.post<{ ordine: { id: string; totale: string }; prenotazioni: Prenotazione[] }>('/api/prenotazioni/ordine-ospite', input),
+    api.post<EsitoOrdine & { invitoPasswordInviato: boolean }>('/api/prenotazioni/ordine-ospite', input),
   getSaldo: (pnr: string, email: string) => api.get<DifferenzaSaldo>(`/api/prenotazioni/${pnr}/saldo?email=${encodeURIComponent(email)}`),
-  saldaResto: (pnr: string, email: string, couponCodice?: string) => api.post<Prenotazione>(`/api/prenotazioni/${pnr}/salda`, { email, ...(couponCodice && { couponCodice }) }),
+  saldaResto: (pnr: string, email: string, couponCodice?: string) => api.post<Prenotazione & { emailConfermaInviata?: boolean }>(`/api/prenotazioni/${pnr}/salda`, { email, ...(couponCodice && { couponCodice }) }),
   dettaglioPerCliente: (pnr: string, email: string) =>
     api.get<DettaglioPrenotazione>(`/api/prenotazioni/${pnr}/dettaglio-cliente?email=${encodeURIComponent(email)}`),
 };

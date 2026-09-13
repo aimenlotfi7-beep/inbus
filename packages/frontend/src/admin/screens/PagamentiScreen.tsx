@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { notifica } from '../shared/notifiche';
+import { motivoErrore } from '../shared/errori';
 import { prenotazioniAdminApi, type PrenotazioneRiga, type EventoConPrenotazioni } from '../../api/prenotazioniAdmin';
 import { PanelHead } from '../shared/PanelHead';
 import { Modale } from '../shared/Modale';
@@ -35,9 +36,10 @@ export function PagamentiScreen() {
     setInviandoSollecito(pnr);
     try {
       const { inviata } = await prenotazioniAdminApi.inviaSollecito(pnr);
-      notifica(inviata ? `Sollecito inviato per ${pnr}.` : `Non è stato possibile inviare l'email per ${pnr} (controlla la configurazione email).`);
+      if (inviata) notifica(`Sollecito inviato per ${pnr}.`, 'successo');
+      else notifica(`L'email di sollecito per ${pnr} non è partita: avvisa tu il cliente.`, 'errore');
     } catch (e) {
-      notifica(e instanceof Error ? e.message : 'Invio non riuscito.');
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     } finally {
       setInviandoSollecito(null);
     }

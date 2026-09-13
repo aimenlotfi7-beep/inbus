@@ -62,5 +62,7 @@ export const listaAttesaApi = {
   contaInAttesaPerEvento: () => api.get<Record<string, number>>('/api/lista-attesa/allerte-per-evento'),
   contaPerEventoEStato: () => api.get<Record<string, { inAttesa: number; promosse: number }>>('/api/lista-attesa/conta-per-evento-e-stato'),
   promuovi: (id: string) => api.post<{ ok: true; emailInviata: boolean; link: string }>(`/api/lista-attesa/${id}/promuovi`),
-  promuoviTutte: (eventoId: string) => api.post<{ promosse: number; fallite: number }>(`/api/lista-attesa/evento/${eventoId}/promuovi-tutte`),
+  /** Solo le iscrizioni indicate (quelle che si stanno guardando). */
+  promuoviTutte: (eventoId: string, ids: string[]) =>
+    api.post<{ promosse: number; emailNonInviate: number; fallite: number }>(`/api/lista-attesa/evento/${eventoId}/promuovi-tutte`, { ids }),
 };

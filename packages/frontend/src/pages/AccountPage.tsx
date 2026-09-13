@@ -454,7 +454,7 @@ function SezioneListaAttesa({ email }: { email: string }) {
       {iscrizioni?.length === 0 && (
         <div className="stato-vuoto">
           <h2>Non sei in lista d'attesa</h2>
-          <p>Quando un evento è esaurito puoi metterti in lista: ti avvisiamo appena si libera un posto.</p>
+          <p>Quando un evento è esaurito puoi metterti in lista: se si liberano posti ti scriviamo via email.</p>
           <Link className="btn btn-primary" to="/">Guarda gli eventi</Link>
         </div>
       )}
@@ -718,7 +718,7 @@ function SezioneChat({ email }: { email: string }) {
   return (
     <section className="acc-sezione">
       <h1>Messaggi</h1>
-      <p className="testo-intro">Scrivi allo staff OnWay: rispondiamo qui e ti avvisiamo via email.</p>
+      <p className="testo-intro">Scrivi allo staff OnWay: la risposta arriva qui, in questa pagina.</p>
 
       <div className="acc-chat-box">
         {!attiva && (

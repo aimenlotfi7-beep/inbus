@@ -49,15 +49,17 @@ export const prenotazioniController = {
 
     const risultato = await prenotazioniService.creaOrdine(articoli, utenteId, bundleId, undefined, { ip: req.ip, userAgent: req.headers['user-agent'] });
 
+    // Solo per un account nuovo: un'email a parte con il link per la password.
+    let invitoPasswordInviato = false;
     if (nuovo) {
       try {
-        await clienteAuthService.invitaAImpostarePassword(utenteId);
+        invitoPasswordInviato = await clienteAuthService.invitaAImpostarePassword(utenteId);
       } catch (err) {
         console.error(`Invito a impostare password fallito per ${email} (ordine comunque creato):`, err);
       }
     }
 
-    res.status(201).json(risultato);
+    res.status(201).json({ ...risultato, invitoPasswordInviato });
   },
   async dettaglioPerCliente(req: Request, res: Response) {
     res.json(await prenotazioniService.dettaglioPerCliente(req.params.pnr, String(req.query.email)));

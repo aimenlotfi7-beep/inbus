@@ -68,8 +68,9 @@ export interface EsitoRichiestaPreventivi {
 
 export interface EsitoAccettazione {
   ok: boolean;
-  // Email "preventivo scelto" partita al fornitore accettato.
-  fornitoreAvvisato: boolean;
+  // Email "preventivo scelto" partita al fornitore accettato. null: nessuna
+  // email da mandare (lo stesso fornitore era già stato scelto).
+  fornitoreAvvisato: boolean | null;
   // Email "non scelto" partite (solo a chi ha risposto e non era ancora stato avvisato).
   nonSceltiAvvisati: number;
 }

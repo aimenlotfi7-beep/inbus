@@ -260,11 +260,11 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
       const esito = await preventiviApi.accetta(r.risposta.id);
       const testo = [
         `Preventivo di ${r.fornitore.nome} accettato.`,
-        esito.fornitoreAvvisato ? 'Il fornitore è stato avvisato via email.' : "L'email al fornitore non è partita.",
+        esito.fornitoreAvvisato === null ? 'Il fornitore era già stato scelto: nessuna nuova email.' : esito.fornitoreAvvisato ? 'Il fornitore è stato avvisato via email.' : "L'email al fornitore non è partita.",
         esito.nonSceltiAvvisati ? `${plurale(esito.nonSceltiAvvisati, 'fornitore non scelto è stato avvisato', 'fornitori non scelti sono stati avvisati')}.` : '',
         'Ora calcola i prezzi di vendita in Prezzi.',
       ].filter(Boolean).join(' ');
-      notifica(testo, esito.fornitoreAvvisato ? 'successo' : 'errore');
+      notifica(testo, esito.fornitoreAvvisato === false ? 'errore' : 'successo');
       caricaRisposte();
       onCambiato();
     } catch (e) {

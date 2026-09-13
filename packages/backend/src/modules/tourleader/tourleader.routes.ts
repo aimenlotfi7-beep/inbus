@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { tourLeader } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
+import { senzaSegreti } from '../../shared/segreti.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
@@ -28,12 +29,11 @@ const creaAmministrativoSchema = candidaturaSchema.extend({
   stato: z.enum(['CANDIDATO', 'ATTIVO', 'ARCHIVIATO']).optional(),
 });
 
-/** Non restituisce mai l'hash della password al frontend (anche se
- *  cifrato, non deve uscire dal server) — solo se ne esiste una
- *  impostata o no, per mostrare "Attiva accesso" o "Rigenera". */
+/** Mai hash della password né token di reset (con il link di invito o
+ *  reset si prende l'account) — solo se una password è impostata. */
 function senzaPassword<T extends { passwordHash: string | null }>(riga: T) {
-  const { passwordHash, ...resto } = riga;
-  return { ...resto, passwordAttiva: passwordHash !== null };
+  const { passwordImpostata, ...resto } = senzaSegreti(riga);
+  return { ...resto, passwordAttiva: passwordImpostata ?? false };
 }
 
 async function getById(id: string) {

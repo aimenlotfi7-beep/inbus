@@ -403,17 +403,30 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   }
 
   async function eliminaLinea(linea: Linea) {
-    const ok = await conferma({
-      titolo: `Eliminare ${linea.nome}?`,
-      testo: <>{linea.bus.length === 0 ? 'Viene tolta la linea, che non ha bus.' : `Vengono tolti la linea e ${linea.bus.length === 1 ? 'il suo bus' : `i suoi ${linea.bus.length} bus`}.`} I passeggeri già assegnati tornano in attesa e verranno smistati di nuovo sulle altre linee.</>,
-      conferma: 'Elimina linea',
-      pericolosa: true,
-    });
-    if (!ok) return;
+    // Chi ha prenotato su una fermata esclusa coperta solo da questa linea
+    // resterebbe senza bus: prima si vede chi riceverà l'avviso.
+    let avvisi: Awaited<ReturnType<typeof eventiApi.anteprimaModificaLinea>>;
     try {
-      await eventiApi.eliminaLinea(linea.id);
+      avvisi = await eventiApi.anteprimaModificaLinea(linea.id);
+    } catch (e) {
+      notifica(`Impossibile controllare quali clienti verrebbero avvisati: ${motivoErrore(e)}`, 'errore');
+      return;
+    }
+    if (avvisi.clientiTotali > 0) {
+      if (!(await confermaAvvisiClienti(avvisi, 'Elimina e avvisa i clienti'))) return;
+    } else {
+      const ok = await conferma({
+        titolo: `Eliminare ${linea.nome}?`,
+        testo: <>{linea.bus.length === 0 ? 'Viene tolta la linea, che non ha bus.' : `Vengono tolti la linea e ${linea.bus.length === 1 ? 'il suo bus' : `i suoi ${linea.bus.length} bus`}.`} I passeggeri già assegnati tornano in attesa e verranno smistati di nuovo sulle altre linee.</>,
+        conferma: 'Elimina linea',
+        pericolosa: true,
+      });
+      if (!ok) return;
+    }
+    try {
+      const esito = await eventiApi.eliminaLinea(linea.id);
       chiudiPannello();
-      notifica(`${linea.nome} eliminata.`, 'successo');
+      notificaEsitoAvvisi(`${linea.nome} eliminata`, esito);
       aggiornaDopoModifica();
     } catch (e) {
       notifica(`Eliminazione non riuscita: ${motivoErrore(e)}`, 'errore');
@@ -431,9 +444,12 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     }
     setSalvando(true);
     try {
-      await eventiApi.aggiornaPercorsoLinea(idEvento, lineaId, percorsoModificato);
+      // Una fermata esclusa tolta dal percorso resterebbe senza bus: prima si vede chi verrà avvisato.
+      const avvisi = await eventiApi.anteprimaModificaLinea(lineaId, percorsoModificato);
+      if (avvisi.clientiTotali > 0 && !(await confermaAvvisiClienti(avvisi, 'Salva e avvisa i clienti'))) return;
+      const esito = await eventiApi.aggiornaPercorsoLinea(idEvento, lineaId, percorsoModificato);
       chiudiPannello();
-      notifica('Percorso della linea aggiornato.', 'successo');
+      notificaEsitoAvvisi('Percorso della linea aggiornato', esito);
       aggiornaDopoModifica();
     } catch (e) {
       notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');

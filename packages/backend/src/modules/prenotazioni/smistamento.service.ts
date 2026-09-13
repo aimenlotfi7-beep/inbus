@@ -2,6 +2,7 @@ import { and, asc, eq, gte, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { busFisici, eventi, fermate, lineaFermate, linee, prenotazioni, tragitti, utenti } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
+import { segnalaEmailNonPartita } from '../../shared/registroEmail.js';
 import { ticketService } from '../ticket/ticket.service.js';
 import { calcolaTempi, leggiOrariTragitto, primaPartenza, type Lettore, type OrariTragitto } from './partenza.js';
 
@@ -210,9 +211,10 @@ async function inviaBiglietti(assegnate: EsitoTragitto['assegnate']) {
     if (!p.saldoPagato) continue;
     try {
       const { inviata } = await ticketService.inviaBigliettoConBus(p.pnr);
-      if (!inviata) console.error(`[smistamento] biglietto con il bus non inviato (PNR ${p.pnr}).`);
+      if (!inviata) await segnalaEmailNonPartita('Biglietto con il bus', p.pnr, null);
     } catch (err) {
       console.error(`[smistamento] biglietto con il bus non inviato (PNR ${p.pnr}):`, err);
+      await segnalaEmailNonPartita('Biglietto con il bus', p.pnr, null);
     }
   }
 }

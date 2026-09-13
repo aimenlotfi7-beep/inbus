@@ -482,8 +482,8 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
       <div className="checkout-form checkout-esito" style={styleTema}>
         <h3>Sei in lista d'attesa</h3>
         <p>
-          Ti scriveremo a <b>{email}</b> appena si libera un posto per <b>{evento.artista}</b>, con un link per
-          completare subito la prenotazione.
+          Se si liberano posti per <b>{evento.artista}</b> ti scriviamo a <b>{email}</b>, con un link per
+          completare la prenotazione.
         </p>
         {onChiudi && <button type="button" className="btn btn-primary btn-block" onClick={onChiudi}>Chiudi</button>}
       </div>
@@ -585,13 +585,13 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
               {tutteEsaurite && (
                 <p className="avviso avviso-attenzione">
                   Al momento non ci sono posti disponibili. Puoi comunque lasciare i tuoi dati e iscriverti alla lista
-                  d'attesa: ti avvisiamo via email appena si libera un posto.
+                  d'attesa: se si liberano posti ti scriviamo via email.
                 </p>
               )}
               {!tutteEsaurite && fermataEsaurita && (
                 <p className="avviso avviso-attenzione">
                   I posti da questa fermata sono esauriti. Scegli un'altra fermata, oppure iscriviti alla lista d'attesa
-                  per questa: ti avvisiamo se si libera un posto qui.
+                  per questa: se si liberano posti qui ti scriviamo via email.
                 </p>
               )}
 

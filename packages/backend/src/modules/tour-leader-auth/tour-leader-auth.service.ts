@@ -9,6 +9,9 @@ import { NonAutorizzato, NonTrovato } from '../../shared/errors.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
 
 const ORE_VALIDITA_TOKEN_RESET = 2;
+/** L'invito a scegliere la password dura di più: il tour leader può
+ *  leggere l'email giorni dopo. */
+const ORE_VALIDITA_INVITO = 72;
 
 export interface TokenTourLeader {
   tipo: 'tour_leader'; // marcatore: impedisce che un token admin venga scambiato per uno tour leader e viceversa
@@ -39,20 +42,26 @@ export const tourLeaderAuthService = {
     }
   },
 
-  /** Genera una password casuale leggibile (per quando l'amministratore
-   *  attiva l'accesso a un tour leader) e la salva già con l'hash — la
-   *  password in chiaro viene restituita UNA volta sola, per essere
-   *  comunicata al tour leader (via email o a voce), non viene mai più
-   *  recuperabile dopo. */
+  /** Accesso alla scansione per un tour leader: un'email con il link per
+   *  scegliere la password (regola del progetto: mai password in chiaro,
+   *  nemmeno da mandare a mano). Il link vale ORE_VALIDITA_INVITO ore; una
+   *  password già scelta resta valida finché non la cambia. Se l'email non
+   *  parte, il gestionale mostra il link da mandare in altro modo. */
   async attivaAccesso(tourLeaderId: string) {
     const [tl] = await db.select().from(tourLeader).where(eq(tourLeader.id, tourLeaderId)).limit(1);
     if (!tl) throw new NonTrovato('Tour leader');
 
-    const passwordChiaro = crypto.randomBytes(6).toString('base64url'); // es. "aB3xQ9-kL"
-    const passwordHash = await bcrypt.hash(passwordChiaro, 10);
-    await db.update(tourLeader).set({ passwordHash }).where(eq(tourLeader.id, tourLeaderId));
+    const token = crypto.randomBytes(24).toString('hex');
+    const scadenza = new Date(Date.now() + ORE_VALIDITA_INVITO * 60 * 60 * 1000);
+    await db.update(tourLeader).set({ tokenResetPassword: token, tokenResetPasswordScadenza: scadenza }).where(eq(tourLeader.id, tourLeaderId));
 
-    return { email: tl.email, password: passwordChiaro };
+    const link = urlSito(`/scansione/reimposta-password/${token}`);
+    const { templateEmailService } = await import('../template-email/template-email.service.js');
+    const { oggetto, html } = await templateEmailService.renderizza('invito_tour_leader', {
+      nome: tl.nome, link, ore_validita: String(ORE_VALIDITA_INVITO), link_accesso: urlSito('/scansione/accedi'),
+    });
+    const { inviata } = await inviaEmail({ a: tl.email, oggetto, html });
+    return { email: tl.email, emailInviata: inviata, link };
   },
 
   async richiediResetPassword(email: string) {

@@ -1,4 +1,4 @@
-import { eq, and, desc, lt } from 'drizzle-orm';
+import { eq, and, desc, lt, inArray } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
 import { listaAttesa, eventi, fermate, tragitti, utenti } from '../../db/schema.js';
@@ -144,21 +144,26 @@ export const listaAttesaService = {
     return risultato;
   },
 
-  async promuoviTutte(eventoId: string) {
+  /** Promuove in blocco le iscrizioni ancora in attesa di un evento. `ids`:
+   *  solo queste (il gestionale manda quelle del servizio che si sta
+   *  guardando); prima "Promuovi tutte (3)" promuoveva tutto l'evento. */
+  async promuoviTutte(eventoId: string, ids?: string[]) {
     const righe = await db.select().from(listaAttesa)
-      .where(and(eq(listaAttesa.eventoId, eventoId), eq(listaAttesa.stato, 'IN_ATTESA')));
+      .where(and(eq(listaAttesa.eventoId, eventoId), eq(listaAttesa.stato, 'IN_ATTESA'), ids ? inArray(listaAttesa.id, ids.length ? ids : ['']) : undefined));
 
     let promosse = 0;
+    let emailNonInviate = 0;
     let fallite = 0;
     for (const riga of righe) {
       try {
-        await this.promuovi(riga.id);
+        const { emailInviata } = await this.promuovi(riga.id);
         promosse++;
+        if (!emailInviata) emailNonInviate++;
       } catch {
         fallite++;
       }
     }
-    return { promosse, fallite };
+    return { promosse, emailNonInviate, fallite };
   },
 
   async getByToken(token: string) {

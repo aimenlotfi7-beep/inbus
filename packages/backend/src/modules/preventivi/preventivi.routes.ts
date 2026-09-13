@@ -337,7 +337,8 @@ export const preventiviService = {
     const [richiesta] = await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.id, risposta.richiestaId)).limit(1);
     if (!richiesta) throw new NonTrovato('Richiesta preventivo');
     const { tragitto, evento } = await tragittoConEvento(richiesta.tragittoId);
-    const nessunAvviso = { ok: true as const, fornitoreAvvisato: false, nonSceltiAvvisati: 0 };
+    // null = nessuna email da mandare (fornitore già scelto): non è un errore.
+    const nessunAvviso = { ok: true as const, fornitoreAvvisato: null, nonSceltiAvvisati: 0 };
 
     // Idempotente: riaccettare la risposta già accettata (doppio click,
     // pagina non aggiornata) non manda email. Il percorso del preventivo si

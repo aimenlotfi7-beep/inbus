@@ -125,22 +125,28 @@ function condizioniPrenotazioniToccate(tragittoId: string, citta: string | null)
   return condizioni;
 }
 
-/** Anteprima (nessuna scrittura): per ogni variazione, quante email
- *  partirebbero. */
+/** Anteprima (nessuna scrittura): per ogni variazione quante prenotazioni
+ *  tocca, e quali prenotazioni in tutto (una prenotazione toccata da più
+ *  variazioni riceve una email sola: il totale conta le persone, non le voci). */
 export async function anteprimaComunicazioni(
   tragittoId: string,
   variazioniRilevate: VariazioneRilevata[]
-): Promise<{ fermata: string; descrizione: string; clienti: number }[]> {
-  const righe: { fermata: string; descrizione: string; clienti: number }[] = [];
+): Promise<{ fermata: string; descrizione: string; clienti: number; prenotazioniIds: string[] }[]> {
+  const righe: { fermata: string; descrizione: string; clienti: number; prenotazioniIds: string[] }[] = [];
   for (const v of variazioniRilevate) {
     const citta = v.fermataVecchia?.citta ?? null;
-    const [conteggio] = await db.select({ n: sql<number>`count(*)::int` })
+    const toccate = await db.select({ id: prenotazioni.id })
       .from(prenotazioni)
       .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
       .where(and(...condizioniPrenotazioniToccate(tragittoId, citta)));
-    righe.push({ fermata: citta ?? '', descrizione: v.descrizione, clienti: Number(conteggio?.n ?? 0) });
+    righe.push({ fermata: citta ?? '', descrizione: v.descrizione, clienti: toccate.length, prenotazioniIds: toccate.map((p) => p.id) });
   }
   return righe;
+}
+
+/** Quante email partirebbero davvero: una per prenotazione toccata. */
+export function clientiUnici(righe: { prenotazioniIds: string[] }[]): number {
+  return new Set(righe.flatMap((r) => r.prenotazioniIds)).size;
 }
 
 /** Per ogni variazione, trova le prenotazioni confermate toccate, crea
@@ -163,6 +169,11 @@ export async function generaComunicazioniVariazione(
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, tragitto.eventoId)).limit(1);
     if (!evento) return esito;
 
+    // Prima si registrano le variazioni (una riga per voce, per il
+    // gestionale) e le risposte attese; poi UNA email per prenotazione con
+    // tutte le sue voci e un solo link. Prima più modifiche nello stesso
+    // salvataggio mandavano più email e più link di rimborso alla stessa persona.
+    const perPrenotazione = new Map<string, { pnr: string; email: string; nome: string | null; descrizioni: string[]; token: string }>();
     for (const v of variazioniRilevate) {
       try {
         const citta = v.fermataVecchia?.citta ?? null;
@@ -178,27 +189,33 @@ export async function generaComunicazioniVariazione(
         }).returning();
 
         for (const { prenotazione: p, clienteEmail, clienteNome } of prenotazioniToccate) {
-          esito.clientiAvvisati++;
-          try {
-            const token = randomUUID();
-            await db.insert(variazioniRisposte).values({ variazioneId: nuovaVariazione.id, prenotazioneId: p.id, token });
-            const link = urlSito(`/variazione/${token}`);
-            const { oggetto, html } = await templateEmailService.renderizza('variazione_viaggio', {
-              nome: clienteNome ?? '',
-              evento: evento.artista,
-              pnr: p.pnr,
-              descrizione: v.descrizione,
-              link,
-            });
-            const { inviata } = await inviaEmail({ a: clienteEmail, oggetto, html });
-            if (!inviata) esito.emailNonInviate++;
-          } catch (err) {
-            esito.emailNonInviate++;
-            console.error(`[variazioni] avviso al cliente ${clienteEmail} (PNR ${p.pnr}) non riuscito:`, err);
-          }
+          const token = randomUUID();
+          await db.insert(variazioniRisposte).values({ variazioneId: nuovaVariazione.id, prenotazioneId: p.id, token });
+          const voce = perPrenotazione.get(p.id);
+          if (voce) voce.descrizioni.push(v.descrizione);
+          else perPrenotazione.set(p.id, { pnr: p.pnr, email: clienteEmail, nome: clienteNome, descrizioni: [v.descrizione], token });
         }
       } catch (err) {
-        console.error(`[variazioni] comunicazione della variazione "${v.descrizione}" (tragitto ${tragittoId}) non riuscita:`, err);
+        console.error(`[variazioni] registrazione della variazione "${v.descrizione}" (tragitto ${tragittoId}) non riuscita:`, err);
+      }
+    }
+
+    for (const c of perPrenotazione.values()) {
+      esito.clientiAvvisati++;
+      try {
+        // Il link vale per tutte le voci della prenotazione (rispondiVariazione).
+        const { oggetto, html } = await templateEmailService.renderizza('variazione_viaggio', {
+          nome: c.nome ?? '',
+          evento: evento.artista,
+          pnr: c.pnr,
+          descrizione: c.descrizioni.join(' '),
+          link: urlSito(`/variazione/${c.token}`),
+        });
+        const { inviata } = await inviaEmail({ a: c.email, oggetto, html });
+        if (!inviata) esito.emailNonInviate++;
+      } catch (err) {
+        esito.emailNonInviate++;
+        console.error(`[variazioni] avviso al cliente ${c.email} (PNR ${c.pnr}) non riuscito:`, err);
       }
     }
   } catch (err) {
@@ -247,7 +264,12 @@ export async function infoRispostaVariazione(token: string) {
   const [v] = await db.select().from(variazioni).where(eq(variazioni.id, riga.variazioneId)).limit(1);
   const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, riga.prenotazioneId)).limit(1);
   if (!v || !p) throw new NonTrovato('Variazione');
-  return { descrizione: v.descrizione, pnr: p.pnr, giaRisposto: riga.risposta };
+  // Le altre variazioni della stessa prenotazione ancora senza risposta: il
+  // link vale per tutte (una email sola per salvataggio).
+  const altre = riga.risposta ? [] : await db.select({ descrizione: variazioni.descrizione }).from(variazioniRisposte)
+    .innerJoin(variazioni, eq(variazioni.id, variazioniRisposte.variazioneId))
+    .where(and(eq(variazioniRisposte.prenotazioneId, riga.prenotazioneId), isNull(variazioniRisposte.risposta), sql`${variazioniRisposte.id} <> ${riga.id}`));
+  return { descrizione: [v.descrizione, ...altre.map((a) => a.descrizione)].join(' '), pnr: p.pnr, giaRisposto: riga.risposta };
 }
 
 export async function rispondiVariazione(token: string, risposta: 'ACCETTATA' | 'RIMBORSO_RICHIESTO') {
@@ -263,6 +285,14 @@ export async function rispondiVariazione(token: string, risposta: 'ACCETTATA' | 
     .where(and(eq(variazioniRisposte.id, riga.id), isNull(variazioniRisposte.risposta)))
     .returning();
   if (!rigaAggiornata) return; // già risposto una volta, non si sovrascrive (comportamento invariato, solo ora davvero senza corsa)
+
+  // La stessa risposta vale per le altre variazioni della prenotazione ancora
+  // senza risposta: il cliente ha ricevuto una email sola con tutte.
+  const altre = await db.update(variazioniRisposte)
+    .set({ risposta, rispostoIl: new Date() })
+    .where(and(eq(variazioniRisposte.prenotazioneId, riga.prenotazioneId), isNull(variazioniRisposte.risposta)))
+    .returning({ variazioneId: variazioniRisposte.variazioneId });
+  const variazioniToccate = [...new Set([riga.variazioneId, ...altre.map((a) => a.variazioneId)])];
 
   if (risposta === 'RIMBORSO_RICHIESTO') {
     // Segnalata come "da variazione" — priorità diversa dalle altre,
@@ -287,10 +317,11 @@ export async function rispondiVariazione(token: string, risposta: 'ACCETTATA' | 
   // "gestita" (tutti hanno risposto, o accettata di default a
   // scadenza — quel caso non scrive nulla qui, va gestito a parte
   // con un controllo periodico se serve un pulsante "segna scaduta").
-  const tutteLeRisposte = await db.select().from(variazioniRisposte).where(eq(variazioniRisposte.variazioneId, riga.variazioneId));
-  const restanoInAttesa = tutteLeRisposte.some((r) => !r.risposta);
-  if (!restanoInAttesa) {
-    await db.update(variazioni).set({ stato: 'GESTITA' }).where(eq(variazioni.id, riga.variazioneId));
+  for (const variazioneId of variazioniToccate) {
+    const tutteLeRisposte = await db.select().from(variazioniRisposte).where(eq(variazioniRisposte.variazioneId, variazioneId));
+    if (!tutteLeRisposte.some((r) => !r.risposta)) {
+      await db.update(variazioni).set({ stato: 'GESTITA' }).where(eq(variazioni.id, variazioneId));
+    }
   }
 }
 

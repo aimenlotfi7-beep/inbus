@@ -10,12 +10,14 @@ import { useSeoTags } from './useSeoTags';
  *  di account (cliente, promoter, organizzatore, tour leader): ognuno
  *  passa la propria funzione di richiesta, il link per tornare indietro
  *  e, se è un portale di lavoro, il tema chiaro. */
-export function RichiediResetGenerico({ onRichiedi, linkIndietro, titoloExtra, temaChiaro, etichettaTipo }: {
+export function RichiediResetGenerico({ onRichiedi, linkIndietro, titoloExtra, temaChiaro, etichettaTipo, oreValidita = 2 }: {
   onRichiedi: (email: string) => Promise<unknown>;
   linkIndietro: string;
   titoloExtra?: string;
   temaChiaro?: boolean;
   etichettaTipo?: string;
+  /** Quanto dura il link (lo decide il server): 48 ore per i clienti, 2 per gli account di lavoro. */
+  oreValidita?: number;
 }) {
   useSeoTags({
     title: 'Password dimenticata — OnWay',
@@ -53,7 +55,7 @@ export function RichiediResetGenerico({ onRichiedi, linkIndietro, titoloExtra, t
       {inviato ? (
         <p className="auth-esito" role="status">
           <Icona nome="spunta" dimensione={20} strokeWidth={2.4} />
-          Controlla la posta (anche lo spam): il link resta valido per un paio d'ore.
+          Controlla la posta (anche lo spam): il link resta valido per {oreValidita} ore.
         </p>
       ) : (
         <form onSubmit={invia}>

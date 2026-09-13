@@ -18,7 +18,7 @@ export async function confermaAvvisiClienti(
     testo: (
       <>
         <p style={{ margin: '0 0 10px' }}>
-          {anteprima.clientiTotali === 1 ? 'Il cliente riceverà' : 'I clienti riceveranno'} un'email con la variazione e la possibilità di chiedere il rimborso:
+          {anteprima.clientiTotali === 1 ? 'Il cliente riceverà' : 'Ogni cliente riceverà'} una sola email con {voci.length > 1 ? 'le variazioni che lo riguardano' : 'la variazione'} e la possibilità di chiedere il rimborso:
         </p>
         <ul style={{ margin: 0, paddingLeft: 18 }}>
           {voci.map((v, i) => (

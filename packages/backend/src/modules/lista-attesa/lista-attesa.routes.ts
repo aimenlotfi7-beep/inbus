@@ -33,7 +33,8 @@ export const listaAttesaController = {
     res.json(await listaAttesaService.promuovi(req.params.id));
   },
   async promuoviTutte(req: Request, res: Response) {
-    res.json(await listaAttesaService.promuoviTutte(req.params.eventoId));
+    const ids = Array.isArray(req.body?.ids) ? (req.body.ids as unknown[]).filter((x): x is string => typeof x === 'string') : undefined;
+    res.json(await listaAttesaService.promuoviTutte(req.params.eventoId, ids));
   },
   async getByToken(req: Request, res: Response) {
     res.json(await listaAttesaService.getByToken(req.params.token));

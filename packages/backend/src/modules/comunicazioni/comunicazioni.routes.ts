@@ -7,6 +7,7 @@ import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { inviaEmail } from '../../shared/email.service.js';
+import { escapaHtml } from '../../shared/formato.js';
 
 const filtroSchema = z.object({
   servizioIds: z.array(z.string()).default([]),
@@ -63,13 +64,16 @@ export const comunicazioniService = {
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, eventoId)).limit(1);
     if (!evento) throw new Error('Evento non trovato');
 
+    // Il testo è scritto a mano nel gestionale: si protegge l'HTML e si
+    // tengono gli a capo.
+    const html = `<p>${escapaHtml(input.corpo).replace(/\n/g, '<br>')}</p>`;
+    let emailNonInviate = 0;
+    let chatNonInviate = 0;
     for (const cliente of destinatari) {
       if (input.canali.includes('EMAIL')) {
-        try {
-          await inviaEmail({ a: cliente.email, oggetto: input.oggetto, html: `<p>${input.corpo.replace(/\n/g, '<br>')}</p>` });
-        } catch (err) {
-          console.error(`Comunicazione: email non inviata a ${cliente.email}:`, err);
-        }
+        // inviaEmail non lancia mai: dice solo se è partita.
+        const { inviata } = await inviaEmail({ a: cliente.email, oggetto: input.oggetto, html });
+        if (!inviata) emailNonInviate++;
       }
       if (input.canali.includes('CHAT')) {
         try {
@@ -86,6 +90,7 @@ export const comunicazioniService = {
           });
           await db.update(conversazioniChat).set({ ultimoMessaggioIl: new Date() }).where(eq(conversazioniChat.id, conversazione.id));
         } catch (err) {
+          chatNonInviate++;
           console.error(`Comunicazione: messaggio chat non inviato a ${cliente.email}:`, err);
         }
       }
@@ -96,7 +101,8 @@ export const comunicazioniService = {
       filtroServizioIds: input.servizioIds, filtroTragittoId: input.tragittoId ?? null, filtroFermataId: input.fermataId ?? null,
       canali: input.canali, numeroDestinatari: destinatari.length,
     }).returning();
-    return salvata;
+    // Il gestionale dice quante email e quanti messaggi non sono partiti.
+    return { ...salvata, emailNonInviate, chatNonInviate };
   },
 };
 

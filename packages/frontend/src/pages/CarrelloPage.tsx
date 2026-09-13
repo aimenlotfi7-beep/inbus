@@ -37,7 +37,7 @@ function accontoAncoraPossibile(articoli: ArticoloCarrello[]): boolean {
   return articoli.length > 0 && scadenzaSaldo(articoli) !== null;
 }
 
-interface Esito { righe: { pnr: string; artista: string }[]; email: string; ospite: boolean; passeggeri: number; }
+interface Esito { righe: { pnr: string; artista: string }[]; email: string; ospite: boolean; passeggeri: number; confermaNonPartita: boolean; invitoPassword: boolean; }
 
 /** Il carrello: il terzo passo della prenotazione ("Riepilogo"), un solo
  *  passo — articoli, totali, codice sconto, come pagare, blocco legale e
@@ -171,6 +171,8 @@ export function CarrelloPage() {
         email: loggato ? (cliente?.email ?? articoli[0].cliente.email) : articoli[0].cliente.email,
         ospite: !loggato,
         passeggeri: passeggeriTotali,
+        confermaNonPartita: risultato.emailConfermaNonInviate > 0,
+        invitoPassword: 'invitoPasswordInviato' in risultato && risultato.invitoPasswordInviato === true,
       });
       tracciaAcquisto(totaleDopoBundle, metaEventId);
       tracciaAcquistoGA4(totaleDopoBundle, metaEventId, bundle?.nome);
@@ -201,8 +203,15 @@ export function CarrelloPage() {
             <ul className="esito-codici">
               {esito.righe.map((r) => <li key={r.pnr}>{r.artista} · codice <b>{r.pnr}</b></li>)}
             </ul>
-            <p>Ti abbiamo mandato la conferma a <b>{esito.email}</b>. Il biglietto con il numero del bus arriva via email prima della partenza.</p>
-            {esito.ospite && <p>Nella stessa email trovi il link per impostare la password e vedere i tuoi viaggi.</p>}
+            {esito.confermaNonPartita ? (
+              <p className="avviso avviso-attenzione">
+                La prenotazione è registrata, ma non siamo riusciti a mandare l'email di conferma a <b>{esito.email}</b>: segnati i codici qui sopra, ti servono per ritrovare la prenotazione.
+              </p>
+            ) : (
+              <p>Ti abbiamo mandato la conferma a <b>{esito.email}</b>.</p>
+            )}
+            <p>Il biglietto con il numero del bus arriva via email prima della partenza.</p>
+            {esito.invitoPassword && <p>In un'email a parte trovi il link per impostare la password e vedere i tuoi viaggi.</p>}
             <div className="esito-azioni">
               {loggato ? (
                 <>

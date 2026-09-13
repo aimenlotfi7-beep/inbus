@@ -1,4 +1,4 @@
-import { and, eq, ne, sql, desc, inArray } from 'drizzle-orm';
+import { and, eq, ne, sql, desc, inArray, lte, gte } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
 import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, promoter, promoterEventi, promoterLink, whiteLabel } from '../../db/schema.js';
@@ -34,7 +34,8 @@ export async function inviaEventoMetaSeConfigurato(
 
 import { verificaComposizione, ripartisciSconto } from '../bundle/bundle-regole.js';
 import { couponService, scontoCoupon } from '../coupon/coupon.service.js';
-import { inizioOggiRoma } from '../../shared/formato.js';
+import { formattaData, formattaEuro, inizioOggiRoma } from '../../shared/formato.js';
+import { segnalaEmailNonPartita } from '../../shared/registroEmail.js';
 import { env } from '../../config/env.js';
 import type { CreaPrenotazioneInput } from './prenotazioni.dto.js';
 
@@ -151,6 +152,31 @@ async function promoterPerEvento(lettore: Pick<typeof db, 'select'>, codice: str
   const [escluso] = await lettore.select().from(promoterEventi)
     .where(and(eq(promoterEventi.promoterId, p.id), eq(promoterEventi.eventoId, eventoId))).limit(1);
   return escluso ? { valido: false } : { valido: true, codice: p.codice };
+}
+
+/** L'email "completa il saldo" (promemoria automatico e sollecito dal
+ *  gestionale): quanto manca, entro quando, link. true se è partita. */
+async function inviaEmailSaldo(
+  p: typeof prenotazioni.$inferSelect,
+  differenzaSaldo: (pnr: string, email: string) => Promise<{ artista: string; differenza: number }>,
+): Promise<boolean> {
+  const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
+  if (!utente) return false;
+  const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
+  const { templateEmailService } = await import('../template-email/template-email.service.js');
+  const dati = await differenzaSaldo(p.pnr, utente.email);
+  const { oggetto, html } = await templateEmailService.renderizza('promemoria_saldo', {
+    nome: utente.nome ?? '',
+    evento: dati.artista,
+    importo: formattaEuro(dati.differenza),
+    scadenza: p.scadenzaSaldo ? formattaData(p.scadenzaSaldo) : 'prima della partenza',
+    // Solo per i testi modificati prima di settembre 2026 ("€{{differenza}}").
+    differenza: dati.differenza.toFixed(2).replace('.', ','),
+    pnr: p.pnr,
+    link: urlSito(`/completa-saldo/${p.pnr}?email=${encodeURIComponent(utente.email)}`),
+  });
+  const { inviata } = await inviaEmail({ a: utente.email, oggetto, html });
+  return inviata;
 }
 
 function accontoPerPasseggero(evento: { accontoEur: string | null }) {
@@ -391,7 +417,8 @@ async function creaRigaInterna(
  *  perdere il posto per un problema di posta). Riusata sia per una
  *  prenotazione singola sia per ognuna di un ordine con più articoli
  *  (carrello e bundle). */
-async function inviaConfermaPrenotazione(risultato: Awaited<ReturnType<typeof creaRigaInterna>>) {
+async function inviaConfermaPrenotazione(risultato: Awaited<ReturnType<typeof creaRigaInterna>>): Promise<boolean> {
+  let inviata = false;
   try {
     if (risultato.tipoPagamento === 'COMPLETO') {
       // Pagamento pieno: SUBITO la conferma di pagamento, senza PDF. Il
@@ -405,7 +432,7 @@ async function inviaConfermaPrenotazione(risultato: Awaited<ReturnType<typeof cr
       } catch (err) {
         console.error(`Registrazione biglietto non riuscita per PNR ${risultato.pnr} (la conferma di pagamento parte comunque):`, err);
       }
-      await ticketService.inviaConfermaPagamento(risultato.pnr);
+      ({ inviata } = await ticketService.inviaConfermaPagamento(risultato.pnr));
     } else {
       // Solo acconto: nessun biglietto ancora (si emette solo a saldo
       // completato) — mando la conferma "normale", senza allegato.
@@ -417,18 +444,20 @@ async function inviaConfermaPrenotazione(risultato: Awaited<ReturnType<typeof cr
         fermata: risultato.fermataCitta,
         orario: risultato.fermataOrario ?? 'da definire',
         passeggeri: String(risultato.passeggeri),
-        totale: Number(risultato.totale).toFixed(2),
+        importo: formattaEuro(risultato.totale),
+        scadenza: risultato.scadenzaSaldo ? formattaData(risultato.scadenzaSaldo) : 'prima della partenza',
+        // Solo per i testi modificati prima di settembre 2026 ("€{{totale}}").
+        totale: Number(risultato.totale).toFixed(2).replace('.', ','),
         evento: risultato.eventoArtista,
         link_saldo: urlSito(`/completa-saldo/${risultato.pnr}?email=${encodeURIComponent(risultato.utenteEmail)}`),
       });
-      await inviaEmail({ a: risultato.utenteEmail, oggetto, html });
+      ({ inviata } = await inviaEmail({ a: risultato.utenteEmail, oggetto, html }));
     }
   } catch (err) {
-    // Non bastava che l'email fallisse in silenzio senza lasciare
-    // traccia: così almeno compare nei log di Railway, anche se al
-    // cliente non arriva nulla.
     console.error('Invio email di conferma prenotazione non riuscito:', err);
   }
+  // Resta scritto nel registro attività del gestionale, non solo nei log.
+  if (!inviata) await segnalaEmailNonPartita(risultato.tipoPagamento === 'COMPLETO' ? 'Conferma della prenotazione' : "Conferma dell'acconto", risultato.pnr, risultato.utenteEmail);
 
   // Con i passeggeri nuovi può servire una linea da confermare (soglia di
   // pareggio raggiunta, bus pieni). Non lancia mai.
@@ -441,6 +470,7 @@ async function inviaConfermaPrenotazione(risultato: Awaited<ReturnType<typeof cr
   // lontana non fa nulla; non lancia mai.
   const { smistamentoService } = await import('./smistamento.service.js');
   await smistamentoService.smistaSubito(risultato.tragittoId);
+  return inviata;
 }
 
 export const prenotazioniService = {
@@ -460,7 +490,7 @@ export const prenotazioniService = {
       verificaCouponUsato(couponOrdine);
       return riga;
     });
-    await inviaConfermaPrenotazione(risultato);
+    const emailConfermaInviata = await inviaConfermaPrenotazione(risultato);
     // Meta Conversions API — best-effort, dopo che la prenotazione è già
     // confermata: un problema con l'API di Meta non deve mai bloccare o
     // ritardare la risposta al cliente.
@@ -471,7 +501,8 @@ export const prenotazioniService = {
         ipCliente: richiesta?.ip, userAgentCliente: richiesta?.userAgent, fbp: input.metaFbp, fbc: input.metaFbc,
       }, canaleVendita?.canale === 'WHITE_LABEL' ? canaleVendita.whiteLabelId : undefined);
     }
-    return risultato;
+    // Il sito lo dice al cliente se la conferma non è partita.
+    return { ...risultato, emailConfermaInviata };
   },
 
   /** Crea un intero ORDINE con più prodotti (carrello) in un'unica
@@ -546,8 +577,9 @@ export const prenotazioniService = {
 
     // Fuori dalla transazione, come per la prenotazione singola — un
     // biglietto/email per ciascun articolo dell'ordine.
+    let emailConfermaNonInviate = 0;
     for (const riga of righe) {
-      await inviaConfermaPrenotazione(riga);
+      if (!(await inviaConfermaPrenotazione(riga))) emailConfermaNonInviate++;
     }
     // Riepilogo del bundle in una mail sola (best-effort: l'ordine è già
     // fatto, una mail che fallisce non lo deve annullare).
@@ -560,11 +592,12 @@ export const prenotazioniService = {
           nome: righe[0].utenteNome || 'cliente',
           bundle: bundleScelto.nome,
           eventi: righe.map((r) => r.eventoArtista).join(', '),
-          totaleOriginale: `€${totaleOriginale.toFixed(2)}`,
-          sconto: `€${Number(ordine.scontoBundle ?? 0).toFixed(2)}`,
-          totale: `€${Number(ordine.totale).toFixed(2)}`,
+          totaleOriginale: formattaEuro(totaleOriginale),
+          sconto: formattaEuro(ordine.scontoBundle ?? 0),
+          totale: formattaEuro(ordine.totale),
         });
-        await inviaEmail({ a: righe[0].utenteEmail, oggetto, html });
+        const { inviata } = await inviaEmail({ a: righe[0].utenteEmail, oggetto, html });
+        if (!inviata) await segnalaEmailNonPartita(`Riepilogo del bundle "${bundleScelto.nome}"`, righe.map((r) => r.pnr).join(', '), righe[0].utenteEmail);
       } catch (e) {
         console.error('[bundle] mail di riepilogo fallita:', e instanceof Error ? e.message : e);
       }
@@ -584,7 +617,7 @@ export const prenotazioniService = {
       }, canaleVendita?.canale === 'WHITE_LABEL' ? canaleVendita.whiteLabelId : undefined);
     }
 
-    return { ordine, prenotazioni: righe.map((r) => ({ ...r, ordineId: ordine.id })) };
+    return { ordine, prenotazioni: righe.map((r) => ({ ...r, ordineId: ordine.id })), emailConfermaNonInviate };
   },
 
   /** Tutto quello che serve per la "travel card" del cliente in un
@@ -869,20 +902,17 @@ export const prenotazioniService = {
     } catch (err) {
       console.error('Registrazione biglietto dopo saldo non riuscita (la conferma di pagamento parte comunque):', err);
     }
-    try {
-      await ticketService.inviaConfermaPagamento(pnr);
-    } catch (err) {
-      console.error(`Invio conferma di pagamento dopo saldo non riuscito (PNR ${pnr}):`, err);
-    }
+    // inviaConfermaPagamento e inviaBigliettoConBus non lanciano per un'email
+    // non partita (restituiscono inviata: false); un errore vero conta uguale.
+    const conferma = await ticketService.inviaConfermaPagamento(pnr).catch(() => ({ inviata: false }));
+    if (!conferma.inviata) await segnalaEmailNonPartita('Conferma del saldo', pnr, email);
     if (aggiornata.busId) {
-      try {
-        await ticketService.inviaBigliettoConBus(pnr);
-      } catch (err) {
-        console.error(`Invio biglietto con il bus dopo saldo non riuscito (PNR ${pnr}):`, err);
-      }
+      const biglietto = await ticketService.inviaBigliettoConBus(pnr).catch(() => ({ inviata: false }));
+      if (!biglietto.inviata) await segnalaEmailNonPartita('Biglietto con il bus (dopo il saldo)', pnr, email);
     }
 
-    return aggiornata;
+    // La pagina del saldo dice al cliente se la conferma non è partita.
+    return { ...aggiornata, emailConfermaInviata: conferma.inviata };
   },
 
   /** Quanto manca da pagare su una prenotazione ad acconto (per mostrarlo
@@ -907,71 +937,39 @@ export const prenotazioniService = {
     };
   },
 
-  /** Cerca le prenotazioni ad acconto il cui saldo scade tra oggi e
-   *  domani (finestra di un giorno, per non perdere invii se lo scheduler
-   *  gira una volta al giorno) e non hanno ancora ricevuto il promemoria,
-   *  e manda l'email con il link per completare il pagamento. Va
-   *  richiamata periodicamente (vedi src/shared/scheduler.ts). */
   /** Sollecito manuale — l'amministratore lo manda quando vuole, a
-   *  differenza del promemoria automatico (che parte solo nella
-   *  finestra di 24 ore prima della scadenza). Stessa email, nessuna
-   *  data/finestra da rispettare qui. */
+   *  differenza del promemoria automatico. Stessa email. */
   async inviaSollecitoManuale(pnr: string) {
     const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, pnr)).limit(1);
     if (!p) throw new NonTrovato('Prenotazione');
     if (p.tipoPagamento !== 'ACCONTO' || p.saldoPagato) throw new ConflittoDati('Questa prenotazione non ha un saldo da sollecitare.');
-
-    const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
-    if (!utente) throw new NonTrovato('Cliente');
-
-    const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
-    const dati = await this.differenzaSaldo(p.pnr, utente.email);
-    const link = urlSito(`/completa-saldo/${p.pnr}?email=${encodeURIComponent(utente.email)}`);
-    const { templateEmailService } = await import('../template-email/template-email.service.js');
-    const { oggetto, html } = await templateEmailService.renderizza('promemoria_saldo', {
-      nome: utente.nome ?? '',
-      evento: dati.artista,
-      differenza: dati.differenza.toFixed(2),
-      pnr: p.pnr,
-      link,
-    });
-    const { inviata } = await inviaEmail({ a: utente.email, oggetto, html });
-    return { inviata };
+    return { inviata: await inviaEmailSaldo(p, this.differenzaSaldo.bind(this)) };
   },
 
   // Lo smistamento sui bus per età vive in smistamento.service.ts.
 
+  /** Promemoria automatico (scheduler, ogni giorno e all'avvio): le
+   *  prenotazioni ad acconto con il saldo in scadenza entro domani, o già
+   *  scaduto se il server era spento, di eventi non ancora passati. Si segna
+   *  "inviato" solo se l'email parte davvero: se no ci riprova il giro dopo. */
   async inviaPromemoriaSaldo() {
-    const oraAdesso = new Date();
-    const domani = new Date(oraAdesso.getTime() + 24 * 3600 * 1000);
-
+    const domani = new Date(Date.now() + 24 * 3600 * 1000);
     const daAvvisare = await db
-      .select()
+      .select({ prenotazione: prenotazioni })
       .from(prenotazioni)
+      .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
       .where(and(
         eq(prenotazioni.stato, 'CONFERMATA'),
         eq(prenotazioni.tipoPagamento, 'ACCONTO'),
         eq(prenotazioni.saldoPagato, false),
         eq(prenotazioni.promemoriaSaldoInviato, false),
+        lte(prenotazioni.scadenzaSaldo, domani),
+        gte(eventi.data, inizioOggiRoma()),
       ));
 
-    const { inviaEmail, urlSito } = await import('../../shared/email.service.js');
     let inviate = 0;
-    for (const p of daAvvisare) {
-      if (!p.scadenzaSaldo || p.scadenzaSaldo > domani || p.scadenzaSaldo < oraAdesso) continue;
-      const [utente] = await db.select().from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
-      if (!utente) continue;
-      const dati = await this.differenzaSaldo(p.pnr, utente.email);
-      const link = urlSito(`/completa-saldo/${p.pnr}?email=${encodeURIComponent(utente.email)}`);
-      const { templateEmailService } = await import('../template-email/template-email.service.js');
-      const { oggetto, html } = await templateEmailService.renderizza('promemoria_saldo', {
-        nome: utente.nome ?? '',
-        evento: dati.artista,
-        differenza: dati.differenza.toFixed(2),
-        pnr: p.pnr,
-        link,
-      });
-      await inviaEmail({ a: utente.email, oggetto, html });
+    for (const { prenotazione: p } of daAvvisare) {
+      if (!(await inviaEmailSaldo(p, this.differenzaSaldo.bind(this)))) continue;
       await db.update(prenotazioni).set({ promemoriaSaldoInviato: true }).where(eq(prenotazioni.id, p.id));
       inviate++;
     }

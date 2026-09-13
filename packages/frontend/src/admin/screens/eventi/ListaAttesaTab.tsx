@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { notifica } from '../../shared/notifiche';
+import { conferma } from '../../shared/conferma';
+import { motivoErrore } from '../../shared/errori';
 import { listaAttesaApi, type IscrizioneListaAttesa } from '../../../api/listaAttesa';
-import { ErroreApi } from '../../../api/client';
+import { plurale } from '../../../shared/formato';
 
 export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; servizi?: { key: string; nome: string }[] }) {
   const [lista, setLista] = useState<IscrizioneListaAttesa[]>([]);
@@ -19,16 +21,29 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
   const [linkDaCopiare, setLinkDaCopiare] = useState<{ nome: string; link: string } | null>(null);
   const [linkCopiato, setLinkCopiato] = useState(false);
 
+  /** Promuove (o, se è già promossa ma non completata, rimanda il link). */
   async function promuovi(riga: IscrizioneListaAttesa) {
-    if (!confirm(`Promuovere ${riga.nome} ${riga.cognome ?? ''}? Le manderemo un'email con il link per completare la prenotazione.`)) return;
+    const nome = `${riga.nome} ${riga.cognome ?? ''}`.trim();
+    const reinvio = riga.stato === 'PROMOSSA';
+    const ok = await conferma({
+      titolo: reinvio ? `Rimandare il link a ${nome}?` : `Promuovere ${nome}?`,
+      testo: reinvio
+        ? 'Riceve di nuovo l\'email con lo stesso link per completare la prenotazione.'
+        : 'Riceve un\'email con il link per completare la prenotazione. I posti non sono bloccati: vanno a chi completa per primo.',
+      conferma: reinvio ? 'Rimanda il link' : 'Promuovi',
+    });
+    if (!ok) return;
     try {
       const r = await listaAttesaApi.promuovi(riga.id);
-      if (!r.emailInviata) {
-        setLinkDaCopiare({ nome: `${riga.nome} ${riga.cognome ?? ''}`, link: r.link });
+      if (r.emailInviata) {
+        notifica(reinvio ? `Link rimandato a ${nome}.` : `${nome} promossa: email inviata.`, 'successo');
+      } else {
+        notifica(`L'email a ${nome} non è partita: copia il link qui sopra e mandalo tu.`, 'errore');
+        setLinkDaCopiare({ nome, link: r.link });
       }
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     }
   }
 
@@ -45,17 +60,28 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
   }
 
   async function promuoviTutte() {
-    if (!confirm(`Promuovere tutte le ${inAttesa.length} iscrizioni in attesa? A ognuno arriverà un'email con il link per completare la prenotazione — chi trova i posti già esauriti nel frattempo resterà segnalato come non riuscito, senza bloccare gli altri.`)) return;
+    const ok = await conferma({
+      titolo: `Promuovere ${plurale(inAttesa.length, 'iscrizione', 'iscrizioni')} in attesa?`,
+      testo: servizi && servizi.length > 0
+        ? 'Solo quelle di questa scheda. A ognuno arriva un\'email con il link per completare la prenotazione: i posti vanno a chi completa per primo.'
+        : 'A ognuno arriva un\'email con il link per completare la prenotazione: i posti vanno a chi completa per primo.',
+      conferma: 'Promuovi',
+    });
+    if (!ok) return;
     try {
-      const { promosse, fallite } = await listaAttesaApi.promuoviTutte(eventoId);
-      notifica(`Fatto — ${promosse} promosse${fallite > 0 ? `, ${fallite} non riuscite (probabilmente posti esauriti nel frattempo)` : ''}.`);
+      const { promosse, emailNonInviate, fallite } = await listaAttesaApi.promuoviTutte(eventoId, inAttesa.map((r) => r.id));
+      const problemi = [
+        emailNonInviate > 0 ? `${plurale(emailNonInviate, 'email non è partita', 'email non sono partite')} (usa "Rimanda il link")` : '',
+        fallite > 0 ? `${plurale(fallite, 'promozione non riuscita', 'promozioni non riuscite')}` : '',
+      ].filter(Boolean);
+      notifica(`${plurale(promosse, 'iscrizione promossa', 'iscrizioni promosse')}${problemi.length ? `, ma ${problemi.join(' e ')}` : ''}.`, problemi.length ? 'errore' : 'successo');
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     }
   }
 
-  if (caricamento) return <p className="testo-intro">Carico...</p>;
+  if (caricamento) return <p className="testo-intro">Carico…</p>;
 
   // Se ci sono più servizi, ogni tab mostra solo le iscrizioni di quel
   // servizio (o quelle senza preferenza, sotto "Liberi") — stessa
@@ -123,7 +149,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
         <div className="section-card" style={{ marginBottom: 16, borderColor: 'var(--pink)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
             <p className="section-label" style={{ marginBottom: 8 }}>
-              Email non configurata — invia questo link a {linkDaCopiare.nome} a mano
+              L'email non è partita: manda tu questo link a {linkDaCopiare.nome}
             </p>
             <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-xl)', padding: '0 6px' }} onClick={() => setLinkDaCopiare(null)} title="Chiudi">✕</button>
           </div>
@@ -135,7 +161,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
               style={{ flex: 1, background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 6, padding: '8px 10px', color: 'var(--paper)', fontSize: 'var(--testo-md)' }}
             />
             <button type="button" className="btn btn-primary" style={{ fontSize: 'var(--testo-md)', padding: '8px 14px', flexShrink: 0 }} onClick={copiaLink}>
-              {linkCopiato ? '✓ Copiato' : 'Copia link'}
+              {linkCopiato ? 'Copiato' : 'Copia link'}
             </button>
           </div>
         </div>
@@ -165,7 +191,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
           {Array.from(perFermata.entries()).map(([citta, dati]) => (
             <div key={citta} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 'var(--testo-base)' }}>
               <span>{citta}</span>
-              <span style={{ color: 'var(--mist)' }}>{dati.passeggeri} passeggero/i · {dati.iscritti} iscrizione/i</span>
+              <span style={{ color: 'var(--mist)' }}>{plurale(dati.passeggeri, 'passeggero', 'passeggeri')} · {plurale(dati.iscritti, 'iscrizione', 'iscrizioni')}</span>
             </div>
           ))}
         </div>
@@ -184,7 +210,7 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
         <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
           <input
             type="text"
-            placeholder="Cerca per nome o email..."
+            placeholder="Cerca per nome o email…"
             className="campo-cerca-originale"
             value={ricerca}
             onChange={(e) => setRicerca(e.target.value)}
@@ -204,16 +230,22 @@ export function ListaAttesaTab({ eventoId, servizi }: { eventoId: string; serviz
       {listaFiltrata.map((riga) => (
         <div key={riga.id} className="riga-cliccabile" style={{ cursor: 'default', flexWrap: 'wrap' }}>
           <span className="riga-titolo">
-            {riga.nome} {riga.cognome ?? ''} · {riga.passeggeri} passeggero/i
+            {riga.nome} {riga.cognome ?? ''} · {plurale(riga.passeggeri, 'passeggero', 'passeggeri')}
             {riga.fermataCitta && <> · <span style={{ color: 'var(--amber)' }}>{riga.fermataCitta}</span></>}
             <br />
             <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{riga.email}{riga.telefono ? ` · ${riga.telefono}` : ''}</span>
           </span>
           <span className="riga-meta">
             {riga.stato === 'PROMOSSA' ? (
-              <span className={`badge ${riga.completata ? 'coperta' : 'dal-ruolo'}`}>
-                {riga.completata ? 'Completata' : riga.emailInviata ? 'Promossa (email inviata)' : 'Promossa (email non inviata)'}
-              </span>
+              <>
+                <span className={`badge ${riga.completata ? 'coperta' : 'dal-ruolo'}`}>
+                  {riga.completata ? 'Completata' : riga.emailInviata ? 'Promossa (email inviata)' : 'Promossa (email non inviata)'}
+                </span>
+                {/* Chi non ha ancora completato può ricevere di nuovo il link. */}
+                {!riga.completata && (
+                  <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 12px' }} onClick={() => promuovi(riga)}>Rimanda il link</button>
+                )}
+              </>
             ) : (
               <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 12px' }} onClick={() => promuovi(riga)}>Promuovi</button>
             )}

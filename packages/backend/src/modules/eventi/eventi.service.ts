@@ -16,6 +16,7 @@ import {
   utenti,
   preventiviRichieste,
   preventiviRisposte,
+  variazioni as variazioniTabella,
 } from '../../db/schema.js';
 import crypto from 'node:crypto';
 import { NonTrovato, ConflittoDati, ErroreApplicativo } from '../../shared/errors.js';
@@ -25,7 +26,7 @@ import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazion
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema } from './eventi.dto.js';
 import {
-  rilevaVariazioni, generaComunicazioniVariazione, anteprimaComunicazioni, normalizzaOrario, normalizzaTesto,
+  rilevaVariazioni, generaComunicazioniVariazione, anteprimaComunicazioni, clientiUnici, normalizzaOrario, normalizzaTesto,
   type FermataConfronto, type VariazioneRilevata, type EsitoComunicazioni,
 } from '../variazioni/variazioni.service.js';
 import { cambiPercorso, fotografiaPercorso } from '../preventivi/cambio-percorso.js';
@@ -77,6 +78,42 @@ async function senzaFermateCoperteDaLinee(
     .where(eq(fermate.tragittoId, tragittoId));
   const cittaCoperte = new Set(coperte.map((c) => c.citta));
   return rilevate.filter((v) => !(v.fermataVecchia && disattivate.has(v.fermataVecchia.citta) && cittaCoperte.has(v.fermataVecchia.citta)));
+}
+
+/** Dopo aver cambiato il percorso di una linea o averla eliminata: le
+ *  fermate già escluse (disattivate) con prenotazioni confermate che nessuna
+ *  linea confermata copre più. Quando sono state escluse la linea le copriva
+ *  e nessuno è stato avvisato: ora quei clienti sono senza bus e ricevono
+ *  "non è più prevista". Chi l'ha già ricevuta per quella fermata no. */
+async function fermateEscluseRimasteScoperte(
+  tragittoId: string,
+  /** Per l'anteprima: la linea come sarebbe dopo (fermateIds null = eliminata). */
+  ipotesi?: { lineaId: string; fermateIds: string[] | null },
+): Promise<VariazioneRilevata[]> {
+  const spente = await db.select({ id: fermate.id, citta: fermate.citta, indirizzo: fermate.indirizzo, orario: fermate.orario }).from(fermate)
+    .where(and(eq(fermate.tragittoId, tragittoId), eq(fermate.attivo, false)));
+  if (spente.length === 0) return [];
+  const [coperte, prenotate, giaAvvisate] = await Promise.all([
+    db.selectDistinct({ citta: fermate.citta, lineaId: lineaFermate.lineaId, fermataId: fermate.id }).from(lineaFermate)
+      .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
+      .innerJoin(linee, and(eq(linee.id, lineaFermate.lineaId), eq(linee.daConfermare, false)))
+      .where(eq(fermate.tragittoId, tragittoId))
+      .then((righe) => ipotesi ? righe.filter((r) => r.lineaId !== ipotesi.lineaId) : righe),
+    db.selectDistinct({ citta: prenotazioni.fermataCitta }).from(prenotazioni)
+      .where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA'))),
+    db.select({ citta: variazioniTabella.fermataDescrizione }).from(variazioniTabella)
+      .where(and(eq(variazioniTabella.tragittoId, tragittoId), sql`(${variazioniTabella.descrizione} ilike '%non è più prevista%' or ${variazioniTabella.descrizione} ilike '%numero minimo di partecipanti%')`)),
+  ]);
+  const cittaCoperte = new Set(coperte.map((c) => c.citta));
+  if (ipotesi?.fermateIds) {
+    const tutte = await db.select({ id: fermate.id, citta: fermate.citta }).from(fermate).where(eq(fermate.tragittoId, tragittoId));
+    for (const f of tutte) if (ipotesi.fermateIds.includes(f.id)) cittaCoperte.add(f.citta);
+  }
+  const cittaPrenotate = new Set(prenotate.map((p) => p.citta));
+  const cittaAvvisate = new Set(giaAvvisate.map((v) => v.citta));
+  return spente
+    .filter((f) => cittaPrenotate.has(f.citta) && !cittaCoperte.has(f.citta) && !cittaAvvisate.has(f.citta))
+    .map((f) => ({ fermataVecchia: { ...f, attivo: true }, descrizione: `La fermata di "${f.citta}" non è più prevista in questo tragitto.` }));
 }
 
 /** Cosa cambia per i clienti già prenotati se si salva questo
@@ -161,13 +198,18 @@ async function comunicaVariazioni(lista: VariazioniDiTragitto[]): Promise<EsitoC
 /** Il tragitto è appena diventato CONFERMATO (prima Linea creata):
  *  avviso a ogni prenotazione confermata. Dopo il commit, best effort —
  *  non lancia mai, un cliente non raggiunto non ferma gli altri. */
-async function avvisaPartenzaConfermata(tragittoId: string): Promise<EsitoComunicazioni> {
+async function avvisaPartenzaConfermata(tragittoId: string, lineaId: string): Promise<EsitoComunicazioni> {
   const esito: EsitoComunicazioni = { clientiAvvisati: 0, emailNonInviate: 0 };
   try {
     const [riga] = await db.select({ tragittoNome: tragitti.nome, artista: eventi.artista, data: eventi.data })
       .from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
       .where(eq(tragitti.id, tragittoId)).limit(1);
     if (!riga) return esito;
+    // Solo chi parte da una fermata della linea appena confermata: per gli
+    // altri la partenza non è ancora certa.
+    const cittaCoperte = new Set((await db.select({ citta: fermate.citta }).from(lineaFermate)
+      .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
+      .where(eq(lineaFermate.lineaId, lineaId))).map((f) => f.citta));
     // L'orario ATTUALE della fermata prenotata (può essere cambiato dopo
     // la prenotazione); quello salvato sulla prenotazione solo di riserva.
     const orariFermate = await db.select({ citta: fermate.citta, orario: fermate.orario }).from(fermate).where(eq(fermate.tragittoId, tragittoId));
@@ -179,7 +221,7 @@ async function avvisaPartenzaConfermata(tragittoId: string): Promise<EsitoComuni
       .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
       .where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA')));
 
-    for (const d of destinatari) {
+    for (const d of destinatari.filter((x) => cittaCoperte.has(x.fermataCitta))) {
       esito.clientiAvvisati++;
       try {
         const { oggetto, html } = await templateEmailService.renderizza('partenza_confermata', {
@@ -891,12 +933,15 @@ export const eventiService = {
   async anteprimaVariazioniEvento(id: string, input: AggiornaEventoInput) {
     const perTragitto = await rilevaVariazioniEvento(id, input);
     const variazioni: { tragitto: string; fermata: string; descrizione: string; clienti: number }[] = [];
+    const toccate: { prenotazioniIds: string[] }[] = [];
     for (const t of perTragitto) {
       for (const r of await anteprimaComunicazioni(t.tragittoId, t.variazioni)) {
         variazioni.push({ tragitto: t.tragittoNome, fermata: r.fermata, descrizione: r.descrizione, clienti: r.clienti });
+        toccate.push(r);
       }
     }
-    return { clientiTotali: variazioni.reduce((s, v) => s + v.clienti, 0), variazioni };
+    // Persone da avvisare (una email ciascuna), non la somma delle voci.
+    return { clientiTotali: clientiUnici(toccate), variazioni };
   },
 
   /** "Elimina" un evento — non lo cancella per davvero (le prenotazioni
@@ -1241,8 +1286,9 @@ export const eventiService = {
     if (!esiste) throw new NonTrovato('Tragitto');
     const vecchie = await fermateSalvatePerConfronto([tragittoId]);
     const rilevate = await senzaFermateCoperteDaLinee(tragittoId, input.fermate, await rilevaVariazioni(vecchie.get(tragittoId) ?? [], fermateInputPerConfronto(input.fermate)));
-    const variazioni = await anteprimaComunicazioni(tragittoId, rilevate);
-    return { clientiTotali: variazioni.reduce((s, v) => s + v.clienti, 0), variazioni };
+    const righe = await anteprimaComunicazioni(tragittoId, rilevate);
+    // Persone da avvisare (una email ciascuna), non la somma delle voci.
+    return { clientiTotali: clientiUnici(righe), variazioni: righe.map(({ prenotazioniIds: _ids, ...v }) => v) };
   },
 
   /** Registra il preventivo (stima dal fornitore, sullo scenario più
@@ -1387,7 +1433,7 @@ export const eventiService = {
 
     // Avvisi solo a transazione confermata, best effort (non lanciano mai).
     const avvisiClienti = creata.partenzaConfermata
-      ? await avvisaPartenzaConfermata(tragittoDelleFermate.id)
+      ? await avvisaPartenzaConfermata(tragittoDelleFermate.id, creata.lineaId)
       : { clientiAvvisati: 0, emailNonInviate: 0 };
     const tourLeaderAvvisato = tourLeaderId ? await avvisaTourLeader(creata.busId) : null;
     return { ...creata, ...avvisiClienti, tourLeaderAvvisato };
@@ -1474,7 +1520,7 @@ export const eventiService = {
 
     // Avvisi solo a transazione confermata, best effort (non lanciano mai).
     const avvisiClienti = confermata.partenzaConfermata
-      ? await avvisaPartenzaConfermata(confermata.tragittoId)
+      ? await avvisaPartenzaConfermata(confermata.tragittoId, confermata.lineaId)
       : { clientiAvvisati: 0, emailNonInviate: 0 };
     const tourLeaderAvvisato = tourLeaderId ? await avvisaTourLeader(confermata.busId) : null;
     return { ...confermata, ...avvisiClienti, tourLeaderAvvisato };
@@ -1529,11 +1575,23 @@ export const eventiService = {
       return a.orario.localeCompare(b.orario);
     });
 
-    return db.transaction(async (tx) => {
+    await db.transaction(async (tx) => {
       await tx.delete(lineaFermate).where(eq(lineaFermate.lineaId, lineaId));
       await tx.insert(lineaFermate).values(fermateOrdinate.map((f, ordine) => ({ lineaId, fermataId: f.id, ordine })));
       await ricalcolaPostiTragitto(tx, lineaEsiste.tragittoId);
     });
+    // Dopo il salvataggio: chi è su una fermata esclusa rimasta senza linea viene avvisato.
+    return generaComunicazioniVariazione(lineaEsiste.tragittoId, await fermateEscluseRimasteScoperte(lineaEsiste.tragittoId));
+  },
+
+  /** Anteprima di eliminaLinea / aggiornaPercorsoLinea, senza scritture: chi
+   *  verrebbe avvisato (fermate escluse che resterebbero senza linea).
+   *  `fermateIds` null = la linea viene eliminata. */
+  async anteprimaModificaLinea(lineaId: string, fermateIds: string[] | null) {
+    const [linea] = await db.select().from(linee).where(eq(linee.id, lineaId)).limit(1);
+    if (!linea) throw new NonTrovato('Linea');
+    const righe = await anteprimaComunicazioni(linea.tragittoId, await fermateEscluseRimasteScoperte(linea.tragittoId, { lineaId, fermateIds }));
+    return { clientiTotali: clientiUnici(righe), variazioni: righe.map(({ prenotazioniIds: _ids, ...v }) => v) };
   },
 
   /** Modifica i dati di UN singolo bus dentro una Linea (autista,
@@ -1639,7 +1697,7 @@ export const eventiService = {
    *  il nuovo biglietto riparte con il bus nuovo). Non si può togliere
    *  l'ultimo bus di un tragitto con posti venduti. Le linee da confermare
    *  non si eliminano a mano: spariscono da sole quando non servono più. */
-  async eliminaLinea(lineaId: string): Promise<{ tragittoId: string }> {
+  async eliminaLinea(lineaId: string): Promise<{ tragittoId: string } & EsitoComunicazioni> {
     const [linea] = await db.select().from(linee).where(eq(linee.id, lineaId)).limit(1);
     if (!linea) throw new ErroreApplicativo('Linea non trovata: potrebbe essere già stata eliminata.', 404, 'NON_TROVATO');
     if (linea.daConfermare) {
@@ -1653,7 +1711,9 @@ export const eventiService = {
       // Una linea già senza bus non toglie nessun bus: niente rifiuto.
       await ricalcolaPostiTragitto(tx, linea.tragittoId, busLinea.length > 0 ? 'elimina_linea' : undefined);
     });
-    return { tragittoId: linea.tragittoId };
+    // Dopo l'eliminazione: chi è su una fermata esclusa rimasta senza linea viene avvisato.
+    const avvisi = await generaComunicazioniVariazione(linea.tragittoId, await fermateEscluseRimasteScoperte(linea.tragittoId));
+    return { tragittoId: linea.tragittoId, ...avvisi };
   },
 
   /** Rimuove un bus dell'evento. Le prenotazioni assegnate tornano senza

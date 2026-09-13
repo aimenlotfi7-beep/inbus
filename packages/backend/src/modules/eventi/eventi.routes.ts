@@ -82,6 +82,8 @@ eventiRouter.put('/linee/bus/:busId', richiedeAuth, richiedePermesso('eventi.cre
 // Elimina una linea con i suoi bus (i passeggeri tornano senza bus). Non
 // esiste più l'assegnazione a mano ("versa"): decide solo lo smistamento.
 eventiRouter.delete('/linee/:lineaId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.eliminaLinea));
+// Anteprima (nessuna scrittura) di eliminazione o cambio percorso: chi verrebbe avvisato.
+eventiRouter.post('/linee/:lineaId/anteprima-modifica', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.anteprimaModificaLinea));
 eventiRouter.get('/tragitti/:tragittoId/linee', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaLinee));
 eventiRouter.get('/tragitti/:tragittoId/anteprima-smistamento', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.anteprimaSmistamento));
 eventiRouter.get('/tragitti/:tragittoId/vendite', richiedeAuth, richiedePermesso('eventi.economia'), asyncHandler(eventiController.venditePerFermata));

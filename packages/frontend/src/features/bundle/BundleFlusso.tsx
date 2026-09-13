@@ -255,7 +255,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
           <div className="esito" role="status">
             <span className="esito-icona" aria-hidden="true"><Icona nome="spunta" dimensione={40} strokeWidth={2.4} /></span>
             <h1>Ordine confermato</h1>
-            <p>Riceverai un'email di conferma con un biglietto per ogni evento del bundle.</p>
+            <p>Riceverai un'email di conferma per ogni evento del bundle. Il biglietto con il numero del bus arriva via email il giorno prima di ogni partenza.</p>
             <ul className="esito-codici">
               {fatto.map((pnr) => <li key={pnr}>Codice <b>{pnr}</b></li>)}
             </ul>

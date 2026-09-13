@@ -27,5 +27,5 @@ export const comunicazioniApi = {
     return api.get<{ numeroDestinatari: number }>(`/api/comunicazioni/evento/${eventoId}/anteprima?${query.toString()}`);
   },
   invia: (eventoId: string, input: FiltroDestinatari & { oggetto: string; corpo: string; canali: ('EMAIL' | 'CHAT')[] }) =>
-    api.post<Comunicazione>(`/api/comunicazioni/evento/${eventoId}`, input),
+    api.post<Comunicazione & { emailNonInviate: number; chatNonInviate: number }>(`/api/comunicazioni/evento/${eventoId}`, input),
 };
