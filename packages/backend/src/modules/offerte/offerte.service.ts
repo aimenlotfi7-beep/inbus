@@ -2,6 +2,7 @@ import { eq, desc, and, or, isNull, gt, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { offerteEvento, eventi } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
+import { inizioOggiRoma } from '../../shared/formato.js';
 import { eventoPerIlSito, includeCompleto } from '../eventi/eventi.service.js';
 import type { CreaOffertaInput, aggiornaOffertaSchema } from './offerte.dto.js';
 import type { z } from 'zod';
@@ -75,6 +76,9 @@ export const offerteService = {
     // completa quando mostra un evento a un cliente.
     const evento = await db.query.eventi.findFirst({ where: eq(eventi.id, o.eventoId), with: includeCompleto });
     if (!evento || evento.bozza || evento.eliminatoIl) throw new NonTrovato('Evento');
+    // Come la pagina dell'evento: niente offerta su un evento passato o con le vendite fermate.
+    if (evento.venditeFermate) throw new ConflittoDati('Le prenotazioni per questo evento sono chiuse.');
+    if (evento.data < inizioOggiRoma()) throw new ConflittoDati('Questo evento è già passato.');
     return { offerta: o, evento: eventoPerIlSito(evento) };
   },
 

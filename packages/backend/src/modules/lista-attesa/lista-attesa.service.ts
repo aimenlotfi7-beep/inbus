@@ -166,8 +166,10 @@ export const listaAttesaService = {
     if (!riga) throw new NonTrovato('Link');
     if (riga.completata) throw new ConflittoDati('Questa prenotazione è già stata completata.');
     const [evento] = await db.select().from(eventi).where(eq(eventi.id, riga.eventoId)).limit(1);
+    const [tragitto] = riga.tragittoId ? await db.select({ servizioId: tragitti.servizioId }).from(tragitti).where(eq(tragitti.id, riga.tragittoId)).limit(1) : [];
     return {
       eventoId: riga.eventoId,
+      servizioId: tragitto?.servizioId ?? null,
       artista: evento?.artista ?? '',
       luogo: evento?.luogo ?? '',
       citta: evento?.citta ?? '',

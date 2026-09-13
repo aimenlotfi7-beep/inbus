@@ -54,7 +54,8 @@ export function CompletaSaldoPage() {
       const r = await fetch(`${API_URL}/api/coupon/valida`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codice: couponCodice.trim(), importo: dati.totaleReale, eventoId: dati.eventoId }),
+        // Con l'email: un voucher personale si riconosce solo così (come al saldo vero).
+        body: JSON.stringify({ codice: couponCodice.trim(), importo: dati.totaleReale, eventoId: dati.eventoId, emailCliente: email }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.errore ?? 'Codice non valido.');

@@ -5,7 +5,13 @@ import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
-import { formattaEuro } from '../../shared/formato';
+import { formattaEuro, oggiIsoRoma } from '../../shared/formato';
+
+/** "2026-09-13" meno n giorni, sempre come giorno di calendario. */
+function giornoIsoMenoGiorni(giorno: string, n: number): string {
+  const [a, m, g] = giorno.split('-').map(Number);
+  return new Date(Date.UTC(a, m - 1, g - n)).toISOString().slice(0, 10);
+}
 
 const VUOTO: CampagnaInput = { nome: '', piattaforma: '', tipo: '', utmSource: '', utmMedium: '', utmCampaign: '', utmContent: '', attiva: true };
 
@@ -24,7 +30,8 @@ function ReportFatturato() {
 
   useEffect(() => {
     const giorni = ETICHETTA_PERIODO.find((p) => p.chiave === periodo)?.giorni;
-    const dataDa = giorni ? new Date(Date.now() - giorni * 86400000).toISOString() : undefined;
+    // Giorni di calendario di Roma, oggi compreso: come le Statistiche.
+    const dataDa = giorni ? giornoIsoMenoGiorni(oggiIsoRoma(), giorni - 1) : undefined;
     setRighe(null);
     campagneApi.report(dataDa).then(setRighe).catch(() => setRighe([]));
   }, [periodo]);

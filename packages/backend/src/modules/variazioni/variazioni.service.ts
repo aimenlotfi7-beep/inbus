@@ -268,12 +268,18 @@ export async function rispondiVariazione(token: string, risposta: 'ACCETTATA' | 
     // Segnalata come "da variazione" — priorità diversa dalle altre,
     // ma passa comunque da approvazione admin (deciso apposta: non
     // automatica, anche se causata da noi).
-    await db.insert(richiesteRimborso).values({
-      prenotazioneId: riga.prenotazioneId,
-      motivo: 'Rimborso richiesto in seguito a una variazione del viaggio.',
-      origine: 'VARIAZIONE',
-      variazioneId: riga.variazioneId,
-    });
+    // Se il cliente ha già una richiesta in attesa per questa prenotazione
+    // non se ne crea una seconda (prima l'errore del vincolo lasciava la
+    // risposta salvata a metà); una prenotazione già cancellata non ne ha bisogno.
+    const [pren] = await db.select({ stato: prenotazioni.stato }).from(prenotazioni).where(eq(prenotazioni.id, riga.prenotazioneId)).limit(1);
+    if (pren?.stato === 'CONFERMATA') {
+      await db.insert(richiesteRimborso).values({
+        prenotazioneId: riga.prenotazioneId,
+        motivo: 'Rimborso richiesto in seguito a una variazione del viaggio.',
+        origine: 'VARIAZIONE',
+        variazioneId: riga.variazioneId,
+      }).onConflictDoNothing();
+    }
   }
 
   // Appena questa risposta arriva, ricontrollo se restano altre

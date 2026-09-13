@@ -1,6 +1,6 @@
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { richiesteRimborso, prenotazioni, utenti, eventi, ordini } from '../../db/schema.js';
+import { richiesteRimborso, prenotazioni, utenti, eventi, ordini, coupon, offerteEvento } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
 import { creditoService } from '../credito/credito.service.js';
@@ -32,6 +32,38 @@ async function avvisaCliente(
   } catch (err) {
     console.error(`[rimborsi] avviso al cliente (prenotazione ${prenotazioneId}) non riuscito:`, err);
     return false;
+  }
+}
+
+/** Segna la richiesta come gestita in un solo comando atomico: un doppio
+ *  clic su "Approva" (o due amministratori insieme) non la gestisce due
+ *  volte e non manda due email. Restituisce la richiesta com'era prima. */
+async function prendiInCarico(id: string, stato: 'APPROVATA' | 'RIFIUTATA', noteAdmin?: string) {
+  const [r] = await db.select().from(richiesteRimborso).where(eq(richiesteRimborso.id, id)).limit(1);
+  if (!r) throw new NonTrovato('Richiesta');
+  const [presa] = await db.update(richiesteRimborso).set({ stato, noteAdmin, gestitaIl: new Date() })
+    .where(and(eq(richiesteRimborso.id, id), eq(richiesteRimborso.stato, 'IN_ATTESA'))).returning({ id: richiesteRimborso.id });
+  if (!presa) throw new ConflittoDati('Questa richiesta è già stata gestita.');
+  return r;
+}
+
+/** Rimborso approvato: il cliente riprende il credito che aveva usato, e
+ *  coupon e offerta tornano disponibili per un uso (il coupon solo se
+ *  nessun'altra riga ancora valida dello stesso ordine lo usa: vale una
+ *  volta per ordine). */
+async function restituisciUtilizzi(p: typeof prenotazioni.$inferSelect) {
+  await creditoService.restituisciCreditoUsato(p.id);
+  if (p.couponCodice) {
+    const altreRighe = p.ordineId
+      ? await db.select({ id: prenotazioni.id }).from(prenotazioni)
+        .where(and(eq(prenotazioni.ordineId, p.ordineId), eq(prenotazioni.couponCodice, p.couponCodice), eq(prenotazioni.stato, 'CONFERMATA'))).limit(1)
+      : [];
+    if (altreRighe.length === 0) {
+      await db.update(coupon).set({ usiAttuali: sql`greatest(${coupon.usiAttuali} - 1, 0)` }).where(eq(coupon.codice, p.couponCodice));
+    }
+  }
+  if (p.offertaId) {
+    await db.update(offerteEvento).set({ utilizzi: sql`greatest(${offerteEvento.utilizzi} - 1, 0)` }).where(eq(offerteEvento.id, p.offertaId));
   }
 }
 
@@ -127,17 +159,22 @@ export const richiesteRimborsoService = {
    *  toglie l'eventuale credito fedeltà già maturato da quel viaggio.
    *  Poi avvisa il cliente (best effort). */
   async approva(id: string, noteAdmin?: string): Promise<{ clienteAvvisato: boolean }> {
-    const [r] = await db.select().from(richiesteRimborso).where(eq(richiesteRimborso.id, id)).limit(1);
-    if (!r) throw new NonTrovato('Richiesta');
-    if (r.stato !== 'IN_ATTESA') throw new ConflittoDati('Questa richiesta è già stata gestita.');
+    const r = await prendiInCarico(id, 'APPROVATA', noteAdmin);
 
     const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, r.prenotazioneId)).limit(1);
     if (p) {
       const motivo = r.origine === 'VARIAZIONE'
         ? 'Rimborso approvato dopo una variazione del viaggio'
         : 'Rimborso approvato su richiesta del cliente';
-      await prenotazioniService.cancella(p.pnr, motivo);
+      try {
+        await prenotazioniService.cancella(p.pnr, motivo);
+      } catch (err) {
+        // La prenotazione non si è cancellata: la richiesta torna da gestire.
+        await db.update(richiesteRimborso).set({ stato: 'IN_ATTESA', noteAdmin: r.noteAdmin, gestitaIl: null }).where(eq(richiesteRimborso.id, id));
+        throw err;
+      }
       await creditoService.revocaCreditoSePresente(p.id);
+      await restituisciUtilizzi(p);
       // Meta continuerebbe altrimenti a considerare valido per sempre
       // un acquisto ormai rimborsato — le sue campagne ottimizzerebbero
       // (e i tuoi numeri di ritorno pubblicitario risulterebbero)
@@ -152,7 +189,6 @@ export const richiesteRimborsoService = {
       }
     }
 
-    await db.update(richiesteRimborso).set({ stato: 'APPROVATA', noteAdmin, gestitaIl: new Date() }).where(eq(richiesteRimborso.id, id));
     const clienteAvvisato = p ? await avvisaCliente(p.id, { tipo: 'approvato' }) : false;
     return { clienteAvvisato };
   },
@@ -160,11 +196,7 @@ export const richiesteRimborsoService = {
   /** Rifiuta e avvisa il cliente: la nota dell'admin è il motivo che il
    *  cliente legge nell'email. */
   async rifiuta(id: string, noteAdmin?: string): Promise<{ clienteAvvisato: boolean }> {
-    const [r] = await db.select().from(richiesteRimborso).where(eq(richiesteRimborso.id, id)).limit(1);
-    if (!r) throw new NonTrovato('Richiesta');
-    if (r.stato !== 'IN_ATTESA') throw new ConflittoDati('Questa richiesta è già stata gestita.');
-
-    await db.update(richiesteRimborso).set({ stato: 'RIFIUTATA', noteAdmin, gestitaIl: new Date() }).where(eq(richiesteRimborso.id, id));
+    const r = await prendiInCarico(id, 'RIFIUTATA', noteAdmin);
     const clienteAvvisato = await avvisaCliente(r.prenotazioneId, { tipo: 'rifiutato', motivo: noteAdmin });
     return { clienteAvvisato };
   },

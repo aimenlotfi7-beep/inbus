@@ -31,6 +31,12 @@ function scadenzaSaldo(articoli: ArticoloCarrello[]): Date | null {
   return prima > Date.now() ? new Date(prima) : null;
 }
 
+/** L'acconto si può scegliere solo se nessun articolo ha già il saldo
+ *  scaduto (il server rifiuta un acconto a meno di 15 giorni dall'evento). */
+function accontoAncoraPossibile(articoli: ArticoloCarrello[]): boolean {
+  return articoli.length > 0 && scadenzaSaldo(articoli) !== null;
+}
+
 interface Esito { righe: { pnr: string; artista: string }[]; email: string; ospite: boolean; passeggeri: number; }
 
 /** Il carrello: il terzo passo della prenotazione ("Riepilogo"), un solo
@@ -71,9 +77,13 @@ export function CarrelloPage() {
   const dopoCoupon = Math.max(0, totaleDopoBundle - scontoCoupon);
   const creditoApplicato = tipoPagamento === 'COMPLETO' && usaCredito ? Math.min(creditoDisponibile, dopoCoupon) : 0;
   const totaleFinale = Math.max(0, dopoCoupon - creditoApplicato);
-  const accontoTotale = articoli.reduce((s, a) => s + (a.accontoEur ?? ACCONTO_PREDEFINITO_EUR) * a.passeggeri, 0);
-  const ammetteAcconto = !bundle || bundle.ammetteAcconto;
+  // Acconto a passeggero, mai oltre il prezzo dell'articolo (come il server).
+  const accontoTotale = articoli.reduce((s, a) => s + Math.min((a.accontoEur ?? ACCONTO_PREDEFINITO_EUR) * a.passeggeri, a.prezzoStimato * a.passeggeri), 0);
+  const ammetteAcconto = (!bundle || bundle.ammetteAcconto) && accontoAncoraPossibile(articoli);
   const scadenza = scadenzaSaldo(articoli);
+  useEffect(() => {
+    if (!ammetteAcconto && tipoPagamento === 'ACCONTO') setTipoPagamento('COMPLETO');
+  }, [ammetteAcconto, tipoPagamento]);
   const importoImpegno = tipoPagamento === 'COMPLETO' ? totaleFinale : accontoTotale;
   const ceSconti = !!bundle || scontoCoupon > 0 || creditoApplicato > 0;
   const passeggeriTotali = articoli.reduce((s, a) => s + a.passeggeri, 0);
@@ -88,12 +98,20 @@ export function CarrelloPage() {
       const r = await fetch(`${API_URL}/api/coupon/valida`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Anteprima: la verifica vera, riga per riga, la fa il server alla conferma.
-        body: JSON.stringify({ codice: couponCodice.trim(), importo: totaleDopoBundle, eventoId: articoli[0]?.eventoId, ...(cliente?.email && { emailCliente: cliente.email }) }),
+        // Anteprima: la verifica vera la fa il server alla conferma.
+        body: JSON.stringify({ codice: couponCodice.trim(), importo: totaleDopoBundle, ...(cliente?.email && { emailCliente: cliente.email }) }),
       });
-      const dati = await r.json();
+      const dati: { tipo: 'PERCENTUALE' | 'FISSO'; valore: string; eventoId: string | null; errore?: string } = await r.json();
       if (!r.ok) throw new Error(dati.errore ?? 'Codice non valido.');
-      setCouponVerificato(dati);
+      // Stesso conto del server: una volta per ordine, solo sulle righe del
+      // suo evento (se ne ha uno); lo sconto fisso non si ripete per riga.
+      const fattoreBundle = bundle ? 1 - bundle.scontoPercentuale / 100 : 1;
+      const importoValido = articoli
+        .filter((a) => !dati.eventoId || a.eventoId === dati.eventoId)
+        .reduce((s, a) => s + a.prezzoStimato * a.passeggeri * fattoreBundle, 0);
+      if (importoValido === 0) throw new Error('Questo coupon non è valido per gli eventi nel carrello.');
+      const sconto = dati.tipo === 'PERCENTUALE' ? importoValido * (Number(dati.valore) / 100) : Math.min(Number(dati.valore), importoValido);
+      setCouponVerificato({ sconto });
     } catch (e) {
       setCouponErrore(e instanceof TypeError ? MESSAGGIO_CONNESSIONE : e instanceof Error ? e.message : 'Codice non valido.');
     } finally {
@@ -269,7 +287,9 @@ export function CarrelloPage() {
                   </button>
                 </div>
                 {couponErrore && <p className="campo-errore" id={`${prefisso}-coupon-errore`} role="alert">{couponErrore}</p>}
-                <p className="campo-aiuto" id={`${prefisso}-coupon-aiuto`}>Codice e credito valgono solo pagando tutto ora. Con l'acconto li puoi usare quando saldi il resto.</p>
+                <p className="campo-aiuto" id={`${prefisso}-coupon-aiuto`}>
+                  {ammetteAcconto ? "Codice e credito valgono solo pagando tutto ora. Con l'acconto li puoi usare quando saldi il resto." : 'Codice e credito si applicano al totale.'}
+                </p>
               </div>
             )}
 

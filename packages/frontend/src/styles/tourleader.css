@@ -96,6 +96,8 @@
 .pagina-partner .tl-tabella th:first-child{ width:72px; }
 .pagina-partner .tl-tabella tr.salito td{ background:rgba(87,211,154,.12); }
 .pagina-partner .tl-tabella .secondaria{ display:block; color:var(--mist); font-size:var(--t-caption); }
+/* Saldo non pagato: stato di errore (rosso), non un'etichetta gialla. */
+.pagina-partner .tl-tabella .tl-saldo-da-pagare{ display:block; color:var(--ow-danger-ink); font-size:var(--t-caption); font-weight:600; }
 .pagina-partner .tl-tabella a{ color:var(--ow-ink); }
 .pagina-partner .tl-check-area{
   display:flex; align-items:center; justify-content:center; width:var(--tap); height:var(--tap);

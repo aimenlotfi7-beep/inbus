@@ -134,7 +134,7 @@ export function TourLeaderPasseggeriPage() {
                         {/* L'etichetta allarga l'area toccabile a 44px: sul bus si spunta di corsa. */}
                         <label className="tl-check-area">
                           <input
-                            type="checkbox" className="tl-check" checked={p.salito} disabled={inSalvataggio === p.id}
+                            type="checkbox" className="tl-check" checked={p.salito} disabled={inSalvataggio === p.id || (p.saldoDaPagare && !p.salito)}
                             onChange={() => alternaSalito(p)}
                             aria-label={`${p.nome} ${p.cognome} è salito`}
                           />
@@ -143,6 +143,8 @@ export function TourLeaderPasseggeriPage() {
                       <td>
                         <b>{p.cognome} {p.nome}</b>
                         <span className="secondaria">{p.pnr}</span>
+                        {/* Senza saldo niente biglietto: non può salire (la casella è spenta). */}
+                        {p.saldoDaPagare && <span className="tl-saldo-da-pagare">Saldo da pagare: non può salire</span>}
                         {/* Su telefono la colonna Telefono è nascosta (usciva dallo schermo): il numero va qui. */}
                         {p.telefono && <a className="tl-tel-stretto" href={`tel:${p.telefono}`}>{p.telefono}</a>}
                       </td>

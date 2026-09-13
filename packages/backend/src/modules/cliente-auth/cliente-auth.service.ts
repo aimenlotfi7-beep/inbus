@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { utenti } from '../../db/schema.js';
 import { env } from '../../config/env.js';
@@ -91,12 +91,8 @@ export const clienteAuthService = {
       idUtente = nuovo.id;
     }
 
-    if (invitanteId) {
-      const [invitante] = await db.select({ nome: utenti.nome }).from(utenti).where(eq(utenti.id, invitanteId)).limit(1);
-      const { creditoService } = await import('../credito/credito.service.js');
-      await creditoService.erogaBonusReferralAmico(idUtente, invitante?.nome ?? null).catch(() => {});
-    }
-
+    // Il bonus dell'amico invitato arriva quando conferma l'email
+    // (verificaEmail), non alla sola registrazione: deciso dal proprietario.
     await inviaEmailVerifica(email, input.nome, token);
   },
 
@@ -109,7 +105,15 @@ export const clienteAuthService = {
       throw new ConflittoDati('Questo link è scaduto — registrati di nuovo per riceverne uno valido.');
     }
 
-    await db.update(utenti).set({ emailVerificata: true, tokenVerificaEmail: null, tokenVerificaScadenza: null }).where(eq(utenti.id, u.id));
+    // Atomico: un doppio clic sul link non dà il bonus due volte.
+    const [verificato] = await db.update(utenti).set({ emailVerificata: true, tokenVerificaEmail: null, tokenVerificaScadenza: null })
+      .where(and(eq(utenti.id, u.id), eq(utenti.tokenVerificaEmail, token))).returning({ id: utenti.id });
+    // "Invita un amico": il bonus dell'amico arriva ora, a email confermata.
+    if (verificato && u.invitatoDaUtenteId) {
+      const [invitante] = await db.select({ nome: utenti.nome }).from(utenti).where(eq(utenti.id, u.invitatoDaUtenteId)).limit(1);
+      const { creditoService } = await import('../credito/credito.service.js');
+      await creditoService.erogaBonusReferralAmico(u.id, invitante?.nome ?? null).catch((err) => console.error(`[referral] bonus all'amico ${u.id} non erogato:`, err));
+    }
     return this.emettiToken(u.id, u.email);
   },
 

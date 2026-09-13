@@ -446,6 +446,52 @@ function conStatoCalcolato<T extends {
 
 /** Inserisce un tragitto (tratta) con le sue fermate — usata sia per i
  *  tragitti liberi sia per quelli dentro un servizio. */
+type FermataInput = z.infer<typeof tragittoSchema>['fermate'][number];
+
+function valoriFermata(f: FermataInput, ordine: number) {
+  return {
+    ordine,
+    fermataAnagraficaId: f.fermataAnagraficaId ?? null,
+    citta: f.citta,
+    indirizzo: f.indirizzo,
+    orario: f.orario ?? null,
+    orarioRitorno: f.orarioRitorno ?? null,
+    indirizzoRitorno: f.indirizzoRitorno ?? null,
+    postiMax: f.postiMax ?? null,
+    prezzo: f.prezzo != null ? f.prezzo.toFixed(2) : null,
+    sogliaMinima: f.sogliaMinima ?? null,
+    attivo: f.attivo,
+  };
+}
+
+/** Allinea le fermate salvate di un tragitto all'elenco nuovo SENZA
+ *  cancellarle e ricrearle: prima ogni salvataggio azzerava i posti
+ *  prenotati per fermata (il limite per fermata saltava), rompeva il
+ *  carrello e la lista d'attesa che puntano alla fermata e scollegava le
+ *  linee. Una fermata nuova corrisponde a una salvata con la stessa voce
+ *  dell'anagrafica o, senza anagrafica, con la stessa città: quella si
+ *  aggiorna e tiene id e posti prenotati. Le altre nuove si aggiungono, le
+ *  salvate rimaste senza corrispondenza si tolgono (con i loro
+ *  collegamenti alle linee). */
+async function sincronizzaFermate(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], tragittoId: string, nuove: FermataInput[]) {
+  const salvate = await tx.select().from(fermate).where(eq(fermate.tragittoId, tragittoId)).orderBy(asc(fermate.ordine));
+  const libere = new Set(salvate.map((f) => f.id));
+  const stessaCitta = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  for (const [ordine, f] of nuove.entries()) {
+    const corrispondente = salvate.find((s) => libere.has(s.id) && (f.fermataAnagraficaId
+      ? s.fermataAnagraficaId === f.fermataAnagraficaId
+      : !s.fermataAnagraficaId && stessaCitta(s.citta, f.citta)))
+      ?? salvate.find((s) => libere.has(s.id) && stessaCitta(s.citta, f.citta));
+    if (corrispondente) {
+      libere.delete(corrispondente.id);
+      await tx.update(fermate).set(valoriFermata(f, ordine)).where(eq(fermate.id, corrispondente.id));
+    } else {
+      await tx.insert(fermate).values({ tragittoId, ...valoriFermata(f, ordine) });
+    }
+  }
+  if (libere.size > 0) await tx.delete(fermate).where(inArray(fermate.id, [...libere]));
+}
+
 async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], eventoId: string, servizioId: string | null, tragitto: z.infer<typeof tragittoSchema>) {
   const [nuovoTragitto] = await tx
     .insert(tragitti)
@@ -467,22 +513,7 @@ async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction
     .returning();
 
   if (tragitto.fermate.length) {
-    await tx.insert(fermate).values(
-      tragitto.fermate.map((f, ordine) => ({
-        tragittoId: nuovoTragitto.id,
-        ordine,
-        fermataAnagraficaId: f.fermataAnagraficaId,
-        citta: f.citta,
-        indirizzo: f.indirizzo,
-        orario: f.orario,
-        orarioRitorno: f.orarioRitorno,
-        indirizzoRitorno: f.indirizzoRitorno,
-        postiMax: f.postiMax,
-        prezzo: f.prezzo?.toFixed(2),
-        sogliaMinima: f.sogliaMinima,
-        attivo: f.attivo,
-      }))
-    );
+    await tx.insert(fermate).values(tragitto.fermate.map((f, ordine) => ({ tragittoId: nuovoTragitto.id, ...valoriFermata(f, ordine) })));
   }
 }
 
@@ -525,18 +556,13 @@ async function sincronizzaTuttiITragitti(
     const giaEsistente = tragitto.id ? esistenti.find((l) => l.id === tragitto.id) : undefined;
 
     if (giaEsistente) {
-      // I posti occupati (venduti) restano tali: se cambi i posti
-      // totali, i disponibili si aggiustano della stessa quantità,
-      // invece di essere resettati (perderebbe traccia di chi ha già
-      // prenotato).
-      const postiOccupati = giaEsistente.postiTotali - giaEsistente.postiDisponibili;
-      const nuoviPostiDisponibili = Math.max(0, tragitto.postiTotali - postiOccupati);
-
+      // I posti in vendita non si toccano da qui: restano "quasi
+      // illimitati" e li gestisce ricalcolaPostiTragitto (le vendite non si
+      // fermano per i posti dei bus). Prima il valore del modulo poteva
+      // rimettere un tetto.
       await tx.update(tragitti).set({
         servizioId,
         nome: tragitto.nome,
-        postiTotali: tragitto.postiTotali,
-        postiDisponibili: nuoviPostiDisponibili,
         prezzoExtra: tragitto.prezzoExtra.toFixed(2),
         attivo: tragitto.attivo,
         referenteNome: tragitto.referenteNome,
@@ -547,51 +573,7 @@ async function sincronizzaTuttiITragitti(
         arrivoCitta: tragitto.arrivoCitta,
       }).where(eq(tragitti.id, giaEsistente.id));
 
-      // Le fermate non hanno prenotazioni collegate direttamente (le
-      // prenotazioni salvano città/indirizzo come testo, non un
-      // riferimento), quindi qui si possono sostituire liberamente.
-      // MA le Linee sì (linea_fermate → fermate.id, con cancellazione
-      // a cascata) — cancellare e ricreare le fermate ad ogni
-      // salvataggio, anche per una modifica banale al tragitto (es.
-      // solo il nome), altrimenti spezzerebbe in silenzio la copertura
-      // di una Linea già costruita. Salvo prima chi copriva cosa (per
-      // città, l'identificatore più stabile fra vecchia e nuova riga —
-      // l'id cambia sempre, la città no), poi ricollego alle nuove
-      // fermate dopo averle inserite.
-      const collegamentiLineaDaPreservare = await tx
-        .select({ citta: fermate.citta, lineaId: lineaFermate.lineaId, ordine: lineaFermate.ordine })
-        .from(lineaFermate)
-        .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
-        .where(eq(fermate.tragittoId, giaEsistente.id));
-
-      await tx.delete(fermate).where(eq(fermate.tragittoId, giaEsistente.id));
-      if (tragitto.fermate.length) {
-        const nuoveFermate = await tx.insert(fermate).values(
-          tragitto.fermate.map((f, ordine) => ({
-            tragittoId: giaEsistente.id,
-            ordine,
-            fermataAnagraficaId: f.fermataAnagraficaId,
-            citta: f.citta,
-            indirizzo: f.indirizzo,
-            orario: f.orario,
-            orarioRitorno: f.orarioRitorno,
-            indirizzoRitorno: f.indirizzoRitorno,
-            postiMax: f.postiMax,
-            prezzo: f.prezzo?.toFixed(2),
-            sogliaMinima: f.sogliaMinima,
-            attivo: f.attivo,
-          }))
-        ).returning({ id: fermate.id, citta: fermate.citta });
-
-        if (collegamentiLineaDaPreservare.length) {
-          const daRicollegare = nuoveFermate.flatMap((nf) =>
-            collegamentiLineaDaPreservare
-              .filter((c) => c.citta === nf.citta)
-              .map((c) => ({ lineaId: c.lineaId, fermataId: nf.id, ordine: c.ordine }))
-          );
-          if (daRicollegare.length) await tx.insert(lineaFermate).values(daRicollegare);
-        }
-      }
+      await sincronizzaFermate(tx, giaEsistente.id, tragitto.fermate);
     } else {
       await inserisciTragitto(tx, eventoId, servizioId, tragitto);
     }
@@ -1037,7 +1019,8 @@ export const eventiService = {
       // Ora le fermate compaiono sempre, con posti disponibili a 0
       // quando è il caso: la scelta resta possibile, solo che porta
       // alla lista d'attesa invece che al pagamento.
-      for (const f of tragitto.fermate) {
+      // Una fermata spenta non si vende: non compare nel checkout.
+      for (const f of tragitto.fermate.filter((fermata) => fermata.attivo)) {
         const prezzoEffettivo = prezzoNormaleFermata(f, evento, tragitto);
         // Se questa fermata ha un limite posti suo (facoltativo), i suoi
         // posti disponibili sono il minore tra quanto le resta e quanto
@@ -1191,13 +1174,9 @@ export const eventiService = {
    *  modificano da qui (Partenze), non più da Eventi. A differenza del
    *  salvataggio completo dell'evento, questa aggiorna UN tragitto
    *  solo, senza dover rimandare tutto il payload — comodo per un
-   *  editing rapido dalla scheda del tragitto in Partenze. Le fermate
-   *  vengono sostituite per intero (elimina+ricrea, come già fa il
-   *  salvataggio completo — non hanno prenotazioni collegate
-   *  direttamente, le prenotazioni salvano città/indirizzo come
-   *  testo, non un riferimento), quindi aggiungere/togliere una
-   *  fermata solo per questa specifica partenza funziona già così
-   *  com'è: basta mandare l'elenco nuovo. */
+   *  editing rapido dalla scheda del tragitto in Partenze. Si manda
+   *  l'elenco completo delle fermate: quelle già salvate si aggiornano,
+   *  le nuove si aggiungono, le mancanti si tolgono (sincronizzaFermate). */
   async aggiornaTragittoOperativo(tragittoId: string, input: z.infer<typeof aggiornaTragittoOperativoSchema>): Promise<EsitoComunicazioni> {
     const [esiste] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
     if (!esiste) throw new NonTrovato('Tragitto');
@@ -1218,40 +1197,9 @@ export const eventiService = {
         }).where(eq(tragitti.id, tragittoId));
       }
 
-      // Stessa preservazione già fatta in salvaTragitti qui sopra —
-      // le Linee (linea_fermate → fermate.id, cancellazione a
-      // cascata) qui sono ancora più a rischio: questa funzione si usa
-      // da Partenze, DOPO che le Linee sono già state costruite in
-      // molti casi. Salvo chi copriva cosa (per città) prima di
-      // cancellare, ricollego alle nuove fermate dopo.
-      const collegamentiLineaDaPreservare = await tx
-        .select({ citta: fermate.citta, lineaId: lineaFermate.lineaId, ordine: lineaFermate.ordine })
-        .from(lineaFermate)
-        .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
-        .where(eq(fermate.tragittoId, tragittoId));
-
-      await tx.delete(fermate).where(eq(fermate.tragittoId, tragittoId));
-      if (input.fermate.length) {
-        const nuoveFermate = await tx.insert(fermate).values(
-          input.fermate.map((f, ordine) => ({
-            tragittoId, ordine,
-            fermataAnagraficaId: f.fermataAnagraficaId,
-            citta: f.citta, indirizzo: f.indirizzo,
-            orario: f.orario, orarioRitorno: f.orarioRitorno, indirizzoRitorno: f.indirizzoRitorno,
-            postiMax: f.postiMax, prezzo: f.prezzo?.toFixed(2),
-            sogliaMinima: f.sogliaMinima, attivo: f.attivo,
-          }))
-        ).returning({ id: fermate.id, citta: fermate.citta });
-
-        if (collegamentiLineaDaPreservare.length) {
-          const daRicollegare = nuoveFermate.flatMap((nf) =>
-            collegamentiLineaDaPreservare
-              .filter((c) => c.citta === nf.citta)
-              .map((c) => ({ lineaId: c.lineaId, fermataId: nf.id, ordine: c.ordine }))
-          );
-          if (daRicollegare.length) await tx.insert(lineaFermate).values(daRicollegare);
-        }
-      }
+      // Le fermate si aggiornano senza essere ricreate: tengono id, posti
+      // prenotati e collegamenti alle linee (vedi sincronizzaFermate).
+      await sincronizzaFermate(tx, tragittoId, input.fermate);
     });
 
     // Le comunicazioni partono SOLO dopo che il salvataggio è andato a
@@ -1701,10 +1649,14 @@ export const eventiService = {
     const tragittiIds = tuttiITragitti.map((l) => l.id);
     if (tragittiIds.length === 0) return [];
 
-    const prenotazioniConfermate = await db
-      .select({ tragittoId: prenotazioni.tragittoId, fermataCitta: prenotazioni.fermataCitta, totale: prenotazioni.totale })
-      .from(prenotazioni)
-      .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')));
+    // Stesse regole delle Statistiche: un acconto non saldato vale già il
+    // prezzo intero, e dal guadagno si tolgono commissioni promoter e quote
+    // White Label (prima Partenze e Statistiche davano numeri diversi).
+    const { prenotazioniComeStatistiche } = await import('../statistiche/statistiche.service.js');
+    const { commissioniPer } = await import('../statistiche/economia.js');
+    const { righe: prenotazioniConfermate, ctx } = await prenotazioniComeStatistiche(inArray(prenotazioni.tragittoId, tragittiIds));
+    const commissioniPerTragitto = commissioniPer(prenotazioniConfermate, (p) => p.tragittoId, ctx);
+    const commissioniPerRiga = commissioniPer(prenotazioniConfermate, (p) => p.id, ctx);
 
     const tutteLeLinee = tragittiIds.length ? await db.select().from(linee).where(inArray(linee.tragittoId, tragittiIds)) : [];
     const lineeIds = tutteLeLinee.map((l) => l.id);
@@ -1718,22 +1670,23 @@ export const eventiService = {
     return tuttiITragitti.map((tragitto) => {
       const incassato = prenotazioniConfermate
         .filter((p) => p.tragittoId === tragitto.id)
-        .reduce((s, p) => s + Number(p.totale), 0);
+        .reduce((s, p) => s + p.totale, 0);
+      const commissioni = commissioniPerTragitto.get(tragitto.id) ?? 0;
 
       // Le linee da confermare non hanno bus né costi: fuori dal riepilogo.
       const lineeTratta = tutteLeLinee.filter((l) => l.tragittoId === tragitto.id && !l.daConfermare);
       const perLinea = lineeTratta.map((l) => {
         const cittaLinea = new Set(tutteLeFermateDiLinea.filter((f) => f.lineaId === l.id).map((f) => f.citta));
-        const incassatoLinea = prenotazioniConfermate
-          .filter((p) => p.tragittoId === tragitto.id && cittaLinea.has(p.fermataCitta))
-          .reduce((s, p) => s + Number(p.totale), 0);
+        const righeLinea = prenotazioniConfermate.filter((p) => p.tragittoId === tragitto.id && cittaLinea.has(p.fermataCitta));
+        const incassatoLinea = righeLinea.reduce((s, p) => s + p.totale, 0);
+        const commissioniLinea = righeLinea.reduce((s, p) => s + (commissioniPerRiga.get(p.id) ?? 0), 0);
         const busLinea = bus.filter((b) => b.lineaId === l.id);
         const costoCensitoLinea = busLinea.some((b) => b.costo !== null);
         const costoLinea = busLinea.reduce((s, b) => s + (b.costo ? Number(b.costo) : 0), 0);
         return {
           lineaId: l.id, lineaNome: l.nome,
-          incassato: incassatoLinea, costo: costoLinea, costoCensito: costoCensitoLinea,
-          guadagno: incassatoLinea - costoLinea,
+          incassato: incassatoLinea, costo: costoLinea, costoCensito: costoCensitoLinea, commissioni: commissioniLinea,
+          guadagno: incassatoLinea - costoLinea - commissioniLinea,
         };
       });
 
@@ -1748,7 +1701,8 @@ export const eventiService = {
         incassato,
         costo,
         costoCensito, // false = nessun bus ha un costo compilato: il guadagno non è affidabile, va segnalato
-        guadagno: incassato - costo,
+        commissioni,
+        guadagno: incassato - costo - commissioni,
         perLinea,
       };
     });

@@ -112,7 +112,11 @@ export interface Linea { id: string; nome: string; daConfermare: boolean; fermat
 /** Un passeggero di UN bus: solo le prenotazioni che lo smistamento ha
  *  messo su quel bus, in ordine di orario della fermata e cognome. id = il
  *  partecipante (serve per segnare la salita); orario "HH:MM". */
-export interface PasseggeroBus { id: string; pnr: string; nome: string; cognome: string; fermata: string; orario: string | null; telefono: string | null; salito: boolean }
+export interface PasseggeroBus {
+  id: string; pnr: string; nome: string; cognome: string; fermata: string; orario: string | null; telefono: string | null; salito: boolean;
+  /** Saldo non pagato: niente biglietto, non si può segnare "salito". */
+  saldoDaPagare: boolean;
+}
 /** Come lo smistamento automatico riempirebbe i bus di un tragitto adesso
  *  (nessuna scrittura): le prenotazioni già assegnate restano ferme, le
  *  altre sono simulate. etaMedia in anni, una cifra decimale. */
@@ -122,8 +126,11 @@ export interface AnteprimaSmistamento {
   linee: { lineaId: string; lineaNome: string; bus: { busId: string; riferimento: string; postiBus: number | null; passeggeri: number; prenotazioni: number; etaMedia: number | null }[] }[];
   senzaPosto: { prenotazioni: number; passeggeri: number };
 }
-export interface RiepilogoEconomicoLinea { lineaId: string; lineaNome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; }
-export interface RiepilogoEconomicoTratta { tragittoId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; guadagno: number; perLinea: RiepilogoEconomicoLinea[]; }
+/** Stesse regole delle Statistiche: "incassato" è il valore venduto (un acconto
+ *  non saldato vale già il prezzo intero); guadagno = incassato − costo dei
+ *  bus − commissioni (promoter e quote White Label). */
+export interface RiepilogoEconomicoLinea { lineaId: string; lineaNome: string; incassato: number; costo: number; costoCensito: boolean; commissioni: number; guadagno: number; }
+export interface RiepilogoEconomicoTratta { tragittoId: string; nome: string; incassato: number; costo: number; costoCensito: boolean; commissioni: number; guadagno: number; perLinea: RiepilogoEconomicoLinea[]; }
 export interface SuggerimentoLinea {
   pronta: boolean;
   lineaGiaConfermata: boolean;

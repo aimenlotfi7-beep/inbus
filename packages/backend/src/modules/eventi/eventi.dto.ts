@@ -20,9 +20,9 @@ const fermataSchema = z.object({
   // la fermata condivide i posti di tutto il bus (come prima).
   postiMax: z.number().int().positive().optional(),
   // Soglia minima (facoltativa su OGNI fermata) + disattivabile
-  // singolarmente — le fermate vengono cancellate e ricreate a ogni
-  // salvataggio (sia da Eventi che da Partenze): questi campi DEVONO
-  // essere qui, altrimenti andrebbero persi ogni volta.
+  // singolarmente — ogni salvataggio (Eventi e Partenze) riscrive tutti i
+  // campi della fermata: questi DEVONO essere qui, altrimenti si
+  // svuoterebbero.
   sogliaMinima: z.number().int().positive().nullable().optional(),
   attivo: z.boolean().default(true),
 });

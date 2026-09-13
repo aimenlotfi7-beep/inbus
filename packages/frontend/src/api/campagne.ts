@@ -26,7 +26,7 @@ export interface CampagnaInput {
 
 export interface RigaReportFonte {
   fonte: string;
-  tipo: 'promoter' | 'campagna' | 'utm_non_registrata' | 'diretto';
+  tipo: 'promoter' | 'white_label' | 'campagna' | 'utm_non_registrata' | 'sito';
   numeroPrenotazioni: number;
   passeggeri: number;
   fatturato: number;

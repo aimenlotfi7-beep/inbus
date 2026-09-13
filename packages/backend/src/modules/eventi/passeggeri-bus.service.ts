@@ -17,6 +17,8 @@ export interface PasseggeroBus {
   orario: string | null;
   telefono: string | null;
   salito: boolean;
+  /** Saldo non pagato: niente biglietto, non può essere segnato "salito". */
+  saldoDaPagare: boolean;
 }
 
 export interface SchedaBus {
@@ -69,7 +71,7 @@ export async function leggiSchedaBus(busId: string): Promise<SchedaBus | null> {
 export async function passeggeriDelBus(busId: string, tragittoId: string): Promise<PasseggeroBus[]> {
   const righe = await db.select({
     id: prenotazioni.id, pnr: prenotazioni.pnr, fermataCitta: prenotazioni.fermataCitta, fermataOrario: prenotazioni.fermataOrario,
-    telefono: utenti.telefono,
+    saldoPagato: prenotazioni.saldoPagato, telefono: utenti.telefono,
   }).from(prenotazioni)
     .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
     .where(and(eq(prenotazioni.busId, busId), eq(prenotazioni.stato, 'CONFERMATA')));
@@ -100,6 +102,7 @@ export async function passeggeriDelBus(busId: string, tragittoId: string): Promi
       orario: orarioLeggibile(orarioPerCitta.get(p.fermataCitta)) ?? orarioLeggibile(p.fermataOrario),
       telefono: p.telefono || null,
       salito: pt.ticketUtilizzatoIl !== null,
+      saldoDaPagare: !p.saldoPagato,
     });
   }
 

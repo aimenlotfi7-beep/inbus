@@ -55,6 +55,7 @@ async function aBlocchiDaDb<T>(ids: string[], leggi: (blocco: string[]) => Promi
 async function leggiPrenotazioni(condizione: SQL | undefined): Promise<PrenotazioneStatistica[]> {
   const righe = await db.select({
     id: prenotazioni.id,
+    ordineId: prenotazioni.ordineId,
     eventoId: prenotazioni.eventoId,
     tragittoId: prenotazioni.tragittoId,
     fermataCitta: prenotazioni.fermataCitta,
@@ -91,7 +92,7 @@ async function leggiPrenotazioni(condizione: SQL | undefined): Promise<Prenotazi
  *  calcolato come al saldo (prezzo attuale della fermata, offerta, sconto): i
  *  numeri di un periodo non cambiano quando arriva il saldo, e il confronto
  *  con un periodo già tutto saldato non penalizza quello in corso. */
-async function totaliPrevisti(righe: { id: string; tragittoId: string; fermataCitta: string; passeggeri: number; totale: string; sconto: string; offertaId: string | null }[]) {
+async function totaliPrevisti(righe: { id: string; tragittoId: string; fermataCitta: string; passeggeri: number; totale: string; sconto: string; scontoBundle: string | null; offertaId: string | null }[]) {
   const previsti = new Map<string, number>();
   if (righe.length === 0) return previsti;
   const tragittiIds = [...new Set(righe.map((r) => r.tragittoId))];
@@ -118,7 +119,7 @@ async function totaliPrevisti(righe: { id: string; tragittoId: string; fermataCi
       r.offertaId ? offertaPer.get(r.offertaId) : undefined,
     );
     // Mai meno dell'acconto: se il prezzo della fermata non c'è più resta quello.
-    previsti.set(r.id, arrotondaEuro(Math.max(Number(r.totale), prezzo * r.passeggeri - Number(r.sconto))));
+    previsti.set(r.id, arrotondaEuro(Math.max(Number(r.totale), prezzo * r.passeggeri - Number(r.sconto) - Number(r.scontoBundle ?? 0))));
   }
   return previsti;
 }
@@ -179,6 +180,15 @@ async function leggiContestoFonti(righe: PrenotazioneStatistica[]): Promise<Cont
 }
 
 const fonteDellaRiga = (r: PrenotazioneStatistica, ctx: ContestoFonti): Fonte => fonteDi(r, ctx.campagne, ctx.nomiPromoter, ctx.nomiWhiteLabel);
+
+/** Per gli altri report (Partenze, area promoter, Campagne): le stesse
+ *  prenotazioni e lo stesso valore delle Statistiche (solo CONFERMATE di
+ *  eventi non in bozza né nel cestino; un acconto non saldato vale già il
+ *  prezzo intero), così lo stesso evento dà gli stessi numeri ovunque. */
+export async function prenotazioniComeStatistiche(condizione: SQL | undefined) {
+  const righe = await leggiPrenotazioni(condizione);
+  return { righe, ctx: await leggiContestoFonti(righe) };
+}
 
 function sintesiPerTipo(righe: PrenotazioneStatistica[], ctx: ContestoFonti) {
   const perTipo = new Map<TipoFonte, { tipo: TipoFonte; nome: string; prenotazioni: number; passeggeri: number; incasso: number }>();

@@ -14,7 +14,7 @@ import { senzaSegreti } from '../../shared/segreti.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { env } from '../../config/env.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
-import { calcolaCommissionePromoter } from '../../shared/commissionePromoter.js';
+import { arrotondaEuro } from '../statistiche/calcoli.js';
 
 const ORE_VALIDITA_TOKEN_RESET = 2;
 function generaTokenReset() {
@@ -165,34 +165,31 @@ export const promoterService = {
     await db.update(promoter).set({ passwordHash, tokenResetPassword: null, tokenResetPasswordScadenza: null }).where(eq(promoter.id, p.id));
   },
 
-  /** Quante prenotazioni e quanto fatturato ha portato il codice di questo promoter. */
+  /** Quante prenotazioni e quanto fatturato ha portato il codice di questo
+   *  promoter. Stesse regole delle Statistiche del gestionale (prenotazioni
+   *  contate, valore degli acconti, commissione riga per riga con il
+   *  compenso del coupon): prima i numeri erano diversi. */
   async statistiche(codice: string) {
-    const [p] = await db.select({ commissionePercentuale: promoter.commissionePercentuale }).from(promoter).where(eq(promoter.codice, codice)).limit(1);
-    const righe = await db.select().from(prenotazioni).where(and(eq(prenotazioni.promoterCodice, codice), eq(prenotazioni.stato, 'CONFERMATA')));
-    const fatturato = righe.reduce((s, r) => s + Number(r.totale), 0);
-    // Commissione calcolata riga per riga (vedi shared/commissionePromoter.ts)
-    // — non più "fatturato × un'unica percentuale", un coupon può avere
-    // un compenso proprio. Stessa logica del report Campagne lato admin.
-    const commissione = p ? await calcolaCommissionePromoter(righe.map((r) => ({ totale: Number(r.totale), passeggeri: r.passeggeri, couponCodice: r.couponCodice })), Number(p.commissionePercentuale)) : 0;
-    return { numeroPrenotazioni: righe.length, fatturato, commissione };
+    const perEvento = await this.statistichePerEvento(codice);
+    const voci = Object.values(perEvento);
+    return {
+      numeroPrenotazioni: voci.reduce((s, v) => s + v.numeroPrenotazioni, 0),
+      fatturato: arrotondaEuro(voci.reduce((s, v) => s + v.fatturato, 0)),
+      commissione: arrotondaEuro(voci.reduce((s, v) => s + v.commissione, 0)),
+    };
   },
 
   /** Stessa cosa, ma spezzata per evento — per la revenue cliccabile
    *  per evento nell'area promoter. */
   async statistichePerEvento(codice: string): Promise<Record<string, { numeroPrenotazioni: number; fatturato: number; commissione: number }>> {
-    const [p] = await db.select({ commissionePercentuale: promoter.commissionePercentuale }).from(promoter).where(eq(promoter.codice, codice)).limit(1);
-    const righe = await db.select().from(prenotazioni).where(and(eq(prenotazioni.promoterCodice, codice), eq(prenotazioni.stato, 'CONFERMATA')));
-    const perEvento = new Map<string, typeof righe>();
-    for (const r of righe) {
-      const lista = perEvento.get(r.eventoId) ?? [];
-      lista.push(r);
-      perEvento.set(r.eventoId, lista);
-    }
+    const { prenotazioniComeStatistiche } = await import('../statistiche/statistiche.service.js');
+    const { commissioniPer, sommaTotali } = await import('../statistiche/economia.js');
+    const { righe, ctx } = await prenotazioniComeStatistiche(eq(prenotazioni.promoterCodice, codice));
+    const commissioni = commissioniPer(righe, (r) => r.eventoId, ctx, { quoteWhiteLabel: false });
     const risultato: Record<string, { numeroPrenotazioni: number; fatturato: number; commissione: number }> = {};
-    for (const [eventoId, righeEvento] of perEvento) {
-      const fatturato = righeEvento.reduce((s, r) => s + Number(r.totale), 0);
-      const commissione = p ? await calcolaCommissionePromoter(righeEvento.map((r) => ({ totale: Number(r.totale), passeggeri: r.passeggeri, couponCodice: r.couponCodice })), Number(p.commissionePercentuale)) : 0;
-      risultato[eventoId] = { numeroPrenotazioni: righeEvento.length, fatturato, commissione };
+    for (const eventoId of new Set(righe.map((r) => r.eventoId))) {
+      const righeEvento = righe.filter((r) => r.eventoId === eventoId);
+      risultato[eventoId] = { numeroPrenotazioni: righeEvento.length, fatturato: sommaTotali(righeEvento), commissione: commissioni.get(eventoId) ?? 0 };
     }
     return risultato;
   },

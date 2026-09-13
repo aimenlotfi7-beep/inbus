@@ -7,6 +7,8 @@ import { arrotondaEuro, raggruppa, type CampagnaFonte } from './calcoli.js';
 
 export interface PrenotazioneStatistica {
   id: string;
+  /** L'ordine del carrello o del bundle (null per una prenotazione singola). */
+  ordineId: string | null;
   eventoId: string;
   tragittoId: string;
   fermataCitta: string;
@@ -89,7 +91,7 @@ export function commissioniPer(
 ): Map<string, number> {
   const conQuote = opzioni.quoteWhiteLabel ?? true;
   const risultato = new Map<string, number>();
-  const perPromoter = new Map<string, { gruppo: string; percentuale: number; righe: { totale: number; passeggeri: number; couponCodice: string | null }[] }>();
+  const perPromoter = new Map<string, { gruppo: string; percentuale: number; righe: { totale: number; passeggeri: number; couponCodice: string | null; ordineId: string | null }[] }>();
   for (const r of righe) {
     const g = gruppo(r);
     if (conQuote && r.quotaWhiteLabel) risultato.set(g, (risultato.get(g) ?? 0) + Number(r.quotaWhiteLabel));
@@ -98,11 +100,14 @@ export function commissioniPer(
     if (percentuale === undefined) continue;
     const chiave = `${g} ${r.promoterCodice}`;
     const voce = perPromoter.get(chiave) ?? { gruppo: g, percentuale, righe: [] };
-    voce.righe.push({ totale: r.totale, passeggeri: r.passeggeri, couponCodice: r.couponCodice });
+    voce.righe.push({ totale: r.totale, passeggeri: r.passeggeri, couponCodice: r.couponCodice, ordineId: r.ordineId });
     perPromoter.set(chiave, voce);
   }
+  // Un ordine con più eventi paga il compenso fisso "per acquisto" una volta
+  // sola, nel primo gruppo in cui compare.
+  const acquistiContati = new Set<string>();
   for (const v of perPromoter.values()) {
-    risultato.set(v.gruppo, (risultato.get(v.gruppo) ?? 0) + calcolaCommissioneRighe(v.righe, ctx.coupon, v.percentuale));
+    risultato.set(v.gruppo, (risultato.get(v.gruppo) ?? 0) + calcolaCommissioneRighe(v.righe, ctx.coupon, v.percentuale, acquistiContati));
   }
   for (const [g, n] of risultato) risultato.set(g, arrotondaEuro(n));
   return risultato;

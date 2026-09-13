@@ -8,7 +8,7 @@ let contatore = 0;
 function prenotazione(dati: Partial<PrenotazioneStatistica>): PrenotazioneStatistica {
   contatore += 1;
   return {
-    id: `p${contatore}`, eventoId: 'e1', tragittoId: 't1', fermataCitta: 'Bologna', busId: null, utenteId: `u${contatore}`,
+    id: `p${contatore}`, ordineId: null, eventoId: 'e1', tragittoId: 't1', fermataCitta: 'Bologna', busId: null, utenteId: `u${contatore}`,
     passeggeri: 1, totale: 50, pagato: 50, sconto: '0', scontoBundle: null, couponCodice: null, promoterCodice: null,
     canaleVendita: 'INBUS', whiteLabelId: null, quotaWhiteLabel: null, utmSource: null, utmMedium: null, utmCampaign: null,
     offertaId: null, tipoPagamento: 'COMPLETO', saldoPagato: true, scadenzaSaldo: null,

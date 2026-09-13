@@ -15,7 +15,8 @@ couponRouter.post(
   valida(z.object({ codice: z.string().min(1), importo: z.number().positive(), eventoId: z.string().optional(), emailCliente: z.string().email().optional() })),
   asyncHandler(async (req: Request, res: Response) => {
     const { sconto, coupon: c } = await couponService.valida(req.body.codice, req.body.importo, req.body.eventoId, req.body.emailCliente);
-    res.json({ sconto, tipo: c.tipo, valore: c.valore });
+    // eventoId: il carrello con più eventi applica il coupon solo alle righe di quell'evento.
+    res.json({ sconto, tipo: c.tipo, valore: c.valore, eventoId: c.eventoId });
   }),
 );
 

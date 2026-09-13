@@ -19,6 +19,16 @@ describe('calcolaCommissioneRighe', () => {
     expect(calcolaCommissioneRighe(righe, mappa, 10)).toBe(15); // non 15*5, una volta sola
   });
 
+  it('coupon con compenso FISSO per ACQUISTO su un carrello con due eventi: conta una volta per ordine', () => {
+    const righe = [
+      { totale: 100, passeggeri: 2, couponCodice: 'FISSO5', ordineId: 'ordine-1' },
+      { totale: 80, passeggeri: 1, couponCodice: 'FISSO5', ordineId: 'ordine-1' },
+      { totale: 50, passeggeri: 1, couponCodice: 'FISSO5', ordineId: 'ordine-2' },
+    ];
+    const mappa = new Map([['FISSO5', { compensoTipo: 'FISSO' as const, compensoValore: '15', compensoFissoPer: 'ACQUISTO' as const }]]);
+    expect(calcolaCommissioneRighe(righe, mappa, 10)).toBe(30); // 15 per ordine-1 + 15 per ordine-2
+  });
+
   it('coupon con compenso FISSO per PASSEGGERO: si moltiplica per il numero di passeggeri', () => {
     const righe = [{ totale: 200, passeggeri: 5, couponCodice: 'FISSOPASS' }];
     const mappa = new Map([['FISSOPASS', { compensoTipo: 'FISSO' as const, compensoValore: '3', compensoFissoPer: 'PASSEGGERO' as const }]]);

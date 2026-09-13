@@ -80,7 +80,8 @@ export function WidgetPubblicoPage() {
               onConferma={async ({ righe, passeggeri, cliente, partecipanti, tipoPagamento }) => {
                 const risultato = await whiteLabelApi.ordineBundle(publicWidgetId, righe.map(({ evento, opzione }) => ({
                   eventoId: evento.id, tragittoId: opzione.tragittoId, fermataId: opzione.fermataId, passeggeri,
-                  tipoPagamento, metodoPagamento: 'CARTA', cliente, partecipanti,
+                  // Nessun pagamento online reale ancora: non registrare "Carta".
+                  tipoPagamento, metodoPagamento: 'DA_CONCORDARE', cliente, partecipanti,
                 })));
                 return { pnr: risultato.prenotazioni.map((p) => p.pnr) };
               }}

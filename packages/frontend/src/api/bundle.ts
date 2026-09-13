@@ -24,7 +24,7 @@ export interface BundleRiga {
 
 export interface EventoDelBundle {
   id: string; slug: string; artista: string; data: string; citta: string; luogo: string; genere: string;
-  immagineUrl: string | null; eliminato: boolean; vendibile: boolean;
+  immagineUrl: string | null; accontoEur: string | null; eliminato: boolean; vendibile: boolean;
 }
 
 export interface BundleDettaglio extends Omit<BundleInput, 'eventiIds' | 'scontoPercentuale'> {

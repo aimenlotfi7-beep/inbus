@@ -25,6 +25,8 @@ export interface DatiFinalizzazione {
   citta: string;
   data: string | null;
   tragittoId: string | null;
+  /** Il servizio del tragitto scelto (eventi con più servizi), altrimenti null. */
+  servizioId: string | null;
   fermataId: string | null;
   passeggeri: number;
   nome: string;

@@ -475,10 +475,12 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     if (!vedeEconomia || !datiEconomia) return null;
     if (costoNuovoBus == null) return <p className="nota-margine" style={{ color: 'var(--mist)' }}>Inserisci il costo del bus per vedere il margine.</p>;
     const costoTotale = (datiEconomia.costoCensito ? datiEconomia.costo : 0) + costoNuovoBus;
-    const margine = datiEconomia.incassato - costoTotale;
+    const margine = datiEconomia.incassato - costoTotale - datiEconomia.commissioni;
     return (
       <p className="nota-margine" style={{ color: margine >= 0 ? 'var(--green)' : 'var(--pink)' }}>
-        Incassati {formattaEuro(datiEconomia.incassato)} · costo dei bus {formattaEuro(costoTotale)} · margine {formattaEuro(margine)}{margine < 0 ? ' (per ora in perdita)' : ''}
+        Incassati {formattaEuro(datiEconomia.incassato)} · costo dei bus {formattaEuro(costoTotale)}
+        {datiEconomia.commissioni > 0 && <> · commissioni {formattaEuro(datiEconomia.commissioni)}</>}
+        {' '}· margine {formattaEuro(margine)}{margine < 0 ? ' (per ora in perdita)' : ''}
       </p>
     );
   }

@@ -45,6 +45,8 @@ async function eventiDelBundle(bundleId: string) {
   return righe.map(({ e }) => ({
     id: e.id, slug: e.slug, artista: e.artista, data: e.data, citta: e.citta, luogo: e.luogo, genere: e.genere,
     immagineUrl: primaImmagine.get(e.id) ?? null,
+    // Acconto a passeggero dell'evento: nel carrello del bundle serve quello vero.
+    accontoEur: e.accontoEur,
     eliminato: !!e.eliminatoIl,
     vendibile: vendibili.get(e.id) ?? false,
   }));

@@ -37,6 +37,10 @@ function messaggioBusSbagliato(nome: string, busGiusto: string | null): string {
   return busGiusto ? `${nome} viaggia sul bus ${busGiusto}, non su questo.` : `${nome} non è ancora assegnato a nessun bus.`;
 }
 
+function messaggioSaldoDaPagare(nome: string): string {
+  return `${nome} non ha ancora pagato il saldo: senza saldo non ha il biglietto e non può salire.`;
+}
+
 /** La lista del bus si vede da 24 ore prima della sua partenza (la prima
  *  fermata della linea, ora di Roma): prima lo smistamento non è avvenuto. */
 async function disponibilitaLista(busId: string) {
@@ -157,13 +161,16 @@ export const controlloAccessiService = {
     return trovati.map((p) => {
       const pren = prenotazioniPerId.get(p.prenotazioneId)!;
       const bus = pren.busId ? riferimenti.get(pren.busId) ?? null : null;
-      const valido = busId ? pren.busId === busId : pren.busId !== null && mieiBusIds.has(pren.busId);
+      const sulBusGiusto = busId ? pren.busId === busId : pren.busId !== null && mieiBusIds.has(pren.busId);
+      const valido = sulBusGiusto && pren.saldoPagato;
       const nome = `${p.nome} ${p.cognome}`;
       let messaggio: string | null = null;
-      if (!valido) {
+      if (!sulBusGiusto) {
         if (!pren.busId) messaggio = `${nome} non è ancora assegnato a nessun bus.`;
         else if (mieiBusIds.has(pren.busId)) messaggio = `${nome} viaggia sul tuo bus ${bus}, non su questo.`;
         else messaggio = `${nome} viaggia sul bus ${bus}, che non è assegnato a te.`;
+      } else if (!pren.saldoPagato) {
+        messaggio = messaggioSaldoDaPagare(nome);
       }
       return {
         partecipanteId: p.id,
@@ -201,6 +208,7 @@ export const controlloAccessiService = {
         throw new VietatoDaiPermessi(busGiusto ? `${nome} viaggia sul bus ${busGiusto}, che non è assegnato a te.` : `${nome} non è ancora assegnato a nessun bus.`);
       }
     }
+    if (!pren.saldoPagato) throw new ConflittoDati(messaggioSaldoDaPagare(nome));
 
     // Stesso motivo del controllo atomico in scansiona(): due richieste
     // quasi simultanee non sovrascrivono l'orario di salita due volte.
@@ -238,6 +246,8 @@ export const controlloAccessiService = {
     }
 
     if (salito) {
+      // Deciso dal proprietario: senza saldo niente biglietto, e quindi non si sale.
+      if (!pren.saldoPagato) throw new ConflittoDati(messaggioSaldoDaPagare(nome));
       // Se era già segnato resta l'orario della prima salita.
       await db.update(partecipantiPrenotazione)
         .set({ ticketUtilizzatoIl: new Date() })

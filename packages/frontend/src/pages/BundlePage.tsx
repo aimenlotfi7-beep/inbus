@@ -71,6 +71,7 @@ export function BundlePage() {
                   // Con cliente.dataNascita e cliente.citta (da ospite): senza,
                   // il carrello rifiuta l'ordine.
                   prezzoStimato: opzione.prezzoEffettivo, passeggeri, cliente, partecipanti,
+                  accontoEur: evento.accontoEur ? Number(evento.accontoEur) : null,
                   // Se il bundle decade (un articolo tolto o aggiunto), ogni
                   // articolo resta attribuito come nel checkout singolo.
                   ...provenienza,

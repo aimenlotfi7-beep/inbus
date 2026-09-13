@@ -33,7 +33,8 @@ export async function inviaEventoMetaSeConfigurato(
 }
 
 import { verificaComposizione, ripartisciSconto } from '../bundle/bundle-regole.js';
-import { couponService } from '../coupon/coupon.service.js';
+import { couponService, scontoCoupon } from '../coupon/coupon.service.js';
+import { inizioOggiRoma } from '../../shared/formato.js';
 import { env } from '../../config/env.js';
 import type { CreaPrenotazioneInput } from './prenotazioni.dto.js';
 
@@ -61,26 +62,52 @@ function generaPnr() {
   return 'IB' + crypto.randomBytes(6).toString('hex').toUpperCase();
 }
 
-/** Il coupon vale solo per l'acquisto pieno, non per il solo acconto —
- *  chi prenota ad acconto potrà comunque usarlo al momento di saldare
- *  il resto (vedi saldaResto più sotto), non qui. */
-async function validaCoupon(tx: Tx, codice: string | undefined, importo: number, eventoId: string, tipoPagamento: 'COMPLETO' | 'ACCONTO', emailCliente?: string, incrementaUso: boolean = true) {
-  if (!codice) return { sconto: 0, coupon: null as Awaited<ReturnType<typeof couponService.verificaEIncrementaUtilizzo>>['coupon'] | null };
-  if (tipoPagamento !== 'COMPLETO') {
+/** Il coupon di un ordine (una prenotazione singola è un ordine da una
+ *  riga). Deciso dal proprietario: vale UNA volta per ordine — un solo uso
+ *  contato, lo sconto fisso si divide tra le righe finché non è esaurito,
+ *  quello in percentuale vale su ogni riga. Se il coupon è di un evento
+ *  vale solo sulle righe di quell'evento. */
+interface CouponOrdine {
+  coupon: Awaited<ReturnType<typeof couponService.verificaEIncrementaUtilizzo>>;
+  fissoResiduo: number;
+  righeValide: number;
+}
+
+/** Controlla il coupon e ne conta l'uso, una volta sola, dentro la
+ *  transazione dell'ordine. Il coupon vale solo pagando tutto: chi prenota
+ *  ad acconto lo usa al saldo (saldaResto). */
+async function prenotaCouponOrdine(tx: Tx, articoli: Pick<CreaPrenotazioneInput, 'couponCodice' | 'tipoPagamento'>[], emailCliente: string): Promise<CouponOrdine | null> {
+  const codici = [...new Set(articoli.map((a) => a.couponCodice?.trim().toUpperCase()).filter((c): c is string => !!c))];
+  if (codici.length === 0) return null;
+  if (codici.length > 1) throw new ErroreApplicativo('Si può usare un solo codice sconto per ordine.', 400, 'COUPON_NON_VALIDO');
+  if (articoli.some((a) => a.tipoPagamento !== 'COMPLETO')) {
     throw new ErroreApplicativo('Il coupon si può usare solo con il pagamento completo — con l\'acconto potrai applicarlo quando salderai il resto.', 400, 'COUPON_NON_VALIDO');
   }
-  // BUG CORRETTO: in un ordine con più eventi (bundle/carrello), lo
-  // stesso codice arriva su OGNI articolo — se ogni riga incrementasse
-  // "usiAttuali" per conto suo, un solo acquisto da N eventi contava
-  // come N usi (2 eventi comprati 2 volte = 4 usi registrati invece di
-  // 2). Ogni riga continua a validare il codice (serve per calcolare
-  // lo sconto e la commissione promoter di QUELLA riga, correttamente),
-  // ma solo LA PRIMA di un ordine incrementa il contatore davvero — le
-  // altre leggono soltanto (couponService.valida, mai incrementaUtilizzo).
-  if (!incrementaUso) {
-    return couponService.valida(codice, importo, eventoId, emailCliente);
-  }
-  return couponService.verificaEIncrementaUtilizzo(tx, codice, importo, eventoId, emailCliente);
+  const coupon = await couponService.verificaEIncrementaUtilizzo(tx, codici[0], emailCliente);
+  return { coupon, fissoResiduo: coupon.tipo === 'FISSO' ? Number(coupon.valore) : 0, righeValide: 0 };
+}
+
+/** Lo sconto del coupon dell'ordine su una riga, e il coupon da segnare
+ *  sulla riga (null se non vale per il suo evento). */
+function couponSuRiga(ordine: CouponOrdine | null, importo: number, eventoId: string) {
+  if (!ordine || (ordine.coupon.eventoId && ordine.coupon.eventoId !== eventoId)) return { sconto: 0, coupon: null };
+  ordine.righeValide++;
+  if (ordine.coupon.tipo === 'PERCENTUALE') return { sconto: scontoCoupon(ordine.coupon, importo), coupon: ordine.coupon };
+  const sconto = Math.min(ordine.fissoResiduo, importo);
+  ordine.fissoResiduo -= sconto;
+  return { sconto, coupon: ordine.coupon };
+}
+
+/** L'email dell'account che prenota: un voucher personale si confronta
+ *  con questa, mai con quella scritta nel modulo. */
+async function emailUtente(tx: Tx, utenteId: string) {
+  const [u] = await tx.select({ email: utenti.email }).from(utenti).where(eq(utenti.id, utenteId)).limit(1);
+  if (!u) throw new NonAutorizzato('Account non trovato — effettua di nuovo il login.');
+  return u.email;
+}
+
+function verificaCouponUsato(ordine: CouponOrdine | null) {
+  if (ordine && ordine.righeValide === 0) throw new ErroreApplicativo('Questo coupon non è valido per questo evento', 400, 'COUPON_NON_VALIDO');
 }
 
 /** Ricalcola il totale "vero" di una prenotazione (prezzo pieno, non
@@ -100,7 +127,7 @@ async function calcolaTotaleReale(p: typeof prenotazioni.$inferSelect) {
     prezzoEffettivo = applicaScontoOfferta(prezzoNormale, offerta);
   }
 
-  return prezzoEffettivo * p.passeggeri - Number(p.sconto);
+  return prezzoEffettivo * p.passeggeri - Number(p.sconto) - Number(p.scontoBundle ?? 0);
 }
 
 /** Un codice promoter vale per questo evento? Può essere il codice opaco di un
@@ -122,6 +149,37 @@ async function promoterPerEvento(lettore: Pick<typeof db, 'select'>, codice: str
   return escluso ? { valido: false } : { valido: true, codice: p.codice };
 }
 
+function accontoPerPasseggero(evento: { accontoEur: string | null }) {
+  return evento.accontoEur ? Number(evento.accontoEur) : env.ACCONTO_FISSO_EUR;
+}
+
+function scadenzaSaldoEvento(evento: { data: Date }) {
+  return new Date(evento.data.getTime() - env.GIORNI_SCADENZA_SALDO * 24 * 3600 * 1000);
+}
+
+/** Fermata, tragitto ed evento di una riga, se oggi si possono vendere: il
+ *  sito nasconde già il resto, ma una richiesta costruita a mano (o un
+ *  carrello vecchio) non deve poter comprare una fermata spenta, un
+ *  tragitto non in vendita o un evento in bozza, nel cestino, passato o
+ *  con le vendite fermate. */
+async function rigaVendibile(lettore: Pick<typeof db, 'select'>, input: Pick<CreaPrenotazioneInput, 'eventoId' | 'tragittoId' | 'fermataId'>) {
+  const [fermata] = await lettore.select().from(fermate).where(eq(fermate.id, input.fermataId)).limit(1);
+  if (!fermata || fermata.tragittoId !== input.tragittoId) throw new NonTrovato('Fermata');
+  const [tragitto] = await lettore.select().from(tragitti).where(eq(tragitti.id, input.tragittoId)).limit(1);
+  if (!tragitto || tragitto.eventoId !== input.eventoId || tragitto.eliminatoIl) throw new NonTrovato('Bus');
+  const [evento] = await lettore.select().from(eventi).where(eq(eventi.id, input.eventoId)).limit(1);
+  if (!evento || evento.bozza || evento.eliminatoIl) throw new NonTrovato('Evento');
+  // "Ferma vendite" dal gestionale: nessuna prenotazione da nessun canale
+  // (sito, link diretto, widget White Label, carrello, lista d'attesa).
+  if (evento.venditeFermate) throw new ConflittoDati('Le prenotazioni per questo evento sono chiuse.');
+  // Il giorno dell'evento si vende ancora (ora di Roma): i bus partono.
+  if (evento.data < inizioOggiRoma()) throw new ConflittoDati('Questo evento è già passato.');
+  if (!tragitto.attivo || tragitto.stato === 'DA_CONFERMARE') throw new ConflittoDati('Questo tragitto non è in vendita.');
+  if (!fermata.attivo) throw new ConflittoDati('Questa fermata non è più prenotabile: scegline un\'altra.');
+  if (prezzoNormaleFermata(fermata, evento, tragitto) <= 0) throw new ConflittoDati('Il prezzo di questa fermata non è ancora definito.');
+  return { fermata, tragitto, evento };
+}
+
 /** La vera logica di creazione di UNA prenotazione (blocco posti,
  *  calcolo prezzo, coupon, credito, inserimento) — prende "tx" come
  *  parametro invece di aprire una propria transazione, così può
@@ -141,33 +199,20 @@ async function creaRigaInterna(
   // whiteLabelId arrivasse solo dopo, il biglietto partirebbe già col
   // layout sbagliato (quello dell'evento, mai quello della White
   // Label), esattamente il bug segnalato.
-  canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string },
+  canaleVendita: { canale: 'WHITE_LABEL'; whiteLabelId: string } | undefined,
   /** Solo per gli ordini bundle: la quota di sconto (in euro, già
    *  ripartita e arrotondata da bundle-regole.ripartisciSconto) da
    *  togliere a QUESTA riga prima di coupon/acconto/credito. Assente nel
    *  flusso singolo: nessun cambio di comportamento. */
-  scontoBundle?: number,
-  /** Se questa riga deve incrementare DAVVERO il contatore di utilizzo
-   *  del coupon (usiAttuali) — true di default (comportamento del
-   *  flusso singolo, invariato). creaOrdine la passa false per tutte le
-   *  righe tranne la prima di un ordine multi-evento, per non contare
-   *  un solo acquisto più volte (vedi commento su validaCoupon). */
-  incrementaCoupon: boolean = true,
+  scontoBundle: number | undefined,
+  /** Il coupon dell'ordine, già controllato e contato una volta sola
+   *  (prenotaCouponOrdine). */
+  couponOrdine: CouponOrdine | null,
 ) {
   const [utente] = await tx.select().from(utenti).where(eq(utenti.id, utenteId)).limit(1);
   if (!utente) throw new NonAutorizzato('Account non trovato — effettua di nuovo il login.');
 
-  const [fermata] = await tx.select().from(fermate).where(eq(fermate.id, input.fermataId)).limit(1);
-  if (!fermata || fermata.tragittoId !== input.tragittoId) throw new NonTrovato('Fermata');
-
-  const [tragitto] = await tx.select().from(tragitti).where(eq(tragitti.id, input.tragittoId)).limit(1);
-  if (!tragitto || tragitto.eventoId !== input.eventoId) throw new NonTrovato('Bus');
-
-  const [evento] = await tx.select().from(eventi).where(eq(eventi.id, input.eventoId)).limit(1);
-  if (!evento) throw new NonTrovato('Evento');
-  // "Ferma vendite" dal gestionale: nessuna prenotazione da nessun canale
-  // (sito, link diretto, widget White Label, carrello, lista d'attesa).
-  if (evento.venditeFermate) throw new ConflittoDati('Le prenotazioni per questo evento sono chiuse.');
+  const { fermata, tragitto, evento } = await rigaVendibile(tx, input);
 
   // --- Blocco posti atomico sul bus (come prima) ---
   const righeAggiornate = await tx
@@ -224,10 +269,7 @@ async function creaRigaInterna(
   // così ogni calcolo a valle — e ogni report che legge
   // prenotazioni.totale — lo vede senza saperne nulla.
   const importoBase = prezzoEffettivo * input.passeggeri - (scontoBundle ?? 0);
-  // Un voucher personale si confronta con l'email dell'account che prenota,
-  // non con quella scritta nel modulo: altrimenti bastava scrivere l'email
-  // di un altro per usarne il voucher.
-  const { sconto, coupon: couponUsato } = await validaCoupon(tx, input.couponCodice, importoBase, input.eventoId, input.tipoPagamento, utente.email, incrementaCoupon);
+  const { sconto, coupon: couponUsato } = couponSuRiga(couponOrdine, importoBase, input.eventoId);
 
   // Il coupon collegato a un promoter attribuisce la vendita anche a
   // lui — un solo codice per sconto e commissione insieme, in aggiunta
@@ -257,12 +299,15 @@ async function creaRigaInterna(
     promoterCodiceDaSalvare = esito.codice;
   }
 
-  const acconto = evento.accontoEur ? Number(evento.accontoEur) : env.ACCONTO_FISSO_EUR;
   const totale = importoBase - sconto;
   const saldoPagato = input.tipoPagamento === 'COMPLETO';
-  const scadenzaSaldo = input.tipoPagamento === 'ACCONTO'
-    ? new Date(evento.data.getTime() - env.GIORNI_SCADENZA_SALDO * 24 * 3600 * 1000)
-    : null;
+  // Acconto per passeggero (deciso dal proprietario), mai sopra il totale.
+  const acconto = Math.min(accontoPerPasseggero(evento) * input.passeggeri, totale);
+  const scadenzaSaldo = input.tipoPagamento === 'ACCONTO' ? scadenzaSaldoEvento(evento) : null;
+  // Un acconto che nascerebbe con il saldo già scaduto non ha senso.
+  if (scadenzaSaldo && scadenzaSaldo <= new Date()) {
+    throw new ErroreApplicativo(`L'acconto non è più disponibile per questo evento: mancano meno di ${env.GIORNI_SCADENZA_SALDO} giorni. Scegli il pagamento completo.`, 400, 'ACCONTO_NON_DISPONIBILE');
+  }
 
   // L'account è già quello autenticato — non c'è più bisogno di
   // creare/ricercare l'utente da un'email scritta nel corpo della
@@ -282,10 +327,6 @@ async function creaRigaInterna(
   if (input.usaCredito && input.tipoPagamento === 'COMPLETO') {
     const [{ creditoDisponibile }] = await tx.select({ creditoDisponibile: utenti.creditoDisponibile }).from(utenti).where(eq(utenti.id, utente.id)).limit(1);
     creditoUsato = Math.min(Number(creditoDisponibile), totale);
-  }
-
-  if (couponUsato) {
-    await tx.update(coupon).set({ usiAttuali: sql`${coupon.usiAttuali} + 1` }).where(eq(coupon.id, couponUsato.id));
   }
 
   const [prenotazione] = await tx
@@ -407,7 +448,12 @@ export const prenotazioniService = {
    * (il rischio concreto che c'era nel prototipo basato su localStorage).
    */
   async crea(input: CreaPrenotazioneInput, utenteId: string, canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }, richiesta?: { ip?: string; userAgent?: string }) {
-    const risultato = await db.transaction((tx) => creaRigaInterna(tx, input, utenteId, canaleVendita));
+    const risultato = await db.transaction(async (tx) => {
+      const couponOrdine = await prenotaCouponOrdine(tx, [input], await emailUtente(tx, utenteId));
+      const riga = await creaRigaInterna(tx, input, utenteId, canaleVendita, undefined, couponOrdine);
+      verificaCouponUsato(couponOrdine);
+      return riga;
+    });
     await inviaConfermaPrenotazione(risultato);
     // Meta Conversions API — best-effort, dopo che la prenotazione è già
     // confermata: un problema con l'API di Meta non deve mai bloccare o
@@ -452,17 +498,15 @@ export const prenotazioniService = {
       if (!bundleScelto.ammetteAcconto && articoli.some((a) => a.tipoPagamento === 'ACCONTO')) throw new ErroreApplicativo('Questo bundle richiede il pagamento completo.', 400, 'BUNDLE_NO_ACCONTO');
       if (!bundleScelto.ammettePromoter && articoli.some((a) => a.promoterCodice)) throw new ErroreApplicativo('Questo bundle non è vendibile tramite promoter.', 400, 'BUNDLE_NO_PROMOTER');
       if (!bundleScelto.ammetteCredito) articoli = articoli.map((a) => ({ ...a, usaCredito: false }));
-      // Sconto ripartito per riga sul prezzo pieno (fermata + extra),
-      // in centesimi esatti — serve il prezzo di ogni riga PRIMA di
-      // crearla: lo si legge qui con la stessa prezzoNormaleFermata
-      // che creaRigaInterna userà poi.
+      // Sconto ripartito per riga sul prezzo della riga (fermata + extra,
+      // con l'eventuale offerta), in centesimi esatti — serve il prezzo di
+      // ogni riga PRIMA di crearla: lo si calcola qui come farà poi
+      // creaRigaInterna.
       const importi: number[] = [];
       for (const a of articoli) {
-        const [f] = await db.select().from(fermate).where(eq(fermate.id, a.fermataId)).limit(1);
-        const [t] = await db.select().from(tragitti).where(eq(tragitti.id, a.tragittoId)).limit(1);
-        const [e] = await db.select().from(eventi).where(eq(eventi.id, a.eventoId)).limit(1);
-        if (!f || !t || !e || f.tragittoId !== t.id || t.eventoId !== e.id) throw new NonTrovato('Fermata');
-        importi.push(prezzoNormaleFermata(f, e, t) * a.passeggeri);
+        const { fermata, tragitto, evento } = await rigaVendibile(db, a);
+        const [offerta] = a.offertaId ? await db.select().from(offerteEvento).where(eq(offerteEvento.id, a.offertaId)).limit(1) : [];
+        importi.push(applicaScontoOfferta(prezzoNormaleFermata(fermata, evento, tragitto), offerta) * a.passeggeri);
       }
       scontiPerRiga = ripartisciSconto(importi, bundleScelto.scontoPercentuale);
     }
@@ -478,10 +522,12 @@ export const prenotazioniService = {
     )));
 
     const { ordine, righe } = await db.transaction(async (tx) => {
+      const couponOrdine = await prenotaCouponOrdine(tx, articoli, await emailUtente(tx, utenteId));
       const righeCreate = [];
       for (const [i, articolo] of articoli.entries()) {
-        righeCreate.push(await creaRigaInterna(tx, articolo, utenteId, canaleVendita, scontiPerRiga?.[i], i === 0));
+        righeCreate.push(await creaRigaInterna(tx, articolo, utenteId, canaleVendita, scontiPerRiga?.[i], couponOrdine));
       }
+      verificaCouponUsato(couponOrdine);
       const totaleOrdine = righeCreate.reduce((somma, r) => somma + Number(r.totale), 0);
       const scontoBundleTotale = scontiPerRiga ? scontiPerRiga.reduce((a, b) => a + b, 0) : null;
       const [nuovoOrdine] = await tx.insert(ordini).values({
@@ -771,11 +817,18 @@ export const prenotazioniService = {
       if (p.saldoPagato) return { riga: p, appenaSaldata: false };
 
       let totaleReale = await calcolaTotaleReale(p);
-      let couponUsato: Awaited<ReturnType<typeof couponService.verificaEIncrementaUtilizzo>>['coupon'] | null = null;
+      // Coupon al saldo: stesso trattamento dell'acquisto pieno — sconto
+      // salvato sulla prenotazione e vendita attribuita al promoter del
+      // coupon, se vale per l'evento.
+      let conCoupon: { codice: string; sconto: string; promoterCodice?: string } | null = null;
       if (couponCodice) {
-        const { sconto, coupon: c } = await couponService.verificaEIncrementaUtilizzo(tx, couponCodice, totaleReale, p.eventoId, email);
+        const c = await couponService.verificaEIncrementaUtilizzo(tx, couponCodice, utente.email);
+        if (c.eventoId && c.eventoId !== p.eventoId) throw new ErroreApplicativo('Questo coupon non è valido per questo evento', 400, 'COUPON_NON_VALIDO');
+        const sconto = scontoCoupon(c, totaleReale);
         totaleReale = Math.max(0, totaleReale - sconto);
-        couponUsato = c;
+        const promoterDaCoupon = await couponService.promoterDiCoupon(tx, c.promoterId);
+        const esito = promoterDaCoupon ? await promoterPerEvento(tx, promoterDaCoupon, p.eventoId) : null;
+        conCoupon = { codice: c.codice, sconto: (Number(p.sconto) + sconto).toFixed(2), ...(esito?.valido && { promoterCodice: esito.codice }) };
       }
 
       // Atomico anche qui: la condizione "saldoPagato = false" si
@@ -787,7 +840,8 @@ export const prenotazioniService = {
         .update(prenotazioni)
         .set({
           saldoPagato: true, saldoPagatoIl: new Date(), totale: totaleReale.toFixed(2),
-          ...(couponUsato && { couponCodice: couponUsato.codice }),
+          ...(conCoupon && { couponCodice: conCoupon.codice, sconto: conCoupon.sconto }),
+          ...(conCoupon?.promoterCodice && { promoterCodice: conCoupon.promoterCodice }),
         })
         .where(and(eq(prenotazioni.pnr, pnr), eq(prenotazioni.saldoPagato, false)))
         .returning();

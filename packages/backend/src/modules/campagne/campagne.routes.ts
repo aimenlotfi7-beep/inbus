@@ -1,9 +1,9 @@
 import { Router, type Request, type Response } from 'express';
-import { eq, and, gte } from 'drizzle-orm';
+import { eq, gte } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
-import { campagne, prenotazioni, promoter } from '../../db/schema.js';
-import { calcolaCommissionePromoter } from '../../shared/commissionePromoter.js';
+import { campagne, prenotazioni } from '../../db/schema.js';
+import { inizioGiornoRoma } from '../../shared/formato.js';
 import { NonTrovato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
@@ -42,74 +42,45 @@ export const campagneService = {
 
 /** Fatturato per fonte — la vista che manca all'anagrafica campagne
  *  qui sopra: non "che campagne esistono" ma "quanto ha reso ognuna",
- *  con lo sconto bundle scorporato e la commissione promoter già
- *  sottratta (margine netto), non solo il fatturato lordo.
+ *  con lo sconto bundle scorporato e le commissioni (promoter e quote
+ *  White Label) già sottratte (margine netto).
  *
- *  Una prenotazione si attribuisce a UNA fonte, in quest'ordine:
- *  1. Promoter, se ha un promoterCodice (è la scelta più esplicita:
- *     qualcuno ha usato un codice preciso).
- *  2. Una campagna registrata, se la sua tripla utm coincide.
- *  3. "UTM non registrata" — ha dei parametri utm, ma nessuna riga in
- *     Campagne li descrive (es. un link montato a mano).
- *  4. "Diretto/organico" — nessun dato di provenienza affatto. */
+ *  Stesse regole e stessa fonte di Statistiche → Vendite e canali
+ *  (fonteDi, commissioniPer): prima questo report contava anche gli eventi
+ *  in bozza o nel cestino e gli acconti per il solo acconto, e dava numeri
+ *  diversi per lo stesso periodo. */
 async function reportFatturatoPerFonte(dataDa?: Date) {
-  const [righe, tutteCampagne, tuttiPromoter] = await Promise.all([
-    db.select({
-      utmSource: prenotazioni.utmSource, utmMedium: prenotazioni.utmMedium, utmCampaign: prenotazioni.utmCampaign,
-      promoterCodice: prenotazioni.promoterCodice, totale: prenotazioni.totale, scontoBundle: prenotazioni.scontoBundle,
-      passeggeri: prenotazioni.passeggeri, couponCodice: prenotazioni.couponCodice,
-    }).from(prenotazioni).where(and(eq(prenotazioni.stato, 'CONFERMATA'), dataDa ? gte(prenotazioni.creataIl, dataDa) : undefined)),
-    db.select().from(campagne),
-    db.select().from(promoter),
-  ]);
+  const { prenotazioniComeStatistiche } = await import('../statistiche/statistiche.service.js');
+  const { commissioniPer } = await import('../statistiche/economia.js');
+  const { fonteDi, arrotondaEuro } = await import('../statistiche/calcoli.js');
+  const { righe, ctx } = await prenotazioniComeStatistiche(dataDa ? gte(prenotazioni.creataIl, dataDa) : undefined);
 
-  interface Gruppo {
-    fonte: string; tipo: 'promoter' | 'campagna' | 'utm_non_registrata' | 'diretto';
-    numeroPrenotazioni: number; passeggeri: number; fatturato: number; scontoBundleApplicato: number;
-    defaultPercentuale?: number; righeGruppo: { totale: number; passeggeri: number; couponCodice: string | null }[];
-  }
-  const gruppi = new Map<string, Gruppo>();
-
+  const fontePerRiga = new Map(righe.map((r) => [r.id, fonteDi(r, ctx.campagne, ctx.nomiPromoter, ctx.nomiWhiteLabel)]));
+  const commissioni = commissioniPer(righe, (r) => fontePerRiga.get(r.id)!.chiave, ctx);
+  const gruppi = new Map<string, { fonte: string; tipo: string; numeroPrenotazioni: number; passeggeri: number; fatturato: number; scontoBundleApplicato: number }>();
   for (const r of righe) {
-    let chiave: string; let fonte: string; let tipo: Gruppo['tipo']; let defaultPercentuale: number | undefined;
-    const p = r.promoterCodice ? tuttiPromoter.find((x) => x.codice === r.promoterCodice) : undefined;
-    if (r.promoterCodice) {
-      chiave = `promoter:${r.promoterCodice}`; tipo = 'promoter';
-      fonte = p ? `Promoter — ${p.nome}` : `Promoter — codice "${r.promoterCodice}" (non trovato)`;
-      defaultPercentuale = p ? Number(p.commissionePercentuale) : undefined;
-    } else {
-      const c = r.utmSource ? tutteCampagne.find((x) => x.utmSource === r.utmSource && (x.utmMedium ?? null) === (r.utmMedium ?? null) && (x.utmCampaign ?? null) === (r.utmCampaign ?? null)) : undefined;
-      if (c) { chiave = `campagna:${c.id}`; tipo = 'campagna'; fonte = c.nome; }
-      else if (r.utmSource) { chiave = `utm:${r.utmSource}/${r.utmMedium ?? ''}`; tipo = 'utm_non_registrata'; fonte = `${r.utmSource}${r.utmMedium ? ` / ${r.utmMedium}` : ''} (nessuna campagna registrata)`; }
-      else { chiave = 'diretto'; tipo = 'diretto'; fonte = 'Diretto / organico (nessun dato di provenienza)'; }
-    }
-    const g = gruppi.get(chiave) ?? { fonte, tipo, numeroPrenotazioni: 0, passeggeri: 0, fatturato: 0, scontoBundleApplicato: 0, defaultPercentuale, righeGruppo: [] };
+    const f = fontePerRiga.get(r.id)!;
+    const g = gruppi.get(f.chiave) ?? { fonte: f.nome, tipo: f.tipo, numeroPrenotazioni: 0, passeggeri: 0, fatturato: 0, scontoBundleApplicato: 0 };
     g.numeroPrenotazioni += 1;
     g.passeggeri += r.passeggeri;
-    g.fatturato += Number(r.totale);
+    g.fatturato += r.totale;
     g.scontoBundleApplicato += Number(r.scontoBundle ?? 0);
-    g.righeGruppo.push({ totale: Number(r.totale), passeggeri: r.passeggeri, couponCodice: r.couponCodice });
-    gruppi.set(chiave, g);
+    gruppi.set(f.chiave, g);
   }
-
-  const risultati = await Promise.all([...gruppi.values()].map(async (g) => {
-    // La commissione non è più "fatturato × un'unica percentuale": un
-    // coupon può avere un compenso proprio (percentuale diversa, o un
-    // importo fisso), quindi si calcola riga per riga (vedi
-    // shared/commissionePromoter.ts, condivisa con le statistiche del
-    // promoter stesso — stessa logica, un solo posto dove viverla).
-    const commissione = g.defaultPercentuale != null ? await calcolaCommissionePromoter(g.righeGruppo, g.defaultPercentuale) : 0;
-    const { righeGruppo, defaultPercentuale, ...resto } = g;
-    return { ...resto, commissione, margineNetto: g.fatturato - commissione };
-  }));
-  return risultati.sort((a, b) => b.fatturato - a.fatturato);
+  return [...gruppi.entries()].map(([chiave, g]) => {
+    const fatturato = arrotondaEuro(g.fatturato);
+    const commissione = commissioni.get(chiave) ?? 0;
+    return { ...g, fatturato, scontoBundleApplicato: arrotondaEuro(g.scontoBundleApplicato), commissione, margineNetto: arrotondaEuro(fatturato - commissione) };
+  }).sort((a, b) => b.fatturato - a.fatturato);
 }
 
 export const campagneRouter = Router();
 campagneRouter.use(richiedeAuth, richiedePermesso('campagne.gestisci'));
 
 campagneRouter.get('/report', asyncHandler(async (req: Request, res: Response) => {
-  const dataDa = typeof req.query.dataDa === 'string' && req.query.dataDa ? new Date(req.query.dataDa) : undefined;
+  // "2026-09-13" = dall'inizio di quel giorno a Roma (come le Statistiche).
+  const testo = typeof req.query.dataDa === 'string' ? req.query.dataDa : '';
+  const dataDa = /^\d{4}-\d{2}-\d{2}$/.test(testo) ? inizioGiornoRoma(new Date(testo)) : testo ? new Date(testo) : undefined;
   res.json(await reportFatturatoPerFonte(dataDa));
 }));
 

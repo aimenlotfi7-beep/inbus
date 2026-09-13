@@ -33,7 +33,8 @@ export function FinalizzaListaAttesaPage() {
     listaAttesaApi.getByToken(token)
       .then(async (d) => {
         setDati(d);
-        const opz = await eventiApi.opzioniPartenza(d.eventoId);
+        // Negli eventi con più servizi le fermate sono quelle del servizio del tragitto scelto.
+        const opz = await eventiApi.opzioniPartenza(d.eventoId, d.servizioId ?? undefined);
         setOpzioni(opz);
         const preferita = opz.find((o) => o.fermataId === d.fermataId && o.postiDisponibili > 0);
         const primaConPosti = opz.find((o) => o.postiDisponibili > 0);
@@ -47,6 +48,8 @@ export function FinalizzaListaAttesaPage() {
   const opzioneScelta = disponibili.find((o) => o.fermataId === fermataId);
   const totale = dati && opzioneScelta ? opzioneScelta.prezzoEffettivo * dati.passeggeri : 0;
   const invio = stato === 'invio';
+  // Niente acconto se il saldo (15 giorni prima dell'evento) è già scaduto: il server lo rifiuta.
+  const accontoPossibile = !!dati?.data && new Date(dati.data).getTime() - 15 * 24 * 3600 * 1000 > Date.now();
 
   async function conferma(tipoPagamento: 'COMPLETO' | 'ACCONTO') {
     if (!token || !opzioneScelta) { setMessaggioErrore('Scegli una fermata di partenza per continuare'); return; }
@@ -58,7 +61,7 @@ export function FinalizzaListaAttesaPage() {
         tragittoId: opzioneScelta.tragittoId,
         fermataId: opzioneScelta.fermataId,
         tipoPagamento,
-        metodoPagamento: 'CARTA',
+        metodoPagamento: 'DA_CONCORDARE', // nessun pagamento online reale ancora: non registrare "Carta"
       });
       setPnr(r.pnr);
       setStato('confermato');
@@ -127,9 +130,11 @@ export function FinalizzaListaAttesaPage() {
                       <button type="button" className="btn btn-primary btn-lg btn-block" disabled={invio} onClick={() => conferma('COMPLETO')}>
                         {azioneInCorso === 'acquista' ? 'Invio…' : 'Conferma la prenotazione'}
                       </button>
-                      <button type="button" className="btn btn-secondary btn-lg btn-block" disabled={invio} onClick={() => conferma('ACCONTO')}>
-                        {azioneInCorso === 'acconto' ? 'Invio…' : 'Conferma con acconto'}
-                      </button>
+                      {accontoPossibile && (
+                        <button type="button" className="btn btn-secondary btn-lg btn-block" disabled={invio} onClick={() => conferma('ACCONTO')}>
+                          {azioneInCorso === 'acconto' ? 'Invio…' : 'Conferma con acconto'}
+                        </button>
+                      )}
                     </div>
                   </>
                 )}

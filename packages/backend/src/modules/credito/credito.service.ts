@@ -70,6 +70,23 @@ export const creditoService = {
     });
   },
 
+  /** Rimborso approvato: il credito che il cliente aveva usato su questa
+   *  prenotazione torna disponibile. Una volta sola: il movimento di
+   *  restituzione, se c'è già, lo impedisce. */
+  async restituisciCreditoUsato(prenotazioneId: string) {
+    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, prenotazioneId)).limit(1);
+    const importo = p ? Number(p.creditoUsato) : 0;
+    if (!p || importo <= 0) return;
+    const motivo = `Credito restituito — rimborso PNR ${p.pnr}`;
+    await db.transaction(async (tx) => {
+      const [giaFatto] = await tx.select({ id: movimentiCredito.id }).from(movimentiCredito)
+        .where(and(eq(movimentiCredito.prenotazioneId, p.id), eq(movimentiCredito.motivo, motivo))).limit(1);
+      if (giaFatto) return;
+      await tx.insert(movimentiCredito).values({ utenteId: p.utenteId, importo: importo.toFixed(2), motivo, prenotazioneId: p.id });
+      await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} + ${importo.toFixed(2)}` }).where(eq(utenti.id, p.utenteId));
+    });
+  },
+
   /** Da chiamare una volta al giorno (scheduler): trova le prenotazioni
    *  il cui viaggio è ormai avvenuto per davvero (data evento passata),
    *  pagate per intero, non ancora "maturate" — e accredita il cliente.

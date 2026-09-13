@@ -13,15 +13,20 @@ function generaPublicWidgetId(): string {
 }
 
 async function getRigaCompleta(id: string) {
+  // leftJoin su evento e bundle: una white label è dell'uno O dell'altro.
+  // Con innerJoin sull'evento quelle dei bundle risultavano "non trovate" e
+  // non si potevano più modificare, spegnere né eliminare.
   const [riga] = await db
     .select({
       whiteLabel,
       organizzatoreNome: organizzatori.nome,
       eventoArtista: eventi.artista,
+      bundleNome: bundle.nome,
     })
     .from(whiteLabel)
     .innerJoin(organizzatori, eq(whiteLabel.organizzatoreId, organizzatori.id))
-    .innerJoin(eventi, eq(whiteLabel.eventoId, eventi.id))
+    .leftJoin(eventi, eq(whiteLabel.eventoId, eventi.id))
+    .leftJoin(bundle, eq(whiteLabel.bundleId, bundle.id))
     .where(eq(whiteLabel.id, id))
     .limit(1);
   if (!riga) throw new WhiteLabelNonTrovata();
@@ -30,6 +35,7 @@ async function getRigaCompleta(id: string) {
     tema: normalizzaTema(riga.whiteLabel.tema),
     organizzatoreNome: riga.organizzatoreNome,
     eventoArtista: riga.eventoArtista,
+    bundleNome: riga.bundleNome,
   };
 }
 
@@ -86,6 +92,9 @@ export const whiteLabelService = {
       dominiAutorizzati: input.dominiAutorizzati,
       tema: temaCompleto,
       layoutBigliettoId: input.layoutBigliettoId ?? null,
+      // Prima si perdevano: arrivavano dal modulo ma non si salvavano.
+      metaPixelId: input.metaPixelId ?? null,
+      metaCapiToken: input.metaCapiToken ?? null,
     }).returning();
     return getRigaCompleta(nuova.id);
   },

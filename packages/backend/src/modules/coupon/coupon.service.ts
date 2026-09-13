@@ -15,6 +15,30 @@ async function getById(id: string) {
   return c;
 }
 
+/** Lo sconto di un coupon su un importo: percentuale, oppure l'importo
+ *  fisso senza mai superare l'importo. */
+export function scontoCoupon(c: { tipo: 'PERCENTUALE' | 'FISSO'; valore: string }, importo: number): number {
+  return c.tipo === 'PERCENTUALE' ? importo * (Number(c.valore) / 100) : Math.min(Number(c.valore), importo);
+}
+
+/** Il coupon con questo codice se oggi è usabile da questo cliente: attivo,
+ *  nelle date (giorni interi, ora di Roma: "valido fino al 30/09" vale fino
+ *  a fine giornata) e, se è un voucher personale, dell'email giusta. */
+async function leggiCouponValido(lettore: Pick<typeof db, 'select'>, codice: string, emailCliente?: string) {
+  const [c] = await lettore.select().from(coupon).where(eq(coupon.codice, codice.toUpperCase())).limit(1);
+  if (!c || !c.attivo) throw new ErroreApplicativo('Coupon non valido', 400, 'COUPON_NON_VALIDO');
+  const oggi = new Date();
+  if (c.validoDal && oggi < inizioGiornoRoma(c.validoDal)) throw new ErroreApplicativo('Coupon non ancora attivo', 400, 'COUPON_NON_VALIDO');
+  if (c.validoAl && oggi >= fineGiornoRoma(c.validoAl)) throw new ErroreApplicativo('Coupon scaduto', 400, 'COUPON_NON_VALIDO');
+  if (c.utenteId) {
+    const [proprietario] = await lettore.select({ email: utenti.email }).from(utenti).where(eq(utenti.id, c.utenteId)).limit(1);
+    if (!proprietario || proprietario.email.toLowerCase() !== emailCliente?.toLowerCase()) {
+      throw new ErroreApplicativo('Questo voucher è personale, non è associato a questa email', 400, 'COUPON_NON_VALIDO');
+    }
+  }
+  return c;
+}
+
 export const couponService = {
   list: () => db.select().from(coupon),
   getById,
@@ -63,53 +87,23 @@ export const couponService = {
     await db.delete(coupon).where(eq(coupon.id, id));
   },
 
-  /** Logica di validazione condivisa: usata qui per l'anteprima admin e
-   *  da prenotazioni.service.ts al momento del vero acquisto. */
+  /** Anteprima pubblica (checkout, carrello, saldo): stesse regole
+   *  dell'acquisto, senza contare l'uso. `importo` è quello delle righe su
+   *  cui il coupon vale. */
   async valida(codice: string, importo: number, eventoId?: string, emailCliente?: string) {
-    const [c] = await db.select().from(coupon).where(eq(coupon.codice, codice.toUpperCase())).limit(1);
-    if (!c || !c.attivo) throw new ErroreApplicativo('Coupon non valido', 400, 'COUPON_NON_VALIDO');
-    const oggi = new Date();
-    // Le date del gestionale sono giorni interi (ora di Roma): "valido fino
-    // al 30/09" vale fino a fine giornata, non fino alle 02:00 del 30.
-    if (c.validoDal && oggi < inizioGiornoRoma(c.validoDal)) throw new ErroreApplicativo('Coupon non ancora attivo', 400, 'COUPON_NON_VALIDO');
-    if (c.validoAl && oggi >= fineGiornoRoma(c.validoAl)) throw new ErroreApplicativo('Coupon scaduto', 400, 'COUPON_NON_VALIDO');
+    const c = await leggiCouponValido(db, codice, emailCliente);
     if (c.usiMax !== null && c.usiAttuali >= c.usiMax) throw new ErroreApplicativo('Coupon esaurito', 400, 'COUPON_NON_VALIDO');
     if (c.eventoId && eventoId && c.eventoId !== eventoId) throw new ErroreApplicativo('Questo coupon non è valido per questo evento', 400, 'COUPON_NON_VALIDO');
-    if (c.utenteId) {
-      const [proprietario] = await db.select({ email: utenti.email }).from(utenti).where(eq(utenti.id, c.utenteId)).limit(1);
-      if (!proprietario || proprietario.email.toLowerCase() !== emailCliente?.toLowerCase()) {
-        throw new ErroreApplicativo('Questo voucher è personale, non è associato a questa email', 400, 'COUPON_NON_VALIDO');
-      }
-    }
-
-    const sconto = c.tipo === 'PERCENTUALE' ? importo * (Number(c.valore) / 100) : Math.min(Number(c.valore), importo);
-    return { sconto, coupon: c };
+    return { sconto: scontoCoupon(c, importo), coupon: c };
   },
 
-  /** Come valida() sopra (stesse regole), MA usata al momento del vero
-   *  acquisto (dentro la transazione della prenotazione, "tx"
-   *  obbligatoria) — controllo e incremento in UN solo comando atomico
-   *  (UPDATE...WHERE...RETURNING), non due passaggi separati. Due
-   *  richieste quasi simultanee sull'ultimo uso disponibile: solo una
-   *  delle due riceve una riga da RETURNING, l'altra vede l'elenco
-   *  vuoto e capisce che il coupon è stato appena esaurito da qualcun
-   *  altro — impossibile che entrambe passino. */
-  async verificaEIncrementaUtilizzo(tx: Tx, codice: string, importo: number, eventoId?: string, emailCliente?: string) {
-    const [c] = await tx.select().from(coupon).where(eq(coupon.codice, codice.toUpperCase())).limit(1);
-    if (!c || !c.attivo) throw new ErroreApplicativo('Coupon non valido', 400, 'COUPON_NON_VALIDO');
-    const oggi = new Date();
-    // Le date del gestionale sono giorni interi (ora di Roma): "valido fino
-    // al 30/09" vale fino a fine giornata, non fino alle 02:00 del 30.
-    if (c.validoDal && oggi < inizioGiornoRoma(c.validoDal)) throw new ErroreApplicativo('Coupon non ancora attivo', 400, 'COUPON_NON_VALIDO');
-    if (c.validoAl && oggi >= fineGiornoRoma(c.validoAl)) throw new ErroreApplicativo('Coupon scaduto', 400, 'COUPON_NON_VALIDO');
-    if (c.eventoId && eventoId && c.eventoId !== eventoId) throw new ErroreApplicativo('Questo coupon non è valido per questo evento', 400, 'COUPON_NON_VALIDO');
-    if (c.utenteId) {
-      const [proprietario] = await tx.select({ email: utenti.email }).from(utenti).where(eq(utenti.id, c.utenteId)).limit(1);
-      if (!proprietario || proprietario.email.toLowerCase() !== emailCliente?.toLowerCase()) {
-        throw new ErroreApplicativo('Questo voucher è personale, non è associato a questa email', 400, 'COUPON_NON_VALIDO');
-      }
-    }
-
+  /** Al momento del vero acquisto (dentro la transazione): stessi
+   *  controlli di valida() e UN uso contato, in un solo comando atomico
+   *  (UPDATE...WHERE...RETURNING) — due richieste sull'ultimo uso
+   *  disponibile non passano entrambe. Si chiama una volta per ordine o
+   *  per saldo: l'evento lo controlla chi applica lo sconto alle righe. */
+  async verificaEIncrementaUtilizzo(tx: Tx, codice: string, emailCliente?: string) {
+    const c = await leggiCouponValido(tx, codice, emailCliente);
     const [aggiornato] = await tx.update(coupon)
       .set({ usiAttuali: sql`${coupon.usiAttuali} + 1` })
       .where(and(
@@ -117,10 +111,8 @@ export const couponService = {
         or(isNull(coupon.usiMax), gt(coupon.usiMax, coupon.usiAttuali)),
       ))
       .returning();
-    if (!aggiornato) throw new ConflittoDati('Questo coupon è appena stato esaurito — qualcun altro l\'ha usato un istante fa.');
-
-    const sconto = c.tipo === 'PERCENTUALE' ? importo * (Number(c.valore) / 100) : Math.min(Number(c.valore), importo);
-    return { sconto, coupon: aggiornato };
+    if (!aggiornato) throw new ErroreApplicativo('Coupon esaurito', 400, 'COUPON_NON_VALIDO');
+    return aggiornato;
   },
 
   /** Il codice del promoter collegato a questo coupon, se c'è — per

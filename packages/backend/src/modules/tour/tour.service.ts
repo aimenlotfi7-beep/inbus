@@ -115,7 +115,8 @@ export const tourService = {
     if (!t) throw new NonTrovato('Tour');
     const membri = await db.select({ e: eventi, ordine: tourEventi.ordine }).from(tourEventi)
       .innerJoin(eventi, eq(eventi.id, tourEventi.eventoId))
-      .where(and(eq(tourEventi.tourId, t.id), eq(eventi.visibileSito, true), eq(eventi.bozza, false), eq(eventi.venditeFermate, false), isNull(eventi.eliminatoIl)));
+      // Le date passate (dal giorno dopo, ora di Roma) non si mostrano più: non sono prenotabili.
+      .where(and(eq(tourEventi.tourId, t.id), eq(eventi.visibileSito, true), eq(eventi.bozza, false), eq(eventi.venditeFermate, false), isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma())));
     membri.sort((a, b) => a.ordine - b.ordine || (a.e.data < b.e.data ? -1 : 1));
     const ids = membri.map((m) => m.e.id);
     const [prezzi, vendibili, immagini] = await Promise.all([

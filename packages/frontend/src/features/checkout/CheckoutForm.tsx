@@ -284,6 +284,10 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
   const creditoApplicato = usaCredito ? Math.min(creditoDisponibile, totale) : 0;
   const totaleConCredito = totale - creditoApplicato;
   const accontoUnitario = evento.accontoEur ? Number(evento.accontoEur) : ACCONTO_PREDEFINITO_EUR;
+  // Come il server: acconto a passeggero mai oltre il totale, e niente
+  // acconto se il saldo (15 giorni prima dell'evento) è già scaduto.
+  const accontoTotale = Math.min(accontoUnitario * passeggeri, totale);
+  const accontoPossibile = new Date(evento.data).getTime() - 15 * 24 * 3600 * 1000 > Date.now();
 
   // ---------- Validazione del passo 2 ----------
   function erroreCampo(chiave: string): string | null {
@@ -350,7 +354,8 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
         orarioRitorno: opzioneScelta.orarioRitorno,
         arrivoOrario: tragittoScelto?.arrivoOrario ?? null,
         accontoEur: evento.accontoEur ? Number(evento.accontoEur) : null,
-        prezzoStimato: opzioneScelta.prezzoEffettivo,
+        // Con l'offerta già applicata, come nel modulo: il server la applica comunque.
+        prezzoStimato: prezzoUnitario,
         passeggeri,
         offertaId: offerta?.id,
         cliente: { email: email.trim(), nome: nome.trim(), cognome: cognome.trim(), telefono: telefono.trim(), citta: citta.trim() || undefined, dataNascita: dataNascita || undefined },
@@ -809,13 +814,17 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                       {azioneInCorso === 'acquista' ? 'Invio…' : 'Conferma la prenotazione'}
                     </button>
                     <p className="checkout-nota-btn">Importo intero: {formattaEuro(totaleConCredito)}</p>
-                    <button type="button" className="btn btn-secondary btn-lg btn-block" disabled={invio} onClick={() => confermaPrenotazione('ACCONTO')}>
-                      {azioneInCorso === 'prenota' ? 'Invio…' : 'Conferma con acconto'}
-                    </button>
-                    <p className="checkout-nota-btn">
-                      Acconto di {formattaEuro(accontoUnitario)} a passeggero ({formattaEuro(accontoUnitario * passeggeri)} in tutto ora),
-                      il resto entro 15 giorni prima della partenza.
-                    </p>
+                    {accontoPossibile && (
+                      <>
+                        <button type="button" className="btn btn-secondary btn-lg btn-block" disabled={invio} onClick={() => confermaPrenotazione('ACCONTO')}>
+                          {azioneInCorso === 'prenota' ? 'Invio…' : 'Conferma con acconto'}
+                        </button>
+                        <p className="checkout-nota-btn">
+                          Acconto di {formattaEuro(accontoUnitario)} a passeggero ({formattaEuro(accontoTotale)} in tutto ora),
+                          il resto entro 15 giorni prima della partenza.
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   <p className="riga-fiducia">
