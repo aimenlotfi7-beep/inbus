@@ -66,7 +66,7 @@ export const authService = {
    *  cachati nel token, così i permessi sono sempre aggiornati. */
   async datiSessione(amministratoreId: string) {
     const [admin] = await db.select().from(amministratori).where(eq(amministratori.id, amministratoreId)).limit(1);
-    if (!admin) throw new NonAutorizzato();
+    if (!admin || !admin.attivo) throw new NonAutorizzato();
     const [ruolo] = await db.select().from(ruoli).where(eq(ruoli.id, admin.ruoloId)).limit(1);
     const eff = await permessiEffettivi(admin.id);
 
@@ -81,9 +81,15 @@ export const authService = {
     };
   },
 
+  // Tutti i token sono firmati con la stessa chiave: quelli di cliente,
+  // promoter, organizzatore e tour leader hanno un "tipo", quello del
+  // gestionale no. Senza questo controllo un token da cliente passava come
+  // token del gestionale.
   verificaToken(token: string): TokenPayload {
     try {
-      return jwt.verify(token, env.JWT_SECRET) as TokenPayload;
+      const dati = jwt.verify(token, env.JWT_SECRET) as TokenPayload & { tipo?: string };
+      if (typeof dati !== 'object' || dati.tipo !== undefined) throw new Error('tipo di token sbagliato');
+      return dati;
     } catch {
       throw new NonAutorizzato('Sessione scaduta o non valida, effettua di nuovo il login');
     }

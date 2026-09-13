@@ -25,6 +25,24 @@ export function richiedeAuth(req: Request, _res: Response, next: NextFunction) {
   next();
 }
 
+/** Per le letture pubbliche che al gestionale mostrano qualcosa in più:
+ *  con il token di un'utenza attiva imposta req.admin, altrimenti prosegue
+ *  come richiesta pubblica. Mai 401: un token scaduto rimasto nel browser
+ *  non deve rompere il sito. */
+export async function authFacoltativa(req: Request, _res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ')) {
+    try {
+      const dati = authService.verificaToken(header.slice('Bearer '.length));
+      const eff = await permessiEffettivi(dati.sub);
+      if (eff.owner || eff.permessi.size > 0) req.admin = dati;
+    } catch {
+      // token non valido o di un altro tipo: richiesta pubblica
+    }
+  }
+  next();
+}
+
 /** Da usare DOPO richiedeAuth: richiedePermesso('eventi.crea').
  *  Chi ha ruolo "owner" passa sempre, a prescindere dalla chiave. */
 export function richiedePermesso(chiave: string) {

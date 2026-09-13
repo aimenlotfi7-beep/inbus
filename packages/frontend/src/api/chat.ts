@@ -38,9 +38,5 @@ export const chatApi = {
   segnaLetti: (id: string) => api.post<void>(`/api/chat/conversazioni/${id}/segna-letti`),
   chiudi: (id: string) => api.post<{ ok: true }>(`/api/chat/conversazioni/${id}/chiudi`),
   riapri: (id: string) => api.post<{ ok: true }>(`/api/chat/conversazioni/${id}/riapri`),
-
-  // Lato cliente (nessuna autenticazione admin richiesta)
-  storicoCliente: (email: string) => api.get<ConversazioneConMessaggi[]>(`/api/chat/by-email?email=${encodeURIComponent(email)}`),
-  inviaCliente: (input: { eventoId: string; nome: string; email: string; testo: string }) =>
-    api.post<MessaggioChat>('/api/chat', input),
+  // Lato cliente: clienteAuthApi.meChat / inviaMessaggioChat (con l'account).
 };

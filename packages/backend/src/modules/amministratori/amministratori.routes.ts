@@ -7,6 +7,7 @@ import { amministratori, logAttivita, ruoli, ruoloPermessi, amministratorePermes
 import { NonTrovato, ConflittoDati, VietatoDaiPermessi } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
+import { senzaSegreti } from '../../shared/segreti.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { permessiEffettivi } from '../auth/permessi.service.js';
 
@@ -46,14 +47,15 @@ export async function registraLog(amministratoreId: string | null, azione: strin
 }
 
 export const amministratoriService = {
-  list: () => db.select().from(amministratori),
+  // Mai hash e token nelle risposte (shared/segreti.ts).
+  list: async () => (await db.select().from(amministratori)).map(senzaSegreti),
   getById,
   create: async (input: z.infer<typeof creaAdminSchema>) => {
     const [nuovo] = await db.insert(amministratori).values({
       nome: input.nome, email: input.email.toLowerCase(),
       passwordHash: await bcrypt.hash(input.password, 10), ruoloId: input.ruoloId,
     }).returning();
-    return nuovo;
+    return senzaSegreti(nuovo);
   },
   update: async (id: string, input: z.infer<typeof aggiornaAdminSchema>) => {
     await getById(id);
@@ -64,7 +66,7 @@ export const amministratoriService = {
       ...(input.attivo !== undefined && { attivo: input.attivo }),
       ...(input.password && { passwordHash: await bcrypt.hash(input.password, 10) }),
     }).where(eq(amministratori.id, id)).returning();
-    return aggiornato;
+    return senzaSegreti(aggiornato);
   },
   remove: async (id: string) => {
     await getById(id);

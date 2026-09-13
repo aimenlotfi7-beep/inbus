@@ -30,7 +30,6 @@ import { uploadRouter } from './modules/upload/upload.routes.js';
 import { layoutBigliettoRouter } from './modules/layout-biglietto/layout-biglietto.routes.js';
 import { tourLeaderAuthRouter } from './modules/tour-leader-auth/tour-leader-auth.routes.js';
 import { controlloAccessiRouter } from './modules/controllo-accessi/controllo-accessi.routes.js';
-import { creditoRouter } from './modules/credito/credito.routes.js';
 import { richiesteRimborsoRouter } from './modules/richieste-rimborso/richieste-rimborso.routes.js';
 import { variazioniRouter, variazioniRispostePubblicheRouter } from './modules/variazioni/variazioni.routes.js';
 import { clienteAuthRouter } from './modules/cliente-auth/cliente-auth.routes.js';
@@ -94,7 +93,6 @@ export function creaApp() {
   app.use('/api/layout-biglietto', layoutBigliettoRouter);
   app.use('/api/tour-leader-auth', tourLeaderAuthRouter);
   app.use('/api/controllo-accessi', controlloAccessiRouter);
-  app.use('/api/credito', creditoRouter);
   app.use('/api/richieste-rimborso', richiesteRimborsoRouter);
   app.use('/api/variazioni', variazioniRouter);
   app.use('/api/variazioni-risposte', variazioniRispostePubblicheRouter);

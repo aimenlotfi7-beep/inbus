@@ -10,6 +10,7 @@ import { NonTrovato, NonAutorizzato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { limiteAutenticazione } from '../../shared/rateLimit.js';
 import { asyncHandler } from '../../shared/http.js';
+import { senzaSegreti } from '../../shared/segreti.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { env } from '../../config/env.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
@@ -36,7 +37,8 @@ async function getById(id: string) {
   const [o] = await db.select().from(organizzatori).where(eq(organizzatori.id, id)).limit(1);
   if (!o) throw new NonTrovato('Organizzatore');
   const eventiAbilitati = await db.select().from(organizzatoreEventi).where(eq(organizzatoreEventi.organizzatoreId, id));
-  return { ...o, eventiAbilitati: eventiAbilitati.map((e) => e.eventoId) };
+  // Mai hash e token di reset nelle risposte (gestionale e /me): shared/segreti.ts.
+  return { ...senzaSegreti(o), eventiAbilitati: eventiAbilitati.map((e) => e.eventoId) };
 }
 
 export const organizzatoriService = {
@@ -44,7 +46,7 @@ export const organizzatoriService = {
     const tutti = await db.select().from(organizzatori);
     const tutteLeAssociazioni = await db.select().from(organizzatoreEventi);
     return tutti.map((o) => ({
-      ...o,
+      ...senzaSegreti(o),
       eventiAbilitati: tutteLeAssociazioni.filter((a) => a.organizzatoreId === o.id).map((a) => a.eventoId),
     }));
   },

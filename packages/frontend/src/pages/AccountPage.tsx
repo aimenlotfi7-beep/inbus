@@ -2,16 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import '../styles/account.css';
 import { AccountShell } from '../features/AccountShell';
-import { prenotazioniApi } from '../api/prenotazioni';
-import { utentiApi, type PreferenzePrivacy } from '../api/utenti';
+import type { PreferenzePrivacy } from '../api/utenti';
 import { eventiApi } from '../api/eventi';
-import { chatApi, type ConversazioneConMessaggi } from '../api/chat';
+import type { ConversazioneConMessaggi } from '../api/chat';
 import type { Prenotazione, Evento } from '../api/types';
 import { CookieBanner, LinkPreferenzeCookie } from '../features/CookieBanner';
 import { clienteLoggato, logoutCliente } from '../features/clienteSessione';
 import { clienteAuthApi, ErroreClienteAuth, type DatiCliente } from '../api/clienteAuth';
-import { ErroreApi } from '../api/client';
-import { listaAttesaApi, type MiaIscrizione } from '../api/listaAttesa';
+import type { MiaIscrizione } from '../api/listaAttesa';
 import { DettaglioViaggioModale } from '../features/DettaglioViaggioModale';
 import { ModaleRimborso } from '../features/ModaleRimborso';
 import { calcolaStatoPrenotazione } from '../features/statoPrenotazione';
@@ -21,8 +19,6 @@ import { Icona } from '../features/Icone';
 import { CampoTesto } from '../features/checkout/CampoTesto';
 import { CampoPassword } from '../features/CampoPassword';
 import { useSeoTags } from '../features/useSeoTags';
-
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 type Sezione = 'dashboard' | 'profilo' | 'viaggi' | 'lista-attesa' | 'credito' | 'invita' | 'privacy' | 'chat';
 
@@ -78,7 +74,7 @@ export function AccountPage() {
   const [eventiPerId, setEventiPerId] = useState<Record<string, Evento>>({});
   useEffect(() => {
     if (!email) return;
-    prenotazioniApi.listByEmail(email).then(async (lista) => {
+    clienteAuthApi.mePrenotazioni().then(async (lista) => {
       setViaggi(lista);
       const idUnici = [...new Set(lista.map((p) => p.eventoId))];
       const eventi = await Promise.all(idUnici.map((id) => eventiApi.getById(id).catch(() => null)));
@@ -139,7 +135,7 @@ export function AccountPage() {
           {sezione === 'credito' && <SezioneCredito />}
           {sezione === 'invita' && <SezioneInvitaAmico />}
           {sezione === 'privacy' && <SezionePrivacy email={email} />}
-          {sezione === 'chat' && <SezioneChat email={email} nome={nomeCliente} />}
+          {sezione === 'chat' && <SezioneChat email={email} />}
         </div>
       </AccountShell>
 
@@ -175,11 +171,11 @@ function SezionePanoramica({ nome, email, viaggi, eventiPerId, onNavigare, onApr
 
   useEffect(() => {
     if (!email) return;
-    chatApi.storicoCliente(email).then((conv) => {
+    clienteAuthApi.meChat().then((conv) => {
       const attiva = conv.find((c) => c.stato !== 'CHIUSA');
       setMessaggiNonLetti(attiva?.messaggi.filter((m) => m.autore === 'ADMIN').length ?? 0);
     }).catch(() => {});
-    listaAttesaApi.mieIscrizioni(email).then((l) => setInListaAttesa(l.length)).catch(() => {});
+    clienteAuthApi.meListaAttesa().then((l) => setInListaAttesa(l.length)).catch(() => {});
   }, [email]);
 
   // Il prossimo viaggio si ricava dai dati già arrivati dal padre
@@ -447,7 +443,7 @@ function SezioneViaggi({ email, viaggi, eventiPerId, onAprireViaggio }: {
 function SezioneListaAttesa({ email }: { email: string }) {
   const [iscrizioni, setIscrizioni] = useState<MiaIscrizione[] | null>(null);
 
-  useEffect(() => { listaAttesaApi.mieIscrizioni(email).then(setIscrizioni).catch(() => setIscrizioni([])); }, [email]);
+  useEffect(() => { clienteAuthApi.meListaAttesa().then(setIscrizioni).catch(() => setIscrizioni([])); }, [email]);
 
   return (
     <section className="acc-sezione">
@@ -675,7 +671,7 @@ function SezioneInvitaAmico() {
    MESSAGGI
    ============================================================ */
 
-function SezioneChat({ email, nome }: { email: string; nome: string }) {
+function SezioneChat({ email }: { email: string }) {
   const [conversazioni, setConversazioni] = useState<ConversazioneConMessaggi[] | null>(null);
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [eventoScelto, setEventoScelto] = useState('');
@@ -683,7 +679,7 @@ function SezioneChat({ email, nome }: { email: string; nome: string }) {
   const [errore, setErrore] = useState('');
   const [invio, setInvio] = useState(false);
 
-  function ricarica() { chatApi.storicoCliente(email).then(setConversazioni).catch(() => {}); }
+  function ricarica() { clienteAuthApi.meChat().then(setConversazioni).catch(() => {}); }
   useEffect(ricarica, [email]);
   useEffect(() => { eventiApi.list().then(setEventi).catch(() => {}); }, []);
 
@@ -708,12 +704,12 @@ function SezioneChat({ email, nome }: { email: string; nome: string }) {
     setErrore('');
     setInvio(true);
     try {
-      // Da loggato il nome lo sappiamo già: non lo chiediamo di nuovo.
-      await chatApi.inviaCliente({ eventoId, nome: nome || email, email, testo });
+      // Nome ed email li prende il server dall'account.
+      await clienteAuthApi.inviaMessaggioChat({ eventoId, testo });
       setTesto('');
       ricarica();
     } catch (e) {
-      setErrore(e instanceof ErroreApi ? e.message : 'Messaggio non inviato: controlla la connessione e riprova.');
+      setErrore(testoErrore(e));
     } finally {
       setInvio(false);
     }
@@ -972,13 +968,13 @@ function SezionePrivacy({ email }: { email: string }) {
   const [salvando, setSalvando] = useState(false);
   const [errore, setErrore] = useState('');
 
-  useEffect(() => { utentiApi.preferenzePrivacy(email).then(setPreferenze).catch(() => {}); }, [email]);
+  useEffect(() => { clienteAuthApi.mePreferenzePrivacy().then(setPreferenze).catch(() => {}); }, [email]);
 
   async function aggiorna(campo: keyof PreferenzePrivacy, valore: boolean) {
     setSalvando(true);
     setErrore('');
     try {
-      const nuove = await utentiApi.aggiornaPreferenzePrivacy(email, { [campo]: valore });
+      const nuove = await clienteAuthApi.aggiornaPreferenzePrivacy({ [campo]: valore });
       setPreferenze(nuove);
     } catch {
       setErrore('Salvataggio non riuscito: controlla la connessione e riprova.');

@@ -32,6 +32,4 @@ export const couponApi = {
   update: (id: string, input: Partial<CouponInput>) => api.put<Coupon>(`/api/coupon/${id}`, input),
   remove: (id: string) => api.delete<void>(`/api/coupon/${id}`),
   inviaEmail: (id: string) => api.post<{ inviata: boolean; email: string }>(`/api/coupon/${id}/invia-email`, {}),
-  // Pubblica, come /api/credito — il cliente vede i suoi voucher nell'account.
-  voucherDiCliente: (email: string) => api.get<Coupon[]>(`/api/coupon/voucher?email=${encodeURIComponent(email)}`),
 };

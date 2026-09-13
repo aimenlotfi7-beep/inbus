@@ -31,6 +31,18 @@ async function inviaEmailVerifica(email: string, nome: string, token: string) {
   await inviaEmail({ a: email, oggetto, html });
 }
 
+/** L'utente con questa email, se esiste e non è un profilo eliminato. Un
+ *  profilo eliminato tiene la sua email (i biglietti dei viaggi già pagati
+ *  devono arrivare) finché la stessa email non torna a registrarsi o a
+ *  prenotare: allora la riga vecchia, con storico e credito, passa a un
+ *  indirizzo segnaposto e si riparte da un profilo nuovo. */
+export async function utenteAttivoPerEmail(email: string) {
+  const [esistente] = await db.select().from(utenti).where(eq(utenti.email, email.toLowerCase())).limit(1);
+  if (!esistente?.eliminatoIl) return esistente;
+  await db.update(utenti).set({ email: `eliminato-${esistente.id}@account-eliminato.invalid` }).where(eq(utenti.id, esistente.id));
+  return undefined;
+}
+
 export const clienteAuthService = {
   /** Registrazione — se l'email esiste già ma senza password (un
    *  cliente "vecchio", da prima che servisse un account), la fa
@@ -38,7 +50,7 @@ export const clienteAuthService = {
    *  già prenotato in passato resterebbe bloccato fuori per sempre. */
   async registrati(input: { email: string; password: string; nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: Date; codiceReferral?: string }) {
     const email = input.email.toLowerCase();
-    const [esistente] = await db.select().from(utenti).where(eq(utenti.email, email)).limit(1);
+    const esistente = await utenteAttivoPerEmail(email);
     if (esistente?.passwordHash) throw new ConflittoDati('Esiste già un account con questa email — prova ad accedere, o recupera la password.');
 
     // "Invita un amico" — solo se questo utente non ha GIÀ un invitante
@@ -158,7 +170,7 @@ export const clienteAuthService = {
    *  frontend intercetta per proporre l'accesso invece di procedere. */
   async trovaOCreaUtenteOspite(input: { email: string; nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: Date }): Promise<{ utenteId: string; nuovo: boolean }> {
     const email = input.email.toLowerCase();
-    const [esistente] = await db.select().from(utenti).where(eq(utenti.email, email)).limit(1);
+    const esistente = await utenteAttivoPerEmail(email);
 
     if (esistente?.passwordHash) {
       throw new ConflittoDati('Questa email ha già un account — accedi per continuare con questo acquisto.');

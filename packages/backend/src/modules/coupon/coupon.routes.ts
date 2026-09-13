@@ -5,9 +5,6 @@ import { creaCouponSchema, aggiornaCouponSchema } from './coupon.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
-import { db } from '../../db/client.js';
-import { utenti } from '../../db/schema.js';
-import { eq } from 'drizzle-orm';
 
 export const couponRouter = Router();
 
@@ -22,15 +19,8 @@ couponRouter.post(
   }),
 );
 
-/** Pubblica, stesso schema di /api/credito — il cliente vede i suoi
- *  voucher nell'account (AccountPage), senza bisogno di un token admin. */
-couponRouter.get('/voucher', asyncHandler(async (req: Request, res: Response) => {
-  const email = typeof req.query.email === 'string' ? req.query.email : undefined;
-  if (!email) return res.json([]);
-  const [u] = await db.select({ id: utenti.id }).from(utenti).where(eq(utenti.email, email.toLowerCase())).limit(1);
-  if (!u) return res.json([]);
-  res.json(await couponService.vaucherDiUtente(u.id));
-}));
+// Niente più GET /voucher?email= pubblica: mostrava i codici dei voucher
+// personali di chiunque (e nessuna pagina la usava).
 
 couponRouter.use(richiedeAuth);
 

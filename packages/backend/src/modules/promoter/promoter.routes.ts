@@ -10,6 +10,7 @@ import { NonTrovato, NonAutorizzato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { limiteAutenticazione } from '../../shared/rateLimit.js';
 import { asyncHandler } from '../../shared/http.js';
+import { senzaSegreti } from '../../shared/segreti.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { env } from '../../config/env.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
@@ -79,11 +80,12 @@ async function getById(id: string) {
   const [p] = await db.select().from(promoter).where(eq(promoter.id, id)).limit(1);
   if (!p) throw new NonTrovato('Promoter');
   const eventiEsclusi = await db.select().from(promoterEventi).where(eq(promoterEventi.promoterId, id));
-  return { ...p, eventiEsclusi: eventiEsclusi.map((e) => e.eventoId) };
+  // Mai hash e token di reset nelle risposte (gestionale e /me): shared/segreti.ts.
+  return { ...senzaSegreti(p), eventiEsclusi: eventiEsclusi.map((e) => e.eventoId) };
 }
 
 export const promoterService = {
-  list: () => db.select().from(promoter),
+  list: async () => (await db.select().from(promoter)).map(senzaSegreti),
   getById,
 
   async create(input: z.infer<typeof creaPromoterSchema>) {

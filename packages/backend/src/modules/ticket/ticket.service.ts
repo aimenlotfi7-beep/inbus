@@ -162,7 +162,7 @@ export const ticketService = {
       pnr: p.pnr,
       importo: formattaEuro(p.totale),
       disponibileDal: tempi ? dataEOra(tempi.disponibileDal) : 'giorno prima della partenza',
-    }, { escapaHtml: ['nome', 'evento', 'fermata', 'pnr'] });
+    });
     return inviaEmail({ a: utente.email, oggetto, html });
   },
 
@@ -205,7 +205,7 @@ export const ticketService = {
       orario: tempi?.orarioFermata ?? 'da definire',
       bus: nomeBus,
       pnr: p.pnr,
-    }, { escapaHtml: ['nome', 'evento', 'fermata', 'orario', 'bus', 'pnr'] });
+    });
     return inviaEmail({ a: utente.email, oggetto, html, allegati });
   },
 

@@ -25,8 +25,8 @@ async function avvisaCliente(
     if (!dati?.email) return false;
     const base = { nome: dati.nome ?? '', evento: dati.artista, pnr: dati.pnr };
     const { oggetto, html } = esito.tipo === 'approvato'
-      ? await templateEmailService.renderizza('rimborso_approvato', { ...base, importo: formattaEuro(dati.totale) }, { escapaHtml: ['nome', 'evento', 'pnr'] })
-      : await templateEmailService.renderizza('rimborso_rifiutato', { ...base, motivo: esito.motivo?.trim() || 'non indicato' }, { escapaHtml: ['nome', 'evento', 'pnr', 'motivo'] });
+      ? await templateEmailService.renderizza('rimborso_approvato', { ...base, importo: formattaEuro(dati.totale) })
+      : await templateEmailService.renderizza('rimborso_rifiutato', { ...base, motivo: esito.motivo?.trim() || 'non indicato' });
     const { inviata } = await inviaEmail({ a: dati.email, oggetto, html });
     return inviata;
   } catch (err) {

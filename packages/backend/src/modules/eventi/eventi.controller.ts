@@ -1,19 +1,24 @@
 import type { Request, Response } from 'express';
-import { eventiService } from './eventi.service.js';
+import { eventiService, eventoPerIlSito } from './eventi.service.js';
 import { lineeDaConfermareService } from './linee-da-confermare.service.js';
 import { smistamentoService } from '../prenotazioni/smistamento.service.js';
 import { nomiPercorsiCambiati } from '../preventivi/cambio-percorso.js';
+import { NonTrovato } from '../../shared/errors.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 
 export const eventiController = {
+  // Letture pubbliche (authFacoltativa): req.admin c'è solo con un'utenza
+  // del gestionale, che vede anche bozze e dati interni dei tragitti.
   async list(req: Request, res: Response) {
-    const eventi = await eventiService.list(req.query as unknown as ListaEventiQuery);
+    const eventi = await eventiService.list(req.query as unknown as ListaEventiQuery, { perGestionale: !!req.admin });
     res.json(eventi);
   },
 
   async getById(req: Request, res: Response) {
     const evento = await eventiService.getById(req.params.id);
-    res.json(evento);
+    if (req.admin) return res.json(evento);
+    if (evento.bozza || evento.eliminatoIl) throw new NonTrovato('Evento');
+    res.json(eventoPerIlSito(evento));
   },
   async getBySlug(req: Request, res: Response) {
     const evento = await eventiService.getBySlug(req.params.slug);

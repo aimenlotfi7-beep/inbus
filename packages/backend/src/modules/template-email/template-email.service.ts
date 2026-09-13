@@ -404,26 +404,20 @@ export const templateEmailService = {
    *  un solo posto (il database, modificabile dal gestionale) invece
    *  che ripetuto/scritto fisso in ogni singolo file.
    *
-   *  opzioni.escapaHtml: i segnaposto il cui valore arriva da persone
-   *  (nomi, indirizzi, descrizioni, motivi) — nel corpo HTML vengono
-   *  resi innocui; nell'oggetto (testo semplice) restano come sono. Mai
-   *  metterci i link.
+   *  Nel corpo HTML ogni valore viene reso innocuo (nomi, indirizzi, motivi
+   *  scritti da persone; nei link "&" diventa "&amp;", che il client email
+   *  rilegge uguale). Prima andava elencato a mano chiamata per chiamata e
+   *  diverse email lo avevano dimenticato. Nell'oggetto (testo semplice) i
+   *  valori restano come sono.
    *
    *  Se la riga non è ancora sul database (sincronizzazione all'avvio
    *  non ancora passata) si usa il testo di base, invece di perdere
    *  l'email. */
-  async renderizza(
-    chiave: string,
-    variabili: Record<string, string>,
-    opzioni: { escapaHtml?: string[] } = {},
-  ): Promise<{ oggetto: string; html: string }> {
+  async renderizza(chiave: string, variabili: Record<string, string>): Promise<{ oggetto: string; html: string }> {
     const [riga] = await db.select().from(templateEmail).where(eq(templateEmail.chiave, chiave)).limit(1);
     const modello = riga ?? MODELLI_BASE.find((m) => m.chiave === chiave);
     if (!modello) throw new NonTrovato('Modello email');
-    const daEscapare = new Set(opzioni.escapaHtml ?? []);
-    const variabiliHtml = Object.fromEntries(
-      Object.entries(variabili).map(([k, v]) => [k, daEscapare.has(k) ? escapaHtml(v) : v]),
-    );
+    const variabiliHtml = Object.fromEntries(Object.entries(variabili).map(([k, v]) => [k, escapaHtml(v)]));
     return {
       oggetto: sostituisciSegnaposto(modello.oggetto, variabili),
       html: sostituisciSegnaposto(modello.corpo, variabiliHtml),

@@ -78,7 +78,7 @@ async function inviaEmailModello(
   allegati?: Parameters<typeof inviaEmail>[0]['allegati'],
 ): Promise<boolean> {
   try {
-    const { oggetto, html } = await templateEmailService.renderizza(chiave, variabili, { escapaHtml: ['evento', 'tragitto'] });
+    const { oggetto, html } = await templateEmailService.renderizza(chiave, variabili);
     return await inviaEmailBestEffort({ a, oggetto, html, allegati });
   } catch (e) {
     console.error(`[preventivi] email "${chiave}" a ${a} non preparata:`, e instanceof Error ? e.message : e);

@@ -1,4 +1,8 @@
 import { tokenCliente } from '../features/clienteSessione';
+import type { Prenotazione } from './types';
+import type { MiaIscrizione } from './listaAttesa';
+import type { ConversazioneConMessaggi, MessaggioChat } from './chat';
+import type { PreferenzePrivacy } from './utenti';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
@@ -48,6 +52,16 @@ export const clienteAuthApi = {
     chiamata<{ ok: true }>('/api/cliente-auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
 
   me: () => chiamata<DatiCliente>('/api/cliente-auth/me', {}, true),
+  // Dati personali dell'area cliente: sempre con l'account (token), mai
+  // con un'email scritta nella richiesta.
+  mePrenotazioni: () => chiamata<Prenotazione[]>('/api/cliente-auth/me/prenotazioni', {}, true),
+  meListaAttesa: () => chiamata<MiaIscrizione[]>('/api/cliente-auth/me/lista-attesa', {}, true),
+  meChat: () => chiamata<ConversazioneConMessaggi[]>('/api/cliente-auth/me/chat', {}, true),
+  inviaMessaggioChat: (input: { eventoId: string; testo: string }) =>
+    chiamata<MessaggioChat>('/api/cliente-auth/me/chat', { method: 'POST', body: JSON.stringify(input) }, true),
+  mePreferenzePrivacy: () => chiamata<PreferenzePrivacy>('/api/cliente-auth/me/preferenze-privacy', {}, true),
+  aggiornaPreferenzePrivacy: (input: Partial<PreferenzePrivacy>) =>
+    chiamata<PreferenzePrivacy>('/api/cliente-auth/me/preferenze-privacy', { method: 'PUT', body: JSON.stringify(input) }, true),
   /** Saldo e movimenti del credito (positivi = maturati, negativi = utilizzati), dal più recente. */
   meCredito: () => chiamata<{ disponibile: number; movimenti: { id: string; importo: string; motivo: string; creatoIl: string }[] }>('/api/cliente-auth/me/credito', {}, true),
   meReferral: () => chiamata<{ codice: string; invitati: { nome: string; completato: boolean }[] }>('/api/cliente-auth/me/referral', {}, true),

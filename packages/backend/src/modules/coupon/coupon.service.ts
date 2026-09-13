@@ -3,7 +3,7 @@ import { db } from '../../db/client.js';
 import { coupon, promoter, utenti } from '../../db/schema.js';
 import { NonTrovato, ErroreApplicativo, ConflittoDati } from '../../shared/errors.js';
 import { inviaEmail } from '../../shared/email.service.js';
-import { fineGiornoRoma, formattaData, inizioGiornoRoma } from '../../shared/formato.js';
+import { escapaHtml, fineGiornoRoma, formattaData, inizioGiornoRoma } from '../../shared/formato.js';
 import type { CreaCouponInput, aggiornaCouponSchema } from './coupon.dto.js';
 import type { z } from 'zod';
 
@@ -144,11 +144,11 @@ export const couponService = {
     const scadenzaTesto = c.validoAl ? `Valido fino al ${formattaData(c.validoAl)}.` : '';
     const html = `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <p>Ciao${u.nome ? ` ${u.nome}` : ''},</p>
+        <p>Ciao${u.nome ? ` ${escapaHtml(u.nome)}` : ''},</p>
         <p>Ti abbiamo riservato un voucher personale — usalo alla tua prossima prenotazione.</p>
         <div style="background:#f6f1e7; border-radius:10px; padding:20px; text-align:center; margin:20px 0;">
           <p style="font-size:12px; color:#888; margin:0 0 6px; text-transform:uppercase; letter-spacing:1px;">Il tuo codice</p>
-          <p style="font-family:monospace; font-size:24px; font-weight:700; margin:0; letter-spacing:2px;">${c.codice}</p>
+          <p style="font-family:monospace; font-size:24px; font-weight:700; margin:0; letter-spacing:2px;">${escapaHtml(c.codice)}</p>
         </div>
         <p><b>Sconto:</b> ${scontoTesto}</p>
         ${scadenzaTesto ? `<p>${scadenzaTesto}</p>` : ''}
@@ -158,10 +158,5 @@ export const couponService = {
     const { inviata } = await inviaEmail({ a: u.email, oggetto: `Il tuo voucher ${c.codice}`, html });
     if (inviata) await db.update(coupon).set({ inviatoIl: new Date() }).where(eq(coupon.id, id));
     return { inviata, email: u.email };
-  },
-
-  /** I voucher assegnati a un cliente — per la sua sezione account. */
-  async vaucherDiUtente(utenteId: string) {
-    return db.select().from(coupon).where(eq(coupon.utenteId, utenteId));
   },
 };

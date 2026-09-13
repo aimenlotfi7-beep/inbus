@@ -62,9 +62,6 @@ export const prenotazioniController = {
   async dettaglioPerCliente(req: Request, res: Response) {
     res.json(await prenotazioniService.dettaglioPerCliente(req.params.pnr, String(req.query.email)));
   },
-  async listByEmail(req: Request, res: Response) {
-    res.json(await prenotazioniService.listByEmail(String(req.query.email)));
-  },
   async eventiConPrenotazioni(_req: Request, res: Response) {
     res.json(await prenotazioniService.eventiConPrenotazioni());
   },
@@ -106,7 +103,8 @@ prenotazioniRouter.get('/eventi', richiedeAuth, richiedePermesso('prenotazioni.v
 prenotazioniRouter.post('/', richiedeAuthCliente, valida(creaPrenotazioneSchema), asyncHandler(prenotazioniController.crea));
 prenotazioniRouter.post('/ordine', richiedeAuthCliente, valida(creaOrdineSchema), asyncHandler(prenotazioniController.creaOrdine));
 prenotazioniRouter.post('/ordine-ospite', limitePnr, valida(creaOrdineOspiteSchema), asyncHandler(prenotazioniController.creaOrdineOspite));
-prenotazioniRouter.get('/by-email', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.listByEmail));
+// Niente più GET /by-email pubblica: dava i PNR di chiunque conoscendone
+// l'email. L'area cliente usa GET /api/cliente-auth/me/prenotazioni.
 prenotazioniRouter.get('/:pnr/dettaglio-cliente', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.dettaglioPerCliente));
 prenotazioniRouter.get('/:pnr/saldo', limitePnr, valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(prenotazioniController.differenzaSaldo));
 prenotazioniRouter.post('/:pnr/salda', limitePnr, valida(z.object({ email: z.string().email(), couponCodice: z.string().optional() })), asyncHandler(prenotazioniController.saldaResto));

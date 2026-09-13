@@ -224,7 +224,10 @@ async function creaRigaInterna(
   // così ogni calcolo a valle — e ogni report che legge
   // prenotazioni.totale — lo vede senza saperne nulla.
   const importoBase = prezzoEffettivo * input.passeggeri - (scontoBundle ?? 0);
-  const { sconto, coupon: couponUsato } = await validaCoupon(tx, input.couponCodice, importoBase, input.eventoId, input.tipoPagamento, input.cliente.email, incrementaCoupon);
+  // Un voucher personale si confronta con l'email dell'account che prenota,
+  // non con quella scritta nel modulo: altrimenti bastava scrivere l'email
+  // di un altro per usarne il voucher.
+  const { sconto, coupon: couponUsato } = await validaCoupon(tx, input.couponCodice, importoBase, input.eventoId, input.tipoPagamento, utente.email, incrementaCoupon);
 
   // Il coupon collegato a un promoter attribuisce la vendita anche a
   // lui — un solo codice per sconto e commissione insieme, in aggiunta
@@ -683,7 +686,7 @@ export const prenotazioniService = {
         const { templateEmailService } = await import('../template-email/template-email.service.js');
         const { oggetto, html } = await templateEmailService.renderizza('prenotazione_cancellata', {
           nome: dati.nome ?? '', evento: dati.artista, pnr: prenotazione.pnr, motivo: motivoFinale,
-        }, { escapaHtml: ['nome', 'evento', 'pnr', 'motivo'] });
+        });
         clienteAvvisato = (await inviaEmail({ a: dati.email, oggetto, html })).inviata;
       }
     } catch (err) {

@@ -143,6 +143,67 @@ clienteAuthRouter.get('/me/credito', richiedeAuthCliente, asyncHandler(async (re
   res.json({ disponibile: Number(u.credito), movimenti });
 }));
 
+/** L'utente del token, letto dal database (email e nome aggiornati). Tutte
+ *  le rotte /me qui sotto prendono l'identità da qui, mai da un'email
+ *  scritta nella richiesta: prima prenotazioni, lista d'attesa, chat e
+ *  consensi privacy si leggevano (e i consensi si cambiavano) con la sola
+ *  email di qualcun altro. */
+async function clienteDelToken(req: Request) {
+  if (!req.cliente) throw new NonAutorizzato();
+  const [u] = await db.select({ id: utenti.id, email: utenti.email, nome: utenti.nome, cognome: utenti.cognome }).from(utenti).where(eq(utenti.id, req.cliente.sub)).limit(1);
+  if (!u) throw new NonAutorizzato();
+  return u;
+}
+
+clienteAuthRouter.get('/me/prenotazioni', richiedeAuthCliente, asyncHandler(async (req: Request, res: Response) => {
+  const u = await clienteDelToken(req);
+  const { prenotazioniService } = await import('../prenotazioni/prenotazioni.service.js');
+  res.json(await prenotazioniService.listByEmail(u.email));
+}));
+
+clienteAuthRouter.get('/me/lista-attesa', richiedeAuthCliente, asyncHandler(async (req: Request, res: Response) => {
+  const u = await clienteDelToken(req);
+  const { listaAttesaService } = await import('../lista-attesa/lista-attesa.service.js');
+  res.json(await listaAttesaService.mieIscrizioni(u.email));
+}));
+
+clienteAuthRouter.get('/me/chat', richiedeAuthCliente, asyncHandler(async (req: Request, res: Response) => {
+  const u = await clienteDelToken(req);
+  const { chatService } = await import('../chat/chat.routes.js');
+  res.json(await chatService.storicoCliente(u.email));
+}));
+
+clienteAuthRouter.post(
+  '/me/chat',
+  richiedeAuthCliente,
+  valida(z.object({ eventoId: z.string().min(1), testo: z.string().min(1).max(4000) })),
+  asyncHandler(async (req: Request, res: Response) => {
+    const u = await clienteDelToken(req);
+    const { chatService } = await import('../chat/chat.routes.js');
+    const nome = [u.nome, u.cognome].filter(Boolean).join(' ') || u.email;
+    res.status(201).json(await chatService.inviaCliente({ eventoId: req.body.eventoId, testo: req.body.testo, email: u.email, nome }));
+  }),
+);
+
+clienteAuthRouter.get('/me/preferenze-privacy', richiedeAuthCliente, asyncHandler(async (req: Request, res: Response) => {
+  const { utentiService } = await import('../utenti/utenti.service.js');
+  res.json(await utentiService.preferenzePrivacy(req.cliente!.sub));
+}));
+
+clienteAuthRouter.put(
+  '/me/preferenze-privacy',
+  richiedeAuthCliente,
+  valida(z.object({
+    presaVisioneInformativa: z.boolean().optional(),
+    consensoMarketing: z.boolean().optional(),
+    consensoProfilazione: z.boolean().optional(),
+  })),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { utentiService } = await import('../utenti/utenti.service.js');
+    res.json(await utentiService.aggiornaPreferenzePrivacy(req.cliente!.sub, req.body));
+  }),
+);
+
 /** "Invita un amico" — codice personale (generato al primo utilizzo)
  *  e lo storico di chi è stato invitato: "in sospeso" (registrato, non
  *  ha ancora prenotato) o "completato" (ha prenotato, il bonus è

@@ -3,12 +3,13 @@ import { eventiController } from './eventi.controller.js';
 import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema, creaLineaSchema, aggiungiBusALineaSchema, aggiornaBusDiLineaSchema, aggiornaPercorsoLineaSchema, impostaVenditeFermateSchema } from './eventi.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
+import { authFacoltativa, richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 
 export const eventiRouter = Router();
 
-// Lettura: pubblica (il sito e l'app cliente le usano senza login)
-eventiRouter.get('/', valida(listaEventiQuerySchema, 'query'), asyncHandler(eventiController.list));
+// Lettura: pubblica (il sito e l'app cliente le usano senza login). Con
+// un'utenza del gestionale arrivano anche bozze e dati interni dei tragitti.
+eventiRouter.get('/', authFacoltativa, valida(listaEventiQuerySchema, 'query'), asyncHandler(eventiController.list));
 // IMPORTANTE: va registrata PRIMA di GET '/:id', altrimenti Express la
 // interpreterebbe come una richiesta per un evento con id "allerte-partenze".
 eventiRouter.get('/allerte-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenze));
@@ -29,7 +30,7 @@ eventiRouter.post('/cestino/tratte/:id/ripristina', richiedeAuth, richiedePermes
 // una richiesta per un evento con id "slug".
 eventiRouter.get('/slug/:slug', asyncHandler(eventiController.getBySlug));
 eventiRouter.get('/:id/conteggio-prenotazioni', asyncHandler(eventiController.conteggioPrenotazioniConfermate));
-eventiRouter.get('/:id', asyncHandler(eventiController.getById));
+eventiRouter.get('/:id', authFacoltativa, asyncHandler(eventiController.getById));
 eventiRouter.get('/:id/opzioni-partenza', asyncHandler(eventiController.opzioniPartenza));
 
 // Scrittura: riservata ad amministratore/operatore

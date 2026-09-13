@@ -14,7 +14,6 @@ import {
   lineaFermate,
   tourLeader,
   utenti,
-  partecipantiPrenotazione,
   preventiviRichieste,
   preventiviRisposte,
 } from '../../db/schema.js';
@@ -191,7 +190,7 @@ async function avvisaPartenzaConfermata(tragittoId: string): Promise<EsitoComuni
           fermata: d.fermataCitta,
           orario: normalizzaOrario(orarioPerCitta.get(d.fermataCitta) ?? d.fermataOrario) ?? 'da definire',
           pnr: d.pnr,
-        }, { escapaHtml: ['nome', 'evento', 'tragitto', 'fermata', 'orario', 'pnr'] });
+        });
         const { inviata } = await inviaEmail({ a: d.email, oggetto, html });
         if (!inviata) esito.emailNonInviate++;
       } catch (err) {
@@ -226,7 +225,7 @@ async function avvisaTourLeader(busId: string): Promise<boolean> {
       tragitto: riga.tragittoNome,
       bus: `${riga.lineaNome} · ${riga.riferimento}`,
       link: urlSito('/scansione/accedi'),
-    }, { escapaHtml: ['nome', 'evento', 'tragitto', 'bus'] });
+    });
     const { inviata } = await inviaEmail({ a: riga.email, oggetto, html });
     return inviata;
   } catch (err) {
@@ -260,6 +259,35 @@ export const includeCompleto = {
   immagini: true,
   allegati: true,
 } as const;
+
+/** Campi del tragitto che servono solo al gestionale: costo e posti del
+ *  preventivo, fornitore, referente, km e fermate del preventivo, copertura.
+ *  Le letture degli eventi sono pubbliche: senza un'utenza del gestionale
+ *  questi campi non escono (vedi eventoPerIlSito). */
+const CAMPI_TRAGITTO_INTERNI = [
+  'preventivoCosto', 'preventivoPostiBus', 'fornitoreId', 'referenteNome', 'referenteTelefono',
+  'partenzaLat', 'partenzaLng', 'kmAccettati', 'fermatePreventivo', 'percorsoPreventivoIl', 'coperta', 'noteCoperta',
+] as const;
+
+function tragittoPerIlSito<T extends object>(tragitto: T): T {
+  const copia = { ...tragitto } as Record<string, unknown>;
+  for (const campo of CAMPI_TRAGITTO_INTERNI) delete copia[campo];
+  return copia as T;
+}
+
+/** L'evento com'è visto dal sito: tragitti (liberi e dei servizi) senza i
+ *  campi interni. Le card virtuali dei tour non hanno tragitti e passano
+ *  invariate. */
+export function eventoPerIlSito<T extends object>(evento: T): T {
+  const e = evento as { tragitti?: object[]; servizi?: { tragitti?: object[] }[] };
+  return {
+    ...evento,
+    ...(Array.isArray(e.tragitti) && { tragitti: e.tragitti.map(tragittoPerIlSito) }),
+    ...(Array.isArray(e.servizi) && {
+      servizi: e.servizi.map((s) => (Array.isArray(s.tragitti) ? { ...s, tragitti: s.tragitti.map(tragittoPerIlSito) } : s)),
+    }),
+  };
+}
 
 /** Rimette i posti in vendita di un tragitto a "quasi illimitati" ogni
  *  volta che l'elenco dei bus cambia (bus nuovo, posti cambiati, bus o
@@ -575,10 +603,13 @@ export const eventiService = {
    *  in poi le tratte di quell'evento possono essere assegnate a
    *  questo servizio invece che restare "libere". */
 
-  async list(query: ListaEventiQuery) {
+  /** `perGestionale` falso (richiesta senza utenza del gestionale): niente
+   *  bozze e niente campi interni dei tragitti, qualunque filtro arrivi. */
+  async list(query: ListaEventiQuery, { perGestionale }: { perGestionale: boolean }) {
     // Nascosti sempre, sia per il gestionale sia per il sito pubblico —
     // solo il Cestino (funzione dedicata più sotto) li fa vedere.
     const condizioni = [isNull(eventi.eliminatoIl)];
+    if (!perGestionale) condizioni.push(eq(eventi.bozza, false));
     if (query.citta) condizioni.push(ilike(eventi.citta, `%${query.citta}%`));
     if (query.genere) condizioni.push(ilike(eventi.genere, `%${query.genere}%`));
     if (query.categoria) condizioni.push(eq(eventi.categoria, query.categoria));
@@ -623,7 +654,7 @@ export const eventiService = {
       with: includeCompleto,
       orderBy: (e, { asc }) => [asc(e.data)],
     });
-    const conStato = risultati.map(conStatoCalcolato);
+    const conStato = risultati.map(conStatoCalcolato).map((e) => (perGestionale ? e : eventoPerIlSito(e)));
     if (cardTour.length === 0) return conStato;
     return [...conStato, ...cardTour].sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
   },
@@ -659,7 +690,7 @@ export const eventiService = {
     // diretto allo slug.
     const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
     if (!tuttiITragitti.some((t) => t.attivo && t.stato !== 'DA_CONFERMARE')) throw new NonTrovato('Evento');
-    return conStatoCalcolato(evento);
+    return eventoPerIlSito(conStatoCalcolato(evento));
   },
 
   async create(input: CreaEventoInput) {

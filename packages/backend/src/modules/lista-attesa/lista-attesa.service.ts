@@ -1,7 +1,7 @@
 import { eq, and, desc, lt } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { listaAttesa, eventi, fermate, tragitti } from '../../db/schema.js';
+import { listaAttesa, eventi, fermate, tragitti, utenti } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
@@ -206,16 +206,17 @@ export const listaAttesaService = {
 
     try {
       // Questo flusso arriva da un link segreto mandato via email (non da
-      // un login vero) — stesso livello di identità già accettato altrove
-      // (es. richieste di rimborso): l'email combacia, è sufficiente per
-      // questo caso specifico. Se non esiste ancora un account con
-      // quell'email, ne creo uno "leggero" (senza password) — dovrà
-      // comunque registrarsi per accedere alla sua area personale in
-      // futuro, ma la prenotazione da qui non resta bloccata.
-      const { utentiService } = await import('../utenti/utenti.service.js');
-      const utente = await utentiService.upsertByEmail({
-        email: riga.email, nome: riga.nome, cognome: riga.cognome ?? '', telefono: riga.telefono ?? '',
-      });
+      // un login vero): l'email combacia, basta per prenotare a suo nome.
+      // Un account che esiste già non si tocca: nome e telefono
+      // dell'iscrizione li può aver scritti chiunque. Senza account ne
+      // nasce uno "leggero" (senza password), come nel checkout ospite.
+      const { utenteAttivoPerEmail } = await import('../cliente-auth/cliente-auth.service.js');
+      let utente = await utenteAttivoPerEmail(riga.email);
+      if (!utente) {
+        [utente] = await db.insert(utenti).values({
+          email: riga.email.toLowerCase(), nome: riga.nome, cognome: riga.cognome, telefono: riga.telefono,
+        }).returning();
+      }
 
       const prenotazione = await prenotazioniService.crea({
         eventoId: riga.eventoId,

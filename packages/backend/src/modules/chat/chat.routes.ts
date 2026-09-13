@@ -145,9 +145,9 @@ export const chatService = {
 
 export const chatRouter = Router();
 
-// Pubblico: il cliente scrive e legge la propria conversazione senza login admin
-chatRouter.post('/', valida(inviaClienteSchema), asyncHandler(async (req: Request, res: Response) => res.status(201).json(await chatService.inviaCliente(req.body))));
-chatRouter.get('/by-email', valida(z.object({ email: z.string().email() }), 'query'), asyncHandler(async (req: Request, res: Response) => res.json(await chatService.storicoCliente(String(req.query.email)))));
+// Il cliente scrive e legge la propria conversazione dall'area personale,
+// con il suo account: /api/cliente-auth/me/chat. Prima erano pubbliche per
+// email (chiunque leggeva lo storico o scriveva a nome di un altro).
 
 // Admin: elenco conversazioni, dettaglio, risposta, stati
 chatRouter.get('/conversazioni', richiedeAuth, richiedePermesso('chat.visualizza'), asyncHandler(async (req: Request, res: Response) => {

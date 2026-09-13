@@ -103,9 +103,9 @@ export function orarioLeggibile(testo: string | null | undefined): string | null
   return o ? `${String(o.ore).padStart(2, '0')}:${String(o.minuti).padStart(2, '0')}` : null;
 }
 
-/** Per i valori scritti da persone (nomi, indirizzi, descrizioni,
- *  motivi) che finiscono dentro l'HTML di un'email: un "<" in un nome
- *  non deve diventare un tag. Mai da usare sui link. */
+/** Per i valori che finiscono dentro l'HTML di un'email: un "<" in un nome
+ *  non deve diventare un tag. Sui link va bene: "&amp;" in un href si
+ *  rilegge come "&". */
 export function escapaHtml(valore: string | null | undefined): string {
   return String(valore ?? '')
     .replace(/&/g, '&amp;')

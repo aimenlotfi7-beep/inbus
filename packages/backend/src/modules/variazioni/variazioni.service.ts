@@ -189,7 +189,7 @@ export async function generaComunicazioniVariazione(
               pnr: p.pnr,
               descrizione: v.descrizione,
               link,
-            }, { escapaHtml: ['nome', 'evento', 'pnr', 'descrizione'] });
+            });
             const { inviata } = await inviaEmail({ a: clienteEmail, oggetto, html });
             if (!inviata) esito.emailNonInviate++;
           } catch (err) {

@@ -13,12 +13,14 @@ export interface PermessiEffettivi {
  *  a prescindere dalle eccezioni (che vengono ignorate in quel caso). */
 export async function permessiEffettivi(amministratoreId: string): Promise<PermessiEffettivi> {
   const [admin] = await db
-    .select({ ruoloId: amministratori.ruoloId })
+    .select({ ruoloId: amministratori.ruoloId, attivo: amministratori.attivo })
     .from(amministratori)
     .where(eq(amministratori.id, amministratoreId))
     .limit(1);
 
-  if (!admin) return { owner: false, permessi: new Set() };
+  // Un'utenza disattivata perde subito ogni permesso, anche con un token
+  // ancora valido (dura 12 ore).
+  if (!admin || !admin.attivo) return { owner: false, permessi: new Set() };
 
   const [ruolo] = await db.select().from(ruoli).where(eq(ruoli.id, admin.ruoloId)).limit(1);
   if (!ruolo) return { owner: false, permessi: new Set() };
