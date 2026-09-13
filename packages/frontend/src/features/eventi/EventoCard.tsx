@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Evento, Tragitto } from '../../api/types';
 import { intervalloPrezzoEvento } from '../../api/prezzi';
-import { formattaEuro } from '../../shared/formato';
+import { formattaEuro, formattaPrezzoBreve } from '../../shared/formato';
 import { Icona } from '../Icone';
 
 /** Un solo componente per le card del sito: evento, tour (card
@@ -110,8 +110,8 @@ export function CardBase({ href, formato = 'griglia', priorita = false, immagine
         <div className="card-piede">
           {prezzo ? (
             <span className="card-prezzo">
-              <b>da {formattaEuro(prezzo.min, { senzaDecimali: true })}</b>
-              {prezzo.max > prezzo.min && <small>fino a {formattaEuro(prezzo.max, { senzaDecimali: true })}</small>}
+              <b>da {formattaPrezzoBreve(prezzo.min)}</b>
+              {prezzo.max > prezzo.min && <small>fino a {formattaPrezzoBreve(prezzo.max)}</small>}
             </span>
           ) : nota ? (
             <span className="card-prezzo"><small>{nota}</small></span>

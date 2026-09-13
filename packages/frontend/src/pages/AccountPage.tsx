@@ -8,7 +8,7 @@ import type { ConversazioneConMessaggi } from '../api/chat';
 import type { Prenotazione, Evento } from '../api/types';
 import { CookieBanner, LinkPreferenzeCookie } from '../features/CookieBanner';
 import { clienteLoggato, logoutCliente } from '../features/clienteSessione';
-import { clienteAuthApi, ErroreClienteAuth, type DatiCliente } from '../api/clienteAuth';
+import { accessoNonValido, clienteAuthApi, ErroreClienteAuth, type DatiCliente } from '../api/clienteAuth';
 import type { MiaIscrizione } from '../api/listaAttesa';
 import { DettaglioViaggioModale } from '../features/DettaglioViaggioModale';
 import { ModaleRimborso } from '../features/ModaleRimborso';
@@ -98,7 +98,10 @@ export function AccountPage() {
         setNomeProprio(dati.nome ?? '');
         setNomeCliente([dati.nome, dati.cognome].filter(Boolean).join(' '));
       })
-      .catch(() => { logoutCliente(); navigate('/accedi?dopo=' + encodeURIComponent('/account')); })
+      .catch((e) => {
+        // Solo un accesso rifiutato fa uscire; con un intoppo di rete si resta dentro.
+        if (accessoNonValido(e)) { logoutCliente(); navigate('/accedi?dopo=' + encodeURIComponent('/account')); }
+      })
       .finally(() => setCaricandoSessione(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

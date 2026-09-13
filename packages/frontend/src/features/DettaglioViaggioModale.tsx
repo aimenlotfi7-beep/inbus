@@ -24,6 +24,8 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
   const [biglietti, setBiglietti] = useState<Biglietto[]>([]);
   const [rimborsoAperto, setRimborsoAperto] = useState(false);
   const [esitoRimborso, setEsitoRimborso] = useState('');
+  const [erroreCaricamento, setErroreCaricamento] = useState(false);
+  const [tentativo, setTentativo] = useState(0);
   const idTitolo = useId();
   const chiudiRef = useRef<HTMLButtonElement>(null);
   // Aggiornato ogni minuto — serve per far scorrere il conto alla
@@ -35,9 +37,11 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
   }, []);
 
   useEffect(() => {
-    prenotazioniApi.dettaglioPerCliente(pnr, email).then(setDettaglio).catch(() => setDettaglio(null));
+    setErroreCaricamento(false);
+    // Prima un errore lasciava "Carico…" per sempre.
+    prenotazioniApi.dettaglioPerCliente(pnr, email).then(setDettaglio).catch(() => { setDettaglio(null); setErroreCaricamento(true); });
     ticketApi.lista(pnr, email).then(setBiglietti).catch(() => setBiglietti([]));
-  }, [pnr, email]);
+  }, [pnr, email, tentativo]);
 
   // Il fuoco va sul pulsante di chiusura all'apertura; Esc chiude — ma
   // non mentre è aperta la finestra del rimborso, che gestisce da sé
@@ -72,7 +76,14 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
       <div className="travel-overlay" onClick={onClose}>
         <div className="travel-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Dettaglio viaggio">
           {pulsanteChiudi}
-          <p className="travel-nota" role="status">Carico…</p>
+          {erroreCaricamento ? (
+            <div role="alert">
+              <p className="travel-nota">Non riesco a caricare il viaggio: potrebbe essere un problema di connessione.</p>
+              <button type="button" className="btn btn-secondary" onClick={() => setTentativo((n) => n + 1)}>Riprova</button>
+            </div>
+          ) : (
+            <p className="travel-nota" role="status">Carico…</p>
+          )}
         </div>
       </div>
     );
@@ -161,6 +172,12 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
         <section className="travel-sezione">
           <h2 className="section-label">Pagamento</h2>
           <ul className="travel-timeline">
+            {dettaglio.stato === 'CANCELLATA' ? (
+              // Una prenotazione cancellata non è "confermata" né "pagata":
+              // il rimborso, se c'è, lo segue lo staff.
+              <li><Icona nome="info" dimensione={18} className="scaduto" />Prenotazione cancellata{dettaglio.motivoCancellazione ? `: ${dettaglio.motivoCancellazione}` : ''}</li>
+            ) : (
+            <>
             <li><Icona nome="spunta" dimensione={18} strokeWidth={2.4} className="fatto" />Prenotazione confermata</li>
             {pagamentoCompleto ? (
               <li><Icona nome="spunta" dimensione={18} strokeWidth={2.4} className="fatto" />Pagamento completato: {formattaEuro(dettaglio.totale)}</li>
@@ -173,6 +190,8 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
                   {dettaglio.scadenzaSaldo ? ` ${stato.chiave === 'acconto_scaduto' ? 'il' : 'entro il'} ${formattaData(dettaglio.scadenzaSaldo)}` : ''}
                 </li>
               </>
+            )}
+            </>
             )}
           </ul>
         </section>
@@ -189,7 +208,8 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
         {dettaglio.stato === 'CONFERMATA' && (
           <div className="travel-azioni">
             {!pagamentoCompleto && (
-              <a className="btn btn-primary btn-block" href={`/completa-saldo/${dettaglio.pnr}`}>Paga il saldo</a>
+              // L'email del cliente è già nota: la pagina del saldo non la chiede di nuovo.
+              <a className="btn btn-primary btn-block" href={`/completa-saldo/${dettaglio.pnr}?email=${encodeURIComponent(email)}`}>Paga il saldo</a>
             )}
             <button type="button" className="btn btn-secondary btn-block" onClick={onVaiAllaChat}>Scrivi allo staff</button>
             <button type="button" className="btn btn-tertiary" onClick={() => setRimborsoAperto(true)}>Richiedi rimborso</button>

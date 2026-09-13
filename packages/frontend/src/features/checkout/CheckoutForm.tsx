@@ -7,15 +7,17 @@ import { prenotazioniApi } from '../../api/prenotazioni';
 import { whiteLabelApi } from '../../api/whiteLabel';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import { applicaScontoOfferta } from '../../api/prezzi';
-import { clienteAuthApi } from '../../api/clienteAuth';
+import { accessoNonValido, clienteAuthApi } from '../../api/clienteAuth';
 import { clienteLoggato, logoutCliente } from '../../features/clienteSessione';
+import { leggiBozzaAccesso, salvaBozzaAccesso } from './bozzaAccesso';
 import { useCarrello } from '../carrello/CarrelloContext';
 import { EtichettaPosti, SceltaFermata } from './SceltaFermata';
 import { Stepper } from './Stepper';
 import { CampoTesto } from './CampoTesto';
 import { provenienzaDaUrl } from './provenienza';
-import { tracciaInizioPrenotazione, tracciaAcquisto, leggiCookieMeta } from '../metaPixel';
-import { tracciaInizioCheckoutGA4, tracciaAcquistoGA4, tracciaAcquistoGoogleAds } from '../googleAnalytics';
+import { tracciaInizioPrenotazione, leggiCookieMeta } from '../metaPixel';
+import { tracciaInizioCheckoutGA4 } from '../googleAnalytics';
+import { tracciaAcquistoRegistrato, valoreAcquisto } from '../tracciaAcquisto';
 import { formattaEuro, plurale } from '../../shared/formato';
 import { MESSAGGIO_CONNESSIONE, testoErrore } from '../../shared/errori';
 import { comportamentoScorrimento } from '../../shared/movimento';
@@ -170,7 +172,8 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
         preselezioneInAttesa.current = null;
         setFermataId(inAttesa);
         setErroreFermata('');
-        setStep(1);
+        setStep(riprendiAlPasso2.current ? 2 : 1);
+        riprendiAlPasso2.current = false;
       }
       setStato('pronto');
     }).catch(() => {
@@ -202,9 +205,18 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fermataPreselezionata, richiestaPreselezione]);
 
+  // Nomi dei passeggeri ripresi dopo "Accedi": si applicano quando il numero
+  // di passeggeri è già quello della bozza.
+  const partecipantiDaRipristinare = useRef<Partecipante[] | null>(null);
   useEffect(() => {
+    const necessari = Math.max(0, passeggeri - 1);
+    const daBozza = partecipantiDaRipristinare.current;
+    if (daBozza && daBozza.length === necessari) {
+      partecipantiDaRipristinare.current = null;
+      setPartecipanti(daBozza);
+      return;
+    }
     setPartecipanti((prev) => {
-      const necessari = Math.max(0, passeggeri - 1);
       if (prev.length === necessari) return prev;
       if (prev.length < necessari) return [...prev, ...Array(necessari - prev.length).fill(null).map(() => ({ nome: '', cognome: '' }))];
       return prev.slice(0, necessari);
@@ -220,11 +232,33 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
       if (dati.cognome) setCognome(dati.cognome);
       if (dati.telefono) setTelefono(dati.telefono);
       setCreditoDisponibile(Number(dati.creditoDisponibile));
-    }).catch(() => {
-      // Il token non è più valido — lo togliamo, il modulo mostra l'invito ad accedere.
-      logoutCliente();
+    }).catch((e) => {
+      // Solo un accesso rifiutato dal server fa uscire: un intoppo di rete no.
+      if (accessoNonValido(e)) logoutCliente();
     });
   }, []);
+
+  // Ritorno da "Accedi" o "Registrati": la prenotazione riprende da dove era
+  // (servizio, fermata, passeggeri, nomi) invece di ricominciare da capo.
+  const riprendiAlPasso2 = useRef(false);
+  useEffect(() => {
+    const bozza = leggiBozzaAccesso(evento.id);
+    if (!bozza) return;
+    const servizio = bozza.servizioId ? evento.servizi.find((s) => s.id === bozza.servizioId) : undefined;
+    if (servizio) setServizioScelto(servizio);
+    partecipantiDaRipristinare.current = bozza.partecipanti.slice(0, Math.max(0, bozza.passeggeri - 1));
+    setPasseggeri(bozza.passeggeri);
+    if (bozza.passeggeri === 1) partecipantiDaRipristinare.current = null;
+    if (bozza.fermataId) {
+      preselezioneInAttesa.current = bozza.fermataId;
+      riprendiAlPasso2.current = true;
+      setElencoFermateAperto(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function salvaBozzaPerAccesso() {
+    salvaBozzaAccesso({ eventoId: evento.id, servizioId: servizioScelto?.id ?? null, fermataId, passeggeri, partecipanti });
+  }
 
   // Popup del percorso: all'apertura il focus va su "Chiudi", Esc chiude
   // e il focus torna a "Vedi il percorso". L'ascoltatore è in cattura e
@@ -246,11 +280,18 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
     };
   }, [percorsoAperto]);
 
+  // "Inizio prenotazione" (Meta, GA4) una volta sola per modulo: prima
+  // partiva a ogni cambio di fermata e gonfiava i numeri.
+  const inizioTracciato = useRef(false);
   function scegliFermata(id: string) {
     setFermataId(id);
     setErroreFermata('');
     const scelta = opzioni.find((o) => o.fermataId === id);
-    if (scelta) { tracciaInizioPrenotazione(scelta.prezzoEffettivo * passeggeri); tracciaInizioCheckoutGA4(scelta.prezzoEffettivo * passeggeri, evento.artista); }
+    if (scelta && !inizioTracciato.current) {
+      inizioTracciato.current = true;
+      tracciaInizioPrenotazione(scelta.prezzoEffettivo * passeggeri);
+      tracciaInizioCheckoutGA4(scelta.prezzoEffettivo * passeggeri, evento.artista);
+    }
   }
 
   function aggiornaPartecipante(idx: number, campo: keyof Partecipante, valore: string) {
@@ -427,12 +468,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
         ? await whiteLabelApi.prenota(publicWidgetId, payloadPrenotazione)
         : await prenotazioniApi.crea(payloadPrenotazione);
       setPnrConfermato(prenotazione.pnr);
-      if (metaEventId) {
-        const valoreEuro = opzioneScelta.prezzoEffettivo * passeggeri; // stima lato client: il valore vero lo calcola il server per la Conversions API
-        tracciaAcquisto(valoreEuro, metaEventId);
-        tracciaAcquistoGA4(valoreEuro, prenotazione.pnr, evento.artista);
-        tracciaAcquistoGoogleAds(valoreEuro, prenotazione.pnr);
-      }
+      tracciaAcquistoRegistrato({ valore: valoreAcquisto([prenotazione]), codice: prenotazione.pnr, eventIdMeta: metaEventId, nome: evento.artista });
       setStato('confermato');
     } catch (e) {
       setMessaggioErrore(testoErrore(e));
@@ -664,8 +700,8 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
                 <p className="campo-aiuto">
                   Ci vuole un minuto: dopo l'accesso torni qui con la fermata e i passeggeri già scelti.
                 </p>
-                <a href={`/accedi?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="btn btn-primary btn-lg btn-block">Accedi</a>
-                <a href={`/registrati?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="btn btn-secondary btn-lg btn-block">Registrati</a>
+                <a href={`/accedi?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`} onClick={salvaBozzaPerAccesso} className="btn btn-primary btn-lg btn-block">Accedi</a>
+                <a href={`/registrati?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`} onClick={salvaBozzaPerAccesso} className="btn btn-secondary btn-lg btn-block">Registrati</a>
                 <div className="checkout-nav">
                   <button type="button" className="btn btn-tertiary" onClick={() => setStep(1)}>Indietro</button>
                 </div>
@@ -674,7 +710,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
               <form className="checkout-passo" noValidate onSubmit={(e) => { e.preventDefault(); continuaPasso2(); }}>
                 {!loggato && (
                   <p className="campo-aiuto checkout-accedi">
-                    Hai già un account? <a href={`/accedi?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`}>Accedi</a>
+                    Hai già un account? <a href={`/accedi?dopo=${encodeURIComponent(window.location.pathname + window.location.search)}`} onClick={salvaBozzaPerAccesso}>Accedi</a>
                   </p>
                 )}
 

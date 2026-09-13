@@ -24,7 +24,7 @@ export function TourScreen() {
   const [ricerca, setRicerca] = useState('');
   const [aperto, setAperto] = useState<{ id: string | null } | null>(null);
 
-  function ricarica() { tourApi.list().then(setLista).catch(() => setLista([])); }
+  function ricarica() { tourApi.list().then(setLista).catch((e) => { setLista([]); notifica(`Tour non caricati: ${motivoErrore(e)}`, 'errore'); }); }
   useEffect(ricarica, []);
 
   const filtrati = ricerca.trim() ? lista.filter((t) => t.nome.toLowerCase().includes(ricerca.trim().toLowerCase())) : lista;

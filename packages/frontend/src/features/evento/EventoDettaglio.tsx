@@ -4,13 +4,14 @@ import type { Evento, OpzionePartenza, Tragitto } from '../../api/types';
 import { eventiApi } from '../../api/eventi';
 import { applicaScontoOfferta, prezzoMinimoEvento } from '../../api/prezzi';
 import { CheckoutForm, type OffertaCheckout } from '../checkout/CheckoutForm';
+import { esisteBozzaAccesso } from '../checkout/bozzaAccesso';
 import { EtichettaPosti } from '../checkout/SceltaFermata';
 import { ElencoFermate } from '../checkout/ElencoFermate';
 import { PulsanteCondividi } from '../PulsanteCondividi';
 import { EventiCorrelati } from '../EventiCorrelati';
 import { Icona } from '../Icone';
 import { useMobile } from '../useMobile';
-import { formattaEuro } from '../../shared/formato';
+import { formattaEuro, formattaPrezzoBreve } from '../../shared/formato';
 
 /** Sotto questa soglia "N persone hanno già prenotato" non si mostra:
  *  "2 persone" sembra scarso invece che rassicurante. */
@@ -33,10 +34,7 @@ function formattaDataLunga(iso: string): string {
   return d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-/** "39 €" quando è tondo, "39,50 €" altrimenti. */
-function prezzoBreve(n: number): string {
-  return formattaEuro(n, { senzaDecimali: Number.isInteger(n) });
-}
+const prezzoBreve = formattaPrezzoBreve;
 
 interface RigaPartenza {
   fermataId: string; tragittoId: string; citta: string; indirizzo: string | null;
@@ -85,7 +83,8 @@ export function EventoScheletro() {
 export function EventoDettaglio({ evento, offerta }: { evento: Evento; offerta?: OffertaCheckout }) {
   const mobile = useMobile();
   const idFoglio = useId();
-  const [foglioAperto, setFoglioAperto] = useState(false);
+  // Di ritorno da "Accedi" con una prenotazione in sospeso il modulo si riapre da solo.
+  const [foglioAperto, setFoglioAperto] = useState(() => esisteBozzaAccesso(evento.id));
   const [fermataPreselezionata, setFermataPreselezionata] = useState<string | undefined>(undefined);
   // Cresce a ogni "Scegli", anche sulla stessa fermata (vedi CheckoutForm).
   const [richiestaPreselezione, setRichiestaPreselezione] = useState(0);

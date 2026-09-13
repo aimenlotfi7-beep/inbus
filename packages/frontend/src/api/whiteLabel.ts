@@ -96,6 +96,8 @@ export interface WhiteLabelPubblica {
 export interface PrenotazioneCreata {
   id: string;
   pnr: string;
+  totale: string;
+  totaleComplessivo?: number;
 }
 
 export const whiteLabelApi = {
@@ -103,7 +105,7 @@ export const whiteLabelApi = {
   opzioniPartenza: (publicWidgetId: string, eventoId?: string, servizioId?: string) =>
     api.get<OpzionePartenza[]>(`/api/public/widget/${publicWidgetId}/opzioni-partenza${eventoId ? `?eventoId=${eventoId}${servizioId ? `&servizioId=${servizioId}` : ''}` : ''}`),
   ordineBundle: (publicWidgetId: string, articoli: Record<string, unknown>[]) =>
-    apiClienteConToken.post<{ ordine: { id: string; totale: string }; prenotazioni: { pnr: string }[] }>(`/api/public/widget/${publicWidgetId}/ordine`, { articoli }),
+    apiClienteConToken.post<{ ordine: { id: string; totale: string }; prenotazioni: { pnr: string; totale: string; totaleComplessivo?: number }[] }>(`/api/public/widget/${publicWidgetId}/ordine`, { articoli }),
   prenota: (publicWidgetId: string, input: Record<string, unknown>) =>
     apiClienteConToken.post<PrenotazioneCreata>(`/api/public/widget/${publicWidgetId}/prenota`, input),
   list: () => api.get<WhiteLabel[]>('/api/admin/white-label'),

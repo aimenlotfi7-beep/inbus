@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { azioneConfermata } from '../../shared/conferma';
 import { bundleApi, type BundleRiga } from '../../../api/bundle';
 import { notifica } from '../../shared/notifiche';
+import { motivoErrore } from '../../shared/errori';
 import { PanelHead } from '../../shared/PanelHead';
 import { RicercaSezione } from '../../shared/RicercaSezione';
 import { BundleCardCompatta } from '../../shared/BundleCardCompatta';
@@ -14,7 +15,7 @@ export function BundleScreen() {
   const [ricerca, setRicerca] = useState('');
   const [aperto, setAperto] = useState<{ id: string | null } | null>(null);
 
-  function ricarica() { bundleApi.list().then(setLista).catch(() => setLista([])); }
+  function ricarica() { bundleApi.list().then(setLista).catch((e) => { setLista([]); notifica(`Bundle non caricati: ${motivoErrore(e)}`, 'errore'); }); }
   useEffect(ricarica, []);
 
   const filtrati = ricerca.trim() ? lista.filter((b) => b.nome.toLowerCase().includes(ricerca.trim().toLowerCase())) : lista;

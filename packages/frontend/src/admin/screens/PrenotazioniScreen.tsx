@@ -9,6 +9,7 @@ import { RicercaSezione } from '../shared/RicercaSezione';
 import { eventoPassato, formattaData, formattaDataOra, formattaEuro, plurale } from '../../shared/formato';
 import { conferma, confermaConTesto } from '../shared/conferma';
 import { motivoErrore } from '../shared/errori';
+import { statoPrenotazioneAdmin } from '../shared/statoPrenotazioneAdmin';
 
 type SottoTab = 'CONFERMATA' | 'CANCELLATA';
 
@@ -19,19 +20,8 @@ const ETICHETTA_METODO: Record<string, string> = {
   DA_CONCORDARE: 'Da concordare',
 };
 
-/** Quattro stati distinti, non tre: chi paga tutto subito è verde
- *  ("Confermata"); chi ha versato solo l'acconto e non ha ancora
- *  saldato è giallo ("Acconto"); chi aveva pagato ad acconto e HA GIÀ
- *  saldato il resto è blu ("Saldata") — voluto diverso dal verde, per
- *  distinguere a colpo d'occhio chi ha confermato subito da chi ci è
- *  arrivato in due tempi; cancellata resta rossa. Lo stesso identico
- *  record cambia colore da solo, appena il saldo viene completato. */
-function statoRiga(r: PrenotazioneRiga): { classe: string; etichetta: string } {
-  if (r.stato === 'CANCELLATA') return { classe: 'non-coperta', etichetta: 'Cancellata' };
-  if (r.tipoPagamento === 'ACCONTO' && !r.saldoPagato) return { classe: 'attenzione', etichetta: 'Acconto' };
-  if (r.tipoPagamento === 'ACCONTO' && r.saldoPagato) return { classe: 'saldata', etichetta: 'Saldata' };
-  return { classe: 'coperta', etichetta: 'Confermata' };
-}
+/** Quattro stati (vedi statoPrenotazioneAdmin, uguale in Clienti). */
+const statoRiga = (r: PrenotazioneRiga) => statoPrenotazioneAdmin(r);
 
 export function PrenotazioniScreen() {
   const [eventiConPren, setEventiConPren] = useState<EventoConPrenotazioni[]>([]);

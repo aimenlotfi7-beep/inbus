@@ -3,6 +3,8 @@ import { eventiApi } from '../../api/eventi';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
+import { notifica } from '../shared/notifiche';
+import { motivoErrore } from '../shared/errori';
 import { giorniAllaData, plurale } from '../../shared/formato';
 
 const ETICHETTA_STATO: Record<string, string> = {
@@ -18,7 +20,7 @@ export function CalendarioScreen() {
   const [inAttesaPerEvento, setInAttesaPerEvento] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    eventiApi.list().then(setEventi);
+    eventiApi.list().then(setEventi).catch((e) => notifica(`Eventi non caricati: ${motivoErrore(e)}`, 'errore'));
     eventiApi.statistichePerEvento().then(setStatistiche).catch(() => {});
     eventiApi.allertePartenzePerEvento().then(setAllerte).catch(() => {});
     listaAttesaApi.contaInAttesaPerEvento().then(setInAttesaPerEvento).catch(() => {});

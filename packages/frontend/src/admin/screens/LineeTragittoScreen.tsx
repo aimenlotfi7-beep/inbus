@@ -107,9 +107,11 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       .then(([ev, c, l]) => { setEvento(ev); setCalcolo(c); setLinee(l); setErrore(''); })
       .catch((e) => setErrore(`Impossibile caricare le linee: ${motivoErrore(e)}`))
       .finally(() => setCaricamento(false));
-    eventiApi.suggerimentoLinea(tragittoId).then(setSuggerimento).catch(() => setSuggerimento(null));
-    eventiApi.anteprimaSmistamento(tragittoId).then(setAnteprima).catch(() => setAnteprima(null));
-    if (vedeEconomia) eventiApi.riepilogoEconomico(eventoId).then(setEconomia).catch(() => setEconomia([]));
+    // Un errore qui non deve sembrare "nessun dato": lo si dice.
+    const nonCaricato = (cosa: string) => (e: unknown) => notifica(`${cosa} non caricato: ${motivoErrore(e)}`, 'errore');
+    eventiApi.suggerimentoLinea(tragittoId).then(setSuggerimento).catch((e) => { setSuggerimento(null); nonCaricato('Suggerimento della linea')(e); });
+    eventiApi.anteprimaSmistamento(tragittoId).then(setAnteprima).catch((e) => { setAnteprima(null); nonCaricato('Smistamento sui bus')(e); });
+    if (vedeEconomia) eventiApi.riepilogoEconomico(eventoId).then(setEconomia).catch((e) => { setEconomia([]); nonCaricato('Riepilogo economico')(e); });
   }
   /** Dopo ogni modifica: dati di questa pagina e, se incorporata, la
    *  pagina che la contiene (intestazione e card non restano indietro). */

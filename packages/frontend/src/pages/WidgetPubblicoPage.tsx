@@ -11,6 +11,7 @@ import type { Evento } from '../api/types';
 import { BundleFlusso } from '../features/bundle/BundleFlusso';
 import { inizializzaMetaPixelWidget } from '../features/metaPixel';
 import { inizializzaGA4Widget, tracciaPaginaGA4 } from '../features/googleAnalytics';
+import { tracciaAcquistoRegistrato, valoreAcquisto } from '../features/tracciaAcquisto';
 
 type Vista = 'caricamento' | 'errore' | 'vetrina' | 'auth' | 'login' | 'registrati' | 'registrati-fatto' | 'checkout' | 'bundle';
 
@@ -83,6 +84,8 @@ export function WidgetPubblicoPage() {
                   // Nessun pagamento online reale ancora: non registrare "Carta".
                   tipoPagamento, metodoPagamento: 'DA_CONCORDARE', cliente, partecipanti,
                 })));
+                // Stesso tracciamento del carrello del sito (prima il bundle del widget non ne mandava nessuno).
+                tracciaAcquistoRegistrato({ valore: valoreAcquisto(risultato.prenotazioni), codice: risultato.ordine?.id ?? risultato.prenotazioni[0]?.pnr ?? '', nome: b.nome });
                 return { pnr: risultato.prenotazioni.map((p) => p.pnr) };
               }}
             />

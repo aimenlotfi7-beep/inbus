@@ -120,5 +120,9 @@ export interface Prenotazione {
   saldoPagato: boolean;
   scadenzaSaldo: string | null;
   stato: 'CONFERMATA' | 'CANCELLATA';
+  motivoCancellazione?: string | null;
+  /** Solo nella risposta della creazione: il prezzo pieno (dopo offerta,
+   *  bundle e coupon, prima del credito), anche con l'acconto. */
+  totaleComplessivo?: number;
   creataIl: string;
 }

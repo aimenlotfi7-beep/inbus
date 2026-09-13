@@ -6,18 +6,28 @@ import type { PreferenzePrivacy } from './utenti';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
-export class ErroreClienteAuth extends Error {}
+/** `status` è il codice HTTP (401 = accesso scaduto o non valido); 0 quando
+ *  la richiesta non è arrivata al server (rete). */
+export class ErroreClienteAuth extends Error {
+  constructor(messaggio: string, public status = 0) { super(messaggio); }
+}
+
+/** Vero solo se il server ha rifiutato l'accesso: un intoppo di rete non
+ *  deve far uscire il cliente dal suo account. */
+export function accessoNonValido(e: unknown): boolean {
+  return e instanceof ErroreClienteAuth && e.status === 401;
+}
 
 async function chiamata<T>(percorso: string, opzioni: RequestInit = {}, autenticata = false): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (autenticata) {
     const token = tokenCliente();
-    if (!token) throw new ErroreClienteAuth('Devi accedere al tuo account.');
+    if (!token) throw new ErroreClienteAuth('Devi accedere al tuo account.', 401);
     headers.Authorization = `Bearer ${token}`;
   }
   const res = await fetch(`${API_URL}${percorso}`, { ...opzioni, headers: { ...headers, ...opzioni.headers } });
   const dati = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ErroreClienteAuth(dati.errore ?? 'Errore di rete.');
+  if (!res.ok) throw new ErroreClienteAuth(dati.errore ?? 'Errore di rete.', res.status);
   return dati as T;
 }
 

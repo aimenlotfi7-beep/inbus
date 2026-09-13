@@ -55,7 +55,7 @@ export const listaAttesaApi = {
   iscriviti: (payload: IscrizioneListaAttesaPayload) => api.post<{ id: string }>('/api/lista-attesa', payload),
   getByToken: (token: string) => api.get<DatiFinalizzazione>(`/api/lista-attesa/finalizza/${token}`),
   finalizza: (token: string, input: { tragittoId: string; fermataId: string; tipoPagamento: 'COMPLETO' | 'ACCONTO'; metodoPagamento: string }) =>
-    api.post<{ pnr: string }>(`/api/lista-attesa/finalizza/${token}`, input),
+    api.post<{ pnr: string; totale: string; totaleComplessivo?: number }>(`/api/lista-attesa/finalizza/${token}`, input),
   // Amministrazione
   listByEvento: (eventoId: string) => api.get<IscrizioneListaAttesa[]>(`/api/lista-attesa/eventi/${eventoId}`),
   contaInAttesa: () => api.get<{ conteggio: number }>('/api/lista-attesa/allerte'),

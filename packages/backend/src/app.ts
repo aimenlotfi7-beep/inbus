@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { env } from './config/env.js';
 import { gestoreErrori } from './shared/http.js';
+import { registroAttivita } from './shared/registroAttivita.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { eventiRouter } from './modules/eventi/eventi.routes.js';
 import { prenotazioniRouter } from './modules/prenotazioni/prenotazioni.routes.js';
@@ -62,6 +63,8 @@ export function creaApp() {
   app.use(express.json({ limit: '15mb' }));
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
+  // Ogni modifica riuscita fatta dal gestionale finisce nel registro attività.
+  app.use('/api', registroAttivita);
 
   // Ogni modulo espone il proprio Router, stesso pattern per tutti.
   app.use('/api/auth', authRouter);

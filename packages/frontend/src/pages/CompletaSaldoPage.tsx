@@ -24,6 +24,7 @@ export function CompletaSaldoPage() {
   const [email, setEmail] = useState(emailDaLink ?? '');
   const [emailDigitata, setEmailDigitata] = useState('');
   const [stato, setStato] = useState<Stato>(emailDaLink ? 'caricamento' : 'chiedi-email');
+  const [confermaNonPartita, setConfermaNonPartita] = useState(false);
   const [dati, setDati] = useState<DifferenzaSaldo | null>(null);
   const [messaggioErrore, setMessaggioErrore] = useState('');
   const [tentativo, setTentativo] = useState(0);
@@ -72,7 +73,8 @@ export function CompletaSaldoPage() {
     setStato('invio');
     setMessaggioErrore('');
     try {
-      await prenotazioniApi.saldaResto(pnr, email, couponVerificato ? couponCodice.trim() : undefined);
+      const esito = await prenotazioniApi.saldaResto(pnr, email, couponVerificato ? couponCodice.trim() : undefined);
+      setConfermaNonPartita(esito.emailConfermaInviata === false);
       setStato('completato');
     } catch (e) {
       setMessaggioErrore(testoErrore(e));
@@ -126,6 +128,9 @@ export function CompletaSaldoPage() {
                 <span className="esito-icona" aria-hidden="true"><Icona nome="spunta" dimensione={40} strokeWidth={2.4} /></span>
                 <h1>Saldo completato</h1>
                 <p>La prenotazione <b>{dati.pnr}</b> per <b>{dati.artista}</b> è saldata per intero. A presto!</p>
+                {confermaNonPartita && (
+                  <p className="avviso avviso-attenzione">Non siamo riusciti a mandarti l'email di conferma: la prenotazione resta saldata, la trovi nella tua area personale.</p>
+                )}
               </div>
             ) : (
               <>

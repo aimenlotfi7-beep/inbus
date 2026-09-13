@@ -107,11 +107,17 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
   }, [bundle, selezionati]);
 
   function chiaveOpzioni(eventoId: string, servizioId?: string) { return `${eventoId}|${servizioId ?? ''}`; }
+  /** Il servizio di un evento: quello scelto, oppure l'unico se ce n'è uno
+   *  solo (come nel checkout singolo: la scelta serve solo con 2 o più). */
+  function servizioDi(eventoId: string): string | undefined {
+    const completo = eventiCompleti[eventoId];
+    return scelte[eventoId]?.servizioId ?? (completo?.servizi.length === 1 ? completo.servizi[0].id : undefined);
+  }
   useEffect(() => {
     for (const id of selezionati) {
       const completo = eventiCompleti[id]; if (!completo) continue;
-      const multi = completo.servizi.length > 0;
-      const servizioId = scelte[id]?.servizioId;
+      const multi = completo.servizi.length >= 2;
+      const servizioId = servizioDi(id);
       if (multi && !servizioId) continue;
       const k = chiaveOpzioni(id, servizioId);
       if (opzioni[k]) continue;
@@ -142,7 +148,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
 
   function opzioneScelta(eventoId: string): OpzionePartenza | undefined {
     const sc = scelte[eventoId]; if (!sc?.fermataId) return undefined;
-    return opzioni[chiaveOpzioni(eventoId, sc.servizioId)]?.find((o) => o.fermataId === sc.fermataId);
+    return opzioni[chiaveOpzioni(eventoId, servizioDi(eventoId))]?.find((o) => o.fermataId === sc.fermataId);
   }
   // Nell'ordine del bundle, non in quello dei clic.
   const righeRiepilogo = bundle.eventi.filter((e) => selezionati.includes(e.id)).map((evento) => ({ evento, opzione: opzioneScelta(evento.id) }));
@@ -168,7 +174,7 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
   function erroreFermata(id: string): string | null {
     const sc = scelte[id];
     const completo = eventiCompleti[id];
-    if (completo && completo.servizi.length > 0 && !sc?.servizioId) return 'Scegli il servizio';
+    if (completo && completo.servizi.length >= 2 && !sc?.servizioId) return 'Scegli il servizio';
     const opz = opzioneScelta(id);
     if (!opz) return 'Scegli la fermata di partenza';
     if (opz.postiDisponibili < passeggeri) return `Da questa fermata non ci sono ${plurale(passeggeri, 'posto libero', 'posti liberi')}: scegline un'altra`;
@@ -396,8 +402,8 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                       {righeRiepilogo.map(({ evento: ev }) => {
                         const completo = eventiCompleti[ev.id];
                         const sc = scelte[ev.id] ?? {};
-                        const multi = !!completo && completo.servizi.length > 0;
-                        const lista = opzioni[chiaveOpzioni(ev.id, sc.servizioId)];
+                        const multi = !!completo && completo.servizi.length >= 2;
+                        const lista = opzioni[chiaveOpzioni(ev.id, servizioDi(ev.id))];
                         const conPosti = lista?.filter((o) => o.postiDisponibili >= passeggeri);
                         const errore = errori[`fermata-${ev.id}`];
                         const idTitolo = `${prefisso}-partenza-${ev.id}`;

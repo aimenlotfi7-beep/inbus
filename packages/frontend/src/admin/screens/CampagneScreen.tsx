@@ -35,7 +35,7 @@ function ReportFatturato() {
     // Giorni di calendario di Roma, oggi compreso: come le Statistiche.
     const dataDa = giorni ? giornoIsoMenoGiorni(oggiIsoRoma(), giorni - 1) : undefined;
     setRighe(null);
-    campagneApi.report(dataDa).then(setRighe).catch(() => setRighe([]));
+    campagneApi.report(dataDa).then(setRighe).catch((e) => { setRighe([]); notifica(`Report non caricato: ${motivoErrore(e)}`, 'errore'); });
   }, [periodo]);
 
   const totaleFatturato = righe?.reduce((s, r) => s + r.fatturato, 0) ?? 0;
@@ -88,7 +88,7 @@ export function CampagneScreen() {
   const [form, setForm] = useState<CampagnaInput>(VUOTO);
   const [aperta, setAperta] = useState(false);
 
-  function ricarica() { campagneApi.list().then(setCampagne); }
+  function ricarica() { campagneApi.list().then(setCampagne).catch((e) => notifica(`Campagne non caricate: ${motivoErrore(e)}`, 'errore')); }
   useEffect(ricarica, []);
 
   function apriNuova() { setInModifica(null); setForm(VUOTO); setAperta(true); }

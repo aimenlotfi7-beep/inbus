@@ -140,38 +140,37 @@ export function AdminLayout({
   // previsti. "Passate" non ne ha una — è solo archivio, niente da
   // lavorare lì per definizione. Solo per chi ha il permesso di vedere
   // quella sezione.
-  useEffect(() => {
-    if (!haPermesso(sessione, 'eventi.partenze')) return;
-    eventiApi.allertePartenze().then((r) => setAllertePartenze(r.conteggio)).catch(() => {});
-    eventiApi.eventiDaCalcolareOrari().then((r) => setEventiDaCalcolareOrari(r.conteggio)).catch(() => {});
-    eventiApi.eventiDaPrezzare().then((r) => setEventiDaPrezzare(r.conteggio)).catch(() => {});
-    eventiApi.lineeProntoDaConfermare().then((r) => setLineeProntoDaConfermare(r.conteggio)).catch(() => {});
-    eventiApi.eventiPreventiviDaRichiedere().then((r) => setEventiPreventiviDaRichiedere(r.conteggio)).catch(() => {});
-    preventiviApi.contaDaValutare().then((r) => setPreventiviDaValutare(r.conteggio)).catch(() => {});
-    preventiviApi.contaCambiPercorso().then((r) => setCambiPercorso(r.conteggio)).catch(() => {});
-    listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
-  }, [sessione]);
-
-  // Separato dal blocco sopra apposta: i rimborsi dipendono da un
-  // permesso diverso (pagamenti, non partenze) — un amministratore
-  // potrebbe avere l'uno senza l'altro.
-  useEffect(() => {
-    if (!haPermesso(sessione, 'prenotazioni.pagamenti')) return;
-    richiesteRimborsoApi.contaInAttesa().then((r) => setRimborsiInAttesa(r.conteggio)).catch(() => {});
-  }, [sessione]);
-
-  // Separato allo stesso modo — permesso diverso (fornitori, non
-  // partenze/pagamenti).
-  useEffect(() => {
-    if (!haPermesso(sessione, 'fornitori.visualizza')) return;
-    fornitoriApi.contaInAttesa().then((r) => setFornitoriInAttesa(r.conteggio)).catch(() => {});
-  }, [sessione]);
-
+  // Ogni gruppo di pallini dipende dal suo permesso (partenze, pagamenti,
+  // fornitori, chat): un amministratore può avere l'uno senza l'altro.
   const [chatNonLette, setChatNonLette] = useState(0);
+  const [aggiornamento, setAggiornamento] = useState(0);
   useEffect(() => {
-    if (!haPermesso(sessione, 'chat.visualizza')) return;
-    chatApi.contaNonLette().then((r) => setChatNonLette(r.conteggio)).catch(() => {});
-  }, [sessione]);
+    if (haPermesso(sessione, 'eventi.partenze')) {
+      eventiApi.allertePartenze().then((r) => setAllertePartenze(r.conteggio)).catch(() => {});
+      eventiApi.eventiDaCalcolareOrari().then((r) => setEventiDaCalcolareOrari(r.conteggio)).catch(() => {});
+      eventiApi.eventiDaPrezzare().then((r) => setEventiDaPrezzare(r.conteggio)).catch(() => {});
+      eventiApi.lineeProntoDaConfermare().then((r) => setLineeProntoDaConfermare(r.conteggio)).catch(() => {});
+      eventiApi.eventiPreventiviDaRichiedere().then((r) => setEventiPreventiviDaRichiedere(r.conteggio)).catch(() => {});
+      preventiviApi.contaDaValutare().then((r) => setPreventiviDaValutare(r.conteggio)).catch(() => {});
+      preventiviApi.contaCambiPercorso().then((r) => setCambiPercorso(r.conteggio)).catch(() => {});
+      listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
+    }
+    if (haPermesso(sessione, 'prenotazioni.pagamenti')) {
+      richiesteRimborsoApi.contaInAttesa().then((r) => setRimborsiInAttesa(r.conteggio)).catch(() => {});
+    }
+    if (haPermesso(sessione, 'fornitori.visualizza')) {
+      fornitoriApi.contaInAttesa().then((r) => setFornitoriInAttesa(r.conteggio)).catch(() => {});
+    }
+    if (haPermesso(sessione, 'chat.visualizza')) {
+      chatApi.contaNonLette().then((r) => setChatNonLette(r.conteggio)).catch(() => {});
+    }
+    // Si aggiornano cambiando sezione e ogni minuto: prima restavano quelli
+    // dell'accesso finché non si ricaricava la pagina.
+  }, [sessione, sezioneAttiva, aggiornamento]);
+  useEffect(() => {
+    const id = setInterval(() => { if (document.visibilityState === 'visible') setAggiornamento((n) => n + 1); }, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Funzione condivisa: quante notifiche ha una singola voce — usata
   // sia per il badge sulla voce stessa sia per calcolare il totale da

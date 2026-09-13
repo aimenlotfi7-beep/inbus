@@ -1,39 +1,35 @@
 import type { Evento } from './types';
 
-/** Prezzo minimo tra tutte le fermate prenotabili di un evento (quello
- *  che il cliente vedrebbe pagare di meno) — include il "prezzo extra"
- *  di ogni tragitto, che si somma SEMPRE al prezzo della fermata
- *  (coerente con la stessa formula usata dal backend in
- *  shared/prezzi.ts). Torna null se non c'è nessun prezzo impostato da
- *  nessuna parte (evento senza tratte, o tratte senza prezzi salvati). */
-export function prezzoMinimoEvento(evento: Evento): number | null {
+/** I prezzi (fermata + "prezzo extra" del tragitto, stessa formula del
+ *  backend in shared/prezzi.ts) delle sole fermate che si possono comprare:
+ *  tragitto attivo e in vendita, fermata accesa. Prima contavano anche le
+ *  fermate spente e i tragitti non ancora in vendita, e il "da" poteva essere
+ *  un prezzo che nessuno può pagare. */
+function prezziVendibili(evento: Evento): number[] {
   const prezzi: number[] = [];
   const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((v) => v.tragitti)];
   for (const tragitto of tuttiITragitti) {
+    if (tragitto.attivo === false || tragitto.stato === 'DA_CONFERMARE') continue;
     const extra = Number(tragitto.prezzoExtra ?? 0);
     for (const f of tragitto.fermate) {
-      if (f.prezzo) prezzi.push(Number(f.prezzo) + extra);
+      if (f.attivo !== false && f.prezzo) prezzi.push(Number(f.prezzo) + extra);
     }
   }
+  return prezzi;
+}
+
+/** Prezzo minimo tra le fermate prenotabili di un evento. Torna null se non
+ *  c'è nessun prezzo impostato (evento senza tratte, o tratte senza prezzi). */
+export function prezzoMinimoEvento(evento: Evento): number | null {
+  const prezzi = prezziVendibili(evento);
   if (prezzi.length > 0) return Math.min(...prezzi);
   return evento.prezzo ? Number(evento.prezzo) : null;
 }
 
-/** Minimo E massimo insieme (un solo giro sui tragitti, non due) — per
- *  mostrare un intervallo ("da €35 a €90") invece del solo minimo:
- *  più onesto quando le fermate hanno prezzi molto diversi tra loro,
- *  il cliente non scopre la cifra vera solo dopo aver scelto la sua
- *  fermata. Torna null se non c'è nessun prezzo impostato (stesso
- *  criterio di prezzoMinimoEvento). */
+/** Minimo e massimo insieme, per mostrare un intervallo ("da 35 € fino a
+ *  90 €"): stesso criterio di prezzoMinimoEvento. */
 export function intervalloPrezzoEvento(evento: Evento): { min: number; max: number } | null {
-  const prezzi: number[] = [];
-  const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((v) => v.tragitti)];
-  for (const tragitto of tuttiITragitti) {
-    const extra = Number(tragitto.prezzoExtra ?? 0);
-    for (const f of tragitto.fermate) {
-      if (f.prezzo) prezzi.push(Number(f.prezzo) + extra);
-    }
-  }
+  const prezzi = prezziVendibili(evento);
   if (prezzi.length > 0) return { min: Math.min(...prezzi), max: Math.max(...prezzi) };
   if (evento.prezzo) { const p = Number(evento.prezzo); return { min: p, max: p }; }
   return null;

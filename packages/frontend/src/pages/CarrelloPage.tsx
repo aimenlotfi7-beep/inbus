@@ -1,8 +1,8 @@
 import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCarrello, type ArticoloCarrello } from '../features/carrello/CarrelloContext';
-import { tracciaAcquisto, leggiCookieMeta } from '../features/metaPixel';
-import { tracciaAcquistoGA4, tracciaAcquistoGoogleAds } from '../features/googleAnalytics';
+import { leggiCookieMeta } from '../features/metaPixel';
+import { tracciaAcquistoRegistrato, valoreAcquisto } from '../features/tracciaAcquisto';
 import { clienteAuthApi, type DatiCliente } from '../api/clienteAuth';
 import { prenotazioniApi } from '../api/prenotazioni';
 import { clienteLoggato } from '../features/clienteSessione';
@@ -174,9 +174,7 @@ export function CarrelloPage() {
         confermaNonPartita: risultato.emailConfermaNonInviate > 0,
         invitoPassword: 'invitoPasswordInviato' in risultato && risultato.invitoPasswordInviato === true,
       });
-      tracciaAcquisto(totaleDopoBundle, metaEventId);
-      tracciaAcquistoGA4(totaleDopoBundle, metaEventId, bundle?.nome);
-      tracciaAcquistoGoogleAds(totaleDopoBundle, metaEventId);
+      tracciaAcquistoRegistrato({ valore: valoreAcquisto(risultato.prenotazioni), codice: risultato.ordine.id, eventIdMeta: metaEventId, nome: bundle?.nome });
       svuota();
       window.scrollTo(0, 0);
     } catch (e) {

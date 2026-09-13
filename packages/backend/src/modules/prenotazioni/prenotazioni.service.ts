@@ -610,7 +610,9 @@ export const prenotazioniService = {
     const metaEventId = articoli.find((a) => a.metaEventId)?.metaEventId;
     if (metaEventId) {
       inviaEventoMetaSeConfigurato({
-        nomeEvento: 'Purchase', eventId: metaEventId, valore: Number(ordine.totale),
+        // Stesso valore della prenotazione singola e del sito: il prezzo pieno
+        // (ordine.totale ha solo gli acconti e toglie il credito).
+        nomeEvento: 'Purchase', eventId: metaEventId, valore: righe.reduce((s, r) => s + Number(r.totaleComplessivo), 0),
         email: articoli[0]?.cliente.email, telefono: articoli[0]?.cliente.telefono ?? undefined,
         ipCliente: richiesta?.ip, userAgentCliente: richiesta?.userAgent,
         fbp: articoli.find((a) => a.metaFbp)?.metaFbp, fbc: articoli.find((a) => a.metaFbc)?.metaFbc,

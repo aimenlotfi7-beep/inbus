@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import { formattaEuro, plurale } from '../../shared/formato';
+import { formattaPrezzoBreve, plurale } from '../../shared/formato';
 import { Icona } from '../Icone';
 import {
   REGIONE_ASSENTE, SOGLIA_ELENCO_LUNGO, fermatePiuVicine, filtraFermate, messaggioPosizione, ordinaPerOrario,
@@ -78,7 +78,7 @@ export function ElencoFermate<T>({
     const prezzi = elenco.map(prezzo).filter((p): p is number => p !== null);
     if (!prezzi.length) return null;
     const minimo = Math.min(...prezzi);
-    return formattaEuro(minimo, { senzaDecimali: Number.isInteger(minimo) });
+    return formattaPrezzoBreve(minimo);
   };
 
   return (

@@ -8,6 +8,13 @@ export function formattaEuro(valore: number | string | null | undefined, opzioni
   return (opzioni.senzaDecimali ? euroInteri : euro).format(Number.isFinite(n) ? n : 0);
 }
 
+/** "39 €" quando è tondo, "39,50 €" altrimenti: mai arrotondato. Lo stesso
+ *  prezzo nelle card, nella pagina dell'evento e nell'elenco fermate (prima
+ *  la card diceva "da 40 €" e la pagina "da 39,50 €"). */
+export function formattaPrezzoBreve(valore: number): string {
+  return formattaEuro(valore, { senzaDecimali: Number.isInteger(valore) });
+}
+
 /** "1 fermata", "3 fermate": il numero con la parola giusta, invece di
  *  "fermata/e" o "1 fermate" scritti a mano. */
 export function plurale(n: number, singolare: string, formaPlurale: string): string {

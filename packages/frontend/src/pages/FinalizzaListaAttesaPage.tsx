@@ -10,6 +10,7 @@ import { formattaDataCard } from '../features/eventi/EventoCard';
 import { Icona } from '../features/Icone';
 import { formattaEuro, plurale } from '../shared/formato';
 import { testoErrore } from '../shared/errori';
+import { tracciaAcquistoRegistrato, valoreAcquisto } from '../features/tracciaAcquisto';
 
 type Stato = 'caricamento' | 'pronto' | 'invio' | 'confermato' | 'errore' | 'non-trovato';
 
@@ -64,6 +65,8 @@ export function FinalizzaListaAttesaPage() {
         metodoPagamento: 'DA_CONCORDARE', // nessun pagamento online reale ancora: non registrare "Carta"
       });
       setPnr(r.pnr);
+      // Anche la prenotazione dalla lista d'attesa è un acquisto (prima non era tracciata).
+      tracciaAcquistoRegistrato({ valore: valoreAcquisto([r]), codice: r.pnr, nome: dati?.artista });
       setStato('confermato');
     } catch (e) {
       setMessaggioErrore(testoErrore(e));
