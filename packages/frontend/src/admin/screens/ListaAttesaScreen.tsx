@@ -67,7 +67,7 @@ export function ListaAttesaScreen() {
   return (
     <div>
       <PanelHead titolo="Lista d'attesa" info="Scegli un evento per vedere chi è in lista d'attesa e promuovere le iscrizioni." />
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo…" />
 
       <div className="mini-tabs" style={{ justifyContent: 'center', marginBottom: 20 }}>
         <button type="button" className={`mini-tab${tab === 'da-lavorare' ? ' active' : ''}`} onClick={() => setTab('da-lavorare')}>Da lavorare</button>

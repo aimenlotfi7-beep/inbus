@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { motivoErrore } from './/errori';
 import { notifica } from './notifiche';
 import { caricaFile, verificaCaricamentoAttivo } from '../../api/upload';
 import { ErroreApi } from '../../api/client';
@@ -33,7 +34,7 @@ export function CaricaFile({ onCaricato, accept = 'image/*', etichetta = '+ Cari
       const url = await caricaFile(file);
       onCaricato(url);
     } catch (err) {
-      notifica(err instanceof ErroreApi ? `Caricamento non riuscito: ${err.message}` : 'Caricamento non riuscito: errore di rete.');
+      notifica(`Caricamento non riuscito: ${motivoErrore(err)}`, 'errore');
     } finally {
       setCaricando(false);
     }
@@ -52,7 +53,7 @@ export function CaricaFile({ onCaricato, accept = 'image/*', etichetta = '+ Cari
         disabled={caricando || attivo === null}
         title={nonAncoraAttivo ? 'Caricamento file non ancora configurato — usa il link qui accanto per ora' : undefined}
       >
-        {caricando ? 'Carico...' : etichetta}
+        {caricando ? 'Carico…' : etichetta}
       </button>
     </>
   );

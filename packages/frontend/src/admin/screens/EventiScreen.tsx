@@ -12,7 +12,7 @@ import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 import { useSelezioneUrl } from '../shared/useSelezioneUrl';
 import { Modale } from '../shared/Modale';
-import { formattaEuro } from '../../shared/formato';
+import { formattaData, formattaEuro } from '../../shared/formato';
 
 export function EventiScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
@@ -89,7 +89,7 @@ export function EventiScreen() {
       ricarica();
       notifica(`"${ev.artista}" spostato nel Cestino.`, 'successo');
     } catch (e) {
-      notifica(e instanceof ErroreApi ? e.message : "Eliminazione non riuscita: impossibile contattare il server.");
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     }
   }
 
@@ -135,7 +135,7 @@ export function EventiScreen() {
         <button type="button" className={`mini-tab${tab === 'passati' ? ' active' : ''}`} onClick={() => setTab('passati')}>Passati</button>
       </div>
 
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, genere o città..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, genere o città…" />
 
       <div className="cards-list">
         {eventiFiltrati.map((ev) => (
@@ -189,7 +189,7 @@ export function EventiScreen() {
       {daEliminare && (
         <Modale titolo="Eliminare l'evento?" onClose={() => setDaEliminare(null)}>
           <p style={{ marginBottom: 16 }}>
-            <b>{daEliminare.artista}</b> ({daEliminare.citta}, {new Date(daEliminare.data).toLocaleDateString('it-IT')}) finisce nel Cestino: sparisce dal sito e dagli elenchi, ma puoi ripristinarlo dalla sezione Cestino.
+            <b>{daEliminare.artista}</b> ({daEliminare.citta}, {formattaData(daEliminare.data)}) finisce nel Cestino: sparisce dal sito e dagli elenchi, ma puoi ripristinarlo dalla sezione Cestino.
           </p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button type="button" className="btn btn-ghost" onClick={() => setDaEliminare(null)}>Annulla</button>

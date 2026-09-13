@@ -13,7 +13,7 @@ import type { MiaIscrizione } from '../api/listaAttesa';
 import { DettaglioViaggioModale } from '../features/DettaglioViaggioModale';
 import { ModaleRimborso } from '../features/ModaleRimborso';
 import { calcolaStatoPrenotazione } from '../features/statoPrenotazione';
-import { formattaEuro, formattaData, giorniAllaData, plurale } from '../shared/formato';
+import { formattaData, formattaDataOra, formattaEuro, giorniAllaData, plurale } from '../shared/formato';
 import { testoErrore } from '../shared/errori';
 import { Icona } from '../features/Icone';
 import { CampoTesto } from '../features/checkout/CampoTesto';
@@ -739,7 +739,7 @@ function SezioneChat({ email }: { email: string }) {
           {attiva?.messaggi.map((m) => (
             <div className={`chat-bubble-mini ${m.autore.toLowerCase()}`} key={m.id}>
               {m.testo}
-              <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff OnWay'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
+              <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff OnWay'} · {formattaDataOra(m.creatoIl)}</div>
             </div>
           ))}
         </div>
@@ -767,7 +767,7 @@ function SezioneChat({ email }: { email: string }) {
                 {c.messaggi.map((m) => (
                   <div key={m.id} className={`chat-bubble-mini ${m.autore.toLowerCase()}`}>
                     {m.testo}
-                    <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff OnWay'} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
+                    <div className="meta">{m.autore === 'CLIENTE' ? 'Tu' : 'Staff OnWay'} · {formattaDataOra(m.creatoIl)}</div>
                   </div>
                 ))}
               </div>

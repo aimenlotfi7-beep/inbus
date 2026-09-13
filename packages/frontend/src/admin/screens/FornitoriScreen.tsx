@@ -80,13 +80,13 @@ export function FornitoriScreen() {
   function ricarica() {
     fornitoriApi.list()
       .then(setFornitori)
-      .catch((e) => notifica(`Caricamento dei fornitori non riuscito: ${motivo(e)}`))
+      .catch((e) => notifica(`Caricamento dei fornitori non riuscito: ${motivo(e)}`, 'errore'))
       .finally(() => setCaricato(true));
   }
   function ricaricaCampiExtraConfig() {
     fornitoriApi.campiExtraConfig()
       .then(setCampiExtraConfig)
-      .catch((e) => notifica(`Caricamento dei campi extra non riuscito: ${motivo(e)}`));
+      .catch((e) => notifica(`Caricamento dei campi extra non riuscito: ${motivo(e)}`, 'errore'));
   }
   useEffect(() => { ricarica(); ricaricaCampiExtraConfig(); }, []);
 
@@ -164,7 +164,7 @@ export function FornitoriScreen() {
       else notifica(posizioneTrovata ? `Fornitore salvato. Posizione trovata: ${posizioneTrovata}.` : 'Fornitore salvato.', 'successo');
       ricarica();
     } catch (e) {
-      notifica(`Salvataggio non riuscito: ${motivo(e)}`);
+      notifica(`Salvataggio non riuscito: ${motivo(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -182,7 +182,7 @@ export function FornitoriScreen() {
       notifica(fatto, 'successo');
       ricarica();
     } catch (e) {
-      notifica(`Cambio di stato non riuscito: ${motivo(e)}`);
+      notifica(`Cambio di stato non riuscito: ${motivo(e)}`, 'errore');
     } finally {
       setAzioneInCorso(false);
     }
@@ -208,7 +208,7 @@ export function FornitoriScreen() {
       notifica(`"${f.nome}" eliminato.`, 'successo');
       ricarica();
     } catch (e) {
-      notifica(`Eliminazione non riuscita: ${motivo(e)}`);
+      notifica(`Eliminazione non riuscita: ${motivo(e)}`, 'errore');
     } finally {
       setAzioneInCorso(false);
     }
@@ -216,7 +216,7 @@ export function FornitoriScreen() {
 
   function copiaLinkRegistrazione() {
     navigator.clipboard.writeText(`${window.location.origin}/fornitore/registrati`);
-    notifica('Link copiato — condividilo con chi vuoi far registrare come fornitore.');
+    notifica('Link copiato — condividilo con chi vuoi far registrare come fornitore.', 'successo');
   }
 
   async function aggiungiCampoExtra() {
@@ -229,7 +229,7 @@ export function FornitoriScreen() {
       notifica(`Campo "${etichetta}" aggiunto al form di registrazione.`, 'successo');
       ricaricaCampiExtraConfig();
     } catch (e) {
-      notifica(`Aggiunta del campo non riuscita: ${motivo(e)}`);
+      notifica(`Aggiunta del campo non riuscita: ${motivo(e)}`, 'errore');
     } finally {
       setAzioneInCorso(false);
     }
@@ -242,7 +242,7 @@ export function FornitoriScreen() {
       notifica(`Campo "${c.etichetta}" tolto dal form di registrazione.`, 'successo');
       ricaricaCampiExtraConfig();
     } catch (e) {
-      notifica(`Rimozione del campo non riuscita: ${motivo(e)}`);
+      notifica(`Rimozione del campo non riuscita: ${motivo(e)}`, 'errore');
     } finally {
       setAzioneInCorso(false);
     }
@@ -332,7 +332,7 @@ export function FornitoriScreen() {
             {inModifica.campiExtra.map((c, i) => <p key={i} style={{ fontSize: 'var(--testo-md)', margin: '2px 0' }}>{c.etichetta}: {c.valore}</p>)}
           </div>
         )}
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => salva()} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva fornitore'}</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => salva()} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva fornitore'}</button>
       </PaginaSezione>
     );
   }
@@ -353,10 +353,10 @@ export function FornitoriScreen() {
       } />
       {inAttesaCount > 0 && (
         <p style={{ background: 'var(--dusk)', border: '1px solid var(--amber)', borderRadius: 8, padding: '10px 14px', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
-          <b style={{ color: 'var(--amber)' }}>{inAttesaCount}</b> fornitore/i in attesa di approvazione — controlla la colonna Stato qui sotto.
+          <b style={{ color: 'var(--amber)' }}>{inAttesaCount}</b> {inAttesaCount === 1 ? 'fornitore' : 'fornitori'} in attesa di approvazione: controlla la colonna Stato qui sotto.
         </p>
       )}
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, referente o indirizzo..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, referente o indirizzo…" />
 
       {vistaCartina ? (
         puntiCartina.length === 0

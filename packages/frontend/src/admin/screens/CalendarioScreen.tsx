@@ -48,7 +48,7 @@ export function CalendarioScreen() {
                   <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 'var(--testo-3xl)', width: 40, textAlign: 'center', flexShrink: 0 }}>{new Date(ev.data).getDate()}</div>
                   <div style={{ flex: 1, minWidth: 160 }}>
                     <b>{ev.artista}</b>
-                    {allerte[ev.id] > 0 && <span className="badge non-coperta" style={{ marginLeft: 8 }} title="Tratte con posti superati">⚠ {allerte[ev.id]}</span>}
+                    {allerte[ev.id] > 0 && <span className="badge non-coperta" style={{ marginLeft: 8 }} title="Tratte con posti superati">{plurale(allerte[ev.id], 'tratta piena', 'tratte piene')}</span>}
                     <div style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>
                       {ev.luogo}, {ev.citta}
                       {giorniAllaPartenza === 0 ? ' · oggi' : giorniAllaPartenza === 1 ? ' · domani' : giorniAllaPartenza > 1 ? ` · tra ${plurale(giorniAllaPartenza, 'giorno', 'giorni')}` : ''}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { percorsiSalvatiApi, type PercorsoSalvato, type FermataPercorsoSalvato } from '../../api/percorsiSalvati';
@@ -121,20 +122,20 @@ export function PercorsiSalvatiScreen() {
     setFermate(nuove);
   }
   function rimuoviFermata(idx: number) {
-    if (fermate.length <= 2) { notifica('Servono sempre almeno due fermate — le due Teste (partenza e arrivo).'); return; }
+    if (fermate.length <= 2) { notifica('Servono sempre almeno due fermate — le due Teste (partenza e arrivo).', 'errore'); return; }
     setFermate(fermate.filter((_, i) => i !== idx));
   }
 
   const [salvando, setSalvando] = useState(false);
   async function salva() {
     if (salvando) return;
-    if (!nome.trim()) { notifica('Dai un nome al tragitto prima di salvarlo.'); return; }
-    if (fermate.length < 2) { notifica('Servono almeno due fermate — le due Teste (partenza e arrivo).'); return; }
+    if (!nome.trim()) { notifica('Dai un nome al tragitto prima di salvarlo.', 'errore'); return; }
+    if (fermate.length < 2) { notifica('Servono almeno due fermate — le due Teste (partenza e arrivo).', 'errore'); return; }
     // Clonato ma non toccato per niente — salvarlo così com'è
     // creerebbe un doppione identico all'originale, per la stessa
     // identica destinazione.
     if (clonatoDa && JSON.stringify({ nome, fermate }) === snapshotIniziale) {
-      notifica('Non hai cambiato nulla rispetto al tragitto clonato — salvarlo così creerebbe un doppione identico. Modifica qualcosa (es. inverti, o cambia una fermata) prima di salvare.');
+      notifica('Non hai cambiato nulla rispetto al tragitto clonato — salvarlo così creerebbe un doppione identico. Modifica qualcosa (es. inverti, o cambia una fermata) prima di salvare.', 'errore');
       return;
     }
     // Le due Teste (prima e ultima fermata, posizione) possono restare
@@ -146,7 +147,7 @@ export function PercorsiSalvatiScreen() {
     // di far sparire senza spiegazioni una fermata dimenticata a metà.
     const incomplete = fermate.filter((f, idx) => !f.citta.trim() || (idx !== fermate.length - 1 && !f.indirizzo?.trim()));
     if (incomplete.length > 0) {
-      notifica(`${incomplete.length} fermata/e non è/sono completa/e — manca la città (o l'indirizzo, per le fermate intermedie). Completala o eliminala prima di salvare.`);
+      notifica(`${incomplete.length === 1 ? '1 fermata non è completa' : `${incomplete.length} fermate non sono complete`}: manca la città (o l'indirizzo, per le fermate intermedie). Completale o eliminale prima di salvare.`, 'errore');
       return;
     }
     // Forzo l'indirizzo vuoto sull'arrivo anche qui, non solo nella UI —
@@ -161,7 +162,7 @@ export function PercorsiSalvatiScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -307,7 +308,7 @@ export function PercorsiSalvatiScreen() {
         })}
         <button className="btn btn-ghost" style={{ marginBottom: 18 }} onClick={aggiungiFermata}>+ Aggiungi fermata</button>
 
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva tragitto'}</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva tragitto'}</button>
       </div>
       <div style={{ position: 'sticky', top: 0 }}>
         <p style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>Cartina — in tempo reale</p>
@@ -430,7 +431,7 @@ export function PercorsiSalvatiScreen() {
       <RicercaSezione
         valore={ricerca}
         onChange={setRicerca}
-        placeholder={cittaSelezionata === null ? 'Cerca per città di arrivo...' : 'Cerca per nome tragitto o città...'}
+        placeholder={cittaSelezionata === null ? 'Cerca per città di arrivo…' : 'Cerca per nome tragitto o città…'}
       />
       {cittaSelezionata === null ? (
         <>

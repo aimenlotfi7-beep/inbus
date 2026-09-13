@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { campagneApi, type Campagna, type CampagnaInput, type RigaReportFonte } from '../../api/campagne';
@@ -51,7 +52,7 @@ function ReportFatturato() {
         </div>
       </div>
       {righe === null ? (
-        <p className="testo-intro">Carico...</p>
+        <p className="testo-intro">Carico…</p>
       ) : righe.length === 0 ? (
         <p className="testo-intro">Nessuna prenotazione confermata in questo periodo.</p>
       ) : (
@@ -100,7 +101,7 @@ export function CampagneScreen() {
   const [salvando, setSalvando] = useState(false);
   async function salva() {
     if (salvando) return;
-    if (!form.nome.trim()) { notifica('Dai un nome alla campagna.'); return; }
+    if (!form.nome.trim()) { notifica('Dai un nome alla campagna.', 'errore'); return; }
     setSalvando(true);
     try {
       if (inModifica) await campagneApi.update(inModifica.id, form);
@@ -108,7 +109,7 @@ export function CampagneScreen() {
       setAperta(false);
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -138,7 +139,7 @@ export function CampagneScreen() {
         <div className="campo" style={{ marginTop: 12 }}>
           <label><input type="checkbox" checked={form.attiva ?? true} onChange={(e) => setForm({ ...form, attiva: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Attiva</label>
         </div>
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva campagna'}</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva campagna'}</button>
       </PaginaSezione>
     );
   }

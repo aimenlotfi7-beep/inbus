@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { organizzatoriApi, type Organizzatore, type OrganizzatoreInput } from '../../api/organizzatori';
-import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
@@ -45,7 +45,7 @@ export function OrganizzatoriScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -69,7 +69,7 @@ export function OrganizzatoriScreen() {
           <label>Eventi associati</label>
           <SelettoreEventi selezionati={form.eventiAbilitati ?? []} onChange={(ids) => setForm({ ...form, eventiAbilitati: ids })} />
         </div>
-        <button className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva organizzatore'}</button>
+        <button className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva organizzatore'}</button>
         {inModifica && <PannelloCommissione organizzatoreId={inModifica.id} />}
       </PaginaSezione>
     );
@@ -81,7 +81,7 @@ export function OrganizzatoriScreen() {
       <div style={{ maxWidth: 480, marginBottom: 20 }}>
         <CampoCopiabile etichetta="Link di accesso per gli organizzatori" valore={`${window.location.origin}/organizzatore`} link />
       </div>
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome o email..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome o email…" />
       <TabellaGenerica
         righe={organizzatoriFiltrati}
         colonne={[

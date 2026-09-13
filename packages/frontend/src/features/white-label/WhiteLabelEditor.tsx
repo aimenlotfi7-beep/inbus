@@ -95,7 +95,7 @@ export function WhiteLabelEditor({ whiteLabel, evento, onSalvato }: { whiteLabel
         <textarea value={domini} onChange={(e) => setDomini(e.target.value)} rows={3} style={{ width: '100%' }} />
 
         <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={salva} disabled={salvando}>
-          {salvando ? 'Salvataggio...' : 'Salva White Label'}
+          {salvando ? 'Salvataggio…' : 'Salva White Label'}
         </button>
       </div>
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formattaData } from '../../shared/formato';
 import { eventiApi } from '../../api/eventi';
 
 interface EventoBase { id: string; artista: string; data: string; luogo: string; citta: string }
@@ -38,7 +39,7 @@ export function SelettoreEventi({ selezionati, onChange }: { selezionati: string
     <div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: espanso ? 8 : 0 }}>
         <input
-          placeholder="Cerca evento da associare..."
+          placeholder="Cerca evento da associare…"
           className="campo-cerca-originale"
           value={ricerca}
           onChange={(e) => { setRicerca(e.target.value); if (!espanso) setEspanso(true); }}
@@ -64,7 +65,7 @@ export function SelettoreEventi({ selezionati, onChange }: { selezionati: string
           {daMostrare.map((e) => (
             <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 'var(--testo-md)', cursor: 'pointer' }}>
               <input type="checkbox" checked={selezionati.includes(e.id)} onChange={() => toggle(e.id)} />
-              <span>{e.artista} — {e.citta}, {new Date(e.data).toLocaleDateString('it-IT')}</span>
+              <span>{e.artista} — {e.citta}, {formattaData(e.data)}</span>
             </label>
           ))}
           {altreNascoste > 0 && (

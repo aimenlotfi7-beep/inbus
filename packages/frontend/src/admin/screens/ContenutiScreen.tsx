@@ -5,6 +5,8 @@ import { categorieApi, type Categoria } from '../../api/categorie';
 import { categorieEventoApi, type CategoriaEvento } from '../../api/categorieEvento';
 import { PanelHead } from '../shared/PanelHead';
 import { ErroreApi } from '../../api/client';
+import { azioneConfermata } from '../shared/conferma';
+import { chiediNuovaCategoria, chiediNuovoGenere } from '../shared/generiCategorie';
 
 const CHIAVI_PAGINE = ['faq', 'privacy', 'cookie', 'termini', 'lavora', 'chisiamo', 'contatti'];
 
@@ -26,42 +28,22 @@ export function ContenutiScreen() {
   useEffect(() => { ricaricaGeneri(); ricaricaCategorieEvento(); }, []);
 
   async function nuovoGenere() {
-    const nome = window.prompt('Nome del nuovo genere:');
-    if (!nome || !nome.trim()) return;
-    try {
-      await categorieApi.create(nome.trim());
-      ricaricaGeneri();
-    } catch (e) {
-      notifica(e instanceof ErroreApi ? `Impossibile creare: ${e.message}` : 'Impossibile creare: errore di rete.');
-    }
+    if (await chiediNuovoGenere()) ricaricaGeneri();
   }
   async function eliminaGenere(g: Categoria) {
-    if (!confirm(`Eliminare il genere "${g.nome}"? Gli eventi che lo usano già lo mantengono comunque scritto, semplicemente non comparirà più nell'elenco per sceglierlo su altri eventi.`)) return;
-    try {
-      await categorieApi.remove(g.id);
-      ricaricaGeneri();
-    } catch (e) {
-      notifica(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
-    }
+    if (await azioneConfermata({
+      titolo: `Eliminare il genere "${g.nome}"?`, testo: 'Gli eventi che lo usano lo mantengono; non compare più tra quelli da scegliere.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => categorieApi.remove(g.id), fatto: 'Genere eliminato.',
+    })) ricaricaGeneri();
   }
   async function nuovaCategoriaEvento() {
-    const nome = window.prompt('Nome della nuova categoria (comparirà come pulsante in alto sul sito):');
-    if (!nome || !nome.trim()) return;
-    try {
-      await categorieEventoApi.create(nome.trim());
-      ricaricaCategorieEvento();
-    } catch (e) {
-      notifica(e instanceof ErroreApi ? `Impossibile creare: ${e.message}` : 'Impossibile creare: errore di rete.');
-    }
+    if (await chiediNuovaCategoria()) ricaricaCategorieEvento();
   }
   async function eliminaCategoriaEvento(c: CategoriaEvento) {
-    if (!confirm(`Eliminare la categoria "${c.nome}"? Sparirà anche dai pulsanti in alto sul sito. Gli eventi che la usano già la mantengono comunque scritta.`)) return;
-    try {
-      await categorieEventoApi.remove(c.id);
-      ricaricaCategorieEvento();
-    } catch (e) {
-      notifica(e instanceof ErroreApi ? `Impossibile eliminare: ${e.message}` : 'Impossibile eliminare: errore di rete.');
-    }
+    if (await azioneConfermata({
+      titolo: `Eliminare la categoria "${c.nome}"?`, testo: 'Sparisce dai pulsanti in alto sul sito. Gli eventi che la usano la mantengono.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => categorieEventoApi.remove(c.id), fatto: 'Categoria eliminata.',
+    })) ricaricaCategorieEvento();
   }
 
   function ricarica() {

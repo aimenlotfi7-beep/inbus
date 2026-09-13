@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formattaData } from '../shared/formato';
 import { Link, useSearchParams } from 'react-router-dom';
 import '../styles/tourleader.css';
 import { LogoOnWay } from '../features/LogoOnWay';
@@ -61,7 +62,7 @@ export function TourLeaderPage() {
         {eventoRif && (
           <div className="evento-context">
             Stai inviando la tua candidatura specificamente per: {eventoRif.artista} — {eventoRif.luogo}, {eventoRif.citta}
-            {' '}({new Date(eventoRif.data).toLocaleDateString('it-IT')}).
+            {' '}({formattaData(eventoRif.data)}).
           </div>
         )}
 

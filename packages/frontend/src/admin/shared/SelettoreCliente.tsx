@@ -27,7 +27,7 @@ export function SelettoreCliente({ utenteId, onChange }: { utenteId: string | nu
   return (
     <div style={{ position: 'relative' }}>
       <input
-        placeholder="Cerca cliente per nome o email..."
+        placeholder="Cerca cliente per nome o email…"
         value={ricerca}
         onChange={(e) => { setRicerca(e.target.value); setAperto(true); }}
         onFocus={() => setAperto(true)}

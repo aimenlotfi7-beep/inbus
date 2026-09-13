@@ -99,7 +99,7 @@ export function MappaPuntiFermate({ punti }: { punti: PuntoFermataMappa[] }) {
 
   return (
     <div>
-      {stato === 'carico' && <p style={{ color: 'var(--mist)' }}>Cerco le fermate sulla cartina...</p>}
+      {stato === 'carico' && <p style={{ color: 'var(--mist)' }}>Cerco le fermate sulla cartina…</p>}
       {stato === 'errore' && <p style={{ color: 'var(--pink)' }}>Non riesco a mostrare la cartina — nessuna fermata trovata con un indirizzo o città valida.</p>}
       {nonTrovate.length > 0 && (
         <p style={{ color: 'var(--amber)', fontSize: 'var(--testo-md)', marginBottom: 8 }}>Non trovate sulla cartina: {nonTrovate.join(', ')}.</p>

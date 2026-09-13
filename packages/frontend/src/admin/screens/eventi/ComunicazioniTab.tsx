@@ -135,7 +135,7 @@ export function ComunicazioniTab({ evento }: { evento: Evento }) {
       <div className="section-card" style={{ marginBottom: 16 }}>
         <p className="section-label" style={{ marginBottom: 10 }}>Il messaggio</p>
         <input placeholder="Oggetto" value={oggetto} onChange={(e) => setOggetto(e.target.value)} style={{ marginBottom: 10 }} />
-        <textarea placeholder="Testo del messaggio..." value={corpo} onChange={(e) => setCorpo(e.target.value)} rows={5} style={{ width: '100%', marginBottom: 10 }} />
+        <textarea placeholder="Testo del messaggio…" value={corpo} onChange={(e) => setCorpo(e.target.value)} rows={5} style={{ width: '100%', marginBottom: 10 }} />
         <div style={{ display: 'flex', gap: 16, marginBottom: 14 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--testo-md)' }}>
             <input type="checkbox" checked={canaleEmail} onChange={(e) => setCanaleEmail(e.target.checked)} /> Email

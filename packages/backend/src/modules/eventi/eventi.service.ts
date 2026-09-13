@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, isNull, sql, gte, lt, asc, ne } from 'drizzle-orm';
+import { and, eq, ilike, inArray, isNull, isNotNull, sql, gte, lt, asc, ne } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
   eventi,
@@ -1334,6 +1334,17 @@ export const eventiService = {
     });
   },
 
+  /** I posti del bus del preventivo, da soli. Il fornitore che risponde dal
+   *  link indica solo il prezzo: accettando la sua risposta i posti restano
+   *  vuoti, e senza posti non si calcolano i prezzi né le linee da
+   *  confermare. Si scrivono dal pannello Prezzi. */
+  async impostaPostiPreventivo(tragittoId: string, postiBus: number) {
+    const [esiste] = await db.select({ preventivoCosto: tragitti.preventivoCosto }).from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!esiste) throw new NonTrovato('Tragitto');
+    if (!esiste.preventivoCosto) throw new ConflittoDati('Registra o accetta prima un preventivo (sezione Preventivi).');
+    await db.update(tragitti).set({ preventivoPostiBus: postiBus }).where(eq(tragitti.id, tragittoId));
+  },
+
   // Sezione PREZZI: i prezzi di vendita per fermata, da un costo GIÀ
   // noto (impostato in Preventivi) — non tocca fornitore/costo.
   async calcolaPrezziVendita(tragittoId: string, input: z.infer<typeof calcolaPrezziVenditaSchema>) {
@@ -2005,7 +2016,8 @@ export const eventiService = {
       .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id })
       .from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma())));
+      // Niente bozze: l'evento che si sta ancora creando non accende i pallini.
+      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), eq(eventi.bozza, false), gte(eventi.data, inizioOggiRoma())));
     if (righeTragitti.length === 0) return 0;
 
     const tragittiIds = righeTragitti.map((r) => r.tragittoId);
@@ -2036,19 +2048,29 @@ export const eventiService = {
     return righe.length;
   },
 
+  /** Eventi con almeno un tragitto con gli orari ma ancora senza nessuna
+   *  richiesta di preventivo partita e senza un preventivo (accettato o
+   *  registrato a mano): il rosso di Preventivi. Con le richieste già
+   *  inviate il tragitto è in attesa (giallo) e non accende il pallino. */
   async contaEventiPreventiviDaRichiedere() {
     const righeTragitti = await db
-      .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id, fornitoreId: tragitti.fornitoreId })
+      .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id })
       .from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma()), isNull(tragitti.fornitoreId)));
+      .where(and(
+        eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), eq(eventi.bozza, false), gte(eventi.data, inizioOggiRoma()),
+        isNull(tragitti.fornitoreId), isNull(tragitti.preventivoCosto),
+      ));
     if (righeTragitti.length === 0) return 0;
 
     const tragittiIds = righeTragitti.map((r) => r.tragittoId);
-    const fermateConOrarioPerPreventivo = await db.select({ tragittoId: fermate.tragittoId, orario: fermate.orario })
-      .from(fermate).where(inArray(fermate.tragittoId, tragittiIds));
+    const [fermateConOrarioPerPreventivo, conRichieste] = await Promise.all([
+      db.select({ tragittoId: fermate.tragittoId, orario: fermate.orario }).from(fermate).where(inArray(fermate.tragittoId, tragittiIds)),
+      db.selectDistinct({ tragittoId: preventiviRichieste.tragittoId }).from(preventiviRichieste).where(inArray(preventiviRichieste.tragittoId, tragittiIds)),
+    ]);
     const conOrarioPerPreventivo = new Set(fermateConOrarioPerPreventivo.filter((f) => f.orario).map((f) => f.tragittoId));
-    const pronti = righeTragitti.filter((r) => conOrarioPerPreventivo.has(r.tragittoId));
+    const giaRichiesti = new Set(conRichieste.map((r) => r.tragittoId));
+    const pronti = righeTragitti.filter((r) => conOrarioPerPreventivo.has(r.tragittoId) && !giaRichiesti.has(r.tragittoId));
     return new Set(pronti.map((r) => r.eventoId)).size;
   },
 
@@ -2058,11 +2080,17 @@ export const eventiService = {
   // GIA' prezzati) - stessa parola, due concetti diversi. Questo
   // conteggio appartiene alla tappa "Prezzi".
   async contaEventiDaPrezzare() {
+    // Solo tragitti con un preventivo (accettato o registrato): senza costo
+    // non c'è niente da prezzare, come nella scheda Prezzi. Prima il pallino
+    // si accendeva appena creato l'evento.
     const righe = await db
       .select({ eventoId: tragitti.eventoId })
       .from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.stato, 'DA_CONFERMARE'), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma())));
+      .where(and(
+        eq(tragitti.stato, 'DA_CONFERMARE'), eq(tragitti.attivo, true), isNotNull(tragitti.preventivoCosto),
+        isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), eq(eventi.bozza, false), gte(eventi.data, inizioOggiRoma()),
+      ));
     return new Set(righe.map((r) => r.eventoId)).size;
   },
 
@@ -2139,11 +2167,25 @@ export const eventiService = {
       // evento resta attivo=true (il soft-delete tocca solo eliminatoIl)
       // — senza questo filtro continuava a comparire in Partenze e a
       // contare nei badge del menu. Stesso fix nei tre conteggi sopra.
-      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl)));
+      // Niente bozze: un evento ancora in creazione non è in Partenze.
+      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), eq(eventi.bozza, false)));
 
     if (righe.length === 0) return [];
 
     const tragittiIds = righe.map((r) => r.tragittoId);
+    // Richieste di preventivo partite e risposte arrivate: il giallo di
+    // Preventivi (richieste inviate, preventivo non ancora accettato).
+    const righeRichieste = await db.select({ tragittoId: preventiviRichieste.tragittoId, rispostaId: preventiviRisposte.id })
+      .from(preventiviRichieste)
+      .leftJoin(preventiviRisposte, eq(preventiviRisposte.richiestaId, preventiviRichieste.id))
+      .where(inArray(preventiviRichieste.tragittoId, tragittiIds));
+    const richiestePer = new Map<string, { richieste: number; risposte: number }>();
+    for (const r of righeRichieste) {
+      const voce = richiestePer.get(r.tragittoId) ?? { richieste: 0, risposte: 0 };
+      voce.richieste++;
+      if (r.rispostaId) voce.risposte++;
+      richiestePer.set(r.tragittoId, voce);
+    }
     const somme = await db
       .select({ tragittoId: prenotazioni.tragittoId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
       .from(prenotazioni)
@@ -2188,6 +2230,8 @@ export const eventiService = {
       totalePasseggeri: mappaPasseggeri.get(r.tragittoId) ?? 0,
       preventivoCosto: r.preventivoCosto,
       fornitoreId: r.fornitoreId,
+      richiestePreventivo: richiestePer.get(r.tragittoId)?.richieste ?? 0,
+      rispostePreventivo: richiestePer.get(r.tragittoId)?.risposte ?? 0,
       fermateCompilate: mappaFermateCompilate.get(r.tragittoId) ?? false,
       servizioNome: r.servizioNome,
       servizioId: r.servizioId,

@@ -36,12 +36,12 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
           <label style={{ gridColumn: '1 / -1' }}>Artista <input value={form.artista} onChange={(e) => setForm({ ...form, artista: e.target.value })} /></label>
           <label>Genere
             <select value={form.genere} onChange={(e) => { if (e.target.value === '__nuovo__') { onNuovoGenere(); return; } setForm({ ...form, genere: e.target.value }); }}>
-              <option value="" disabled>Scegli un genere...</option>
+              <option value="" disabled>Scegli un genere…</option>
               {categorie.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
               {form.genere && !categorie.some((c) => c.nome === form.genere) && (
                 <option value={form.genere}>{form.genere}</option>
               )}
-              <option value="__nuovo__">+ Nuovo genere...</option>
+              <option value="__nuovo__">+ Nuovo genere…</option>
             </select>
           </label>
           <label>
@@ -56,7 +56,7 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
               {form.categoria && !categorieEvento.some((c) => c.nome === form.categoria) && (
                 <option value={form.categoria}>{form.categoria}</option>
               )}
-              <option value="__nuova__">+ Nuova categoria...</option>
+              <option value="__nuova__">+ Nuova categoria…</option>
             </select>
           </label>
           <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
@@ -108,7 +108,7 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
             value={form.descrizione ?? ''}
             onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
             rows={5}
-            placeholder="Es. orario e punto di ritrovo, cosa portare, regole del bus, contatti in caso di emergenza..."
+            placeholder="Es. orario e punto di ritrovo, cosa portare, regole del bus, contatti in caso di emergenza…"
           />
         </div>
         <div className="campo">

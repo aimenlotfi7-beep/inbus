@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { fermateAnagraficaApi, type FermataAnagrafica, type FermataAnagraficaInput } from '../../api/fermateAnagrafica';
@@ -59,7 +60,7 @@ export function FermateScreen() {
 
   const [ricalcolando, setRicalcolando] = useState(false);
   async function ricalcolaPosizione() {
-    if (!form.indirizzo.trim() || !form.citta.trim()) { notifica('Inserisci prima città e indirizzo.'); return; }
+    if (!form.indirizzo.trim() || !form.citta.trim()) { notifica('Inserisci prima città e indirizzo.', 'errore'); return; }
     setRicalcolando(true);
     try {
       const risultato = await geocodifica(`${form.indirizzo}, ${form.citta}`);
@@ -67,7 +68,7 @@ export function FermateScreen() {
         setForm((f) => ({ ...f, lat: risultato.coordinate!.lat, lng: risultato.coordinate!.lng, regione: risultato.regione }));
         notifica(risultato.regione ? `Trovata: ${risultato.regione}.` : 'Posizione trovata, ma la regione non è stata riconosciuta.', 'successo');
       } else {
-        notifica('Indirizzo non trovato — controlla città e indirizzo.');
+        notifica('Indirizzo non trovato — controlla città e indirizzo.', 'errore');
       }
     } finally {
       setRicalcolando(false);
@@ -76,7 +77,7 @@ export function FermateScreen() {
 
   async function salva() {
     if (!form.nome.trim() || !form.citta.trim() || !form.indirizzo.trim()) {
-      notifica('Nome, citta e indirizzo sono obbligatori.');
+      notifica('Nome, citta e indirizzo sono obbligatori.', 'errore');
       return;
     }
     setSalvando(true);
@@ -103,7 +104,7 @@ export function FermateScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? e.message : 'Impossibile salvare. Riprova.');
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -172,7 +173,7 @@ export function FermateScreen() {
 
       {tab === 'cartina' ? (
         percorsiSalvati === null ? (
-          <p style={{ color: 'var(--mist)' }}>Carico i percorsi per capire quali fermate sono Testa...</p>
+          <p style={{ color: 'var(--mist)' }}>Carico i percorsi per capire quali fermate sono Testa…</p>
         ) : (
           <MappaPuntiFermate
             punti={fermate.map((f) => ({
@@ -183,7 +184,7 @@ export function FermateScreen() {
         )
       ) : (
       <>
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, città o indirizzo..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, città o indirizzo…" />
 
       {fermateFiltrate.length === 0 ? (
         <p className="testo-intro">
@@ -276,7 +277,7 @@ export function FermateScreen() {
               se Nominatim aveva sbagliato la prima volta. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: -6, marginBottom: 12 }}>
             <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} disabled={ricalcolando} onClick={ricalcolaPosizione}>
-              {ricalcolando ? 'Cerco...' : '↻ Ricalcola posizione e regione'}
+              {ricalcolando ? 'Cerco…' : '↻ Ricalcola posizione e regione'}
             </button>
             <span style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>Regione attuale: <b>{form.regione ?? 'nessuna'}</b></span>
           </div>
@@ -292,7 +293,7 @@ export function FermateScreen() {
             <textarea rows={2} value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} />
           </div>
           <button className="btn btn-primary" style={{ width: '100%', marginTop: 10 }} disabled={salvando} onClick={salva}>
-            {salvando ? 'Salvo...' : 'Salva'}
+            {salvando ? 'Salvo…' : 'Salva'}
           </button>
         </Modale>
       )}

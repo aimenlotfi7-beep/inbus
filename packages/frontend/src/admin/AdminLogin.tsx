@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from './shared/errori';
 import { authApi, type SessioneAdmin } from '../api/auth';
 import { LogoOnWay } from '../features/LogoOnWay';
 import { ErroreApi } from '../api/client';
@@ -31,7 +32,7 @@ export function AdminLogin({ onLogin, messaggioIniziale }: { onLogin: (sessione:
       localStorage.setItem('inbus_admin_token', token);
       onLogin(admin);
     } catch (err) {
-      setErrore(err instanceof ErroreApi ? err.message : 'Impossibile contattare il server');
+      setErrore(motivoErrore(err));
     } finally {
       setCaricamento(false);
     }
@@ -48,7 +49,7 @@ export function AdminLogin({ onLogin, messaggioIniziale }: { onLogin: (sessione:
         <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         <button className="btn btn-primary" type="submit" disabled={caricamento}>
-          {caricamento ? 'Accesso...' : 'Accedi'}
+          {caricamento ? 'Accesso…' : 'Accedi'}
         </button>
         {errore && <p className="error-msg">{errore}</p>}
         <button type="button" className="btn btn-ghost" style={{ marginTop: 10, fontSize: 'var(--testo-md)' }} onClick={() => setVista('richiedi-reset')}>
@@ -85,7 +86,7 @@ function RichiediReset({ onIndietro }: { onIndietro: () => void }) {
         ) : (
           <>
             <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <button className="btn btn-primary" type="submit" disabled={caricamento}>{caricamento ? 'Invio...' : 'Invia link'}</button>
+            <button className="btn btn-primary" type="submit" disabled={caricamento}>{caricamento ? 'Invio…' : 'Invia link'}</button>
           </>
         )}
         <button type="button" className="btn btn-ghost" style={{ marginTop: 10, fontSize: 'var(--testo-md)' }} onClick={onIndietro}>← Torna al login</button>
@@ -111,7 +112,7 @@ function NuovaPassword({ token, onFatto }: { token: string; onFatto: () => void 
       await authApi.resetPassword(token, password);
       setFatto(true);
     } catch (e) {
-      setErrore(e instanceof ErroreApi ? e.message : 'Link scaduto o non valido.');
+      setErrore(motivoErrore(e));
     } finally {
       setCaricamento(false);
     }
@@ -132,7 +133,7 @@ function NuovaPassword({ token, onFatto }: { token: string; onFatto: () => void 
             <input type="password" placeholder="Nuova password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             <input type="password" placeholder="Ripeti la password" value={conferma} onChange={(e) => setConferma(e.target.value)} required />
             {errore && <p className="error-msg">{errore}</p>}
-            <button className="btn btn-primary" type="submit" disabled={caricamento}>{caricamento ? 'Salvataggio...' : 'Salva nuova password'}</button>
+            <button className="btn btn-primary" type="submit" disabled={caricamento}>{caricamento ? 'Salvataggio…' : 'Salva nuova password'}</button>
           </form>
         )}
       </div>

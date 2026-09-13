@@ -39,7 +39,8 @@ export function TourLeaderScreen() {
       setLinkCopiato(true);
       setTimeout(() => setLinkCopiato(false), 2500);
     } catch {
-      window.prompt('Copia questo link:', linkCandidatura);
+      // Il browser ha bloccato la copia automatica: il link resta selezionabile nel messaggio.
+      notifica(`Copia il link a mano: ${linkCandidatura}`, 'info');
     }
   }
 
@@ -86,7 +87,7 @@ export function TourLeaderScreen() {
   async function salva() {
     if (salvando) return;
     if (!form.nome.trim() || !form.cognome.trim() || !form.email.trim()) {
-      notifica('Compila almeno nome, cognome ed email.');
+      notifica('Compila almeno nome, cognome ed email.', 'errore');
       return;
     }
     setSalvando(true);
@@ -95,7 +96,7 @@ export function TourLeaderScreen() {
       setFormAperto(false);
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -120,7 +121,7 @@ export function TourLeaderScreen() {
           </label>
         </div>
         <div className="campo"><label>Note</label><input value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva tour leader'}</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva tour leader'}</button>
       </PaginaSezione>
     );
   }
@@ -145,7 +146,7 @@ export function TourLeaderScreen() {
       <div style={{ maxWidth: 480, marginBottom: 20 }}>
         <CampoCopiabile etichetta="Link di accesso per i tour leader già censiti" valore={`${window.location.origin}/scansione/accedi`} link />
       </div>
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o città..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o città…" />
       <TabellaGenerica
         righe={listaFiltrata}
         colonne={[

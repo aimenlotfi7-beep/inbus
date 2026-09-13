@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formattaData } from '../../shared/formato';
 import { commissioniApi, type RegolaCommissione } from '../../api/organizzatori';
 
 export function PannelloCommissione({ organizzatoreId }: { organizzatoreId: string }) {
@@ -38,7 +39,7 @@ export function PannelloCommissione({ organizzatoreId }: { organizzatoreId: stri
           style={{ flex: 1 }}
         />
         <button className="btn btn-primary" onClick={salva} disabled={!nuovaPercentuale || salvando}>
-          {salvando ? 'Salvo...' : 'Imposta'}
+          {salvando ? 'Salvo…' : 'Imposta'}
         </button>
       </div>
       {storico.length > 1 && (
@@ -47,8 +48,8 @@ export function PannelloCommissione({ organizzatoreId }: { organizzatoreId: stri
           <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {storico.map((r) => (
               <p key={r.id} style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>
-                {r.percentuale}% — dal {new Date(r.validoDal).toLocaleDateString('it-IT')}
-                {r.validoA ? ` al ${new Date(r.validoA).toLocaleDateString('it-IT')}` : ' (attiva)'}
+                {r.percentuale}% — dal {formattaData(r.validoDal)}
+                {r.validoA ? ` al ${formattaData(r.validoA)}` : ' (attiva)'}
               </p>
             ))}
           </div>

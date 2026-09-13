@@ -4,7 +4,7 @@ import { motivoErrore } from '../shared/errori';
 import { prenotazioniAdminApi, type PrenotazioneRiga, type EventoConPrenotazioni } from '../../api/prenotazioniAdmin';
 import { PanelHead } from '../shared/PanelHead';
 import { Modale } from '../shared/Modale';
-import { formattaEuro } from '../../shared/formato';
+import { formattaData, formattaEuro } from '../../shared/formato';
 
 export function PagamentiScreen() {
   const [righe, setRighe] = useState<PrenotazioneRiga[]>([]);
@@ -82,7 +82,7 @@ export function PagamentiScreen() {
       {eventoSelezionato && (
         <>
           <p className="testo-intro" style={{ marginTop: -8, marginBottom: 16 }}>
-            {eventoSelezionato.luogo}, {eventoSelezionato.citta} · {new Date(eventoSelezionato.data).toLocaleDateString('it-IT')}
+            {eventoSelezionato.luogo}, {eventoSelezionato.citta} · {formattaData(eventoSelezionato.data)}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))', gap: 14, marginBottom: 20 }}>
             <div style={{ background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 14, padding: 20 }}>
@@ -120,11 +120,11 @@ export function PagamentiScreen() {
                   <tr key={r.id}>
                     <td>{r.pnr}</td>
                     <td>{r.clienteNome} {r.clienteCognome ?? ''}<br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{r.clienteEmail}</span></td>
-                    <td>{new Date(r.creataIl).toLocaleDateString('it-IT')}</td>
-                    <td>{r.scadenzaSaldo ? new Date(r.scadenzaSaldo).toLocaleDateString('it-IT') : '—'}</td>
+                    <td>{formattaData(r.creataIl)}</td>
+                    <td>{r.scadenzaSaldo ? formattaData(r.scadenzaSaldo) : '—'}</td>
                     <td>
                       <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '4px 10px' }} disabled={inviandoSollecito === r.pnr} onClick={() => sollecita(r.pnr)}>
-                        {inviandoSollecito === r.pnr ? 'Invio...' : 'Invia sollecito'}
+                        {inviandoSollecito === r.pnr ? 'Invio…' : 'Invia sollecito'}
                       </button>
                     </td>
                   </tr>

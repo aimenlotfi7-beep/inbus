@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../../shared/errori';
 import { bundleApi, type BundleInput, type EventoDelBundle, ETICHETTA_STATO_BUNDLE, formattaDataOraIt } from '../../../api/bundle';
 import { organizzatoriApi, type Organizzatore } from '../../../api/organizzatori';
 import { ErroreApi } from '../../../api/client';
@@ -65,7 +66,7 @@ export function BundleForm({ bundleId, onChiudi }: { bundleId: string | null; on
       });
       setEventiDettaglio(b.eventi);
       setStatoAttuale(ETICHETTA_STATO_BUNDLE[b.stato]);
-    }).catch(() => notifica('Bundle non trovato.'));
+    }).catch(() => notifica('Bundle non trovato.', 'errore'));
   }, [bundleId]);
 
   // Completamento vero di ogni passo — non "ci sono passato sopra", ma
@@ -96,7 +97,7 @@ export function BundleForm({ bundleId, onChiudi }: { bundleId: string | null; on
       notifica('Bundle salvato.', 'successo');
       onChiudi();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? e.message : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     } finally { setSalvando(false); }
   }
 
@@ -114,7 +115,7 @@ export function BundleForm({ bundleId, onChiudi }: { bundleId: string | null; on
   if (bundleId) {
     return (
       <PaginaSezione titolo="Modifica bundle" onIndietro={onChiudi} larga
-        azioni={<button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva bundle'}</button>}>
+        azioni={<button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva bundle'}</button>}>
         {statoAttuale && <p className="testo-intro" style={{ marginBottom: 12 }}>Stato attuale: <b>{statoAttuale}</b> (calcolato da date e attivazione, non si imposta a mano).</p>}
         <div className="mini-tabs">
           {STEP_WIZARD.map((s) => (
@@ -161,7 +162,7 @@ export function BundleForm({ bundleId, onChiudi }: { bundleId: string | null; on
             Avanti →
           </button>
         ) : (
-          <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Creo...' : 'Crea bundle'}</button>
+          <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Creo…' : 'Crea bundle'}</button>
         )}
       </div>
     </PaginaSezione>
@@ -219,7 +220,7 @@ function BundleEventi({ form, agg, nonVendibili }: { form: BundleInput; agg: (p:
       )}
       {nonVendibili.length > 0 && (
         <p style={{ marginTop: 10, fontSize: 'var(--testo-md)', color: 'var(--amber)' }}>
-          ⚠ {nonVendibili.length} evento/i del bundle non {nonVendibili.length === 1 ? 'è' : 'sono'} al momento vendibil{nonVendibili.length === 1 ? 'e' : 'i'} (nessun tragitto prezzato con posti, o evento passato/eliminato): {nonVendibili.map((e) => e.artista).join(', ')}.
+          ⚠ {nonVendibili.length === 1 ? '1 evento del bundle non è al momento vendibile' : `${nonVendibili.length} eventi del bundle non sono al momento vendibili`} (nessun tragitto prezzato con posti, o evento passato/eliminato): {nonVendibili.map((e) => e.artista).join(', ')}.
           {form.tipo === 'FISSO' ? ' Un bundle fisso con un evento non vendibile non è acquistabile.' : ''}
         </p>
       )}

@@ -4,7 +4,7 @@ import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { Modale } from '../shared/Modale';
-import { formattaEuro } from '../../shared/formato';
+import { formattaData, formattaEuro, plurale } from '../../shared/formato';
 
 export function UtentiScreen() {
   const [utenti, setUtenti] = useState<Utente[]>([]);
@@ -28,7 +28,7 @@ export function UtentiScreen() {
   return (
     <div>
       <PanelHead titolo="Utenti" />
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o città..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o città…" />
       <TabellaGenerica
         righe={utentiFiltrati}
         colonne={[
@@ -36,7 +36,7 @@ export function UtentiScreen() {
           { etichetta: 'Email', render: (u) => u.email },
           { etichetta: 'Telefono', render: (u) => u.telefono ?? '—' },
           { etichetta: 'Città', render: (u) => u.citta ?? '—' },
-          { etichetta: 'Cliente dal', render: (u) => new Date(u.creatoIl).toLocaleDateString('it-IT') },
+          { etichetta: 'Cliente dal', render: (u) => formattaData(u.creatoIl) },
           { etichetta: 'Credito', render: (u) => Number(u.creditoDisponibile) > 0 ? <span style={{ color: 'var(--green)', fontWeight: 700 }}>{formattaEuro(u.creditoDisponibile)}</span> : '—' },
         ]}
       />
@@ -50,11 +50,11 @@ export function UtentiScreen() {
             </p>
           )}
           <p className="section-label">Prenotazioni</p>
-          {prenotazioni === null && <p className="testo-intro">Carico...</p>}
+          {prenotazioni === null && <p className="testo-intro">Carico…</p>}
           {prenotazioni !== null && prenotazioni.length === 0 && <p className="testo-intro">Nessuna prenotazione ancora.</p>}
           {prenotazioni?.map((p) => (
             <div key={p.id} className="riga-cliccabile" style={{ cursor: 'default' }}>
-              <span className="riga-titolo">{p.artista} · {p.pnr}<br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{new Date(p.dataEvento).toLocaleDateString('it-IT')} · {p.passeggeri} passeggero/i · {formattaEuro(p.totale)}</span></span>
+              <span className="riga-titolo">{p.artista} · {p.pnr}<br /><span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{formattaData(p.dataEvento)} · {plurale(p.passeggeri, 'passeggero', 'passeggeri')} · {formattaEuro(p.totale)}</span></span>
               <span className={`badge ${p.stato === 'CONFERMATA' ? 'coperta' : 'non-coperta'}`}>{p.stato === 'CONFERMATA' ? 'Confermata' : 'Cancellata'}</span>
             </div>
           ))}

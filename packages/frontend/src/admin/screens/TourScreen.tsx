@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { tourApi, type TourRiga, type TourInput } from '../../api/tour';
 import { notifica } from '../shared/notifiche';
+import { azioneConfermata } from '../shared/conferma';
 import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
@@ -28,9 +30,10 @@ export function TourScreen() {
   const filtrati = ricerca.trim() ? lista.filter((t) => t.nome.toLowerCase().includes(ricerca.trim().toLowerCase())) : lista;
 
   async function elimina(t: TourRiga) {
-    if (!confirm(`Eliminare il tour "${t.nome}"? Gli eventi che raggruppa NON vengono toccati — tornano semplicemente a comparire come eventi singoli sul sito.`)) return;
-    try { await tourApi.remove(t.id); notifica('Tour eliminato.', 'successo'); ricarica(); }
-    catch (e) { notifica(e instanceof ErroreApi ? e.message : 'Eliminazione non riuscita.'); }
+    if (await azioneConfermata({
+      titolo: `Eliminare il tour "${t.nome}"?`, testo: 'Gli eventi che raggruppa non vengono toccati: tornano a comparire come eventi singoli sul sito.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => tourApi.remove(t.id), fatto: 'Tour eliminato.',
+    })) ricarica();
   }
 
   if (aperto) return <TourForm tourId={aperto.id} onChiudi={() => { setAperto(null); ricarica(); }} />;
@@ -41,7 +44,7 @@ export function TourScreen() {
       <p className="testo-intro" style={{ marginBottom: 12 }}>
         Più date dello stesso spettacolo (es. 10 concerti in giorni diversi) raggruppate sotto una card sola sul sito. Ogni data resta un evento indipendente — crealo prima normalmente in Eventi, poi selezionalo qui.
       </p>
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome…" />
       {filtrati.length === 0 ? (
         <p className="testo-intro">{ricerca ? 'Nessun tour trovato.' : 'Nessun tour creato ancora.'}</p>
       ) : (
@@ -75,29 +78,29 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
     tourApi.dettaglio(tourId).then((t) => {
       setForm({ nome: t.nome, slug: t.slug, copertinaUrl: t.copertinaUrl, descrizione: t.descrizione ?? '', descrizioneSeo: t.descrizioneSeo ?? '', eventiIds: t.eventi.map((e) => e.id) });
       setEventiEliminati(t.eventi.filter((e) => e.eliminato).map((e) => e.artista));
-    }).catch(() => notifica('Tour non trovato.'));
+    }).catch(() => notifica('Tour non trovato.', 'errore'));
   }, [tourId]);
 
   async function salva() {
     if (salvando) return;
-    if (!form.nome.trim()) { notifica('Inserisci il nome del tour.'); return; }
-    if (form.eventiIds.length === 0) { notifica('Scegli almeno un evento da raggruppare.'); return; }
+    if (!form.nome.trim()) { notifica('Inserisci il nome del tour.', 'errore'); return; }
+    if (form.eventiIds.length === 0) { notifica('Scegli almeno un evento da raggruppare.', 'errore'); return; }
     setSalvando(true);
     try {
       if (tourId) await tourApi.update(tourId, form); else await tourApi.create(form);
       notifica('Tour salvato.', 'successo');
       onChiudi();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? e.message : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     } finally { setSalvando(false); }
   }
 
   return (
     <PaginaSezione titolo={tourId ? 'Modifica tour' : 'Nuovo tour'} onIndietro={onChiudi} larga
-      azioni={<button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva tour'}</button>}>
+      azioni={<button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva tour'}</button>}>
       {eventiEliminati.length > 0 && (
         <p style={{ background: 'var(--dusk)', border: '1px solid var(--pink)', borderRadius: 8, padding: '10px 14px', fontSize: 'var(--testo-md)', marginBottom: 14 }}>
-          ⚠ {eventiEliminati.length} evento/i in questo tour {eventiEliminati.length === 1 ? 'è stato eliminato' : 'sono stati eliminati'} ({eventiEliminati.join(', ')}) — salvando, {eventiEliminati.length === 1 ? 'esce' : 'escono'} automaticamente dal tour.
+          ⚠ {eventiEliminati.length === 1 ? '1 evento in questo tour è stato eliminato' : `${eventiEliminati.length} eventi in questo tour sono stati eliminati`} ({eventiEliminati.join(', ')}) — salvando, {eventiEliminati.length === 1 ? 'esce' : 'escono'} automaticamente dal tour.
         </p>
       )}
       <div className="sub-tabs">
@@ -131,7 +134,7 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
             value={form.descrizione ?? ''}
             onChange={(e) => setForm({ ...form, descrizione: e.target.value })}
             rows={5}
-            placeholder="Es. presentazione dello spettacolo, cosa aspettarsi, note comuni a tutte le date..."
+            placeholder="Es. presentazione dello spettacolo, cosa aspettarsi, note comuni a tutte le date…"
           />
         </div>
         <div className="campo">
@@ -140,7 +143,7 @@ function TourForm({ tourId, onChiudi }: { tourId: string | null; onChiudi: () =>
             value={form.descrizioneSeo ?? ''}
             onChange={(e) => setForm({ ...form, descrizioneSeo: e.target.value })}
             rows={3}
-            placeholder='Se vuota, viene generata automaticamente (es. 12 date disponibili per...)'
+            placeholder='Se vuota, viene generata automaticamente (es. 12 date disponibili per…)'
           />
         </div>
       </div>

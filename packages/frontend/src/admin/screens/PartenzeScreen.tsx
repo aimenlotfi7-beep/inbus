@@ -134,16 +134,24 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   // Stesse parole della pagina del tragitto (PartenzeTab): prima la card
   // diceva "Fatto" e dentro "Prezzato", per la stessa identica cosa.
   // Niente simboli: il colore del bollino dice già lo stato.
-  function etichettaStato(p: Partenza, tabAttuale: TabPartenze): { fatto: boolean; testo: string } {
+  /** `attesa`: non ancora fatto, ma non tocca a noi (richieste di preventivo
+   *  partite): giallo invece di rosso. */
+  function etichettaStato(p: Partenza, tabAttuale: TabPartenze): { fatto: boolean; testo: string; attesa?: boolean } {
     if (tabAttuale === 'fermate') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'Orari impostati' } : { fatto: false, testo: 'Orari da impostare' };
     if (tabAttuale === 'preventivi') {
       // Prima di tutto, in viola: il preventivo va rifatto perché il percorso è cambiato.
       if (p.cambioPercorso) return { fatto: false, testo: ETICHETTA_CAMBIO_PERCORSO[p.cambioPercorso] };
+      // Verde: preventivo accettato o registrato.
       if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: p.fornitoreId ? 'Accettato' : 'Registrato' };
       // Prima servono gli orari (la richiesta al fornitore mostra
       // fermate/orari) — senza, non ha ancora senso segnalarlo come
       // "da fare" qui, resta solo un'attesa neutra.
       if (!p.fermateCompilate) return { fatto: true, testo: '' };
+      // Giallo: richieste inviate, preventivo non ancora accettato.
+      if (p.richiestePreventivo > 0) {
+        return { fatto: false, attesa: true, testo: p.rispostePreventivo > 0 ? plurale(p.rispostePreventivo, 'risposta da valutare', 'risposte da valutare') : 'Richieste inviate' };
+      }
+      // Rosso: nessuna richiesta ancora inviata.
       return { fatto: false, testo: 'Da richiedere' };
     }
     if (tabAttuale === 'da-prezzare') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'In vendita' } : { fatto: false, testo: 'Da prezzare' };
@@ -244,7 +252,8 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
           {cardsFiltrate.map((gruppo) => {
             const stati = gruppo.map((p) => etichettaStato(p, tab));
             const tuttoFatto = stati.every((s) => s.fatto);
-            const nienteFatto = stati.every((s) => !s.fatto);
+            // Un tragitto in attesa (richieste di preventivo inviate) non è "da fare": giallo, non rosso.
+            const nienteFatto = stati.every((s) => !s.fatto && !s.attesa);
             // Un evento con più tragitti insieme (es. andata+ritorno, o
             // più servizi) può avere alcuni già a posto e altri no per
             // questa tappa — né "tutto fatto" né "niente fatto", un
@@ -259,8 +268,12 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
             const etichetteDaFareUniche = [...new Set(daFare.map((s) => s.testo))];
             const etichetteFatteUniche = [...new Set(stati.filter((s) => s.fatto && s.testo).map((s) => s.testo))];
             const nienteDaMostrare = stati.every((s) => !s.testo);
+            const tuttiInAttesaOFatti = !tuttoFatto && stati.every((s) => s.fatto || s.attesa);
+            const etichetteAttesaUniche = [...new Set(stati.filter((s) => s.attesa).map((s) => s.testo))];
             const testoBadge = nienteDaMostrare ? undefined
               : tuttoFatto ? (etichetteFatteUniche.length === 1 ? etichetteFatteUniche[0] : 'Fatto')
+              : tuttiInAttesaOFatti && etichetteAttesaUniche.length === 1 ? etichetteAttesaUniche[0]
+              : tuttiInAttesaOFatti ? 'In attesa dei fornitori'
               : parziale ? `${stati.length - daFare.length}/${stati.length} pronti`
               : etichetteDaFareUniche.length === 1 ? etichetteDaFareUniche[0]
               : `${daFare.length} da completare`;

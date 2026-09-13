@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { notifica } from '../shared/notifiche';
-import { formattaEuro } from '../../shared/formato';
+import { azioneConfermata } from '../shared/conferma';
+import { formattaData, formattaEuro } from '../../shared/formato';
 import { couponApi, type Coupon, type CouponInput } from '../../api/coupon';
 import { eventiApi } from '../../api/eventi';
 import type { Evento } from '../../api/types';
@@ -59,10 +61,10 @@ export function VoucherScreen() {
     setInviando(true);
     try {
       const r = await couponApi.inviaEmail(inModifica.id);
-      notifica(r.inviata ? `Voucher inviato a ${r.email}.` : 'Invio non riuscito — controlla che la posta sia configurata.', r.inviata ? 'successo' : undefined);
+      notifica(r.inviata ? `Voucher inviato a ${r.email}.` : `L'email a ${r.email} non è partita: comunica tu il codice al cliente.`, r.inviata ? 'successo' : 'errore');
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? e.message : 'Invio non riuscito.');
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     } finally {
       setInviando(false);
     }
@@ -79,15 +81,16 @@ export function VoucherScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
   }
   async function elimina(c: Coupon) {
-    if (!confirm(`Eliminare il voucher "${c.codice}"?`)) return;
-    await couponApi.remove(c.id);
-    ricarica();
+    if (await azioneConfermata({
+      titolo: `Eliminare il voucher "${c.codice}"?`, testo: 'Il codice non si potrà più usare.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => couponApi.remove(c.id), fatto: 'Voucher eliminato.',
+    })) ricarica();
   }
 
   if (modaleAperta) {
@@ -117,7 +120,7 @@ export function VoucherScreen() {
         {inModifica && form.utenteId && (
           <div className="campo">
             <button type="button" className="btn btn-ghost" onClick={inviaEmail} disabled={inviando}>
-              {inviando ? 'Invio...' : inModifica.inviatoIl ? `↻ Rinvia via email (inviato il ${new Date(inModifica.inviatoIl).toLocaleDateString('it-IT')})` : '✉ Invia via email'}
+              {inviando ? 'Invio…' : inModifica.inviatoIl ? `Rinvia via email (inviato il ${formattaData(inModifica.inviatoIl)})` : 'Invia via email'}
             </button>
           </div>
         )}
@@ -132,7 +135,7 @@ export function VoucherScreen() {
         <div className="campo">
           <label><input type="checkbox" checked={form.attivo ?? true} onChange={(e) => setForm({ ...form, attivo: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Attivo</label>
         </div>
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva voucher'}</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva voucher'}</button>
       </PaginaSezione>
     );
   }
@@ -140,7 +143,7 @@ export function VoucherScreen() {
   return (
     <div>
       <PanelHead titolo="Voucher" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo voucher</button>} />
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per codice voucher..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per codice voucher…" />
       <TabellaGenerica
         righe={couponFiltrati}
         colonne={[

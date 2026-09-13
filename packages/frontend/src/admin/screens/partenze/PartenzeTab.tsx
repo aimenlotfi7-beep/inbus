@@ -90,6 +90,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
   const puoAccettarePreventivi = haPermesso(sessione, 'preventivi.accetta');
   const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
   const [eventoCompleto, setEventoCompleto] = useState<Evento | null>(null);
+  const [richiestePerTragitto, setRichiestePerTragitto] = useState<Map<string, { richieste: number; risposte: number }>>(new Map());
   // Mappa tragittoId -> form in modifica — non più un solo tragitto alla
   // volta: un evento con più servizi/percorsi nello stesso contesto (es.
   // "Orari") deve poter avere PIÙ pannelli aperti insieme.
@@ -145,6 +146,13 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
   // aggiornano sotto gli occhi, senza smontare la pagina (prima si
   // perdevano pannelli aperti e posizione dello scorrimento).
   function ricarica() {
+    // In Preventivi il bollino è giallo quando le richieste sono partite:
+    // il conteggio arriva dall'elenco di Partenze.
+    if (contestoPartenze?.tabOrigine === 'preventivi') {
+      eventiApi.elencoPartenze()
+        .then((elenco) => setRichiestePerTragitto(new Map(elenco.filter((p) => p.evento.id === eventoId).map((p) => [p.tragittoId, { richieste: p.richiestePreventivo, risposte: p.rispostePreventivo }]))))
+        .catch(() => {});
+    }
     Promise.all([
       eventiApi.calcolaBus(eventoId),
       eventiApi.listaBus(eventoId),
@@ -370,6 +378,30 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
       ? { testo: 'Questi sono i prezzi attuali. Premi "Calcola prezzi per fermata" per ricalcolarli se costo o posti sono cambiati.', tipo: 'info' }
       : { testo: '', tipo: 'info' }));
   }
+  /** Salva i posti del bus di un preventivo che non li aveva (risposta del
+   *  fornitore dal link) e li mette subito nel pannello Prezzi. */
+  async function salvaPostiPreventivo(tragittoId: string, postiBus: number): Promise<boolean> {
+    try {
+      await eventiApi.impostaPostiPreventivo(tragittoId, postiBus);
+      setFormPreventivoMap((prev) => {
+        const m = new Map(prev);
+        const attuale = m.get(tragittoId);
+        if (attuale) m.set(tragittoId, { ...attuale, postiBus });
+        return m;
+      });
+      setEventoCompleto((ev) => ev && {
+        ...ev,
+        tragitti: ev.tragitti.map((t) => (t.id === tragittoId ? { ...t, preventivoPostiBus: postiBus } : t)),
+        servizi: ev.servizi.map((s) => ({ ...s, tragitti: s.tragitti.map((t) => (t.id === tragittoId ? { ...t, preventivoPostiBus: postiBus } : t)) })),
+      });
+      impostaStatoPrezzi(tragittoId, 'Posti salvati: ora premi "Calcola prezzi per fermata".', 'info');
+      ricarica();
+      return true;
+    } catch (e) {
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
+      return false;
+    }
+  }
   function chiudiPreventivo(tragittoId: string) {
     setFormPreventivoMap((prev) => { const m = new Map(prev); m.delete(tragittoId); return m; });
   }
@@ -409,8 +441,13 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
     // Il costo viene da qui — registrato nella sezione Preventivi.
     const costo = tragittoVero?.preventivoCosto ? Number(tragittoVero.preventivoCosto) : undefined;
     const postiBus = tragittoVero?.preventivoPostiBus ?? undefined;
-    if (!tragittoVero || !costo || !postiBus) {
-      impostaStatoPrezzi(tragittoId, 'Manca ancora un preventivo registrato: registralo prima in Preventivi.', 'errore');
+    if (!tragittoVero || !costo) {
+      impostaStatoPrezzi(tragittoId, 'Manca ancora un preventivo: registralo o accettalo prima in Preventivi.', 'errore');
+      return;
+    }
+    if (!postiBus) {
+      // Succede con un preventivo arrivato dal fornitore: indica solo il prezzo.
+      impostaStatoPrezzi(tragittoId, 'Mancano i posti del bus del preventivo: scrivili qui sopra e salvali, poi ricalcola.', 'errore');
       return;
     }
     const arrivoIndirizzo = tragittoVero.arrivoIndirizzo;
@@ -747,13 +784,19 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
                 <span className={`badge ${prezzato ? 'badge-stato-verde' : 'badge-stato-arancio'}`}>
                   {prezzato ? 'In vendita' : 'Da prezzare'}
                 </span>
-              ) : contestoPartenze?.tabOrigine === 'preventivi' ? (
-                // Qui conta solo se un preventivo c'è già: accettato da un
-                // fornitore, o registrato a mano.
-                <span className={`badge ${tragittoVeroPerOrari?.fornitoreId || tragittoVeroPerOrari?.preventivoCosto ? 'badge-stato-verde' : 'badge-stato-arancio'}`}>
-                  {tragittoVeroPerOrari?.fornitoreId ? 'Accettato' : tragittoVeroPerOrari?.preventivoCosto ? 'Registrato' : 'Da richiedere'}
-                </span>
-              ) : (
+              ) : contestoPartenze?.tabOrigine === 'preventivi' ? (() => {
+                // Verde: preventivo accettato o registrato. Giallo: richieste
+                // inviate, in attesa. Rosso: nessuna richiesta ancora partita.
+                const inviate = richiestePerTragitto.get(tragitto.tragittoId);
+                const preventivoPresente = !!(tragittoVeroPerOrari?.fornitoreId || tragittoVeroPerOrari?.preventivoCosto);
+                const classe = preventivoPresente ? 'badge-stato-verde' : inviate?.richieste ? 'badge-stato-arancio' : 'badge-stato-rosso';
+                const testo = tragittoVeroPerOrari?.fornitoreId ? 'Accettato'
+                  : tragittoVeroPerOrari?.preventivoCosto ? 'Registrato'
+                  : inviate?.risposte ? plurale(inviate.risposte, 'risposta da valutare', 'risposte da valutare')
+                  : inviate?.richieste ? 'Richieste inviate'
+                  : 'Da richiedere';
+                return <span className={`badge ${classe}`}>{testo}</span>;
+              })() : (
                 <span className={`badge ${classeBadge(stato.classe)}`}>{stato.etichetta}</span>
               )}
               {tragitto.stato === 'PREZZATO' && (
@@ -945,6 +988,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
 
             if (formPreventivo) return (
               <div style={{ marginTop: 14 }}>
+                <PartenzaArrivo tragitto={tragittoVeroDi(tragitto.tragittoId)} />
                 {/* Stessa posizione del pulsante "Calcola orari": titolo a
                     sinistra, azione a destra. */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
@@ -961,7 +1005,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
                 <div className="section-card" style={{ marginBottom: 16, background: 'var(--dusk-2)' }}>
                   <div className="form-grid">
                     <div><span style={stileEtichettaPiccola}>Costo del preventivo</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{formPreventivo.costo != null ? formattaEuro(formPreventivo.costo) : 'Non registrato'}</p></div>
-                    <div><span style={stileEtichettaPiccola}>Posti presunti del bus</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{formPreventivo.postiBus ?? 'Non indicati'}</p></div>
+                    <div>
+                      <span style={stileEtichettaPiccola}>Posti presunti del bus</span>
+                      {formPreventivo.postiBus != null
+                        ? <p style={{ margin: '2px 0 0', fontWeight: 600 }}>{formPreventivo.postiBus}</p>
+                        : formPreventivo.costo != null
+                          ? <CampoPostiPreventivo onSalva={(posti) => salvaPostiPreventivo(tragitto.tragittoId, posti)} />
+                          : <p style={{ margin: '2px 0 0', fontWeight: 600 }}>Non indicati</p>}
+                    </div>
                     <div><span style={stileEtichettaPiccola}>Fornitore</span><p style={{ margin: '2px 0 0', fontWeight: 600 }}>{nomeFornitore(formPreventivo.fornitoreId)}</p></div>
                   </div>
                   <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 8, marginBottom: 0 }}>Per cambiare costo o fornitore, vai in Preventivi.</p>
@@ -1066,6 +1117,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
               const rigaPrezzo = { display: 'grid', gridTemplateColumns: '1fr 110px 130px', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 'var(--testo-base)' } as const;
               return (
               <div style={{ marginTop: 14 }}>
+                <PartenzaArrivo tragitto={tv} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <p className="section-label" style={{ margin: 0 }}>Preventivo</p>
                   {prezzato && <span className="badge badge-stato-verde">In vendita</span>}
@@ -1096,12 +1148,15 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
             }
             if (contestoPartenze?.tabOrigine === 'preventivi') {
               return (
-                <PreventiviTragitto
-                  tragittoId={tragitto.tragittoId}
-                  tragittoVero={tragittoVero}
-                  puoAccettare={puoAccettarePreventivi}
-                  onCambiato={() => { ricarica(); onSalvato?.(); }}
-                />
+                <div style={{ marginTop: 14 }}>
+                  <PartenzaArrivo tragitto={tragittoVero} />
+                  <PreventiviTragitto
+                    tragittoId={tragitto.tragittoId}
+                    tragittoVero={tragittoVero}
+                    puoAccettare={puoAccettarePreventivi}
+                    onCambiato={() => { ricarica(); onSalvato?.(); }}
+                  />
+                </div>
               );
             }
             if (contestoPartenze?.tabOrigine === 'da-confermare') {
@@ -1177,6 +1232,53 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
       </div>
       </div>
 
+    </div>
+  );
+}
+
+/** Da dove parte e dove arriva il tragitto, in una riga: la stessa
+ *  informazione della scheda Orari, anche in Preventivi e Prezzi. */
+function PartenzaArrivo({ tragitto }: { tragitto: Tragitto | undefined }) {
+  if (!tragitto) return null;
+  const partenza = tragitto.fermate.find((f) => f.attivo !== false);
+  const arrivo = [tragitto.arrivoCitta, tragitto.arrivoIndirizzo].filter(Boolean).join(', ');
+  const cella = { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 } as const;
+  const etichetta = { fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: '.04em' } as const;
+  return (
+    <div className="section-card" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'center', marginBottom: 14, background: 'var(--dusk-2)' }}>
+      <div style={cella}>
+        <span style={etichetta}>Partenza</span>
+        <b>{partenza ? partenza.citta : 'Nessuna fermata'}</b>
+        <span style={{ fontSize: 'var(--testo-sm)', color: partenza?.orario ? 'var(--mist)' : 'var(--pink)' }}>{partenza ? (partenza.orario ?? 'orario da impostare') : ''}</span>
+      </div>
+      <span aria-hidden="true" style={{ color: 'var(--mist)' }}>→</span>
+      <div style={{ ...cella, textAlign: 'right' }}>
+        <span style={etichetta}>Arrivo</span>
+        <b style={{ color: arrivo ? undefined : 'var(--pink)' }}>{arrivo || 'Da impostare in Eventi'}</b>
+        <span style={{ fontSize: 'var(--testo-sm)', color: tragitto.arrivoOrario ? 'var(--mist)' : 'var(--pink)' }}>{tragitto.arrivoOrario ?? 'orario da impostare'}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Campo per i posti del bus di un preventivo che non li ha (risposta del
+ *  fornitore dal link, che indica solo il prezzo). */
+function CampoPostiPreventivo({ onSalva }: { onSalva: (posti: number) => Promise<boolean> }) {
+  const [posti, setPosti] = useState<number | undefined>(undefined);
+  const [salvando, setSalvando] = useState(false);
+  const valido = posti !== undefined && Number.isInteger(posti) && posti >= 1 && posti <= 200;
+  async function salva() {
+    if (!valido || posti === undefined) return;
+    setSalvando(true);
+    await onSalva(posti);
+    setSalvando(false);
+  }
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
+      <CampoNumero value={posti} onChange={setPosti} placeholder="es. 54" style={{ width: 90 }} aria-label="Posti del bus del preventivo" />
+      <button type="button" className="btn btn-primary btn-piccolo" disabled={!valido || salvando} onClick={salva}>
+        {salvando ? 'Salvo…' : 'Salva posti'}
+      </button>
     </div>
   );
 }

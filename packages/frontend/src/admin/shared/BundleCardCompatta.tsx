@@ -1,4 +1,5 @@
 import { ETICHETTA_STATO_BUNDLE, CLASSE_STATO_BUNDLE, type BundleRiga } from '../../api/bundle';
+import { plurale } from '../../shared/formato';
 
 /** Stessa forma visiva di EventoCardCompatta (stesse classi CSS
  *  evento-card-compatta-*), ma per un bundle — campi diversi (nome,
@@ -22,8 +23,8 @@ export function BundleCardCompatta({ bundle, onClick, onElimina }: { bundle: Bun
       <div className="evento-card-compatta-corpo">
         <span className="evento-card-compatta-genere">{bundle.tipo === 'FISSO' ? 'Bundle fisso' : 'Bundle libero'}</span>
         <h4>{bundle.nome}</h4>
-        <p>{bundle.numeroEventi} evento/i · −{Number(bundle.scontoPercentuale)}%</p>
-        {bundle.inEvidenzaHome && <p>★ In evidenza in home</p>}
+        <p>{plurale(bundle.numeroEventi, 'evento', 'eventi')} · −{Number(bundle.scontoPercentuale)}%</p>
+        {bundle.inEvidenzaHome && <p>In evidenza in home</p>}
         <button className="btn btn-ghost" style={{ marginTop: 8, fontSize: 'var(--testo-xs)', color: 'var(--pink)', padding: 0 }} onClick={(e) => { e.stopPropagation(); onElimina(); }}>
           Elimina
         </button>

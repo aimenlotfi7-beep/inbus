@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formattaData } from '../../shared/formato';
 import { azioneConfermata } from '../shared/conferma';
 import { eventiApi } from '../../api/eventi';
 import type { Evento } from '../../api/types';
@@ -60,7 +61,7 @@ export function CestinoScreen() {
 
       {tab === 'eventi' && (
         <>
-          {eventiEliminati === null && <p className="testo-intro">Carico...</p>}
+          {eventiEliminati === null && <p className="testo-intro">Carico…</p>}
           {eventiEliminati?.length === 0 && <p className="testo-intro">Il cestino eventi è vuoto.</p>}
           {eventiEliminati?.map((ev) => (
             <div key={ev.id} className="riga-cliccabile" style={{ cursor: 'default' }}>
@@ -68,7 +69,7 @@ export function CestinoScreen() {
                 {ev.artista}
                 <br />
                 <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>
-                  {ev.luogo}, {ev.citta} · eliminato il {new Date(ev.eliminatoIl).toLocaleDateString('it-IT')}
+                  {ev.luogo}, {ev.citta} · eliminato il {formattaData(ev.eliminatoIl)}
                 </span>
               </span>
               <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 12px' }} onClick={() => ripristinaEvento(ev.id, ev.artista)}>
@@ -81,7 +82,7 @@ export function CestinoScreen() {
 
       {tab === 'tratte' && (
         <>
-          {tratteEliminate === null && <p className="testo-intro">Carico...</p>}
+          {tratteEliminate === null && <p className="testo-intro">Carico…</p>}
           {tratteEliminate?.length === 0 && <p className="testo-intro">Il cestino tratte è vuoto.</p>}
           {tratteEliminate?.map((t) => (
             <div key={t.id} className="riga-cliccabile" style={{ cursor: 'default' }}>
@@ -89,7 +90,7 @@ export function CestinoScreen() {
                 {t.nome}
                 <br />
                 <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>
-                  Evento: {t.eventoArtista} · eliminata il {new Date(t.eliminatoIl).toLocaleDateString('it-IT')}
+                  Evento: {t.eventoArtista} · eliminata il {formattaData(t.eliminatoIl)}
                 </span>
               </span>
               <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '5px 12px' }} onClick={() => ripristinaTratta(t.id, t.nome)}>

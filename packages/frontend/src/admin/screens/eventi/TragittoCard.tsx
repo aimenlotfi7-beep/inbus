@@ -109,7 +109,7 @@ export function TragittoCard({
             onChange={(e) => { if (e.target.value) onAggiorna('servizioId', e.target.value); }}
             style={{ fontSize: 'var(--testo-md)', maxWidth: 260 }}
           >
-            <option value="" disabled>↳ Sposta in un servizio...</option>
+            <option value="" disabled>↳ Sposta in un servizio…</option>
             {serviziAssegnabili.map((v) => <option key={v.key} value={v.key}>{v.nome || 'Senza nome'}</option>)}
           </select>
         </div>
@@ -282,7 +282,7 @@ export function TragittoCard({
       {salvaRapido && (
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
         <button className="btn btn-primary" onClick={salvaRapido.onSalva} disabled={salvaRapido.salvando}>
-          {salvaRapido.salvando ? 'Salvo...' : 'Salva modifica'}
+          {salvaRapido.salvando ? 'Salvo…' : 'Salva modifica'}
         </button>
       </div>
       )}

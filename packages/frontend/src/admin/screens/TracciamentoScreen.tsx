@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { notifica } from '../shared/notifiche';
 import { impostazioniApi } from '../../api/impostazioni';
 import { ErroreApi } from '../../api/client';
@@ -51,7 +52,7 @@ export function TracciamentoScreen() {
       await impostazioniApi.set(chiave, valori[chiave] ?? '');
       notifica('Impostazione salvata.', 'successo');
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvataggio(null);
     }
@@ -62,7 +63,7 @@ export function TracciamentoScreen() {
       <PanelHead titolo="Tracciamento" />
       <p className="testo-intro" style={{ marginBottom: 16 }}>Meta Pixel e Google Analytics 4 — da dove arrivano le visite, dove abbandonano, cosa comprano. Il pixel di un singolo organizzatore si imposta invece nella sua scheda White Label.</p>
       {caricamento ? (
-        <p style={{ color: 'var(--mist)' }}>Carico...</p>
+        <p style={{ color: 'var(--mist)' }}>Carico…</p>
       ) : (
         <div style={{ maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 18 }}>
           {CAMPI.map((c) => (
@@ -78,7 +79,7 @@ export function TracciamentoScreen() {
                 <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 6 }}>{c.nota}</p>
               </div>
               <button className="btn btn-ghost" onClick={() => salva(c.chiave)} disabled={salvataggio === c.chiave}>
-                {salvataggio === c.chiave ? 'Salvataggio...' : 'Salva'}
+                {salvataggio === c.chiave ? 'Salvataggio…' : 'Salva'}
               </button>
             </div>
           ))}

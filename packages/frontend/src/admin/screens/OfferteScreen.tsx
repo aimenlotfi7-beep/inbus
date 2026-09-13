@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formattaData } from '../../shared/formato';
 import { eventiApi } from '../../api/eventi';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
@@ -43,7 +44,7 @@ export function OfferteScreen() {
   return (
     <div>
       <PanelHead titolo="Offerte" info="Scegli un evento per creare/gestire le sue offerte con sconto dedicato." />
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo…" />
 
       <div className="cards-list">
         {eventiFiltrati.map((ev) => (
@@ -51,7 +52,7 @@ export function OfferteScreen() {
             <span style={{ fontSize: 'var(--testo-2xs)', textTransform: 'uppercase', letterSpacing: 1, color: 'var(--amber)' }}>{ev.genere}</span>
             <h3 style={{ fontSize: 'var(--testo-2xl)', margin: '6px 0 4px' }}>{ev.artista}</h3>
             <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>{ev.luogo}, {ev.citta}</p>
-            <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>{new Date(ev.data).toLocaleDateString('it-IT')}</p>
+            <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>{formattaData(ev.data)}</p>
           </div>
         ))}
         {!eventiFiltrati.length && <p style={{ color: 'var(--mist)' }}>{ricerca ? 'Nessun evento trovato.' : 'Nessun evento ancora — creane uno dalla sezione Eventi.'}</p>}

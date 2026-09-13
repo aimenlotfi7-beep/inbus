@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { azioneConfermata } from '../../shared/conferma';
 import { bundleApi, type BundleRiga } from '../../../api/bundle';
 import { notifica } from '../../shared/notifiche';
-import { ErroreApi } from '../../../api/client';
 import { PanelHead } from '../../shared/PanelHead';
 import { RicercaSezione } from '../../shared/RicercaSezione';
 import { BundleCardCompatta } from '../../shared/BundleCardCompatta';
@@ -33,7 +32,7 @@ export function BundleScreen() {
     <div>
       <PanelHead titolo="Bundle" azione={<button className="btn btn-primary" onClick={() => setAperto({ id: null })}>+ Nuovo bundle</button>} />
       <p className="testo-intro" style={{ marginBottom: 12 }}>Più eventi già esistenti venduti insieme con uno sconto. Gli eventi restano acquistabili anche singolarmente.</p>
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome…" />
       {filtrati.length === 0 ? (
         <p className="testo-intro">{ricerca ? 'Nessun bundle trovato.' : 'Nessun bundle creato ancora.'}</p>
       ) : (

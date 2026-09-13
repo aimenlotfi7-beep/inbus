@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { formattaEuro } from '../../shared/formato';
@@ -59,7 +60,7 @@ export function CouponScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -136,7 +137,7 @@ export function CouponScreen() {
         <div className="campo">
           <label><input type="checkbox" checked={form.attivo ?? true} onChange={(e) => setForm({ ...form, attivo: e.target.checked })} style={{ width: 'auto', marginRight: 8 }} /> Attivo</label>
         </div>
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva coupon'}</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva coupon'}</button>
       </PaginaSezione>
     );
   }
@@ -144,7 +145,7 @@ export function CouponScreen() {
   return (
     <div>
       <PanelHead titolo="Coupon" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo coupon</button>} />
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per codice coupon..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per codice coupon…" />
       <TabellaGenerica
         righe={couponFiltrati}
         colonne={[

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { ruoliApi, type Ruolo, type Permesso } from '../../api/ruoli';
@@ -66,7 +67,7 @@ export function RuoliScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -102,7 +103,7 @@ export function RuoliScreen() {
           </div>
         ))}
 
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva ruolo'}</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva ruolo'}</button>
       </PaginaSezione>
     );
   }
@@ -110,7 +111,7 @@ export function RuoliScreen() {
   return (
     <div>
       <PanelHead titolo="Ruoli" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo ruolo</button>} info={mappaTooltip.ruoli_intro ?? TOOLTIP_DEFAULT.ruoli_intro} />
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome ruolo..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome ruolo…" />
       <TabellaGenerica
         righe={ruoliFiltrati}
         colonne={[

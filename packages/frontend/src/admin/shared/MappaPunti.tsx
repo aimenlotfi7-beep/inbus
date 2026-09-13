@@ -85,7 +85,7 @@ export function MappaPunti({ punti }: { punti: PuntoMappa[] }) {
 
   return (
     <div>
-      {stato === 'carico' && <p style={{ color: 'var(--mist)' }}>Cerco i punti sulla cartina...</p>}
+      {stato === 'carico' && <p style={{ color: 'var(--mist)' }}>Cerco i punti sulla cartina…</p>}
       {stato === 'errore' && <p style={{ color: 'var(--pink)' }}>Non riesco a mostrare la cartina — nessun punto trovato con un indirizzo o città valida.</p>}
       {nonTrovati.length > 0 && (
         <p style={{ color: 'var(--amber)', fontSize: 'var(--testo-md)', marginBottom: 8 }}>Non trovati sulla cartina: {nonTrovati.join(', ')}.</p>

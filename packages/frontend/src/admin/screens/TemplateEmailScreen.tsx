@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { notifica } from '../shared/notifiche';
+import { confermaConTesto } from '../shared/conferma';
 import { templateEmailApi, type TemplateEmail } from '../../api/templateEmail';
 import { ErroreApi } from '../../api/client';
 import { sanificaHtml } from '../../shared/sanificaHtml';
@@ -34,7 +36,7 @@ export function TemplateEmailScreen() {
         // (per riflettere l'orario di salvataggio aggiornato).
         setSelezionato((sel) => sel ? (l.find((t) => t.chiave === sel.chiave) ?? null) : null);
       })
-      .catch((e) => setErrore(e instanceof ErroreApi ? e.message : 'Impossibile caricare i modelli email. Controlla i tuoi permessi o riprova.'))
+      .catch((e) => setErrore(motivoErrore(e)))
       .finally(() => setCaricamento(false));
   }
   useEffect(ricarica, []);
@@ -47,13 +49,13 @@ export function TemplateEmailScreen() {
 
   async function salva() {
     if (!selezionato) return;
-    if (!oggetto.trim() || !corpo.trim()) { notifica('Oggetto e corpo non possono essere vuoti.'); return; }
+    if (!oggetto.trim() || !corpo.trim()) { notifica('Oggetto e corpo non possono essere vuoti.', 'errore'); return; }
     setSalvando(true);
     try {
       await templateEmailApi.aggiorna(selezionato.chiave, { oggetto, corpo });
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -77,10 +79,13 @@ export function TemplateEmailScreen() {
     }
   }
 
-  function inserisciImmagineDaLink() {
-    const url = prompt('Incolla il link (URL) dell\'immagine da inserire:');
-    if (!url?.trim()) return;
-    inserisciTagImmagine(url.trim());
+  async function inserisciImmagineDaLink() {
+    const url = (await confermaConTesto({
+      titolo: "Inserisci un'immagine da link", testo: '', conferma: 'Inserisci',
+      campoTesto: { etichetta: "Link (URL) dell'immagine", placeholder: 'https://…' },
+    }))?.trim();
+    if (!url) return;
+    inserisciTagImmagine(url);
   }
 
   function inserisciSegnaposto(chiave: string) {
@@ -96,7 +101,7 @@ export function TemplateEmailScreen() {
     }
   }
 
-  if (caricamento) return <p className="testo-intro">Carico...</p>;
+  if (caricamento) return <p className="testo-intro">Carico…</p>;
   if (errore) return <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>;
 
   return (
@@ -169,7 +174,7 @@ export function TemplateEmailScreen() {
             </div>
 
             <button className="btn btn-primary" onClick={salva} disabled={salvando}>
-              {salvando ? 'Salvo...' : 'Salva'}
+              {salvando ? 'Salvo…' : 'Salva'}
             </button>
 
             <div style={{ marginTop: 20 }}>

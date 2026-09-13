@@ -35,9 +35,9 @@ export function ComunicazioniScreen() {
   return (
     <div>
       <PanelHead titolo="Comunicazioni" info={mappaTooltip.comunicazioni_intro ?? TOOLTIP_DEFAULT.comunicazioni_intro} />
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista, città o luogo…" />
 
-      {caricamento && <p className="testo-intro">Carico...</p>}
+      {caricamento && <p className="testo-intro">Carico…</p>}
       {!caricamento && eventiOrdinati.length === 0 && <p className="testo-intro">Nessun evento trovato.</p>}
 
       <div className="cards-list">

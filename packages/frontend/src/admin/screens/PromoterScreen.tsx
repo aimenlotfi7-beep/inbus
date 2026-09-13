@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { azioneConfermata } from '../shared/conferma';
 import { eventiApi } from '../../api/eventi';
 import { SelettoreEventi } from '../shared/SelettoreEventi';
@@ -11,7 +12,7 @@ import { CampoNumero } from '../shared/CampoNumero';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { CampoCopiabile } from '../shared/CampoCopiabile';
-import { formattaEuro } from '../../shared/formato';
+import { formattaData, formattaEuro } from '../../shared/formato';
 
 const VUOTO: PromoterInput = { nome: '', email: '', password: '', commissionePercentuale: 10 };
 
@@ -49,7 +50,7 @@ export function PromoterScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -88,7 +89,7 @@ export function PromoterScreen() {
             {statistiche.numeroPrenotazioni} prenotazioni portate · {formattaEuro(statistiche.fatturato)} di fatturato generato
           </p>
         )}
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva promoter'}</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva promoter'}</button>
       </PaginaSezione>
     );
   }
@@ -99,7 +100,7 @@ export function PromoterScreen() {
       <div style={{ maxWidth: 480, marginBottom: 20 }}>
         <CampoCopiabile etichetta="Link di accesso per i promoter" valore={`${window.location.origin}/promoter`} link />
       </div>
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o codice..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o codice…" />
       <TabellaGenerica
         righe={promoterFiltrati}
         colonne={[
@@ -138,9 +139,9 @@ function SelettoreLinkPromoter({ promoterId }: { promoterId: string }) {
     <div>
       <select value={eventoId} onChange={(e) => setEventoId(e.target.value)} style={{ marginBottom: 8 }}>
         <option value="">— Scegli un evento —</option>
-        {eventi.map((ev) => <option key={ev.id} value={ev.id}>{ev.artista} — {new Date(ev.data).toLocaleDateString('it-IT')}</option>)}
+        {eventi.map((ev) => <option key={ev.id} value={ev.id}>{ev.artista} — {formattaData(ev.data)}</option>)}
       </select>
-      {eventoId && (caricando ? <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>Genero il link...</p> : link && <CampoCopiabile etichetta="" valore={link} />)}
+      {eventoId && (caricando ? <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>Genero il link…</p> : link && <CampoCopiabile etichetta="" valore={link} />)}
     </div>
   );
 }

@@ -292,7 +292,7 @@ export function MappaPercorso({ percorsi }: { percorsi: PercorsoMappa[] }) {
           {percorsi.length > 5 && <><br />Con molte fermate mai cercate prima può richiedere qualche minuto (il servizio gratuito chiede di restare sotto 1 richiesta al secondo).</>}
         </p>
       )}
-      {stato === 'carico-tracciati' && <p style={{ color: 'var(--mist)' }}>Fermate trovate — calcolo i tracciati stradali...</p>}
+      {stato === 'carico-tracciati' && <p style={{ color: 'var(--mist)' }}>Fermate trovate — calcolo i tracciati stradali…</p>}
       {stato === 'errore' && <p style={{ color: 'var(--pink)' }}>Non riesco a mostrare la cartina — nessuna fermata trovata con un indirizzo o città valida.</p>}
       {tappeNonTrovateTotali.length > 0 && (
         <p style={{ color: 'var(--amber)', fontSize: 'var(--testo-md)', marginBottom: 8 }}>

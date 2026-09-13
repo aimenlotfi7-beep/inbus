@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { notifica } from '../shared/notifiche';
 import { impostazioniApi } from '../../api/impostazioni';
 import { ErroreApi } from '../../api/client';
@@ -55,15 +56,15 @@ export function ImpostazioniScreen() {
   async function salva(chiave: string) {
     const numero = Number(valori[chiave]);
     if (!Number.isFinite(numero) || numero < 0) {
-      notifica('Inserisci un numero valido.');
+      notifica('Inserisci un numero valido.', 'errore');
       return;
     }
     setSalvataggio(chiave);
     try {
       await impostazioniApi.set(chiave, String(numero));
-      notifica('Impostazione salvata.');
+      notifica('Impostazione salvata.', 'successo');
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvataggio(null);
     }
@@ -75,15 +76,15 @@ export function ImpostazioniScreen() {
     // (divisione per zero sui posti di pareggio), oltre 100 non
     // avrebbe senso (più del 100% di riempimento del bus).
     if (!Number.isFinite(numero) || numero <= 0 || numero > 100) {
-      notifica('Inserisci una percentuale tra 1 e 100.');
+      notifica('Inserisci una percentuale tra 1 e 100.', 'errore');
       return;
     }
     setSalvataggio(CHIAVE_SOGLIA_OCCUPAZIONE);
     try {
       await impostazioniApi.set(CHIAVE_SOGLIA_OCCUPAZIONE, String(numero));
-      notifica('Impostazione salvata.');
+      notifica('Impostazione salvata.', 'successo');
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvataggio(null);
     }
@@ -98,7 +99,7 @@ export function ImpostazioniScreen() {
       await impostazioniApi.set('notifica_fornitori_non_scelti', String(nuovo));
     } catch (e) {
       setNotificaNonScelti(!nuovo); // ripristina se il salvataggio fallisce
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: errore di rete.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     }
   }
 
@@ -106,7 +107,7 @@ export function ImpostazioniScreen() {
     <div>
       <PanelHead titolo="Impostazioni" />
       {caricamento ? (
-        <p style={{ color: 'var(--mist)' }}>Carico...</p>
+        <p style={{ color: 'var(--mist)' }}>Carico…</p>
       ) : (
         <div style={{ maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 18 }}>
           {IMPOSTAZIONI.map((i) => (
@@ -120,7 +121,7 @@ export function ImpostazioniScreen() {
                 />
               </div>
               <button className="btn btn-ghost" onClick={() => salva(i.chiave)} disabled={salvataggio === i.chiave}>
-                {salvataggio === i.chiave ? 'Salvataggio...' : 'Salva'}
+                {salvataggio === i.chiave ? 'Salvataggio…' : 'Salva'}
               </button>
             </div>
           ))}
@@ -151,7 +152,7 @@ export function ImpostazioniScreen() {
               />
             </div>
             <button className="btn btn-ghost" onClick={salvaSogliaOccupazione} disabled={salvataggio === CHIAVE_SOGLIA_OCCUPAZIONE}>
-              {salvataggio === CHIAVE_SOGLIA_OCCUPAZIONE ? 'Salvataggio...' : 'Salva'}
+              {salvataggio === CHIAVE_SOGLIA_OCCUPAZIONE ? 'Salvataggio…' : 'Salva'}
             </button>
           </div>
 

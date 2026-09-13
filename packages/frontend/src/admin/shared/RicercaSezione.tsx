@@ -7,7 +7,7 @@ export function RicercaSezione({ valore, onChange, placeholder }: { valore: stri
       <div className="home-search-box">
         <input
           type="text"
-          placeholder={placeholder ?? 'Inizia a digitare per cercare...'}
+          placeholder={placeholder ?? 'Inizia a digitare per cercare…'}
           value={valore}
           onChange={(e) => onChange(e.target.value)}
         />

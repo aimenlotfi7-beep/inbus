@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { notifica } from '../../shared/notifiche';
-import { formattaEuro } from '../../../shared/formato';
+import { formattaData, formattaEuro } from '../../../shared/formato';
 import { TITOLI_PARTENZE, type ContestoPartenze } from '../partenze/tipi';
 import { TragittoCard } from './TragittoCard';
 import { StepInformazioni } from './StepInformazioni';
@@ -22,6 +22,7 @@ import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNon
 import { confermaAvvisiClienti, notificaEsitoAvvisi } from '../../shared/avvisiClienti';
 import { notificaPercorsiCambiati } from '../../shared/AvvisoCambioPercorso';
 import { motivoErrore } from '../../shared/errori';
+import { chiediNuovaCategoria, chiediNuovoGenere } from '../../shared/generiCategorie';
 import { PartenzeTab } from '../partenze/PartenzeTab';
 import { ListaAttesaTab } from './ListaAttesaTab';
 import { ComunicazioniTab } from './ComunicazioniTab';
@@ -377,11 +378,11 @@ export function SchedaEventoModale({
       try {
         const { haPrenotazioni, quante } = await eventiApi.tragittoHaPrenotazioniConfermate(tragittoRimosso.id);
         if (haPrenotazioni) {
-          notifica(`Questo tragitto ha ${quante} prenotazion${quante > 1 ? 'i' : 'e'} confermat${quante > 1 ? 'e' : 'a'} — non può essere rimosso. Annulla o sposta quelle prenotazioni prima di rimuoverlo.`);
+          notifica(`Questo tragitto ha ${quante} prenotazion${quante > 1 ? 'i' : 'e'} confermat${quante > 1 ? 'e' : 'a'} — non può essere rimosso. Annulla o sposta quelle prenotazioni prima di rimuoverlo.`, 'errore');
           return;
         }
       } catch {
-        notifica('Impossibile verificare le prenotazioni di questo tragitto — controlla la connessione e riprova.');
+        notifica('Impossibile verificare le prenotazioni di questo tragitto — controlla la connessione e riprova.', 'errore');
         return;
       }
     }
@@ -562,27 +563,17 @@ export function SchedaEventoModale({
   }, [form, servizi, modalitaServizi, evento]);
 
   async function nuovoGenere() {
-    const nome = window.prompt('Nome del nuovo genere:');
-    if (!nome || !nome.trim()) return;
-    try {
-      const creato = await categorieApi.create(nome.trim());
-      ricaricaCategorie();
-      setForm((f) => ({ ...f, genere: creato.nome }));
-    } catch (e) {
-      notifica(e instanceof ErroreApi ? `Impossibile creare il genere: ${e.message}` : 'Impossibile creare il genere: errore di rete.');
-    }
+    const creato = await chiediNuovoGenere();
+    if (!creato) return;
+    ricaricaCategorie();
+    setForm((f) => ({ ...f, genere: creato.nome }));
   }
 
   async function nuovaCategoria() {
-    const nome = window.prompt('Nome della nuova categoria (comparirà come pulsante in alto sul sito):');
-    if (!nome || !nome.trim()) return;
-    try {
-      const creata = await categorieEventoApi.create(nome.trim());
-      ricaricaCategorieEvento();
-      setForm((f) => ({ ...f, categoria: creata.nome }));
-    } catch (e) {
-      notifica(e instanceof ErroreApi ? `Impossibile creare la categoria: ${e.message}` : 'Impossibile creare la categoria: errore di rete.');
-    }
+    const creata = await chiediNuovaCategoria();
+    if (!creata) return;
+    ricaricaCategorieEvento();
+    setForm((f) => ({ ...f, categoria: creata.nome }));
   }
 
 
@@ -590,11 +581,11 @@ export function SchedaEventoModale({
   async function salva() {
     if (salvando) return; // già in corso, ignora click ripetuti
     if (!infoCompleta(form)) {
-      notifica('Compila almeno artista, genere, luogo, città e data.');
+      notifica('Compila almeno artista, genere, luogo, città e data.', 'errore');
       return;
     }
     if (numeroTragitti === 0) {
-      notifica('Aggiungi almeno un tragitto prima di salvare.');
+      notifica('Aggiungi almeno un tragitto prima di salvare.', 'errore');
       setStep(2);
       return;
     }
@@ -602,14 +593,14 @@ export function SchedaEventoModale({
       const haTragittiLiberi = (form.tragitti ?? []).some((t) => !t.servizioId);
       const gruppiTotali = servizi.length + (haTragittiLiberi ? 1 : 0);
       if (gruppiTotali < 2) {
-        notifica('Hai scelto "Più servizi" ma di fatto ne hai solo uno — aggiungine almeno un secondo, oppure torna su "Un solo servizio".');
+        notifica('Hai scelto "Più servizi" ma di fatto ne hai solo uno — aggiungine almeno un secondo, oppure torna su "Un solo servizio".', 'successo');
         setStep(2);
         return;
       }
     }
     const servizioSenzaNome = servizi.find((v) => !v.nome.trim());
     if (servizioSenzaNome) {
-      notifica('Dai un nome a tutti i servizi prima di salvare — è un campo obbligatorio, come tutti gli altri.');
+      notifica('Dai un nome a tutti i servizi prima di salvare — è un campo obbligatorio, come tutti gli altri.', 'errore');
       setStep(2);
       setModalitaServizi('multiplo');
       setServizioTabAttivo(servizioSenzaNome.key);
@@ -625,7 +616,7 @@ export function SchedaEventoModale({
     // rientrano in questo controllo.
     const servizioDaRinominare = servizi.find((v) => v.daRinominare);
     if (servizioDaRinominare) {
-      notifica(`Rinomina "${servizioDaRinominare.nome}" prima di salvare — un nome vero aiuta a distinguerlo dagli altri, sia per te sia per i clienti in fase di scelta.`);
+      notifica(`Rinomina "${servizioDaRinominare.nome}" prima di salvare — un nome vero aiuta a distinguerlo dagli altri, sia per te sia per i clienti in fase di scelta.`, 'errore');
       setStep(2);
       setModalitaServizi('multiplo');
       setServizioTabAttivo(servizioDaRinominare.key);
@@ -638,14 +629,14 @@ export function SchedaEventoModale({
     // si annulla dal pulsante apposta mentre è ancora vuoto.
     const servizioVuoto = servizi.find((v) => !(form.tragitti ?? []).some((t) => t.servizioId === v.key && t.nome.trim()));
     if (servizioVuoto) {
-      notifica(`Il servizio "${servizioVuoto.nome}" non ha ancora nessun tragitto — aggiungine almeno uno, oppure annullalo dal pulsante "Annulla" mentre è ancora vuoto.`);
+      notifica(`Il servizio "${servizioVuoto.nome}" non ha ancora nessun tragitto — aggiungine almeno uno, oppure annullalo dal pulsante "Annulla" mentre è ancora vuoto.`, 'errore');
       setStep(2);
       setModalitaServizi('multiplo');
       setServizioTabAttivo(servizioVuoto.key);
       return;
     }
     if (numeroImmagini(form) === 0) {
-      notifica('Carica almeno un\'immagine prima di salvare.');
+      notifica('Carica almeno un\'immagine prima di salvare.', 'errore');
       setStep(3);
       setSubTabImmagini('immagini');
       return;
@@ -661,7 +652,7 @@ export function SchedaEventoModale({
       return l.fermate.some((f) => !f.citta.trim() || !f.indirizzo?.trim());
     });
     if (tragittoIncompleto) {
-      notifica(`Il tragitto "${tragittoIncompleto.nome.trim() || '(senza nome)'}" non è completo — manca il nome, oppure la città/indirizzo di una fermata. Completalo o eliminalo prima di salvare.`);
+      notifica(`Il tragitto "${tragittoIncompleto.nome.trim() || '(senza nome)'}" non è completo — manca il nome, oppure la città/indirizzo di una fermata. Completalo o eliminalo prima di salvare.`, 'errore');
       setStep(2);
       if (tragittoIncompleto.servizioId) { setModalitaServizi('multiplo'); setServizioTabAttivo(tragittoIncompleto.servizioId); }
       return;
@@ -689,7 +680,7 @@ export function SchedaEventoModale({
       ? (form.tragitti ?? []).find((t, idx) => idx !== arrivoEvento.indice && t.arrivoCitta?.trim() && !stessaCitta(t.arrivoCitta, arrivoEvento.citta))
       : undefined;
     if (tragittoDivergente) {
-      notifica(`Tutti i tragitti di questo evento devono arrivare a "${arrivoEvento.citta}" (stabilito da "${form.tragitti![arrivoEvento.indice].nome.trim() || 'primo tragitto'}") — "${tragittoDivergente.nome.trim() || '(senza nome)'}" arriva invece a "${tragittoDivergente.arrivoCitta}". Correggilo prima di salvare.`);
+      notifica(`Tutti i tragitti di questo evento devono arrivare a "${arrivoEvento.citta}" (stabilito da "${form.tragitti![arrivoEvento.indice].nome.trim() || 'primo tragitto'}") — "${tragittoDivergente.nome.trim() || '(senza nome)'}" arriva invece a "${tragittoDivergente.arrivoCitta}". Correggilo prima di salvare.`, 'errore');
       setStep(2);
       if (tragittoDivergente.servizioId) { setModalitaServizi('multiplo'); setServizioTabAttivo(tragittoDivergente.servizioId); }
       return;
@@ -740,7 +731,7 @@ export function SchedaEventoModale({
         notifica('Evento creato.', 'successo');
       }
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server. Controlla che il backend sia acceso.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
       // Il salvataggio è fallito — sul server non è cambiato nulla,
       // ma qui in modulo potevano già esserci modifiche locali (es.
       // un tragitto tolto perché si voleva eliminare, poi rifiutato
@@ -962,7 +953,7 @@ export function SchedaEventoModale({
                 value={cittaPercorsoScelta}
                 onChange={(e) => { setCittaPercorsoScelta(e.target.value); setPercorsiSelezionatiIds(new Set()); }}
               >
-                <option value="">Scegli una città di arrivo...</option>
+                <option value="">Scegli una città di arrivo…</option>
                 {cittaConConteggio.map(({ citta, conteggio }) => (
                   <option key={citta} value={citta}>{citta} ({conteggio})</option>
                 ))}
@@ -1141,7 +1132,7 @@ export function SchedaEventoModale({
                 <div className="riepilogo-riga-evento"><span>Artista</span><b>{form.artista || '—'}</b></div>
                 <div className="riepilogo-riga-evento"><span>Genere</span><b>{form.genere || '—'}</b></div>
                 <div className="riepilogo-riga-evento"><span>Luogo</span><b>{form.luogo ? `${form.luogo}, ${form.citta}` : '—'}</b></div>
-                <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? new Date(form.data).toLocaleDateString('it-IT') : '—'}</b></div>
+                <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? formattaData(form.data) : '—'}</b></div>
                 <div className="riepilogo-riga-evento"><span>Acconto</span><b>{formattaEuro(form.accontoEur || 10)}</b></div>
                 <div className="riepilogo-riga-evento"><span>In evidenza</span><b>{form.inEvidenza ? 'Sì' : 'No'}</b></div>
                 <div className="riepilogo-riga-evento"><span>Categoria</span><b>{form.categoria || '—'}</b></div>
@@ -1153,7 +1144,7 @@ export function SchedaEventoModale({
 
             {/* Salva e esci subito, disponibile su qualunque sezione ci
                 si trovi — non serve passare dalle altre per salvare. */}
-            <button className="btn btn-primary" style={{ width: '100%', marginTop: 18 }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva modifica'}</button>
+            <button className="btn btn-primary" style={{ width: '100%', marginTop: 18 }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva modifica'}</button>
           </>
         )}
       </PaginaSezione>
@@ -1206,7 +1197,7 @@ export function SchedaEventoModale({
           <div className="riepilogo-riga-evento"><span>Artista</span><b>{form.artista || '—'}</b></div>
           <div className="riepilogo-riga-evento"><span>Genere</span><b>{form.genere || '—'}</b></div>
           <div className="riepilogo-riga-evento"><span>Luogo</span><b>{form.luogo ? `${form.luogo}, ${form.citta}` : '—'}</b></div>
-          <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? new Date(form.data).toLocaleDateString('it-IT') : '—'}</b></div>
+          <div className="riepilogo-riga-evento"><span>Data</span><b>{form.data ? formattaData(form.data) : '—'}</b></div>
           <div className="riepilogo-riga-evento"><span>Acconto</span><b>{formattaEuro(form.accontoEur || 10)}</b></div>
           <div className="riepilogo-riga-evento"><span>In evidenza</span><b>{form.inEvidenza ? 'Sì' : 'No'}</b></div>
           <div className="riepilogo-riga-evento"><span>Categoria</span><b>{form.categoria || '—'}</b></div>
@@ -1229,16 +1220,16 @@ export function SchedaEventoModale({
           <button
             className="btn btn-primary"
             onClick={() => {
-              if (step === 1 && !infoCompleta(form)) { notifica('Compila almeno artista, genere, luogo, città e data prima di proseguire.'); return; }
+              if (step === 1 && !infoCompleta(form)) { notifica('Compila almeno artista, genere, luogo, città e data prima di proseguire.', 'errore'); return; }
               // Immagine obbligatoria: meglio dirlo qui che al clic finale su "Crea evento".
-              if (step === 3 && numeroImmagini(form) === 0) { notifica('Aggiungi almeno un\'immagine prima di proseguire.'); return; }
+              if (step === 3 && numeroImmagini(form) === 0) { notifica('Aggiungi almeno un\'immagine prima di proseguire.', 'errore'); return; }
               setStep((s) => (s + 1) as 2 | 3 | 4);
             }}
           >
             Avanti →
           </button>
         ) : (
-          <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Creo...' : 'Crea evento'}</button>
+          <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Creo…' : 'Crea evento'}</button>
         )}
       </div>
     </PaginaSezione>

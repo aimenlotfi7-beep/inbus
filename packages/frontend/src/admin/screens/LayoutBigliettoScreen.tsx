@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../api/layoutBiglietto';
@@ -168,7 +169,7 @@ export function LayoutBigliettoScreen() {
   }
 
   async function salva() {
-    if (!nome.trim()) { notifica('Dai un nome al layout prima di salvare.'); return; }
+    if (!nome.trim()) { notifica('Dai un nome al layout prima di salvare.', 'errore'); return; }
     setSalvando(true);
     try {
       const configurazione = JSON.stringify(config);
@@ -180,7 +181,7 @@ export function LayoutBigliettoScreen() {
       }
       ricarica();
     } catch (e) {
-      notifica(e instanceof Error ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -190,7 +191,7 @@ export function LayoutBigliettoScreen() {
     try {
       await layoutBigliettoApi.scaricaAnteprima(JSON.stringify(config));
     } catch (e) {
-      notifica(e instanceof Error ? `Anteprima non riuscita: ${e.message}` : 'Anteprima non riuscita.');
+      notifica(`Anteprima non riuscita: ${motivoErrore(e)}`, 'errore');
     } finally {
       setGenerandoAnteprima(false);
     }
@@ -365,7 +366,7 @@ export function LayoutBigliettoScreen() {
     window.removeEventListener('mouseup', fineTrascinamento);
   }, []);
 
-  if (caricamento) return <p className="testo-intro">Carico...</p>;
+  if (caricamento) return <p className="testo-intro">Carico…</p>;
   if (errore) return <p className="testo-intro" style={{ color: 'var(--pink)' }}>{errore}</p>;
 
   return (
@@ -597,9 +598,9 @@ export function LayoutBigliettoScreen() {
               </p>
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-                <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva'}</button>
+                <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva'}</button>
                 <button className="btn btn-ghost" onClick={anteprima} disabled={generandoAnteprima}>
-                  {generandoAnteprima ? 'Genero...' : 'Genera anteprima PDF'}
+                  {generandoAnteprima ? 'Genero…' : 'Genera anteprima PDF'}
                 </button>
                 {selezionato && !selezionato.predefinito && (
                   <button className="btn btn-ghost" onClick={impostaPredefinito}>Imposta come predefinito</button>

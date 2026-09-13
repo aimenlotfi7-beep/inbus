@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../shared/errori';
 import { bundleApi, type BundleRiga } from '../../api/bundle';
 import { whiteLabelApi, type WhiteLabel } from '../../api/whiteLabel';
 import { organizzatoriApi, type Organizzatore } from '../../api/organizzatori';
@@ -120,7 +121,7 @@ function NuovaWhiteLabel({ organizzatori, onIndietro, onCreata }: { organizzator
       const nuova = await whiteLabelApi.create(eventoId.startsWith('bundle:') ? { organizzatoreId, bundleId: eventoId.slice(7) } : { organizzatoreId, eventoId });
       onCreata(nuova);
     } catch (e) {
-      setErrore(e instanceof ErroreApi ? e.message : 'Creazione non riuscita.');
+      setErrore(motivoErrore(e));
     } finally {
       setCaricamento(false);
     }
@@ -131,7 +132,7 @@ function NuovaWhiteLabel({ organizzatori, onIndietro, onCreata }: { organizzator
       <div className="campo">
         <label>Organizzatore</label>
         <select value={organizzatoreId} onChange={(e) => { setOrganizzatoreId(e.target.value); setEventoId(''); }}>
-          <option value="">Scegli...</option>
+          <option value="">Scegli…</option>
           {organizzatori.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
         </select>
       </div>
@@ -139,7 +140,7 @@ function NuovaWhiteLabel({ organizzatori, onIndietro, onCreata }: { organizzator
         <div className="campo">
           <label>Evento o bundle</label>
           <select value={eventoId} onChange={(e) => setEventoId(e.target.value)}>
-            <option value="">Scegli...</option>
+            <option value="">Scegli…</option>
             {eventiOrganizzatore.length > 0 && <optgroup label="Eventi">{eventiOrganizzatore.map((e) => <option key={e.id} value={e.id}>{e.artista}</option>)}</optgroup>}
             {bundleOrganizzatore.length > 0 && <optgroup label="Bundle">{bundleOrganizzatore.map((b) => <option key={b.id} value={`bundle:${b.id}`}>{b.nome} (bundle)</option>)}</optgroup>}
           </select>
@@ -150,7 +151,7 @@ function NuovaWhiteLabel({ organizzatori, onIndietro, onCreata }: { organizzator
       )}
       {errore && <p style={{ color: 'var(--pink)', fontSize: 'var(--testo-md)' }}>{errore}</p>}
       <button className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} onClick={crea} disabled={!organizzatoreId || !eventoId || caricamento}>
-        {caricamento ? 'Creazione...' : 'Crea White Label'}
+        {caricamento ? 'Creazione…' : 'Crea White Label'}
       </button>
     </PaginaSezione>
   );
@@ -179,7 +180,7 @@ function MetaPixelOrganizzatore({ whiteLabel, onSalvato }: { whiteLabel: WhiteLa
       onSalvato(aggiornata);
       notifica('Pixel dell\'organizzatore salvato.', 'successo');
     } catch (e) {
-      notifica(e instanceof ErroreApi ? e.message : 'Salvataggio non riuscito.');
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -199,7 +200,7 @@ function MetaPixelOrganizzatore({ whiteLabel, onSalvato }: { whiteLabel: WhiteLa
         <label>Token Conversions API</label>
         <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="(non impostato)" />
       </div>
-      <button className="btn btn-ghost" onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva'}</button>
+      <button className="btn btn-ghost" onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva'}</button>
     </div>
   );
 }

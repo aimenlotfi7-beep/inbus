@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../../shared/errori';
 import { azioneConfermata } from '../../shared/conferma';
 import { notifica } from '../../shared/notifiche';
 import { offerteApi, type Offerta, type OffertaInput } from '../../../api/offerte';
@@ -51,7 +52,7 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
   async function salva() {
     if (salvando) return;
     if (!nome.trim() || !slug.trim() || !scontoPercentuale) {
-      notifica('Compila almeno nome, link (slug) e percentuale di sconto.');
+      notifica('Compila almeno nome, link (slug) e percentuale di sconto.', 'errore');
       return;
     }
     const payload: OffertaInput = {
@@ -67,7 +68,7 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
       setFormAperto(false);
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Errore: ${e.message}` : 'Errore di rete.');
+      notifica(`Errore: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -94,11 +95,12 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
       setLinkCopiato(o.id);
       setTimeout(() => setLinkCopiato(null), 2500);
     } catch {
-      window.prompt('Copia questo link:', link);
+      // Il browser ha bloccato la copia automatica: il link resta selezionabile nel messaggio.
+      notifica(`Copia il link a mano: ${link}`, 'info');
     }
   }
 
-  if (caricamento) return <p className="testo-intro">Carico...</p>;
+  if (caricamento) return <p className="testo-intro">Carico…</p>;
 
   return (
     <div>
@@ -129,7 +131,7 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
             </label>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva e genera link'}</button>
+            <button className="btn btn-primary" onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva e genera link'}</button>
             <button className="btn btn-ghost" onClick={() => setFormAperto(false)}>Annulla</button>
           </div>
         </div>

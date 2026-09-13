@@ -26,7 +26,7 @@ export function VetrinaScreen() {
       <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 16 }}>
         Scegli quali eventi mostrare nel carosello "Eventi Consigliati" in homepage — clicca una card per attivarla/disattivarla.
       </p>
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista o città..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per artista o città…" />
       <div className="cards-list">
         {eventiFiltrati.map((ev) => (
           <EventoCardCompatta
@@ -34,7 +34,7 @@ export function VetrinaScreen() {
             evento={{ ...ev, immagineUrl: ev.immagini[0]?.url ?? null }}
             onClick={() => toggle(ev)}
             selezionato={ev.inEvidenza}
-            badge={ev.inEvidenza ? '✓ In vetrina' : undefined}
+            badge={ev.inEvidenza ? 'In vetrina' : undefined}
           />
         ))}
         {!eventi.length && <p style={{ color: 'var(--mist)' }}>Nessun evento creato ancora.</p>}

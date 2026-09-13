@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { formattaDataOra } from '../../shared/formato';
+import { motivoErrore } from '../shared/errori';
 import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { amministratoriApi, type Amministratore, type AmministratoreInput, type LogRiga, type EccezionePermesso } from '../../api/amministratori';
@@ -65,7 +67,7 @@ export function AmministratoriScreen() {
       setModaleAperta(false);
       ricarica();
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
     }
@@ -81,7 +83,7 @@ export function AmministratoriScreen() {
     try {
       const dati = await amministratoriApi.permessi(a.id);
       if (dati.ruoloOwner) {
-        notifica('Questa utenza ha il ruolo proprietario: ha già tutti i permessi, non servono eccezioni personali.');
+        notifica('Questa utenza ha il ruolo proprietario: ha già tutti i permessi, non servono eccezioni personali.', 'info');
         return;
       }
       setPermessiUtenza(a);
@@ -96,7 +98,7 @@ export function AmministratoriScreen() {
       }
       setStatoPermessi(stato);
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Impossibile aprire i permessi: ${e.message}` : 'Impossibile aprire i permessi: errore di rete.');
+      notifica(`Impossibile aprire i permessi: ${motivoErrore(e)}`, 'errore');
     }
   }
 
@@ -122,17 +124,17 @@ export function AmministratoriScreen() {
       await amministratoriApi.salvaPermessi(permessiUtenza.id, eccezioni);
       setPermessiUtenza(null);
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Salvataggio non riuscito: ${e.message}` : 'Salvataggio non riuscito: impossibile contattare il server.');
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     }
   }
 
   const moduli = Array.from(new Set(permessiAssegnabili.map((p) => p.modulo)));
 
   const ETICHETTA_STATO: Record<StatoPermesso, string> = {
-    ruolo: '✓ Dal ruolo',
-    extra: '+ Concesso in più',
-    negato: '✕ Tolto',
-    nessuno: '— Non attivo',
+    ruolo: 'Dal ruolo',
+    extra: 'Concesso in più',
+    negato: 'Tolto',
+    nessuno: 'Non attivo',
   };
   const CLASSE_STATO: Record<StatoPermesso, string> = {
     ruolo: 'dal-ruolo', extra: 'concesso-extra', negato: 'negato', nessuno: 'non-attivo',
@@ -157,7 +159,7 @@ export function AmministratoriScreen() {
             </p>
           )}
         </div>
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo...' : 'Salva amministratore'}</button>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva amministratore'}</button>
       </PaginaSezione>
     );
   }
@@ -193,7 +195,7 @@ export function AmministratoriScreen() {
       <div style={{ maxWidth: 480, marginBottom: 20 }}>
         <CampoCopiabile etichetta="Link di accesso al gestionale (per tutti, inclusi i Collaboratori)" valore={`${window.location.origin}/admin.html`} link />
       </div>
-      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o ruolo..." />
+      <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o ruolo…" />
       <TabellaGenerica
         righe={adminFiltrati}
         colonne={[
@@ -213,7 +215,7 @@ export function AmministratoriScreen() {
         colonne={[
           { etichetta: 'Azione', render: (l) => <b>{l.azione}</b> },
           { etichetta: 'Dettaglio', render: (l) => l.dettaglio ?? '—' },
-          { etichetta: 'Quando', render: (l) => new Date(l.data).toLocaleString('it-IT') },
+          { etichetta: 'Quando', render: (l) => formattaDataOra(l.data) },
         ]}
       />
     </div>

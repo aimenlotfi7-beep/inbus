@@ -221,6 +221,9 @@ export const eventiApi = {
   registraPreventivoManuale: (tragittoId: string, input: { preventivoCosto: number; preventivoPostiBus: number; fornitoreId?: string; fileNome?: string; fileContenuto?: string }) =>
     api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/preventivo`, input),
   // Sezione PREZZI: i prezzi di vendita per fermata, da un costo GIÀ noto.
+  /** I posti del bus del preventivo (il fornitore dal link indica solo il prezzo). */
+  impostaPostiPreventivo: (tragittoId: string, postiBus: number) =>
+    api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/posti-preventivo`, { postiBus }),
   calcolaPrezziVendita: (tragittoId: string, input: { prezziPerFermata: { fermataId: string; prezzo: number }[] }) =>
     api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/prezzi-vendita`, input),
   rimuoviBus: (id: string, busId: string) => api.delete<void>(`/api/eventi/${id}/bus/${busId}`),
@@ -245,6 +248,8 @@ export const eventiApi = {
     // Percorso cambiato dopo il preventivo accettato: cosa c'è da fare (null = in regola).
     cambioPercorso: 'da_richiedere' | 'in_attesa' | 'da_valutare' | null;
     preventivoCosto: string | null; fornitoreId: string | null; fermateCompilate: boolean; servizioNome: string | null; servizioId: string | null;
+    /** Richieste di preventivo partite e risposte arrivate (giallo in Preventivi). */
+    richiestePreventivo: number; rispostePreventivo: number;
     evento: { id: string; artista: string; genere: string; data: string; citta: string; luogo: string; slug: string; immagineUrl: string | null };
   }>>('/api/eventi/elenco-partenze'),
   statistichePerEvento: () => api.get<Record<string, { partecipanti: number; busCensiti: number }>>('/api/eventi/statistiche-per-evento'),

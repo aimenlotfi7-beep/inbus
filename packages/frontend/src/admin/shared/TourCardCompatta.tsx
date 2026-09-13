@@ -1,4 +1,5 @@
 import type { TourRiga } from '../../api/tour';
+import { plurale } from '../../shared/formato';
 
 /** Stessa forma visiva di EventoCardCompatta/BundleCardCompatta
  *  (stesse classi CSS evento-card-compatta-*) — stile e posizione
@@ -9,12 +10,12 @@ export function TourCardCompatta({ tour, onClick, onElimina }: { tour: TourRiga;
       {tour.copertinaUrl ? (
         <div className="evento-card-compatta-copertina">
           <img src={tour.copertinaUrl} alt="" />
-          <div className="evento-card-compatta-badge badge">{tour.numeroEventi} date</div>
+          <div className="evento-card-compatta-badge badge">{plurale(tour.numeroEventi, 'data', 'date')}</div>
         </div>
       ) : (
         <div className="evento-card-compatta-copertina" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--dusk-2)' }}>
           <span style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>Nessuna copertina</span>
-          <div className="evento-card-compatta-badge badge">{tour.numeroEventi} date</div>
+          <div className="evento-card-compatta-badge badge">{plurale(tour.numeroEventi, 'data', 'date')}</div>
         </div>
       )}
       <div className="evento-card-compatta-corpo">

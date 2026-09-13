@@ -58,7 +58,7 @@ export function WidgetPubblicoPage() {
     }
   }
 
-  if (vista === 'caricamento') return <Sfondo colore="#14121f"><p style={{ color: '#a99fc2' }}>Carico...</p></Sfondo>;
+  if (vista === 'caricamento') return <Sfondo colore="#14121f"><p style={{ color: '#a99fc2' }}>Carico…</p></Sfondo>;
   if (vista === 'errore') return <Sfondo colore="#14121f"><p style={{ color: '#a99fc2' }}>{erroreVista}</p></Sfondo>;
   if (!dati || !publicWidgetId) return null;
 
@@ -223,7 +223,7 @@ function FormLogin({ tema, onFatto }: { tema: WhiteLabelPubblica['tema']; onFatt
       <Campo tema={tema} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <Campo tema={tema} type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
       <TestoErrore>{errore}</TestoErrore>
-      <PulsantePrincipale tema={tema} onClick={invia} disabled={caricamento}>{caricamento ? 'Accesso...' : 'Accedi'}</PulsantePrincipale>
+      <PulsantePrincipale tema={tema} onClick={invia} disabled={caricamento}>{caricamento ? 'Accesso…' : 'Accedi'}</PulsantePrincipale>
     </Riquadro>
   );
 }
@@ -262,7 +262,7 @@ function FormRegistrati({ tema, onFatto }: { tema: WhiteLabelPubblica['tema']; o
       <Campo tema={tema} type="date" placeholder="Data di nascita" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} />
       <Campo tema={tema} type="password" placeholder="Password (almeno 8 caratteri)" value={password} onChange={(e) => setPassword(e.target.value)} />
       <TestoErrore>{errore}</TestoErrore>
-      <PulsantePrincipale tema={tema} onClick={invia} disabled={caricamento}>{caricamento ? 'Creazione...' : 'Crea account'}</PulsantePrincipale>
+      <PulsantePrincipale tema={tema} onClick={invia} disabled={caricamento}>{caricamento ? 'Creazione…' : 'Crea account'}</PulsantePrincipale>
     </Riquadro>
   );
 }

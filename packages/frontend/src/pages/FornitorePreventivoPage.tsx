@@ -4,7 +4,7 @@ import '../styles/tourleader.css';
 import { LogoOnWay } from '../features/LogoOnWay';
 import { preventiviApi, type DatiPubbliciPreventivo } from '../api/preventivi';
 import { ErroreApi } from '../api/client';
-import { formattaEuro } from '../shared/formato';
+import { formattaData, formattaEuro } from '../shared/formato';
 import { CookieBanner } from '../features/CookieBanner';
 import { useSeoTags } from '../features/useSeoTags';
 
@@ -91,7 +91,7 @@ export function FornitorePreventivoPage() {
 
         {dati && (
           <div className="evento-context">
-            <p><b>{dati.tragitto.nome}</b>{dati.evento && <> — {dati.evento.artista}, {dati.evento.luogo} ({dati.evento.citta}), {new Date(dati.evento.data).toLocaleDateString('it-IT')}</>}</p>
+            <p><b>{dati.tragitto.nome}</b>{dati.evento && <> — {dati.evento.artista}, {dati.evento.luogo} ({dati.evento.citta}), {formattaData(dati.evento.data)}</>}</p>
             {dati.tragitto.arrivoCitta && <p>Arrivo: {dati.tragitto.arrivoCitta}{dati.tragitto.arrivoOrario ? ` alle ${dati.tragitto.arrivoOrario}` : ''}</p>}
             {dati.fermate.length > 0 && (
               <>

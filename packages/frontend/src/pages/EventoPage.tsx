@@ -7,7 +7,7 @@ import { prezzoMinimoEvento } from '../api/prezzi';
 import { useSeoTags } from '../features/useSeoTags';
 import { EventoDettaglio, EventoScheletro } from '../features/evento/EventoDettaglio';
 import { Layout } from '../Layout';
-import { formattaEuro } from '../shared/formato';
+import { formattaData, formattaEuro } from '../shared/formato';
 
 type Stato = 'caricamento' | 'pronto' | 'non-trovato' | 'errore';
 
@@ -35,7 +35,7 @@ export function EventoPage() {
   useSeoTags({
     title: evento ? `${evento.artista} — ${evento.luogo}, ${evento.citta} | OnWay` : 'Evento | OnWay',
     description: evento
-      ? (evento.descrizioneSeo?.trim() || `Bus per ${evento.artista} il ${new Date(evento.data).toLocaleDateString('it-IT')} a ${evento.citta}${prezzoMinimo !== null ? ` — a partire da ${formattaEuro(prezzoMinimo)}` : ''}. Prenota il tuo posto con OnWay.`)
+      ? (evento.descrizioneSeo?.trim() || `Bus per ${evento.artista} il ${formattaData(evento.data)} a ${evento.citta}${prezzoMinimo !== null ? ` — a partire da ${formattaEuro(prezzoMinimo)}` : ''}. Prenota il tuo posto con OnWay.`)
       : 'Prenota il tuo bus per l\'evento con OnWay.',
     image: copertina,
     url: window.location.href,

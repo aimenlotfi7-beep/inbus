@@ -157,6 +157,12 @@ export const eventiController = {
     await lineeDaConfermareService.allineaSubito(req.params.tragittoId);
     res.json({ ok: true });
   },
+  async impostaPostiPreventivo(req: Request, res: Response) {
+    await eventiService.impostaPostiPreventivo(req.params.tragittoId, req.body.postiBus);
+    // I posti del preventivo contano per le linee da confermare.
+    await lineeDaConfermareService.allineaSubito(req.params.tragittoId);
+    res.json({ ok: true });
+  },
   async calcolaPrezziVendita(req: Request, res: Response) {
     await eventiService.calcolaPrezziVendita(req.params.tragittoId, req.body);
     await lineeDaConfermareService.allineaSubito(req.params.tragittoId);

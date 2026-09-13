@@ -36,7 +36,7 @@ export function AdminHome({ onVaiA }: { onVaiA: (s: SezioneGestionale) => void }
         <div className="home-search-box">
           <input
             type="text"
-            placeholder="Inizia a digitare per cercare..."
+            placeholder="Inizia a digitare per cercare…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && cerca()}
@@ -44,7 +44,7 @@ export function AdminHome({ onVaiA }: { onVaiA: (s: SezioneGestionale) => void }
         </div>
         <p className="home-search-hint">Premi Invio per cercare</p>
 
-        {cercando && <p style={{ color: 'var(--mist)', marginTop: 20 }}>Cerco...</p>}
+        {cercando && <p style={{ color: 'var(--mist)', marginTop: 20 }}>Cerco…</p>}
 
         {risultati && (
           <div className="home-risultati">

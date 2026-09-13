@@ -34,7 +34,7 @@ export function TestiTooltipScreen() {
     }
   }
 
-  if (caricamento) return <p className="testo-intro">Carico...</p>;
+  if (caricamento) return <p className="testo-intro">Carico…</p>;
 
   return (
     <div>
@@ -85,7 +85,7 @@ function RigaTooltip({ etichetta, valoreIniziale, salvando, onSalva }: {
       />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button className="btn btn-ghost" disabled={!modificato || salvando} onClick={handleSalva}>
-          {salvando ? 'Salvo...' : 'Salva'}
+          {salvando ? 'Salvo…' : 'Salva'}
         </button>
         {appenaSalvato && <span style={{ color: 'var(--green, #4ade80)', fontSize: 'var(--testo-md)' }}>✓ Salvato</span>}
       </div>

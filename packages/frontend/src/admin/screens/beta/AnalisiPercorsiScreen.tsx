@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motivoErrore } from '../../shared/errori';
 import { eventiApi, type VenditePerFermata } from '../../../api/eventi';
 import type { Evento } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
@@ -7,7 +8,7 @@ import { geocodifica, durataViaggio, type Coordinate } from '../../shared/geo';
 import { PanelHead } from '../../shared/PanelHead';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { MappaPercorso, type PercorsoMappa } from '../../shared/MappaPercorso';
-import { formattaEuro } from '../../../shared/formato';
+import { formattaData, formattaEuro } from '../../../shared/formato';
 
 function distanzaLineaRetta(a: Coordinate, b: Coordinate): number {
   const R = 6371;
@@ -83,7 +84,7 @@ export function AnalisiPercorsiScreen() {
     setErroreAnalisi('');
     setPercorsi(null);
     setCostoCombinatoMap(new Map());
-    setProgresso('Carico l\'evento...');
+    setProgresso('Carico l\'evento…');
     try {
       const evento = await eventiApi.getById(eventoId);
       const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)]
@@ -120,7 +121,7 @@ export function AnalisiPercorsiScreen() {
 
         const fermateAttive = t.fermate.filter((f) => f.attivo);
         for (const f of fermateAttive) {
-          setProgresso(`Localizzo le fermate di "${t.nome}" (${nodi.length + 1} finora)...`);
+          setProgresso(`Localizzo le fermate di "${t.nome}" (${nodi.length + 1} finora)…`);
           if (!f.orario) continue; // senza orario non si può verificare la compatibilità: fermata scartata
           const orarioMinuti = minutiDa(f.orario);
           if (orarioMinuti === null) continue;
@@ -161,7 +162,7 @@ export function AnalisiPercorsiScreen() {
           const minutiDisponibili = nodo.orarioMinuti - coda.orarioMinuti;
           if (minutiDisponibili <= 0) continue; // stesso ordine di orario già garantito dal ciclo, ma per sicurezza
 
-          setProgresso(`Verifico il tempo di guida reale (${++contatoreGuida})...`);
+          setProgresso(`Verifico il tempo di guida reale (${++contatoreGuida})…`);
           const minutiGuida = await durataViaggio(coda.coord, nodo.coord);
           if (minutiGuida !== null && minutiGuida <= minutiDisponibili) {
             percorso.fermate.push(nodo);
@@ -182,7 +183,7 @@ export function AnalisiPercorsiScreen() {
         .sort((a, b) => b.fermate.length - a.fermate.length);
       setPercorsi(risultato);
     } catch (e) {
-      setErroreAnalisi(e instanceof Error ? e.message : 'Analisi non riuscita — controlla la connessione e riprova.');
+      setErroreAnalisi(motivoErrore(e));
     } finally {
       setAnalizzando(false);
       setProgresso('');
@@ -202,12 +203,12 @@ export function AnalisiPercorsiScreen() {
           <select value={eventoId} onChange={(e) => setEventoId(e.target.value)}>
             <option value="">— scegli un evento —</option>
             {eventi.map((ev) => (
-              <option key={ev.id} value={ev.id}>{ev.artista} — {ev.citta}, {new Date(ev.data).toLocaleDateString('it-IT')}</option>
+              <option key={ev.id} value={ev.id}>{ev.artista} — {ev.citta}, {formattaData(ev.data)}</option>
             ))}
           </select>
         </div>
         <button className="btn btn-primary" onClick={analizza} disabled={!eventoId || analizzando}>
-          {analizzando ? 'Analizzo...' : 'Costruisci percorsi'}
+          {analizzando ? 'Analizzo…' : 'Costruisci percorsi'}
         </button>
         {analizzando && progresso && (
           <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginTop: 8 }}>{progresso}</p>

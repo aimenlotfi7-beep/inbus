@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { eventiController } from './eventi.controller.js';
 import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema, creaLineaSchema, aggiungiBusALineaSchema, aggiornaBusDiLineaSchema, aggiornaPercorsoLineaSchema, impostaVenditeFermateSchema } from './eventi.dto.js';
 import { valida } from '../../shared/validate.js';
@@ -93,6 +94,7 @@ eventiRouter.put('/tragitti/:tragittoId/operativo', richiedeAuth, richiedePermes
 // per lo stesso corpo del PUT qui sopra — nessuna scrittura.
 eventiRouter.post('/tragitti/:tragittoId/operativo/anteprima', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaTragittoOperativoSchema), asyncHandler(eventiController.anteprimaTragittoOperativo));
 eventiRouter.put('/tragitti/:tragittoId/preventivo', richiedeAuth, richiedePermesso('eventi.crea'), valida(registraPreventivoManualeSchema), asyncHandler(eventiController.registraPreventivoManuale));
+eventiRouter.put('/tragitti/:tragittoId/posti-preventivo', richiedeAuth, richiedePermesso('eventi.crea'), valida(z.object({ postiBus: z.number().int().min(1).max(200) })), asyncHandler(eventiController.impostaPostiPreventivo));
 eventiRouter.put('/tragitti/:tragittoId/prezzi-vendita', richiedeAuth, richiedePermesso('eventi.crea'), valida(calcolaPrezziVenditaSchema), asyncHandler(eventiController.calcolaPrezziVendita));
 eventiRouter.delete('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(eventiController.rimuoviBus));
 eventiRouter.get('/:id/bus/:busId/passeggeri', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaPasseggeriBus));
