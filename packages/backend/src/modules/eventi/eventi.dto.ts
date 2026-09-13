@@ -210,6 +210,11 @@ export const aggiornaTragittoOperativoSchema = z.object({
   // default a 0 lo azzerava in silenzio a ogni salvataggio da Partenze).
   prezzoExtra: z.number().optional(),
   fermate: z.array(fermataSchema).default([]),
+  // L'arrivo si modifica anche da Orari (deciso dal proprietario, settembre
+  // 2026). Facoltativi: se non arrivano restano quelli salvati.
+  arrivoCitta: z.string().optional(),
+  arrivoIndirizzo: z.string().optional(),
+  arrivoOrario: z.string().optional(),
 }).refine(
   (t) => {
     const idUsati = t.fermate.map((f) => f.fermataAnagraficaId).filter((id): id is string => !!id);

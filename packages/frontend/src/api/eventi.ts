@@ -106,9 +106,20 @@ export interface BusDiLinea {
   id: string; fornitoreId: string | null; riferimento: string; autistaNome: string | null; autistaTelefono: string | null;
   tourLeaderId: string | null; tourLeaderNome: string | null; costo: string | null; postiBus: number | null; note: string | null;
 }
-/** daConfermare: linea creata in automatico (soglia di pareggio raggiunta o
- *  bus pieni), senza bus finché l'admin non la conferma con confermaLinea. */
-export interface Linea { id: string; nome: string; daConfermare: boolean; fermate: FermataLinea[]; bus: BusDiLinea[]; }
+/** Salvataggio da Partenze → Orari: fermate, prezzo extra e (facoltativo) l'arrivo. */
+export interface TragittoOperativoInput {
+  prezzoExtra?: number;
+  fermate: FermataInput[];
+  arrivoCitta?: string;
+  arrivoIndirizzo?: string;
+  arrivoOrario?: string;
+}
+
+/** daConfermare: proposta creata in automatico quando si raggiunge il pareggio
+ *  (che riparte dopo ogni bus), senza bus finché l'admin non la conferma con
+ *  confermaLinea. busPerLinea: la proposta è un bus in più su quella linea
+ *  (confermandola il bus va lì); null = linea nuova. */
+export interface Linea { id: string; nome: string; daConfermare: boolean; busPerLinea: { id: string; nome: string } | null; fermate: FermataLinea[]; bus: BusDiLinea[]; }
 /** Un passeggero di UN bus: solo le prenotazioni che lo smistamento ha
  *  messo su quel bus, in ordine di orario della fermata e cognome. id = il
  *  partecipante (serve per segnare la salita); orario "HH:MM". */
@@ -197,10 +208,10 @@ export const eventiApi = {
   // frontend finora) — qui il client mancante.
 
   // prezzoExtra facoltativo: se non lo mandi resta quello salvato.
-  aggiornaTragittoOperativo: (tragittoId: string, input: { prezzoExtra?: number; fermate: FermataInput[] }) =>
+  aggiornaTragittoOperativo: (tragittoId: string, input: TragittoOperativoInput) =>
     api.put<{ ok: true; percorsiCambiati?: string[] } & EsitoAvvisiClienti>(`/api/eventi/tragitti/${tragittoId}/operativo`, input),
   // Stesso corpo, nessuna scrittura: quali variazioni e quanti clienti.
-  anteprimaTragittoOperativo: (tragittoId: string, input: { prezzoExtra?: number; fermate: FermataInput[] }) =>
+  anteprimaTragittoOperativo: (tragittoId: string, input: TragittoOperativoInput) =>
     api.post<AnteprimaVariazioniTragitto>(`/api/eventi/tragitti/${tragittoId}/operativo/anteprima`, input),
   // Sezione PREVENTIVI: registra il costo (fornitore+file facoltativi) —
   // non tocca i prezzi di vendita.

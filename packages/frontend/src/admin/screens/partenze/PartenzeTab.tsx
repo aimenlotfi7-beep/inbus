@@ -47,8 +47,8 @@ function statoTragitto(tragitto: CalcoloBusTragitto) {
   // vendita (non può avere prenotazioni): gli altri controlli non hanno
   // ancora senso.
   if (tragitto.stato === 'DA_CONFERMARE') return { classe: 'attenzione', etichetta: 'Da prezzare, non ancora in vendita' };
-  // Le linee da confermare nascono da sole (pareggio raggiunto, bus pieni).
-  if (tragitto.lineeDaConfermare > 0) return { classe: 'attenzione', etichetta: tragitto.lineeDaConfermare === 1 ? 'Linea da confermare' : `${tragitto.lineeDaConfermare} linee da confermare` };
+  // Bus e linee da confermare nascono da soli (pareggio raggiunto, che riparte dopo ogni bus).
+  if (tragitto.lineeDaConfermare > 0) return { classe: 'attenzione', etichetta: tragitto.lineeDaConfermare === 1 ? 'Bus o linea da confermare' : `${tragitto.lineeDaConfermare} proposte da confermare` };
   if (tragitto.stato === 'CONFERMATO') {
     // postiTotali qui = posti dei bus confermati (quelli in vendita non si
     // fermano mai).
@@ -93,7 +93,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
   // Mappa tragittoId -> form in modifica — non più un solo tragitto alla
   // volta: un evento con più servizi/percorsi nello stesso contesto (es.
   // "Orari") deve poter avere PIÙ pannelli aperti insieme.
-  const [formOperativoMap, setFormOperativoMap] = useState<Map<string, { prezzoExtra: number; fermate: FermataInput[] }>>(new Map());
+  const [formOperativoMap, setFormOperativoMap] = useState<Map<string, { prezzoExtra: number; fermate: FermataInput[]; arrivoCitta: string; arrivoIndirizzo: string; arrivoOrario: string }>>(new Map());
   // Come erano all'apertura: serve a capire se ci sono modifiche da perdere.
   const [formOperativoInizialeMap, setFormOperativoInizialeMap] = useState<Map<string, string>>(new Map());
   // Chiave composita `${tragittoId}::${idx}` — quale riga fermata ha
@@ -272,6 +272,13 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
         postiMax: f.postiMax ?? undefined,
         sogliaMinima: f.sogliaMinima, attivo: f.attivo,
       })),
+      // L'arrivo si modifica anche da qui, come nella scheda del tragitto in Eventi.
+      // Città: quella dell'evento se un altro tragitto l'ha già (una sola per evento).
+      arrivoCitta: (eventoCompleto
+        ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id !== tragittoVero.id && t.arrivoCitta?.trim())?.arrivoCitta
+        : undefined) ?? tragittoVero.arrivoCitta ?? '',
+      arrivoIndirizzo: tragittoVero.arrivoIndirizzo ?? '',
+      arrivoOrario: tragittoVero.arrivoOrario ?? '',
     };
     setFormOperativoMap((prev) => new Map(prev).set(tragitto.tragittoId, form));
     setFormOperativoInizialeMap((prev) => new Map(prev).set(tragitto.tragittoId, JSON.stringify(form)));
@@ -506,14 +513,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
   async function calcolaOrariDaArrivo(tragittoId: string) {
     const formOperativo = formOperativoMap.get(tragittoId);
     if (!formOperativo || !eventoCompleto) return;
-    const tragittoVero = tragittoVeroDi(tragittoId);
-    const arrivoIndirizzoContesto = tragittoVero?.arrivoIndirizzo;
-    const arrivoOrarioContesto = tragittoVero?.arrivoOrario;
+    // L'arrivo scritto nel modulo (anche se non ancora salvato).
+    const arrivoIndirizzoContesto = formOperativo.arrivoIndirizzo;
+    const arrivoOrarioContesto = formOperativo.arrivoOrario;
 
     const fermateValide = formOperativo.fermate.filter((f) => f.indirizzo?.trim());
     if (fermateValide.length === 0) { impostaStatoOrari(tragittoId, 'Aggiungi almeno una fermata con l\'indirizzo compilato.', 'errore'); return; }
-    if (!arrivoIndirizzoContesto?.trim()) { impostaStatoOrari(tragittoId, 'Manca l\'indirizzo di arrivo: impostalo in Eventi, nella scheda di questo tragitto.', 'errore'); return; }
-    if (!arrivoOrarioContesto) { impostaStatoOrari(tragittoId, 'Manca l\'orario di arrivo: impostalo in Eventi, nella scheda di questo tragitto.', 'errore'); return; }
+    if (!arrivoIndirizzoContesto?.trim()) { impostaStatoOrari(tragittoId, 'Manca l\'indirizzo di arrivo: scrivilo qui sotto, in Arrivo.', 'errore'); return; }
+    if (!arrivoOrarioContesto) { impostaStatoOrari(tragittoId, 'Manca l\'orario di arrivo: scrivilo qui sotto, in Arrivo.', 'errore'); return; }
 
     setCalcolandoOrariSet((prev) => new Set(prev).add(tragittoId));
     impostaStatoOrari(tragittoId, 'Localizzo gli indirizzi…', 'info');
@@ -814,6 +821,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
                   const indirizzoAperto = fermateIndirizzoEspanso.has(chiaveEspanso);
                   return (
                   <div key={idx} style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
+                    {/* Come nella scheda del tragitto in Eventi: la prima fermata è la partenza. */}
+                    {idx === 0 && <p style={{ marginBottom: 4, fontSize: 'var(--testo-lg)', fontWeight: 700, color: 'var(--green)' }}>Partenza</p>}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {/* Doppio tap (mobile) o doppio clic (desktop) —
                           un tap solo è troppo facile da toccare per
@@ -887,6 +896,44 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
                     ))}
                   </select>
                 )}
+                {(() => {
+                  // Arrivo, come nella scheda del tragitto in Eventi (blu, non
+                  // rosso: il rosso nel gestionale vuol dire errore). Un evento ha
+                  // una sola città di arrivo: se un altro tragitto ce l'ha già, qui
+                  // resta quella.
+                  const cittaDiAltri = eventoCompleto
+                    ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)]
+                      .find((t) => t.id !== tragitto.tragittoId && t.arrivoCitta?.trim())
+                    : undefined;
+                  const aggiornaArrivo = (campo: 'arrivoCitta' | 'arrivoIndirizzo' | 'arrivoOrario', valore: string) =>
+                    setFormOperativoMap((prev) => {
+                      const f2 = prev.get(tragitto.tragittoId);
+                      return f2 ? new Map(prev).set(tragitto.tragittoId, { ...f2, [campo]: valore }) : prev;
+                    });
+                  return (
+                    <>
+                      <p style={{ marginTop: 14, marginBottom: 4, fontSize: 'var(--testo-lg)', fontWeight: 700, color: 'var(--blue)' }}>Arrivo</p>
+                      <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 110px' }}>
+                        <label>Città di arrivo
+                          <input
+                            value={cittaDiAltri?.arrivoCitta ?? formOperativo.arrivoCitta}
+                            disabled={!!cittaDiAltri}
+                            title={cittaDiAltri ? `Stessa città di arrivo di tutto l'evento: per cambiarla, modificala su "${cittaDiAltri.nome}".` : undefined}
+                            style={cittaDiAltri ? { opacity: .6, cursor: 'not-allowed' } : undefined}
+                            onChange={(e) => aggiornaArrivo('arrivoCitta', e.target.value)}
+                            placeholder="es. Roma"
+                          />
+                        </label>
+                        <label>Indirizzo di arrivo
+                          <input value={formOperativo.arrivoIndirizzo} onChange={(e) => aggiornaArrivo('arrivoIndirizzo', e.target.value)} placeholder="es. Piazzale Clodio, Roma" />
+                        </label>
+                        <label>Orario
+                          <OrarioInput value={formOperativo.arrivoOrario} onChange={(v) => aggiornaArrivo('arrivoOrario', v)} style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }} />
+                        </label>
+                      </div>
+                    </>
+                  );
+                })()}
                 <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                   <button type="button" className="btn btn-primary" style={{ flex: 1 }} disabled={salvandoOperativo} onClick={() => salvaOperativo(tragitto.tragittoId)}>
                     {salvandoOperativo ? 'Salvo…' : 'Salva orari'}

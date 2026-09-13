@@ -148,8 +148,8 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
     }
     if (tabAttuale === 'da-prezzare') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'In vendita' } : { fatto: false, testo: 'Da prezzare' };
     if (tabAttuale === 'da-confermare' || tabAttuale === 'confermato') {
-      // Le linee da confermare nascono da sole (pareggio raggiunto, bus pieni).
-      if (p.lineeDaConfermare > 0) return { fatto: false, testo: p.lineeDaConfermare === 1 ? 'Linea da confermare' : `${p.lineeDaConfermare} linee da confermare` };
+      // Bus e linee da confermare nascono da soli (pareggio raggiunto, che riparte dopo ogni bus).
+      if (p.lineeDaConfermare > 0) return { fatto: false, testo: p.lineeDaConfermare === 1 ? 'Bus o linea da confermare' : `${p.lineeDaConfermare} proposte da confermare` };
       if (scoperta(p)) return { fatto: false, testo: postiMancanti(p.totalePasseggeri - p.postiSuiBus) };
       if (tabAttuale === 'confermato') return { fatto: true, testo: '' };
       return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'Confermata' } : { fatto: false, testo: 'Sotto il pareggio' };
