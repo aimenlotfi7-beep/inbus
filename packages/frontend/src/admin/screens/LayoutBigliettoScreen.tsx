@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../api/layoutBiglietto';
 import { PanelHead } from '../shared/PanelHead';
@@ -201,13 +202,13 @@ export function LayoutBigliettoScreen() {
   }
   async function elimina() {
     if (!selezionato) return;
-    if (!confirm(`Eliminare il layout "${selezionato.nome}"? Gli eventi che lo usavano torneranno a quello predefinito.`)) return;
-    try {
-      await layoutBigliettoApi.elimina(selezionato.id);
+    const id = selezionato.id;
+    if (await azioneConfermata({
+      titolo: `Eliminare il layout "${selezionato.nome}"?`, testo: 'Gli eventi che lo usavano tornano a quello predefinito.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => layoutBigliettoApi.elimina(id), fatto: 'Layout eliminato.',
+    })) {
       setSelezionato(null);
       ricarica();
-    } catch (e) {
-      notifica(e instanceof Error ? e.message : 'Eliminazione non riuscita.');
     }
   }
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { formattaEuro } from '../../shared/formato';
 import { couponApi, type Coupon, type CouponInput } from '../../api/coupon';
@@ -64,9 +65,10 @@ export function CouponScreen() {
     }
   }
   async function elimina(c: Coupon) {
-    if (!confirm(`Eliminare il coupon "${c.codice}"?`)) return;
-    await couponApi.remove(c.id);
-    ricarica();
+    if (await azioneConfermata({
+      titolo: `Eliminare il coupon "${c.codice}"?`, testo: 'Il codice non si potrà più usare.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => couponApi.remove(c.id), fatto: 'Coupon eliminato.',
+    })) ricarica();
   }
 
   if (modaleAperta) {

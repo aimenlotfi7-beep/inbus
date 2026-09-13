@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { amministratoriApi, type Amministratore, type AmministratoreInput, type LogRiga, type EccezionePermesso } from '../../api/amministratori';
 import { ruoliApi, type Ruolo, type Permesso } from '../../api/ruoli';
@@ -70,13 +71,10 @@ export function AmministratoriScreen() {
     }
   }
   async function elimina(a: Amministratore) {
-    if (!confirm(`Eliminare l'amministratore "${a.nome}"?`)) return;
-    try {
-      await amministratoriApi.remove(a.id);
-      ricarica();
-    } catch (e) {
-      notifica(e instanceof ErroreApi ? `Eliminazione non riuscita: ${e.message}` : 'Eliminazione non riuscita: impossibile contattare il server.');
-    }
+    if (await azioneConfermata({
+      titolo: `Eliminare l'amministratore "${a.nome}"?`, testo: 'Non potrà più accedere al gestionale.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => amministratoriApi.remove(a.id), fatto: 'Amministratore eliminato.',
+    })) ricarica();
   }
 
   async function apriPermessi(a: Amministratore) {

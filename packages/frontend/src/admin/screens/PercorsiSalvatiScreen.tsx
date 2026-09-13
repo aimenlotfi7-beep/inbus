@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { percorsiSalvatiApi, type PercorsoSalvato, type FermataPercorsoSalvato } from '../../api/percorsiSalvati';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../api/fermateAnagrafica';
@@ -166,9 +167,10 @@ export function PercorsiSalvatiScreen() {
     }
   }
   async function elimina(t: PercorsoSalvato) {
-    if (!confirm(`Eliminare il tragitto "${t.nome}"?`)) return;
-    await percorsiSalvatiApi.remove(t.id);
-    ricarica();
+    if (await azioneConfermata({
+      titolo: `Eliminare il tragitto "${t.nome}"?`, testo: 'Gli eventi che l\'hanno già usato non cambiano.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => percorsiSalvatiApi.remove(t.id), fatto: 'Tragitto eliminato.',
+    })) ricarica();
   }
 
   const modificato = snapshotIniziale !== '' && JSON.stringify({ nome, fermate }) !== snapshotIniziale;

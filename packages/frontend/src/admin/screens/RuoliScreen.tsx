@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { ruoliApi, type Ruolo, type Permesso } from '../../api/ruoli';
 import { ErroreApi } from '../../api/client';
@@ -72,14 +73,11 @@ export function RuoliScreen() {
   }
 
   async function elimina(r: Ruolo) {
-    if (r.owner) { notifica('Il ruolo proprietario non può essere eliminato.'); return; }
-    if (!confirm(`Eliminare il ruolo "${r.nome}"? Questa azione fallisce se qualche utenza lo sta ancora usando.`)) return;
-    try {
-      await ruoliApi.remove(r.id);
-      ricarica();
-    } catch (e) {
-      notifica(e instanceof ErroreApi ? `Eliminazione non riuscita: ${e.message}` : 'Eliminazione non riuscita: impossibile contattare il server.');
-    }
+    if (r.owner) { notifica('Il ruolo proprietario non può essere eliminato.', 'errore'); return; }
+    if (await azioneConfermata({
+      titolo: `Eliminare il ruolo "${r.nome}"?`, testo: 'Non si può eliminare se qualche utenza lo sta ancora usando.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => ruoliApi.remove(r.id), fatto: 'Ruolo eliminato.',
+    })) ricarica();
   }
 
   if (modaleAperta) {

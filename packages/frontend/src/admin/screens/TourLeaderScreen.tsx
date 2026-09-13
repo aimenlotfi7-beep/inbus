@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { notifica } from '../shared/notifiche';
-import { conferma } from '../shared/conferma';
+import { conferma, azioneConfermata } from '../shared/conferma';
 import { motivoErrore } from '../shared/errori';
 import { tourLeaderApi, type TourLeader, type CandidaturaInput } from '../../api/tourleader';
 import { ErroreApi } from '../../api/client';
@@ -52,9 +52,10 @@ export function TourLeaderScreen() {
     ricarica();
   }
   async function elimina(t: TourLeader) {
-    if (!confirm(`Eliminare ${t.nome} ${t.cognome}?`)) return;
-    await tourLeaderApi.remove(t.id);
-    ricarica();
+    if (await azioneConfermata({
+      titolo: `Eliminare ${t.nome} ${t.cognome}?`, testo: 'Non potrà più accedere alla scansione.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => tourLeaderApi.remove(t.id), fatto: 'Tour leader eliminato.',
+    })) ricarica();
   }
 
   /** Email al tour leader con il link per scegliere la password: nessuna

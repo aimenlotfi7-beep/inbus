@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { notifica } from '../shared/notifiche';
 import { prenotazioniAdminApi, type PrenotazioneRiga, type EventoConPrenotazioni } from '../../api/prenotazioniAdmin';
-import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { Modale } from '../shared/Modale';
 import { RicercaSezione } from '../shared/RicercaSezione';
-import { eventoPassato, formattaEuro } from '../../shared/formato';
+import { eventoPassato, formattaData, formattaDataOra, formattaEuro, plurale } from '../../shared/formato';
 import { conferma, confermaConTesto } from '../shared/conferma';
 import { motivoErrore } from '../shared/errori';
 
@@ -45,11 +44,13 @@ export function PrenotazioniScreen() {
   const [filtroPagamento, setFiltroPagamento] = useState<'TUTTI' | 'COMPLETO' | 'ACCONTO'>('TUTTI');
   const [filtroSaldo, setFiltroSaldo] = useState<'TUTTI' | 'SALDATO' | 'DA_SALDARE'>('TUTTI');
   const [caricamento, setCaricamento] = useState(false);
+  const [erroreCaricamento, setErroreCaricamento] = useState('');
+  const [erroreEventi, setErroreEventi] = useState('');
   const [passeggeriInModale, setPasseggeriInModale] = useState<PrenotazioneRiga | null>(null);
   const [storicoInModale, setStoricoInModale] = useState<PrenotazioneRiga | null>(null);
 
   useEffect(() => {
-    prenotazioniAdminApi.eventiConPrenotazioni().then(setEventiConPren);
+    prenotazioniAdminApi.eventiConPrenotazioni().then(setEventiConPren).catch((e) => setErroreEventi(motivoErrore(e)));
   }, []);
 
   const righeFiltrate = righe.filter((r) => {
@@ -66,12 +67,20 @@ export function PrenotazioniScreen() {
     ? eventiPerData.filter((e) => e.artista.toLowerCase().includes(ricercaTab.toLowerCase()) || e.citta.toLowerCase().includes(ricercaTab.toLowerCase()))
     : eventiPerData;
 
+  // Solo la risposta dell'ultima richiesta conta: cambiando evento o scheda
+  // le righe vecchie spariscono subito (prima restavano i PNR dell'evento
+  // precedente, con Cancella ed Elimina attivi).
+  const richiestaCorrente = useRef(0);
   function ricaricaPrenotazioni() {
     if (!eventoAttivoId) return;
+    const numero = ++richiestaCorrente.current;
+    setRighe([]);
+    setErroreCaricamento('');
     setCaricamento(true);
     prenotazioniAdminApi.listAll({ eventoId: eventoAttivoId, stato: sottoTab, ricerca: ricercaPrenotazioni.trim() || undefined })
-      .then(setRighe)
-      .finally(() => setCaricamento(false));
+      .then((r) => { if (numero === richiestaCorrente.current) setRighe(r); })
+      .catch((e) => { if (numero === richiestaCorrente.current) setErroreCaricamento(motivoErrore(e)); })
+      .finally(() => { if (numero === richiestaCorrente.current) setCaricamento(false); });
   }
   useEffect(ricaricaPrenotazioni, [eventoAttivoId, sottoTab]);
   useEffect(() => {
@@ -102,12 +111,19 @@ export function PrenotazioniScreen() {
     }
   }
   async function eliminaDefinitivamente(r: PrenotazioneRiga) {
-    if (!confirm(`Eliminare DEFINITIVAMENTE la prenotazione ${r.pnr}? Non è recuperabile, sparisce anche dallo storico.`)) return;
+    const ok = await conferma({
+      titolo: `Eliminare definitivamente la prenotazione ${r.pnr}?`,
+      testo: 'Non è recuperabile: sparisce anche dallo storico.',
+      conferma: 'Elimina definitivamente',
+      pericolosa: true,
+    });
+    if (!ok) return;
     try {
       await prenotazioniAdminApi.eliminaDefinitivamente(r.pnr);
       ricaricaPrenotazioni();
+      notifica(`Prenotazione ${r.pnr} eliminata.`, 'successo');
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Eliminazione non riuscita: ${e.message}` : 'Eliminazione non riuscita: impossibile contattare il server.');
+      notifica(`Eliminazione non riuscita: ${motivoErrore(e)}`, 'errore');
     }
   }
   async function rigeneraBiglietto(r: PrenotazioneRiga) {
@@ -125,7 +141,7 @@ export function PrenotazioniScreen() {
         ? 'Biglietto reinviato al cliente via email.'
         : "Biglietto rigenerato, ma l'email al cliente non è partita: può comunque scaricarlo dalla sua area.", inviata ? 'successo' : 'errore');
     } catch (e) {
-      notifica(e instanceof ErroreApi ? `Non riuscito: ${e.message}` : 'Non riuscito: impossibile contattare il server.');
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     }
   }
 
@@ -133,7 +149,7 @@ export function PrenotazioniScreen() {
     return (
       <PaginaSezione titolo={`Prenotazioni — ${eventoAttivo.artista}`} onIndietro={() => setEventoAttivoId(null)} larga>
         <p className="testo-intro" style={{ marginTop: -6, marginBottom: 16 }}>
-          {eventoAttivo.luogo}, {eventoAttivo.citta} · {new Date(eventoAttivo.data).toLocaleDateString('it-IT')}
+          {eventoAttivo.luogo}, {eventoAttivo.citta} · {formattaData(eventoAttivo.data)}
         </p>
 
         <div className="mini-tabs">
@@ -141,7 +157,7 @@ export function PrenotazioniScreen() {
           <button type="button" className={`mini-tab${sottoTab === 'CANCELLATA' ? ' active' : ''}`} onClick={() => setSottoTab('CANCELLATA')}>Cancellate</button>
         </div>
 
-        <RicercaSezione valore={ricercaPrenotazioni} onChange={setRicercaPrenotazioni} placeholder="Cerca per PNR, cliente o partecipante..." />
+        <RicercaSezione valore={ricercaPrenotazioni} onChange={setRicercaPrenotazioni} placeholder="Cerca per PNR, cliente o partecipante…" />
 
         <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
           <select value={filtroPagamento} onChange={(e) => setFiltroPagamento(e.target.value as typeof filtroPagamento)} style={{ maxWidth: 200 }}>
@@ -156,13 +172,20 @@ export function PrenotazioniScreen() {
           </select>
         </div>
 
-        {caricamento && <p className="testo-intro">Carico...</p>}
+        {caricamento && <p className="testo-intro">Carico…</p>}
 
-        {!caricamento && righeFiltrate.length === 0 && (
+        {!caricamento && erroreCaricamento && (
+          <p className="avviso avviso-errore" role="alert">
+            Prenotazioni non caricate: {erroreCaricamento}{' '}
+            <button type="button" className="btn btn-ghost btn-piccolo" onClick={ricaricaPrenotazioni}>Riprova</button>
+          </p>
+        )}
+
+        {!caricamento && !erroreCaricamento && righeFiltrate.length === 0 && (
           <p className="testo-intro">Nessuna prenotazione {sottoTab === 'CONFERMATA' ? 'confermata' : 'cancellata'} per questi filtri.</p>
         )}
 
-        {righeFiltrate.length > 0 && (
+        {!caricamento && righeFiltrate.length > 0 && (
           <div className="table-scroll">
             <table className="data-table">
               <thead>
@@ -197,7 +220,7 @@ export function PrenotazioniScreen() {
                       </td>
                       <td>{ETICHETTA_METODO[r.metodoPagamento] ?? r.metodoPagamento}</td>
                       <td style={{ textAlign: 'right' }}><b>{formattaEuro(r.totale)}</b></td>
-                      <td>{new Date(r.creataIl).toLocaleDateString('it-IT')}</td>
+                      <td>{formattaData(r.creataIl)}</td>
                       <td>
                         <button type="button" className="btn btn-ghost" style={{ padding: 0, border: 'none', background: 'none' }} onClick={() => setStoricoInModale(r)} title="Vedi lo storico">
                           <span className={`badge ${stato.classe}`}>{stato.etichetta}</span>
@@ -239,21 +262,21 @@ export function PrenotazioniScreen() {
                 ))}
               </>
             ) : (
-              <p className="testo-intro">Nessun altro passeggero oltre al richiedente (prenotazione per {passeggeriInModale.passeggeri} persona/e in totale — il richiedente conta come una di queste).</p>
+              <p className="testo-intro">Nessun altro passeggero oltre al richiedente (prenotazione per {plurale(passeggeriInModale.passeggeri, 'persona', 'persone')} in totale, richiedente compreso).</p>
             )}
           </Modale>
         )}
 
         {storicoInModale && (
           <Modale titolo={`Storico — PNR ${storicoInModale.pnr}`} onClose={() => setStoricoInModale(null)}>
-            <div className="riepilogo-riga-evento"><span>Creata il</span><b>{new Date(storicoInModale.creataIl).toLocaleString('it-IT')}</b></div>
+            <div className="riepilogo-riga-evento"><span>Creata il</span><b>{formattaDataOra(storicoInModale.creataIl)}</b></div>
             <div className="riepilogo-riga-evento"><span>Tipo pagamento</span><b>{storicoInModale.tipoPagamento === 'COMPLETO' ? 'Pagamento completo' : 'Acconto'}</b></div>
             {storicoInModale.tipoPagamento === 'ACCONTO' && (
               <div className="riepilogo-riga-evento">
                 <span>Saldo</span>
                 <b>
                   {storicoInModale.saldoPagato && storicoInModale.saldoPagatoIl
-                    ? `Completato il ${new Date(storicoInModale.saldoPagatoIl).toLocaleString('it-IT')}`
+                    ? `Completato il ${formattaDataOra(storicoInModale.saldoPagatoIl)}`
                     : 'Non ancora completato'}
                 </b>
               </div>
@@ -277,7 +300,9 @@ export function PrenotazioniScreen() {
         }
       />
 
-      {eventiConPren.length === 0 ? (
+      {erroreEventi ? (
+        <p className="avviso avviso-errore" role="alert">Eventi non caricati: {erroreEventi}</p>
+      ) : eventiConPren.length === 0 ? (
         <p className="testo-intro">Nessun evento ha ancora prenotazioni.</p>
       ) : eventiPerData.length === 0 ? (
         <p className="testo-intro">{mostraPassati ? 'Nessun evento passato con prenotazioni.' : 'Nessun evento futuro con prenotazioni.'}</p>
@@ -286,7 +311,7 @@ export function PrenotazioniScreen() {
           {eventiPerData.length > 6 && (
             <div className="home-search-box" style={{ maxWidth: 480, margin: '0 0 20px' }}>
               <input
-                placeholder="Cerca tra gli eventi con prenotazioni..."
+                placeholder="Cerca tra gli eventi con prenotazioni…"
                 value={ricercaTab}
                 onChange={(e) => setRicercaTab(e.target.value)}
                 style={{ fontSize: 'var(--testo-lg)', textAlign: 'left', padding: '10px 4px' }}

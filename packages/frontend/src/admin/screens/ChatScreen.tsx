@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { chatApi, type Conversazione, type MessaggioChat } from '../../api/chat';
 import { PanelHead } from '../shared/PanelHead';
+import { conferma } from '../shared/conferma';
+import { notifica } from '../shared/notifiche';
+import { motivoErrore } from '../shared/errori';
+import { formattaDataOra } from '../../shared/formato';
 
 const ETICHETTA_STATO: Record<Conversazione['stato'], { testo: string; classe: string }> = {
   APERTA: { testo: 'Aperta', classe: 'attenzione' },
@@ -14,17 +18,30 @@ const INTERVALLO_AGGIORNAMENTO_MS = 4000;
 
 export function ChatScreen() {
   const [conversazioni, setConversazioni] = useState<Conversazione[] | null>(null);
+  const [erroreLista, setErroreLista] = useState('');
   const [filtroStato, setFiltroStato] = useState<Conversazione['stato'] | 'TUTTE'>('TUTTE');
   const [selezionata, setSelezionata] = useState<Conversazione | null>(null);
   const [messaggi, setMessaggi] = useState<MessaggioChat[]>([]);
   const [testo, setTesto] = useState('');
+  const [inviando, setInviando] = useState(false);
   const selezionataRef = useRef<Conversazione | null>(null);
   selezionataRef.current = selezionata;
 
   function ricaricaLista() {
-    chatApi.listaConversazioni(filtroStato === 'TUTTE' ? undefined : filtroStato).then(setConversazioni);
+    chatApi.listaConversazioni(filtroStato === 'TUTTE' ? undefined : filtroStato)
+      .then((lista) => { setConversazioni(lista); setErroreLista(''); })
+      .catch((e) => setErroreLista(motivoErrore(e)));
   }
   useEffect(ricaricaLista, [filtroStato]);
+
+  /** I messaggi di una conversazione, solo se è ancora quella aperta quando
+   *  arrivano: prima, cambiando conversazione durante il caricamento, i
+   *  messaggi di una finivano sotto un'altra. */
+  function caricaMessaggi(id: string) {
+    chatApi.messaggiConversazione(id)
+      .then((m) => { if (selezionataRef.current?.id === id) setMessaggi(m); })
+      .catch(() => { /* il giro successivo riprova; l'errore resta nella lista */ });
+  }
 
   // Aggiornamento automatico — sia la lista (per vedere subito nuove
   // conversazioni/messaggi non letti) sia la chat aperta al momento
@@ -33,40 +50,64 @@ export function ChatScreen() {
     const id = setInterval(() => {
       ricaricaLista();
       const attuale = selezionataRef.current;
-      if (attuale) chatApi.messaggiConversazione(attuale.id).then(setMessaggi);
+      if (attuale) caricaMessaggi(attuale.id);
     }, INTERVALLO_AGGIORNAMENTO_MS);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroStato]);
 
   function apri(c: Conversazione) {
+    selezionataRef.current = c;
     setSelezionata(c);
-    chatApi.messaggiConversazione(c.id).then(setMessaggi);
-    if (c.nonLetti > 0) chatApi.segnaLetti(c.id).then(ricaricaLista);
+    setMessaggi([]);
+    setTesto('');
+    caricaMessaggi(c.id);
+    if (c.nonLetti > 0) chatApi.segnaLetti(c.id).then(ricaricaLista).catch(() => {});
   }
 
   async function invia() {
-    if (!testo.trim() || !selezionata) return;
-    await chatApi.rispondi(selezionata.id, testo);
-    setTesto('');
-    chatApi.messaggiConversazione(selezionata.id).then(setMessaggi);
-    ricaricaLista();
+    // Un secondo Invio mentre la risposta parte non la manda due volte.
+    if (!testo.trim() || !selezionata || inviando) return;
+    setInviando(true);
+    try {
+      await chatApi.rispondi(selezionata.id, testo);
+      setTesto('');
+      caricaMessaggi(selezionata.id);
+      ricaricaLista();
+    } catch (e) {
+      notifica(`Risposta non inviata: ${motivoErrore(e)}`, 'errore');
+    } finally {
+      setInviando(false);
+    }
   }
 
   async function chiudi() {
     if (!selezionata) return;
-    if (!confirm(`Chiudere la conversazione con ${selezionata.clienteNome}? Se scrive di nuovo, se ne aprirà una nuova (questa resta comunque consultabile nello storico).`)) return;
+    const ok = await conferma({
+      titolo: `Chiudere la conversazione con ${selezionata.clienteNome}?`,
+      testo: 'Se il cliente scrive di nuovo se ne apre una nuova; questa resta consultabile nello storico.',
+      conferma: 'Chiudi conversazione',
+    });
+    if (!ok) return;
     const id = selezionata.id;
-    await chatApi.chiudi(id);
-    setSelezionata((s) => s && s.id === id ? { ...s, stato: 'CHIUSA' } : s);
-    ricaricaLista();
+    try {
+      await chatApi.chiudi(id);
+      setSelezionata((s) => s && s.id === id ? { ...s, stato: 'CHIUSA' } : s);
+      ricaricaLista();
+    } catch (e) {
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
+    }
   }
   async function riapri() {
     if (!selezionata) return;
     const id = selezionata.id;
-    await chatApi.riapri(id);
-    setSelezionata((s) => s && s.id === id ? { ...s, stato: 'IN_CORSO' } : s);
-    ricaricaLista();
+    try {
+      await chatApi.riapri(id);
+      setSelezionata((s) => s && s.id === id ? { ...s, stato: 'IN_CORSO' } : s);
+      ricaricaLista();
+    } catch (e) {
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
+    }
   }
 
   return (
@@ -85,7 +126,8 @@ export function ChatScreen() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 18, height: '64vh' }}>
         <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {conversazioni === null && <p className="testo-intro">Carico...</p>}
+          {erroreLista && <p className="avviso avviso-errore" role="alert">Conversazioni non caricate: {erroreLista}</p>}
+          {conversazioni === null && !erroreLista && <p className="testo-intro">Carico…</p>}
           {conversazioni?.length === 0 && <p className="testo-intro">Nessuna conversazione.</p>}
           {conversazioni?.map((c) => (
             <button
@@ -102,7 +144,7 @@ export function ChatScreen() {
                 {c.nonLetti > 0 && <span style={{ background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 'var(--testo-2xs)', padding: '1px 7px' }}>{c.nonLetti}</span>}
               </div>
               <div style={{ fontSize: 'var(--testo-sm)', opacity: .75 }}>{c.eventoArtista}</div>
-              <div style={{ fontSize: 'var(--testo-xs)', opacity: .6, marginTop: 2 }}>{ETICHETTA_STATO[c.stato].testo} · {new Date(c.ultimoMessaggioIl).toLocaleString('it-IT')}</div>
+              <div style={{ fontSize: 'var(--testo-xs)', opacity: .6, marginTop: 2 }}>{ETICHETTA_STATO[c.stato].testo} · {formattaDataOra(c.ultimoMessaggioIl)}</div>
             </button>
           ))}
         </div>
@@ -129,21 +171,21 @@ export function ChatScreen() {
                     color: m.autore === 'ADMIN' ? '#fff' : 'var(--paper)',
                   }}>
                     {m.testo}
-                    <div style={{ fontSize: 'var(--testo-2xs)', opacity: .7, marginTop: 4 }}>{m.nome} · {new Date(m.creatoIl).toLocaleString('it-IT')}</div>
+                    <div style={{ fontSize: 'var(--testo-2xs)', opacity: .7, marginTop: 4 }}>{m.nome} · {formattaDataOra(m.creatoIl)}</div>
                   </div>
                 ))}
               </div>
               {selezionata.stato !== 'CHIUSA' && (
                 <div style={{ display: 'flex', gap: 8, padding: 12, borderTop: '1px solid var(--line)' }}>
-                  <input value={testo} onChange={(e) => setTesto(e.target.value)} placeholder="Scrivi una risposta..."
+                  <input value={testo} onChange={(e) => setTesto(e.target.value)} placeholder="Scrivi una risposta…"
                     onKeyDown={(e) => e.key === 'Enter' && invia()}
                     style={{ flex: 1, minWidth: 0, background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 12px', color: 'var(--paper)' }} />
-                  <button className="btn btn-primary" style={{ flexShrink: 0, padding: '10px 18px' }} onClick={invia}>Invia</button>
+                  <button className="btn btn-primary" style={{ flexShrink: 0, padding: '10px 18px' }} onClick={invia} disabled={inviando}>{inviando ? 'Invio…' : 'Invia'}</button>
                 </div>
               )}
               {selezionata.stato === 'CHIUSA' && (
                 <p style={{ padding: 12, textAlign: 'center', color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>
-                  Conversazione chiusa — riapri per rispondere ancora.
+                  Conversazione chiusa: riapri per rispondere ancora.
                 </p>
               )}
             </>

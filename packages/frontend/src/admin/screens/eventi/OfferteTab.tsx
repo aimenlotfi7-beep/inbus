@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { azioneConfermata } from '../../shared/conferma';
 import { notifica } from '../../shared/notifiche';
 import { offerteApi, type Offerta, type OffertaInput } from '../../../api/offerte';
 import { campagneApi, type Campagna } from '../../../api/campagne';
@@ -77,9 +78,10 @@ export function OfferteTab({ eventoId, nomeEvento }: { eventoId: string; nomeEve
     ricarica();
   }
   async function elimina(o: Offerta) {
-    if (!confirm(`Eliminare l'offerta "${o.nome}"?`)) return;
-    await offerteApi.remove(o.id);
-    ricarica();
+    if (await azioneConfermata({
+      titolo: `Eliminare l'offerta "${o.nome}"?`, testo: 'Il link dell\'offerta smette di funzionare.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => offerteApi.remove(o.id), fatto: 'Offerta eliminata.',
+    })) ricarica();
   }
 
   function linkOfferta(o: Offerta) {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { campagneApi, type Campagna, type CampagnaInput, type RigaReportFonte } from '../../api/campagne';
 import { ErroreApi } from '../../api/client';
@@ -113,9 +114,10 @@ export function CampagneScreen() {
     }
   }
   async function elimina(c: Campagna) {
-    if (!confirm(`Eliminare la campagna "${c.nome}"?`)) return;
-    await campagneApi.remove(c.id);
-    ricarica();
+    if (await azioneConfermata({
+      titolo: `Eliminare la campagna "${c.nome}"?`, testo: 'Le prenotazioni già arrivate restano, ma nel report compariranno come UTM senza campagna.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => campagneApi.remove(c.id), fatto: 'Campagna eliminata.',
+    })) ricarica();
   }
 
   if (aperta) {

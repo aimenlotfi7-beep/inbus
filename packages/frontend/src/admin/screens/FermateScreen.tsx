@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { fermateAnagraficaApi, type FermataAnagrafica, type FermataAnagraficaInput } from '../../api/fermateAnagrafica';
 import { percorsiSalvatiApi } from '../../api/percorsiSalvati';
@@ -109,13 +110,10 @@ export function FermateScreen() {
   }
 
   async function elimina(f: FermataAnagrafica) {
-    if (!confirm('Eliminare "' + f.nome + '"?')) return;
-    try {
-      await fermateAnagraficaApi.remove(f.id);
-      ricarica();
-    } catch (e) {
-      notifica(e instanceof ErroreApi ? e.message : 'Impossibile eliminare. Riprova.');
-    }
+    if (await azioneConfermata({
+      titolo: `Eliminare "${f.nome}"?`, testo: 'La fermata sparisce dall\'anagrafica.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => fermateAnagraficaApi.remove(f.id), fatto: 'Fermata eliminata.',
+    })) ricarica();
   }
 
   const fermateFiltrate = ricerca.trim()

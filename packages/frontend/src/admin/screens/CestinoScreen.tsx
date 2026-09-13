@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { azioneConfermata } from '../shared/conferma';
 import { eventiApi } from '../../api/eventi';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
@@ -32,14 +33,16 @@ export function CestinoScreen() {
   }, []);
 
   async function ripristinaEvento(id: string, nome: string) {
-    if (!confirm(`Ripristinare "${nome}"? Tornerà visibile ovunque, come prima di essere eliminato.`)) return;
-    await eventiApi.cestino.ripristinaEvento(id);
-    ricaricaEventi();
+    if (await azioneConfermata({
+      titolo: `Ripristinare "${nome}"?`, testo: 'Torna visibile ovunque, come prima di essere eliminato.', conferma: 'Ripristina',
+      esegui: () => eventiApi.cestino.ripristinaEvento(id), fatto: `"${nome}" ripristinato.`,
+    })) ricaricaEventi();
   }
   async function ripristinaTratta(id: string, nome: string) {
-    if (!confirm(`Ripristinare la tratta "${nome}"? Tornerà visibile nel suo evento.`)) return;
-    await eventiApi.cestino.ripristinaTratta(id);
-    ricaricaTratte();
+    if (await azioneConfermata({
+      titolo: `Ripristinare la tratta "${nome}"?`, testo: 'Torna visibile nel suo evento.', conferma: 'Ripristina',
+      esegui: () => eventiApi.cestino.ripristinaTratta(id), fatto: `Tratta "${nome}" ripristinata.`,
+    })) ricaricaTratte();
   }
 
   return (

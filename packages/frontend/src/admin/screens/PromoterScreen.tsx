@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { azioneConfermata } from '../shared/conferma';
 import { eventiApi } from '../../api/eventi';
 import { SelettoreEventi } from '../shared/SelettoreEventi';
 import { notifica } from '../shared/notifiche';
@@ -54,9 +55,10 @@ export function PromoterScreen() {
     }
   }
   async function elimina(p: Promoter) {
-    if (!confirm(`Eliminare il promoter "${p.nome}"?`)) return;
-    await promoterApi.remove(p.id);
-    ricarica();
+    if (await azioneConfermata({
+      titolo: `Eliminare il promoter "${p.nome}"?`, testo: 'Non potrà più accedere alla sua area e i suoi link smettono di attribuire vendite.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => promoterApi.remove(p.id), fatto: 'Promoter eliminato.',
+    })) ricarica();
   }
 
   if (modaleAperta) {

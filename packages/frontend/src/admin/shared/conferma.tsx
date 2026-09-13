@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Modale } from './Modale';
+import { notifica } from './notifiche';
+import { motivoErrore } from './errori';
 
 /** Finestra di conferma del gestionale, al posto di window.confirm() e
  *  window.prompt(): stesso aspetto delle altre modali, testo con grassetti
@@ -35,6 +37,23 @@ export function conferma(richiesta: RichiestaConferma): Promise<boolean> {
 export function confermaConTesto(richiesta: RichiestaConferma & { campoTesto: NonNullable<RichiestaConferma['campoTesto']> }): Promise<string | null> {
   if (!apriConferma) return Promise.resolve(window.prompt(`${richiesta.titolo}\n\n${richiesta.campoTesto.etichetta}`));
   return apriConferma(richiesta).then((esito) => (esito.ok ? esito.testo : null));
+}
+
+/** Conferma, poi l'azione, poi il messaggio d'esito: il percorso di ogni
+ *  "Elimina"/"Ripristina" del gestionale. Prima molte eliminazioni usavano
+ *  la finestra del browser e, se fallivano, non dicevano nulla. true se
+ *  l'azione è andata a buon fine. */
+export async function azioneConfermata(opzioni: RichiestaConferma & { esegui: () => Promise<unknown>; fatto: string }): Promise<boolean> {
+  const { esegui, fatto, ...richiesta } = opzioni;
+  if (!(await conferma(richiesta))) return false;
+  try {
+    await esegui();
+    notifica(fatto, 'successo');
+    return true;
+  } catch (e) {
+    notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
+    return false;
+  }
 }
 
 export function ConfermeHost() {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { organizzatoriApi, type Organizzatore, type OrganizzatoreInput } from '../../api/organizzatori';
 import { ErroreApi } from '../../api/client';
@@ -50,9 +51,10 @@ export function OrganizzatoriScreen() {
     }
   }
   async function elimina(o: Organizzatore) {
-    if (!confirm(`Eliminare l'organizzatore "${o.nome}"?`)) return;
-    await organizzatoriApi.remove(o.id);
-    ricarica();
+    if (await azioneConfermata({
+      titolo: `Eliminare l'organizzatore "${o.nome}"?`, testo: 'Non potrà più accedere alla sua area.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => organizzatoriApi.remove(o.id), fatto: 'Organizzatore eliminato.',
+    })) ricarica();
   }
 
   if (modaleAperta) {

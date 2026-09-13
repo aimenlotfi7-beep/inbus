@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { azioneConfermata } from '../../shared/conferma';
 import { bundleApi, type BundleRiga } from '../../../api/bundle';
 import { notifica } from '../../shared/notifiche';
 import { ErroreApi } from '../../../api/client';
@@ -20,9 +21,10 @@ export function BundleScreen() {
   const filtrati = ricerca.trim() ? lista.filter((b) => b.nome.toLowerCase().includes(ricerca.trim().toLowerCase())) : lista;
 
   async function elimina(b: BundleRiga) {
-    if (!confirm(`Eliminare il bundle "${b.nome}"? Gli ordini già fatti restano.`)) return;
-    try { await bundleApi.remove(b.id); notifica('Bundle eliminato.'); ricarica(); }
-    catch (e) { notifica(e instanceof ErroreApi ? e.message : 'Eliminazione non riuscita.'); }
+    if (await azioneConfermata({
+      titolo: `Eliminare il bundle "${b.nome}"?`, testo: 'Gli ordini già fatti restano.', conferma: 'Elimina', pericolosa: true,
+      esegui: () => bundleApi.remove(b.id), fatto: 'Bundle eliminato.',
+    })) ricarica();
   }
 
   if (aperto) return <BundleForm bundleId={aperto.id} onChiudi={() => { setAperto(null); ricarica(); }} />;
