@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from 'express';
 import { db } from '../../db/client.js';
 import { eventi, tragitti } from '../../db/schema.js';
-import { eq, and, gte, inArray } from 'drizzle-orm';
+import { eq, and, gte, inArray, isNull } from 'drizzle-orm';
 import { urlSito } from '../../shared/email.service.js';
+import { inizioOggiRoma } from '../../shared/formato.js';
 
 export const sitemapRouter = Router();
 
@@ -16,7 +17,7 @@ sitemapRouter.get('/sitemap.xml', async (_req: Request, res: Response) => {
   // logica già applicata alla lista pubblica degli eventi, più facile
   // da verificare che faccia davvero quello che deve.
   const righeConfermate = await db.selectDistinct({ eventoId: tragitti.eventoId }).from(tragitti)
-    .where(and(inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true)));
+    .where(and(inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl)));
   const idEventiConfermati = righeConfermate.map((r) => r.eventoId);
 
   const eventiVisibili = idEventiConfermati.length === 0 ? [] : await db
@@ -25,7 +26,11 @@ sitemapRouter.get('/sitemap.xml', async (_req: Request, res: Response) => {
     .where(and(
       eq(eventi.visibileSito, true),
       eq(eventi.venditeFermate, false),
-      gte(eventi.data, new Date()),
+      // Come la pagina pubblica: niente bozze né cestino, e l'evento resta
+      // fino a fine giornata (ora di Roma).
+      eq(eventi.bozza, false),
+      isNull(eventi.eliminatoIl),
+      gte(eventi.data, inizioOggiRoma()),
       // Stessa regola già applicata alla lista/pagina pubblica: senza
       // nemmeno un tragitto confermato, l'evento non esiste ancora per
       // il sito — non ha senso indicizzarlo se poi il link restituisce

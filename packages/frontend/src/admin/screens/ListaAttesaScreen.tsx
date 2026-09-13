@@ -6,6 +6,7 @@ import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { SchedaEventoModale } from './eventi/SchedaEventoModale';
+import { eventoPassato } from '../../shared/formato';
 
 type Tab = 'da-lavorare' | 'promosse' | 'passate';
 
@@ -35,11 +36,10 @@ export function ListaAttesaScreen() {
   }
   useEffect(ricarica, []);
 
-  const adesso = Date.now();
   const eventiConIscrizioni = eventi.filter((ev) => conteggi[ev.id]);
   const eventiPerTab = eventiConIscrizioni.filter((ev) => {
     const c = conteggi[ev.id];
-    const passato = new Date(ev.data).getTime() < adesso;
+    const passato = eventoPassato(ev.data); // dal giorno dopo l'evento, ora di Roma
     if (tab === 'passate') return passato;
     if (passato) return false; // un evento passato vive solo nella tab "Passate", mai nelle altre due
     return tab === 'da-lavorare' ? c.inAttesa > 0 : c.inAttesa === 0;

@@ -5,6 +5,7 @@ import type { CategoriaEvento } from '../../../api/categorieEvento';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { EtichettaTooltip } from '../../shared/EtichettaTooltip';
 import { infoCompleta, descrizioneCompilata } from './completamento';
+import { oggiIsoRoma } from '../../../shared/formato';
 
 /** Passo 1 della scheda evento (Informazioni / Descrizione). Estratto
  *  da SchedaEventoModale: riceve il form e il suo setter, le liste
@@ -60,7 +61,7 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
           </label>
           <label>Luogo <input value={form.luogo} onChange={(e) => setForm({ ...form, luogo: e.target.value })} /></label>
           <label>Città <input value={form.citta} onChange={(e) => setForm({ ...form, citta: e.target.value })} /></label>
-          <label>Data <input type="date" min={new Date().toISOString().slice(0, 10)} value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
+          <label>Data <input type="date" min={oggiIsoRoma()} value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></label>
           <label>
             <EtichettaTooltip testo="URL" chiave="url" mappaTooltip={mappaTooltip} />
             <input

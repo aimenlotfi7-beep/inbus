@@ -19,7 +19,7 @@ import { CampoNumero } from '../shared/CampoNumero';
 import { PanelHead } from '../shared/PanelHead';
 import { useNavigazione } from '../shared/NavigazioneContext';
 import { useSessione } from '../shared/SessioneContext';
-import { formattaData, formattaDataOra, formattaEuro, plurale } from '../../shared/formato';
+import { formattaData, formattaDataOra, formattaEuro, giorniAllaData, plurale } from '../../shared/formato';
 import { SEZIONE_PARTENZE, type TabPartenze } from './partenze/tipi';
 
 const BUS_VUOTO: BusDiLineaInput = { riferimento: '' };
@@ -184,7 +184,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   const postiPrevistiPerLinea = tragittoVero.preventivoPostiBus;
   const datiEconomia = economia.find((e) => e.tragittoId === idTragitto);
   const anteprimaPerBus = new Map((anteprima?.linee ?? []).flatMap((l) => l.bus).map((b) => [b.busId, b]));
-  const giorniAllEvento = Math.ceil((new Date(evento.data).getTime() - Date.now()) / 86400000);
+  const giorniAllEvento = giorniAllaData(evento.data); // giorni di calendario, ora di Roma
   const testoGiorni = giorniAllEvento < 0 ? 'Passato' : giorniAllEvento === 0 ? 'Oggi' : giorniAllEvento === 1 ? 'Domani' : `Tra ${giorniAllEvento} giorni`;
   // Dati del preventivo accettato (fornitore, posti, costo): per una linea
   // nuova o da confermare resta da scrivere solo la targa.

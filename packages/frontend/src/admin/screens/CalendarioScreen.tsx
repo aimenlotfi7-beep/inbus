@@ -3,6 +3,7 @@ import { eventiApi } from '../../api/eventi';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';
+import { giorniAllaData, plurale } from '../../shared/formato';
 
 const ETICHETTA_STATO: Record<string, string> = {
   POCHI_POSTI: 'Pochi posti',
@@ -41,7 +42,7 @@ export function CalendarioScreen() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {lista.map((ev) => {
               const stat = statistiche[ev.id];
-              const giorniAllaPartenza = Math.ceil((new Date(ev.data).getTime() - Date.now()) / (24 * 3600 * 1000));
+              const giorniAllaPartenza = giorniAllaData(ev.data); // giorni di calendario, ora di Roma
               return (
                 <div key={ev.id} style={{ display: 'flex', gap: 14, alignItems: 'center', background: 'var(--dusk)', border: '1px solid var(--line)', borderRadius: 10, padding: '10px 14px', flexWrap: 'wrap' }}>
                   <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 'var(--testo-3xl)', width: 40, textAlign: 'center', flexShrink: 0 }}>{new Date(ev.data).getDate()}</div>
@@ -50,7 +51,7 @@ export function CalendarioScreen() {
                     {allerte[ev.id] > 0 && <span className="badge non-coperta" style={{ marginLeft: 8 }} title="Tratte con posti superati">⚠ {allerte[ev.id]}</span>}
                     <div style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>
                       {ev.luogo}, {ev.citta}
-                      {giorniAllaPartenza >= 0 && ` · tra ${giorniAllaPartenza} giorni`}
+                      {giorniAllaPartenza === 0 ? ' · oggi' : giorniAllaPartenza === 1 ? ' · domani' : giorniAllaPartenza > 1 ? ` · tra ${plurale(giorniAllaPartenza, 'giorno', 'giorni')}` : ''}
                       {ev.statoDisponibilita && <> · {ETICHETTA_STATO[ev.statoDisponibilita]}</>}
                     </div>
                   </div>

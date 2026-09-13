@@ -10,7 +10,7 @@ import { useNavigazione } from '../shared/NavigazioneContext';
 import { useMappaTooltip } from '../shared/useMappaTooltip';
 import { notifica } from '../shared/notifiche';
 import { motivoErrore } from '../shared/errori';
-import { plurale } from '../../shared/formato';
+import { eventoPassato, plurale } from '../../shared/formato';
 
 import { TITOLI_PARTENZE, SEZIONE_PARTENZE, type TabPartenze, type AzionePartenze } from './partenze/tipi';
 import { ETICHETTA_CAMBIO_PERCORSO } from '../shared/AvvisoCambioPercorso';
@@ -93,9 +93,9 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
     return () => window.removeEventListener('focus', ricarica);
   }, []);
 
-  const adesso = Date.now();
+  // Passata dal giorno dopo l'evento (ora di Roma): il giorno stesso i bus devono ancora partire.
   function passata(p: Partenza) {
-    return new Date(p.evento.data).getTime() < adesso;
+    return eventoPassato(p.evento.data);
   }
   // Contano i posti dei bus confermati, non quelli in vendita (sempre
   // "quasi illimitati": le vendite non si fermano per i bus).

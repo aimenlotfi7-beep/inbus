@@ -66,6 +66,27 @@ export function istanteOraRoma(anno: number, mese: number, giorno: number, ore: 
   return new Date(comeSeFosseUtc - scartoRomaMs(stima));
 }
 
+/** Mezzanotte di Roma del giorno di calendario (a Roma) di un istante. */
+export function inizioGiornoRoma(data: Date | string): Date {
+  const g = giornoARoma(data);
+  return istanteOraRoma(g.anno, g.mese, g.giorno, 0, 0);
+}
+
+/** Mezzanotte di Roma del giorno DOPO: l'istante in cui quel giorno finisce.
+ *  Un coupon "valido fino al 30/09" vale fino a questo istante. */
+export function fineGiornoRoma(data: Date | string): Date {
+  const g = giornoARoma(data);
+  return istanteOraRoma(g.anno, g.mese, g.giorno + 1, 0, 0);
+}
+
+/** Mezzanotte di oggi a Roma. Un evento è "in programma" finché la sua data
+ *  è >= di questo istante: la data è salvata a mezzanotte (UTC), e il
+ *  confronto con l'ora attuale lo dava già per passato dalle 02:00 del
+ *  giorno stesso, quando i bus devono ancora partire. */
+export function inizioOggiRoma(adesso: Date = new Date()): Date {
+  return inizioGiornoRoma(adesso);
+}
+
 /** Legge un orario scritto a mano ("18:30", "8.05", "18:30:00"); null se
  *  non è un orario valido. */
 export function leggiOrario(testo: string | null | undefined): { ore: number; minuti: number } | null {

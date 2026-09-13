@@ -3,6 +3,7 @@ import { db } from '../../db/client.js';
 import { coupon, promoter, utenti } from '../../db/schema.js';
 import { NonTrovato, ErroreApplicativo, ConflittoDati } from '../../shared/errors.js';
 import { inviaEmail } from '../../shared/email.service.js';
+import { fineGiornoRoma, formattaData, inizioGiornoRoma } from '../../shared/formato.js';
 import type { CreaCouponInput, aggiornaCouponSchema } from './coupon.dto.js';
 import type { z } from 'zod';
 
@@ -68,8 +69,10 @@ export const couponService = {
     const [c] = await db.select().from(coupon).where(eq(coupon.codice, codice.toUpperCase())).limit(1);
     if (!c || !c.attivo) throw new ErroreApplicativo('Coupon non valido', 400, 'COUPON_NON_VALIDO');
     const oggi = new Date();
-    if (c.validoDal && oggi < c.validoDal) throw new ErroreApplicativo('Coupon non ancora attivo', 400, 'COUPON_NON_VALIDO');
-    if (c.validoAl && oggi > c.validoAl) throw new ErroreApplicativo('Coupon scaduto', 400, 'COUPON_NON_VALIDO');
+    // Le date del gestionale sono giorni interi (ora di Roma): "valido fino
+    // al 30/09" vale fino a fine giornata, non fino alle 02:00 del 30.
+    if (c.validoDal && oggi < inizioGiornoRoma(c.validoDal)) throw new ErroreApplicativo('Coupon non ancora attivo', 400, 'COUPON_NON_VALIDO');
+    if (c.validoAl && oggi >= fineGiornoRoma(c.validoAl)) throw new ErroreApplicativo('Coupon scaduto', 400, 'COUPON_NON_VALIDO');
     if (c.usiMax !== null && c.usiAttuali >= c.usiMax) throw new ErroreApplicativo('Coupon esaurito', 400, 'COUPON_NON_VALIDO');
     if (c.eventoId && eventoId && c.eventoId !== eventoId) throw new ErroreApplicativo('Questo coupon non è valido per questo evento', 400, 'COUPON_NON_VALIDO');
     if (c.utenteId) {
@@ -95,8 +98,10 @@ export const couponService = {
     const [c] = await tx.select().from(coupon).where(eq(coupon.codice, codice.toUpperCase())).limit(1);
     if (!c || !c.attivo) throw new ErroreApplicativo('Coupon non valido', 400, 'COUPON_NON_VALIDO');
     const oggi = new Date();
-    if (c.validoDal && oggi < c.validoDal) throw new ErroreApplicativo('Coupon non ancora attivo', 400, 'COUPON_NON_VALIDO');
-    if (c.validoAl && oggi > c.validoAl) throw new ErroreApplicativo('Coupon scaduto', 400, 'COUPON_NON_VALIDO');
+    // Le date del gestionale sono giorni interi (ora di Roma): "valido fino
+    // al 30/09" vale fino a fine giornata, non fino alle 02:00 del 30.
+    if (c.validoDal && oggi < inizioGiornoRoma(c.validoDal)) throw new ErroreApplicativo('Coupon non ancora attivo', 400, 'COUPON_NON_VALIDO');
+    if (c.validoAl && oggi >= fineGiornoRoma(c.validoAl)) throw new ErroreApplicativo('Coupon scaduto', 400, 'COUPON_NON_VALIDO');
     if (c.eventoId && eventoId && c.eventoId !== eventoId) throw new ErroreApplicativo('Questo coupon non è valido per questo evento', 400, 'COUPON_NON_VALIDO');
     if (c.utenteId) {
       const [proprietario] = await tx.select({ email: utenti.email }).from(utenti).where(eq(utenti.id, c.utenteId)).limit(1);
@@ -136,7 +141,7 @@ export const couponService = {
     if (!u) throw new NonTrovato('Cliente');
 
     const scontoTesto = c.tipo === 'PERCENTUALE' ? `${Number(c.valore)}%` : `€${Number(c.valore).toFixed(2)}`;
-    const scadenzaTesto = c.validoAl ? `Valido fino al ${c.validoAl.toLocaleDateString('it-IT')}.` : '';
+    const scadenzaTesto = c.validoAl ? `Valido fino al ${formattaData(c.validoAl)}.` : '';
     const html = `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
         <p>Ciao${u.nome ? ` ${u.nome}` : ''},</p>

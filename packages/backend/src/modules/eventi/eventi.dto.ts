@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { inizioOggiRoma } from '../../shared/formato.js';
 
 // Il prezzo tollera anche `null` in ingresso (può arrivare così da un
 // tragitto applicato che non aveva prezzo su quella fermata, es. l'arrivo)
@@ -131,8 +132,9 @@ function verificaUnicaCittaArrivo(
  *  che la sua data ormai passata blocchi il salvataggio. */
 function verificaDataNonPassata(d: { data?: Date }, ctx: z.RefinementCtx) {
   if (!d.data) return;
-  const oggi = new Date(); oggi.setHours(0, 0, 0, 0);
-  if (d.data < oggi) {
+  // Oggi a Roma: con setHours sul server UTC, tra mezzanotte e le 02:00 si
+  // poteva creare un evento con la data di ieri.
+  if (d.data < inizioOggiRoma()) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['data'], message: 'La data dell\'evento non può essere nel passato.' });
   }
 }

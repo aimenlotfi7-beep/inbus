@@ -40,3 +40,15 @@ export function giorniAllaData(valore: string | number | Date, ora: Date = new D
   const giorno = (x: Date) => { const [a, m, g] = giornoRoma.format(x).split('-').map(Number); return Date.UTC(a, m - 1, g); };
   return Math.round((giorno(d) - giorno(ora)) / 86400000);
 }
+
+/** Un evento è passato solo dal giorno DOPO (ora di Roma). La data è salvata
+ *  a mezzanotte: il confronto con l'ora attuale lo dava per passato dalla
+ *  mezzanotte del giorno stesso, quando i bus devono ancora partire. */
+export function eventoPassato(data: string | number | Date): boolean {
+  return giorniAllaData(data) < 0;
+}
+
+/** "2026-09-13": il giorno di oggi a Roma, per i campi data (min, valore iniziale). */
+export function oggiIsoRoma(): string {
+  return giornoRoma.format(new Date());
+}

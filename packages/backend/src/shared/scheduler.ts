@@ -49,8 +49,9 @@ export function avviaSchedulerRiordinoEta() {
     // e comunicata PRIMA dello smistamento — altrimenti si rischierebbe
     // di assegnare posti su una fermata che sta per sparire).
     try {
-      const { disattivate } = await disattivaFermateSottoSoglia();
-      if (disattivate > 0) console.log(`Fermate "Partenza" disattivate per soglia non raggiunta: ${disattivate}.`);
+      const { disattivate, emailNonInviate } = await disattivaFermateSottoSoglia();
+      if (disattivate > 0) console.log(`Fermate disattivate per soglia minima non raggiunta: ${disattivate}.`);
+      if (emailNonInviate > 0) console.error(`Soglia minima: ${emailNonInviate} avvisi ai clienti non partiti.`);
     } catch (err) {
       console.error('Errore durante il controllo soglia minima fermate:', err);
     }

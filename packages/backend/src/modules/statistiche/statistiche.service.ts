@@ -347,7 +347,7 @@ export const statisticheService = {
       const tragittiAttivi = dati.strutture.tragitti.filter((t) => t.attivo);
 
       // Stessi tragitti del pallino viola di Preventivi (contaCambiPercorso).
-      const perCambio = tragittiAttivi.filter((t) => perId.get(t.eventoId)!.data >= adesso);
+      const perCambio = tragittiAttivi.filter((t) => perId.get(t.eventoId)!.data >= inizioGiornoRoma(oggi));
       const cambi = await cambiPercorso(perCambio.map((t) => t.id));
       for (const t of perCambio) {
         const cambio = cambi.get(t.id);

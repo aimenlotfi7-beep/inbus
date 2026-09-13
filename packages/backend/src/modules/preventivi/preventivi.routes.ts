@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import crypto from 'node:crypto';
-import { eq, and, asc, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, asc, gte, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { preventiviRichieste, preventiviRisposte, fornitori, tragitti, eventi, fermate } from '../../db/schema.js';
@@ -13,7 +13,7 @@ import { templateEmailService } from '../template-email/template-email.service.j
 import { leggiRaggioKmPreventivo, leggiNotificaNonScelti, leggiGiorniValiditaLinkPreventivo } from '../impostazioni/impostazioni.routes.js';
 import { limitePnr } from '../../shared/rateLimit.js';
 import { distanzaKm, calcolaKmApprossimati } from '../../shared/distanza.js';
-import { formattaData, formattaEuro } from '../../shared/formato.js';
+import { formattaData, formattaEuro, inizioOggiRoma } from '../../shared/formato.js';
 import { classificaCandidato, destinatariRichiesta } from './classifica-candidato.js';
 import { cambiPercorso, fotografiaPercorso, richiestaAperta } from './cambio-percorso.js';
 
@@ -471,7 +471,7 @@ export const preventiviService = {
   contaCambiPercorso: async () => {
     const righe = await db.select({ id: tragitti.id }).from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNotNull(tragitti.preventivoCosto), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
+      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNotNull(tragitti.preventivoCosto), isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma())));
     return (await cambiPercorso(righe.map((r) => r.id))).size;
   },
 };

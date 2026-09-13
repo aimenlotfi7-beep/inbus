@@ -1,9 +1,10 @@
-import { and, eq, inArray, isNull, sql, desc } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, sql, desc } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { bundle, bundleEventi, eventi, tragitti, immaginiEvento } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import type { BundleInput } from './bundle.dto.js';
 import { statoBundle, bundleVisibile } from './bundle-stato.js';
+import { inizioOggiRoma } from '../../shared/formato.js';
 
 function slugDa(testo: string) {
   return testo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'bundle';
@@ -25,7 +26,7 @@ async function vendibilitaEventi(eventiIds: string[]): Promise<Map<string, boole
   if (eventiIds.length === 0) return new Map();
   const righe = await db.select({ eventoId: tragitti.eventoId })
     .from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-    .where(and(inArray(tragitti.eventoId, eventiIds), inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), sql`${tragitti.postiDisponibili} > 0`, isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`, eq(eventi.venditeFermate, false)));
+    .where(and(inArray(tragitti.eventoId, eventiIds), inArray(tragitti.stato, ['PREZZATO', 'CONFERMATO']), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), sql`${tragitti.postiDisponibili} > 0`, isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma()), eq(eventi.venditeFermate, false)));
   const ok = new Set(righe.map((r) => r.eventoId));
   return new Map(eventiIds.map((id) => [id, ok.has(id)]));
 }

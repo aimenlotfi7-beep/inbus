@@ -7,7 +7,7 @@ import { PaginaSezione } from '../shared/PaginaSezione';
 import { EventoCardCompatta } from '../shared/EventoCardCompatta';
 import { Modale } from '../shared/Modale';
 import { RicercaSezione } from '../shared/RicercaSezione';
-import { formattaEuro } from '../../shared/formato';
+import { eventoPassato, formattaEuro } from '../../shared/formato';
 import { conferma, confermaConTesto } from '../shared/conferma';
 import { motivoErrore } from '../shared/errori';
 
@@ -60,8 +60,8 @@ export function PrenotazioniScreen() {
   });
 
   const eventoAttivo = eventiConPren.find((e) => e.id === eventoAttivoId) ?? null;
-  const adesso = Date.now();
-  const eventiPerData = eventiConPren.filter((e) => (mostraPassati ? new Date(e.data).getTime() < adesso : new Date(e.data).getTime() >= adesso));
+  // Il giorno dell'evento resta tra i prossimi (ora di Roma), non tra i passati.
+  const eventiPerData = eventiConPren.filter((e) => (mostraPassati ? eventoPassato(e.data) : !eventoPassato(e.data)));
   const tabFiltrate = ricercaTab.trim()
     ? eventiPerData.filter((e) => e.artista.toLowerCase().includes(ricercaTab.toLowerCase()) || e.citta.toLowerCase().includes(ricercaTab.toLowerCase()))
     : eventiPerData;

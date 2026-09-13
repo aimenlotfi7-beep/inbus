@@ -1,8 +1,9 @@
-import { and, eq, inArray, isNull, sql, desc } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, sql, desc } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { tour, tourEventi, eventi, tragitti, fermate, immaginiEvento } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
 import type { TourInput } from './tour.dto.js';
+import { inizioOggiRoma } from '../../shared/formato.js';
 
 function slugDa(testo: string) {
   return testo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'tour';
@@ -156,7 +157,7 @@ export const tourService = {
       .innerJoin(eventi, eq(eventi.id, tourEventi.eventoId))
       .where(and(
         inArray(tourEventi.tourId, righeTour.map((t) => t.id)), isNull(eventi.eliminatoIl),
-        soloFuturi ? sql`${eventi.data} >= now()` : undefined,
+        soloFuturi ? gte(eventi.data, inizioOggiRoma()) : undefined,
         soloVisibili ? and(eq(eventi.visibileSito, true), eq(eventi.bozza, false)) : undefined,
       ));
     if (membri.length === 0) return [];

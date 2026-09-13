@@ -12,7 +12,7 @@ import type { Evento } from '../api/types';
 import { ErroreApi } from '../api/client';
 import { CookieBanner } from '../features/CookieBanner';
 import { useSeoTags } from '../features/useSeoTags';
-import { formattaEuro, formattaData, plurale } from '../shared/formato';
+import { formattaEuro, formattaData, giorniAllaData, plurale } from '../shared/formato';
 
 const CHIAVE_TOKEN = 'inbus_promoter_token';
 
@@ -250,7 +250,8 @@ function SezioneCodiciSconto() {
       <p className="page-sub">Condividi il codice: chi lo usa ha uno sconto, tu una commissione.</p>
       {coupon.map((c) => {
         const scadenza = c.validoAl ? new Date(c.validoAl) : null;
-        const scaduto = scadenza ? scadenza < new Date() : false;
+        // "Valido fino al 30/09" vale per tutto il 30 (ora di Roma), come al checkout.
+        const scaduto = scadenza ? giorniAllaData(scadenza) < 0 : false;
         const compensoTesto = c.compensoTipo === 'FISSO'
           ? `${formattaEuro(c.compensoValore)} ${c.compensoFissoPer === 'PASSEGGERO' ? 'a passeggero' : 'ad acquisto'}`
           : c.compensoTipo === 'PERCENTUALE' ? `${c.compensoValore}%` : `${c.commissionePercentualeDefault}% (tasso di default)`;

@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { variazioni, variazioniRisposte, prenotazioni, richiesteRimborso, eventi, tragitti, utenti, fermate } from '../../db/schema.js';
+import { variazioni, variazioniRisposte, prenotazioni, richiesteRimborso, eventi, tragitti, utenti, fermate, linee, lineaFermate } from '../../db/schema.js';
+import { calcolaTempi, leggiOrariTragitto } from '../prenotazioni/partenza.js';
+import { inizioOggiRoma } from '../../shared/formato.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
 import { leggiSogliaPosticipoMinuti } from '../impostazioni/impostazioni.routes.js';
 import { templateEmailService } from '../template-email/template-email.service.js';
@@ -294,14 +296,17 @@ export async function rispondiVariazione(token: string, risposta: 'ACCETTATA' | 
  *  già costruito per le Variazioni vere e proprie (email + scelta
  *  accetta/rimborso) — dal punto di vista del cliente è esattamente lo
  *  stesso tipo di avviso, solo con una causa diversa. */
-export async function disattivaFermateSottoSoglia() {
-  const oraAdesso = new Date();
-  const tra24Ore = new Date(oraAdesso.getTime() + 24 * 3600 * 1000);
+/** Parole fisse della descrizione di questa variazione: servono anche a
+ *  riconoscere una fermata già spenta (e avvisata) per soglia. */
+const TESTO_SOGLIA = 'non ha raggiunto il numero minimo di partecipanti';
 
-  // Facoltativa su OGNI fermata ora (prima solo su quelle marcate
-  // "Partenza", un concetto tolto insieme al campo "tipo") — la sola
-  // presenza di una soglia scritta (isNotNull) basta a dire che questa
-  // fermata va controllata.
+export async function disattivaFermateSottoSoglia() {
+  const adesso = new Date();
+
+  // Facoltativa su OGNI fermata: la sola presenza di una soglia scritta
+  // basta a dire che va controllata. Solo tragitti attivi di eventi in
+  // programma, pubblicati e non nel cestino: prima finivano nel controllo
+  // anche gli eventi già passati, con avvisi per viaggi già fatti.
   const fermateConSoglia = await db.select({
     fermataId: fermate.id,
     tragittoId: fermate.tragittoId,
@@ -309,41 +314,78 @@ export async function disattivaFermateSottoSoglia() {
     indirizzo: fermate.indirizzo,
     orario: fermate.orario,
     sogliaMinima: fermate.sogliaMinima,
-    eventoData: eventi.data,
   }).from(fermate)
     .innerJoin(tragitti, eq(tragitti.id, fermate.tragittoId))
     .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-    .where(and(isNotNull(fermate.sogliaMinima), eq(fermate.attivo, true)));
+    .where(and(
+      isNotNull(fermate.sogliaMinima), eq(fermate.attivo, true),
+      eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl),
+      isNull(eventi.eliminatoIl), eq(eventi.bozza, false), gte(eventi.data, inizioOggiRoma(adesso)),
+    ));
 
+  const orariPerTragitto = new Map<string, Awaited<ReturnType<typeof leggiOrariTragitto>>>();
+  const copertePerTragitto = new Map<string, Set<string>>();
   let disattivate = 0;
-  for (const f of fermateConSoglia) {
-    if (!f.orario) continue; // senza orario non posso calcolare quando parte davvero
-    const [ore, minuti] = f.orario.split(':').map(Number);
-    if (Number.isNaN(ore) || Number.isNaN(minuti)) continue;
-    const partenzaVera = new Date(f.eventoData);
-    partenzaVera.setHours(ore, minuti, 0, 0);
-    if (partenzaVera > tra24Ore) continue; // non ancora nelle prossime 24 ore, troppo presto per decidere
+  let emailNonInviate = 0;
 
+  for (const f of fermateConSoglia) {
     // Una fermata che va storta non deve fermare il controllo delle altre.
     try {
-      // Garantita non-nulla dal filtro isNotNull qui sopra — non c'è più
-      // un valore di riserva generale a cui ricadere se manca.
+      if (!orariPerTragitto.has(f.tragittoId)) orariPerTragitto.set(f.tragittoId, await leggiOrariTragitto(f.tragittoId));
+      const orari = orariPerTragitto.get(f.tragittoId);
+      if (!orari) continue;
+      // Stessa partenza (ora di Roma) e stesso momento "24 ore prima" dello
+      // smistamento sui bus e del biglietto (partenza.ts). Prima l'orario
+      // era letto come ora UTC con setHours: la decisione arrivava 1-2 ore
+      // dopo lo smistamento.
+      const tempi = calcolaTempi(orari, f.citta);
+      if (!tempi.orarioFermata) continue; // senza orario della fermata non si sa quando parte
+      if (adesso < tempi.disponibileDal) continue; // troppo presto per decidere
+      if (adesso >= tempi.partenza) continue; // già partita: niente da decidere
+
+      // Fermata dentro una linea confermata: il bus la serve comunque, e chi
+      // ha prenotato lì riceverà il biglietto. Non si spegne e non si
+      // avvisa (stessa regola dei salvataggi, senzaFermateCoperteDaLinee).
+      if (!copertePerTragitto.has(f.tragittoId)) {
+        const coperte = await db.selectDistinct({ citta: fermate.citta }).from(lineaFermate)
+          .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
+          .innerJoin(linee, and(eq(linee.id, lineaFermate.lineaId), eq(linee.daConfermare, false)))
+          .where(eq(fermate.tragittoId, f.tragittoId));
+        copertePerTragitto.set(f.tragittoId, new Set(coperte.map((c) => c.citta)));
+      }
+      if (copertePerTragitto.get(f.tragittoId)!.has(f.citta)) continue;
+
+      // Già spenta per soglia in questa finestra e poi riattivata a mano
+      // dal gestionale: è una scelta, non la si rispegne ogni ora con
+      // nuove email.
+      const [giaGestita] = await db.select({ id: variazioni.id }).from(variazioni)
+        .where(and(
+          eq(variazioni.tragittoId, f.tragittoId), eq(variazioni.fermataDescrizione, f.citta),
+          gte(variazioni.creataIl, tempi.disponibileDal), ilike(variazioni.descrizione, `%${TESTO_SOGLIA}%`),
+        )).limit(1);
+      if (giaGestita) continue;
+
+      // Garantita non-nulla dal filtro isNotNull qui sopra.
       const soglia = f.sogliaMinima!;
       const [conteggio] = await db.select({ tot: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)` }).from(prenotazioni)
         .where(and(eq(prenotazioni.tragittoId, f.tragittoId), eq(prenotazioni.fermataCitta, f.citta), eq(prenotazioni.stato, 'CONFERMATA')));
       const partecipantiAttuali = Number(conteggio?.tot ?? 0);
-      if (partecipantiAttuali >= soglia) continue; // soglia raggiunta, tutto bene, nessuna azione
+      if (partecipantiAttuali >= soglia) continue; // soglia raggiunta, nessuna azione
 
       await db.update(fermate).set({ attivo: false }).where(eq(fermate.id, f.fermataId));
       disattivate++;
       // Non lancia mai, e un cliente non raggiunto non ferma gli altri.
-      await generaComunicazioniVariazione(f.tragittoId, [{
+      const esito = await generaComunicazioniVariazione(f.tragittoId, [{
         fermataVecchia: { citta: f.citta, indirizzo: f.indirizzo, orario: f.orario },
-        descrizione: `La fermata di "${f.citta}" non ha raggiunto il numero minimo di partecipanti necessario (${partecipantiAttuali} su ${soglia} richiesti) — non è più prevista per questa partenza.`,
+        descrizione: `La fermata di "${f.citta}" ${TESTO_SOGLIA} necessario (${partecipantiAttuali} su ${soglia} richiesti) — non è più prevista per questa partenza.`,
       }]);
+      emailNonInviate += esito.emailNonInviate;
+      if (esito.emailNonInviate > 0) {
+        console.error(`[variazioni] fermata ${f.citta} (tragitto ${f.tragittoId}) spenta per soglia: ${esito.emailNonInviate} avvisi ai clienti non partiti.`);
+      }
     } catch (err) {
       console.error(`[variazioni] controllo soglia della fermata ${f.fermataId} (${f.citta}) non riuscito:`, err);
     }
   }
-  return { disattivate };
+  return { disattivate, emailNonInviate };
 }

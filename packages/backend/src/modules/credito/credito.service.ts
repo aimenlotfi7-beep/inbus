@@ -1,4 +1,5 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, lt, sql } from 'drizzle-orm';
+import { inizioOggiRoma } from '../../shared/formato.js';
 import { db } from '../../db/client.js';
 import { prenotazioni, eventi, utenti, movimentiCredito, partecipantiPrenotazione } from '../../db/schema.js';
 import { leggiCreditoPerPasseggero, leggiCreditoReferralInvitante, leggiCreditoReferralAmico } from '../impostazioni/impostazioni.routes.js';
@@ -87,7 +88,8 @@ export const creditoService = {
         eq(prenotazioni.stato, 'CONFERMATA'),
         eq(prenotazioni.saldoPagato, true),
         eq(prenotazioni.creditoMaturato, false),
-        sql`${eventi.data} < now()`,
+        // Viaggio concluso = evento di un giorno precedente a oggi (ora di Roma).
+        lt(eventi.data, inizioOggiRoma()),
       ));
 
     let maturate = 0;

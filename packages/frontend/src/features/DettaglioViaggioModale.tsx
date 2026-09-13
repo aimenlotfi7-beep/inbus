@@ -79,7 +79,6 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
   }
 
   const ev = dettaglio.evento;
-  const oggi = new Date().toISOString().slice(0, 10);
   const giorniAlViaggio = ev ? giorniAllaData(ev.data) : null;
   const pagamentoCompleto = dettaglio.tipoPagamento === 'COMPLETO' || dettaglio.saldoPagato;
   const stato = calcolaStatoPrenotazione(dettaglio);
@@ -96,7 +95,7 @@ export function DettaglioViaggioModale({ pnr, email, onClose, onVaiAllaChat }: {
         {ev && (
           <p className="travel-data">
             {formatoDataLunga.format(new Date(ev.data))}
-            {giorniAlViaggio !== null && ev.data >= oggi && (giorniAlViaggio <= 0 ? ' · oggi' : giorniAlViaggio === 1 ? ' · domani' : ` · tra ${plurale(giorniAlViaggio, 'giorno', 'giorni')}`)}
+            {giorniAlViaggio !== null && giorniAlViaggio >= 0 && (giorniAlViaggio <= 0 ? ' · oggi' : giorniAlViaggio === 1 ? ' · domani' : ` · tra ${plurale(giorniAlViaggio, 'giorno', 'giorni')}`)}
           </p>
         )}
 

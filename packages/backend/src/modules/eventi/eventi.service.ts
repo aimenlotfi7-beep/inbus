@@ -33,7 +33,7 @@ import { cambiPercorso, fotografiaPercorso } from '../preventivi/cambio-percorso
 import { tourService } from '../tour/tour.service.js';
 import { templateEmailService } from '../template-email/template-email.service.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
-import { formattaData, formattaDataOra } from '../../shared/formato.js';
+import { formattaData, formattaDataOra, giornoARoma, inizioOggiRoma } from '../../shared/formato.js';
 import type { z } from 'zod';
 
 type TragittoInput = z.infer<typeof tragittoSchema>;
@@ -587,7 +587,7 @@ export const eventiService = {
       const q = `%${query.ricerca.trim()}%`;
       condizioni.push(sql`(${ilike(eventi.artista, q)} OR ${ilike(eventi.luogo, q)} OR ${ilike(eventi.citta, q)})`);
     }
-    if (query.soloFuturi) condizioni.push(sql`${eventi.data} >= now()`);
+    if (query.soloFuturi) condizioni.push(gte(eventi.data, inizioOggiRoma()));
     if (query.soloVisibili) {
       condizioni.push(eq(eventi.visibileSito, true));
       condizioni.push(eq(eventi.bozza, false)); // le bozze non compaiono mai sul sito pubblico
@@ -651,7 +651,9 @@ export const eventiService = {
       with: includeCompleto,
     });
     if (!evento) throw new NonTrovato('Evento');
-    if (!evento.visibileSito || evento.bozza || evento.eliminatoIl || new Date(evento.data) < new Date()) throw new NonTrovato('Evento');
+    // "Passato" solo dal giorno dopo (ora di Roma): il giorno dell'evento
+    // la pagina serve ancora, i bus devono partire.
+    if (!evento.visibileSito || evento.bozza || evento.eliminatoIl || new Date(evento.data) < inizioOggiRoma()) throw new NonTrovato('Evento');
     // Stessa regola della lista: senza nemmeno un tragitto confermato,
     // l'evento non esiste ancora per il sito — nemmeno con un link
     // diretto allo slug.
@@ -667,8 +669,10 @@ export const eventiService = {
     // realtà era andato a buon fine) più che un evento voluto davvero
     // due volte nello stesso giorno. Confronto sul solo GIORNO (non
     // l'orario preciso), case-insensitive sul nome artista.
-    const giornoInizio = new Date(input.data); giornoInizio.setHours(0, 0, 0, 0);
-    const giornoFine = new Date(giornoInizio); giornoFine.setDate(giornoFine.getDate() + 1);
+    // La data arriva come giorno (salvata a mezzanotte UTC): confini del
+    // giorno in UTC, uguali su qualsiasi server (setHours dipendeva dal fuso).
+    const giornoInizio = new Date(input.data); giornoInizio.setUTCHours(0, 0, 0, 0);
+    const giornoFine = new Date(giornoInizio); giornoFine.setUTCDate(giornoFine.getUTCDate() + 1);
     const [doppione] = await db.select({ id: eventi.id }).from(eventi)
       .where(and(
         isNull(eventi.eliminatoIl),
@@ -1750,7 +1754,9 @@ export const eventiService = {
     const cumulativoPerCitta = new Map<string, number>();
     const cumulativoPerGiornoECitta = new Map<string, number>(); // chiave: "giorno::citta"
     for (const r of righe) {
-      const giorno = r.creataIl.toISOString().slice(0, 10); // YYYY-MM-DD
+      // YYYY-MM-DD del giorno di Roma (con toISOString una vendita delle 00:30 finiva nel giorno prima)
+      const g = giornoARoma(r.creataIl);
+      const giorno = `${g.anno}-${String(g.mese).padStart(2, '0')}-${String(g.giorno).padStart(2, '0')}`;
       const nuovoCumulativo = (cumulativoPerCitta.get(r.citta) ?? 0) + r.passeggeri;
       cumulativoPerCitta.set(r.citta, nuovoCumulativo);
       cumulativoPerGiornoECitta.set(`${giorno}::${r.citta}`, nuovoCumulativo);
@@ -1897,7 +1903,7 @@ export const eventiService = {
       .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id })
       .from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
+      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma())));
     if (righeTragitti.length === 0) return 0;
 
     const tragittiIds = righeTragitti.map((r) => r.tragittoId);
@@ -1923,7 +1929,7 @@ export const eventiService = {
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
       .where(and(
         eq(linee.daConfermare, true), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl),
-        isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`,
+        isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma()),
       ));
     return righe.length;
   },
@@ -1933,7 +1939,7 @@ export const eventiService = {
       .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id, fornitoreId: tragitti.fornitoreId })
       .from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`, isNull(tragitti.fornitoreId)));
+      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma()), isNull(tragitti.fornitoreId)));
     if (righeTragitti.length === 0) return 0;
 
     const tragittiIds = righeTragitti.map((r) => r.tragittoId);
@@ -1954,7 +1960,7 @@ export const eventiService = {
       .select({ eventoId: tragitti.eventoId })
       .from(tragitti)
       .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.stato, 'DA_CONFERMARE'), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), sql`${eventi.data} >= now()`));
+      .where(and(eq(tragitti.stato, 'DA_CONFERMARE'), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma())));
     return new Set(righe.map((r) => r.eventoId)).size;
   },
 
@@ -1974,8 +1980,11 @@ export const eventiService = {
    *  dei bus veri dei tragitti confermati: quelli in vendita restano
    *  "quasi illimitati". */
   async allertePartenzePerEvento(): Promise<Record<string, number>> {
+    // Solo eventi in programma e non nel cestino: su un evento finito il
+    // pallino restava acceso per sempre.
     const righeTragitti = await db.select({ tragittoId: tragitti.id, eventoId: tragitti.eventoId }).from(tragitti)
-      .where(and(eq(tragitti.stato, 'CONFERMATO'), isNull(tragitti.eliminatoIl)));
+      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(and(eq(tragitti.stato, 'CONFERMATO'), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma())));
     if (righeTragitti.length === 0) return {};
     const tragittiIds = righeTragitti.map((r) => r.tragittoId);
 
