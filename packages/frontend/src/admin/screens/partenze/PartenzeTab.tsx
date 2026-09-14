@@ -740,7 +740,10 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
           >
             <div>
               <h3>{!contestoPartenze && (espansa ? '▾ ' : '▸ ')}{tragitto.nome}</h3>
-              {contestoPartenze?.tabOrigine !== 'fermate' && contestoPartenze?.tabOrigine !== 'da-prezzare' && contestoPartenze?.tabOrigine !== 'da-confermare' && (() => {
+              {/* Passeggeri, bus e incassi servono dove si guarda il viaggio già venduto (Confermate,
+                  Passate, scheda in Eventi): non in Orari, Quotazione e Prezzi, che vengono prima delle
+                  vendite, né in Da confermare, dove li mostra già la pagina delle linee. */}
+              {contestoPartenze?.tabOrigine !== 'fermate' && contestoPartenze?.tabOrigine !== 'preventivi' && contestoPartenze?.tabOrigine !== 'da-prezzare' && contestoPartenze?.tabOrigine !== 'da-confermare' && (() => {
                 // I passeggeri confermati di ogni fermata attiva, anche a
                 // zero, dal calcolo bus (lo stesso dato della pagina Linee):
                 // prima arrivavano da un elenco riservato a chi vede gli
