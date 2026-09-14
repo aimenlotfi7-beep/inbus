@@ -100,9 +100,6 @@ export const preventiviApi = {
   reinviaRichiesta: (richiestaId: string) =>
     api.post<{ inviata: boolean }>(`/api/preventivi/richieste/${richiestaId}/reinvia`, {}),
   listaPerTragitto: (tragittoId: string) => api.get<RichiestaConRisposta[]>(`/api/preventivi/tragitto/${tragittoId}`),
-  contaDaValutare: () => api.get<{ conteggio: number }>('/api/preventivi/conta-da-valutare'),
-  // Tragitti con il percorso cambiato dopo il preventivo (il pallino viola).
-  contaCambiPercorso: () => api.get<{ conteggio: number }>('/api/preventivi/conta-cambi-percorso'),
   // null se il percorso è ancora quello del preventivo accettato.
   percorso: (tragittoId: string) => api.get<CambioPercorso | null>(`/api/preventivi/percorso/${tragittoId}`),
   // "Il preventivo va ancora bene": il percorso di adesso diventa quello del preventivo.

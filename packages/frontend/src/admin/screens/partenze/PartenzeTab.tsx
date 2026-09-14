@@ -7,6 +7,8 @@ import { notificaPercorsiCambiati } from '../../shared/AvvisoCambioPercorso';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { formattaEuro, plurale } from '../../../shared/formato';
 import type { ContestoPartenze } from './tipi';
+import { CLASSE_BADGE_LIVELLO, CLASSE_LINGUETTA_LIVELLO, COLORE_LIVELLO, statoGenerale, statoInTappa, type DatiStatoTragitto, type Partenza, type StatoTappa } from './statiPartenze';
+import { COLORE_ARRIVO, COLORE_PARTENZA, PartenzaArrivo } from '../../shared/PartenzaArrivo';
 import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea } from '../../../api/eventi';
 import type { Evento, Tragitto } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
@@ -37,32 +39,6 @@ type PrezzoFermata = {
   prezzo: number | undefined;
 };
 
-/** Un solo indicatore di stato per tragitto, con le stesse parole delle
- *  card in elenco (PartenzeScreen): arancio se c'è una linea da confermare
- *  o il pareggio non è raggiunto, rosso se su un tragitto confermato
- *  mancano posti sui bus, verde se è a posto. Niente simboli: il colore
- *  basta. */
-function statoTragitto(tragitto: CalcoloBusTragitto) {
-  // Finché i prezzi non sono salvati il tragitto non è nemmeno in
-  // vendita (non può avere prenotazioni): gli altri controlli non hanno
-  // ancora senso.
-  if (tragitto.stato === 'DA_CONFERMARE') return { classe: 'attenzione', etichetta: 'Da prezzare, non ancora in vendita' };
-  // Bus e linee da confermare nascono da soli (pareggio raggiunto, che riparte dopo ogni bus).
-  if (tragitto.lineeDaConfermare > 0) return { classe: 'attenzione', etichetta: tragitto.lineeDaConfermare === 1 ? 'Bus o linea da confermare' : `${tragitto.lineeDaConfermare} proposte da confermare` };
-  if (tragitto.stato === 'CONFERMATO') {
-    // postiTotali qui = posti dei bus confermati (quelli in vendita non si
-    // fermano mai).
-    const mancanti = tragitto.totalePasseggeri - tragitto.postiTotali;
-    if (mancanti > 0) return { classe: 'non-coperta', etichetta: mancanti === 1 ? 'Manca 1 posto' : `Mancano ${mancanti} posti` };
-    return { classe: 'coperta', etichetta: 'Confermata' };
-  }
-  return { classe: 'attenzione', etichetta: 'Sotto il pareggio' };
-}
-
-function classeBadge(classe: string) {
-  return classe === 'coperta' ? 'badge-stato-verde' : classe === 'attenzione' ? 'badge-stato-arancio' : classe === 'non-coperta' ? 'badge-stato-rosso' : classe;
-}
-
 /** Sezione "Partenze" di un singolo evento: riepilogo generale, calcolo
  *  bus necessari, copertura tratte, censimento bus fisici. Va dentro la
  *  scheda dell'evento (tab). */
@@ -90,7 +66,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
   const puoAccettarePreventivi = haPermesso(sessione, 'preventivi.accetta');
   const [calcolo, setCalcolo] = useState<CalcoloBusTragitto[]>([]);
   const [eventoCompleto, setEventoCompleto] = useState<Evento | null>(null);
-  const [richiestePerTragitto, setRichiestePerTragitto] = useState<Map<string, { richieste: number; risposte: number }>>(new Map());
+  // Le righe dell'elenco di Partenze di questo evento: richieste di
+  // preventivo, risposte e percorso cambiato, per lo stesso stato delle card.
+  const [partenzePerTragitto, setPartenzePerTragitto] = useState<Map<string, Partenza>>(new Map());
   // Mappa tragittoId -> form in modifica — non più un solo tragitto alla
   // volta: un evento con più servizi/percorsi nello stesso contesto (es.
   // "Orari") deve poter avere PIÙ pannelli aperti insieme.
@@ -146,13 +124,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
   // aggiornano sotto gli occhi, senza smontare la pagina (prima si
   // perdevano pannelli aperti e posizione dello scorrimento).
   function ricarica() {
-    // In Preventivi il bollino è giallo quando le richieste sono partite:
-    // il conteggio arriva dall'elenco di Partenze.
-    if (contestoPartenze?.tabOrigine === 'preventivi') {
-      eventiApi.elencoPartenze()
-        .then((elenco) => setRichiestePerTragitto(new Map(elenco.filter((p) => p.evento.id === eventoId).map((p) => [p.tragittoId, { richieste: p.richiestePreventivo, risposte: p.rispostePreventivo }]))))
-        .catch(() => {});
-    }
+    eventiApi.elencoPartenze()
+      .then((elenco) => setPartenzePerTragitto(new Map(elenco.filter((p) => p.evento.id === eventoId).map((p) => [p.tragittoId, p]))))
+      .catch(() => {});
     Promise.all([
       eventiApi.calcolaBus(eventoId),
       eventiApi.listaBus(eventoId),
@@ -203,6 +177,27 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
 
   function tragittoVeroDi(tragittoId: string): Tragitto | undefined {
     return eventoCompleto ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragittoId) : undefined;
+  }
+  /** Lo stato del tragitto con le regole di statiPartenze.ts: nella voce da
+   *  cui si arriva, o in generale (scheda dell'evento in Eventi). Orari,
+   *  preventivo, bus e passeggeri dai dati appena caricati qui; richieste,
+   *  risposte e percorso cambiato dall'elenco di Partenze. */
+  function statoDi(tragitto: CalcoloBusTragitto): StatoTappa | null {
+    const tv = tragittoVeroDi(tragitto.tragittoId);
+    const riga = partenzePerTragitto.get(tragitto.tragittoId);
+    const dati: DatiStatoTragitto = {
+      stato: tragitto.stato,
+      fermateCompilate: tv ? tv.fermate.some((f) => f.orario) : riga?.fermateCompilate ?? false,
+      fornitoreId: tv ? tv.fornitoreId ?? null : riga?.fornitoreId ?? null,
+      preventivoCosto: tv ? tv.preventivoCosto ?? null : riga?.preventivoCosto ?? null,
+      cambioPercorso: riga?.cambioPercorso ?? null,
+      richiestePreventivo: riga?.richiestePreventivo ?? 0,
+      rispostePreventivo: riga?.rispostePreventivo ?? 0,
+      lineeDaConfermare: tragitto.lineeDaConfermare,
+      totalePasseggeri: tragitto.totalePasseggeri,
+      postiSuiBus: tragitto.postiTotali, // qui sono i posti dei bus confermati
+    };
+    return contestoPartenze ? statoInTappa(dati, contestoPartenze.tabOrigine) : statoGenerale(dati);
   }
   function nomeFornitore(id: string | null | undefined) {
     if (!id) return 'Nessuno indicato';
@@ -649,6 +644,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
     : calcolo
   ).filter((l) => !contestoPartenze || contestoPartenze.tragittiIds.includes(l.tragittoId));
 
+  /** Quanti tragitti di un servizio (null: i tragitti liberi) hanno qualcosa
+   *  da fare: il numero rosso sulla sua linguetta. */
+  function daFareNelServizio(servizioId: string | null) {
+    return calcolo
+      .filter((l) => (l.servizioId ?? null) === servizioId && (!contestoPartenze || contestoPartenze.tragittiIds.includes(l.tragittoId)))
+      .filter((l) => statoDi(l)?.livello === 'da-fare').length;
+  }
+
   // Arrivando da una card con più di un tragitto insieme (es.
   // andata+ritorno) — una tab a testa invece di vederli tutti impilati.
   const mostraTabTragitti = !!contestoPartenze && calcoloVisibile.length > 1;
@@ -669,32 +672,18 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
             // SOLO i servizi coinvolti in quello stato.
             .filter((v) => calcolo.some((l) => l.servizioId === v.key))
             .filter((v) => !contestoPartenze || calcolo.some((l) => l.servizioId === v.key && contestoPartenze.tragittiIds.includes(l.tragittoId)))
-            .map((v) => {
-            const nonCopertiQui = calcolo.filter((l) => l.servizioId === v.key && l.totalePasseggeri > 0 && !l.coperta).length;
-            return (
+            .map((v) => (
               <button key={v.key} type="button" className={`mini-tab${servizioAttivo === v.key ? ' active' : ''}`} onClick={() => setServizioAttivo(v.key)}>
                 {v.nome}
-                {nonCopertiQui > 0 && (
-                  <span title={`${plurale(nonCopertiQui, 'tragitto', 'tragitti')} con prenotazioni ma senza bus sufficienti`} style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 'var(--testo-xs)', padding: '1px 6px', fontWeight: 700 }}>
-                    {nonCopertiQui}
-                  </span>
-                )}
+                <PallinoDaFare quanti={daFareNelServizio(v.key)} />
               </button>
-            );
-          })}
-          {calcolo.some((l) => !l.servizioId) && (!contestoPartenze || calcolo.some((l) => !l.servizioId && contestoPartenze.tragittiIds.includes(l.tragittoId))) && (() => {
-            const nonCopertiLiberi = calcolo.filter((l) => !l.servizioId && l.totalePasseggeri > 0 && !l.coperta).length;
-            return (
-              <button type="button" className={`mini-tab${servizioAttivo === 'liberi' ? ' active' : ''}`} onClick={() => setServizioAttivo('liberi')}>
-                Tragitti liberi
-                {nonCopertiLiberi > 0 && (
-                  <span title={`${plurale(nonCopertiLiberi, 'tragitto', 'tragitti')} con prenotazioni ma senza bus sufficienti`} style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 'var(--testo-xs)', padding: '1px 6px', fontWeight: 700 }}>
-                    {nonCopertiLiberi}
-                  </span>
-                )}
-              </button>
-            );
-          })()}
+            ))}
+          {calcolo.some((l) => !l.servizioId) && (!contestoPartenze || calcolo.some((l) => !l.servizioId && contestoPartenze.tragittiIds.includes(l.tragittoId))) && (
+            <button type="button" className={`mini-tab${servizioAttivo === 'liberi' ? ' active' : ''}`} onClick={() => setServizioAttivo('liberi')}>
+              Tragitti liberi
+              <PallinoDaFare quanti={daFareNelServizio(null)} />
+            </button>
+          )}
         </div>
       )}
 
@@ -706,16 +695,15 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
       {mostraTabTragitti && (
         <div className="mini-tabs partenze-tabs-colonna" style={{ marginBottom: 16 }}>
           {calcoloVisibile.map((t) => {
-            // La tab stessa diventa verde una volta fatta, non solo il
-            // contenuto dentro, visibile anche senza doverci cliccare.
+            // La linguetta ha il colore dello stato del tragitto in questa
+            // voce, visibile senza doverci cliccare.
             const tv = tragittoVeroDi(t.tragittoId);
-            const fattoQui = contestoPartenze?.tabOrigine === 'fermate' ? tv?.fermate.some((f) => f.orario)
-              : contestoPartenze?.tabOrigine === 'da-prezzare' ? t.stato !== 'DA_CONFERMARE' // prezzi di vendita salvati, non solo un preventivo
-              : null; // "fatto/da fare" non si applica alle altre tappe allo stesso modo — resta neutra
+            const statoLinguetta = statoDi(t);
             return (
               <button
                 key={t.tragittoId} type="button"
-                className={`mini-tab${tragittoTabSelezionato?.tragittoId === t.tragittoId ? ' active' : ''}${fattoQui === null ? '' : fattoQui ? ' completato' : ' attenzione'}`}
+                className={`mini-tab${tragittoTabSelezionato?.tragittoId === t.tragittoId ? ' active' : ''}${statoLinguetta ? ` ${CLASSE_LINGUETTA_LIVELLO[statoLinguetta.livello]}` : ''}`}
+                title={statoLinguetta?.testo || undefined}
                 onClick={() => setTabTragittoAttivo(t.tragittoId)}
               >
                 {t.nome} · {plurale(tv?.fermate.filter((f) => f.attivo !== false).length ?? 0, 'fermata', 'fermate')}
@@ -727,11 +715,10 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
 
       <div className="partenze-contenuto">
       {calcoloDaRenderizzare.map((tragitto) => {
-        const stato = statoTragitto(tragitto);
+        const stato = statoDi(tragitto);
         const busTragitto = busLista.filter((b) => b.tragittiIds.includes(tragitto.tragittoId));
         const espansa = aperte.has(tragitto.tragittoId);
         const tragittoVeroPerOrari = tragittoVeroDi(tragitto.tragittoId);
-        const orariImpostati = tragittoVeroPerOrari?.fermate.some((f) => f.orario) ?? false;
         // "In vendita" nella tab Prezzi: vero solo quando i prezzi di
         // vendita sono salvati (lo stato lascia DA_CONFERMARE).
         const prezzato = tragitto.stato !== 'DA_CONFERMARE';
@@ -739,7 +726,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
         return (
         <div
           key={tragitto.tragittoId} className="section-card"
-          style={stato.classe === 'non-coperta' ? { borderColor: 'var(--pink)' } : undefined}
+          // Bordo colorato solo quando serve un intervento (rosso) o il percorso è cambiato (viola).
+          style={stato && (stato.livello === 'da-fare' || stato.livello === 'percorso-cambiato') ? { borderColor: COLORE_LIVELLO[stato.livello] } : undefined}
         >
           <div
             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, cursor: contestoPartenze ? 'default' : 'pointer' }}
@@ -776,29 +764,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
               })()}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-              {contestoPartenze?.tabOrigine === 'fermate' ? (
-                <span className={`badge ${orariImpostati ? 'badge-stato-verde' : 'badge-stato-arancio'}`}>
-                  {orariImpostati ? 'Orari impostati' : 'Orari da impostare'}
-                </span>
-              ) : contestoPartenze?.tabOrigine === 'da-prezzare' ? (
-                <span className={`badge ${prezzato ? 'badge-stato-verde' : 'badge-stato-arancio'}`}>
-                  {prezzato ? 'In vendita' : 'Da prezzare'}
-                </span>
-              ) : contestoPartenze?.tabOrigine === 'preventivi' ? (() => {
-                // Verde: preventivo accettato o registrato. Giallo: richieste
-                // inviate, in attesa. Rosso: nessuna richiesta ancora partita.
-                const inviate = richiestePerTragitto.get(tragitto.tragittoId);
-                const preventivoPresente = !!(tragittoVeroPerOrari?.fornitoreId || tragittoVeroPerOrari?.preventivoCosto);
-                const classe = preventivoPresente ? 'badge-stato-verde' : inviate?.richieste ? 'badge-stato-arancio' : 'badge-stato-rosso';
-                const testo = tragittoVeroPerOrari?.fornitoreId ? 'Accettato'
-                  : tragittoVeroPerOrari?.preventivoCosto ? 'Registrato'
-                  : inviate?.risposte ? plurale(inviate.risposte, 'risposta da valutare', 'risposte da valutare')
-                  : inviate?.richieste ? 'Richieste inviate'
-                  : 'Da richiedere';
-                return <span className={`badge ${classe}`}>{testo}</span>;
-              })() : (
-                <span className={`badge ${classeBadge(stato.classe)}`}>{stato.etichetta}</span>
-              )}
+              {stato?.testo && <span className={`badge ${CLASSE_BADGE_LIVELLO[stato.livello]}`}>{stato.testo}</span>}
               {tragitto.stato === 'PREZZATO' && (
                 <span style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)' }}>In vendita, nessun bus assegnato</span>
               )}
@@ -864,8 +830,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
                   const indirizzoAperto = fermateIndirizzoEspanso.has(chiaveEspanso);
                   return (
                   <div key={idx} style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
-                    {/* Come nella scheda del tragitto in Eventi: la prima fermata è la partenza. */}
-                    {idx === 0 && <p style={{ marginBottom: 4, fontSize: 'var(--testo-lg)', fontWeight: 700, color: 'var(--green)' }}>Partenza</p>}
+                    {/* La partenza è la prima fermata attiva, come nelle altre voci. */}
+                    {idx === formOperativo.fermate.findIndex((x) => x.attivo !== false) && <p style={{ marginBottom: 4, fontSize: 'var(--testo-lg)', fontWeight: 700, color: COLORE_PARTENZA }}>Partenza</p>}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {/* Doppio tap (mobile) o doppio clic (desktop) —
                           un tap solo è troppo facile da toccare per
@@ -955,7 +921,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
                     });
                   return (
                     <>
-                      <p style={{ marginTop: 14, marginBottom: 4, fontSize: 'var(--testo-lg)', fontWeight: 700, color: 'var(--blue)' }}>Arrivo</p>
+                      <p style={{ marginTop: 14, marginBottom: 4, fontSize: 'var(--testo-lg)', fontWeight: 700, color: COLORE_ARRIVO }}>Arrivo</p>
                       <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 110px' }}>
                         <label>Città di arrivo
                           <input
@@ -1072,12 +1038,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
             // In "Orari" e "Prezzi", una volta chiuso l'editor deve restare
             // possibile RIVEDERE quello che c'è già: vista di sola lettura.
             if (contestoPartenze?.tabOrigine === 'fermate') {
-              const partenzaVero = tragittoVero?.fermate[0];
-              const fermateIntermedie = tragittoVero?.fermate.slice(1) ?? [];
+              // Come in PartenzaArrivo: si parte dalla prima fermata attiva, le escluse non contano.
+              const fermateAttive = tragittoVero?.fermate.filter((f) => f.attivo !== false) ?? [];
+              const partenzaVero = fermateAttive[0];
+              const fermateIntermedie = fermateAttive.slice(1);
               const rigaOrario = { display: 'grid', gridTemplateColumns: '1fr 110px', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--line)', fontSize: 'var(--testo-base)' } as const;
               return (
               <div style={{ marginTop: 14 }}>
-                <p className="section-label" style={{ marginBottom: 8 }}>Partenza</p>
+                <p className="section-label" style={{ marginBottom: 8, color: COLORE_PARTENZA }}>Partenza</p>
                 {partenzaVero ? (
                   <div style={{ ...rigaOrario, marginBottom: 14 }}>
                     <span>{partenzaVero.citta}</span>
@@ -1085,7 +1053,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
                   </div>
                 ) : <p className="testo-intro" style={{ marginBottom: 14 }}>Nessuna fermata su questo tragitto.</p>}
 
-                <p className="section-label" style={{ marginBottom: 8 }}>Fermate intermedie ({fermateIntermedie.filter((f) => f.attivo !== false).length})</p>
+                <p className="section-label" style={{ marginBottom: 8 }}>Fermate intermedie ({fermateIntermedie.length})</p>
                 {fermateIntermedie.length === 0
                   ? <p className="testo-intro">Nessuna fermata intermedia: si va dritti dalla partenza all'arrivo.</p>
                   : fermateIntermedie.map((f) => (
@@ -1096,7 +1064,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
                   ))}
                 {/* L'arrivo è necessario per calcolare gli orari: sempre in
                     vista, così si controlla a colpo d'occhio. */}
-                <p className="section-label" style={{ marginTop: 14, marginBottom: 8 }}>Arrivo</p>
+                <p className="section-label" style={{ marginTop: 14, marginBottom: 8, color: COLORE_ARRIVO }}>Arrivo</p>
                 {tragittoVero?.arrivoCitta || tragittoVero?.arrivoIndirizzo || tragittoVero?.arrivoOrario ? (
                   <div style={rigaOrario}>
                     <span>
@@ -1178,6 +1146,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
             const rigaStile: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--line)' };
             return (
               <div style={{ marginTop: 14 }}>
+                <PartenzaArrivo tragitto={tragittoVero} />
                 <div style={rigaStile}>
                   <div><strong style={{ fontSize: 'var(--testo-base)' }}>Fermate</strong> <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)' }}>· {plurale(tragitto.fermate.length, 'fermata', 'fermate')}</span></div>
                   <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '3px 10px' }} onClick={() => apriModificaOperativa(tragitto)}>Modifica</button>
@@ -1236,28 +1205,13 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
   );
 }
 
-/** Da dove parte e dove arriva il tragitto, in una riga: la stessa
- *  informazione della scheda Orari, anche in Preventivi e Prezzi. */
-function PartenzaArrivo({ tragitto }: { tragitto: Tragitto | undefined }) {
-  if (!tragitto) return null;
-  const partenza = tragitto.fermate.find((f) => f.attivo !== false);
-  const arrivo = [tragitto.arrivoCitta, tragitto.arrivoIndirizzo].filter(Boolean).join(', ');
-  const cella = { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 } as const;
-  const etichetta = { fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: '.04em' } as const;
+/** Il numero rosso di tragitti con qualcosa da fare, su una linguetta. */
+function PallinoDaFare({ quanti }: { quanti: number }) {
+  if (quanti === 0) return null;
   return (
-    <div className="section-card" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'center', marginBottom: 14, background: 'var(--dusk-2)' }}>
-      <div style={cella}>
-        <span style={etichetta}>Partenza</span>
-        <b>{partenza ? partenza.citta : 'Nessuna fermata'}</b>
-        <span style={{ fontSize: 'var(--testo-sm)', color: partenza?.orario ? 'var(--mist)' : 'var(--pink)' }}>{partenza ? (partenza.orario ?? 'orario da impostare') : ''}</span>
-      </div>
-      <span aria-hidden="true" style={{ color: 'var(--mist)' }}>→</span>
-      <div style={{ ...cella, textAlign: 'right' }}>
-        <span style={etichetta}>Arrivo</span>
-        <b style={{ color: arrivo ? undefined : 'var(--pink)' }}>{arrivo || 'Da impostare in Eventi'}</b>
-        <span style={{ fontSize: 'var(--testo-sm)', color: tragitto.arrivoOrario ? 'var(--mist)' : 'var(--pink)' }}>{tragitto.arrivoOrario ?? 'orario da impostare'}</span>
-      </div>
-    </div>
+    <span title={`${plurale(quanti, 'tragitto', 'tragitti')} con qualcosa da fare`} style={{ marginLeft: 6, background: 'var(--pink)', color: '#fff', borderRadius: 999, fontSize: 'var(--testo-xs)', padding: '1px 6px', fontWeight: 700 }}>
+      {quanti}
+    </span>
   );
 }
 

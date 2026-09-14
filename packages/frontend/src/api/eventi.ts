@@ -233,13 +233,9 @@ export const eventiApi = {
   riepilogoEconomico: (id: string) => api.get<RiepilogoEconomicoTratta[]>(`/api/eventi/${id}/riepilogo-economico`),
   venditePerFermata: (tragittoId: string) => api.get<VenditePerFermata>(`/api/eventi/tragitti/${tragittoId}/vendite`),
   suggerimentoLinea: (tragittoId: string) => api.get<SuggerimentoLinea>(`/api/eventi/tragitti/${tragittoId}/suggerimento-linea`),
-  allertePartenze: () => api.get<{ conteggio: number }>('/api/eventi/allerte-partenze'),
-  eventiDaCalcolareOrari: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-calcolare-orari'),
-  eventiDaPrezzare: () => api.get<{ conteggio: number }>('/api/eventi/eventi-da-prezzare'),
-  eventiPreventiviDaRichiedere: () => api.get<{ conteggio: number }>('/api/eventi/eventi-preventivi-da-richiedere'),
-  lineeProntoDaConfermare: () => api.get<{ conteggio: number }>('/api/eventi/linee-pronto-da-confermare'),
   allertePartenzePerEvento: () => api.get<Record<string, number>>('/api/eventi/allerte-partenze-per-evento'),
-  elencoPartenze: () => api.get<Array<{
+  /** `soloInProgramma`: senza gli eventi passati (per i pallini del menu). */
+  elencoPartenze: (opzioni?: { soloInProgramma?: boolean }) => api.get<Array<{
     tragittoId: string; tragittoNome: string;
     stato: 'DA_CONFERMARE' | 'PREZZATO' | 'CONFERMATO';
     postiTotali: number; totalePasseggeri: number;
@@ -251,7 +247,7 @@ export const eventiApi = {
     /** Richieste di preventivo partite e risposte arrivate (giallo in Preventivi). */
     richiestePreventivo: number; rispostePreventivo: number;
     evento: { id: string; artista: string; genere: string; data: string; citta: string; luogo: string; slug: string; immagineUrl: string | null };
-  }>>('/api/eventi/elenco-partenze'),
+  }>>(`/api/eventi/elenco-partenze${opzioni?.soloInProgramma ? '?inProgramma=1' : ''}`),
   statistichePerEvento: () => api.get<Record<string, { partecipanti: number; busCensiti: number }>>('/api/eventi/statistiche-per-evento'),
   tragittoHaPrenotazioniConfermate: (tragittoId: string) => api.get<{ haPrenotazioni: boolean; quante: number }>(`/api/eventi/tragitti/${tragittoId}/prenotazioni-confermate`),
   cestino: {

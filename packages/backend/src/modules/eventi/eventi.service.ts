@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, isNull, isNotNull, sql, gte, lt, asc, ne } from 'drizzle-orm';
+import { and, eq, ilike, inArray, isNull, sql, gte, lt, asc, ne } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
   eventi,
@@ -2003,107 +2003,11 @@ export const eventiService = {
     return risultato;
   },
 
-  /** Quanti eventi (non passati) hanno almeno un tragitto ancora "da
-   *  confermare" — nessun bus vero registrato, quindi non ancora in
-   *  vendita. Badge dedicato nel menu di Partenze, per non doverli
-   *  scoprire aprendo ogni evento uno per uno. */
-  /** Eventi con almeno un tragitto senza ancora nessuna fermata con
-   *  orario impostato — stesso criterio già usato da "fermateCompilate"
-   *  qui sotto (almeno una fermata con orario = fatto). Conteggio per
-   *  la tappa di menu "Orari". */
-  async contaEventiDaCalcolareOrari() {
-    const righeTragitti = await db
-      .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id })
-      .from(tragitti)
-      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      // Niente bozze: l'evento che si sta ancora creando non accende i pallini.
-      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), eq(eventi.bozza, false), gte(eventi.data, inizioOggiRoma())));
-    if (righeTragitti.length === 0) return 0;
+  // I pallini del menu di Partenze si calcolano nel gestionale dall'elenco
+  // qui sotto (elencoPartenze), con le stesse regole delle card: prima
+  // c'erano qui cinque conteggi a parte, con regole diverse dalle card.
 
-    const tragittiIds = righeTragitti.map((r) => r.tragittoId);
-    const fermateConOrario = await db.select({ tragittoId: fermate.tragittoId, orario: fermate.orario })
-      .from(fermate).where(inArray(fermate.tragittoId, tragittiIds));
-    const conOrario = new Set(fermateConOrario.filter((f) => f.orario).map((f) => f.tragittoId));
-    const senzaOrario = righeTragitti.filter((r) => !conOrario.has(r.tragittoId));
-    return new Set(senzaOrario.map((r) => r.eventoId)).size;
-  },
-
-  /** Eventi con almeno un tragitto già pronto per chiedere un
-   *  preventivo (orario impostato) ma senza ancora un fornitore
-   *  accettato — il segnale "c'è qualcosa da fare in Preventivi",
-   *  distinto da "risposte arrivate da valutare" (contaDaValutare, nel
-   *  modulo preventivi) che invece guarda le richieste già inviate. */
-  /** Quanti EVENTI hanno almeno una linea da confermare (creata in
-   *  automatico: soglia di pareggio raggiunta, o bus pieni) — il pallino
-   *  su "Da confermare" nel menu. Solo tragitti attivi di eventi non
-   *  passati e non nel cestino. */
-  async contaLineeProntoDaConfermare() {
-    const righe = await db.selectDistinct({ eventoId: tragitti.eventoId }).from(linee)
-      .innerJoin(tragitti, eq(tragitti.id, linee.tragittoId))
-      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(
-        eq(linee.daConfermare, true), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl),
-        isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma()),
-      ));
-    return righe.length;
-  },
-
-  /** Eventi con almeno un tragitto con gli orari ma ancora senza nessuna
-   *  richiesta di preventivo partita e senza un preventivo (accettato o
-   *  registrato a mano): il rosso di Preventivi. Con le richieste già
-   *  inviate il tragitto è in attesa (giallo) e non accende il pallino. */
-  async contaEventiPreventiviDaRichiedere() {
-    const righeTragitti = await db
-      .select({ eventoId: tragitti.eventoId, tragittoId: tragitti.id })
-      .from(tragitti)
-      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(
-        eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), eq(eventi.bozza, false), gte(eventi.data, inizioOggiRoma()),
-        isNull(tragitti.fornitoreId), isNull(tragitti.preventivoCosto),
-      ));
-    if (righeTragitti.length === 0) return 0;
-
-    const tragittiIds = righeTragitti.map((r) => r.tragittoId);
-    const [fermateConOrarioPerPreventivo, conRichieste] = await Promise.all([
-      db.select({ tragittoId: fermate.tragittoId, orario: fermate.orario }).from(fermate).where(inArray(fermate.tragittoId, tragittiIds)),
-      db.selectDistinct({ tragittoId: preventiviRichieste.tragittoId }).from(preventiviRichieste).where(inArray(preventiviRichieste.tragittoId, tragittiIds)),
-    ]);
-    const conOrarioPerPreventivo = new Set(fermateConOrarioPerPreventivo.filter((f) => f.orario).map((f) => f.tragittoId));
-    const giaRichiesti = new Set(conRichieste.map((r) => r.tragittoId));
-    const pronti = righeTragitti.filter((r) => conOrarioPerPreventivo.has(r.tragittoId) && !giaRichiesti.has(r.tragittoId));
-    return new Set(pronti.map((r) => r.eventoId)).size;
-  },
-
-  // Nome corretto: questi tragitti hanno stato interno "DA_CONFERMARE"
-  // (prima ancora di essere prezzati) - da non confondere con la tappa
-  // di menu "Da Confermare" (quella per costruire le Linee, tragitti
-  // GIA' prezzati) - stessa parola, due concetti diversi. Questo
-  // conteggio appartiene alla tappa "Prezzi".
-  async contaEventiDaPrezzare() {
-    // Solo tragitti con un preventivo (accettato o registrato): senza costo
-    // non c'è niente da prezzare, come nella scheda Prezzi. Prima il pallino
-    // si accendeva appena creato l'evento.
-    const righe = await db
-      .select({ eventoId: tragitti.eventoId })
-      .from(tragitti)
-      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(
-        eq(tragitti.stato, 'DA_CONFERMARE'), eq(tragitti.attivo, true), isNotNull(tragitti.preventivoCosto),
-        isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), eq(eventi.bozza, false), gte(eventi.data, inizioOggiRoma()),
-      ));
-    return new Set(righe.map((r) => r.eventoId)).size;
-  },
-
-  /** Eventi con almeno un tragitto già prezzato ma senza ancora
-   *  nessuna Linea costruita — questo, e non lo stato interno
-   *  "DA_CONFERMARE" (un nome simile ma un concetto diverso), è il
-   *  conteggio giusto per la tappa di menu "Da Confermare". */
-  async contaAllertePartenze(): Promise<number> {
-    const perEvento = await eventiService.allertePartenzePerEvento();
-    return Object.values(perEvento).reduce((somma, n) => somma + n, 0);
-  },
-
-  /** Come sopra, ma per singolo evento — quante tratte con posti
+  /** Per singolo evento: quante tratte con posti
    *  superati ha OGNI evento (non solo il totale generale), usata per
    *  mostrare il pallino di avviso sulla card dell'evento specifico
    *  nella sezione Partenze, non solo nel menu laterale. Contano i posti
@@ -2142,7 +2046,7 @@ export const eventiService = {
    *  ogni servizio (Andata/Ritorno ecc.), non solo quelli liberi —
    *  ognuno diventa una partenza a sé, col nome del suo servizio se ce
    *  l'ha. */
-  async elencoPartenze() {
+  async elencoPartenze({ soloInProgramma = false }: { soloInProgramma?: boolean } = {}) {
     const righe = await db.select({
       tragittoId: tragitti.id,
       tragittoNome: tragitti.nome,
@@ -2168,7 +2072,11 @@ export const eventiService = {
       // — senza questo filtro continuava a comparire in Partenze e a
       // contare nei badge del menu. Stesso fix nei tre conteggi sopra.
       // Niente bozze: un evento ancora in creazione non è in Partenze.
-      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), eq(eventi.bozza, false)));
+      .where(and(
+        eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), eq(eventi.bozza, false),
+        // Il giorno dell'evento è ancora "in programma" (ora di Roma).
+        ...(soloInProgramma ? [gte(eventi.data, inizioOggiRoma())] : []),
+      ));
 
     if (righe.length === 0) return [];
 

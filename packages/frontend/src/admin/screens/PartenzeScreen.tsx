@@ -10,12 +10,11 @@ import { useNavigazione } from '../shared/NavigazioneContext';
 import { useMappaTooltip } from '../shared/useMappaTooltip';
 import { notifica } from '../shared/notifiche';
 import { motivoErrore } from '../shared/errori';
-import { eventoPassato, plurale } from '../../shared/formato';
+import { plurale } from '../../shared/formato';
 
 import { TITOLI_PARTENZE, SEZIONE_PARTENZE, type TabPartenze, type AzionePartenze } from './partenze/tipi';
-import { ETICHETTA_CAMBIO_PERCORSO } from '../shared/AvvisoCambioPercorso';
+import { COLORE_LIVELLO, statoCard, statoInTappa, tappeDi, type Partenza } from './partenze/statiPartenze';
 export type { TabPartenze } from './partenze/tipi';
-type Partenza = Awaited<ReturnType<typeof eventiApi.elencoPartenze>>[number];
 
 const CHIAVE_TOOLTIP: Record<TabPartenze, string> = {
   fermate: 'partenze_orari_intro', preventivi: 'partenze_preventivi_intro', 'da-prezzare': 'partenze_prezzi_intro',
@@ -31,11 +30,6 @@ const MESSAGGIO_VUOTO: Record<TabPartenze, string> = {
   passate: 'Nessun evento passato ancora.',
 };
 
-/** "Manca 1 posto" / "Mancano 3 posti". */
-function postiMancanti(n: number) {
-  return n === 1 ? 'Manca 1 posto' : `Mancano ${n} posti`;
-}
-
 /**
  * Le sei tappe del flusso Orari → Preventivi → Prezzi → Da confermare →
  * Confermate | Passate, ognuna una voce separata nel menu a sinistra
@@ -45,8 +39,9 @@ function postiMancanti(n: number) {
  * Un tragitto qui vive SEMPRE finché l'evento non è passato — un
  * compito fatto in una tappa non lo fa sparire dalle altre, resta
  * sempre raggiungibile per rivederlo. Le card degli eventi restano
- * sempre visibili mentre ci si lavora, contorno rosso se manca ancora
- * qualcosa in QUESTA tappa, verde se è già a posto qui.
+ * sempre visibili mentre ci si lavora: contorno rosso se in QUESTA tappa
+ * tocca a noi fare qualcosa, arancio se si aspetta qualcun altro, verde se
+ * è già a posto, viola se il percorso è cambiato (statiPartenze.ts).
  *
  * - "Orari": si calcolano gli orari di ogni fermata e si esporta
  *   l'elenco da mandare ai fornitori.
@@ -93,79 +88,9 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
     return () => window.removeEventListener('focus', ricarica);
   }, []);
 
-  // Passata dal giorno dopo l'evento (ora di Roma): il giorno stesso i bus devono ancora partire.
-  function passata(p: Partenza) {
-    return eventoPassato(p.evento.data);
-  }
-  // Contano i posti dei bus confermati, non quelli in vendita (sempre
-  // "quasi illimitati": le vendite non si fermano per i bus).
-  function scoperta(p: Partenza) {
-    return p.stato === 'CONFERMATO' && p.totalePasseggeri > p.postiSuiBus;
-  }
-  // A quali tappe appartiene questo tragitto, TUTTE insieme (un
-  // tragitto compare in più tappe insieme man mano che avanza — es. in
-  // "Da confermare" e "Confermate" contemporaneamente).
-  function tabsDi(p: Partenza): TabPartenze[] {
-    if (passata(p)) return ['passate'];
-    // Preventivi: compare solo quando ci sono orari da mostrare al
-    // fornitore (senza orari non ha senso chiedere un preventivo).
-    // Prezzi: compare solo quando un preventivo esiste già (accettato
-    // o registrato a mano in Preventivi) — Prezzi calcola i prezzi di
-    // vendita da un costo noto, non registra il costo la prima volta.
-    const conPreventivi: TabPartenze[] = p.fermateCompilate ? ['preventivi'] : [];
-    const conPrezzi: TabPartenze[] = p.preventivoCosto ? ['da-prezzare'] : [];
-    if (p.stato === 'DA_CONFERMARE') return ['fermate', ...conPreventivi, ...conPrezzi];
-    const risultato: TabPartenze[] = ['fermate', ...conPreventivi, ...conPrezzi, 'da-confermare'];
-    if (p.stato !== 'PREZZATO') risultato.push('confermato'); // "Confermate" resta un insieme a parte
-    return risultato;
-  }
-  function fattoInTab(p: Partenza, tabAttuale: TabPartenze): boolean {
-    if (tabAttuale === 'fermate') return p.fermateCompilate;
-    // Accettato da un fornitore, o registrato a mano, e sul percorso di adesso.
-    if (tabAttuale === 'preventivi') return !p.cambioPercorso && (!!p.fornitoreId || !!p.preventivoCosto);
-    // Fatto solo quando i prezzi di vendita sono salvati davvero (lo stato
-    // lascia DA_CONFERMARE) — prima bastava aver registrato il preventivo,
-    // e la card diceva "Fatto" su un tragitto ancora senza prezzi.
-    if (tabAttuale === 'da-prezzare') return p.stato !== 'DA_CONFERMARE';
-    if (tabAttuale === 'da-confermare') return p.stato === 'CONFERMATO' && !scoperta(p) && p.lineeDaConfermare === 0;
-    if (tabAttuale === 'confermato') return !scoperta(p) && p.lineeDaConfermare === 0; // qui dentro lo stato è già sempre CONFERMATO, per costruzione
-    return false; // Passate: mai un contorno
-  }
-  // Stesse parole della pagina del tragitto (PartenzeTab): prima la card
-  // diceva "Fatto" e dentro "Prezzato", per la stessa identica cosa.
-  // Niente simboli: il colore del bollino dice già lo stato.
-  /** `attesa`: non ancora fatto, ma non tocca a noi (richieste di preventivo
-   *  partite): giallo invece di rosso. */
-  function etichettaStato(p: Partenza, tabAttuale: TabPartenze): { fatto: boolean; testo: string; attesa?: boolean } {
-    if (tabAttuale === 'fermate') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'Orari impostati' } : { fatto: false, testo: 'Orari da impostare' };
-    if (tabAttuale === 'preventivi') {
-      // Prima di tutto, in viola: il preventivo va rifatto perché il percorso è cambiato.
-      if (p.cambioPercorso) return { fatto: false, testo: ETICHETTA_CAMBIO_PERCORSO[p.cambioPercorso] };
-      // Verde: preventivo accettato o registrato.
-      if (fattoInTab(p, tabAttuale)) return { fatto: true, testo: p.fornitoreId ? 'Accettato' : 'Registrato' };
-      // Prima servono gli orari (la richiesta al fornitore mostra
-      // fermate/orari) — senza, non ha ancora senso segnalarlo come
-      // "da fare" qui, resta solo un'attesa neutra.
-      if (!p.fermateCompilate) return { fatto: true, testo: '' };
-      // Giallo: richieste inviate, preventivo non ancora accettato.
-      if (p.richiestePreventivo > 0) {
-        return { fatto: false, attesa: true, testo: p.rispostePreventivo > 0 ? plurale(p.rispostePreventivo, 'risposta da valutare', 'risposte da valutare') : 'Richieste inviate' };
-      }
-      // Rosso: nessuna richiesta ancora inviata.
-      return { fatto: false, testo: 'Da richiedere' };
-    }
-    if (tabAttuale === 'da-prezzare') return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'In vendita' } : { fatto: false, testo: 'Da prezzare' };
-    if (tabAttuale === 'da-confermare' || tabAttuale === 'confermato') {
-      // Bus e linee da confermare nascono da soli (pareggio raggiunto, che riparte dopo ogni bus).
-      if (p.lineeDaConfermare > 0) return { fatto: false, testo: p.lineeDaConfermare === 1 ? 'Bus o linea da confermare' : `${p.lineeDaConfermare} proposte da confermare` };
-      if (scoperta(p)) return { fatto: false, testo: postiMancanti(p.totalePasseggeri - p.postiSuiBus) };
-      if (tabAttuale === 'confermato') return { fatto: true, testo: '' };
-      return fattoInTab(p, tabAttuale) ? { fatto: true, testo: 'Confermata' } : { fatto: false, testo: 'Sotto il pareggio' };
-    }
-    return { fatto: true, testo: '' }; // Passate: nessuna etichetta di stato, mai contorno
-  }
-
-  const partenzePerTab = partenze.filter((p) => tabsDi(p).includes(tab));
+  // Voci, stati e colori stanno in statiPartenze.ts: gli stessi della pagina
+  // del tragitto e dei pallini del menu.
+  const partenzePerTab = partenze.filter((p) => tappeDi(p).includes(tab));
   // Raggruppo per evento — un evento con più tragitti/servizi in
   // questa tappa diventa UNA sola card.
   const eventiRaggruppati = new Map<string, Partenza[]>();
@@ -250,33 +175,11 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
       ) : (
         <div className="cards-list">
           {cardsFiltrate.map((gruppo) => {
-            const stati = gruppo.map((p) => etichettaStato(p, tab));
-            const tuttoFatto = stati.every((s) => s.fatto);
-            // Un tragitto in attesa (richieste di preventivo inviate) non è "da fare": giallo, non rosso.
-            const nienteFatto = stati.every((s) => !s.fatto && !s.attesa);
-            // Un evento con più tragitti insieme (es. andata+ritorno, o
-            // più servizi) può avere alcuni già a posto e altri no per
-            // questa tappa — né "tutto fatto" né "niente fatto", un
-            // terzo stato a parte (giallo) per non confonderlo con
-            // nessuno dei due.
-            const parziale = !tuttoFatto && !nienteFatto;
-            // Se alcuni sono fatti e altri no (evento a più servizi), o
-            // se sono tutti da fare ma con etichette diverse, mostro
-            // solo un conteggio generico invece di scegliere a caso
-            // quale delle due mostrare.
-            const daFare = stati.filter((s) => !s.fatto);
-            const etichetteDaFareUniche = [...new Set(daFare.map((s) => s.testo))];
-            const etichetteFatteUniche = [...new Set(stati.filter((s) => s.fatto && s.testo).map((s) => s.testo))];
-            const nienteDaMostrare = stati.every((s) => !s.testo);
-            const tuttiInAttesaOFatti = !tuttoFatto && stati.every((s) => s.fatto || s.attesa);
-            const etichetteAttesaUniche = [...new Set(stati.filter((s) => s.attesa).map((s) => s.testo))];
-            const testoBadge = nienteDaMostrare ? undefined
-              : tuttoFatto ? (etichetteFatteUniche.length === 1 ? etichetteFatteUniche[0] : 'Fatto')
-              : tuttiInAttesaOFatti && etichetteAttesaUniche.length === 1 ? etichetteAttesaUniche[0]
-              : tuttiInAttesaOFatti ? 'In attesa dei fornitori'
-              : parziale ? `${stati.length - daFare.length}/${stati.length} pronti`
-              : etichetteDaFareUniche.length === 1 ? etichetteDaFareUniche[0]
-              : `${daFare.length} da completare`;
+            // Passate: solo archivio, nessuno stato e nessun contorno.
+            const stati = gruppo.map((p) => statoInTappa(p, tab)).filter((s): s is NonNullable<typeof s> => s !== null);
+            // Il colore è quello del tragitto messo peggio (rosso se ce n'è
+            // uno da fare, anche se gli altri sono pronti).
+            const card = statoCard(stati);
             // Contano i posti dei bus confermati: quelli in vendita sono
             // sempre "quasi illimitati", mai "2/999999 posti".
             const passeggeri = gruppo.reduce((s, p) => s + p.totalePasseggeri, 0);
@@ -285,30 +188,25 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
             const testoPosti = senzaBus === gruppo.length
               ? `${plurale(passeggeri, 'passeggero', 'passeggeri')} · nessun bus`
               : `${passeggeri}/${posti} posti${senzaBus > 0 ? ` · ${senzaBus} senza bus` : ''}`;
-            // Viola, sopra ogni altro stato: un tragitto dell'evento ha il
-            // percorso cambiato dopo il preventivo accettato. In Preventivi
-            // la card intera; nelle altre tappe una nota.
-            const cambiati = tab !== 'passate' ? gruppo.filter((p) => p.cambioPercorso) : [];
-            const violaInCard = tab === 'preventivi' && cambiati.length > 0;
-            const testoViola = cambiati.length === 1 && cambiati[0].cambioPercorso
-              ? ETICHETTA_CAMBIO_PERCORSO[cambiati[0].cambioPercorso]
-              : `${cambiati.length} percorsi cambiati`;
+            // Viola, sopra ogni altro stato: in Preventivi la card intera
+            // (statoInTappa), nelle altre voci una nota.
+            const cambiati = tab !== 'passate' && tab !== 'preventivi' ? gruppo.filter((p) => p.cambioPercorso) : [];
             return (
               <EventoCardCompatta
                 key={gruppo[0].evento.id}
                 evento={gruppo[0].evento}
                 onClick={() => apriGruppo(gruppo)}
-                percorsoCambiato={violaInCard}
-                richiedeIntervento={!violaInCard && tab !== 'passate' && nienteFatto}
-                parziale={!violaInCard && tab !== 'passate' && parziale}
-                completata={!violaInCard && tab !== 'passate' && tuttoFatto}
-                badge={violaInCard ? testoViola : testoBadge}
-                badgeColore={violaInCard ? 'var(--viola)' : tuttoFatto ? 'var(--green)' : parziale ? 'var(--amber)' : 'var(--pink)'}
+                percorsoCambiato={card.livello === 'percorso-cambiato'}
+                richiedeIntervento={card.livello === 'da-fare'}
+                inAttesa={card.livello === 'attesa'}
+                completata={card.livello === 'fatto'}
+                badge={card.testo}
+                badgeColore={card.livello ? COLORE_LIVELLO[card.livello] : undefined}
                 extra={
                   <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 2 }}>
                     {plurale(gruppo.length, 'tragitto', 'tragitti')}
                     {(tab === 'da-confermare' || tab === 'confermato') && ` · ${testoPosti}`}
-                    {!violaInCard && cambiati.length > 0 && <span style={{ color: 'var(--viola)', fontWeight: 600 }}> · percorso cambiato</span>}
+                    {cambiati.length > 0 && <span style={{ color: 'var(--viola)', fontWeight: 600 }}> · percorso cambiato</span>}
                   </p>
                 }
               />

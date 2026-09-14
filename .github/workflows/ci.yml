@@ -53,7 +53,7 @@ jobs:
       - run: npm run test:db
 
   frontend:
-    name: Frontend — typecheck + build
+    name: Frontend — typecheck, test + build
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: packages/frontend } }
     steps:
@@ -62,6 +62,8 @@ jobs:
         with: { node-version: 22, cache: npm, cache-dependency-path: packages/frontend/package-lock.json }
       - run: npm ci
       - run: npx tsc --noEmit --noUnusedLocals --noUnusedParameters
+      # Regole del gestionale senza schermo (per ora: colori e pallini di Partenze).
+      - run: npm test
       # Il prerender in fondo a "build" prova a contattare l'API e, se
       # non ci riesce, salta con un avviso — non fallisce. Qui basta.
       - run: npm run build

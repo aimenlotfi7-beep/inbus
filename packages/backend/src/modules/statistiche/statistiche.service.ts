@@ -363,7 +363,7 @@ export const statisticheService = {
       // Solo i tragitti in vendita: uno disattivato non si prepara più.
       const tragittiAttivi = dati.strutture.tragitti.filter((t) => t.attivo);
 
-      // Stessi tragitti del pallino viola di Preventivi (contaCambiPercorso).
+      // Stessi tragitti del viola di Partenze → Preventivi.
       const perCambio = tragittiAttivi.filter((t) => perId.get(t.eventoId)!.data >= inizioGiornoRoma(oggi));
       const cambi = await cambiPercorso(perCambio.map((t) => t.id));
       for (const t of perCambio) {

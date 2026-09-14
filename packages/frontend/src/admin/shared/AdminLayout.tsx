@@ -5,9 +5,10 @@ import { eventiApi } from '../../api/eventi';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import { richiesteRimborsoApi } from '../../api/richiesteRimborso';
 import { fornitoriApi } from '../../api/fornitori';
-import { preventiviApi } from '../../api/preventivi';
 import { chatApi } from '../../api/chat';
 import { plurale } from '../../shared/formato';
+import { SEZIONE_PARTENZE, type TabPartenze } from '../screens/partenze/tipi';
+import { COSA_DA_FARE, palliniPartenze, type VocePallino } from '../screens/partenze/statiPartenze';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'bundle' | 'tour' | 'vetrina' | 'calendario' | 'cestino'
@@ -119,40 +120,23 @@ export function AdminLayout({
   // robusto: o funziona la disposizione verticale normale, o non
   // funziona nulla del layout mobile in generale.
   const [menuMobileAperto, setMenuMobileAperto] = useState(false);
-  const [allertePartenze, setAllertePartenze] = useState(0);
-  const [eventiDaCalcolareOrari, setEventiDaCalcolareOrari] = useState(0);
-  const [eventiDaPrezzare, setEventiDaPrezzare] = useState(0);
-  const [lineeProntoDaConfermare, setLineeProntoDaConfermare] = useState(0);
-  const [preventiviDaValutare, setPreventiviDaValutare] = useState(0);
-  // Viola, a parte: tragitti con il percorso cambiato dopo il preventivo
-  // accettato (preventivo da rifare, più urgente degli altri avvisi).
-  const [cambiPercorso, setCambiPercorso] = useState(0);
-  const [eventiPreventiviDaRichiedere, setEventiPreventiviDaRichiedere] = useState(0);
+  // Pallini di Partenze: calcolati con le stesse regole delle card e della
+  // pagina del tragitto (statiPartenze.ts). Per ogni voce gli eventi con
+  // almeno un tragitto rosso; in viola, a parte, quelli con il percorso
+  // cambiato dopo il preventivo (su Preventivi).
+  const [palliniPartenzeVoci, setPalliniPartenzeVoci] = useState<ReturnType<typeof palliniPartenze> | null>(null);
   const [inAttesa, setInAttesa] = useState(0);
   const [rimborsiInAttesa, setRimborsiInAttesa] = useState(0);
   const [fornitoriInAttesa, setFornitoriInAttesa] = useState(0);
 
-  // Notifiche su ogni tappa di Partenze dove c'è davvero qualcosa da
-  // lavorare — "Orari" quanti eventi non hanno ancora nessun orario
-  // impostato, "Prezzi" quanti non sono ancora prezzati, "Da
-  // Confermare" quanti sono prezzati ma senza ancora una Linea,
-  // "Confermato" le tratte con più passeggeri confermati dei posti
-  // previsti. "Passate" non ne ha una — è solo archivio, niente da
-  // lavorare lì per definizione. Solo per chi ha il permesso di vedere
-  // quella sezione.
+  // "Passate" non ha pallino: è solo archivio.
   // Ogni gruppo di pallini dipende dal suo permesso (partenze, pagamenti,
   // fornitori, chat): un amministratore può avere l'uno senza l'altro.
   const [chatNonLette, setChatNonLette] = useState(0);
   const [aggiornamento, setAggiornamento] = useState(0);
   useEffect(() => {
     if (haPermesso(sessione, 'eventi.partenze')) {
-      eventiApi.allertePartenze().then((r) => setAllertePartenze(r.conteggio)).catch(() => {});
-      eventiApi.eventiDaCalcolareOrari().then((r) => setEventiDaCalcolareOrari(r.conteggio)).catch(() => {});
-      eventiApi.eventiDaPrezzare().then((r) => setEventiDaPrezzare(r.conteggio)).catch(() => {});
-      eventiApi.lineeProntoDaConfermare().then((r) => setLineeProntoDaConfermare(r.conteggio)).catch(() => {});
-      eventiApi.eventiPreventiviDaRichiedere().then((r) => setEventiPreventiviDaRichiedere(r.conteggio)).catch(() => {});
-      preventiviApi.contaDaValutare().then((r) => setPreventiviDaValutare(r.conteggio)).catch(() => {});
-      preventiviApi.contaCambiPercorso().then((r) => setCambiPercorso(r.conteggio)).catch(() => {});
+      eventiApi.elencoPartenze({ soloInProgramma: true }).then((p) => setPalliniPartenzeVoci(palliniPartenze(p))).catch(() => {});
       listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
     }
     if (haPermesso(sessione, 'prenotazioni.pagamenti')) {
@@ -180,14 +164,16 @@ export function AdminLayout({
   /** Le notifiche viola (più urgenti) di una voce: per ora i tragitti con il
    *  percorso cambiato dopo il preventivo accettato, su "Preventivi". */
   function notificaUrgenteVoce(id: string): number {
-    return id === 'partenze-preventivi' ? cambiPercorso : 0;
+    return id === 'partenze-preventivi' ? palliniPartenzeVoci?.percorsiCambiati ?? 0 : 0;
+  }
+  /** La voce di Partenze di una sezione del menu, se lo è (e ha un pallino). */
+  function vocePartenze(id: string): VocePallino | null {
+    const voce = (Object.keys(SEZIONE_PARTENZE) as TabPartenze[]).find((tab) => SEZIONE_PARTENZE[tab] === id);
+    return voce && voce !== 'passate' ? voce : null;
   }
   function notificaVoce(id: string): number {
-    if (id === 'partenze-orari') return eventiDaCalcolareOrari;
-    if (id === 'partenze-prezzi') return eventiDaPrezzare;
-    if (id === 'partenze-da-confermare') return lineeProntoDaConfermare;
-    if (id === 'partenze-preventivi') return preventiviDaValutare + eventiPreventiviDaRichiedere;
-    if (id === 'partenze-confermato') return allertePartenze;
+    const voce = vocePartenze(id);
+    if (voce) return palliniPartenzeVoci?.perVoce[voce] ?? 0;
     if (id === 'lista-attesa') return inAttesa;
     if (id === 'rimborsi') return rimborsiInAttesa;
     if (id === 'chat') return chatNonLette;
@@ -281,7 +267,7 @@ export function AdminLayout({
                   >
                     {voce.label}
                     {notificaUrgenteVoce(voce.id) > 0 && (
-                      <span className="side-badge urgente" title={`${plurale(notificaUrgenteVoce(voce.id), 'tragitto', 'tragitti')} con il percorso cambiato: il preventivo va rifatto`}>
+                      <span className="side-badge urgente" title={`${plurale(notificaUrgenteVoce(voce.id), 'evento', 'eventi')} con il percorso cambiato: il preventivo va rifatto`}>
                         {notificaUrgenteVoce(voce.id)}
                       </span>
                     )}
@@ -289,11 +275,7 @@ export function AdminLayout({
                       <span
                         className="side-badge"
                         title={
-                          voce.id === 'partenze-orari' ? `${plurale(eventiDaCalcolareOrari, 'evento', 'eventi')} senza ancora nessun orario impostato`
-                            : voce.id === 'partenze-prezzi' ? `${plurale(eventiDaPrezzare, 'evento', 'eventi')} con almeno un tragitto da prezzare`
-                            : voce.id === 'partenze-da-confermare' ? `${plurale(lineeProntoDaConfermare, 'evento', 'eventi')} con un bus o una linea da confermare`
-                            : voce.id === 'partenze-preventivi' ? `${plurale(eventiPreventiviDaRichiedere, 'evento pronto', 'eventi pronti')} per una richiesta di preventivo, ${preventiviDaValutare} con risposte da valutare`
-                            : voce.id === 'partenze-confermato' ? `${plurale(allertePartenze, 'tragitto', 'tragitti')} con più passeggeri che posti`
+                          vocePartenze(voce.id) ? `${plurale(notificaVoce(voce.id), 'evento', 'eventi')} con ${COSA_DA_FARE[vocePartenze(voce.id)!]}`
                             : voce.id === 'lista-attesa' ? `${plurale(inAttesa, 'iscrizione', 'iscrizioni')} in attesa di promozione`
                             : voce.id === 'rimborsi' ? `${plurale(rimborsiInAttesa, 'richiesta', 'richieste')} di rimborso da gestire`
                             : voce.id === 'chat' ? `${plurale(chatNonLette, 'conversazione', 'conversazioni')} con messaggi non letti`

@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import crypto from 'node:crypto';
-import { eq, and, asc, gte, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, asc, gte, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { preventiviRichieste, preventiviRisposte, fornitori, tragitti, eventi, fermate } from '../../db/schema.js';
@@ -428,17 +428,21 @@ export const preventiviService = {
     }
     return { inviata };
   },
-  // Per il badge nel menu — una risposta "da valutare" è una risposta
-  // arrivata per un tragitto che NON ha ancora un fornitore accettato
-  // (una volta accettato uno, tutte le altre risposte per quel
-  // tragitto restano solo storico, non più "da decidere").
+  /** Per gli avvisi delle Statistiche: tragitti con risposte dei fornitori
+   *  e ancora senza preventivo (né accettato né registrato a mano), come il
+   *  rosso "risposte da valutare" in Partenze → Preventivi. Solo tragitti
+   *  attivi di eventi in programma, non in bozza e non nel cestino: prima
+   *  contava anche gli eventi passati e l'avviso restava per sempre. */
   contaDaValutare: async () => {
-    const risposte = await db.select({ tragittoId: preventiviRichieste.tragittoId }).from(preventiviRisposte)
-      .innerJoin(preventiviRichieste, eq(preventiviRichieste.id, preventiviRisposte.richiestaId));
-    const tragittiIds = [...new Set(risposte.map((r) => r.tragittoId))];
-    if (tragittiIds.length === 0) return 0;
-    const tragittiSenzaAccettazione = await db.select({ id: tragitti.id }).from(tragitti).where(and(inArray(tragitti.id, tragittiIds), isNull(tragitti.fornitoreId), isNull(tragitti.eliminatoIl)));
-    return tragittiSenzaAccettazione.length;
+    const righe = await db.selectDistinct({ tragittoId: preventiviRichieste.tragittoId }).from(preventiviRisposte)
+      .innerJoin(preventiviRichieste, eq(preventiviRichieste.id, preventiviRisposte.richiestaId))
+      .innerJoin(tragitti, eq(tragitti.id, preventiviRichieste.tragittoId))
+      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(and(
+        isNull(tragitti.fornitoreId), isNull(tragitti.preventivoCosto), eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl),
+        isNull(eventi.eliminatoIl), eq(eventi.bozza, false), gte(eventi.data, inizioOggiRoma()),
+      ));
+    return righe.length;
   },
   /** Il percorso è cambiato dal preventivo accettato? Per il riquadro viola
    *  in Preventivi e in Da confermare: fermate tolte e aggiunte, cosa fare e
@@ -466,14 +470,6 @@ export const preventiviService = {
     if (t.preventivoCosto == null) throw new ConflittoDati('Questo tragitto non ha ancora un preventivo da confermare.');
     await db.update(tragitti).set(await fotografiaPercorso(tragittoId)).where(eq(tragitti.id, tragittoId));
     return { ok: true as const };
-  },
-  /** Per il pallino viola su "Preventivi": tragitti attivi di eventi non
-   *  passati con il percorso cambiato dal preventivo accettato. */
-  contaCambiPercorso: async () => {
-    const righe = await db.select({ id: tragitti.id }).from(tragitti)
-      .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-      .where(and(eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNotNull(tragitti.preventivoCosto), isNull(eventi.eliminatoIl), gte(eventi.data, inizioOggiRoma())));
-    return (await cambiPercorso(righe.map((r) => r.id))).size;
   },
 };
 
@@ -512,12 +508,6 @@ preventiviRouter.post('/richieste/:richiestaId/reinvia', richiedePermesso('event
 }));
 preventiviRouter.get('/tragitto/:tragittoId', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await preventiviService.listaPerTragitto(req.params.tragittoId));
-}));
-preventiviRouter.get('/conta-da-valutare', richiedePermesso('eventi.partenze'), asyncHandler(async (_req: Request, res: Response) => {
-  res.json({ conteggio: await preventiviService.contaDaValutare() });
-}));
-preventiviRouter.get('/conta-cambi-percorso', richiedePermesso('eventi.partenze'), asyncHandler(async (_req: Request, res: Response) => {
-  res.json({ conteggio: await preventiviService.contaCambiPercorso() });
 }));
 // Percorso cambiato dopo il preventivo accettato (null = in regola).
 preventiviRouter.get('/percorso/:tragittoId', richiedePermesso('eventi.partenze'), asyncHandler(async (req: Request, res: Response) => {

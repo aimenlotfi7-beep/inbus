@@ -196,26 +196,12 @@ export const eventiController = {
     res.json(await eventiService.suggerimentoLinea(req.params.tragittoId));
   },
 
-  async allertePartenze(_req: Request, res: Response) {
-    res.json({ conteggio: await eventiService.contaAllertePartenze() });
-  },
-  async eventiDaCalcolareOrari(_req: Request, res: Response) {
-    res.json({ conteggio: await eventiService.contaEventiDaCalcolareOrari() });
-  },
-  async eventiDaPrezzare(_req: Request, res: Response) {
-    res.json({ conteggio: await eventiService.contaEventiDaPrezzare() });
-  },
-  async eventiPreventiviDaRichiedere(_req: Request, res: Response) {
-    res.json({ conteggio: await eventiService.contaEventiPreventiviDaRichiedere() });
-  },
-  async lineeProntoDaConfermare(_req: Request, res: Response) {
-    res.json({ conteggio: await eventiService.contaLineeProntoDaConfermare() });
-  },
   async allertePartenzePerEvento(_req: Request, res: Response) {
     res.json(await eventiService.allertePartenzePerEvento());
   },
-  async elencoPartenze(_req: Request, res: Response) {
-    res.json(await eventiService.elencoPartenze());
+  /** ?inProgramma=1: senza gli eventi passati (pallini del menu). */
+  async elencoPartenze(req: Request, res: Response) {
+    res.json(await eventiService.elencoPartenze({ soloInProgramma: req.query.inProgramma === '1' }));
   },
   async statistichePerEvento(_req: Request, res: Response) {
     res.json(await eventiService.statistichePerEvento());

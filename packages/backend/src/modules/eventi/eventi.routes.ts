@@ -12,12 +12,7 @@ export const eventiRouter = Router();
 // un'utenza del gestionale arrivano anche bozze e dati interni dei tragitti.
 eventiRouter.get('/', authFacoltativa, valida(listaEventiQuerySchema, 'query'), asyncHandler(eventiController.list));
 // IMPORTANTE: va registrata PRIMA di GET '/:id', altrimenti Express la
-// interpreterebbe come una richiesta per un evento con id "allerte-partenze".
-eventiRouter.get('/allerte-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenze));
-eventiRouter.get('/eventi-da-calcolare-orari', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiDaCalcolareOrari));
-eventiRouter.get('/eventi-da-prezzare', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiDaPrezzare));
-eventiRouter.get('/eventi-preventivi-da-richiedere', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.eventiPreventiviDaRichiedere));
-eventiRouter.get('/linee-pronto-da-confermare', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.lineeProntoDaConfermare));
+// interpreterebbe come una richiesta per un evento con id "allerte-partenze-per-evento".
 eventiRouter.get('/allerte-partenze-per-evento', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.allertePartenzePerEvento));
 eventiRouter.get('/elenco-partenze', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.elencoPartenze));
 eventiRouter.get('/statistiche-per-evento', richiedeAuth, richiedePermesso('eventi.visualizza'), asyncHandler(eventiController.statistichePerEvento));

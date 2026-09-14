@@ -519,8 +519,12 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 }
 .mini-tab:focus, .mini-tab:focus-visible{outline:none; box-shadow:none;}
 .mini-tab.active{border-color:var(--blue); color:var(--paper); background:rgba(37,99,235,.1);}
+/* Linguette dei tragitti in Partenze: stessi colori delle card (statiPartenze.ts). */
 .mini-tab.completato{background:var(--green); border-color:var(--green); color:#fff;}
 .mini-tab.attenzione{background:var(--pink); border-color:var(--pink); color:#fff;}
+.mini-tab.in-attesa{background:var(--amber); border-color:var(--amber); color:#fff;}
+.mini-tab.percorso-cambiato{background:var(--viola); border-color:var(--viola); color:#fff;}
+.mini-tab.completato.active, .mini-tab.attenzione.active, .mini-tab.in-attesa.active, .mini-tab.percorso-cambiato.active{box-shadow:0 0 0 2px var(--dusk), 0 0 0 4px var(--blue);}
 
 /* Sotto-tab (dentro una sezione, es. Info/Descrizione dentro "Info
    evento") — più piccole e discrete delle tab principali, per capire a
@@ -617,7 +621,7 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
    apposta per quando ci sono tanti eventi in elenco e il piccolo badge
    da solo rischia di passare inosservato scorrendo la griglia. */
 .evento-card-compatta.richiede-intervento{border:1px solid var(--pink); box-shadow:0 0 14px 1px rgba(255,61,122,.45);}
-.evento-card-compatta.parziale{border:1px solid var(--amber); box-shadow:0 0 14px 1px color-mix(in srgb, var(--amber) 40%, transparent);}
+.evento-card-compatta.in-attesa{border:1px solid var(--amber); box-shadow:0 0 14px 1px color-mix(in srgb, var(--amber) 40%, transparent);}
 .evento-card-compatta.completata{border:1px solid var(--green); box-shadow:0 0 14px 1px rgba(22,163,74,.4);}
 .evento-card-compatta.selezionata{border-color:var(--pink);}
 
@@ -713,7 +717,8 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .tabella-righe .riga.spenta{color:var(--mist);}
 .tabella-righe .num{text-align:right; font-variant-numeric:tabular-nums;}
 .scheda-linea{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:var(--dusk);}
-.scheda-linea.da-confermare{border-style:dashed; border-color:var(--amber); background:color-mix(in srgb, var(--amber) 5%, var(--dusk));}
+/* Proposta da confermare: tocca a noi, quindi rosso come nelle card di Partenze. */
+.scheda-linea.da-confermare{border-style:dashed; border-color:var(--pink); background:color-mix(in srgb, var(--pink) 5%, var(--dusk));}
 /* Viola: preventivo da rifare perché il percorso è cambiato dopo averlo
    accettato. Colore riservato a questo caso, più urgente degli avvisi rossi. */
 .avviso-percorso{border:1px solid var(--viola); background:color-mix(in srgb, var(--viola) 8%, var(--dusk)); border-radius:12px; padding:12px 14px; margin-bottom:14px;}
@@ -745,6 +750,7 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .badge-stato-verde{background:var(--green); color:#fff;}
 .badge-stato-arancio{background:var(--amber); color:#fff;}
 .badge-stato-rosso{background:var(--pink); color:#fff;}
+.badge-stato-viola{background:var(--viola); color:#fff;}
 .badge.confermata{background:rgba(255,179,71,.15); color:var(--amber);}
 .badge.cancellata{background:rgba(255,61,122,.15); color:var(--pink);}
 

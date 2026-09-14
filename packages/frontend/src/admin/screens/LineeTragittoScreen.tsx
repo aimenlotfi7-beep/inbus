@@ -17,6 +17,7 @@ import { tourLeaderApi, type TourLeader } from '../../api/tourleader';
 import { haPermesso } from '../../api/auth';
 import { CampoNumero } from '../shared/CampoNumero';
 import { PanelHead } from '../shared/PanelHead';
+import { PartenzaArrivo } from '../shared/PartenzaArrivo';
 import { useNavigazione } from '../shared/NavigazioneContext';
 import { useSessione } from '../shared/SessioneContext';
 import { formattaData, formattaDataOra, formattaEuro, giorniAllaData, plurale } from '../../shared/formato';
@@ -598,6 +599,8 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         </>
       )}
 
+      <PartenzaArrivo tragitto={tragittoVero} />
+
       <div className="riepilogo-numeri">
         <div className="riepilogo-numero"><span>Passeggeri</span><b>{passeggeriTotali}</b></div>
         <div className="riepilogo-numero"><span>Posti sui bus</span><b>{postiSuiBus}</b></div>
@@ -670,7 +673,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
             <div key={l.id} className="scheda-linea da-confermare">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
-                  <p style={{ fontWeight: 700, margin: 0 }}>{nomeProposta(l)} <span className="badge attenzione" style={{ marginLeft: 4 }}>Da confermare</span></p>
+                  <p style={{ fontWeight: 700, margin: 0 }}>{nomeProposta(l)} <span className="badge badge-stato-rosso" style={{ marginLeft: 4 }}>Da confermare</span></p>
                   <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', margin: '2px 0 0' }}>
                     {percorso || 'Nessuna fermata'}{postiPrevistiPerLinea ? ` · ${plurale(postiPrevistiPerLinea, 'posto previsto', 'posti previsti')}` : ''}
                   </p>

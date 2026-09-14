@@ -28,25 +28,23 @@ interface EventoMinimo {
  *  (es. "3 in attesa"). "richiedeIntervento" contorna la card
  *  di rosso — pensato per quando il badge da solo, con tanti eventi in
  *  elenco, rischia di passare inosservato. "completata" fa lo stesso
- *  ma di verde. "parziale" (giallo) è per il caso in mezzo — un evento
- *  con più tragitti insieme, dove ALCUNI sono a posto per questa tappa
- *  e ALTRI no ancora (es. metà evento già in vendita, l'altra metà da
- *  prezzare): né tutto fatto né niente fatto, va distinto da entrambi.
+ *  ma di verde. "inAttesa" (arancio): non tocca a noi, si aspetta
+ *  qualcun altro (fornitori che rispondono, prenotazioni per il pareggio).
  *  "percorsoCambiato" (viola) è il più urgente: un preventivo da rifare
  *  perché le fermate sono cambiate dopo averlo accettato.
- *  Solo UNO tra percorsoCambiato/richiedeIntervento/parziale/completata
+ *  Solo UNO tra percorsoCambiato/richiedeIntervento/inAttesa/completata
  *  deve essere vero alla volta — il contorno colorato si AGGIUNGE al badge
  *  testuale, non lo sostituisce (i due possono comparire insieme). */
-export function EventoCardCompatta({ evento, onClick, badge, badgeColore, richiedeIntervento, parziale, completata, percorsoCambiato, extra, opacitaRidotta, mostraLinkPubblico, footer, selezionato }: {
+export function EventoCardCompatta({ evento, onClick, badge, badgeColore, richiedeIntervento, inAttesa, completata, percorsoCambiato, extra, opacitaRidotta, mostraLinkPubblico, footer, selezionato }: {
   evento: EventoMinimo;
   onClick: () => void;
   badge?: ReactNode;
   /** Sfondo del badge — facoltativo, di default resta rosso (comportamento
    *  di sempre). Serve quando il badge deve rispecchiare uno stato che non
-   *  è sempre "attenzione" (es. verde se fatto, arancio se parziale). */
+   *  è sempre "attenzione" (es. verde se fatto, arancio se in attesa). */
   badgeColore?: string;
   richiedeIntervento?: boolean;
-  parziale?: boolean;
+  inAttesa?: boolean;
   completata?: boolean;
   percorsoCambiato?: boolean;
   extra?: ReactNode;
@@ -57,7 +55,7 @@ export function EventoCardCompatta({ evento, onClick, badge, badgeColore, richie
 }) {
   return (
     <div
-      className={`evento-card-compatta${percorsoCambiato ? ' percorso-cambiato' : ''}${richiedeIntervento ? ' richiede-intervento' : ''}${parziale ? ' parziale' : ''}${completata ? ' completata' : ''}${selezionato ? ' selezionata' : ''}`}
+      className={`evento-card-compatta${percorsoCambiato ? ' percorso-cambiato' : ''}${richiedeIntervento ? ' richiede-intervento' : ''}${inAttesa ? ' in-attesa' : ''}${completata ? ' completata' : ''}${selezionato ? ' selezionata' : ''}`}
       onClick={onClick}
       // Raggiungibile anche da tastiera (Tab, poi Invio o Spazio), non solo col mouse.
       role="button"
