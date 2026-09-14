@@ -1,247 +1,184 @@
-# INBUS v2 — Architettura di produzione
+# OnWay (INBUS v2)
 
-Riscrittura da zero della Versione 18 (il prototipo statico HTML/JS/localStorage)
-con un'architettura pensata per essere **affidabile** e **modificabile da
-qualsiasi programmatore** senza dover ricostruire la struttura da capo.
+Piattaforma di prenotazione di bus per concerti ed eventi in Italia: sito pubblico,
+area clienti, portali per promoter, organizzatori, tour leader e fornitori, e un
+gestionale per chi organizza i viaggi.
 
-## Stato del progetto
+- **Sito e gestionale** (React + Vite) pubblicati su **Vercel**
+- **API** (Node.js + Express + TypeScript) e **database PostgreSQL** su **Railway**
+- Codice su GitHub: a ogni caricamento partono controlli e test automatici
 
-Il progetto è cresciuto molto oltre la prima versione di questo documento —
-i numeri sotto sono verificati contro il codice vero, non a memoria.
-
-- **Backend**: 35 moduli, tutti con API vere e funzionanti — 45 tabelle nello
-  schema. Copre eventi (con servizi/tragitti/fermate/anagrafica fermate,
-  percorsi salvati riutilizzabili, layout biglietto personalizzabile),
-  prenotazioni (acconto/saldo, blocco posti atomico, biglietto digitale con
-  QR), lista d'attesa, rimborsi, coupon, campagne, offerte, White Label
-  (widget incorporabile per organizzatori terzi), Promoter e Organizzatori
-  (portali dedicati con commissioni), Tour Leader (candidatura pubblica,
-  scansione biglietti da bus), chat cliente↔admin, contenuti CMS del sito,
-  ruoli e permessi granulari, cestino con ripristino.
-- **Sito pubblico**: grafica derivata dalla Versione 18, ma cresciuta molto
-  oltre — pagine principali:
-  - **Home** (`/`), **carrello** (`/carrello`), **pagina evento** (`/eventi/:slug`)
-  - **Account cliente** (`/account`, `/accedi`, `/registrati`, reset password,
-    verifica email) — area riservata con i miei viaggi, chat, credito fedeltà
-  - **FAQ** e pagine legali (`/pagina/:chiave`)
-  - **Area Promoter** (`/promoter`) e **Area Organizzatori** (`/organizzatore`)
-    — login, statistiche, generatore di link, reset password dedicato
-  - **Candidatura Tour Leader** (`/tour-leader`) e **area scansione biglietti**
-    (`/scansione/*`) — login dedicato, elenco bus, scansione QR passeggeri
-  - **Widget White Label** (`/w/:publicWidgetId`) — checkout incorporabile su
-    siti di organizzatori terzi
-  - Link diretti per completare un saldo (`/completa-saldo/:pnr`) o finalizzare
-    una promozione da lista d'attesa (`/finalizza/:token`)
-- **Gestionale**: circa 30 sezioni collegate all'API vera, organizzate in
-  gruppi (Eventi, Partenze, Vendite, Marketing, Customer Care, Persone,
-  Logistica, Sistema) — sidebar responsive con menu a tendina su mobile.
-
-Tutto è stato **verificato per davvero** in questo ambiente: compilazione
-TypeScript pulita, build di produzione Vite riuscita, avvio a runtime
-dell'app Express confermato. L'unica cosa che non ho potuto testare qui è
-l'esecuzione contro un vero database Postgres (questa sandbox non può
-far girare un database persistente) — il codice è scritto per funzionare
-appena colleghi un Postgres vero, e le istruzioni sotto ti guidano passo
-passo a farlo sul tuo computer.
+Aggiornato a settembre 2026.
 
 ---
 
-## Come far girare tutto sul tuo computer
+## Cosa c'è dentro
 
-### Modalità semplice (consigliata): doppio click
+### Sito pubblico e aree riservate
+- **Home, pagina evento, carrello e checkout** (anche senza account: acquisto
+  come ospite), **bundle** (`/bundle`), **tour** (`/tour/:slug`), **offerte**
+  (`/offerta/:slug`), FAQ e pagine legali (`/pagina/:chiave`)
+- **Area cliente** (`/account`): viaggi, biglietti, saldo, chat, credito
+  fedeltà, invita un amico, privacy
+- **Promoter** (`/promoter`, link `/p/:codice`) e **Organizzatori**
+  (`/organizzatore`): statistiche e commissioni
+- **Tour leader** (`/tour-leader` per candidarsi, `/scansione` per la lista
+  passeggeri e la scansione dei biglietti sul bus)
+- **Fornitori di bus**: registrazione (`/fornitore/registrati`) e risposta a
+  quotazioni e preventivi dal link ricevuto via email
+  (`/fornitore/preventivo/:token`)
+- **Widget White Label** (`/w/:publicWidgetId`) da incorporare sui siti di terzi
+- Link diretti: saldo (`/completa-saldo/:pnr`), lista d'attesa
+  (`/finalizza/:token`), risposta a una variazione di viaggio (`/variazione/:token`)
 
-Ho preparato tre file per evitare di scrivere comandi nel terminale ogni volta:
+### Gestionale (`/admin.html`)
+41 voci in 9 gruppi, ognuna visibile solo a chi ha il permesso:
 
-1. **`INSTALLA.bat`** — da eseguire **una sola volta**, la prima volta che scarichi
-   il progetto (fa tutta l'installazione automaticamente: dipendenze, database,
-   dati di esempio). Ci mette qualche minuto, è normale.
-2. **`AVVIA.bat`** — da usare **ogni volta che vuoi lavorare**: apre da solo
-   database, backend e sito. Aspetta qualche secondo, poi apri il browser su
-   `http://localhost:5173`.
-3. **`STOP.bat`** — per spegnere tutto in ordine quando hai finito.
-4. **`STUDIO.bat`** — apre Drizzle Studio nel browser, uno strumento
-   visuale per guardare/modificare i dati del database direttamente
-   (comodo per controlli rapidi, senza scrivere query SQL a mano).
+| Gruppo | Voci |
+|---|---|
+| Eventi | Eventi, Bundle, Tour, Calendario |
+| Partenze | Orari, Quotazione, Prezzi, Da confermare, Confermate, Passate, Variazioni |
+| Vendite | Prenotazioni, Lista d'attesa |
+| Marketing | Campagne, Tracciamento, Coupon, Offerte, Vetrina, Contenuti sito, Testo email, Layout biglietto |
+| Customer Care | Pagamenti, Rimborsi, Utenti, Voucher, Chat, Comunicazioni |
+| Persone | Promoter, Organizzatori, White Label, Tour Leader |
+| Logistica | Fornitori, Fermate, Tragitti salvati |
+| Sistema | Amministratori, Ruoli, Cestino, Statistiche, Testi tooltip, Impostazioni |
+| Beta | Tragitti vicini |
 
-Serve comunque avere installato una volta Node.js e Docker Desktop (vedi sotto),
-e Docker Desktop deve essere **aperto e pronto** prima di lanciare `AVVIA.bat`
-(guarda l'icona della balena in basso a destra: deve essere stabile, non animata).
+### Il percorso di un viaggio (Partenze)
+1. **Orari** — si calcolano gli orari delle fermate a partire dall'arrivo.
+2. **Quotazione** — ai fornitori si chiede un prezzo *indicativo* di un bus sul
+   tragitto. La richiesta **parte da sola** appena ci sono gli orari, ai fornitori
+   con "Invio automatico" nel raggio. Scegliere una quotazione non impegna nessuno.
+3. **Prezzi** — dal costo della quotazione si calcola il prezzo di ogni fermata e
+   il tragitto va in vendita. Le vendite non si fermano mai per i posti dei bus.
+4. **Da confermare** — quando le prenotazioni arrivano al pareggio nasce la
+   proposta di un bus e i **preventivi per quel bus partono da soli** (con la
+   precedenza a chi ha dato la quotazione). Si sceglie il fornitore e si conferma:
+   ogni bus può avere un fornitore diverso.
+5. **Confermate / Passate** — bus assegnati, smistamento automatico dei passeggeri
+   per età il giorno prima della partenza, biglietto con il bus solo a saldo pagato.
 
-Se preferisci il controllo manuale via terminale, trovi le istruzioni passo-passo
-più sotto.
+Colori uguali ovunque in Partenze: **rosso** tocca a noi, **arancio** si aspetta
+qualcun altro, **verde** fatto, **viola** percorso cambiato dopo la quotazione.
 
-### Cosa installare prima (una tantum), prima di usare INSTALLA.bat
+### Regole sui soldi (decise dal proprietario)
+- Acconto **per passeggero**, mai oltre il totale; il saldo scade 15 giorni prima
+  dell'evento e dopo quella data l'acconto non si può più scegliere.
+- Un coupon vale **una volta per ordine**.
+- Credito fedeltà e bonus "invita un amico" solo a pagamento confermato.
+- Nessun gateway di pagamento collegato per ora: gli ordini dal sito risultano
+  "da concordare".
 
-1. **Node.js** (versione LTS) — [nodejs.org](https://nodejs.org)
-2. **Docker Desktop** — [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
+### Numeri
+- Backend: 39 moduli, 58 tabelle, 91 migrazioni del database
+- Test automatici: 122 veloci e 96 con il database (backend), 22 nel gestionale
 
-Dopo l'installazione riavvia il computer se richiesto, poi apri Docker Desktop
-e aspetta che sia pronto prima di lanciare `INSTALLA.bat`.
+---
 
-### Modalità manuale (via terminale)
+## Far girare tutto sul proprio computer
 
-### 2. Estrai il progetto
+### Modo semplice: doppio clic
+Serve avere installato **Node.js** (versione LTS) e **Docker Desktop**, aperto e
+pronto (icona della balena ferma).
 
-Estrai lo zip in una cartella, ad esempio `Desktop/inbus-v2`, e apri un
-terminale in quella cartella (`cd Desktop/inbus-v2`).
+1. **`INSTALLA.bat`** — una sola volta: dipendenze, database, dati di esempio.
+2. **`AVVIA.bat`** — ogni volta: database, API e sito. Poi apri
+   `http://localhost:5173` (sito) e `http://localhost:5173/admin.html` (gestionale).
+3. **`STOP.bat`** — spegne tutto.
+4. **`STUDIO.bat`** — apre Drizzle Studio per guardare i dati del database.
 
-### 3. Avvia il database
+Accesso al gestionale in locale, con i dati di esempio: `admin@inbus.it` / `inbus2026`
+(solo sul proprio computer, mai in produzione).
 
+### Modo manuale (terminale)
 ```bash
-docker compose up -d
-```
-La prima volta scarica l'immagine di Postgres (circa un minuto). Verifica
-che sia partito con `docker ps`: dovresti vedere un container chiamato
-`inbus-v2-postgres-1` con stato `Up`.
-
-### 4. Avvia il backend (l'API)
-
-In questo stesso terminale:
-```bash
+docker compose up -d                # database Postgres locale
 cd packages/backend
 npm install
-cp .env.example .env
+cp .env.example .env                # DATABASE_URL e JWT_SECRET
 npm run db:migrate
 npm run seed
-npm run dev
+npm run dev                         # API su http://localhost:4000
 ```
-**Lascia questo terminale aperto.** Vedrai scritto qualcosa tipo:
-```
-INBUS API in ascolto su http://localhost:4000 (development)
-```
-Se si ferma o dà errore, guarda la sezione "Problemi comuni" più sotto.
-
-### 5. Avvia il frontend (sito + gestionale)
-
-Apri un **secondo terminale** (senza chiudere il primo), nella stessa
-cartella del progetto:
+In un secondo terminale:
 ```bash
 cd packages/frontend
 npm install
-npm run dev
-```
-Vedrai scritto qualcosa tipo:
-```
-Local:   http://localhost:5173/
+npm run dev                         # sito e gestionale su http://localhost:5173
 ```
 
-### 6. Apri il browser
+> **Attenzione ai database.** `packages/backend/.env` punta al database locale.
+> Il `.env` nella radice del repository punta alla **produzione**: i comandi del
+> backend e gli script in `src/db/` vanno lanciati **sempre da `packages/backend`**.
+> `db:azzera-tutto-test` cancella eventi, prenotazioni e clienti: mai senza motivo.
 
-- **Sito pubblico**: [http://localhost:5173](http://localhost:5173)
-  — vedrai l'evento di esempio "Ultimo" allo Stadio Olimpico, creato dal
-  seed; puoi cliccare "Prenota" e provare un checkout vero
-- **Gestionale**: [http://localhost:5173/admin.html](http://localhost:5173/admin.html)
-  — login con `admin@inbus.it` / `inbus2026`, poi hai il menu laterale
-  con tutte le sezioni collegate ai dati veri
-
-### Come fermare tutto
-
-Nei due terminali aperti premi `Ctrl+C`. Per fermare anche il database:
-```bash
-docker compose down
-```
-(i dati restano salvati; la prossima volta ti basta `docker compose up -d`)
+### Problemi comuni
+- **"npm: comando non trovato"** — Node.js non installato, o terminale da riaprire.
+- **"Cannot connect to the Docker daemon"** — Docker Desktop non è avviato.
+- **Errore su `DATABASE_URL`** — manca `packages/backend/.env` (copia `.env.example`).
+- **"port 5432 already in use"** — un altro Postgres usa la porta: fermalo o
+  cambia la porta in `docker-compose.yml` e in `.env`.
+- **Il sito non mostra eventi** — l'API non è partita o manca `npm run seed`.
 
 ---
 
-## Problemi comuni
+## Test e controlli automatici
 
-**"npm: comando non trovato"** → Node.js non è installato o serve
-riavviare il terminale dopo l'installazione.
+| Comando (da `packages/backend`) | Cosa prova |
+|---|---|
+| `npm test` | Regole pure: prezzi, date e ore di Roma, orari di partenza, proposte da confermare, statistiche |
+| `npm run test:db` | Con un database vero: prenotazioni, acconto, saldo, coupon, rimborsi, smistamento, accessi, quotazioni e preventivi per bus, invio automatico ai fornitori |
 
-**"Cannot connect to the Docker daemon"** → Docker Desktop non è avviato:
-aprilo dall'icona sul desktop/dock e aspetta che sia pronto (icona verde),
-poi riprova `docker compose up -d`.
+`npm run test:db` usa **solo** un database che finisce con `_test` e sta su questo
+computer (di solito `inbus_test` in Docker, creato da solo) e non manda email vere.
 
-**Il backend dà errore su `DATABASE_URL`** → controlla di aver eseguito
-`cp .env.example .env` dentro `packages/backend` (il file `.env` non è
-incluso nello zip per sicurezza, va creato copiando l'esempio).
+Da `packages/frontend`: `npm test` (regola dei colori e dei pallini di Partenze).
 
-**"port 5432 already in use"** → hai già un altro Postgres in ascolto
-sulla stessa porta. Ferma quell'altro servizio, oppure cambia la porta
-in `docker-compose.yml` (es. `"5433:5432"`) e nella `DATABASE_URL` dentro
-`.env` di conseguenza.
-
-**Il sito si apre ma non vedi eventi** → controlla che il terminale del
-backend sia ancora aperto e senza errori, e che tu abbia eseguito
-`npm run seed` almeno una volta.
-
-Se qualcosa non torna, mandami il messaggio di errore esatto che vedi
-nel terminale (anche uno screenshot va benissimo) e lo risolviamo insieme.
+Su GitHub, a ogni caricamento (`.github/workflows/ci.yml`): controllo dei tipi,
+tutti i test (anche con un database creato per il giro) e build del sito. Se
+qualcosa fallisce arriva una mail. `smoke.yml` controlla ogni 30 minuti che il
+sito in produzione risponda.
 
 ---
-
-## Perché questa architettura
-
-- **PostgreSQL** — i dati (eventi → bus → fermate → prenotazioni, utenti...)
-  sono profondamente relazionali: è lo strumento giusto, non un file JSON.
-- **Node.js + TypeScript + Express** — backend standard, documentato,
-  facile da trovare su cui assumere sviluppatori.
-- **Drizzle ORM** (non Prisma) — scelta pragmatica: Prisma richiede di
-  scaricare un motore binario da un server esterno, impossibile da
-  verificare in questo ambiente sandbox. Drizzle è puro TypeScript/SQL,
-  altrettanto moderno e diffuso, e mi ha permesso di **compilare e
-  testare per davvero** ogni parte di questo progetto.
-- **React + TypeScript + Vite** — frontend a componenti: ogni sezione
-  (Eventi, Chat, Utenti...) è un file piccolo e isolato, non un unico
-  file da migliaia di righe come nel prototipo originale.
-- **Struttura a moduli per dominio** (`modules/eventi`, `modules/prenotazioni`...),
-  ognuno con lo stesso schema a 4 file: chi impara il pattern su un
-  modulo sa già leggere tutti gli altri.
 
 ## Struttura del repository
 
 ```
 inbus-v2/
-├── docker-compose.yml
-├── packages/
-│   ├── backend/
-│   │   ├── src/
-│   │   │   ├── db/schema.ts          # tutte le tabelle (45)
-│   │   │   ├── modules/              # 35 moduli, uno per dominio
-│   │   │   ├── shared/                # errori, validazione condivisi
-│   │   │   └── config/env.ts          # variabili d'ambiente validate
-│   │   └── drizzle/                   # migration SQL generate
-│   └── frontend/
-│       └── src/
-│           ├── api/                   # client HTTP tipizzato per modulo
-│           ├── pages/                 # pagine di primo livello del sito pubblico
-│           ├── features/              # logica riusabile (carrello, checkout...)
-│           ├── admin/                 # gestionale
-│           │   ├── shared/            # layout, modale, tabella riusabili
-│           │   └── screens/           # una schermata per sezione
-│           └── styles/                # gestionale.css, sito.css, + fogli dedicati
-│               #   (account, promoter, tourleader, faq, pagina)
-└── docs/MODULI-DA-COMPLETARE.md       # cosa manca e come completarlo
+├── docker-compose.yml                 # Postgres locale
+├── INSTALLA.bat / AVVIA.bat / STOP.bat / STUDIO.bat
+├── .github/workflows/                 # controlli automatici
+├── docs/                              # guida alla pubblicazione (DEPLOY-PRODUZIONE.md)
+└── packages/
+    ├── backend/
+    │   ├── drizzle/                   # migrazioni SQL (applicate da sole all'avvio su Railway)
+    │   ├── test/                      # dati finti e controlli di sicurezza per i test con il database
+    │   └── src/
+    │       ├── db/schema.ts           # tutte le tabelle
+    │       ├── modules/               # un modulo per argomento (routes + service)
+    │       ├── shared/                # email, date, errori, scheduler, registro attività
+    │       └── config/env.ts          # variabili d'ambiente controllate all'avvio
+    └── frontend/
+        └── src/
+            ├── api/                   # chiamate all'API, una per modulo
+            ├── pages/                 # pagine del sito pubblico e delle aree riservate
+            ├── features/              # parti del sito: evento, carrello, checkout, bundle, white label
+            ├── shared/                # componenti comuni del sito
+            ├── admin/                 # gestionale: shared/ (componenti comuni), screens/ (una schermata per voce)
+            └── styles/                # sito.css, gestionale.css, onway-theme.css e un foglio per area
 ```
 
-## Moduli backend implementati (35)
+## Perché questa architettura
+- **PostgreSQL** — eventi, tragitti, fermate, bus e prenotazioni sono dati legati tra loro.
+- **Node.js + TypeScript + Express** — tecnologie diffuse, facili da trovare.
+- **Drizzle ORM** — TypeScript e SQL puro, migrazioni versionate nel repository.
+- **React + TypeScript + Vite** — ogni schermata è un file a sé.
+- **Moduli per argomento** — chi impara come è fatto un modulo sa leggere anche gli altri.
 
-Auth (cliente + admin, separati) · Eventi (con servizi/tragitti/fermate,
-anagrafica fermate riutilizzabile, percorsi salvati, stato Da confermare/
-Confermato) · Categorie evento · Categorie (generi) · Prenotazioni (blocco
-posti atomico anti-doppia-prenotazione, acconto/saldo) · Lista d'attesa ·
-Richieste di rimborso · Coupon · Campagne · Offerte · Ticket (biglietto
-digitale, QR) · Layout biglietto (editor visuale personalizzabile) ·
-Template email · Fornitori · Percorsi salvati · Fermate anagrafica ·
-Utenti · Credito fedeltà · Commissioni · White Label (widget incorporabile)
-· Promoter · Organizzatori · Tour Leader + autenticazione dedicata ·
-Controllo accessi (scansione biglietti) · Chat · Pagine CMS + Contenuti
-sito · Comunicazioni · Amministratori · Ruoli e permessi · Impostazioni ·
-Statistiche · Sitemap · Upload
-
-## Sezioni gestionale collegate (~30)
-
-Organizzate in gruppi — **Eventi**: Eventi, Calendario, Cestino ·
-**Partenze**: Partenze · **Vendite**: Prenotazioni, Lista d'attesa ·
-**Marketing**: Campagne, Offerte, Vetrina, Contenuti sito, Testo email,
-Layout biglietto · **Customer Care**: Pagamenti, Rimborsi, Utenti, Coupon,
-Chat, Comunicazioni · **Persone**: Promoter, Organizzatori, White Label,
-Tour Leader · **Logistica**: Fornitori, Fermate, Percorsi salvati,
-Impostazioni · **Sistema**: Amministratori, Ruoli, Statistiche, Testi
-tooltip
-
-Per il dettaglio di cosa manca ancora vedi `docs/MODULI-DA-COMPLETARE.md`.
-
-Per pubblicare il progetto online (non solo sul tuo PC), vedi
-`docs/DEPLOY-PRODUZIONE.md` — guida passo-passo con Railway + Vercel.
+## Pubblicazione
+- Frontend: Vercel, pubblica da solo a ogni caricamento su `main`.
+- Backend: Railway, pubblica da solo; all'avvio applica le migrazioni del database
+  (`node dist/db/migrate.js`) e poi avvia il server.
+- Guida passo passo: `docs/DEPLOY-PRODUZIONE.md`.
