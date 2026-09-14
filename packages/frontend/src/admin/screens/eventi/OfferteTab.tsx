@@ -4,7 +4,6 @@ import { azioneConfermata } from '../../shared/conferma';
 import { notifica } from '../../shared/notifiche';
 import { offerteApi, type Offerta, type OffertaInput } from '../../../api/offerte';
 import { campagneApi, type Campagna } from '../../../api/campagne';
-import { ErroreApi } from '../../../api/client';
 import { InfoTooltip } from '../../shared/InfoTooltip';
 import { TOOLTIP_DEFAULT } from '../../tooltipDefaults';
 import { useMappaTooltip } from '../../shared/useMappaTooltip';

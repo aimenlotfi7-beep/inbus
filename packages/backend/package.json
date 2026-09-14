@@ -24,7 +24,8 @@
     "db:studio": "drizzle-kit studio",
     "seed": "tsx src/db/seed.ts",
     "reset-dati-test": "tsx src/db/reset-dati-test.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:db": "vitest run --config vitest.db.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",

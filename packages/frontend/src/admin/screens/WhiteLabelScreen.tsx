@@ -5,7 +5,6 @@ import { whiteLabelApi, type WhiteLabel } from '../../api/whiteLabel';
 import { organizzatoriApi, type Organizzatore } from '../../api/organizzatori';
 import { eventiApi } from '../../api/eventi';
 import type { Evento } from '../../api/types';
-import { ErroreApi } from '../../api/client';
 import { notifica } from '../shared/notifiche';
 import { PanelHead } from '../shared/PanelHead';
 import { PaginaSezione } from '../shared/PaginaSezione';

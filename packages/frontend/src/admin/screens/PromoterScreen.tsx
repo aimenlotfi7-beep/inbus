@@ -5,7 +5,6 @@ import { eventiApi } from '../../api/eventi';
 import { SelettoreEventi } from '../shared/SelettoreEventi';
 import { notifica } from '../shared/notifiche';
 import { promoterApi, type Promoter, type PromoterInput } from '../../api/promoter';
-import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { CampoNumero } from '../shared/CampoNumero';

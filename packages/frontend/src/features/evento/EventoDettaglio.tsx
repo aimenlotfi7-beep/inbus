@@ -11,7 +11,7 @@ import { PulsanteCondividi } from '../PulsanteCondividi';
 import { EventiCorrelati } from '../EventiCorrelati';
 import { Icona } from '../Icone';
 import { useMobile } from '../useMobile';
-import { formattaEuro, formattaPrezzoBreve } from '../../shared/formato';
+import { formattaPrezzoBreve } from '../../shared/formato';
 
 /** Sotto questa soglia "N persone hanno già prenotato" non si mostra:
  *  "2 persone" sembra scarso invece che rassicurante. */

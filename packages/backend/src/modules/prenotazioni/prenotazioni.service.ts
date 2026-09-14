@@ -1,7 +1,7 @@
 import { and, eq, ne, sql, desc, inArray, lte, gte } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { prenotazioni, tragitti, fermate, eventi, coupon, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, promoter, promoterEventi, promoterLink, whiteLabel } from '../../db/schema.js';
+import { prenotazioni, tragitti, fermate, eventi, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, promoter, promoterEventi, promoterLink, whiteLabel } from '../../db/schema.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { bundleService } from '../bundle/bundle.service.js';

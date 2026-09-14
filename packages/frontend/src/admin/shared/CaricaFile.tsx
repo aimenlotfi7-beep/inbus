@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { motivoErrore } from './/errori';
 import { notifica } from './notifiche';
 import { caricaFile, verificaCaricamentoAttivo } from '../../api/upload';
-import { ErroreApi } from '../../api/client';
 
 /** Pulsante "Carica file" riusabile — carica davvero il file (invece di
  *  dover incollare un link a mano) e passa l'URL risultante al chiamante

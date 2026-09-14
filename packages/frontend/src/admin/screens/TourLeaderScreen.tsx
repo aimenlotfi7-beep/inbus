@@ -3,7 +3,6 @@ import { notifica } from '../shared/notifiche';
 import { conferma, azioneConfermata } from '../shared/conferma';
 import { motivoErrore } from '../shared/errori';
 import { tourLeaderApi, type TourLeader, type CandidaturaInput } from '../../api/tourleader';
-import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';

@@ -3,7 +3,6 @@ import { notifica } from '../shared/notifiche';
 import { conferma } from '../shared/conferma';
 import { motivoErrore } from '../shared/errori';
 import { eventiApi } from '../../api/eventi';
-import { ErroreApi } from '../../api/client';
 import { prezzoMinimoEvento } from '../../api/prezzi';
 import type { Evento } from '../../api/types';
 import { PanelHead } from '../shared/PanelHead';

@@ -3,7 +3,6 @@ import { motivoErrore } from '../shared/errori';
 import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { campagneApi, type Campagna, type CampagnaInput, type RigaReportFonte } from '../../api/campagne';
-import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';

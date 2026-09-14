@@ -3,7 +3,6 @@ import { motivoErrore } from '../shared/errori';
 import { notifica } from '../shared/notifiche';
 import { confermaConTesto } from '../shared/conferma';
 import { templateEmailApi, type TemplateEmail } from '../../api/templateEmail';
-import { ErroreApi } from '../../api/client';
 import { sanificaHtml } from '../../shared/sanificaHtml';
 import { PanelHead } from '../shared/PanelHead';
 import { CaricaFile } from '../shared/CaricaFile';

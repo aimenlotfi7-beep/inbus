@@ -1,7 +1,7 @@
 import { eq, and, or, isNull, gt, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { coupon, promoter, utenti } from '../../db/schema.js';
-import { NonTrovato, ErroreApplicativo, ConflittoDati } from '../../shared/errors.js';
+import { NonTrovato, ErroreApplicativo } from '../../shared/errors.js';
 import { inviaEmail } from '../../shared/email.service.js';
 import { fineGiornoRoma, formattaData, formattaEuro, inizioGiornoRoma } from '../../shared/formato.js';
 import type { CreaCouponInput, aggiornaCouponSchema } from './coupon.dto.js';

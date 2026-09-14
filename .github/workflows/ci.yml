@@ -1,8 +1,9 @@
-# Controllo automatico a ogni push: typecheck backend + frontend, build
-# di produzione del frontend. Se una di queste fallisce, GitHub mostra
-# la X rossa sul commit e manda una mail — prima che Vercel/Railway
-# pubblichino qualcosa di rotto. Costa ~2 minuti a push, gratis sui
-# repository privati fino al limite mensile (ampiamente sufficiente).
+# Controllo automatico a ogni push: typecheck backend + frontend, test
+# automatici del backend (anche con il database), build di produzione del
+# frontend. Se una di queste fallisce, GitHub mostra la X rossa sul commit e
+# manda una mail. Vercel e Railway pubblicano comunque: la mail serve ad
+# accorgersene subito. Costa pochi minuti a push, gratis sui repository
+# privati fino al limite mensile (ampiamente sufficiente).
 name: CI
 
 on:
@@ -23,6 +24,33 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit --noUnusedLocals --noUnusedParameters
       - run: npm test
+
+  # Le regole dei soldi e dei posti provate sul serio: prenotazioni, acconto,
+  # saldo, coupon, rimborsi, smistamento sui bus, accessi. Su un database
+  # vuoto creato apposta per questo giro (sparisce alla fine), mai quello di
+  # produzione; nessuna email parte davvero.
+  backend-database:
+    name: Backend — prove con il database
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: packages/backend } }
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: inbus, POSTGRES_PASSWORD: inbus, POSTGRES_DB: inbus_test }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U inbus"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://inbus:inbus@localhost:5432/inbus_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: packages/backend/package-lock.json }
+      - run: npm ci
+      - run: npm run test:db
 
   frontend:
     name: Frontend — typecheck + build

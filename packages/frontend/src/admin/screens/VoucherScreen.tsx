@@ -6,7 +6,6 @@ import { formattaData, formattaEuro } from '../../shared/formato';
 import { couponApi, type Coupon, type CouponInput } from '../../api/coupon';
 import { eventiApi } from '../../api/eventi';
 import type { Evento } from '../../api/types';
-import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { CampoNumero } from '../shared/CampoNumero';
 import { RicercaSezione } from '../shared/RicercaSezione';

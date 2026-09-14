@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { motivoErrore } from './shared/errori';
 import { authApi, type SessioneAdmin } from '../api/auth';
 import { LogoOnWay } from '../features/LogoOnWay';
-import { ErroreApi } from '../api/client';
 import { erroreValidazionePassword } from '../features/validazionePassword';
 
 type Vista = 'login' | 'richiedi-reset' | 'nuova-password';

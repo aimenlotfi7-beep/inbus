@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { motivoErrore } from '../../shared/errori';
 import { bundleApi, type BundleInput, type EventoDelBundle, ETICHETTA_STATO_BUNDLE, formattaDataOraIt } from '../../../api/bundle';
 import { organizzatoriApi, type Organizzatore } from '../../../api/organizzatori';
-import { ErroreApi } from '../../../api/client';
 import { notifica } from '../../shared/notifiche';
 import { PaginaSezione } from '../../shared/PaginaSezione';
 import { CampoNumero } from '../../shared/CampoNumero';

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Evento, Tragitto } from '../../api/types';
 import { intervalloPrezzoEvento } from '../../api/prezzi';
-import { formattaEuro, formattaPrezzoBreve } from '../../shared/formato';
+import { formattaPrezzoBreve } from '../../shared/formato';
 import { Icona } from '../Icone';
 
 /** Un solo componente per le card del sito: evento, tour (card

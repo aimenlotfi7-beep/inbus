@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { motivoErrore } from '../shared/errori';
 import { notifica } from '../shared/notifiche';
 import { impostazioniApi } from '../../api/impostazioni';
-import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 
 // Prima vivevano dentro "Impostazioni" generiche, in mezzo a soglie

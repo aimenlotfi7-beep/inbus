@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
-import { notifica } from '../shared/notifiche';
 import { pagineApi, type PaginaCms, type ContenutoSito } from '../../api/pagine';
 import { categorieApi, type Categoria } from '../../api/categorie';
 import { categorieEventoApi, type CategoriaEvento } from '../../api/categorieEvento';
 import { PanelHead } from '../shared/PanelHead';
-import { ErroreApi } from '../../api/client';
 import { azioneConfermata } from '../shared/conferma';
 import { chiediNuovaCategoria, chiediNuovoGenere } from '../shared/generiCategorie';
 

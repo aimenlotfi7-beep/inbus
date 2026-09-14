@@ -70,7 +70,6 @@ export const clienteAuthService = {
     const token = generaToken();
     const scadenza = new Date(Date.now() + ORE_VALIDITA_TOKEN_VERIFICA * 60 * 60 * 1000);
 
-    let idUtente: string;
     if (esistente) {
       await db.update(utenti).set({
         passwordHash, nome: input.nome, cognome: input.cognome,
@@ -80,15 +79,13 @@ export const clienteAuthService = {
         emailVerificata: false, tokenVerificaEmail: token, tokenVerificaScadenza: scadenza,
         ...(invitanteId && { invitatoDaUtenteId: invitanteId }),
       }).where(eq(utenti.id, esistente.id));
-      idUtente = esistente.id;
     } else {
-      const [nuovo] = await db.insert(utenti).values({
+      await db.insert(utenti).values({
         email, passwordHash, nome: input.nome, cognome: input.cognome, telefono: input.telefono, citta: input.citta,
         dataNascita: input.dataNascita,
         tokenVerificaEmail: token, tokenVerificaScadenza: scadenza,
         invitatoDaUtenteId: invitanteId,
-      }).returning({ id: utenti.id });
-      idUtente = nuovo.id;
+      });
     }
 
     // Il bonus dell'amico invitato arriva quando conferma l'email

@@ -4,7 +4,6 @@ import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { fermateAnagraficaApi, type FermataAnagrafica, type FermataAnagraficaInput } from '../../api/fermateAnagrafica';
 import { percorsiSalvatiApi } from '../../api/percorsiSalvati';
-import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { Modale } from '../shared/Modale';

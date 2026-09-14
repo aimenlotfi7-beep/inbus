@@ -44,13 +44,14 @@ export async function authFacoltativa(req: Request, _res: Response, next: NextFu
 }
 
 /** Da usare DOPO richiedeAuth: richiedePermesso('eventi.crea').
- *  Chi ha ruolo "owner" passa sempre, a prescindere dalla chiave. */
+ *  Chi ha ruolo "owner" passa sempre, a prescindere dalla chiave.
+ *  Il rifiuto passa da next(): Express 4 non raccoglie gli errori lanciati
+ *  da un middleware async, e prima la richiesta restava appesa e l'errore
+ *  non gestito poteva fermare il server (trovato dai test automatici). */
 export function richiedePermesso(chiave: string) {
-  return async (req: Request, _res: Response, next: NextFunction) => {
-    if (!req.admin) throw new NonAutorizzato();
-    const ok = await haPermesso(req.admin.sub, chiave);
-    if (!ok) throw new VietatoDaiPermessi();
-    next();
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.admin) return next(new NonAutorizzato());
+    haPermesso(req.admin.sub, chiave).then((ok) => next(ok ? undefined : new VietatoDaiPermessi()), next);
   };
 }
 

@@ -5,7 +5,6 @@ import { azioneConfermata } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { amministratoriApi, type Amministratore, type AmministratoreInput, type LogRiga, type EccezionePermesso } from '../../api/amministratori';
 import { ruoliApi, type Ruolo, type Permesso } from '../../api/ruoli';
-import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';

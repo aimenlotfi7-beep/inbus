@@ -3,7 +3,6 @@ import { motivoErrore } from '../shared/errori';
 import { tourApi, type TourRiga, type TourInput } from '../../api/tour';
 import { notifica } from '../shared/notifiche';
 import { azioneConfermata } from '../shared/conferma';
-import { ErroreApi } from '../../api/client';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { PaginaSezione } from '../shared/PaginaSezione';

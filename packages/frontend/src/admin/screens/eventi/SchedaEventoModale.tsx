@@ -15,7 +15,6 @@ import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/ferma
 import { layoutBigliettoApi, type LayoutBiglietto } from '../../../api/layoutBiglietto';
 import { categorieApi, type Categoria } from '../../../api/categorie';
 import { categorieEventoApi, type CategoriaEvento } from '../../../api/categorieEvento';
-import { ErroreApi } from '../../../api/client';
 import type { Evento } from '../../../api/types';
 import { PaginaSezione } from '../../shared/PaginaSezione';
 import { useAvvisoModificheNonSalvate } from '../../shared/useAvvisoModificheNonSalvate';
