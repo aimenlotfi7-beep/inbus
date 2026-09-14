@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { db } from '../src/db/client.js';
-import { amministratori, coupon, eventi, fermate, impostazioni, lineaFermate, linee, busFisici, ruoli, tragitti, utenti } from '../src/db/schema.js';
+import { amministratori, coupon, eventi, fermate, fornitori, impostazioni, lineaFermate, linee, busFisici, ruoli, tragitti, utenti } from '../src/db/schema.js';
 import { inizioGiornoRoma } from '../src/shared/formato.js';
 import type { CreaPrenotazioneInput } from '../src/modules/prenotazioni/prenotazioni.dto.js';
 import { svuotaPosta } from './posta.js';
@@ -19,7 +19,7 @@ export async function svuotaDatabase() {
   // Dentro un blocco solo per non stampare un avviso per ogni tabella svuotata.
   await db.execute(sql.raw(`do $$ begin
     set local client_min_messages = warning;
-    truncate table eventi, utenti, coupon, promoter, impostazioni, log_attivita, amministratori restart identity cascade;
+    truncate table eventi, utenti, coupon, promoter, impostazioni, log_attivita, amministratori, fornitori restart identity cascade;
   end $$`));
   svuotaPosta();
 }
@@ -75,6 +75,25 @@ export async function creaLineaConBus(tragittoId: string, fermateIds: string[], 
   await db.insert(lineaFermate).values(fermateIds.map((fermataId, ordine) => ({ lineaId: linea.id, fermataId, ordine })));
   const [bus] = await db.insert(busFisici).values({ lineaId: linea.id, riferimento: `Bus ${nome}`, postiBus }).returning();
   return { linea, bus };
+}
+
+export async function creaFornitore(o: Partial<typeof fornitori.$inferInsert> = {}) {
+  const n = progressivo();
+  const [f] = await db.insert(fornitori).values({ nome: `Autolinee ${n}`, email: `fornitore-${n}@example.com`, stato: 'APPROVATO', ...o }).returning();
+  return f;
+}
+
+/** Una proposta da confermare (come quelle create in automatico) sulle fermate indicate. */
+export async function creaProposta(tragittoId: string, fermateIds: string[], nome = 'Linea 1') {
+  const [linea] = await db.insert(linee).values({ tragittoId, nome, daConfermare: true }).returning();
+  await db.insert(lineaFermate).values(fermateIds.map((fermataId, ordine) => ({ lineaId: linea.id, fermataId, ordine })));
+  return linea;
+}
+
+/** Un bus su una linea che c'è già. */
+export async function creaBusSuLinea(lineaId: string, postiBus: number) {
+  const [bus] = await db.insert(busFisici).values({ lineaId, riferimento: 'Bus di prova', postiBus }).returning();
+  return bus;
 }
 
 export async function creaAmministratore(o: { owner?: boolean; attivo?: boolean } = {}) {

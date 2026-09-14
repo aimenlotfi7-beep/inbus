@@ -10,7 +10,7 @@ function partenza(o: Partial<Partenza> = {}): Partenza {
   return {
     tragittoId: 't1', tragittoNome: 'Da Roma', stato: 'DA_CONFERMARE', postiTotali: 999999, totalePasseggeri: 0,
     postiSuiBus: 0, lineeDaConfermare: 0, cambioPercorso: null, preventivoCosto: null, fornitoreId: null,
-    fermateCompilate: false, servizioNome: null, servizioId: null, richiestePreventivo: 0, rispostePreventivo: 0,
+    fermateCompilate: false, servizioNome: null, servizioId: null, richiestePreventivo: 0, rispostePreventivo: 0, proposteSenzaRichieste: 0, risposteBus: 0,
     evento: { id: 'e1', artista: 'Concerto', genere: 'Pop', data: fraGiorni(30), citta: 'Milano', luogo: 'Stadio', slug: 'concerto', immagineUrl: null },
     ...o,
   };
@@ -25,7 +25,7 @@ describe('Orari', () => {
   });
 });
 
-describe('Preventivi', () => {
+describe('Quotazione', () => {
   const conOrari = { fermateCompilate: true };
   it('nessuna richiesta: rosso', () => {
     expect(statoInTappa(partenza(conOrari), 'preventivi')).toEqual({ livello: 'da-fare', testo: 'Da richiedere' });
@@ -37,8 +37,8 @@ describe('Preventivi', () => {
     expect(statoInTappa(partenza({ ...conOrari, richiestePreventivo: 3, rispostePreventivo: 2 }), 'preventivi')).toEqual({ livello: 'da-fare', testo: '2 risposte da valutare' });
   });
   it('accettato o registrato: verde', () => {
-    expect(statoInTappa(partenza({ ...conOrari, fornitoreId: 'f1', preventivoCosto: '1800' }), 'preventivi')).toEqual({ livello: 'fatto', testo: 'Accettato' });
-    expect(statoInTappa(partenza({ ...conOrari, preventivoCosto: '1800' }), 'preventivi')).toEqual({ livello: 'fatto', testo: 'Registrato' });
+    expect(statoInTappa(partenza({ ...conOrari, fornitoreId: 'f1', preventivoCosto: '1800' }), 'preventivi')).toEqual({ livello: 'fatto', testo: 'Scelta' });
+    expect(statoInTappa(partenza({ ...conOrari, preventivoCosto: '1800' }), 'preventivi')).toEqual({ livello: 'fatto', testo: 'Registrata' });
   });
   it('percorso cambiato: viola, sopra tutto', () => {
     expect(statoInTappa(partenza({ ...conOrari, fornitoreId: 'f1', preventivoCosto: '1800', cambioPercorso: 'da_richiedere' }), 'preventivi')?.livello).toBe('percorso-cambiato');
@@ -58,9 +58,15 @@ describe('Da confermare e Confermate', () => {
   it('in vendita senza bus e sotto il pareggio: arancio, si aspettano le prenotazioni', () => {
     expect(statoInTappa(partenza({ stato: 'PREZZATO', totalePasseggeri: 12 }), 'da-confermare')).toEqual({ livello: 'attesa', testo: 'Sotto il pareggio' });
   });
-  it('bus o linea da confermare: rosso', () => {
-    expect(statoInTappa(partenza({ stato: 'PREZZATO', lineeDaConfermare: 1 }), 'da-confermare')).toEqual({ livello: 'da-fare', testo: 'Bus o linea da confermare' });
-    expect(statoInTappa(partenza({ stato: 'CONFERMATO', lineeDaConfermare: 2, postiSuiBus: 50, totalePasseggeri: 60 }), 'confermato')?.livello).toBe('da-fare');
+  it('proposta nata e preventivi del bus non ancora chiesti: rosso', () => {
+    expect(statoInTappa(partenza({ stato: 'PREZZATO', lineeDaConfermare: 1, proposteSenzaRichieste: 1 }), 'da-confermare')).toEqual({ livello: 'da-fare', testo: 'Bus da richiedere' });
+    expect(statoInTappa(partenza({ stato: 'CONFERMATO', lineeDaConfermare: 2, proposteSenzaRichieste: 2, postiSuiBus: 50, totalePasseggeri: 60 }), 'confermato')).toEqual({ livello: 'da-fare', testo: '2 bus da richiedere' });
+  });
+  it('preventivi del bus chiesti, nessuna risposta: arancio', () => {
+    expect(statoInTappa(partenza({ stato: 'PREZZATO', lineeDaConfermare: 1 }), 'da-confermare')).toEqual({ livello: 'attesa', testo: 'Preventivi bus inviati' });
+  });
+  it('risposte dei fornitori per il bus: rosso, tocca a noi scegliere', () => {
+    expect(statoInTappa(partenza({ stato: 'PREZZATO', lineeDaConfermare: 1, risposteBus: 2 }), 'da-confermare')).toEqual({ livello: 'da-fare', testo: '2 preventivi bus da valutare' });
   });
   it('più passeggeri che posti sui bus: rosso', () => {
     expect(statoInTappa(partenza({ stato: 'CONFERMATO', postiSuiBus: 50, totalePasseggeri: 53 }), 'confermato')).toEqual({ livello: 'da-fare', testo: 'Mancano 3 posti' });
@@ -79,7 +85,7 @@ describe('card con più tragitti', () => {
     expect(statoCard([{ livello: 'fatto', testo: 'Orari impostati' }, { livello: 'da-fare', testo: 'Orari da impostare' }])).toEqual({ livello: 'da-fare', testo: '1/2 pronti' });
   });
   it('uno in attesa e uno pronto: arancio', () => {
-    expect(statoCard([{ livello: 'fatto', testo: 'Accettato' }, { livello: 'attesa', testo: 'Richieste inviate' }]).livello).toBe('attesa');
+    expect(statoCard([{ livello: 'fatto', testo: 'Scelta' }, { livello: 'attesa', testo: 'Richieste inviate' }]).livello).toBe('attesa');
   });
   it('tutti pronti con la stessa etichetta: verde con quell\'etichetta', () => {
     expect(statoCard([{ livello: 'fatto', testo: 'In vendita' }, { livello: 'fatto', testo: 'In vendita' }])).toEqual({ livello: 'fatto', testo: 'In vendita' });

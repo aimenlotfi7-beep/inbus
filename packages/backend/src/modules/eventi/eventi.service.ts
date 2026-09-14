@@ -16,6 +16,7 @@ import {
   utenti,
   preventiviRichieste,
   preventiviRisposte,
+  fornitori,
   variazioni as variazioniTabella,
 } from '../../db/schema.js';
 import crypto from 'node:crypto';
@@ -30,6 +31,7 @@ import {
   type FermataConfronto, type VariazioneRilevata, type EsitoComunicazioni,
 } from '../variazioni/variazioni.service.js';
 import { cambiPercorso, fotografiaPercorso } from '../preventivi/cambio-percorso.js';
+import { avvisaFornitoriBus, chiudiPreventiviBus, rispostaPerProposta } from '../preventivi/preventivi-bus.service.js';
 import { tourService } from '../tour/tour.service.js';
 import { templateEmailService } from '../template-email/template-email.service.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
@@ -1328,7 +1330,7 @@ export const eventiService = {
           tragittoId, fornitoreId: input.fornitoreId, token: crypto.randomBytes(24).toString('hex'), tipoInvio: 'MANUALE',
         }).returning();
         await tx.insert(preventiviRisposte).values({
-          richiestaId: richiesta.id, prezzo: input.preventivoCosto.toFixed(2), fileNome: input.fileNome, fileContenuto: input.fileContenuto,
+          richiestaId: richiesta.id, prezzo: input.preventivoCosto.toFixed(2), postiBus: input.preventivoPostiBus, fileNome: input.fileNome, fileContenuto: input.fileContenuto,
         });
       }
     });
@@ -1341,7 +1343,7 @@ export const eventiService = {
   async impostaPostiPreventivo(tragittoId: string, postiBus: number) {
     const [esiste] = await db.select({ preventivoCosto: tragitti.preventivoCosto }).from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
     if (!esiste) throw new NonTrovato('Tragitto');
-    if (!esiste.preventivoCosto) throw new ConflittoDati('Registra o accetta prima un preventivo (sezione Preventivi).');
+    if (!esiste.preventivoCosto) throw new ConflittoDati('Registra o scegli prima una quotazione (sezione Quotazione).');
     await db.update(tragitti).set({ preventivoPostiBus: postiBus }).where(eq(tragitti.id, tragittoId));
   },
 
@@ -1350,7 +1352,7 @@ export const eventiService = {
   async calcolaPrezziVendita(tragittoId: string, input: z.infer<typeof calcolaPrezziVenditaSchema>) {
     const [esiste] = await db.select().from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
     if (!esiste) throw new NonTrovato('Tragitto');
-    if (!esiste.preventivoCosto) throw new ConflittoDati('Registra prima un preventivo (sezione Preventivi) prima di calcolare i prezzi di vendita.');
+    if (!esiste.preventivoCosto) throw new ConflittoDati('Registra o scegli prima una quotazione (sezione Quotazione), poi calcola i prezzi di vendita.');
 
     await db.transaction(async (tx) => {
       for (const { fermataId, prezzo } of input.prezziPerFermata) {
@@ -1454,7 +1456,7 @@ export const eventiService = {
    *  linee-da-confermare.service.ts): fermate scelte e primo bus, come
    *  creaLinea. Se è la prima linea confermata del tragitto, la partenza
    *  diventa confermata e chi ha prenotato riceve l'email. */
-  async confermaLinea(lineaId: string, input: { riferimento: string; fornitoreId?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus: number; note?: string; fermateIds: string[] }) {
+  async confermaLinea(lineaId: string, input: { riferimento: string; fornitoreId?: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string; costo?: number; postiBus: number; note?: string; fermateIds: string[]; rispostaId?: string }) {
     const [linea] = await db.select().from(linee).where(eq(linee.id, lineaId)).limit(1);
     if (!linea) throw new ErroreApplicativo('Linea non trovata: potrebbe essere sparita perché non serviva più. Ricarica la pagina.', 404, 'NON_TROVATO');
     if (!linea.daConfermare) throw new ConflittoDati(`${linea.nome} è già confermata: ricarica la pagina.`);
@@ -1474,13 +1476,17 @@ export const eventiService = {
       // Stesso lucchetto delle linee automatiche: la linea non sparisce
       // mentre la si conferma.
       await tx.select({ id: tragitti.id }).from(tragitti).where(eq(tragitti.id, linea.tragittoId)).for('update').limit(1);
+      // Il preventivo scelto deve valere ancora per questa proposta: il
+      // fornitore del bus è il suo (costo e posti restano quelli del modulo).
+      if (input.rispostaId) {
+        const scelta = await rispostaPerProposta(tx, input.rispostaId, lineaId);
+        input = { ...input, fornitoreId: scelta.fornitoreId };
+      }
 
       // Proposta di un BUS in più (stesse fermate di una linea confermata):
       // il bus va su quella linea e la proposta sparisce.
       const lineaDelBus = await lineaPerBusProposto(tx, lineaId, linea.tragittoId);
       if (lineaDelBus) {
-        const [tolta] = await tx.delete(linee).where(and(eq(linee.id, lineaId), eq(linee.daConfermare, true))).returning({ id: linee.id });
-        if (!tolta) throw new ConflittoDati(`${linea.nome} non è più da confermare: è sparito perché non serviva più, o è già stato confermato. Ricarica la pagina.`);
         const [nuovoBus] = await tx.insert(busFisici).values({
           lineaId: lineaDelBus.id,
           fornitoreId: input.fornitoreId,
@@ -1492,8 +1498,12 @@ export const eventiService = {
           postiBus: input.postiBus,
           note: input.note,
         }).returning();
+        // Prima di togliere la proposta: i suoi preventivi si chiudono e quello scelto resta legato al bus.
+        const { richiesteIds } = await chiudiPreventiviBus(tx, lineaId, nuovoBus.id, input.rispostaId);
+        const [tolta] = await tx.delete(linee).where(and(eq(linee.id, lineaId), eq(linee.daConfermare, true))).returning({ id: linee.id });
+        if (!tolta) throw new ConflittoDati(`${linea.nome} non è più da confermare: è sparito perché non serviva più, o è già stato confermato. Ricarica la pagina.`);
         await ricalcolaPostiTragitto(tx, linea.tragittoId);
-        return { lineaId: lineaDelBus.id, busId: nuovoBus.id, tragittoId: linea.tragittoId, partenzaConfermata: false };
+        return { lineaId: lineaDelBus.id, busId: nuovoBus.id, tragittoId: linea.tragittoId, partenzaConfermata: false, richiesteIds };
       }
 
       const [ancora] = await tx.update(linee).set({ daConfermare: false })
@@ -1516,6 +1526,7 @@ export const eventiService = {
         postiBus: input.postiBus,
         note: input.note,
       }).returning();
+      const { richiesteIds } = await chiudiPreventiviBus(tx, lineaId, nuovoBus.id, input.rispostaId);
 
       const passatiAConfermato = await tx.update(tragitti).set({ stato: 'CONFERMATO' })
         .where(and(eq(tragitti.id, linea.tragittoId), inArray(tragitti.stato, ['DA_CONFERMARE', 'PREZZATO'])))
@@ -1526,6 +1537,7 @@ export const eventiService = {
         busId: nuovoBus.id,
         tragittoId: linea.tragittoId,
         partenzaConfermata: altreConfermate.length === 0 && passatiAConfermato.length > 0,
+        richiesteIds,
       };
     });
 
@@ -1534,7 +1546,10 @@ export const eventiService = {
       ? await avvisaPartenzaConfermata(confermata.tragittoId, confermata.lineaId)
       : { clientiAvvisati: 0, emailNonInviate: 0 };
     const tourLeaderAvvisato = tourLeaderId ? await avvisaTourLeader(confermata.busId) : null;
-    return { ...confermata, ...avvisiClienti, tourLeaderAvvisato };
+    // Fornitori che avevano mandato un preventivo per questo bus: lo scelto e gli altri.
+    const { richiesteIds, ...esito } = confermata;
+    const avvisiFornitori = await avvisaFornitoriBus({ tragittoId: confermata.tragittoId, nomeBus: linea.nome, richiesteIds, rispostaSceltaId: input.rispostaId });
+    return { ...esito, ...avvisiClienti, tourLeaderAvvisato, fornitoreSceltoAvvisato: avvisiFornitori.sceltoAvvisato, fornitoriNonSceltiAvvisati: avvisiFornitori.nonSceltiAvvisati };
   },
 
   /** Aggiunge un ULTERIORE bus a una Linea già esistente — stesse
@@ -1652,6 +1667,17 @@ export const eventiService = {
       .orderBy(lineaFermate.ordine);
 
     const tuttiIBus = await db.select().from(busFisici).where(inArray(busFisici.lineaId, lineaIds));
+    const righePreventivi = tuttiIBus.length ? await db.select({
+      busId: preventiviRisposte.busId, rispostaId: preventiviRisposte.id, prezzo: preventiviRisposte.prezzo,
+      fornitoreNome: fornitori.nome, fornitoreHaEmail: sql<boolean>`${fornitori.email} IS NOT NULL`,
+      haFile: sql<boolean>`${preventiviRisposte.fileContenuto} IS NOT NULL`,
+      haFileFirmato: sql<boolean>`${preventiviRisposte.fileFirmatoContenuto} IS NOT NULL`,
+      fileFirmatoInviatoIl: preventiviRisposte.fileFirmatoInviatoIl,
+    }).from(preventiviRisposte)
+      .innerJoin(preventiviRichieste, eq(preventiviRichieste.id, preventiviRisposte.richiestaId))
+      .innerJoin(fornitori, eq(fornitori.id, preventiviRichieste.fornitoreId))
+      .where(inArray(preventiviRisposte.busId, tuttiIBus.map((b) => b.id))) : [];
+    const preventiviPerBus = new Map(righePreventivi.map(({ busId, ...p }) => [busId!, p]));
     const tourLeaderIds = tuttiIBus.map((b) => b.tourLeaderId).filter((id): id is string => id !== null);
     const tourLeaders = tourLeaderIds.length ? await db.select().from(tourLeader).where(inArray(tourLeader.id, tourLeaderIds)) : [];
 
@@ -1699,6 +1725,8 @@ export const eventiService = {
           const tl = tourLeaders.find((t) => t.id === b.tourLeaderId);
           return tl ? `${tl.nome} ${tl.cognome}` : null;
         })(),
+        // Il preventivo scelto per questo bus, se è arrivato da una richiesta (file e file firmato).
+        preventivo: preventiviPerBus.get(b.id) ?? null,
       })),
     }));
   },
@@ -2081,18 +2109,39 @@ export const eventiService = {
     if (righe.length === 0) return [];
 
     const tragittiIds = righe.map((r) => r.tragittoId);
-    // Richieste di preventivo partite e risposte arrivate: il giallo di
-    // Preventivi (richieste inviate, preventivo non ancora accettato).
-    const righeRichieste = await db.select({ tragittoId: preventiviRichieste.tragittoId, rispostaId: preventiviRisposte.id })
-      .from(preventiviRichieste)
-      .leftJoin(preventiviRisposte, eq(preventiviRisposte.richiestaId, preventiviRichieste.id))
-      .where(inArray(preventiviRichieste.tragittoId, tragittiIds));
+    // Richieste ai fornitori partite e risposte arrivate: di quotazione (voce
+    // Quotazione) e per i bus delle proposte da confermare (Da confermare).
+    const [righeRichieste, righeProposte] = await Promise.all([
+      db.select({
+        tragittoId: preventiviRichieste.tragittoId, scopo: preventiviRichieste.scopo, lineaId: preventiviRichieste.lineaId,
+        chiusaIl: preventiviRichieste.chiusaIl, rispostaId: preventiviRisposte.id,
+      })
+        .from(preventiviRichieste)
+        .leftJoin(preventiviRisposte, eq(preventiviRisposte.richiestaId, preventiviRichieste.id))
+        .where(inArray(preventiviRichieste.tragittoId, tragittiIds)),
+      db.select({ id: linee.id, tragittoId: linee.tragittoId }).from(linee)
+        .where(and(inArray(linee.tragittoId, tragittiIds), eq(linee.daConfermare, true))),
+    ]);
     const richiestePer = new Map<string, { richieste: number; risposte: number }>();
+    const proposteConRichieste = new Set<string>();
+    const risposteBusPer = new Map<string, number>();
+    const idsProposte = new Set(righeProposte.map((p) => p.id));
     for (const r of righeRichieste) {
+      if (r.scopo === 'BUS') {
+        // Solo le tornate aperte di proposte che ci sono ancora.
+        if (r.chiusaIl || !r.lineaId || !idsProposte.has(r.lineaId)) continue;
+        proposteConRichieste.add(r.lineaId);
+        if (r.rispostaId) risposteBusPer.set(r.tragittoId, (risposteBusPer.get(r.tragittoId) ?? 0) + 1);
+        continue;
+      }
       const voce = richiestePer.get(r.tragittoId) ?? { richieste: 0, risposte: 0 };
       voce.richieste++;
       if (r.rispostaId) voce.risposte++;
       richiestePer.set(r.tragittoId, voce);
+    }
+    const proposteSenzaRichieste = new Map<string, number>();
+    for (const p of righeProposte) {
+      if (!proposteConRichieste.has(p.id)) proposteSenzaRichieste.set(p.tragittoId, (proposteSenzaRichieste.get(p.tragittoId) ?? 0) + 1);
     }
     const somme = await db
       .select({ tragittoId: prenotazioni.tragittoId, totale: sql<number>`sum(${prenotazioni.passeggeri})` })
@@ -2140,6 +2189,10 @@ export const eventiService = {
       fornitoreId: r.fornitoreId,
       richiestePreventivo: richiestePer.get(r.tragittoId)?.richieste ?? 0,
       rispostePreventivo: richiestePer.get(r.tragittoId)?.risposte ?? 0,
+      // Proposte da confermare ancora senza richieste di preventivo per il
+      // bus, e risposte arrivate per i bus (da scegliere).
+      proposteSenzaRichieste: proposteSenzaRichieste.get(r.tragittoId) ?? 0,
+      risposteBus: risposteBusPer.get(r.tragittoId) ?? 0,
       fermateCompilate: mappaFermateCompilate.get(r.tragittoId) ?? false,
       servizioNome: r.servizioNome,
       servizioId: r.servizioId,

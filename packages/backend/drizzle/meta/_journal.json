@@ -638,6 +638,13 @@
       "when": 1789302030293,
       "tag": "0090_brave_komodo",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1789384131859,
+      "tag": "0091_quotazione_e_preventivi_bus",
+      "breakpoints": true
     }
   ]
 }

@@ -15,7 +15,9 @@ export interface ContestoPartenze {
  *  dell'elenco e nel titolo della pagina del singolo evento. */
 export const TITOLI_PARTENZE: Record<TabPartenze, string> = {
   fermate: 'Orari',
-  preventivi: 'Preventivi',
+  // Il prezzo indicativo di un bus per fare i prezzi (i preventivi veri si
+  // chiedono per ogni bus, in Da confermare). La chiave resta "preventivi".
+  preventivi: 'Quotazione',
   'da-prezzare': 'Prezzi',
   'da-confermare': 'Da confermare',
   confermato: 'Confermate',

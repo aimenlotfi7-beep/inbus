@@ -23,15 +23,15 @@ const CHIAVE_TOOLTIP: Record<TabPartenze, string> = {
 
 const MESSAGGIO_VUOTO: Record<TabPartenze, string> = {
   fermate: 'Nessun evento con tragitti in programma, al momento.',
-  preventivi: 'Nessun evento pronto per un preventivo: prima vanno calcolati gli orari.',
-  'da-prezzare': 'Nessun evento da prezzare: prima serve un preventivo registrato.',
+  preventivi: 'Nessun evento pronto per una quotazione: prima vanno calcolati gli orari.',
+  'da-prezzare': 'Nessun evento da prezzare: prima serve una quotazione.',
   'da-confermare': 'Nessun evento in attesa di bus, al momento.',
   confermato: 'Nessun evento confermato, al momento.',
   passate: 'Nessun evento passato ancora.',
 };
 
 /**
- * Le sei tappe del flusso Orari → Preventivi → Prezzi → Da confermare →
+ * Le sei tappe del flusso Orari → Quotazione → Prezzi → Da confermare →
  * Confermate | Passate, ognuna una voce separata nel menu a sinistra
  * (sotto "Partenze"): si vedono distinte, niente barra di tab da
  * cliccare dentro la pagina.
@@ -45,9 +45,9 @@ const MESSAGGIO_VUOTO: Record<TabPartenze, string> = {
  *
  * - "Orari": si calcolano gli orari di ogni fermata e si esporta
  *   l'elenco da mandare ai fornitori.
- * - "Preventivi": si chiede o si registra il costo del fornitore.
+ * - "Quotazione": il prezzo indicativo di un bus chiesto ai fornitori, per fare i prezzi.
  * - "Prezzi": dal costo si decide il prezzo di vendita per ogni fermata.
- * - "Da confermare": già in vendita — qui si aggiungono le linee (bus veri).
+ * - "Da confermare": già in vendita — qui si chiedono i preventivi per ogni bus e si confermano linee e bus.
  * - "Confermate": un insieme A PARTE — ci entra SOLO chi ha avuto
  *   almeno una volta un bus vero registrato (stato interno che una
  *   volta raggiunto non torna mai indietro da solo).
@@ -103,7 +103,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
   const cardsCercate = ricerca.trim()
     ? cardsGrezze.filter((gruppo) => `${gruppo[0].evento.artista} ${gruppo[0].evento.citta} ${gruppo[0].evento.luogo}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : cardsGrezze;
-  // In Preventivi le card viola (percorso cambiato, preventivo da rifare)
+  // In Quotazione le card viola (percorso cambiato, quotazione da rifare)
   // vanno in cima: sono le più urgenti.
   const cardsFiltrate = tab === 'preventivi'
     ? [...cardsCercate].sort((a, b) => Number(b.some((p) => p.cambioPercorso)) - Number(a.some((p) => p.cambioPercorso)))
@@ -188,7 +188,7 @@ export function PartenzeScreen({ tab }: { tab: TabPartenze }) {
             const testoPosti = senzaBus === gruppo.length
               ? `${plurale(passeggeri, 'passeggero', 'passeggeri')} · nessun bus`
               : `${passeggeri}/${posti} posti${senzaBus > 0 ? ` · ${senzaBus} senza bus` : ''}`;
-            // Viola, sopra ogni altro stato: in Preventivi la card intera
+            // Viola, sopra ogni altro stato: in Quotazione la card intera
             // (statoInTappa), nelle altre voci una nota.
             const cambiati = tab !== 'passate' && tab !== 'preventivi' ? gruppo.filter((p) => p.cambioPercorso) : [];
             return (

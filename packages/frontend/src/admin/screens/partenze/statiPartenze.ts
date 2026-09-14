@@ -25,7 +25,8 @@ export interface StatoTappa {
 /** I dati di un tragitto che servono a decidere lo stato. */
 export type DatiStatoTragitto = Pick<Partenza,
   'stato' | 'fermateCompilate' | 'fornitoreId' | 'preventivoCosto' | 'cambioPercorso'
-  | 'richiestePreventivo' | 'rispostePreventivo' | 'lineeDaConfermare' | 'totalePasseggeri' | 'postiSuiBus'>;
+  | 'richiestePreventivo' | 'rispostePreventivo' | 'lineeDaConfermare' | 'totalePasseggeri' | 'postiSuiBus'
+  | 'proposteSenzaRichieste' | 'risposteBus'>;
 
 export const COLORE_LIVELLO: Record<Livello, string> = {
   'da-fare': 'var(--pink)',
@@ -76,9 +77,10 @@ export function statoInTappa(t: DatiStatoTragitto, tab: TabPartenze): StatoTappa
     case 'fermate':
       return t.fermateCompilate ? { livello: 'fatto', testo: 'Orari impostati' } : { livello: 'da-fare', testo: 'Orari da impostare' };
     case 'preventivi':
+      // Voce "Quotazione": il prezzo indicativo di un bus per fare i prezzi.
       if (t.cambioPercorso) return { livello: 'percorso-cambiato', testo: ETICHETTA_CAMBIO_PERCORSO[t.cambioPercorso] };
-      if (t.fornitoreId) return { livello: 'fatto', testo: 'Accettato' };
-      if (t.preventivoCosto) return { livello: 'fatto', testo: 'Registrato' };
+      if (t.fornitoreId) return { livello: 'fatto', testo: 'Scelta' };
+      if (t.preventivoCosto) return { livello: 'fatto', testo: 'Registrata' };
       // I fornitori hanno risposto: tocca a noi scegliere.
       if (t.rispostePreventivo > 0) return { livello: 'da-fare', testo: plurale(t.rispostePreventivo, 'risposta da valutare', 'risposte da valutare') };
       if (t.richiestePreventivo > 0) return { livello: 'attesa', testo: 'Richieste inviate' };
@@ -88,7 +90,12 @@ export function statoInTappa(t: DatiStatoTragitto, tab: TabPartenze): StatoTappa
     case 'da-confermare':
     case 'confermato': {
       if (t.stato === 'DA_CONFERMARE') return { livello: 'da-fare', testo: 'Da prezzare' };
-      if (t.lineeDaConfermare > 0) return { livello: 'da-fare', testo: t.lineeDaConfermare === 1 ? 'Bus o linea da confermare' : `${t.lineeDaConfermare} proposte da confermare` };
+      // Proposte da confermare: si chiedono i preventivi per i bus, si sceglie, si conferma.
+      if (t.lineeDaConfermare > 0) {
+        if (t.risposteBus > 0) return { livello: 'da-fare', testo: plurale(t.risposteBus, 'preventivo bus da valutare', 'preventivi bus da valutare') };
+        if (t.proposteSenzaRichieste > 0) return { livello: 'da-fare', testo: t.proposteSenzaRichieste === 1 ? 'Bus da richiedere' : `${t.proposteSenzaRichieste} bus da richiedere` };
+        return { livello: 'attesa', testo: 'Preventivi bus inviati' };
+      }
       const mancanti = mancanoPosti(t);
       if (mancanti > 0) return { livello: 'da-fare', testo: mancanti === 1 ? 'Manca 1 posto' : `Mancano ${mancanti} posti` };
       if (t.stato === 'CONFERMATO') return { livello: 'fatto', testo: tab === 'confermato' ? '' : 'Confermata' };
@@ -164,8 +171,8 @@ export function palliniPartenze(partenze: Partenza[]): { perVoce: Record<VocePal
 /** Cosa c'è da fare in una voce, per il suggerimento sul pallino. */
 export const COSA_DA_FARE: Record<VocePallino, string> = {
   fermate: 'orari da impostare',
-  preventivi: 'preventivi da richiedere o risposte da valutare',
+  preventivi: 'quotazioni da richiedere o risposte da valutare',
   'da-prezzare': 'prezzi da salvare',
-  'da-confermare': 'bus o linee da confermare, o posti mancanti sui bus',
-  confermato: 'bus o linee da confermare, o posti mancanti sui bus',
+  'da-confermare': 'bus da richiedere, preventivi da valutare o posti mancanti sui bus',
+  confermato: 'bus da richiedere, preventivi da valutare o posti mancanti sui bus',
 };

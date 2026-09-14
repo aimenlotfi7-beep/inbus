@@ -128,49 +128,63 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
   },
   {
     chiave: 'preventivo_richiesta',
-    nome: 'Richiesta preventivo a un fornitore',
-    oggetto: 'Richiesta preventivo — {{evento}} ({{tragitto}})',
+    nome: 'Richiesta di quotazione indicativa a un fornitore (per il tragitto)',
+    oggetto: 'Richiesta di quotazione — {{evento}} ({{tragitto}})',
     corpo: `
       <p>Buongiorno,</p>
-      <p>Le chiediamo un preventivo per il seguente tragitto: <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}}.</p>
+      <p>Le chiediamo una quotazione indicativa per un bus sul tragitto <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}}.</p>
+      <p>Ci serve per preparare i prezzi del viaggio e non è un impegno: quando le prenotazioni lo richiederanno Le chiederemo il preventivo vero per ogni bus. Chi ci ha dato la quotazione avrà la precedenza.</p>
       <p><a href="{{link}}">Apri la richiesta e rispondi</a></p>
-      <p>Il link mostra tutti i dettagli (fermate, orari) e permette di caricare il proprio preventivo.</p>
+      <p>Il link mostra tutti i dettagli (fermate, orari) e permette di indicare prezzo e posti del bus.</p>
     `,
     segnaposto: ['evento', 'tragitto', 'data', 'link'],
   },
   {
     chiave: 'preventivo_richiesta_cambio_percorso',
-    nome: 'Nuova richiesta preventivo a un fornitore, perché il percorso è cambiato',
-    oggetto: 'Percorso cambiato: nuovo preventivo — {{evento}} ({{tragitto}})',
+    nome: 'Nuova richiesta di quotazione a un fornitore, perché il percorso è cambiato',
+    oggetto: 'Percorso cambiato: nuova quotazione — {{evento}} ({{tragitto}})',
     corpo: `
       <p>Buongiorno,</p>
-      <p>Il percorso del tragitto <b>{{tragitto}}</b> (evento <b>{{evento}}</b> del {{data}}) è cambiato: alcune fermate sono state tolte o aggiunte. Le chiediamo un nuovo preventivo sul percorso aggiornato.</p>
+      <p>Il percorso del tragitto <b>{{tragitto}}</b> (evento <b>{{evento}}</b> del {{data}}) è cambiato: alcune fermate sono state tolte o aggiunte. Le chiediamo una nuova quotazione indicativa sul percorso aggiornato.</p>
       <p><a href="{{link}}">Apri la richiesta e rispondi</a></p>
-      <p>Il link mostra le fermate e gli orari aggiornati e permette di caricare il nuovo preventivo.</p>
+      <p>Il link mostra le fermate e gli orari aggiornati e permette di indicare prezzo e posti del bus.</p>
     `,
     segnaposto: ['evento', 'tragitto', 'data', 'link'],
   },
   {
-    chiave: 'preventivo_non_scelto',
-    nome: 'Avviso al fornitore non scelto (dopo aver accettato un altro preventivo)',
-    oggetto: 'Aggiornamento sulla richiesta preventivo — {{evento}} ({{tragitto}})',
+    chiave: 'preventivo_bus_richiesta',
+    nome: 'Richiesta di preventivo per un bus a un fornitore',
+    oggetto: 'Richiesta preventivo per un bus — {{evento}} ({{bus}})',
     corpo: `
       <p>Buongiorno,</p>
-      <p>Grazie per il preventivo inviato per il tragitto <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}} — per questo viaggio abbiamo scelto un altro fornitore.</p>
+      <p>Le chiediamo un preventivo per un bus: <b>{{bus}}</b>, tragitto <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}}.</p>
+      <p>Fermate: {{fermate}}. Posti di riferimento: {{posti}}.</p>
+      <p><a href="{{link}}">Apri la richiesta e rispondi</a></p>
+      <p>Il link mostra tutti i dettagli e permette di indicare prezzo e posti del bus e di caricare il proprio preventivo.</p>
+    `,
+    segnaposto: ['evento', 'tragitto', 'data', 'bus', 'fermate', 'posti', 'link'],
+  },
+  {
+    chiave: 'preventivo_non_scelto',
+    nome: 'Avviso al fornitore non scelto per un bus',
+    oggetto: 'Aggiornamento sulla richiesta preventivo — {{evento}} ({{bus}})',
+    corpo: `
+      <p>Buongiorno,</p>
+      <p>Grazie per il preventivo inviato per <b>{{bus}}</b> (tragitto <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}}) — per questo bus abbiamo scelto un altro fornitore.</p>
       <p>Ci teniamo comunque a ringraziarla per la disponibilità, e restiamo a disposizione per le prossime richieste.</p>
     `,
-    segnaposto: ['evento', 'tragitto', 'data'],
+    segnaposto: ['evento', 'tragitto', 'data', 'bus'],
   },
   {
     chiave: 'preventivo_scelto',
-    nome: 'Avviso al fornitore scelto (preventivo accettato)',
-    oggetto: 'Preventivo accettato — {{evento}} ({{tragitto}})',
+    nome: 'Avviso al fornitore scelto per un bus (preventivo accettato)',
+    oggetto: 'Preventivo accettato — {{evento}} ({{bus}})',
     corpo: `
       <p>Buongiorno,</p>
-      <p>Le comunichiamo che abbiamo scelto il Suo preventivo di <b>{{prezzo}}</b> per il tragitto <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}}.</p>
+      <p>Le comunichiamo che abbiamo scelto il Suo preventivo di <b>{{prezzo}}</b> per <b>{{bus}}</b> (tragitto <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}}).</p>
       <p>Seguirà a parte il preventivo confermato e firmato per accettazione. Per qualsiasi necessità restiamo a Sua disposizione.</p>
     `,
-    segnaposto: ['evento', 'tragitto', 'data', 'prezzo'],
+    segnaposto: ['evento', 'tragitto', 'data', 'bus', 'prezzo'],
   },
   {
     chiave: 'bundle_conferma',
@@ -323,6 +337,35 @@ const VECCHIO_CORPO_CONFERMA_ACCONTO = `
       <p>A presto!</p>
     `;
 
+/** Testi di prima della quotazione indicativa (settembre 2026): il preventivo
+ *  del tragitto era un impegno con un solo fornitore. */
+const VECCHIO_OGGETTO_PREVENTIVO_RICHIESTA = 'Richiesta preventivo — {{evento}} ({{tragitto}})';
+const VECCHIO_CORPO_PREVENTIVO_RICHIESTA = `
+      <p>Buongiorno,</p>
+      <p>Le chiediamo un preventivo per il seguente tragitto: <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}}.</p>
+      <p><a href="{{link}}">Apri la richiesta e rispondi</a></p>
+      <p>Il link mostra tutti i dettagli (fermate, orari) e permette di caricare il proprio preventivo.</p>
+    `;
+const VECCHIO_OGGETTO_PREVENTIVO_CAMBIO_PERCORSO = 'Percorso cambiato: nuovo preventivo — {{evento}} ({{tragitto}})';
+const VECCHIO_CORPO_PREVENTIVO_CAMBIO_PERCORSO = `
+      <p>Buongiorno,</p>
+      <p>Il percorso del tragitto <b>{{tragitto}}</b> (evento <b>{{evento}}</b> del {{data}}) è cambiato: alcune fermate sono state tolte o aggiunte. Le chiediamo un nuovo preventivo sul percorso aggiornato.</p>
+      <p><a href="{{link}}">Apri la richiesta e rispondi</a></p>
+      <p>Il link mostra le fermate e gli orari aggiornati e permette di caricare il nuovo preventivo.</p>
+    `;
+const VECCHIO_OGGETTO_PREVENTIVO_NON_SCELTO_TRAGITTO = 'Aggiornamento sulla richiesta preventivo — {{evento}} ({{tragitto}})';
+const VECCHIO_CORPO_PREVENTIVO_NON_SCELTO_TRAGITTO = `
+      <p>Buongiorno,</p>
+      <p>Grazie per il preventivo inviato per il tragitto <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}} — per questo viaggio abbiamo scelto un altro fornitore.</p>
+      <p>Ci teniamo comunque a ringraziarla per la disponibilità, e restiamo a disposizione per le prossime richieste.</p>
+    `;
+const VECCHIO_OGGETTO_PREVENTIVO_SCELTO = 'Preventivo accettato — {{evento}} ({{tragitto}})';
+const VECCHIO_CORPO_PREVENTIVO_SCELTO = `
+      <p>Buongiorno,</p>
+      <p>Le comunichiamo che abbiamo scelto il Suo preventivo di <b>{{prezzo}}</b> per il tragitto <b>{{tragitto}}</b>, evento <b>{{evento}}</b> del {{data}}.</p>
+      <p>Seguirà a parte il preventivo confermato e firmato per accettazione. Per qualsiasi necessità restiamo a Sua disposizione.</p>
+    `;
+
 /** Vecchio testo di "preventivo_non_scelto" (senza evento/tragitto/data). */
 const VECCHIO_OGGETTO_PREVENTIVO_NON_SCELTO = 'Aggiornamento sulla richiesta preventivo';
 const VECCHIO_CORPO_PREVENTIVO_NON_SCELTO = `
@@ -405,6 +448,10 @@ const AGGIORNAMENTI_TESTO_BASE: { chiave: string; vecchioOggetto?: string; vecch
   { chiave: 'promemoria_saldo', vecchioOggetto: SEED_OGGETTO_PROMEMORIA_SALDO, vecchioCorpo: SEED_CORPO_PROMEMORIA_SALDO },
   { chiave: 'lista_attesa_promossa', vecchioCorpo: VECCHIO_CORPO_LISTA_ATTESA_PROMOSSA },
   { chiave: 'preventivo_non_scelto', vecchioOggetto: VECCHIO_OGGETTO_PREVENTIVO_NON_SCELTO, vecchioCorpo: VECCHIO_CORPO_PREVENTIVO_NON_SCELTO },
+  { chiave: 'preventivo_non_scelto', vecchioOggetto: VECCHIO_OGGETTO_PREVENTIVO_NON_SCELTO_TRAGITTO, vecchioCorpo: VECCHIO_CORPO_PREVENTIVO_NON_SCELTO_TRAGITTO },
+  { chiave: 'preventivo_richiesta', vecchioOggetto: VECCHIO_OGGETTO_PREVENTIVO_RICHIESTA, vecchioCorpo: VECCHIO_CORPO_PREVENTIVO_RICHIESTA },
+  { chiave: 'preventivo_richiesta_cambio_percorso', vecchioOggetto: VECCHIO_OGGETTO_PREVENTIVO_CAMBIO_PERCORSO, vecchioCorpo: VECCHIO_CORPO_PREVENTIVO_CAMBIO_PERCORSO },
+  { chiave: 'preventivo_scelto', vecchioOggetto: VECCHIO_OGGETTO_PREVENTIVO_SCELTO, vecchioCorpo: VECCHIO_CORPO_PREVENTIVO_SCELTO },
   { chiave: 'ticket', vecchioOggetto: VECCHIO_OGGETTO_TICKET, vecchioCorpo: VECCHIO_CORPO_TICKET },
   { chiave: 'bundle_conferma', vecchioCorpo: VECCHIO_CORPO_BUNDLE_CONFERMA },
 ];
@@ -422,6 +469,10 @@ export async function sincronizzaTemplateEmail() {
     if (!esistente) {
       await db.insert(templateEmail).values({ chiave: modello.chiave, nome: modello.nome, oggetto: modello.oggetto, corpo: modello.corpo });
       continue;
+    }
+    // Il nome è solo l'etichetta nel gestionale (non si modifica da lì): segue sempre quello di base.
+    if (esistente.nome !== modello.nome) {
+      await db.update(templateEmail).set({ nome: modello.nome }).where(eq(templateEmail.chiave, modello.chiave));
     }
     const aggiornamento = AGGIORNAMENTI_TESTO_BASE.find((a) => a.chiave === modello.chiave && a.vecchioCorpo === esistente.corpo);
     if (aggiornamento) {

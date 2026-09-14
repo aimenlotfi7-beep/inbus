@@ -470,6 +470,21 @@ export const preventiviRichieste = pgTable('preventivi_richieste', {
   // accettato un preventivo: il fornitore può rispondere anche se il
   // viaggio ha già un preventivo, e mail e pagina lo spiegano.
   perCambioPercorso: boolean('per_cambio_percorso').notNull().default(false),
+  // Cosa si chiede (deciso dal proprietario, settembre 2026):
+  // - QUOTAZIONE: prezzo indicativo di un bus sull'intero tragitto, serve a
+  //   calcolare i prezzi di vendita; non impegna nessuno (niente mail di
+  //   "scelto", niente file firmato);
+  // - BUS: preventivo vero per UN bus, chiesto quando nasce la proposta da
+  //   confermare (linea_id); ogni bus può avere un fornitore diverso.
+  scopo: text('scopo').$type<'QUOTAZIONE' | 'BUS'>().notNull().default('QUOTAZIONE'),
+  // Solo BUS: la proposta da confermare. set null: se la proposta sparisce
+  // (non serve più) la richiesta resta, e si ricollega se la proposta
+  // rinasce con le stesse fermate (fermate_ids).
+  lineaId: text('linea_id').references((): AnyPgColumn => linee.id, { onDelete: 'set null' }),
+  // Solo BUS: le fermate del bus al momento della richiesta, in ordine.
+  fermateIds: jsonb('fermate_ids').$type<string[]>(),
+  // Solo BUS: il bus è stato confermato, la tornata è chiusa.
+  chiusaIl: timestamp('chiusa_il'),
   creataIl: timestamp('creata_il').notNull().defaultNow(),
 });
 
@@ -480,6 +495,10 @@ export const preventiviRisposte = pgTable('preventivi_risposte', {
   // scrivere all'admin — vedi conversazione).
   richiestaId: text('richiesta_id').notNull().references(() => preventiviRichieste.id, { onDelete: 'cascade' }).unique(),
   prezzo: numeric('prezzo', { precision: 10, scale: 2 }).notNull(),
+  // I posti del bus offerto (le risposte più vecchie non li hanno).
+  postiBus: integer('posti_bus'),
+  // Solo per un preventivo BUS scelto: il bus confermato con questa risposta.
+  busId: text('bus_id').references((): AnyPgColumn => busFisici.id, { onDelete: 'set null' }),
   // File nel database per ora (base64 in una colonna text) — soluzione
   // temporanea, come discusso: da spostare su un servizio dedicato
   // quando si aggiungeranno anche le immagini altrove nel sito.

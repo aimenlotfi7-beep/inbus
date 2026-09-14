@@ -3,7 +3,8 @@ import { eventiService, eventoPerIlSito } from './eventi.service.js';
 import { lineeDaConfermareService } from './linee-da-confermare.service.js';
 import { smistamentoService } from '../prenotazioni/smistamento.service.js';
 import { nomiPercorsiCambiati } from '../preventivi/cambio-percorso.js';
-import { NonTrovato } from '../../shared/errors.js';
+import { NonTrovato, VietatoDaiPermessi } from '../../shared/errors.js';
+import { haPermesso } from '../auth/permessi.service.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 
 export const eventiController = {
@@ -100,6 +101,9 @@ export const eventiController = {
   /** Conferma una linea da confermare (creata in automatico): dati del bus
    *  e fermate. */
   async confermaLinea(req: Request, res: Response) {
+    // Scegliere il preventivo di un fornitore (mail "scelto" e "non scelto")
+    // richiede lo stesso permesso di chi sceglie i preventivi.
+    if (req.body.rispostaId && !(await haPermesso(req.admin!.sub, 'preventivi.accetta'))) throw new VietatoDaiPermessi('Il tuo ruolo non può scegliere i preventivi dei fornitori.');
     const risultato = await eventiService.confermaLinea(req.params.lineaId, req.body);
     await lineeDaConfermareService.allineaSubito(risultato.tragittoId);
     await smistamentoService.smistaSubitoPerLinea(risultato.lineaId);

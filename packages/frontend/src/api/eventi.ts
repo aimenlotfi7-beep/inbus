@@ -88,6 +88,8 @@ export interface BusFisico {
 export interface LineaInput {
   fornitoreId?: string; riferimento: string; autistaNome?: string; autistaTelefono?: string; tourLeaderId?: string | null; costo?: number; postiBus?: number; note?: string; fermateIds: string[];
 }
+/** Conferma di una proposta: rispostaId = il preventivo del bus scelto (il fornitore del bus è il suo). */
+export interface ConfermaLineaInput extends LineaInput { rispostaId?: string }
 // Aggiungere un bus a una Linea esistente, o modificare un bus già
 // dentro — mai le fermate, quelle sono della Linea intera.
 export type BusDiLineaInput = Omit<LineaInput, 'fermateIds'>;
@@ -101,10 +103,22 @@ export interface EsitoCreaLinea extends EsitoAvvisiClienti {
   partenzaConfermata: boolean;
   tourLeaderAvvisato: boolean | null;
 }
+/** Solo per la conferma di una proposta: mail al fornitore scelto (null =
+ *  nessun preventivo scelto) e mail "non scelto" partite. */
+export interface EsitoConfermaLinea extends EsitoCreaLinea {
+  fornitoreSceltoAvvisato: boolean | null;
+  fornitoriNonSceltiAvvisati: number;
+}
 export interface FermataLinea { fermataId: string; citta: string; orario: string | null; inAttesa: number; versati: number; }
+/** Il preventivo scelto per un bus (arrivato da una richiesta ai fornitori). */
+export interface PreventivoDelBus {
+  rispostaId: string; prezzo: string; fornitoreNome: string; fornitoreHaEmail: boolean;
+  haFile: boolean; haFileFirmato: boolean; fileFirmatoInviatoIl: string | null;
+}
 export interface BusDiLinea {
   id: string; fornitoreId: string | null; riferimento: string; autistaNome: string | null; autistaTelefono: string | null;
   tourLeaderId: string | null; tourLeaderNome: string | null; costo: string | null; postiBus: number | null; note: string | null;
+  preventivo: PreventivoDelBus | null;
 }
 /** Salvataggio da Partenze → Orari: fermate, prezzo extra e (facoltativo) l'arrivo. */
 export interface TragittoOperativoInput {
@@ -202,7 +216,7 @@ export const eventiApi = {
   // Conferma una linea da confermare (creata in automatico): dati del primo
   // bus e fermate, come creaLinea. 409 se nel frattempo è sparita perché non
   // serviva più, o è già confermata.
-  confermaLinea: (lineaId: string, input: LineaInput) => api.post<EsitoCreaLinea>(`/api/eventi/linee/${lineaId}/conferma`, input),
+  confermaLinea: (lineaId: string, input: ConfermaLineaInput) => api.post<EsitoConfermaLinea>(`/api/eventi/linee/${lineaId}/conferma`, input),
   // L'assegnazione ai bus è solo automatica (per età, il giorno prima della
   // partenza): questa è l'anteprima, senza scritture.
   anteprimaSmistamento: (tragittoId: string) => api.get<AnteprimaSmistamento>(`/api/eventi/tragitti/${tragittoId}/anteprima-smistamento`),
@@ -244,8 +258,10 @@ export const eventiApi = {
     // Percorso cambiato dopo il preventivo accettato: cosa c'è da fare (null = in regola).
     cambioPercorso: 'da_richiedere' | 'in_attesa' | 'da_valutare' | null;
     preventivoCosto: string | null; fornitoreId: string | null; fermateCompilate: boolean; servizioNome: string | null; servizioId: string | null;
-    /** Richieste di preventivo partite e risposte arrivate (giallo in Preventivi). */
+    /** Richieste di quotazione partite e risposte arrivate (voce Quotazione). */
     richiestePreventivo: number; rispostePreventivo: number;
+    /** Proposte da confermare senza richieste di preventivo per il bus, e risposte arrivate per i bus. */
+    proposteSenzaRichieste: number; risposteBus: number;
     evento: { id: string; artista: string; genere: string; data: string; citta: string; luogo: string; slug: string; immagineUrl: string | null };
   }>>(`/api/eventi/elenco-partenze${opzioni?.soloInProgramma ? '?inProgramma=1' : ''}`),
   statistichePerEvento: () => api.get<Record<string, { partecipanti: number; busCensiti: number }>>('/api/eventi/statistiche-per-evento'),

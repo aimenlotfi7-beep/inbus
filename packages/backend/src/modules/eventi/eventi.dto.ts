@@ -180,6 +180,11 @@ export const creaLineaSchema = z.object({
   note: z.string().optional(),
   fermateIds: z.array(z.string()).min(1),
 });
+// Conferma di una proposta: come una linea nuova, più (facoltativo) il
+// preventivo del bus scelto tra quelli chiesti per questa proposta.
+export const confermaLineaSchema = creaLineaSchema.extend({
+  rispostaId: z.string().optional(),
+});
 // Aggiungere un bus a una Linea esistente — stesse fermate della
 // Linea, non si ridefiniscono qui.
 export const aggiungiBusALineaSchema = creaLineaSchema.omit({ fermateIds: true });

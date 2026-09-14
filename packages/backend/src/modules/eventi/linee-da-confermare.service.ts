@@ -3,6 +3,7 @@ import { db } from '../../db/client.js';
 import { busFisici, eventi, fermate, lineaFermate, linee, prenotazioni, tragitti } from '../../db/schema.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
 import type { Lettore } from '../prenotazioni/partenza.js';
+import { ricollegaPreventiviBus } from '../preventivi/preventivi-bus.service.js';
 
 /** Proposte "da confermare", create e tolte in automatico (pagina "Da confermare").
  *
@@ -236,6 +237,8 @@ async function allinea(tragittoId: string): Promise<EsitoAllineamento> {
       const [nuova] = await tx.insert(linee).values({ tragittoId, nome, ordine, daConfermare: true }).returning({ id: linee.id });
       ordine += 1;
       await tx.insert(lineaFermate).values(proposta.fermateIds.map((fermataId, posizione) => ({ lineaId: nuova.id, fermataId, ordine: posizione })));
+      // I preventivi già chiesti per una proposta uguale, sparita e rinata, tornano a valere.
+      await ricollegaPreventiviBus(tx, tragittoId, nuova.id, proposta.fermateIds);
       esito.create += 1;
     }
     return esito;

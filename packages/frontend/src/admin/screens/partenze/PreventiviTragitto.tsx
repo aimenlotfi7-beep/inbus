@@ -11,20 +11,21 @@ import { CampoNumero } from '../../shared/CampoNumero';
 import { AvvisoCambioPercorso } from '../../shared/AvvisoCambioPercorso';
 import { formattaEuro, plurale } from '../../../shared/formato';
 
-/** Sezione "Preventivi" di UN tragitto (dentro Partenze): richiesta ai
- *  fornitori nel raggio, tabella delle risposte, accettazione, file
- *  firmato. Estratta da PartenzeTab (che teneva cinque Map "per
- *  tragitto" nello stato del genitore): qui lo stato è locale e
- *  semplice — un tragitto, un componente.
+/** Sezione "Quotazione" di UN tragitto (dentro Partenze): richiesta ai
+ *  fornitori nel raggio di una quotazione indicativa (prezzo e posti di un
+ *  bus sul percorso intero), tabella delle risposte, scelta di quella su cui
+ *  fare i prezzi. Scegliere non manda email e non impegna nessuno (deciso
+ *  dal proprietario, settembre 2026): i preventivi veri, con file firmato,
+ *  si chiedono per ogni bus in Da confermare (PreventiviBus.tsx), e chi ha
+ *  dato la quotazione ha la precedenza.
  *
- *  Ogni azione che scrive a un fornitore (richiesta, accettazione, file
- *  firmato) chiede conferma prima e dice dopo se l'email è partita
+ *  Le richieste chiedono conferma prima e dicono dopo se l'email è partita
  *  davvero; quelle non partite si possono reinviare dall'elenco.
  *
- *  Se il percorso è cambiato dopo il preventivo accettato, in cima c'è il
+ *  Se il percorso è cambiato dopo la quotazione scelta, in cima c'è il
  *  riquadro viola con cosa è cambiato e cosa fare: nuova richiesta "per
  *  cambio percorso" (anche ai fornitori già contattati) oppure conferma
- *  che il preventivo attuale va ancora bene. */
+ *  che la quotazione attuale va ancora bene. */
 export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onCambiato }: {
   tragittoId: string;
   tragittoVero: Tragitto | undefined;
@@ -40,7 +41,6 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
   const [caricandoCandidati, setCaricandoCandidati] = useState(false);
   const [inviandoRichiesta, setInviandoRichiesta] = useState(false);
   const [accettandoId, setAccettandoId] = useState<string | null>(null);
-  const [caricandoFirmatoId, setCaricandoFirmatoId] = useState<string | null>(null);
   const [reinviandoId, setReinviandoId] = useState<string | null>(null);
   // Percorso cambiato dopo il preventivo accettato (null = in regola), e se
   // la richiesta aperta ora è una nuova richiesta per quel cambio.
@@ -89,12 +89,12 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
   }
 
   async function salvaManuale() {
-    if (!formManuale.costo || !formManuale.postiBus) { notifica('Inserisci il costo e i posti presunti del bus.', 'errore'); return; }
+    if (!formManuale.costo || !formManuale.postiBus) { notifica('Inserisci il costo e i posti del bus.', 'errore'); return; }
     // Registrarne uno nuovo sostituisce quello già salvato: va detto prima.
     if (tragittoVero?.preventivoCosto) {
       const ok = await conferma({
-        titolo: 'Sostituire il preventivo registrato?',
-        testo: <>Questo tragitto ha già un preventivo di <b>{formattaEuro(tragittoVero.preventivoCosto)}</b> ({nomeFornitore(tragittoVero.fornitoreId)}). Verrà sostituito da quello nuovo di <b>{formattaEuro(formManuale.costo)}</b>; poi ricontrolla i prezzi in Prezzi.</>,
+        titolo: 'Sostituire la quotazione?',
+        testo: <>Questo tragitto ha già una quotazione di <b>{formattaEuro(tragittoVero.preventivoCosto)}</b> ({nomeFornitore(tragittoVero.fornitoreId)}). Verrà sostituita da quella nuova di <b>{formattaEuro(formManuale.costo)}</b>; poi ricontrolla i prezzi in Prezzi.</>,
         conferma: 'Sostituisci',
       });
       if (!ok) return;
@@ -109,7 +109,7 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
         fileNome: formManuale.file?.name,
         fileContenuto,
       });
-      notifica('Preventivo registrato: ora puoi calcolare i prezzi di vendita in Prezzi.', 'successo');
+      notifica('Quotazione registrata: ora puoi calcolare i prezzi di vendita in Prezzi.', 'successo');
       setApertoManuale(false);
       setFormManuale({});
       caricaRisposte();
@@ -131,10 +131,10 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
       let lat = tragittoVero.partenzaLat, lng = tragittoVero.partenzaLng;
       if (perCambio || lat == null || lng == null) {
         const partenza = tragittoVero.fermate.filter((f) => f.attivo !== false)[0];
-        if (!partenza?.citta) { notifica('Manca la città di partenza su questo tragitto: sistemala in Eventi prima di richiedere un preventivo.', 'errore'); return; }
+        if (!partenza?.citta) { notifica('Manca la città di partenza su questo tragitto: sistemala in Eventi prima di richiedere una quotazione.', 'errore'); return; }
         const r = await geocodifica(partenza.indirizzo ? `${partenza.indirizzo}, ${partenza.citta}` : partenza.citta);
         if (!r.coordinate) {
-          notifica(r.erroreRete ? ERRORE_MAPPE : 'Indirizzo di partenza non trovato sulla mappa: controllalo in Eventi prima di richiedere un preventivo.', 'errore');
+          notifica(r.erroreRete ? ERRORE_MAPPE : 'Indirizzo di partenza non trovato sulla mappa: controllalo in Eventi prima di richiedere una quotazione.', 'errore');
           return;
         }
         lat = r.coordinate.lat; lng = r.coordinate.lng;
@@ -169,10 +169,10 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
       return;
     }
     const ok = await conferma({
-      titolo: perCambioPercorso ? 'Inviare la richiesta di nuovo preventivo?' : 'Inviare la richiesta di preventivo?',
+      titolo: perCambioPercorso ? 'Inviare la richiesta di nuova quotazione?' : 'Inviare la richiesta di quotazione?',
       testo: perCambioPercorso
-        ? <>Riceveranno un'email che spiega che il percorso è cambiato, con il link per il nuovo preventivo: <b>{destinatari.map((c) => c.nome).join(', ')}</b>.</>
-        : <>Riceveranno un'email con il link per rispondere: <b>{destinatari.map((c) => c.nome).join(', ')}</b>.</>,
+        ? <>Riceveranno un'email che spiega che il percorso è cambiato, con il link per la nuova quotazione: <b>{destinatari.map((c) => c.nome).join(', ')}</b>.</>
+        : <>Riceveranno un'email che chiede una quotazione indicativa (non un impegno), con il link per rispondere: <b>{destinatari.map((c) => c.nome).join(', ')}</b>.</>,
       conferma: `Invia a ${plurale(destinatari.length, 'fornitore', 'fornitori')}`,
     });
     if (!ok) return;
@@ -189,7 +189,7 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
       // "inviate" anche quando il servizio email non funzionava.
       const inviate = risultato.inviateAutomatiche + risultato.inviateManuali;
       const totale = inviate + risultato.nonInviate + risultato.senzaEmail;
-      const cosa = eraPerCambio ? 'Richiesta di nuovo preventivo' : 'Richiesta';
+      const cosa = eraPerCambio ? 'Richiesta di nuova quotazione' : 'Richiesta di quotazione';
       if (risultato.nonInviate === 0 && risultato.senzaEmail === 0) {
         notifica(`${cosa} inviata a ${plurale(inviate, 'fornitore', 'fornitori')}.`, 'successo');
       } else {
@@ -209,20 +209,20 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
     }
   }
 
-  /** "Il preventivo va ancora bene": il percorso di adesso diventa quello
-   *  del preventivo accettato, senza cambiare costo né scrivere a nessuno. */
+  /** "La quotazione va ancora bene": il percorso di adesso diventa quello
+   *  della quotazione scelta, senza cambiare costo né scrivere a nessuno. */
   async function confermaPercorsoAttuale() {
     if (!tragittoVero?.preventivoCosto) return;
     const ok = await conferma({
-      titolo: 'Il preventivo va ancora bene?',
-      testo: <>Il preventivo di <b>{formattaEuro(tragittoVero.preventivoCosto)}</b> ({nomeFornitore(tragittoVero.fornitoreId)}) resta valido anche per il percorso di adesso e l'avviso viola sparisce. Le richieste di nuovo preventivo ancora aperte si chiudono: i fornitori non potranno più rispondere.</>,
+      titolo: 'La quotazione va ancora bene?',
+      testo: <>La quotazione di <b>{formattaEuro(tragittoVero.preventivoCosto)}</b> ({nomeFornitore(tragittoVero.fornitoreId)}) resta valida anche per il percorso di adesso e l'avviso viola sparisce. Le richieste di nuova quotazione ancora aperte si chiudono: i fornitori non potranno più rispondere.</>,
       conferma: 'Sì, va ancora bene',
     });
     if (!ok) return;
     setConfermandoPercorso(true);
     try {
       await preventiviApi.confermaPercorso(tragittoId);
-      notifica('Preventivo confermato per il percorso di adesso.', 'successo');
+      notifica('Quotazione confermata per il percorso di adesso.', 'successo');
       caricaRisposte();
       onCambiato();
     } catch (e) {
@@ -247,72 +247,26 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
     }
   }
 
+  /** Sceglie la risposta come quotazione del tragitto: costo, posti e
+   *  fornitore di riferimento per i prezzi. Nessuna email a nessuno. */
   async function accettaPreventivo(r: RichiestaConRisposta) {
     if (!r.risposta || accettandoId) return;
     const ok = await conferma({
-      titolo: 'Accettare questo preventivo?',
-      testo: <>Il preventivo di <b>{r.fornitore.nome}</b> ({formattaEuro(r.risposta.prezzo)}) diventa il costo di questo tragitto: servirà in Prezzi per calcolare i prezzi di vendita. Il fornitore riceverà un'email, e anche gli altri che hanno risposto.</>,
-      conferma: 'Accetta preventivo',
+      titolo: 'Scegliere questa quotazione?',
+      testo: <>La quotazione di <b>{r.fornitore.nome}</b> ({formattaEuro(r.risposta.prezzo)}{r.risposta.postiBus ? `, ${r.risposta.postiBus} posti` : ''}) diventa il riferimento per calcolare i prezzi di vendita in Prezzi. Non parte nessuna email: è indicativa. {r.fornitore.nome} avrà la precedenza quando chiederai i preventivi per i bus.</>,
+      conferma: 'Scegli quotazione',
     });
     if (!ok) return;
     setAccettandoId(r.risposta.id);
     try {
-      const esito = await preventiviApi.accetta(r.risposta.id);
-      const testo = [
-        `Preventivo di ${r.fornitore.nome} accettato.`,
-        esito.fornitoreAvvisato === null ? 'Il fornitore era già stato scelto: nessuna nuova email.' : esito.fornitoreAvvisato ? 'Il fornitore è stato avvisato via email.' : "L'email al fornitore non è partita.",
-        esito.nonSceltiAvvisati ? `${plurale(esito.nonSceltiAvvisati, 'fornitore non scelto è stato avvisato', 'fornitori non scelti sono stati avvisati')}.` : '',
-        'Ora calcola i prezzi di vendita in Prezzi.',
-      ].filter(Boolean).join(' ');
-      notifica(testo, esito.fornitoreAvvisato === false ? 'errore' : 'successo');
+      await preventiviApi.accetta(r.risposta.id);
+      notifica(`Quotazione di ${r.fornitore.nome} scelta. ${r.risposta.postiBus ? 'Ora calcola i prezzi di vendita in Prezzi.' : 'Il fornitore non ha indicato i posti del bus: scrivili in Prezzi prima di calcolare.'}`, 'successo');
       caricaRisposte();
       onCambiato();
     } catch (e) {
-      notifica(`Accettazione non riuscita: ${motivoErrore(e)}`, 'errore');
+      notifica(`Scelta non riuscita: ${motivoErrore(e)}`, 'errore');
     } finally {
       setAccettandoId(null);
-    }
-  }
-
-  async function caricaFileFirmatoPerRisposta(r: RichiestaConRisposta, input: HTMLInputElement) {
-    const file = input.files?.[0];
-    // Svuoto subito il campo: altrimenti, dopo un errore, scegliere di
-    // nuovo lo stesso file non farebbe partire nulla.
-    input.value = '';
-    if (!file || !r.risposta) return;
-    const ok = await conferma({
-      titolo: 'Inviare il file firmato?',
-      testo: <><b>{file.name}</b> verrà salvato e inviato subito via email a <b>{r.fornitore.nome}</b>.</>,
-      conferma: 'Carica e invia',
-    });
-    if (!ok) return;
-    setCaricandoFirmatoId(r.risposta.id);
-    try {
-      const { inviata } = await preventiviApi.caricaFileFirmato(r.risposta.id, file.name, await fileABase64(file));
-      notifica(inviata
-        ? `File firmato inviato a ${r.fornitore.nome}.`
-        : `File firmato salvato, ma l'email per ${r.fornitore.nome} non è partita: usa "Reinvia firmato".`, inviata ? 'successo' : 'errore');
-      caricaRisposte();
-    } catch (e) {
-      notifica(`Caricamento non riuscito: ${motivoErrore(e)}`, 'errore');
-    } finally {
-      setCaricandoFirmatoId(null);
-    }
-  }
-
-  async function reinviaFirmato(r: RichiestaConRisposta) {
-    if (!r.risposta) return;
-    setReinviandoId(r.risposta.id);
-    try {
-      const { inviata } = await preventiviApi.reinviaFileFirmato(r.risposta.id);
-      notifica(inviata
-        ? `File firmato inviato a ${r.fornitore.nome}.`
-        : `L'email con il file firmato per ${r.fornitore.nome} non è partita: controlla la configurazione delle email.`, inviata ? 'successo' : 'errore');
-      caricaRisposte();
-    } catch (e) {
-      notifica(`Reinvio non riuscito: ${motivoErrore(e)}`, 'errore');
-    } finally {
-      setReinviandoId(null);
     }
   }
 
@@ -357,12 +311,12 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
             <>
               {cambioPercorso.stato !== 'da_valutare' && (
                 <button type="button" className="btn btn-viola" disabled={caricandoCandidati} onClick={() => caricaCandidati(true)}>
-                  {caricandoCandidati ? 'Cerco i fornitori vicini…' : cambioPercorso.stato === 'da_richiedere' ? 'Richiedi nuovo preventivo' : 'Chiedi ad altri fornitori'}
+                  {caricandoCandidati ? 'Cerco i fornitori vicini…' : cambioPercorso.stato === 'da_richiedere' ? 'Richiedi nuova quotazione' : 'Chiedi ad altri fornitori'}
                 </button>
               )}
               {puoAccettare && tragittoVero?.preventivoCosto && (
                 <button type="button" className="btn btn-ghost" disabled={confermandoPercorso} onClick={confermaPercorsoAttuale}>
-                  {confermandoPercorso ? 'Salvo…' : 'Il preventivo va ancora bene'}
+                  {confermandoPercorso ? 'Salvo…' : 'La quotazione va ancora bene'}
                 </button>
               )}
             </>
@@ -373,28 +327,28 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
       {/* Le due azioni sulla stessa riga, accanto al titolo: prima una era
           a destra e l'altra sotto a sinistra, come se non fossero sorelle. */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-        <p className="section-label" style={{ marginBottom: 0 }}>Richiedi preventivo</p>
+        <p className="section-label" style={{ marginBottom: 0 }}>Richiedi quotazione</p>
         {!pannelloAperto && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {/* Con il percorso cambiato la richiesta giusta è quella viola
                 qui sopra: una normale non potrebbe ricevere risposte. */}
             {!cambioPercorso && (
               <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} disabled={caricandoCandidati} onClick={() => caricaCandidati(false)}>
-                {caricandoCandidati ? 'Cerco i fornitori vicini…' : '+ Nuova richiesta preventivo'}
+                {caricandoCandidati ? 'Cerco i fornitori vicini…' : '+ Nuova richiesta di quotazione'}
               </button>
             )}
-            <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} onClick={() => setApertoManuale(true)}>+ Registra un preventivo avuto altrove</button>
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-md)' }} onClick={() => setApertoManuale(true)}>+ Registra una quotazione avuta altrove</button>
           </div>
         )}
       </div>
       {apertoManuale && (
         <div style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 8, padding: 12, marginBottom: 14 }}>
-          <p className="testo-intro" style={{ marginBottom: 10 }}>Per un preventivo avuto fuori dal sistema (telefono, email diretta) invece che tramite una richiesta.</p>
+          <p className="testo-intro" style={{ marginBottom: 10 }}>Per una quotazione avuta fuori dal sistema (telefono, email diretta) invece che tramite una richiesta.</p>
           <div className="form-grid">
-            <label>Costo del preventivo
+            <label>Costo della quotazione
               <CampoNumero valuta value={formManuale.costo} onChange={(v) => setFormManuale((f) => ({ ...f, costo: v }))} />
             </label>
-            <label>Posti presunti del bus
+            <label>Posti del bus
               <CampoNumero value={formManuale.postiBus} onChange={(v) => setFormManuale((f) => ({ ...f, postiBus: v }))} />
             </label>
             <label>Fornitore (facoltativo)
@@ -403,12 +357,12 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
                 {fornitoriLista.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
               </select>
             </label>
-            <label>Allega il suo preventivo (facoltativo)
+            <label>Allega la sua quotazione (facoltativo)
               <input type="file" accept="application/pdf,image/*" onChange={(e) => setFormManuale((f) => ({ ...f, file: e.target.files?.[0] }))} />
             </label>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            <button type="button" className="btn btn-primary" disabled={salvandoManuale} onClick={salvaManuale}>{salvandoManuale ? 'Salvo…' : 'Registra preventivo'}</button>
+            <button type="button" className="btn btn-primary" disabled={salvandoManuale} onClick={salvaManuale}>{salvandoManuale ? 'Salvo…' : 'Registra quotazione'}</button>
             <button type="button" className="btn btn-ghost" onClick={() => { setApertoManuale(false); setFormManuale({}); }}>Annulla</button>
           </div>
         </div>
@@ -417,7 +371,7 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
         <div style={{ background: 'var(--night)', border: `1px solid ${perCambioPercorso ? 'var(--viola)' : 'var(--line)'}`, borderRadius: 8, padding: 12, marginBottom: 14 }}>
           {perCambioPercorso && (
             <p style={{ fontSize: 'var(--testo-md)', color: 'var(--viola)', fontWeight: 600, marginBottom: 8 }}>
-              Nuova richiesta per cambio percorso: i fornitori ricevono un'email che spiega che il percorso è cambiato. Puoi scegliere anche chi avevi già contattato.
+              Nuova richiesta di quotazione per cambio percorso: i fornitori ricevono un'email che spiega che il percorso è cambiato. Puoi scegliere anche chi avevi già contattato.
             </p>
           )}
           {candidati.length === 0 && <p className="testo-intro">Nessun fornitore approvato entro il raggio impostato: allarga il raggio in Impostazioni o registra un fornitore più vicino.</p>}
@@ -439,25 +393,25 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
                 />
                 <span style={{ flex: 1 }}>{c.nome} <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>({c.distanzaKm} km)</span></span>
                 {c.statoCandidato === 'gia_contattato' && <span style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)' }}>{perCambioPercorso ? 'contattato per il percorso di prima' : 'già contattato'}</span>}
-                {c.statoCandidato === 'accettato_in_precedenza' && <span style={{ fontSize: 'var(--testo-xs)', color: 'var(--green)' }}>scelto in precedenza per questo tragitto</span>}
+                {c.statoCandidato === 'accettato_in_precedenza' && <span style={{ fontSize: 'var(--testo-xs)', color: 'var(--green)' }}>quotazione scelta in precedenza</span>}
               </label>
             );
           })}
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <button type="button" className={`btn ${perCambioPercorso ? 'btn-viola' : 'btn-primary'}`} disabled={inviandoRichiesta || candidati.length === 0} onClick={inviaRichiesta}>
-              {inviandoRichiesta ? 'Invio…' : perCambioPercorso ? 'Invia richiesta di nuovo preventivo' : 'Invia richiesta'}
+              {inviandoRichiesta ? 'Invio…' : perCambioPercorso ? 'Invia richiesta di nuova quotazione' : 'Invia richiesta'}
             </button>
             <button type="button" className="btn btn-ghost" onClick={chiudiCandidati}>Annulla</button>
           </div>
         </div>
       )}
 
-      {/* Il preventivo registrato (a mano o accettato) si vede anche qui,
+      {/* La quotazione (registrata a mano o scelta) si vede anche qui,
           subito dopo il salvataggio. */}
       {tragittoVero?.preventivoCosto && (
         <div className="section-card" style={{ marginTop: 14, background: 'var(--dusk-2)' }}>
           <p style={{ margin: 0, fontWeight: 600 }}>
-            Preventivo registrato: {formattaEuro(tragittoVero.preventivoCosto)} · {tragittoVero.preventivoPostiBus != null ? plurale(tragittoVero.preventivoPostiBus, 'posto presunto', 'posti presunti') : 'posti non indicati'}
+            Quotazione: {formattaEuro(tragittoVero.preventivoCosto)} · {tragittoVero.preventivoPostiBus != null ? plurale(tragittoVero.preventivoPostiBus, 'posto', 'posti') : 'posti non indicati'}
           </p>
           <p style={{ margin: '4px 0 0', fontSize: 'var(--testo-md)', color: 'var(--mist)' }}>
             Fornitore: {nomeFornitore(tragittoVero.fornitoreId)}.{' '}
@@ -473,14 +427,14 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
       ) : !risposte ? (
         <p className="testo-intro">Carico…</p>
       ) : risposte.length === 0 ? (
-        <p className="testo-intro">Nessuna richiesta inviata ancora per questo tragitto.</p>
+        <p className="testo-intro">Nessuna richiesta di quotazione inviata ancora per questo tragitto.</p>
       ) : (
         <div className="table-scroll">
           <table className="data-table">
-            <thead><tr><th>Fornitore</th><th style={{ textAlign: 'right' }}>Costo</th><th>Stato</th><th></th></tr></thead>
+            <thead><tr><th>Fornitore</th><th style={{ textAlign: 'right' }}>Costo</th><th style={{ textAlign: 'right' }}>Posti</th><th>Stato</th><th></th></tr></thead>
             <tbody>
               {risposte.map((r) => {
-                // Accettata = la risposta con fornitore e prezzo del preventivo.
+                // Scelta = la risposta con fornitore e prezzo della quotazione.
                 // Non lo è una richiesta senza risposta, né la risposta a una
                 // richiesta per cambio percorso ancora aperta (anche se arriva
                 // dallo stesso fornitore).
@@ -488,7 +442,6 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
                   && tragittoVero?.fornitoreId === r.fornitore.id
                   && r.cambioPercorso !== 'aperta'
                   && (tragittoVero.preventivoCosto == null || Number(tragittoVero.preventivoCosto) === Number(r.risposta.prezzo));
-                const firmatoNonPartito = !!r.risposta?.haFileFirmato && !r.risposta.fileFirmatoInviatoIl;
                 return (
                   <tr key={r.richiestaId}>
                     <td>
@@ -508,9 +461,10 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
                       {r.risposta && prezzi.length >= 2 && Number(r.risposta.prezzo) === minPrezzo && <span style={{ display: 'block', fontSize: 'var(--testo-xs)', color: 'var(--mist)' }}>più economico</span>}
                       {r.risposta && prezzi.length >= 2 && Number(r.risposta.prezzo) === maxPrezzo && maxPrezzo !== minPrezzo && <span style={{ display: 'block', fontSize: 'var(--testo-xs)', color: 'var(--mist)' }}>più caro</span>}
                     </td>
+                    <td style={{ textAlign: 'right' }}>{r.risposta?.postiBus ?? '—'}</td>
                     <td style={{ fontSize: 'var(--testo-sm)' }}>
                       {accettato ? (
-                        <span className="badge badge-stato-verde">Accettato</span>
+                        <span className="badge badge-stato-verde">Scelta</span>
                       ) : r.risposta ? (
                         <span style={{ color: 'var(--mist)' }}>Ha risposto</span>
                       ) : (
@@ -520,7 +474,6 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
                           {!r.fornitore.email && <span style={stileNotaRossa}>fornitore senza email</span>}
                         </span>
                       )}
-                      {firmatoNonPartito && <span style={stileNotaRossa}>file firmato: email non partita</span>}
                     </td>
                     <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
                       {/* Reinvio: per chi non ha ancora risposto (anche col link
@@ -536,24 +489,12 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
                       )}
                       {r.risposta && puoAccettare && !accettato && (
                         <button type="button" className="btn btn-ghost btn-piccolissimo" style={{ color: 'var(--green)', marginLeft: 6 }} disabled={!!accettandoId} onClick={() => accettaPreventivo(r)}>
-                          {accettandoId === r.risposta.id ? 'Accetto…' : 'Accetta'}
+                          {accettandoId === r.risposta.id ? 'Scelgo…' : 'Scegli'}
                         </button>
                       )}
-                      {r.risposta && accettato && !r.risposta.haFileFirmato && (
-                        <label className="btn btn-ghost btn-piccolissimo" style={{ cursor: caricandoFirmatoId ? 'default' : 'pointer', marginLeft: 6, opacity: caricandoFirmatoId ? .6 : 1 }}>
-                          {caricandoFirmatoId === r.risposta.id ? 'Invio…' : 'Carica firmato'}
-                          <input type="file" accept="application/pdf" style={{ display: 'none' }} disabled={!!caricandoFirmatoId} onChange={(e) => caricaFileFirmatoPerRisposta(r, e.currentTarget)} />
-                        </label>
-                      )}
+                      {/* File firmati di prima di settembre 2026, quando questo era un preventivo vero: si scaricano ancora. */}
                       {r.risposta?.haFileFirmato && (
-                        <button type="button" className="btn btn-ghost btn-piccolissimo" style={{ color: firmatoNonPartito ? undefined : 'var(--green)', marginLeft: 6 }} onClick={() => scaricaFileRisposta(r.risposta!.id, 'firmato')}>
-                          {firmatoNonPartito ? 'Scarica firmato' : 'Firmato e inviato · scarica'}
-                        </button>
-                      )}
-                      {firmatoNonPartito && (
-                        <button type="button" className="btn btn-ghost btn-piccolissimo" style={{ marginLeft: 6 }} disabled={!!reinviandoId} onClick={() => reinviaFirmato(r)}>
-                          {reinviandoId === r.risposta!.id ? 'Invio…' : 'Reinvia firmato'}
-                        </button>
+                        <button type="button" className="btn btn-ghost btn-piccolissimo" style={{ marginLeft: 6 }} onClick={() => scaricaFileRisposta(r.risposta!.id, 'firmato')}>Scarica firmato</button>
                       )}
                     </td>
                   </tr>

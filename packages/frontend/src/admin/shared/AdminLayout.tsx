@@ -36,7 +36,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
   ]},
   { titolo: 'Partenze', voci: [
     { id: 'partenze-orari', label: 'Orari', permesso: 'eventi.partenze' },
-    { id: 'partenze-preventivi', label: 'Preventivi', permesso: 'eventi.partenze' },
+    { id: 'partenze-preventivi', label: 'Quotazione', permesso: 'eventi.partenze' },
     { id: 'partenze-prezzi', label: 'Prezzi', permesso: 'eventi.partenze' },
     { id: 'partenze-da-confermare', label: 'Da confermare', permesso: 'eventi.partenze' },
     { id: 'partenze-confermato', label: 'Confermate', permesso: 'eventi.partenze' },
@@ -123,7 +123,7 @@ export function AdminLayout({
   // Pallini di Partenze: calcolati con le stesse regole delle card e della
   // pagina del tragitto (statiPartenze.ts). Per ogni voce gli eventi con
   // almeno un tragitto rosso; in viola, a parte, quelli con il percorso
-  // cambiato dopo il preventivo (su Preventivi).
+  // cambiato dopo la quotazione (su Quotazione).
   const [palliniPartenzeVoci, setPalliniPartenzeVoci] = useState<ReturnType<typeof palliniPartenze> | null>(null);
   const [inAttesa, setInAttesa] = useState(0);
   const [rimborsiInAttesa, setRimborsiInAttesa] = useState(0);
@@ -162,7 +162,7 @@ export function AdminLayout({
   // anche quando il gruppo è chiuso a tendina su mobile — altrimenti
   // una notifica dentro un gruppo chiuso passerebbe inosservata).
   /** Le notifiche viola (più urgenti) di una voce: per ora i tragitti con il
-   *  percorso cambiato dopo il preventivo accettato, su "Preventivi". */
+   *  percorso cambiato dopo la quotazione scelta, su "Quotazione". */
   function notificaUrgenteVoce(id: string): number {
     return id === 'partenze-preventivi' ? palliniPartenzeVoci?.percorsiCambiati ?? 0 : 0;
   }
@@ -267,7 +267,7 @@ export function AdminLayout({
                   >
                     {voce.label}
                     {notificaUrgenteVoce(voce.id) > 0 && (
-                      <span className="side-badge urgente" title={`${plurale(notificaUrgenteVoce(voce.id), 'evento', 'eventi')} con il percorso cambiato: il preventivo va rifatto`}>
+                      <span className="side-badge urgente" title={`${plurale(notificaUrgenteVoce(voce.id), 'evento', 'eventi')} con il percorso cambiato: la quotazione va rifatta`}>
                         {notificaUrgenteVoce(voce.id)}
                       </span>
                     )}
