@@ -427,7 +427,7 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
       ) : !risposte ? (
         <p className="testo-intro">Carico…</p>
       ) : risposte.length === 0 ? (
-        <p className="testo-intro">Nessuna richiesta di quotazione inviata ancora per questo tragitto.</p>
+        <p className="testo-intro">Nessuna richiesta di quotazione ancora. Parte da sola ai fornitori con "Invio automatico" nel raggio appena il tragitto ha gli orari: se non ne è partita nessuna, nel raggio non ce ne sono e va mandata a mano.</p>
       ) : (
         <div className="table-scroll">
           <table className="data-table">
@@ -470,6 +470,7 @@ export function PreventiviTragitto({ tragittoId, tragittoVero, puoAccettare, onC
                       ) : (
                         <span style={{ color: 'var(--mist)' }}>
                           In attesa di risposta
+                          {r.richiesta.tipoInvio === 'AUTOMATICO' && <span style={{ display: 'block', fontSize: 'var(--testo-xs)' }}>invio automatico</span>}
                           {r.linkScaduto && <span style={stileNotaRossa}>link scaduto</span>}
                           {!r.fornitore.email && <span style={stileNotaRossa}>fornitore senza email</span>}
                         </span>

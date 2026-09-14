@@ -322,9 +322,9 @@ export function FornitoriScreen() {
           </div>
         )}
         <div className="campo"><label htmlFor={id('note')}>Note</label><input id={id('note')} value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
-        <label title="Se attivo, quando questo fornitore rientra nel raggio della PRIMA richiesta preventivo di un tragitto, la mail gli parte da sola." style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0', cursor: 'pointer' }}>
+        <label title="Se attivo, le richieste gli partono da sole, senza clic: la quotazione appena un tragitto nel raggio ha gli orari (e di nuovo se il percorso cambia), i preventivi per un bus appena nasce la proposta vicino a lui." style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0', cursor: 'pointer' }}>
           <input type="checkbox" checked={form.invioAutomatico ?? false} onChange={(e) => setForm({ ...form, invioAutomatico: e.target.checked })} style={{ width: 'auto' }} />
-          Invio automatico della richiesta preventivo (se nel raggio)
+          Invio automatico di quotazioni e preventivi per i bus (se nel raggio)
         </label>
         {inModifica?.campiExtra && inModifica.campiExtra.length > 0 && (
           <div style={{ marginBottom: 14 }}>

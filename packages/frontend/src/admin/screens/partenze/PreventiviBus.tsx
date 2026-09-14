@@ -167,7 +167,7 @@ export function PreventiviBus({ proposta, tragitto, puoScegliere, onScegli }: {
       ) : !richieste ? (
         <p style={{ color: 'var(--mist)', margin: '8px 0 0' }}>Carico…</p>
       ) : richieste.length === 0 ? (
-        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', margin: '8px 0 0' }}>Nessun preventivo chiesto ancora per questo bus.</p>
+        <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', margin: '8px 0 0' }}>Nessun preventivo chiesto ancora per questo bus. Partono da soli ai fornitori con "Invio automatico" vicini e a chi ha dato la quotazione: se non è partito niente, chiedili a mano.</p>
       ) : (
         <div className="table-scroll" style={{ marginTop: 8 }}>
           <table className="data-table">
@@ -188,6 +188,7 @@ export function PreventiviBus({ proposta, tragitto, puoScegliere, onScegli }: {
                     <td style={{ textAlign: 'right' }}>{r.risposta?.postiBus ?? '—'}</td>
                     <td style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>
                       {r.risposta ? 'Ha risposto' : 'In attesa di risposta'}
+                      {r.richiesta.tipoInvio === 'AUTOMATICO' && <span style={{ display: 'block', fontSize: 'var(--testo-xs)' }}>invio automatico</span>}
                       {!r.risposta && r.linkScaduto && <span style={{ display: 'block', color: 'var(--pink)', fontSize: 'var(--testo-xs)' }}>link scaduto</span>}
                       {!r.fornitore.email && <span style={{ display: 'block', color: 'var(--pink)', fontSize: 'var(--testo-xs)' }}>fornitore senza email</span>}
                     </td>

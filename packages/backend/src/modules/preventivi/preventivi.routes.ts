@@ -185,18 +185,49 @@ function inviaFileFirmato(email: string, fileNome: string, fileContenuto: string
   ]);
 }
 
-/** Invia a automatici e scelti a mano; conteggi veri (vedi richiedi). */
-async function inviaATutti(candidati: Awaited<ReturnType<typeof candidatiVicini>>, manualiIds: string[], opzioni: { cambioPercorso?: boolean }, dati: Parameters<typeof inviaRichiestaSingola>[2]) {
+/** Invia a automatici e scelti a mano; conteggi veri (vedi richiedi).
+ *  senzaClic: richiesta partita da sola (invio-automatico.service.ts), tutte
+ *  registrate come automatiche. */
+async function inviaATutti(candidati: Awaited<ReturnType<typeof candidatiVicini>>, manualiIds: string[], opzioni: { cambioPercorso?: boolean; senzaClic?: boolean }, dati: Parameters<typeof inviaRichiestaSingola>[2]) {
   const { automatici, manuali } = destinatariRichiesta(candidati, new Set(manualiIds), opzioni);
-  const esito = { inviateAutomatiche: 0, inviateManuali: 0, nonInviate: 0, senzaEmail: 0 };
+  const esito = { inviateAutomatiche: 0, inviateManuali: 0, nonInviate: 0, senzaEmail: 0, fornitori: [] as string[] };
   const conta = (r: EsitoRichiesta, campoInviate: 'inviateAutomatiche' | 'inviateManuali') => {
     if (r === 'inviata') esito[campoInviate]++;
     else if (r === 'non_inviata') esito.nonInviate++;
     else esito.senzaEmail++;
   };
-  for (const f of automatici) conta(await inviaRichiestaSingola(f, 'AUTOMATICO', dati), 'inviateAutomatiche');
-  for (const f of manuali) conta(await inviaRichiestaSingola(f, 'MANUALE', dati), 'inviateManuali');
+  for (const f of automatici) { conta(await inviaRichiestaSingola(f, 'AUTOMATICO', dati), 'inviateAutomatiche'); esito.fornitori.push(f.nome); }
+  for (const f of manuali) { conta(await inviaRichiestaSingola(f, opzioni.senzaClic ? 'AUTOMATICO' : 'MANUALE', dati), 'inviateManuali'); esito.fornitori.push(f.nome); }
   return esito;
+}
+
+/** Richiesta di quotazione partita da sola (senza clic), vedi
+ *  invio-automatico.service.ts. Prima richiesta: ai fornitori con "Invio
+ *  automatico" nel raggio. Percorso cambiato: a quelli con "Invio automatico"
+ *  (anche se già contattati per il percorso di prima) e a chi aveva dato la
+ *  quotazione, anche fuori raggio. */
+export async function inviaQuotazioneSenzaClic(tragittoId: string, posizione: { lat: number; lng: number }, perCambioPercorso: boolean) {
+  const { tragitto } = await tragittoConEvento(tragittoId);
+  const raggioKm = await leggiRaggioKmPreventivo();
+  const giaContattati = await db.select({ fornitoreId: preventiviRichieste.fornitoreId }).from(preventiviRichieste)
+    .where(and(eq(preventiviRichieste.tragittoId, tragittoId), eq(preventiviRichieste.scopo, 'QUOTAZIONE')));
+  const candidati = await candidatiVicini(posizione.lat, posizione.lng, raggioKm, {
+    contattatiIds: new Set(giaContattati.map((r) => r.fornitoreId)), fornitoreQuotazioneId: tragitto.fornitoreId, quotazioneSempre: perCambioPercorso,
+  });
+  const scelti = perCambioPercorso ? candidati.filter((c) => c.invioAutomatico || c.id === tragitto.fornitoreId).map((c) => c.id) : [];
+  return inviaATutti(candidati, scelti, { cambioPercorso: perCambioPercorso, senzaClic: true }, { tragittoId, scopo: 'QUOTAZIONE', perCambioPercorso });
+}
+
+/** Preventivi per il bus di una proposta partiti da soli: ai fornitori con
+ *  "Invio automatico" vicini alla prima fermata del bus e, con la precedenza,
+ *  a chi ha dato la quotazione. */
+export async function inviaPreventiviBusSenzaClic(lineaId: string, posizione: { lat: number; lng: number }) {
+  const { linea, fermateIds } = await propostaAperta(lineaId);
+  if (fermateIds.length === 0) return null;
+  const { tragitto } = await tragittoConEvento(linea.tragittoId);
+  const raggioKm = await leggiRaggioKmPreventivo();
+  const candidati = await candidatiPerBus(lineaId, posizione.lat, posizione.lng, raggioKm);
+  return inviaATutti(candidati, tragitto.fornitoreId ? [tragitto.fornitoreId] : [], { senzaClic: true }, { tragittoId: linea.tragittoId, scopo: 'BUS', lineaId, fermateIds });
 }
 
 /** Le richieste con la loro risposta (solo i metadati: gli allegati si

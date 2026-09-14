@@ -34,9 +34,9 @@ export const TOOLTIP_DEFAULT: Record<string, string> = {
   // Una spiegazione per ogni voce di Partenze: prima Orari e Prezzi
   // mostravano il testo dei preventivi, e Preventivi uno generico.
   partenze_orari_intro: 'Calcola l\'orario di ogni fermata partendo dall\'arrivo ed esporta l\'elenco da mandare ai fornitori. Ogni card è un evento.',
-  partenze_preventivi_intro: 'Chiedi ai fornitori vicini una quotazione indicativa di un bus, oppure registra quella avuta per telefono o email, e scegli quella su cui fare i prezzi. Non impegna nessuno: i preventivi veri si chiedono per ogni bus, in Da confermare.',
+  partenze_preventivi_intro: 'La richiesta di quotazione indicativa di un bus parte da sola ai fornitori con "Invio automatico" appena il tragitto ha gli orari; puoi chiederla anche ad altri o registrare quella avuta per telefono. Scegli quella su cui fare i prezzi: non impegna nessuno, i preventivi veri si chiedono per ogni bus in Da confermare.',
   partenze_prezzi_intro: 'Dal costo della quotazione calcola il prezzo di ogni fermata, controllalo e metti il tragitto in vendita.',
-  partenze_da_confermare_intro: 'Tragitti già in vendita: quando le prenotazioni arrivano al pareggio nasce la proposta di un bus. Chiedi i preventivi per quel bus ai fornitori, scegli e conferma.',
+  partenze_da_confermare_intro: 'Tragitti già in vendita: quando le prenotazioni arrivano al pareggio nasce la proposta di un bus e i preventivi partono da soli ai fornitori con "Invio automatico" e a chi ha dato la quotazione. Scegli e conferma.',
   partenze_confermate_intro: 'Tragitti con almeno un bus assegnato. In rosso quelli con più passeggeri che posti.',
   partenze_passate_intro: 'Archivio degli eventi già passati, qualunque fosse lo stato.',
   preventivo_form_intro: 'Costo e posti arrivano dalla quotazione scelta in Quotazione. Il prezzo di ogni fermata cresce con i km fino all\'arrivo: puoi correggerlo prima di salvare.',

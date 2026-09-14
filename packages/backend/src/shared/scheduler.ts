@@ -3,6 +3,7 @@ import { smistamentoService } from '../modules/prenotazioni/smistamento.service.
 import { lineeDaConfermareService } from '../modules/eventi/linee-da-confermare.service.js';
 import { creditoService } from '../modules/credito/credito.service.js';
 import { disattivaFermateSottoSoglia } from '../modules/variazioni/variazioni.service.js';
+import { invioAutomaticoService } from '../modules/preventivi/invio-automatico.service.js';
 
 const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
 const UN_ORA_MS = 60 * 60 * 1000;
@@ -60,6 +61,14 @@ export function avviaSchedulerRiordinoEta() {
       if (create > 0 || tolte > 0) console.log(`Linee da confermare: ${create} create, ${tolte} tolte.`);
     } catch (err) {
       console.error('Errore durante l\'aggiornamento delle linee da confermare:', err);
+    }
+    try {
+      // Richieste ai fornitori che partono da sole (invio-automatico.service.ts):
+      // quello che non è partito subito, o era già in attesa.
+      const { quotazioni, bus } = await invioAutomaticoService.tutti();
+      if (quotazioni > 0 || bus > 0) console.log(`Richieste automatiche ai fornitori: ${quotazioni} quotazioni, ${bus} preventivi per bus.`);
+    } catch (err) {
+      console.error('Errore durante le richieste automatiche ai fornitori:', err);
     }
     try {
       const { assegnate, senzaPosto } = await smistamentoService.esegui();

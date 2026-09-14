@@ -5,6 +5,7 @@ import { smistamentoService } from '../prenotazioni/smistamento.service.js';
 import { nomiPercorsiCambiati } from '../preventivi/cambio-percorso.js';
 import { NonTrovato, VietatoDaiPermessi } from '../../shared/errors.js';
 import { haPermesso } from '../auth/permessi.service.js';
+import { invioAutomaticoService } from '../preventivi/invio-automatico.service.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 
 export const eventiController = {
@@ -40,7 +41,10 @@ export const eventiController = {
   async update(req: Request, res: Response) {
     const { id, clientiAvvisati, emailNonInviate } = await eventiService.update(req.params.id, req.body as AggiornaEventoInput);
     const evento = await eventiService.getById(id);
-    const percorsiCambiati = await nomiPercorsiCambiati([...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((t) => t.id));
+    const tragittiIds = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((t) => t.id);
+    const percorsiCambiati = await nomiPercorsiCambiati(tragittiIds);
+    // In sottofondo: quotazioni che ora possono partire da sole (evento pubblicato, orari, percorso cambiato).
+    void invioAutomaticoService.perTragitti(tragittiIds);
     res.json({ ...evento, clientiAvvisati, emailNonInviate, percorsiCambiati });
   },
   async anteprimaVariazioniEvento(req: Request, res: Response) {
@@ -149,6 +153,8 @@ export const eventiController = {
   async aggiornaTragittoOperativo(req: Request, res: Response) {
     const { clientiAvvisati, emailNonInviate } = await eventiService.aggiornaTragittoOperativo(req.params.tragittoId, req.body);
     const percorsiCambiati = await nomiPercorsiCambiati([req.params.tragittoId]);
+    // In sottofondo: con gli orari (o il percorso cambiato) la richiesta di quotazione parte da sola.
+    void invioAutomaticoService.perTragitto(req.params.tragittoId);
     res.json({ ok: true, clientiAvvisati, emailNonInviate, percorsiCambiati });
   },
   async anteprimaTragittoOperativo(req: Request, res: Response) {

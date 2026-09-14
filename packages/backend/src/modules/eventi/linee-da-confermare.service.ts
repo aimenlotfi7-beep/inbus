@@ -4,6 +4,7 @@ import { busFisici, eventi, fermate, lineaFermate, linee, prenotazioni, tragitti
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
 import type { Lettore } from '../prenotazioni/partenza.js';
 import { ricollegaPreventiviBus } from '../preventivi/preventivi-bus.service.js';
+import { invioAutomaticoService } from '../preventivi/invio-automatico.service.js';
 
 /** Proposte "da confermare", create e tolte in automatico (pagina "Da confermare").
  *
@@ -206,7 +207,8 @@ async function allinea(tragittoId: string): Promise<EsitoAllineamento> {
   const giuste = proposteGiaGiuste(primaLettura);
   if (giuste === primaLettura.bozze.length && giuste === primaLettura.necessarie.length) return { create: 0, tolte: 0 };
 
-  return db.transaction(async (tx) => {
+  const nuoveProposte: string[] = [];
+  const esitoTransazione = await db.transaction(async (tx) => {
     const esito: EsitoAllineamento = { create: 0, tolte: 0 };
     // Blocca il tragitto: due prenotazioni nello stesso istante non creano
     // due volte la stessa proposta, e una conferma in corso aspetta.
@@ -239,10 +241,16 @@ async function allinea(tragittoId: string): Promise<EsitoAllineamento> {
       await tx.insert(lineaFermate).values(proposta.fermateIds.map((fermataId, posizione) => ({ lineaId: nuova.id, fermataId, ordine: posizione })));
       // I preventivi già chiesti per una proposta uguale, sparita e rinata, tornano a valere.
       await ricollegaPreventiviBus(tx, tragittoId, nuova.id, proposta.fermateIds);
+      nuoveProposte.push(nuova.id);
       esito.create += 1;
     }
     return esito;
   });
+  // Dopo il salvataggio, in sottofondo: i preventivi per i bus delle proposte
+  // appena nate partono da soli (non rallentano la prenotazione che le ha
+  // fatte nascere; perProposta non lancia mai).
+  for (const id of nuoveProposte) void invioAutomaticoService.perProposta(id);
+  return esitoTransazione;
 }
 
 export const lineeDaConfermareService = {
