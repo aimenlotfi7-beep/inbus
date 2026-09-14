@@ -519,12 +519,22 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 }
 .mini-tab:focus, .mini-tab:focus-visible{outline:none; box-shadow:none;}
 .mini-tab.active{border-color:var(--blue); color:var(--paper); background:rgba(37,99,235,.1);}
-/* Linguette dei tragitti in Partenze: stessi colori delle card (statiPartenze.ts). */
-.mini-tab.completato{background:var(--green); border-color:var(--green); color:#fff;}
-.mini-tab.attenzione{background:var(--pink); border-color:var(--pink); color:#fff;}
-.mini-tab.in-attesa{background:var(--amber); border-color:var(--amber); color:#fff;}
-.mini-tab.percorso-cambiato{background:var(--viola); border-color:var(--viola); color:#fff;}
-.mini-tab.completato.active, .mini-tab.attenzione.active, .mini-tab.in-attesa.active, .mini-tab.percorso-cambiato.active{box-shadow:0 0 0 2px var(--dusk), 0 0 0 4px var(--blue);}
+/* Linguette dei tragitti in Partenze: stessi colori delle card (statiPartenze.ts).
+   Niente blu (non piaceva al proprietario): il tragitto aperto è a colore
+   pieno, gli altri nello stesso colore ma chiari. */
+.mini-tab.completato{--colore-stato:var(--green); --testo-stato:#15803d;}
+.mini-tab.attenzione{--colore-stato:var(--pink); --testo-stato:#b91c1c;}
+.mini-tab.in-attesa{--colore-stato:var(--amber); --testo-stato:#b45309;}
+.mini-tab.percorso-cambiato{--colore-stato:var(--viola); --testo-stato:#6d28d9;}
+.mini-tab.completato, .mini-tab.attenzione, .mini-tab.in-attesa, .mini-tab.percorso-cambiato{
+  background:color-mix(in srgb, var(--colore-stato) 12%, var(--dusk));
+  border-color:color-mix(in srgb, var(--colore-stato) 45%, var(--dusk));
+  color:var(--testo-stato);
+}
+.mini-tab.completato:hover, .mini-tab.attenzione:hover, .mini-tab.in-attesa:hover, .mini-tab.percorso-cambiato:hover{border-color:var(--colore-stato);}
+.mini-tab.completato.active, .mini-tab.attenzione.active, .mini-tab.in-attesa.active, .mini-tab.percorso-cambiato.active{
+  background:var(--colore-stato); border-color:var(--colore-stato); color:#fff;
+}
 
 /* Sotto-tab (dentro una sezione, es. Info/Descrizione dentro "Info
    evento") — più piccole e discrete delle tab principali, per capire a
