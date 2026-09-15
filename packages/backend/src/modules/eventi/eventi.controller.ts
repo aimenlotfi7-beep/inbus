@@ -43,6 +43,13 @@ export const eventiController = {
     const evento = await eventiService.getById(id);
     const tragittiIds = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)].map((t) => t.id);
     const percorsiCambiati = await nomiPercorsiCambiati(tragittiIds);
+    // Data od orari cambiati: chi ora parte entro 24 ore va sui bus subito
+    // (deciso dal proprietario), senza aspettare il giro dell'ora. Non lancia.
+    // Anche le proposte da confermare: dipendono dalle fermate attive.
+    for (const tragittoId of tragittiIds) {
+      await lineeDaConfermareService.allineaSubito(tragittoId);
+      await smistamentoService.smistaSubito(tragittoId);
+    }
     // In sottofondo: quotazioni che ora possono partire da sole (evento pubblicato, orari, percorso cambiato).
     void invioAutomaticoService.perTragitti(tragittiIds);
     res.json({ ...evento, clientiAvvisati, emailNonInviate, percorsiCambiati });
@@ -153,6 +160,10 @@ export const eventiController = {
   async aggiornaTragittoOperativo(req: Request, res: Response) {
     const { clientiAvvisati, emailNonInviate } = await eventiService.aggiornaTragittoOperativo(req.params.tragittoId, req.body);
     const percorsiCambiati = await nomiPercorsiCambiati([req.params.tragittoId]);
+    // Fermate od orari cambiati: proposte da confermare aggiornate e chi ora
+    // parte entro 24 ore sui bus subito. Nessuna delle due lancia.
+    await lineeDaConfermareService.allineaSubito(req.params.tragittoId);
+    await smistamentoService.smistaSubito(req.params.tragittoId);
     // In sottofondo: con gli orari (o il percorso cambiato) la richiesta di quotazione parte da sola.
     void invioAutomaticoService.perTragitto(req.params.tragittoId);
     res.json({ ok: true, clientiAvvisati, emailNonInviate, percorsiCambiati });

@@ -1,27 +1,32 @@
-import { and, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { busFisici, eventi, fermate, lineaFermate, linee, prenotazioni, tragitti } from '../../db/schema.js';
+import { busFisici, eventi, fermate, lineaFermate, linee, prenotazioni, tragitti, utenti } from '../../db/schema.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
 import type { Lettore } from '../prenotazioni/partenza.js';
+import { etaPrenotazione, primaFermataDellaLinea, riempiBus, type BusDaRiempire, type GruppoPasseggeri } from '../prenotazioni/riempimento-bus.js';
 import { ricollegaPreventiviBus } from '../preventivi/preventivi-bus.service.js';
 import { invioAutomaticoService } from '../preventivi/invio-automatico.service.js';
 
 /** Proposte "da confermare", create e tolte in automatico (pagina "Da confermare").
  *
  *  Regole decise dal proprietario (settembre 2026):
- *  - la prima proposta nasce quando i passeggeri confermati del tragitto
- *    arrivano al pareggio (una percentuale dei posti del preventivo, in
- *    Impostazioni: es. 30 su un bus da 50);
- *  - il pareggio riparte dopo ogni bus: la proposta successiva nasce solo
- *    quando i passeggeri superano i posti dei bus confermati (e delle
- *    proposte precedenti) di un altro pareggio. Bus da 50 e pareggio 30:
- *    proposte a 30, 80, 130; con un bus vero da 54 la seconda a 84;
- *  - di norma la proposta è un BUS in più sulla linea che c'è già, con le
+ *  - si prova lo smistamento su tutte le prenotazioni confermate, con la
+ *    stessa regola dello smistamento vero (prenotazioni/riempimento-bus.ts:
+ *    gruppi interi, solo sui bus delle linee che si fermano alla loro
+ *    fermata, chi ha già un bus resta lì). Contano i bus confermati con i
+ *    loro posti e quelli proposti con i posti della quotazione;
+ *  - quando chi resterebbe senza posto arriva al pareggio (una percentuale
+ *    dei posti della quotazione, in Impostazioni) nasce una proposta, e si
+ *    riprova con quel bus in più. Con un bus da 50 e pareggio 30 e gruppi
+ *    piccoli su una fermata sola: proposte a 30, 80, 130;
+ *  - di norma la proposta è un BUS in più sulla linea principale, con le
  *    stesse fermate: confermandola si inseriscono solo i dati del bus;
- *  - una LINEA nuova si propone solo se un bus può partire saltando le prime
- *    fermate consecutive: i prenotati delle fermate saltate stanno già nei
- *    bus esistenti e quelli dalla fermata di partenza in poi arrivano da
- *    soli al pareggio. Si salta il più possibile.
+ *  - una LINEA nuova solo se TUTTI quelli senza posto salgono dopo le prime
+ *    fermate consecutive: parte dalla prima fermata di chi è senza posto;
+ *  - il primo bus di un tragitto senza linee nasce con la linea su tutte le
+ *    fermate.
+ *  Un gruppo più grande di un bus non entra in nessun bus, nemmeno in uno
+ *  nuovo: non fa nascere proposte (resta "senza posto", da sistemare a mano).
  *
  *  Nel database una proposta è una riga di `linee` con daConfermare = true e
  *  le sue fermate: una proposta di bus ha le stesse fermate della linea a cui
@@ -31,9 +36,8 @@ import { invioAutomaticoService } from '../preventivi/invio-automatico.service.j
  *  nessuno; spariscono da sole se non servono più. Le vendite non si
  *  fermano mai per i posti dei bus.
  *
- *  Posti per il calcolo: una linea con bus conta i posti dei suoi bus; una
- *  linea confermata ma senza bus conta i posti del preventivo (senza
- *  preventivo, i posti per bus delle Impostazioni). */
+ *  Una linea confermata ma senza bus conta come un bus con i posti della
+ *  quotazione (senza quotazione, i posti per bus delle Impostazioni). */
 
 const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
 
@@ -41,63 +45,70 @@ export interface EsitoAllineamento { create: number; tolte: number }
 
 export type Proposta = { tipo: 'bus'; fermateIds: string[] } | { tipo: 'linea'; fermateIds: string[] };
 
-/** Le proposte che servono, in ordine. `fermateOrdinate`: le fermate attive
- *  nell'ordine del percorso, con i prenotati; `fermateLineaPrincipale`: le
- *  fermate della linea a cui va un bus in più (tutte le attive se non c'è
- *  ancora una linea). */
-export function propostePerTragitto(dati: {
-  passeggeri: number;
-  postiPareggio: number | null;
-  postiPerBus: number;
-  postiConfermati: number;
-  lineeConfermate: number;
-  fermateOrdinate: { id: string; prenotati: number }[];
-  fermateLineaPrincipale: string[];
-}): Proposta[] {
-  const { passeggeri, postiPareggio, postiPerBus, lineeConfermate, fermateOrdinate, fermateLineaPrincipale } = dati;
-  if (postiPareggio === null || postiPerBus <= 0 || passeggeri <= 0 || fermateOrdinate.length === 0) return [];
-  const pareggio = Math.max(1, postiPareggio);
-  const proposte: Proposta[] = [];
-  let posti = dati.postiConfermati;
-  while (passeggeri >= posti + pareggio && proposte.length < 100) {
-    let proposta: Proposta = { tipo: 'bus', fermateIds: fermateLineaPrincipale };
-    // La prima proposta di un tragitto senza linee è sempre il primo bus su
-    // tutte le fermate: non c'è ancora un bus che serva quelle saltate.
-    if (lineeConfermate > 0 || proposte.length > 0) {
-      for (let partenza = fermateOrdinate.length - 1; partenza >= 1; partenza--) {
-        const saltate = fermateOrdinate.slice(0, partenza).reduce((s, f) => s + f.prenotati, 0);
-        const dallaPartenza = fermateOrdinate.slice(partenza).reduce((s, f) => s + f.prenotati, 0);
-        if (saltate <= posti && dallaPartenza >= pareggio) {
-          proposta = { tipo: 'linea', fermateIds: fermateOrdinate.slice(partenza).map((f) => f.id) };
-          break;
-        }
-      }
-    }
-    proposte.push(proposta);
-    posti += postiPerBus;
-  }
-  return proposte;
-}
-
-/** Il contatore del pareggio nella pagina Linee (regola del proprietario,
- *  settembre 2026): conta sempre per il prossimo bus non ancora proposto,
- *  da 0 al pareggio, e dice quale bus è ("3° bus"). Parte solo quando tutti
- *  i bus prima sono pieni: confermati con i loro posti, proposti con i posti
- *  della quotazione. Stesso conto di propostePerTragitto, quindi arriva al
- *  pareggio proprio quando nasce la proposta successiva. */
+/** Il contatore del pareggio nella pagina Linee: conta chi resterebbe senza
+ *  posto, per il prossimo bus non ancora proposto ("3° bus"), da 0 al
+ *  pareggio. Arriva al pareggio proprio quando nasce la proposta successiva. */
 export interface ContatorePareggio { bus: number; contati: number; pareggio: number }
 
-export function contatorePerTragitto(dati: Parameters<typeof propostePerTragitto>[0] & { busConfermati: number }): ContatorePareggio | null {
-  if (dati.postiPareggio === null || dati.postiPerBus <= 0) return null;
-  const pareggio = Math.max(1, dati.postiPareggio);
-  const proposte = propostePerTragitto(dati).length;
-  const postiDavanti = dati.postiConfermati + proposte * dati.postiPerBus;
+export interface DatiProposte {
+  /** Le prenotazioni confermate del tragitto, con età e bus già assegnato. */
+  gruppi: GruppoPasseggeri[];
+  /** I bus confermati (e le linee confermate senza bus, come un bus da postiPerBus). */
+  bus: BusDaRiempire[];
+  /** Quanti sono quei bus. */
+  busConfermati: number;
+  /** Le fermate attive nell'ordine del percorso. */
+  fermateOrdinate: { id: string; citta: string }[];
+  /** Le fermate della linea a cui va un bus in più (tutte le attive se non c'è ancora una linea). */
+  fermateLineaPrincipale: string[];
+  lineeConfermate: number;
+  postiPareggio: number | null;
+  postiPerBus: number;
+}
+
+/** Le proposte che servono, in ordine, e il contatore del pareggio dopo di loro. */
+export function calcolaProposte(dati: DatiProposte): { proposte: Proposta[]; contatore: ContatorePareggio | null } {
+  const { postiPareggio, postiPerBus, fermateOrdinate } = dati;
+  if (postiPareggio === null || postiPerBus <= 0 || fermateOrdinate.length === 0) return { proposte: [], contatore: null };
+  const pareggio = Math.max(1, postiPareggio);
+  const ordineCitta = fermateOrdinate.map((f) => f.citta);
+  const cittaDi = new Map(fermateOrdinate.map((f) => [f.id, f.citta]));
+  const postiMassimi = Math.max(postiPerBus, ...dati.bus.map((b) => b.postiBus));
+
+  const proposte: Proposta[] = [];
+  const bus = [...dati.bus];
+  let senzaPostoPrima = Number.POSITIVE_INFINITY;
+  let fuori: GruppoPasseggeri[] = [];
+  for (;;) {
+    // Chi non entra: solo i gruppi di una fermata attiva che un bus potrebbe portare.
+    fuori = riempiBus(dati.gruppi, bus).senzaPosto.filter((g) => ordineCitta.includes(g.fermataCitta) && g.passeggeri <= postiMassimi);
+    const senzaPosto = fuori.reduce((s, g) => s + g.passeggeri, 0);
+    // Un bus in più che non fa salire nessuno (fermate che nessuna proposta copre): ci si ferma.
+    if (senzaPosto < pareggio || senzaPosto >= senzaPostoPrima || proposte.length >= 100) break;
+    senzaPostoPrima = senzaPosto;
+
+    const primaFuori = Math.min(...fuori.map((g) => ordineCitta.indexOf(g.fermataCitta)));
+    const principaleCopre = fuori.every((g) => dati.fermateLineaPrincipale.some((id) => cittaDi.get(id) === g.fermataCitta));
+    const primoBusDelTragitto = dati.lineeConfermate === 0 && proposte.length === 0;
+    const proposta: Proposta = primoBusDelTragitto || (primaFuori === 0 && principaleCopre)
+      ? { tipo: 'bus', fermateIds: dati.fermateLineaPrincipale }
+      : { tipo: 'linea', fermateIds: fermateOrdinate.slice(primaFuori).map((f) => f.id) };
+    proposte.push(proposta);
+    const cittaProposta = new Set(proposta.fermateIds.map((id) => cittaDi.get(id)).filter((c): c is string => !!c));
+    bus.push({ busId: `proposta-${proposte.length}`, postiBus: postiPerBus, fermate: cittaProposta, primaFermata: primaFermataDellaLinea(cittaProposta, ordineCitta) });
+  }
   return {
-    bus: dati.busConfermati + proposte + 1,
-    contati: Math.min(pareggio, Math.max(0, dati.passeggeri - postiDavanti)),
-    pareggio,
+    proposte,
+    contatore: {
+      bus: dati.busConfermati + proposte.length + 1,
+      contati: Math.min(pareggio, fuori.reduce((s, g) => s + g.passeggeri, 0)),
+      pareggio,
+    },
   };
 }
+
+export const propostePerTragitto = (dati: DatiProposte) => calcolaProposte(dati).proposte;
+export const contatorePerTragitto = (dati: DatiProposte) => calcolaProposte(dati).contatore;
 
 /** Per orario, come creaLinea; quelle senza orario in fondo, nell'ordine del tragitto. */
 function perOrario<T extends { orario: string | null; ordine: number }>(a: T, b: T) {
@@ -131,9 +142,12 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
   if (!t || !t.attivo || t.eliminatoIl || t.eventoEliminatoIl || (t.stato !== 'PREZZATO' && t.stato !== 'CONFERMATO')) return null;
   if (t.eventoData.getTime() < Date.now() - UN_GIORNO_MS) return null;
 
-  const [righePrenotati, righeLinee, righeFermate] = await Promise.all([
-    lettore.select({ citta: prenotazioni.fermataCitta, passeggeri: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)::int` }).from(prenotazioni)
-      .where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA'))).groupBy(prenotazioni.fermataCitta),
+  const [righePrenotazioni, righeLinee, righeFermate] = await Promise.all([
+    lettore.select({
+      id: prenotazioni.id, fermataCitta: prenotazioni.fermataCitta, passeggeri: prenotazioni.passeggeri, creataIl: prenotazioni.creataIl,
+      busId: prenotazioni.busId, dataNascitaTitolare: utenti.dataNascita,
+    }).from(prenotazioni).innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
+      .where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA'))),
     lettore.select({ id: linee.id, nome: linee.nome, ordine: linee.ordine, daConfermare: linee.daConfermare, creatoIl: linee.creatoIl })
       .from(linee).where(eq(linee.tragittoId, tragittoId)),
     lettore.select({ id: fermate.id, citta: fermate.citta, orario: fermate.orario, ordine: fermate.ordine }).from(fermate)
@@ -142,8 +156,10 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
   const idsLinee = righeLinee.map((l) => l.id);
   const [righeBus, righeLineaFermate] = idsLinee.length
     ? await Promise.all([
-      lettore.select({ lineaId: busFisici.lineaId, postiBus: busFisici.postiBus }).from(busFisici).where(inArray(busFisici.lineaId, idsLinee)),
-      lettore.select({ lineaId: lineaFermate.lineaId, fermataId: lineaFermate.fermataId }).from(lineaFermate).where(inArray(lineaFermate.lineaId, idsLinee)),
+      lettore.select({ id: busFisici.id, lineaId: busFisici.lineaId, postiBus: busFisici.postiBus }).from(busFisici)
+        .where(inArray(busFisici.lineaId, idsLinee)).orderBy(asc(busFisici.creatoIl), asc(busFisici.id)),
+      lettore.select({ lineaId: lineaFermate.lineaId, fermataId: lineaFermate.fermataId, citta: fermate.citta }).from(lineaFermate)
+        .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId)).where(inArray(lineaFermate.lineaId, idsLinee)),
     ])
     : [[], []];
 
@@ -163,11 +179,26 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
     .filter((l) => l.daConfermare && !postiBusPerLinea.has(l.id))
     .sort((a, b) => a.creatoIl.getTime() - b.creatoIl.getTime() || a.ordine - b.ordine)
     .map((l) => ({ ...l, fermateIds: fermateDiLinea(l.id) }));
-  const confermate = righeLinee.filter((l) => !bozze.some((b) => b.id === l.id));
-  const postiConfermati = confermate.reduce((tot, l) => tot + (postiBusPerLinea.get(l.id) ?? postiPerBus), 0);
+  const confermate = righeLinee.filter((l) => !bozze.some((b) => b.id === l.id))
+    .sort((a, b) => a.creatoIl.getTime() - b.creatoIl.getTime() || a.ordine - b.ordine);
 
-  const prenotatiPerCitta = new Map(righePrenotati.map((r) => [r.citta, Number(r.passeggeri)]));
-  const fermateOrdinate = [...righeFermate].sort(perOrario).map((f) => ({ id: f.id, prenotati: prenotatiPerCitta.get(f.citta) ?? 0 }));
+  const fermateOrdinate = [...righeFermate].sort(perOrario).map((f) => ({ id: f.id, citta: f.citta }));
+  const ordineCitta = fermateOrdinate.map((f) => f.citta);
+  // I bus veri, linea per linea (per nascita); una linea confermata senza bus vale un bus da postiPerBus.
+  const busConfermatiDaRiempire: BusDaRiempire[] = confermate.flatMap((l) => {
+    const cittaLinea = new Set(righeLineaFermate.filter((r) => r.lineaId === l.id).map((r) => r.citta));
+    const primaFermata = primaFermataDellaLinea(cittaLinea, ordineCitta);
+    const busLinea = righeBus.filter((b) => b.lineaId === l.id);
+    return busLinea.length > 0
+      ? busLinea.map((b) => ({ busId: b.id, postiBus: b.postiBus ?? 0, fermate: cittaLinea, primaFermata }))
+      : [{ busId: `linea-senza-bus-${l.id}`, postiBus: postiPerBus, fermate: cittaLinea, primaFermata }];
+  });
+  const gruppi: GruppoPasseggeri[] = righePrenotazioni.map((r) => ({
+    id: r.id, fermataCitta: r.fermataCitta, passeggeri: r.passeggeri, creataIl: r.creataIl,
+    // Un bus di una linea che non c'è più (o di una proposta) non tiene il posto.
+    busId: r.busId && busConfermatiDaRiempire.some((b) => b.busId === r.busId) ? r.busId : null,
+    eta: etaPrenotazione([], r.dataNascitaTitolare, t.eventoData),
+  }));
   // Linea principale: quella confermata con più fermate attive (a parità, la prima creata).
   const idsAttive = new Set(righeFermate.map((f) => f.id));
   const principale = [...confermate]
@@ -177,20 +208,19 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
       return !migliore || fermateAttive.length > migliore.fermate.length ? { linea: l, fermate: fermateAttive } : migliore;
     }, null);
 
-  const datiProposte = {
-    passeggeri: [...prenotatiPerCitta.values()].reduce((s, n) => s + n, 0),
-    postiPareggio: t.preventivoPostiBus ? Math.round(t.preventivoPostiBus * (soglia / 100)) : null,
-    postiPerBus,
-    postiConfermati,
-    lineeConfermate: confermate.length,
+  const { proposte, contatore } = calcolaProposte({
+    gruppi,
+    bus: busConfermatiDaRiempire,
+    busConfermati: busConfermatiDaRiempire.length,
     fermateOrdinate,
     fermateLineaPrincipale: principale ? principale.fermate : fermateOrdinate.map((f) => f.id),
-  };
-  // Come i posti: una linea confermata senza bus vale un bus.
-  const busConfermati = confermate.reduce((tot, l) => tot + Math.max(1, busPerLinea.get(l.id) ?? 0), 0);
+    lineeConfermate: confermate.length,
+    postiPareggio: t.preventivoPostiBus ? Math.round(t.preventivoPostiBus * (soglia / 100)) : null,
+    postiPerBus,
+  });
   return {
-    necessarie: propostePerTragitto(datiProposte),
-    contatore: contatorePerTragitto({ ...datiProposte, busConfermati }),
+    necessarie: proposte,
+    contatore,
     bozze,
     tutte: righeLinee,
     principale: principale ? { nome: principale.linea.nome, bus: busPerLinea.get(principale.linea.id) ?? 0 } : null,

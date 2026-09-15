@@ -2093,13 +2093,14 @@ export const eventiService = {
       .where(and(inArray(prenotazioni.tragittoId, tragittiIds), eq(prenotazioni.stato, 'CONFERMATA')))
       .groupBy(prenotazioni.tragittoId);
     const mappaPasseggeri = new Map(somme.map((s) => [s.tragittoId, Number(s.totale)]));
-    const { postiSuiBus } = await postiBusELineeDaConfermare(tragittiIds);
+    // Chi resterebbe davvero senza posto (gruppi interi, linee che si fermano
+    // alla fermata), non i posti "a mucchio".
+    const { smistamentoService } = await import('../prenotazioni/smistamento.service.js');
+    const senzaPosto = await smistamentoService.senzaPostoPerTragitti(tragittiIds.filter((id) => (mappaPasseggeri.get(id) ?? 0) > 0));
 
     const risultato: Record<string, number> = {};
     for (const r of righeTragitti) {
-      const passeggeri = mappaPasseggeri.get(r.tragittoId) ?? 0;
-      if (passeggeri === 0) continue; // niente da coprire, non è un allarme
-      if ((postiSuiBus.get(r.tragittoId) ?? 0) < passeggeri) risultato[r.eventoId] = (risultato[r.eventoId] ?? 0) + 1;
+      if (senzaPosto.has(r.tragittoId)) risultato[r.eventoId] = (risultato[r.eventoId] ?? 0) + 1;
     }
     return risultato;
   },
@@ -2212,6 +2213,9 @@ export const eventiService = {
     const { postiSuiBus, lineeDaConfermare } = await postiBusELineeDaConfermare(tragittiIds);
     // Percorso cambiato dopo il preventivo accettato: la card va in viola.
     const cambi = await cambiPercorso(tragittiIds);
+    // "Mancano N posti": chi resterebbe davvero senza posto, solo sui tragitti con bus.
+    const { smistamentoService } = await import('../prenotazioni/smistamento.service.js');
+    const senzaPosto = await smistamentoService.senzaPostoPerTragitti(righe.filter((r) => r.stato === 'CONFERMATO' && (mappaPasseggeri.get(r.tragittoId) ?? 0) > 0).map((r) => r.tragittoId));
 
     return righe.map((r) => ({
       tragittoId: r.tragittoId,
@@ -2219,6 +2223,7 @@ export const eventiService = {
       stato: r.stato,
       postiTotali: r.postiTotali,
       postiSuiBus: postiSuiBus.get(r.tragittoId) ?? 0,
+      senzaPosto: senzaPosto.get(r.tragittoId) ?? 0,
       lineeDaConfermare: lineeDaConfermare.get(r.tragittoId) ?? 0,
       cambioPercorso: cambi.get(r.tragittoId)?.stato ?? null,
       totalePasseggeri: mappaPasseggeri.get(r.tragittoId) ?? 0,

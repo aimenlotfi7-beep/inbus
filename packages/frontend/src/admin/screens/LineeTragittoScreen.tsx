@@ -26,6 +26,17 @@ import { SEZIONE_PARTENZE, type TabPartenze } from './partenze/tipi';
 
 const BUS_VUOTO: BusDiLineaInput = { riferimento: '' };
 
+/** Quanto è pieno un bus o una linea: verde, arancio quasi pieno, rosso oltre. */
+function BarraPosti({ occupati, posti }: { occupati: number; posti: number }) {
+  const quota = posti > 0 ? occupati / posti : 0;
+  const tono = quota > 1 ? 'oltre' : quota >= 0.9 ? 'quasi-piena' : '';
+  return (
+    <span className={`barra-posti ${tono}`} role="img" aria-label={`${occupati} posti occupati su ${posti}`}>
+      <i style={{ width: `${Math.min(100, Math.round(quota * 100))}%` }} />
+    </span>
+  );
+}
+
 /** Il pannello aperto dentro una scheda linea, proprio sotto la riga su
  *  cui si è cliccato: uno alla volta, così un modulo non finisce in fondo
  *  alla pagina (dove non lo si vedeva) né salva sulla linea sbagliata. */
@@ -210,10 +221,14 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     postiBus: tragittoVero.preventivoPostiBus ?? undefined,
   };
 
-  /** Quanti passeggeri sono già sui bus, per città, sommando tutte le linee. */
-  function suiBusPerCitta(citta: string) {
-    return linee.reduce((tot, l) => tot + (l.fermate.find((x) => x.citta === citta)?.versati ?? 0), 0);
+  // Dallo smistamento (vero o simulato): chi ha un posto e chi no, per città.
+  const conPostoPerCitta = new Map<string, number>();
+  for (const b of (anteprima?.linee ?? []).flatMap((l) => l.bus)) {
+    for (const f of b.perFermata) conPostoPerCitta.set(f.citta, (conPostoPerCitta.get(f.citta) ?? 0) + f.passeggeri);
   }
+  const senzaPostoPerCitta = new Map((anteprima?.senzaPosto.perFermata ?? []).map((f) => [f.citta, f.passeggeri]));
+  const passeggeriConPosto = [...conPostoPerCitta.values()].reduce((s, n) => s + n, 0);
+  const fermateConPrenotati = fermateAttive.filter((f) => (prenotatiPerFermata.get(f.id) ?? 0) > 0).length;
 
   /** Alla quotazione di QUESTO tragitto in Partenze, Quotazione (non all'elenco). */
   function vaiAlPreventivo() {
@@ -565,12 +580,19 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
 
   // ---- Il prossimo passo: una cosa sola, con un solo pulsante blu ----
   let prossimoPasso: { tono: 'azione' | 'avviso' | 'info'; titolo: string; testo: ReactNode; azione?: { testo: string; onClick: () => void } };
-  const mancanoPosti = lineeConfermate.length > 0 ? passeggeriTotali - postiSuiBus : 0;
   // Il contatore del pareggio (dal server, stesso conto delle proposte): sempre
   // per il prossimo bus non ancora proposto, da 0 al pareggio.
   const contatore = suggerimento?.contatorePareggio ?? null;
   const mancantiAlPareggio = contatore ? contatore.pareggio - contatore.contati : null;
   const alPareggioDel = contatore ? ` del ${contatore.bus}° bus` : '';
+  // Chi resta senza posto con i bus confermati: gruppi interi, solo sui bus
+  // delle linee che si fermano alla sua fermata (non passeggeri meno posti).
+  const senzaPosto = anteprima?.senzaPosto ?? null;
+  const testoSenzaPosto = senzaPosto?.perFermata.map((f) => `${f.citta}: ${f.gruppi.length === 1 ? `un gruppo da ${f.gruppi[0]}` : `gruppi da ${f.gruppi.join(', ')}`}`).join(' · ') ?? '';
+  /** La linea confermata che si ferma alla prima fermata di chi è senza posto (per "Aggiungi un bus"). */
+  const lineaPerSenzaPosto = senzaPosto?.perFermata.length
+    ? lineeConfermate.find((l) => l.fermate.some((f) => f.citta === senzaPosto.perFermata[0].citta)) ?? lineeConfermate[0]
+    : lineeConfermate[0];
   if (lineeDaConfermare.length > 0) {
     const prima = lineeDaConfermare[0];
     const diBus = propostaDiBus(prima);
@@ -596,17 +618,20 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
           : 'Il primo bus da confermare si propone da solo quando le prenotazioni raggiungono il pareggio.',
         azione: { testo: 'Crea la linea', onClick: apriNuovaLinea },
       };
-  } else if (mancanoPosti > 0) {
+  } else if (senzaPosto && senzaPosto.passeggeri > 0) {
     prossimoPasso = {
       tono: 'avviso',
-      titolo: mancanoPosti === 1 ? 'Manca 1 posto' : `Mancano ${mancanoPosti} posti`,
-      testo: mancantiAlPareggio
-        ? `I passeggeri confermati sono più dei posti sui bus. Il ${contatore?.bus}° bus si propone da solo quando chi resta fuori arriva al pareggio (mancano ${plurale(mancantiAlPareggio, 'passeggero', 'passeggeri')}); se serve, aggiungilo già adesso.`
-        : 'I passeggeri confermati sono più dei posti sui bus: aggiungi un bus a una linea.',
-      azione: { testo: 'Aggiungi un bus', onClick: () => apriAggiungiBus(lineeConfermate[0].id) },
+      titolo: `${plurale(senzaPosto.passeggeri, 'passeggero', 'passeggeri')} senza posto`,
+      testo: (
+        <>
+          {testoSenzaPosto}. I gruppi non si dividono e salgono solo sui bus delle linee che si fermano alla loro fermata: i posti liberi che restano non bastano per loro.
+          {' '}{mancantiAlPareggio
+            ? `Il ${contatore?.bus}° bus si propone da solo quando arrivano al pareggio (mancano ${plurale(mancantiAlPareggio, 'passeggero', 'passeggeri')}); se serve, aggiungilo già adesso.`
+            : 'Aggiungi un bus alla linea che si ferma lì.'}
+        </>
+      ),
+      azione: lineaPerSenzaPosto ? { testo: `Aggiungi un bus a ${lineaPerSenzaPosto.nome}`, onClick: () => apriAggiungiBus(lineaPerSenzaPosto.id) } : undefined,
     };
-  } else if (anteprima && anteprima.senzaPosto.passeggeri > 0) {
-    prossimoPasso = { tono: 'avviso', titolo: `${anteprima.senzaPosto.passeggeri === 1 ? '1 passeggero resterebbe' : `${anteprima.senzaPosto.passeggeri} passeggeri resterebbero`} senza posto`, testo: 'La loro fermata non è in nessuna linea, oppure i bus che la coprono sono pieni.', azione: { testo: 'Crea una linea', onClick: apriNuovaLinea } };
   } else if (anteprima?.giaSmistato) {
     prossimoPasso = { tono: 'info', titolo: 'Passeggeri smistati', testo: 'I passeggeri sono sui bus: i clienti hanno ricevuto il biglietto e i tour leader vedono la lista.' };
   } else {
@@ -671,10 +696,29 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       <PartenzaArrivo tragitto={tragittoVero} />
 
       <div className="riepilogo-numeri">
-        <div className="riepilogo-numero"><span>Passeggeri</span><b>{passeggeriTotali}</b></div>
-        <div className="riepilogo-numero"><span>Posti sui bus</span><b>{postiSuiBus}</b></div>
-        <div className="riepilogo-numero"><span>{contatore ? `Pareggio ${contatore.bus}° bus` : 'Pareggio'}</span><b>{pareggio}</b></div>
-        <div className="riepilogo-numero"><span>Evento</span><b>{testoGiorni}</b></div>
+        <div className="riepilogo-numero">
+          <span>Passeggeri</span><b>{passeggeriTotali}</b>
+          <small>{plurale(fermateConPrenotati, 'fermata', 'fermate')} con prenotati</small>
+        </div>
+        <div className="riepilogo-numero">
+          <span>Posti sui bus</span><b>{postiSuiBus}</b>
+          <small>{plurale(tuttiIBus.length, 'bus', 'bus')} · {plurale(lineeConfermate.length, 'linea', 'linee')}{anteprima ? ` · ${passeggeriConPosto} occupati` : ''}</small>
+          {postiSuiBus > 0 && <BarraPosti occupati={passeggeriConPosto} posti={postiSuiBus} />}
+        </div>
+        {senzaPosto && lineeConfermate.length > 0 && (
+          <div className={`riepilogo-numero ${senzaPosto.passeggeri > 0 ? 'rosso' : 'verde'}`}>
+            <span>Senza posto</span><b>{senzaPosto.passeggeri}</b>
+            <small>{senzaPosto.passeggeri > 0 ? testoSenzaPosto : 'Tutti hanno un posto'}</small>
+          </div>
+        )}
+        <div className="riepilogo-numero">
+          <span>{contatore ? `Pareggio ${contatore.bus}° bus` : 'Pareggio'}</span><b>{pareggio}</b>
+          <small>{contatore ? 'conta chi resterebbe senza posto' : 'serve una quotazione'}</small>
+        </div>
+        <div className="riepilogo-numero">
+          <span>Evento</span><b>{testoGiorni}</b>
+          <small>{anteprima?.giaSmistato ? 'Passeggeri sui bus' : anteprima?.smistamentoIl ? `Smistamento dal ${formattaDataOra(anteprima.smistamentoIl)}` : 'Smistamento il giorno prima'}</small>
+        </div>
         {vedeEconomia && datiEconomia && (
           <div className="riepilogo-numero">
             <span>Margine</span>
@@ -701,15 +745,27 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       </div>
 
       <p className="section-label" style={{ marginBottom: 8 }}>Fermate</p>
-      <div className="tabella-righe">
-        <div className="riga intestazione"><span>Fermata</span><span className="num">Orario</span><span className="num">Prenotati</span><span className="num">Sui bus</span><span /></div>
+      <div className="tabella-righe fermate-linee">
+        <div className="riga intestazione">
+          <span>Fermata</span><span className="num">Orario</span><span className="num">Prenotati</span>
+          <span className="num">{anteprima?.giaSmistato ? 'Sui bus' : 'Con posto'}</span><span className="num">Senza posto</span><span />
+        </div>
         {tutteLeFermateOrdinate.length === 0 && <div className="riga"><span style={{ color: 'var(--mist)' }}>Nessuna fermata su questo tragitto.</span></div>}
-        {tutteLeFermateOrdinate.map((f) => (
+        {tutteLeFermateOrdinate.map((f) => {
+          const lineeFermata = lineeConfermate.filter((l) => l.fermate.some((x) => x.citta === f.citta)).map((l) => l.nome);
+          const fuori = senzaPostoPerCitta.get(f.citta) ?? 0;
+          return (
           <div key={f.id} className={`riga${f.attivo ? '' : ' spenta'}`}>
-            <span style={{ minWidth: 0 }}>{f.citta}{!f.attivo && <span style={{ fontSize: 'var(--testo-sm)' }}> · esclusa</span>}</span>
+            <span style={{ minWidth: 0 }}>
+              {f.citta}{!f.attivo && <span style={{ fontSize: 'var(--testo-sm)' }}> · esclusa</span>}
+              {f.attivo && lineeConfermate.length > 0 && (
+                <small className="sotto">{lineeFermata.length > 0 ? lineeFermata.join(' · ') : 'Nessuna linea si ferma qui'}</small>
+              )}
+            </span>
             <span className="num">{f.orario ?? '—'}</span>
             <span className="num">{prenotatiPerFermata.get(f.id) ?? 0}</span>
-            <span className="num">{suiBusPerCitta(f.citta)}</span>
+            <span className="num">{anteprima ? conPostoPerCitta.get(f.citta) ?? 0 : '—'}</span>
+            <span className={`num${fuori > 0 ? ' valore-rosso' : ''}`}>{anteprima ? fuori : '—'}</span>
             <span style={{ textAlign: 'right' }}>
               {fermataInSalvataggio === f.id ? '…' : (
                 <MenuAzioni etichetta={`Azioni sulla fermata di ${f.citta}`} voci={[f.attivo
@@ -718,7 +774,8 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
               )}
             </span>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -734,16 +791,21 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         if (l.daConfermare && lineaDelBusProposto(l)) return null;
         if (l.daConfermare) return schedaProposta(l, percorso);
 
-        const prenotazioniLinea = l.fermate.reduce((tot, f) => tot + f.inAttesa + f.versati, 0);
         const postiLinea = l.bus.reduce((tot, b) => tot + (b.postiBus ?? 0), 0);
+        // Chi è su questa linea (o ci andrebbe con lo smistamento): la somma dei suoi bus.
+        const occupatiLinea = l.bus.reduce((tot, b) => tot + (anteprimaPerBus.get(b.id)?.passeggeri ?? 0), 0);
+        const proposteSuLinea = lineeDaConfermare.filter((p) => lineaDelBusProposto(p)?.id === l.id).length;
         return (
           <div key={l.id} className="scheda-linea">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <p style={{ fontWeight: 700, margin: 0 }}>{l.nome}</p>
-                <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', margin: '2px 0 0' }}>
-                  {percorso || 'Nessuna fermata'} · {plurale(prenotazioniLinea, 'passeggero', 'passeggeri')} · {plurale(postiLinea, 'posto', 'posti')}
+                <p className="percorso-linea">{l.fermate.length > 0 ? l.fermate.map((f, i) => <span key={f.fermataId}>{i > 0 && <i aria-hidden="true">→</i>}{f.citta}</span>) : 'Nessuna fermata'}</p>
+                <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', margin: '4px 0 0' }}>
+                  {plurale(l.bus.length, 'bus', 'bus')} · {anteprima ? `${occupatiLinea} / ${plurale(postiLinea, 'posto occupato', 'posti occupati')}` : plurale(postiLinea, 'posto', 'posti')}
+                  {proposteSuLinea > 0 && <> · {proposteSuLinea === 1 ? '1 bus da confermare' : `${proposteSuLinea} bus da confermare`}</>}
                 </p>
+                {postiLinea > 0 && anteprima && <BarraPosti occupati={occupatiLinea} posti={postiLinea} />}
               </div>
               <MenuAzioni etichetta={`Azioni su ${l.nome}`} voci={[
                 { testo: 'Modifica percorso', onClick: () => apriModificaPercorso(l) },
@@ -778,19 +840,27 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
               return (
                 <div key={b.id}>
                   <div className="riga-bus">
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ margin: 0, fontWeight: 600 }}>{b.riferimento} · {b.postiBus != null ? plurale(b.postiBus, 'posto', 'posti') : 'posti non indicati'}</p>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p style={{ margin: 0, fontWeight: 600 }}>
+                        {b.riferimento}{' '}
+                        <span className="posti-bus">
+                          {b.postiBus == null ? 'posti non indicati' : previsione ? `${previsione.passeggeri} / ${plurale(b.postiBus, 'posto', 'posti')}` : plurale(b.postiBus, 'posto', 'posti')}
+                        </span>
+                      </p>
+                      {previsione && b.postiBus != null && b.postiBus > 0 && <BarraPosti occupati={previsione.passeggeri} posti={b.postiBus} />}
+                      {previsione && (
+                        <p style={{ margin: '4px 0 0', fontSize: 'var(--testo-sm)' }}>
+                          {previsione.passeggeri === 0
+                            ? (anteprima?.giaSmistato ? 'Nessuno sul bus' : 'Nessuno previsto dallo smistamento')
+                            : <>{anteprima?.giaSmistato ? 'Sul bus' : 'Previsti'}: {previsione.perFermata.map((x) => `${x.citta} ${x.passeggeri}`).join(' · ')}{previsione.etaMedia != null ? ` · età media ${Math.round(previsione.etaMedia)}` : ''}</>}
+                        </p>
+                      )}
                       <p style={{ margin: '2px 0 0', fontSize: 'var(--testo-sm)', color: 'var(--mist)' }}>
                         {[fornitoreNome, b.autistaNome && `autista ${b.autistaNome}`, b.tourLeaderNome ? `tour leader ${b.tourLeaderNome}` : 'nessun tour leader'].filter(Boolean).join(' · ')}
                       </p>
                       {b.preventivo && <PreventivoDelBusRiga preventivo={b.preventivo} onCambiato={ricarica} />}
                       {costoQuotazione != null && b.costo != null && Number(b.costo) > costoQuotazione && (
                         <p style={{ margin: '2px 0 0', fontSize: 'var(--testo-sm)', color: '#b45309' }}>Costa {formattaEuro(Number(b.costo) - costoQuotazione)} più della quotazione usata per i prezzi.</p>
-                      )}
-                      {previsione && (
-                        <p style={{ margin: '2px 0 0', fontSize: 'var(--testo-sm)' }}>
-                          {anteprima?.giaSmistato ? 'Sul bus' : 'Previsti dallo smistamento'}: {plurale(previsione.passeggeri, 'passeggero', 'passeggeri')}{previsione.etaMedia != null ? ` · età media ${Math.round(previsione.etaMedia)}` : ''}
-                        </p>
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>

@@ -148,8 +148,12 @@ export interface PasseggeroBus {
 export interface AnteprimaSmistamento {
   smistamentoIl: string | null; // ISO: quando parte lo smistamento (partenza meno 24 ore); null se non calcolabile
   giaSmistato: boolean;         // true se la finestra delle 24 ore è già iniziata
-  linee: { lineaId: string; lineaNome: string; bus: { busId: string; riferimento: string; postiBus: number | null; passeggeri: number; prenotazioni: number; etaMedia: number | null }[] }[];
-  senzaPosto: { prenotazioni: number; passeggeri: number };
+  linee: {
+    lineaId: string; lineaNome: string;
+    bus: { busId: string; riferimento: string; postiBus: number | null; passeggeri: number; prenotazioni: number; etaMedia: number | null; perFermata: { citta: string; passeggeri: number }[] }[];
+  }[];
+  /** Chi non entra in nessun bus, per fermata, con la grandezza di ogni gruppo (i gruppi non si dividono). */
+  senzaPosto: { prenotazioni: number; passeggeri: number; perFermata: { citta: string; passeggeri: number; gruppi: number[] }[] };
 }
 /** Stesse regole delle Statistiche: "incassato" è il valore venduto (un acconto
  *  non saldato vale già il prezzo intero); guadagno = incassato − costo dei
@@ -258,6 +262,8 @@ export const eventiApi = {
     postiTotali: number; totalePasseggeri: number;
     // Posti dei bus confermati (postiTotali resta "quasi illimitato") e linee da confermare.
     postiSuiBus: number; lineeDaConfermare: number;
+    /** Passeggeri che resterebbero senza posto con i bus di adesso (gruppi interi, linee che si fermano alla fermata). */
+    senzaPosto: number;
     // Percorso cambiato dopo il preventivo accettato: cosa c'è da fare (null = in regola).
     cambioPercorso: 'da_richiedere' | 'in_attesa' | 'da_valutare' | null;
     preventivoCosto: string | null; fornitoreId: string | null; fermateCompilate: boolean; servizioNome: string | null; servizioId: string | null;

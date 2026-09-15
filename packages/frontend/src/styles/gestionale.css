@@ -714,6 +714,21 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .riepilogo-numero{background:var(--dusk-2); border-radius:10px; padding:10px 12px; min-width:0;}
 .riepilogo-numero span{display:block; font-size:var(--testo-sm); color:var(--mist);}
 .riepilogo-numero b{display:block; font-size:var(--testo-2xl); font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums;}
+.riepilogo-numero small{display:block; font-size:var(--testo-xs); color:var(--mist); margin-top:2px; line-height:1.35;}
+/* Senza posto: rosso se qualcuno resta a terra, verde se no (stessi colori di Partenze). */
+.riepilogo-numero.rosso{background:color-mix(in srgb, var(--pink) 10%, var(--dusk-2));}
+.riepilogo-numero.rosso b{color:var(--pink);}
+.riepilogo-numero.verde b{color:var(--green);}
+/* Posti occupati di un bus o di una linea. */
+.barra-posti{display:block; height:6px; border-radius:999px; background:var(--line); overflow:hidden; margin-top:6px; max-width:320px;}
+.barra-posti > i{display:block; height:100%; background:var(--green); border-radius:999px;}
+.barra-posti.quasi-piena > i{background:var(--amber);}
+.barra-posti.oltre > i{background:var(--pink);}
+.scheda-linea .percorso-linea{display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; margin:4px 0 0; font-size:var(--testo-md);}
+.scheda-linea .percorso-linea i{font-style:normal; color:var(--mist); margin-right:6px;}
+.scheda-linea .posti-bus{margin-left:8px; font-weight:400; color:var(--mist); font-variant-numeric:tabular-nums;}
+.tabella-righe .riga .sotto{display:block; font-size:var(--testo-xs); color:var(--mist);}
+.tabella-righe .valore-rosso{color:var(--pink); font-weight:700;}
 .prossimo-passo{display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:18px;}
 .prossimo-passo p{margin:0;}
 .prossimo-passo .titolo{font-weight:700; margin-bottom:2px;}
@@ -726,6 +741,7 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .tabella-righe .riga.intestazione{font-size:var(--testo-xs); color:var(--mist); text-transform:uppercase; letter-spacing:.3px; background:var(--dusk-2); border-radius:12px 12px 0 0;}
 .tabella-righe .riga.spenta{color:var(--mist);}
 .tabella-righe .num{text-align:right; font-variant-numeric:tabular-nums;}
+.tabella-righe.fermate-linee .riga{grid-template-columns:minmax(0,1fr) 64px 76px 80px 84px 44px;}
 .scheda-linea{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:var(--dusk);}
 /* Proposta da confermare: tocca a noi, quindi rosso come nelle card di Partenze. */
 .scheda-linea.da-confermare{border-style:dashed; border-color:var(--pink); background:color-mix(in srgb, var(--pink) 5%, var(--dusk));}
@@ -753,6 +769,7 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .menu-azioni-voci button.pericolosa{color:var(--pink);}
 @media (max-width:600px){
   .tabella-righe .riga{grid-template-columns:minmax(0,1fr) 52px 62px 58px 36px; gap:6px; font-size:var(--testo-md);}
+  .tabella-righe.fermate-linee .riga{grid-template-columns:minmax(0,1fr) 46px 56px 56px 56px 32px;}
 }
 .badge{padding:3px 10px; border-radius:999px; font-size:var(--testo-xs); text-transform:uppercase; letter-spacing:.5px;}
 /* Varianti a sfondo pieno (testo sempre bianco) per le etichette di

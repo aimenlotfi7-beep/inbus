@@ -25,7 +25,7 @@ export interface StatoTappa {
 /** I dati di un tragitto che servono a decidere lo stato. */
 export type DatiStatoTragitto = Pick<Partenza,
   'stato' | 'fermateCompilate' | 'fornitoreId' | 'preventivoCosto' | 'cambioPercorso'
-  | 'richiestePreventivo' | 'rispostePreventivo' | 'lineeDaConfermare' | 'totalePasseggeri' | 'postiSuiBus'
+  | 'richiestePreventivo' | 'rispostePreventivo' | 'lineeDaConfermare' | 'senzaPosto'
   | 'proposteSenzaRichieste' | 'risposteBus'>;
 
 export const COLORE_LIVELLO: Record<Livello, string> = {
@@ -51,9 +51,11 @@ export const CLASSE_LINGUETTA_LIVELLO: Record<Livello, string> = {
   'percorso-cambiato': 'percorso-cambiato',
 };
 
-/** Più passeggeri confermati che posti sui bus confermati. */
+/** Passeggeri che resterebbero senza posto con i bus confermati (calcolato dal
+ *  server come lo smistamento: gruppi interi, solo sulle linee che si fermano
+ *  alla loro fermata; non passeggeri meno posti). */
 function mancanoPosti(t: DatiStatoTragitto) {
-  return t.stato === 'CONFERMATO' ? Math.max(0, t.totalePasseggeri - t.postiSuiBus) : 0;
+  return t.stato === 'CONFERMATO' ? t.senzaPosto : 0;
 }
 
 /** In quali voci compare un tragitto, tutte insieme: un compito fatto in una
@@ -97,7 +99,7 @@ export function statoInTappa(t: DatiStatoTragitto, tab: TabPartenze): StatoTappa
         return { livello: 'attesa', testo: 'Preventivi bus inviati' };
       }
       const mancanti = mancanoPosti(t);
-      if (mancanti > 0) return { livello: 'da-fare', testo: mancanti === 1 ? 'Manca 1 posto' : `Mancano ${mancanti} posti` };
+      if (mancanti > 0) return { livello: 'da-fare', testo: `${mancanti} senza posto` };
       if (t.stato === 'CONFERMATO') return { livello: 'fatto', testo: tab === 'confermato' ? '' : 'Confermata' };
       // In vendita senza bus: si aspettano le prenotazioni per arrivare al pareggio.
       return { livello: 'attesa', testo: 'Sotto il pareggio' };
@@ -173,6 +175,6 @@ export const COSA_DA_FARE: Record<VocePallino, string> = {
   fermate: 'orari da impostare',
   preventivi: 'quotazioni da richiedere o risposte da valutare',
   'da-prezzare': 'prezzi da salvare',
-  'da-confermare': 'bus da richiedere, preventivi da valutare o posti mancanti sui bus',
-  confermato: 'bus da richiedere, preventivi da valutare o posti mancanti sui bus',
+  'da-confermare': 'bus da richiedere, preventivi da valutare o passeggeri senza posto',
+  confermato: 'bus da richiedere, preventivi da valutare o passeggeri senza posto',
 };

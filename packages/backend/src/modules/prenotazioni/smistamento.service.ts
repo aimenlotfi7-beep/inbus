@@ -5,20 +5,18 @@ import { NonTrovato } from '../../shared/errors.js';
 import { segnalaEmailNonPartita } from '../../shared/registroEmail.js';
 import { ticketService } from '../ticket/ticket.service.js';
 import { calcolaTempi, leggiOrariTragitto, primaPartenza, type Lettore, type OrariTragitto } from './partenza.js';
+import { etaPrenotazione, primaFermataDellaLinea, riempiBus, type BusDaRiempire, type GruppoPasseggeri } from './riempimento-bus.js';
+
+export { etaPrenotazione };
 
 /** Smistamento automatico dei passeggeri sui bus — l'unico modo in cui una
  *  prenotazione riceve un bus (l'assegnazione a mano non esiste più).
  *
- *  Regole decise dal proprietario:
- *  - l'unità è la prenotazione intera: un gruppo non si divide mai;
- *  - ordine per età media, dal più grande al più giovane (a parità, chi ha
- *    prenotato prima); senza nessuna data di nascita, in fondo;
- *  - bus in ordine stabile (linee per creazione, poi bus per creazione),
- *    solo quelli delle linee che contengono la fermata della prenotazione;
- *    un gruppo va nel primo bus che ha abbastanza posti, mai oltre la
- *    capienza; se non entra da nessuna parte resta senza bus;
- *  - una prenotazione si assegna da 24 ore prima della SUA partenza fino a
- *    2 ore dopo (ora di Roma), quindi anche il giorno stesso dell'evento.
+ *  Come si riempiono i bus (gruppi interi, per età, prima la linea che parte
+ *  più vicino alla fermata): riempimento-bus.ts, la stessa regola usata per
+ *  proporre i bus da confermare. In più qui: una prenotazione si assegna da
+ *  24 ore prima della SUA partenza fino a 2 ore dopo (ora di Roma), quindi
+ *  anche il giorno stesso dell'evento.
  *
  *  Gira ogni ora (scheduler) e subito dopo una nuova prenotazione o un bus o
  *  una linea aggiunti o modificati (smistaSubito): chi prenota o viene
@@ -32,47 +30,27 @@ import { calcolaTempi, leggiOrariTragitto, primaPartenza, type Lettore, type Ora
  *  risultato coincide con l'anteprima (salvo vendite o cancellazioni nel
  *  frattempo). */
 
-const ANNO_MS = 365.2425 * 24 * 60 * 60 * 1000;
 const DUE_GIORNI_MS = 2 * 24 * 60 * 60 * 1000;
 
-interface BusDaRiempire { busId: string; riferimento: string; postiBus: number | null; fermate: Set<string> }
-interface LineaDaRiempire { lineaId: string; lineaNome: string; bus: BusDaRiempire[] }
-interface PrenotazioneDaSmistare {
-  id: string; pnr: string; fermataCitta: string; fermataOrario: string | null;
-  passeggeri: number; creataIl: Date; busId: string | null; eta: number | null;
+interface BusDellaLinea { busId: string; riferimento: string; postiBus: number | null }
+interface LineaDaRiempire { lineaId: string; lineaNome: string; bus: BusDellaLinea[] }
+interface PrenotazioneDaSmistare extends GruppoPasseggeri {
+  pnr: string; fermataOrario: string | null;
   /** Da quando e fino a quando si può assegnare il bus (vedi partenza.ts). */
   dal: Date; finoAl: Date;
 }
-interface StatoTragitto { orari: OrariTragitto; linee: LineaDaRiempire[]; prenotazioni: PrenotazioneDaSmistare[] }
-interface CaricoBus { passeggeri: number; prenotazioni: number; sommaEta: number; passeggeriConEta: number }
+interface StatoTragitto { orari: OrariTragitto; linee: LineaDaRiempire[]; bus: BusDaRiempire[]; prenotazioni: PrenotazioneDaSmistare[] }
 interface EsitoTragitto { assegnate: { pnr: string; saldoPagato: boolean }[]; senzaPosto: PrenotazioneDaSmistare[] }
 
 export interface AnteprimaSmistamento {
   smistamentoIl: string | null;
   giaSmistato: boolean;
-  linee: { lineaId: string; lineaNome: string; bus: { busId: string; riferimento: string; postiBus: number | null; passeggeri: number; prenotazioni: number; etaMedia: number | null }[] }[];
-  senzaPosto: { prenotazioni: number; passeggeri: number };
-}
-
-/** Età media (in anni, alla data dell'evento) dei partecipanti che hanno la
- *  data di nascita; se nessuno ce l'ha, quella del titolare; null se manca
- *  anche quella. */
-export function etaPrenotazione(dateNascitaPartecipanti: (Date | null)[], dataNascitaTitolare: Date | null, riferimento: Date): number | null {
-  const conData = dateNascitaPartecipanti.filter((d): d is Date => d !== null);
-  const date = conData.length > 0 ? conData : dataNascitaTitolare ? [dataNascitaTitolare] : [];
-  if (date.length === 0) return null;
-  return date.reduce((somma, d) => somma + (riferimento.getTime() - d.getTime()) / ANNO_MS, 0) / date.length;
-}
-
-function confrontaPerEta(a: PrenotazioneDaSmistare, b: PrenotazioneDaSmistare): number {
-  if (a.eta !== b.eta) {
-    if (a.eta === null) return 1;
-    if (b.eta === null) return -1;
-    return b.eta - a.eta;
-  }
-  const creazione = a.creataIl.getTime() - b.creataIl.getTime();
-  if (creazione !== 0) return creazione;
-  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  linee: {
+    lineaId: string; lineaNome: string;
+    bus: { busId: string; riferimento: string; postiBus: number | null; passeggeri: number; prenotazioni: number; etaMedia: number | null; perFermata: { citta: string; passeggeri: number }[] }[];
+  }[];
+  /** Chi non entra in nessun bus: per fermata, con la grandezza di ogni gruppo. */
+  senzaPosto: { prenotazioni: number; passeggeri: number; perFermata: { citta: string; passeggeri: number; gruppi: number[] }[] };
 }
 
 /** Senza bus e dentro la sua finestra: da assegnare in questo giro. */
@@ -99,13 +77,16 @@ async function leggiStatoTragitto(lettore: Lettore, tragittoId: string): Promise
       .orderBy(asc(busFisici.creatoIl), asc(busFisici.id))
     : [];
 
-  const lineeDaRiempire = righeLinee.map((l) => {
+  const ordineCitta = orari.fermate.map((f) => f.citta);
+  const lineeDaRiempire = righeLinee.map((l) => ({
+    lineaId: l.id,
+    lineaNome: l.nome,
+    bus: righeBus.filter((b) => b.lineaId === l.id).map((b) => ({ busId: b.id, riferimento: b.riferimento, postiBus: b.postiBus })),
+  }));
+  const busDaRiempire: BusDaRiempire[] = righeLinee.flatMap((l) => {
     const cittaCoperte = new Set(righeFermate.filter((f) => f.lineaId === l.id).map((f) => f.citta));
-    return {
-      lineaId: l.id,
-      lineaNome: l.nome,
-      bus: righeBus.filter((b) => b.lineaId === l.id).map((b) => ({ busId: b.id, riferimento: b.riferimento, postiBus: b.postiBus, fermate: cittaCoperte })),
-    };
+    const primaFermata = primaFermataDellaLinea(cittaCoperte, ordineCitta);
+    return righeBus.filter((b) => b.lineaId === l.id).map((b) => ({ busId: b.id, postiBus: b.postiBus ?? 0, fermate: cittaCoperte, primaFermata }));
   });
 
   const righePrenotazioni = await lettore.select({
@@ -118,6 +99,7 @@ async function leggiStatoTragitto(lettore: Lettore, tragittoId: string): Promise
   return {
     orari,
     linee: lineeDaRiempire,
+    bus: busDaRiempire,
     prenotazioni: righePrenotazioni.map((r) => {
       const tempi = calcolaTempi(orari, r.fermataCitta, r.fermataOrario);
       return {
@@ -138,32 +120,7 @@ async function leggiStatoTragitto(lettore: Lettore, tragittoId: string): Promise
  *  non si può più assegnare (partenza passata da oltre 2 ore) non occupa
  *  posti al posto di chi parte dopo. */
 function simula(stato: StatoTragitto, adesso: Date) {
-  const busInOrdine = stato.linee.flatMap((l) => l.bus);
-  const carico = new Map<string, CaricoBus>(busInOrdine.map((b) => [b.busId, { passeggeri: 0, prenotazioni: 0, sommaEta: 0, passeggeriConEta: 0 }]));
-  const aggiungi = (busId: string, p: PrenotazioneDaSmistare) => {
-    const c = carico.get(busId);
-    if (!c) return; // bus di un altro tragitto (dati vecchi): non conta qui
-    c.passeggeri += p.passeggeri;
-    c.prenotazioni += 1;
-    if (p.eta !== null) {
-      c.sommaEta += p.eta * p.passeggeri;
-      c.passeggeriConEta += p.passeggeri;
-    }
-  };
-  for (const p of stato.prenotazioni) if (p.busId) aggiungi(p.busId, p);
-
-  const assegnazioni = new Map<string, string>();
-  const senzaPosto: PrenotazioneDaSmistare[] = [];
-  for (const p of stato.prenotazioni.filter((x) => !x.busId && adesso <= x.finoAl).sort(confrontaPerEta)) {
-    const bus = busInOrdine.find((b) => b.fermate.has(p.fermataCitta) && (b.postiBus ?? 0) - (carico.get(b.busId)?.passeggeri ?? 0) >= p.passeggeri);
-    if (!bus) {
-      senzaPosto.push(p);
-      continue;
-    }
-    assegnazioni.set(p.id, bus.busId);
-    aggiungi(bus.busId, p);
-  }
-  return { carico, assegnazioni, senzaPosto };
+  return riempiBus(stato.prenotazioni.filter((p) => p.busId || adesso <= p.finoAl), stato.bus);
 }
 
 /** Un giro di smistamento su un tragitto, in una transazione che blocca il
@@ -195,6 +152,15 @@ async function smistaTragitto(tragittoId: string, adesso: Date): Promise<EsitoTr
     esito.senzaPosto.push(...senzaPosto.filter((p) => idonee.has(p.id)));
     return esito;
   });
+}
+
+/** Le righe per città nell'ordine delle fermate del tragitto. */
+function ordinaPerPercorso<T extends { citta: string }>(righe: T[], orari: OrariTragitto): T[] {
+  const posizione = (citta: string) => {
+    const i = orari.fermate.findIndex((f) => f.citta === citta);
+    return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  return righe.sort((a, b) => posizione(a.citta) - posizione(b.citta));
 }
 
 function segnalaSenzaPosto(tragittoId: string, senzaPosto: PrenotazioneDaSmistare[]) {
@@ -288,6 +254,22 @@ export const smistamentoService = {
     }
   },
 
+  /** Per le card di Partenze e il Calendario: quanti passeggeri di ogni
+   *  tragitto resterebbero senza posto con i bus di adesso (gruppi interi,
+   *  solo sulle linee che si fermano alla loro fermata). Non i posti "a
+   *  mucchio": 56 passeggeri su 60 posti possono lasciarne fuori 14. */
+  async senzaPostoPerTragitti(tragittiIds: string[]): Promise<Map<string, number>> {
+    const adesso = new Date();
+    const risultato = new Map<string, number>();
+    for (const tragittoId of tragittiIds) {
+      const stato = await leggiStatoTragitto(db, tragittoId);
+      if (!stato || stato.prenotazioni.length === 0) continue;
+      const passeggeri = simula(stato, adesso).senzaPosto.reduce((somma, p) => somma + p.passeggeri, 0);
+      if (passeggeri > 0) risultato.set(tragittoId, passeggeri);
+    }
+    return risultato;
+  },
+
   /** Stessa logica, nessuna scrittura: come verrebbero riempiti i bus del
    *  tragitto con le prenotazioni di adesso. */
   async anteprima(tragittoId: string): Promise<AnteprimaSmistamento> {
@@ -311,18 +293,26 @@ export const smistamentoService = {
         lineaId: l.lineaId,
         lineaNome: l.lineaNome,
         bus: l.bus.map((b) => {
-          const c = carico.get(b.busId) ?? { passeggeri: 0, prenotazioni: 0, sommaEta: 0, passeggeriConEta: 0 };
+          const c = carico.get(b.busId);
           return {
             busId: b.busId,
             riferimento: b.riferimento,
             postiBus: b.postiBus,
-            passeggeri: c.passeggeri,
-            prenotazioni: c.prenotazioni,
-            etaMedia: c.passeggeriConEta > 0 ? Math.round((c.sommaEta / c.passeggeriConEta) * 10) / 10 : null,
+            passeggeri: c?.passeggeri ?? 0,
+            prenotazioni: c?.prenotazioni ?? 0,
+            etaMedia: c && c.passeggeriConEta > 0 ? Math.round((c.sommaEta / c.passeggeriConEta) * 10) / 10 : null,
+            perFermata: ordinaPerPercorso([...(c?.perFermata ?? new Map<string, number>())].map(([citta, passeggeri]) => ({ citta, passeggeri })), stato.orari),
           };
         }),
       })),
-      senzaPosto: { prenotazioni: senzaPosto.length, passeggeri: senzaPosto.reduce((somma, p) => somma + p.passeggeri, 0) },
+      senzaPosto: {
+        prenotazioni: senzaPosto.length,
+        passeggeri: senzaPosto.reduce((somma, p) => somma + p.passeggeri, 0),
+        perFermata: ordinaPerPercorso([...new Set(senzaPosto.map((p) => p.fermataCitta))].map((citta) => {
+          const gruppi = senzaPosto.filter((p) => p.fermataCitta === citta).map((p) => p.passeggeri);
+          return { citta, passeggeri: gruppi.reduce((s, n) => s + n, 0), gruppi };
+        }), stato.orari),
+      },
     };
   },
 };

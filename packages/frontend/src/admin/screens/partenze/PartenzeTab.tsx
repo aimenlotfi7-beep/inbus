@@ -196,8 +196,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
       proposteSenzaRichieste: riga?.proposteSenzaRichieste ?? 0,
       risposteBus: riga?.risposteBus ?? 0,
       lineeDaConfermare: tragitto.lineeDaConfermare,
-      totalePasseggeri: tragitto.totalePasseggeri,
-      postiSuiBus: tragitto.postiTotali, // qui sono i posti dei bus confermati
+      senzaPosto: riga?.senzaPosto ?? 0,
     };
     return contestoPartenze ? statoInTappa(dati, contestoPartenze.tabOrigine) : statoGenerale(dati);
   }

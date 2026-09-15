@@ -9,7 +9,7 @@ const fraGiorni = (giorni: number) => new Date(Date.now() + giorni * 24 * 3600 *
 function partenza(o: Partial<Partenza> = {}): Partenza {
   return {
     tragittoId: 't1', tragittoNome: 'Da Roma', stato: 'DA_CONFERMARE', postiTotali: 999999, totalePasseggeri: 0,
-    postiSuiBus: 0, lineeDaConfermare: 0, cambioPercorso: null, preventivoCosto: null, fornitoreId: null,
+    postiSuiBus: 0, senzaPosto: 0, lineeDaConfermare: 0, cambioPercorso: null, preventivoCosto: null, fornitoreId: null,
     fermateCompilate: false, servizioNome: null, servizioId: null, richiestePreventivo: 0, rispostePreventivo: 0, proposteSenzaRichieste: 0, risposteBus: 0,
     evento: { id: 'e1', artista: 'Concerto', genere: 'Pop', data: fraGiorni(30), citta: 'Milano', luogo: 'Stadio', slug: 'concerto', immagineUrl: null },
     ...o,
@@ -68,10 +68,10 @@ describe('Da confermare e Confermate', () => {
   it('risposte dei fornitori per il bus: rosso, tocca a noi scegliere', () => {
     expect(statoInTappa(partenza({ stato: 'PREZZATO', lineeDaConfermare: 1, risposteBus: 2 }), 'da-confermare')).toEqual({ livello: 'da-fare', testo: '2 preventivi bus da valutare' });
   });
-  it('più passeggeri che posti sui bus: rosso', () => {
-    expect(statoInTappa(partenza({ stato: 'CONFERMATO', postiSuiBus: 50, totalePasseggeri: 53 }), 'confermato')).toEqual({ livello: 'da-fare', testo: 'Mancano 3 posti' });
+  it('passeggeri che non entrano nei bus (anche con posti liberi, se i gruppi non ci stanno): rosso', () => {
+    expect(statoInTappa(partenza({ stato: 'CONFERMATO', postiSuiBus: 60, totalePasseggeri: 56, senzaPosto: 14 }), 'confermato')).toEqual({ livello: 'da-fare', testo: '14 senza posto' });
   });
-  it('bus confermati e posti sufficienti: verde', () => {
+  it('bus confermati e tutti con un posto: verde', () => {
     expect(statoInTappa(partenza({ stato: 'CONFERMATO', postiSuiBus: 50, totalePasseggeri: 40 }), 'da-confermare')).toEqual({ livello: 'fatto', testo: 'Confermata' });
     expect(statoInTappa(partenza({ stato: 'CONFERMATO', postiSuiBus: 50, totalePasseggeri: 40 }), 'confermato')).toEqual({ livello: 'fatto', testo: '' });
   });
@@ -108,7 +108,7 @@ describe('voci e pallini del menu', () => {
       partenza({ tragittoId: 'b' }), // stesso evento, Orari rosso
       partenza({ tragittoId: 'c', fermateCompilate: true, richiestePreventivo: 2, evento: { ...partenza().evento, id: 'e2' } }), // Preventivi arancio
       partenza({ tragittoId: 'd', fermateCompilate: true, richiestePreventivo: 2, rispostePreventivo: 1, evento: { ...partenza().evento, id: 'e3' } }), // Preventivi rosso
-      partenza({ tragittoId: 'e', fermateCompilate: true, preventivoCosto: '900', stato: 'CONFERMATO', postiSuiBus: 50, totalePasseggeri: 51, evento: { ...partenza().evento, id: 'e4' } }),
+      partenza({ tragittoId: 'e', fermateCompilate: true, preventivoCosto: '900', stato: 'CONFERMATO', postiSuiBus: 50, totalePasseggeri: 51, senzaPosto: 1, evento: { ...partenza().evento, id: 'e4' } }),
       partenza({ tragittoId: 'f', fermateCompilate: true, preventivoCosto: '900', stato: 'PREZZATO', totalePasseggeri: 5, cambioPercorso: 'in_attesa', evento: { ...partenza().evento, id: 'e5' } }),
     ];
     const { perVoce, percorsiCambiati } = palliniPartenze(elenco);

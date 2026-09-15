@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calcolaTempi, primaPartenza } from './partenza.js';
-import { etaPrenotazione } from './smistamento.service.js';
+import { etaPrenotazione } from './riempimento-bus.js';
 
 // Quando parte il bus di una fermata, e da quando si assegna.
 
