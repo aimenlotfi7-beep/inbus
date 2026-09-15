@@ -1,4 +1,4 @@
-import { calcolaCommissioneRighe } from '../../shared/commissioneRighe.js';
+import { calcolaCommissioneRighe, type RegolaCompensoPromoter } from '../../shared/commissioneRighe.js';
 import { arrotondaEuro, raggruppa, type CampagnaFonte } from './calcoli.js';
 
 /** I conti economici delle statistiche che non leggono il database (i dati
@@ -24,6 +24,8 @@ export interface PrenotazioneStatistica {
   scontoBundle: string | null;
   couponCodice: string | null;
   promoterCodice: string | null;
+  /** Regola del compenso del promoter fissata alla vendita (null per le vendite senza promoter). */
+  compensoPromoter: RegolaCompensoPromoter | null;
   canaleVendita: string;
   whiteLabelId: string | null;
   quotaWhiteLabel: string | null;
@@ -80,8 +82,11 @@ export const sommaTotali = (righe: { totale: number | string }[]) => arrotondaEu
 
 /** Commissioni per gruppo (evento, fonte, linea…). Per i promoter la stessa
  *  regola del report Campagne: riga per riga con il compenso del coupon se ce
- *  l'ha (calcolaCommissioneRighe), arrotondata per promoter; un codice
- *  promoter che non esiste più non matura commissione. Con quoteWhiteLabel
+ *  l'ha (calcolaCommissioneRighe), arrotondata per promoter. Vale la regola
+ *  fissata sulla prenotazione alla vendita (percentuale e compenso del coupon
+ *  di allora), anche se poi il promoter è stato eliminato; solo le vendite
+ *  che non ce l'hanno usano quelli di oggi, e un codice promoter che non
+ *  esiste più non matura commissione. Con quoteWhiteLabel
  *  (di serie) si aggiunge la quota dell'organizzatore fissata sulla
  *  prenotazione al momento della vendita; va tolta quando si mostra solo
  *  quanto spetta ai promoter. */
@@ -93,16 +98,16 @@ export function commissioniPer(
 ): Map<string, number> {
   const conQuote = opzioni.quoteWhiteLabel ?? true;
   const risultato = new Map<string, number>();
-  const perPromoter = new Map<string, { gruppo: string; percentuale: number; righe: { totale: number; passeggeri: number; couponCodice: string | null; ordineId: string | null }[] }>();
+  const perPromoter = new Map<string, { gruppo: string; percentuale: number; righe: { totale: number; passeggeri: number; couponCodice: string | null; ordineId: string | null; regola: RegolaCompensoPromoter | null }[] }>();
   for (const r of righe) {
     const g = gruppo(r);
     if (conQuote && r.quotaWhiteLabel) risultato.set(g, (risultato.get(g) ?? 0) + Number(r.quotaWhiteLabel));
     if (!r.promoterCodice) continue;
-    const percentuale = ctx.percentualiPromoter.get(r.promoterCodice);
-    if (percentuale === undefined) continue;
+    const percentualeDiOggi = ctx.percentualiPromoter.get(r.promoterCodice);
+    if (percentualeDiOggi === undefined && !r.compensoPromoter) continue;
     const chiave = `${g} ${r.promoterCodice}`;
-    const voce = perPromoter.get(chiave) ?? { gruppo: g, percentuale, righe: [] };
-    voce.righe.push({ totale: r.totale, passeggeri: r.passeggeri, couponCodice: r.couponCodice, ordineId: r.ordineId });
+    const voce = perPromoter.get(chiave) ?? { gruppo: g, percentuale: percentualeDiOggi ?? 0, righe: [] };
+    voce.righe.push({ totale: r.totale, passeggeri: r.passeggeri, couponCodice: r.couponCodice, ordineId: r.ordineId, regola: r.compensoPromoter });
     perPromoter.set(chiave, voce);
   }
   // Un ordine con più eventi paga il compenso fisso "per acquisto" una volta

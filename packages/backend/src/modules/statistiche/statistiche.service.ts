@@ -68,6 +68,7 @@ async function leggiPrenotazioni(condizione: SQL | undefined): Promise<Prenotazi
     scontoBundle: prenotazioni.scontoBundle,
     couponCodice: prenotazioni.couponCodice,
     promoterCodice: prenotazioni.promoterCodice,
+    compensoPromoter: prenotazioni.compensoPromoter,
     canaleVendita: prenotazioni.canaleVendita,
     whiteLabelId: prenotazioni.whiteLabelId,
     quotaWhiteLabel: prenotazioni.commissioneImportoSnapshot,

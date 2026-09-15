@@ -25,6 +25,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { createId } from '@paralleldrive/cuid2';
+import type { RegolaCompensoPromoter } from '../shared/commissioneRighe.js';
 
 const id = () => text('id').primaryKey().$defaultFn(() => createId());
 
@@ -848,6 +849,10 @@ export const prenotazioni = pgTable('prenotazioni', {
   metodoPagamento: metodoPagamentoEnum('metodo_pagamento').notNull().default('CARTA'),
   utenteId: text('utente_id').notNull().references(() => utenti.id),
   promoterCodice: text('promoter_codice'),
+  // La regola del compenso del promoter al momento della vendita (sua
+  // percentuale e compenso del coupon usato): cambiarli dopo non cambia
+  // le commissioni delle vendite passate. Null senza promoter.
+  compensoPromoter: jsonb('compenso_promoter').$type<RegolaCompensoPromoter>(),
   // Se questa prenotazione è nata da un checkout con carrello (più
   // prodotti insieme), qui c'è l'ordine a cui appartiene — nullo per
   // le prenotazioni singole normali (come sono sempre state finora,

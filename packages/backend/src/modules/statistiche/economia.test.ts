@@ -9,7 +9,7 @@ function prenotazione(dati: Partial<PrenotazioneStatistica>): PrenotazioneStatis
   contatore += 1;
   return {
     id: `p${contatore}`, ordineId: null, eventoId: 'e1', tragittoId: 't1', fermataCitta: 'Bologna', busId: null, utenteId: `u${contatore}`,
-    passeggeri: 1, totale: 50, pagato: 50, sconto: '0', scontoBundle: null, couponCodice: null, promoterCodice: null,
+    passeggeri: 1, totale: 50, pagato: 50, sconto: '0', scontoBundle: null, couponCodice: null, promoterCodice: null, compensoPromoter: null,
     canaleVendita: 'INBUS', whiteLabelId: null, quotaWhiteLabel: null, utmSource: null, utmMedium: null, utmCampaign: null,
     offertaId: null, tipoPagamento: 'COMPLETO', saldoPagato: true, scadenzaSaldo: null,
     creataIl: new Date('2026-09-01T10:00:00Z'), eventoData: new Date('2026-10-17T00:00:00Z'),
@@ -46,6 +46,17 @@ describe('commissioniPer', () => {
   });
   it('senza le quote White Label quando serve solo il promoter', () => {
     expect(commissioniPer(righe, () => 'tutto', contesto(), { quoteWhiteLabel: false }).get('tutto')).toBe(21);
+  });
+  it('la regola fissata alla vendita vale al posto di percentuale e coupon di oggi, anche a promoter eliminato', () => {
+    const regola = (percentuale: number, coupon: Partial<{ compensoTipo: 'FISSO' | 'PERCENTUALE'; compensoValore: number; compensoFissoPer: 'ACQUISTO' | 'PASSEGGERO' }> = {}) =>
+      ({ percentuale, compensoTipo: null, compensoValore: null, compensoFissoPer: null, ...coupon });
+    const conRegola = [
+      prenotazione({ totale: 100, promoterCodice: 'GIULIA', compensoPromoter: regola(20) }), // oggi 10%: resta il 20% di allora
+      prenotazione({ totale: 80, passeggeri: 2, promoterCodice: 'GIULIA', couponCodice: 'RADIO', compensoPromoter: regola(20, { compensoTipo: 'FISSO', compensoValore: 5, compensoFissoPer: 'PASSEGGERO' }) }),
+      prenotazione({ totale: 50, promoterCodice: 'ELIMINATO', compensoPromoter: regola(10) }),
+      prenotazione({ totale: 100, promoterCodice: 'GIULIA' }), // vendita vecchia senza regola: percentuale di oggi
+    ];
+    expect(commissioniPer(conRegola, () => 'tutto', contesto()).get('tutto')).toBe(20 + 10 + 5 + 10);
   });
 });
 

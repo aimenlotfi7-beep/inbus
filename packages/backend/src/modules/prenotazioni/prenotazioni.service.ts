@@ -1,7 +1,8 @@
 import { and, eq, ne, sql, desc, inArray, lte, gte } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { prenotazioni, tragitti, fermate, eventi, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, promoter, promoterEventi, promoterLink, whiteLabel } from '../../db/schema.js';
+import { prenotazioni, tragitti, fermate, eventi, utenti, partecipantiPrenotazione, immaginiEvento, offerteEvento, ordini, promoter, promoterEventi, promoterLink, whiteLabel, coupon } from '../../db/schema.js';
+import type { RegolaCompensoPromoter } from '../../shared/commissioneRighe.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { bundleService } from '../bundle/bundle.service.js';
@@ -152,6 +153,27 @@ async function promoterPerEvento(lettore: Pick<typeof db, 'select'>, codice: str
   const [escluso] = await lettore.select().from(promoterEventi)
     .where(and(eq(promoterEventi.promoterId, p.id), eq(promoterEventi.eventoId, eventoId))).limit(1);
   return escluso ? { valido: false } : { valido: true, codice: p.codice };
+}
+
+/** La regola del compenso del promoter com'è adesso, da fissare sulla
+ *  prenotazione (deciso dal proprietario, settembre 2026): la percentuale del
+ *  promoter e il compenso del coupon usato. Cambiarli dopo non cambia le
+ *  commissioni delle vendite già fatte. Null senza promoter, o con un codice
+ *  che non corrisponde a nessun promoter (nessuna commissione, come prima). */
+async function regolaCompensoPromoter(lettore: Pick<typeof db, 'select'>, promoterCodice: string | null | undefined, couponCodice: string | null | undefined): Promise<RegolaCompensoPromoter | null> {
+  if (!promoterCodice) return null;
+  const [p] = await lettore.select({ percentuale: promoter.commissionePercentuale }).from(promoter).where(eq(promoter.codice, promoterCodice)).limit(1);
+  if (!p) return null;
+  const [c] = couponCodice
+    ? await lettore.select({ compensoTipo: coupon.compensoTipo, compensoValore: coupon.compensoValore, compensoFissoPer: coupon.compensoFissoPer })
+      .from(coupon).where(eq(coupon.codice, couponCodice)).limit(1)
+    : [];
+  return {
+    percentuale: Number(p.percentuale),
+    compensoTipo: c?.compensoTipo ?? null,
+    compensoValore: c?.compensoValore != null ? Number(c.compensoValore) : null,
+    compensoFissoPer: c?.compensoFissoPer ?? null,
+  };
 }
 
 /** L'email "completa il saldo" (promemoria automatico e sollecito dal
@@ -392,6 +414,7 @@ async function creaRigaInterna(
       metodoPagamento: input.metodoPagamento,
       utenteId: utente.id,
       promoterCodice: promoterCodiceDaSalvare,
+      compensoPromoter: await regolaCompensoPromoter(tx, promoterCodiceDaSalvare, couponUsato?.codice),
       ...(canaleVendita && { canaleVendita: canaleVendita.canale, whiteLabelId: canaleVendita.whiteLabelId }),
     })
     .returning();
@@ -871,6 +894,9 @@ export const prenotazioniService = {
         const esito = promoterDaCoupon ? await promoterPerEvento(tx, promoterDaCoupon, p.eventoId) : null;
         conCoupon = { codice: c.codice, sconto: (Number(p.sconto) + sconto).toFixed(2), ...(esito?.valido && { promoterCodice: esito.codice }) };
       }
+      // Con un coupon al saldo cambiano coupon (e forse promoter): la regola
+      // del compenso si fissa adesso, con quelli nuovi.
+      const compensoPromoter = conCoupon ? await regolaCompensoPromoter(tx, conCoupon.promoterCodice ?? p.promoterCodice, conCoupon.codice) : undefined;
 
       // Atomico anche qui: la condizione "saldoPagato = false" si
       // riverifica proprio nel comando che lo imposta — due richieste
@@ -883,6 +909,7 @@ export const prenotazioniService = {
           saldoPagato: true, saldoPagatoIl: new Date(), totale: totaleReale.toFixed(2), totalePrevisto: totaleReale.toFixed(2),
           ...(conCoupon && { couponCodice: conCoupon.codice, sconto: conCoupon.sconto }),
           ...(conCoupon?.promoterCodice && { promoterCodice: conCoupon.promoterCodice }),
+          ...(compensoPromoter !== undefined && { compensoPromoter }),
         })
         .where(and(eq(prenotazioni.pnr, pnr), eq(prenotazioni.saldoPagato, false)))
         .returning();
