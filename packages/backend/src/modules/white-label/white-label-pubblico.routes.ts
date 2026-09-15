@@ -24,25 +24,39 @@ whiteLabelPubblicoRouter.get('/:publicWidgetId', asyncHandler(async (req: Reques
   res.json(await whiteLabelService.getPubblicaDaWidgetId(req.params.publicWidgetId));
 }));
 
+/** L'evento che il widget può mostrare: il suo, oppure (widget di un
+ *  bundle) quello richiesto con ?eventoId=, solo se fa parte del bundle. */
+async function eventoDelWidget(publicWidgetId: string, eventoIdRichiesto: unknown) {
+  const wl = await whiteLabelService.getPubblicaConIdInterno(publicWidgetId);
+  if (wl.bundleId) {
+    const eventoId = String(eventoIdRichiesto ?? '');
+    const { bundleService } = await import('../bundle/bundle.service.js');
+    const b = await bundleService.perAcquisto(wl.bundleId).catch(async () => ({ eventiIds: (await bundleService.dettaglio(wl.bundleId!)).eventi.map((e) => e.id) }));
+    if (!b.eventiIds.includes(eventoId)) throw new ErroreApplicativo('Questo evento non fa parte del bundle.', 400, 'EVENT_NOT_AVAILABLE');
+    return { eventoId, perBundle: true };
+  }
+  if (!wl.eventoId) throw new ErroreApplicativo('Widget non valido.', 400, 'WIDGET_NON_VALIDO');
+  return { eventoId: wl.eventoId, perBundle: false };
+}
+
+/** L'evento completo per il checkout del widget. Non passa dalla pagina
+ *  pubblica del sito: un evento nascosto dal sito OnWay ("Visibile sul
+ *  sito" spento) si vende lo stesso dal widget dell'organizzatore. */
+whiteLabelPubblicoRouter.get('/:publicWidgetId/evento', asyncHandler(async (req: Request, res: Response) => {
+  const { eventoId } = await eventoDelWidget(req.params.publicWidgetId, req.query.eventoId);
+  const { eventiService } = await import('../eventi/eventi.service.js');
+  res.json(await eventiService.getPerWidget(eventoId));
+}));
+
 /** Fermate + prezzi disponibili per l'evento di questa White Label —
  *  riusa integralmente eventiService.opzioniPartenza (stessa funzione
  *  del sito principale), solo dopo aver verificato che l'evento
  *  richiesto è davvero quello di questa White Label, non un altro. */
 whiteLabelPubblicoRouter.get('/:publicWidgetId/opzioni-partenza', asyncHandler(async (req: Request, res: Response) => {
-  const wl = await whiteLabelService.getPubblicaConIdInterno(req.params.publicWidgetId);
+  const { eventoId, perBundle } = await eventoDelWidget(req.params.publicWidgetId, req.query.eventoId);
   const { eventiService } = await import('../eventi/eventi.service.js');
-  // Widget di un bundle: le opzioni sono per UN evento del bundle alla
-  // volta (?eventoId=…&servizioId=…) — e solo per eventi che ne fanno parte.
-  if (wl.bundleId) {
-    const eventoId = String(req.query.eventoId ?? '');
-    const { bundleService } = await import('../bundle/bundle.service.js');
-    const b = await bundleService.perAcquisto(wl.bundleId).catch(async () => ({ eventiIds: (await bundleService.dettaglio(wl.bundleId!)).eventi.map((e) => e.id) }));
-    if (!b.eventiIds.includes(eventoId)) throw new ErroreApplicativo('Questo evento non fa parte del bundle.', 400, 'EVENT_NOT_AVAILABLE');
-    res.json(await eventiService.opzioniPartenza(eventoId, req.query.servizioId ? String(req.query.servizioId) : undefined));
-    return;
-  }
-  if (!wl.eventoId) throw new ErroreApplicativo('Widget non valido.', 400, 'WIDGET_NON_VALIDO');
-  res.json(await eventiService.opzioniPartenza(wl.eventoId));
+  // Widget di un bundle: le opzioni sono per UN evento del bundle alla volta (?eventoId=…&servizioId=…).
+  res.json(await eventiService.opzioniPartenza(eventoId, perBundle && req.query.servizioId ? String(req.query.servizioId) : undefined));
 }));
 
 /** Ordine BUNDLE dal widget — le righe passano dallo stesso creaOrdine

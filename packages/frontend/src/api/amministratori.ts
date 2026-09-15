@@ -33,4 +33,6 @@ export const amministratoriApi = {
   log: () => api.get<LogRiga[]>('/api/amministratori/log'),
   permessi: (id: string) => api.get<PermessiUtenza>(`/api/amministratori/${id}/permessi`),
   salvaPermessi: (id: string, eccezioni: EccezionePermesso[]) => api.put<{ ok: true }>(`/api/amministratori/${id}/permessi`, { eccezioni }),
+  // Email con il link per scegliere una nuova password (24 ore); il link torna se l'email non parte.
+  linkPassword: (id: string) => api.post<{ email: string; emailInviata: boolean; link: string }>(`/api/amministratori/${id}/link-password`, {}),
 };

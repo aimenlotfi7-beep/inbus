@@ -26,6 +26,7 @@ function contesto(): ContestoFonti {
     percentualiPromoter: new Map([['GIULIA', 10]]),
     nomiWhiteLabel: new Map(),
     coupon: new Map([['RADIO', { compensoTipo: 'FISSO', compensoValore: '3', compensoFissoPer: 'PASSEGGERO', promoterId: null }]]),
+    campagnaDiOfferta: new Map(),
   };
 }
 

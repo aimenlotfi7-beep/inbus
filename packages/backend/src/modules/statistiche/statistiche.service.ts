@@ -167,13 +167,14 @@ async function eventiTra(inizio: Date, fine: Date): Promise<RigaEvento[]> {
 
 async function leggiContestoFonti(righe: PrenotazioneStatistica[]): Promise<ContestoFonti> {
   const codiciCoupon = [...new Set(righe.map((r) => r.couponCodice).filter((c): c is string => !!c))];
-  const [tutteCampagne, tuttiPromoter, righeWhiteLabel, righeCoupon] = await Promise.all([
+  const [tutteCampagne, tuttiPromoter, righeWhiteLabel, righeCoupon, offerteConCampagna] = await Promise.all([
     db.select({ id: campagne.id, nome: campagne.nome, utmSource: campagne.utmSource, utmMedium: campagne.utmMedium, utmCampaign: campagne.utmCampaign }).from(campagne),
     db.select({ id: promoter.id, nome: promoter.nome, codice: promoter.codice, commissionePercentuale: promoter.commissionePercentuale }).from(promoter),
     db.select({ id: whiteLabel.id, nome: organizzatori.nome }).from(whiteLabel).innerJoin(organizzatori, eq(organizzatori.id, whiteLabel.organizzatoreId)),
     aBlocchiDaDb(codiciCoupon, (codici) => db.select({
       codice: coupon.codice, compensoTipo: coupon.compensoTipo, compensoValore: coupon.compensoValore, compensoFissoPer: coupon.compensoFissoPer, promoterId: coupon.promoterId,
     }).from(coupon).where(inArray(coupon.codice, codici))),
+    db.select({ id: offerteEvento.id, campagnaId: offerteEvento.campagnaId }).from(offerteEvento).where(isNotNull(offerteEvento.campagnaId)),
   ]);
   return {
     campagne: tutteCampagne,
@@ -183,10 +184,11 @@ async function leggiContestoFonti(righe: PrenotazioneStatistica[]): Promise<Cont
     percentualiPromoter: new Map(tuttiPromoter.map((p) => [p.codice, Number(p.commissionePercentuale)])),
     nomiWhiteLabel: new Map(righeWhiteLabel.map((w) => [w.id, w.nome])),
     coupon: new Map(righeCoupon.map((c) => [c.codice, c])),
+    campagnaDiOfferta: new Map(offerteConCampagna.map((o) => [o.id, o.campagnaId!])),
   };
 }
 
-const fonteDellaRiga = (r: PrenotazioneStatistica, ctx: ContestoFonti): Fonte => fonteDi(r, ctx.campagne, ctx.nomiPromoter, ctx.nomiWhiteLabel);
+const fonteDellaRiga = (r: PrenotazioneStatistica, ctx: ContestoFonti): Fonte => fonteDi(r, ctx.campagne, ctx.nomiPromoter, ctx.nomiWhiteLabel, ctx.campagnaDiOfferta);
 
 /** Per gli altri report (Partenze, area promoter, Campagne): le stesse
  *  prenotazioni e lo stesso valore delle Statistiche (solo CONFERMATE di

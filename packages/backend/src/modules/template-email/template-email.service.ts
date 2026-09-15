@@ -319,6 +319,45 @@ export const MODELLI_BASE: { chiave: string; nome: string; oggetto: string; corp
     `,
     segnaposto: ['nome', 'evento', 'pnr', 'motivo'],
   },
+  {
+    chiave: 'fornitore_registrazione_ricevuta',
+    nome: 'Registrazione ricevuta (al fornitore che si registra dal sito)',
+    oggetto: 'Abbiamo ricevuto la registrazione di {{fornitore}} — OnWay',
+    corpo: `
+      <p>Buongiorno,</p>
+      <p>grazie per aver registrato <b>{{fornitore}}</b> come fornitore di OnWay.</p>
+      <p>Il nostro staff esaminerà i dati: appena la registrazione sarà approvata riceverà un'email di conferma, e da quel momento le richieste di preventivo per i viaggi vicino a Lei.</p>
+      <p>Per qualsiasi necessità restiamo a Sua disposizione.</p>
+    `,
+    segnaposto: ['fornitore'],
+  },
+  {
+    chiave: 'fornitore_nuova_registrazione',
+    nome: 'Nuovo fornitore da approvare (allo staff)',
+    oggetto: 'Nuovo fornitore da approvare: {{fornitore}}',
+    corpo: `
+      <p>Un nuovo fornitore si è registrato dal sito e aspetta l'approvazione:</p>
+      <ul>
+        <li><b>Nome:</b> {{fornitore}}</li>
+        <li><b>Email:</b> {{email}}</li>
+        <li><b>Indirizzo:</b> {{indirizzo}}</li>
+      </ul>
+      <p><a href="{{link}}">Apri Fornitori nel gestionale</a> per controllare i dati e approvarlo.</p>
+    `,
+    segnaposto: ['fornitore', 'email', 'indirizzo', 'link'],
+  },
+  {
+    chiave: 'fornitore_approvato',
+    nome: 'Registrazione approvata (al fornitore)',
+    oggetto: 'Registrazione approvata — OnWay',
+    corpo: `
+      <p>Buongiorno,</p>
+      <p>la registrazione di <b>{{fornitore}}</b> come fornitore di OnWay è stata approvata.</p>
+      <p>Da oggi potrà ricevere via email le richieste di quotazione e di preventivo per i viaggi organizzati vicino a Lei: ogni email contiene il link per rispondere, senza bisogno di password.</p>
+      <p>Grazie e buon lavoro.</p>
+    `,
+    segnaposto: ['fornitore'],
+  },
 ];
 
 /** Vecchio testo del modello "conferma_acconto" (prima del link corretto

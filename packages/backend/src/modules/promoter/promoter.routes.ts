@@ -85,7 +85,12 @@ async function getById(id: string) {
 }
 
 export const promoterService = {
-  list: async () => (await db.select().from(promoter)).map(senzaSegreti),
+  /** Con gli eventi esclusi: la modifica nel gestionale parte da quelli
+   *  salvati (prima partiva vuota e salvando li cancellava). */
+  list: async () => {
+    const [righe, esclusioni] = await Promise.all([db.select().from(promoter), db.select().from(promoterEventi)]);
+    return righe.map((p) => ({ ...senzaSegreti(p), eventiEsclusi: esclusioni.filter((e) => e.promoterId === p.id).map((e) => e.eventoId) }));
+  },
   getById,
 
   async create(input: z.infer<typeof creaPromoterSchema>) {

@@ -1,9 +1,9 @@
 import { Router, type Request, type Response } from 'express';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { tourLeader } from '../../db/schema.js';
-import { NonTrovato } from '../../shared/errors.js';
+import { ConflittoDati, NonTrovato } from '../../shared/errors.js';
 import { senzaSegreti } from '../../shared/segreti.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
@@ -12,7 +12,8 @@ import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 const candidaturaSchema = z.object({
   nome: z.string().min(1),
   cognome: z.string().min(1),
-  email: z.string().email(),
+  // Sempre minuscola: l'accesso alla scansione la cerca così.
+  email: z.string().trim().email().transform((e) => e.toLowerCase()),
   telefono: z.string().optional(),
   dataNascita: z.coerce.date().optional(),
   citta: z.string().optional(),
@@ -42,10 +43,21 @@ async function getById(id: string) {
   return senzaPassword(t);
 }
 
+/** Un'email per tour leader: con due uguali l'accesso alla scansione
+ *  entrerebbe in uno a caso. Confronto senza maiuscole (anche le vecchie). */
+async function verificaEmailLibera(email: string, messaggio: string, escludiId?: string) {
+  const [gia] = await db.select({ id: tourLeader.id }).from(tourLeader)
+    .where(and(sql`lower(${tourLeader.email}) = ${email.toLowerCase()}`, escludiId ? ne(tourLeader.id, escludiId) : undefined)).limit(1);
+  if (gia) throw new ConflittoDati(messaggio);
+}
+
+const EMAIL_GIA_USATA = 'Esiste già un tour leader con questa email.';
+
 export const tourLeaderService = {
   list: async () => (await db.select().from(tourLeader)).map(senzaPassword),
   getById,
   candidati: async (input: z.infer<typeof candidaturaSchema>) => {
+    await verificaEmailLibera(input.email, 'Con questa email c\'è già una candidatura: ti ricontatteremo noi.');
     const [nuovo] = await db.insert(tourLeader).values({ ...input, stato: 'CANDIDATO' }).returning();
     return senzaPassword(nuovo);
   },
@@ -53,11 +65,13 @@ export const tourLeaderService = {
   // lo crea decide subito lo stato, di default ATTIVO dato che è già
   // stato valutato per essere censito qui.
   creaAmministrativo: async (input: z.infer<typeof candidaturaSchema> & { stato?: 'CANDIDATO' | 'ATTIVO' | 'ARCHIVIATO' }) => {
+    await verificaEmailLibera(input.email, EMAIL_GIA_USATA);
     const [nuovo] = await db.insert(tourLeader).values({ ...input, stato: input.stato ?? 'ATTIVO' }).returning();
     return senzaPassword(nuovo);
   },
   update: async (id: string, input: z.infer<typeof aggiornaSchema>) => {
     await getById(id);
+    if (input.email) await verificaEmailLibera(input.email, EMAIL_GIA_USATA, id);
     const [aggiornato] = await db.update(tourLeader).set(input).where(eq(tourLeader.id, id)).returning();
     return senzaPassword(aggiornato);
   },

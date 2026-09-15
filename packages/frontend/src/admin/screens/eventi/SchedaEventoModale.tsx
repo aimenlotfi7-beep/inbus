@@ -229,6 +229,9 @@ export function SchedaEventoModale({
         visibileSito: sorgente.visibileSito,
         descrizione: sorgente.descrizione ?? undefined,
         descrizioneSeo: sorgente.descrizioneSeo ?? undefined,
+        // Prima non si caricavano: in modifica sembravano vuoti.
+        cosaIncluso: sorgente.cosaIncluso ?? undefined,
+        requisitiNote: sorgente.requisitiNote ?? undefined,
         ticketColoreAccento: sorgente.ticketColoreAccento ?? undefined,
         ticketImmagineSfondoUrl: sorgente.ticketImmagineSfondoUrl ?? undefined,
         layoutBigliettoId: sorgente.layoutBigliettoId,

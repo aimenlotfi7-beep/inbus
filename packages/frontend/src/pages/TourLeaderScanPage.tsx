@@ -10,12 +10,14 @@ const TESTO_ESITO: Record<EsitoScansione['esito'], string> = {
   valido: 'Valido',
   gia_a_bordo: 'Già a bordo',
   bus_sbagliato: 'Bus sbagliato',
+  saldo_da_pagare: 'Saldo da pagare',
   non_valido: 'Non valido',
 };
 const ESITO_POSITIVO: Record<EsitoScansione['esito'], boolean> = {
   valido: true,
   gia_a_bordo: true,
   bus_sbagliato: false,
+  saldo_da_pagare: false,
   non_valido: false,
 };
 
@@ -136,6 +138,7 @@ export function TourLeaderScanPage() {
               {TESTO_ESITO[risultato.esito]}
             </p>
             {'nome' in risultato && <p className="tl-scan-esito-nome">{risultato.nome}</p>}
+            {'messaggio' in risultato && <p className="tl-scan-esito-messaggio">{risultato.messaggio}</p>}
           </div>
         )}
       </div>

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { whiteLabelApi, type WhiteLabelPubblica } from '../api/whiteLabel';
-import { eventiApi } from '../api/eventi';
 import { clienteAuthApi } from '../api/clienteAuth';
 import { salvaTokenCliente, clienteLoggato } from '../features/clienteSessione';
 import { WhiteLabelPreview } from '../features/white-label/WhiteLabelPreview';
@@ -50,7 +49,8 @@ export function WidgetPubblicoPage() {
     if (!dati.evento) return;
     setVista('caricamento');
     try {
-      const ev = await eventiApi.getBySlug(dati.evento.slug);
+      // Non la pagina pubblica del sito: l'evento può essere nascosto da OnWay e in vendita qui.
+      const ev = await whiteLabelApi.evento(publicWidgetId!);
       setEventoCompleto(ev);
       setVista('checkout');
     } catch (e) {
@@ -74,7 +74,7 @@ export function WidgetPubblicoPage() {
             <BundleFlusso
               bundle={b}
               tema={{ superficie: dati.tema.colori.superficie, testo: dati.tema.colori.testoPrincipale, bordi: dati.tema.colori.bordi }}
-              caricaEvento={(ev) => eventiApi.getBySlug(ev.slug)}
+              caricaEvento={(ev) => whiteLabelApi.evento(publicWidgetId, ev.id)}
               caricaOpzioni={(eventoId, servizioId) => whiteLabelApi.opzioniPartenza(publicWidgetId, eventoId, servizioId)}
               mostraSceltaAcconto
               testoConferma="Conferma l'acquisto"

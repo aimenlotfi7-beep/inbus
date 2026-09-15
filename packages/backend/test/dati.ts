@@ -19,7 +19,7 @@ export async function svuotaDatabase() {
   // Dentro un blocco solo per non stampare un avviso per ogni tabella svuotata.
   await db.execute(sql.raw(`do $$ begin
     set local client_min_messages = warning;
-    truncate table eventi, utenti, coupon, promoter, impostazioni, log_attivita, amministratori, fornitori restart identity cascade;
+    truncate table eventi, utenti, coupon, promoter, impostazioni, log_attivita, amministratori, fornitori, tour_leader restart identity cascade;
   end $$`));
   svuotaPosta();
 }

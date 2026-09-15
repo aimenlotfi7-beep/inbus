@@ -1,11 +1,11 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { tourLeader } from '../../db/schema.js';
 import { env } from '../../config/env.js';
-import { NonAutorizzato, NonTrovato } from '../../shared/errors.js';
+import { ConflittoDati, NonAutorizzato, NonTrovato, VietatoDaiPermessi } from '../../shared/errors.js';
 import { inviaEmail, urlSito } from '../../shared/email.service.js';
 
 const ORE_VALIDITA_TOKEN_RESET = 2;
@@ -19,13 +19,21 @@ export interface TokenTourLeader {
   nome: string;
 }
 
+/** Le email dei tour leader salvate prima del settembre 2026 possono avere
+ *  maiuscole: il confronto è sempre senza maiuscole. */
+const stessaEmail = (email: string) => sql`lower(${tourLeader.email}) = ${email.trim().toLowerCase()}`;
+
+const MESSAGGIO_ARCHIVIATO = 'Il tuo accesso alla scansione non è attivo: contatta l\'organizzazione.';
+
 export const tourLeaderAuthService = {
   async login(email: string, password: string) {
-    const [tl] = await db.select().from(tourLeader).where(eq(tourLeader.email, email.toLowerCase())).limit(1);
+    const [tl] = await db.select().from(tourLeader).where(stessaEmail(email)).limit(1);
     if (!tl || !tl.passwordHash) throw new NonAutorizzato('Email o password non corrette');
 
     const passwordOk = await bcrypt.compare(password, tl.passwordHash);
     if (!passwordOk) throw new NonAutorizzato('Email o password non corrette');
+    // Archiviato = senza accesso (deciso dal proprietario, settembre 2026).
+    if (tl.stato === 'ARCHIVIATO') throw new VietatoDaiPermessi(MESSAGGIO_ARCHIVIATO);
 
     const payload: TokenTourLeader = { tipo: 'tour_leader', sub: tl.id, nome: `${tl.nome} ${tl.cognome}` };
     const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: '12h' });
@@ -42,6 +50,14 @@ export const tourLeaderAuthService = {
     }
   },
 
+  /** A ogni richiesta della scansione: il tour leader esiste ancora e non è
+   *  stato archiviato dopo l'accesso (il token vale 12 ore). */
+  async verificaAncoraAttivo(tourLeaderId: string) {
+    const [tl] = await db.select({ stato: tourLeader.stato }).from(tourLeader).where(eq(tourLeader.id, tourLeaderId)).limit(1);
+    if (!tl) throw new NonAutorizzato('Sessione scaduta o non valida, effettua di nuovo il login');
+    if (tl.stato === 'ARCHIVIATO') throw new VietatoDaiPermessi(MESSAGGIO_ARCHIVIATO);
+  },
+
   /** Accesso alla scansione per un tour leader: un'email con il link per
    *  scegliere la password (regola del progetto: mai password in chiaro,
    *  nemmeno da mandare a mano). Il link vale ORE_VALIDITA_INVITO ore; una
@@ -50,6 +66,9 @@ export const tourLeaderAuthService = {
   async attivaAccesso(tourLeaderId: string) {
     const [tl] = await db.select().from(tourLeader).where(eq(tourLeader.id, tourLeaderId)).limit(1);
     if (!tl) throw new NonTrovato('Tour leader');
+    if (tl.stato === 'ARCHIVIATO') {
+      throw new ConflittoDati(`${tl.nome} ${tl.cognome} è archiviato: rimettilo su «Attivo» prima di mandargli il link.`);
+    }
 
     const token = crypto.randomBytes(24).toString('hex');
     const scadenza = new Date(Date.now() + ORE_VALIDITA_INVITO * 60 * 60 * 1000);
@@ -65,8 +84,9 @@ export const tourLeaderAuthService = {
   },
 
   async richiediResetPassword(email: string) {
-    const [tl] = await db.select().from(tourLeader).where(eq(tourLeader.email, email.toLowerCase())).limit(1);
-    if (!tl || !tl.passwordHash) return; // silenzioso apposta, e solo se ha già credenziali attive
+    const [tl] = await db.select().from(tourLeader).where(stessaEmail(email)).limit(1);
+    // Silenzioso apposta, e solo se ha già credenziali attive e non è archiviato.
+    if (!tl || !tl.passwordHash || tl.stato === 'ARCHIVIATO') return;
 
     const token = crypto.randomBytes(24).toString('hex');
     const scadenza = new Date(Date.now() + ORE_VALIDITA_TOKEN_RESET * 60 * 60 * 1000);

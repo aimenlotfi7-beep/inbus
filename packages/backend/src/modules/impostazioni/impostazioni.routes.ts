@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { impostazioni } from '../../db/schema.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
+import { ErroreApplicativo } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 
@@ -190,11 +191,32 @@ impostazioniRouter.get('/', richiedePermesso('impostazioni.gestisci'), asyncHand
   res.json(tutte);
 }));
 
+/** I numeri che il server legge: un valore fuori da qui verrebbe salvato ma
+ *  poi scartato in silenzio dalle funzioni leggi* (che usano il valore
+ *  iniziale), quindi si rifiuta subito con un messaggio. */
+const REGOLE_NUMERI: Record<string, { minimo: number; massimo?: number; messaggio: string }> = {
+  [CHIAVE_POSTI_PER_BUS]: { minimo: 1, messaggio: 'I posti per bus devono essere almeno 1.' },
+  [CHIAVE_SOGLIA_OCCUPAZIONE_PAREGGIO]: { minimo: 1, massimo: 100, messaggio: 'Inserisci una percentuale tra 1 e 100.' },
+  [CHIAVE_RAGGIO_KM_PREVENTIVO]: { minimo: 1, messaggio: 'Il raggio deve essere di almeno 1 km.' },
+  [CHIAVE_GIORNI_LINK_PREVENTIVO]: { minimo: 1, messaggio: 'Il link deve valere almeno 1 giorno.' },
+  [CHIAVE_CREDITO_PER_PASSEGGERO]: { minimo: 0, messaggio: 'Inserisci un importo da 0 in su.' },
+  [CHIAVE_CREDITO_REFERRAL_INVITANTE]: { minimo: 0, messaggio: 'Inserisci un importo da 0 in su.' },
+  [CHIAVE_CREDITO_REFERRAL_AMICO]: { minimo: 0, messaggio: 'Inserisci un importo da 0 in su.' },
+  [CHIAVE_SOGLIA_POSTICIPO_MINUTI]: { minimo: 0, messaggio: 'Inserisci un numero di minuti da 0 in su.' },
+};
+
 impostazioniRouter.put(
   '/:chiave',
   richiedePermesso('impostazioni.gestisci'),
   valida(z.object({ valore: z.string().min(1) })),
   asyncHandler(async (req: Request, res: Response) => {
+    const regola = REGOLE_NUMERI[req.params.chiave];
+    if (regola) {
+      const numero = Number(req.body.valore);
+      if (!Number.isFinite(numero) || numero < regola.minimo || (regola.massimo !== undefined && numero > regola.massimo)) {
+        throw new ErroreApplicativo(regola.messaggio, 400, 'VALORE_NON_VALIDO');
+      }
+    }
     await db.insert(impostazioni).values({ chiave: req.params.chiave, valore: req.body.valore })
       .onConflictDoUpdate({ target: impostazioni.chiave, set: { valore: req.body.valore } });
     res.json({ ok: true });

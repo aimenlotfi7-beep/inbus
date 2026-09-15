@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { db } from '../../db/client.js';
@@ -115,7 +115,36 @@ amministratoriRouter.put(
         throw new VietatoDaiPermessi('Non puoi assegnare un ruolo con più permessi di quelli che hai tu.');
       }
     }
+    // Disattivare: mai sé stessi (si resterebbe fuori) né l'ultimo proprietario attivo.
+    if (req.body.attivo === false && target.attivo) {
+      if (target.id === req.admin!.sub) throw new ConflittoDati('Non puoi disattivare la tua utenza.');
+      if (ruoloAttuale?.owner) {
+        const proprietariAttivi = await db.select({ id: amministratori.id }).from(amministratori)
+          .where(and(eq(amministratori.ruoloId, target.ruoloId), eq(amministratori.attivo, true)));
+        if (proprietariAttivi.filter((a) => a.id !== target.id).length === 0) {
+          throw new ConflittoDati("Non puoi disattivare l'unica utenza proprietaria attiva.");
+        }
+      }
+    }
     res.json(await amministratoriService.update(req.params.id, req.body));
+  })
+);
+
+/** Link per scegliere una nuova password, a un collega: vale 24 ore. Stesse
+ *  regole della modifica (un proprietario solo da un proprietario). */
+amministratoriRouter.post(
+  '/:id/link-password',
+  richiedePermesso('utenze.gestisci'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const target = await getById(req.params.id);
+    const eff = await permessiEffettivi(req.admin!.sub);
+    const [ruoloTarget] = await db.select().from(ruoli).where(eq(ruoli.id, target.ruoloId)).limit(1);
+    if (!eff.owner && ruoloTarget?.owner) {
+      throw new VietatoDaiPermessi("Solo il proprietario può gestire un'altra utenza proprietaria.");
+    }
+    if (!target.attivo) throw new ConflittoDati(`${target.nome} è disattivato: riattivalo prima di mandargli il link.`);
+    const { authService } = await import('../auth/auth.service.js');
+    res.json(await authService.mandaLinkPassword(target, 24));
   })
 );
 

@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { formattaDataOra } from '../../shared/formato';
 import { motivoErrore } from '../shared/errori';
-import { azioneConfermata } from '../shared/conferma';
+import { azioneConfermata, conferma } from '../shared/conferma';
 import { notifica } from '../shared/notifiche';
 import { amministratoriApi, type Amministratore, type AmministratoreInput, type LogRiga, type EccezionePermesso } from '../../api/amministratori';
+import { haPermesso } from '../../api/auth';
 import { ruoliApi, type Ruolo, type Permesso } from '../../api/ruoli';
 import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { CampoCopiabile } from '../shared/CampoCopiabile';
+import { Modale } from '../shared/Modale';
+import { useSessione } from '../shared/SessioneContext';
 import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
 import { useMappaTooltip } from '../shared/useMappaTooltip';
 
@@ -19,6 +22,9 @@ type StatoPermesso = 'ruolo' | 'extra' | 'negato' | 'nessuno';
 
 export function AmministratoriScreen() {
   const mappaTooltip = useMappaTooltip();
+  const sessione = useSessione();
+  const puoCreare = haPermesso(sessione, 'utenze.crea');
+  const [linkNonInviato, setLinkNonInviato] = useState<{ nome: string; link: string } | null>(null);
   const [admin, setAdmin] = useState<Amministratore[]>([]);
   const [log, setLog] = useState<LogRiga[]>([]);
   const [ruoliAssegnabili, setRuoliAssegnabili] = useState<Ruolo[]>([]);
@@ -58,17 +64,62 @@ export function AmministratoriScreen() {
 
   async function salva() {
     if (salvando) return;
-    if (!form.nome || !form.email || !form.ruoloId) return;
+    if (!form.nome.trim() || !form.email.trim() || !form.ruoloId || (!inModifica && !form.password)) {
+      notifica(inModifica ? 'Compila nome, email e ruolo.' : 'Compila nome, email, password e ruolo.', 'errore');
+      return;
+    }
     setSalvando(true);
     try {
       if (inModifica) await amministratoriApi.update(inModifica.id, form);
       else await amministratoriApi.create(form);
       setModaleAperta(false);
+      notifica(inModifica ? 'Amministratore salvato.' : 'Amministratore creato: comunicagli la password, potrà cambiarla con «Password dimenticata?».', 'successo');
       ricarica();
     } catch (e) {
       notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
     } finally {
       setSalvando(false);
+    }
+  }
+
+  /** Disattivato: non entra più e perde subito tutti i permessi; dati e
+   *  registro restano, e si riattiva quando serve. */
+  async function cambiaAttivo(a: Amministratore) {
+    const disattiva = a.attivo;
+    const ok = await conferma({
+      titolo: disattiva ? `Disattivare ${a.nome}?` : `Riattivare ${a.nome}?`,
+      testo: disattiva
+        ? 'Non potrà più entrare nel gestionale e perde subito i permessi. I suoi dati restano: puoi riattivarlo quando vuoi.'
+        : 'Potrà entrare di nuovo nel gestionale, con il suo ruolo.',
+      conferma: disattiva ? 'Disattiva' : 'Riattiva',
+      pericolosa: disattiva,
+    });
+    if (!ok) return;
+    try {
+      await amministratoriApi.update(a.id, { attivo: !disattiva });
+      notifica(disattiva ? `${a.nome} disattivato.` : `${a.nome} riattivato.`, 'successo');
+      ricarica();
+    } catch (e) {
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
+    }
+  }
+
+  async function mandaLinkPassword(a: Amministratore) {
+    const ok = await conferma({
+      titolo: `Mandare a ${a.nome} il link per una nuova password?`,
+      testo: `Riceve a ${a.email} un'email con il link per scegliere la password, valido 24 ore. Quella attuale resta valida finché non ne sceglie una nuova.`,
+      conferma: 'Manda il link',
+    });
+    if (!ok) return;
+    try {
+      const esito = await amministratoriApi.linkPassword(a.id);
+      if (esito.emailInviata) notifica(`Link per la password inviato a ${esito.email}.`, 'successo');
+      else {
+        notifica(`L'email a ${esito.email} non è partita: manda tu il link.`, 'errore');
+        setLinkNonInviato({ nome: a.nome, link: esito.link });
+      }
+    } catch (e) {
+      notifica(`Azione non riuscita: ${motivoErrore(e)}`, 'errore');
     }
   }
   async function elimina(a: Amministratore) {
@@ -159,6 +210,11 @@ export function AmministratoriScreen() {
           )}
         </div>
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva amministratore'}</button>
+        {inModifica && inModifica.attivo && (
+          <button type="button" className="btn btn-ghost" style={{ width: '100%', marginTop: 10 }} onClick={() => mandaLinkPassword(inModifica)}>
+            Manda link per una nuova password
+          </button>
+        )}
       </PaginaSezione>
     );
   }
@@ -190,7 +246,7 @@ export function AmministratoriScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Amministratori" azione={<button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo amministratore</button>} />
+      <PanelHead titolo="Amministratori" azione={puoCreare ? <button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo amministratore</button> : undefined} />
       <div style={{ maxWidth: 480, marginBottom: 20 }}>
         <CampoCopiabile etichetta="Link di accesso al gestionale (per tutti, inclusi i Collaboratori)" valore={`${window.location.origin}/admin.html`} link />
       </div>
@@ -201,7 +257,20 @@ export function AmministratoriScreen() {
           { etichetta: 'Nome', render: (a) => <b>{a.nome}</b> },
           { etichetta: 'Email', render: (a) => a.email },
           { etichetta: 'Ruolo', render: (a) => nomeRuolo(a.ruoloId) },
-          { etichetta: 'Stato', render: (a) => a.attivo ? 'Attivo' : 'Disattivo' },
+          {
+            etichetta: 'Stato',
+            render: (a) => (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span className={`badge ${a.attivo ? 'badge-stato-verde' : 'badge-stato-rosso'}`}>{a.attivo ? 'Attivo' : 'Disattivo'}</span>
+                {/* La propria utenza non si disattiva: si resterebbe fuori. */}
+                {a.id !== sessione?.id && (
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '2px 8px', ...(a.attivo && { color: 'var(--pink)' }) }} onClick={() => cambiaAttivo(a)}>
+                    {a.attivo ? 'Disattiva' : 'Riattiva'}
+                  </button>
+                )}
+              </div>
+            ),
+          },
           { etichetta: 'Permessi extra', render: (a) => <button className="btn btn-ghost" style={{ padding: '5px 12px', fontSize: 'var(--testo-md)' }} onClick={() => apriPermessi(a)}>Personalizza</button> },
         ]}
         onModifica={apriModifica}
@@ -217,6 +286,15 @@ export function AmministratoriScreen() {
           { etichetta: 'Quando', render: (l) => formattaDataOra(l.data) },
         ]}
       />
+
+      {linkNonInviato && (
+        <Modale titolo={`Link per ${linkNonInviato.nome}`} onClose={() => setLinkNonInviato(null)}>
+          <p className="testo-intro" style={{ marginBottom: 16 }}>
+            L'email non è partita: manda tu questo link (per messaggio). Serve a scegliere la password ed è valido 24 ore.
+          </p>
+          <CampoCopiabile etichetta="Link per la password" valore={linkNonInviato.link} />
+        </Modale>
+      )}
     </div>
   );
 }

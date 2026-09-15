@@ -89,11 +89,13 @@ export const controlloAccessiService = {
   /** Scansiona un QR — restituisce sempre un esito chiaro, mai un
    *  errore HTTP "secco": è pensata per essere usata in movimento, sul
    *  bus, dove serve un feedback immediato e leggibile a schermo. Valido
-   *  solo se la prenotazione è assegnata a QUESTO bus. */
+   *  solo se la prenotazione è assegnata a QUESTO bus e il saldo è pagato
+   *  (come la lista e il check-in manuale: senza saldo non si sale). */
   async scansiona(busId: string, tourLeaderId: string, token: string): Promise<
     | { esito: 'valido'; nome: string }
     | { esito: 'gia_a_bordo'; nome: string }
     | { esito: 'bus_sbagliato'; nome: string; busGiusto: string | null; messaggio: string }
+    | { esito: 'saldo_da_pagare'; nome: string; messaggio: string }
     | { esito: 'non_valido' }
   > {
     await verificaProprietaBus(busId, tourLeaderId);
@@ -113,6 +115,7 @@ export const controlloAccessiService = {
       const busGiusto = pren.busId ? (await riferimentiBus([pren.busId])).get(pren.busId) ?? null : null;
       return { esito: 'bus_sbagliato', nome, busGiusto, messaggio: messaggioBusSbagliato(nome, busGiusto) };
     }
+    if (!pren.saldoPagato) return { esito: 'saldo_da_pagare', nome, messaggio: messaggioSaldoDaPagare(nome) };
 
     // Atomico: la condizione "non ancora usato" si riverifica proprio
     // nel comando che lo segna usato — due scansioni quasi simultanee

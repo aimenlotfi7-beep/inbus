@@ -11,14 +11,16 @@ import { PanelHead } from '../shared/PanelHead';
 // Solo numeriche ora — Pixel/GA4 (testo/segreto) si sono spostati in
 // Marketing → Tracciamento, una sezione dedicata invece di stare
 // mescolati qui in mezzo a soglie senza nessun legame con loro.
-const IMPOSTAZIONI: { chiave: string; etichetta: string; default: string; suffisso?: string }[] = [
-  { chiave: 'posti_per_bus', etichetta: 'Posti per bus (usato per "Calcola bus necessari" in Partenze)', default: '50' },
-  { chiave: 'credito_per_passeggero', etichetta: 'Credito fedeltà per passeggero (€)', default: '0.5' },
-  { chiave: 'credito_referral_invitante', etichetta: 'Invita un amico — credito a chi invita, quando l\'amico conferma la sua prima prenotazione (€, 0 = disattivato)', default: '0' },
-  { chiave: 'credito_referral_amico', etichetta: 'Invita un amico — credito all\'amico invitato, subito alla registrazione (€, 0 = disattivato)', default: '0' },
-  { chiave: 'soglia_posticipo_variazione_minuti', etichetta: 'Soglia posticipo per notifica variazione (minuti — l\'anticipo e il cambio città/indirizzo notificano sempre, senza soglia; 0 o vuoto = avvisa sempre anche per il posticipo)', default: '0' },
-  { chiave: 'giorni_validita_link_preventivo', etichetta: 'Giorni di validità del link inviato ai fornitori per rispondere a una richiesta preventivo (dopo, il link risulta scaduto; chi ha già risposto continua a vedere la sua risposta)', default: '60' },
-  { chiave: 'raggio_km_preventivo', etichetta: 'Raggio (km, linea d\'aria) per cercare fornitori vicini a una richiesta preventivo — modificabile comunque per singola richiesta', default: '40' },
+// minimo: sotto questo numero il server userebbe il valore iniziale, quindi
+// si rifiuta subito con un messaggio (stesse regole nel server).
+const IMPOSTAZIONI: { chiave: string; etichetta: string; default: string; minimo: number; messaggio: string }[] = [
+  { chiave: 'posti_per_bus', etichetta: 'Posti per bus (usati quando la quotazione scelta non indica i posti: pareggio, proposte dei bus, statistiche)', default: '50', minimo: 1, messaggio: 'I posti per bus devono essere almeno 1.' },
+  { chiave: 'credito_per_passeggero', etichetta: 'Credito fedeltà per passeggero (€)', default: '0.5', minimo: 0, messaggio: 'Inserisci un importo da 0 in su.' },
+  { chiave: 'credito_referral_invitante', etichetta: 'Invita un amico — credito a chi invita, quando l\'amico conferma la sua prima prenotazione (€, 0 = disattivato)', default: '0', minimo: 0, messaggio: 'Inserisci un importo da 0 in su.' },
+  { chiave: 'credito_referral_amico', etichetta: 'Invita un amico — credito all\'amico invitato, subito alla registrazione (€, 0 = disattivato)', default: '0', minimo: 0, messaggio: 'Inserisci un importo da 0 in su.' },
+  { chiave: 'soglia_posticipo_variazione_minuti', etichetta: 'Soglia posticipo per notifica variazione (minuti — l\'anticipo e il cambio città/indirizzo notificano sempre, senza soglia; 0 = avvisa sempre anche per il posticipo)', default: '0', minimo: 0, messaggio: 'Inserisci un numero di minuti da 0 in su.' },
+  { chiave: 'giorni_validita_link_preventivo', etichetta: 'Giorni di validità del link inviato ai fornitori per rispondere a una richiesta (dopo, il link risulta scaduto; chi ha già risposto continua a vedere la sua risposta)', default: '60', minimo: 1, messaggio: 'Il link deve valere almeno 1 giorno.' },
+  { chiave: 'raggio_km_preventivo', etichetta: 'Raggio (km, linea d\'aria) entro cui i fornitori ricevono le richieste automatiche di quotazione e preventivo', default: '40', minimo: 1, messaggio: 'Il raggio deve essere di almeno 1 km.' },
 ];
 
 // Chiave della formula prezzi (sezione dedicata più sotto, separata
@@ -53,9 +55,11 @@ export function ImpostazioniScreen() {
   }, []);
 
   async function salva(chiave: string) {
-    const numero = Number(valori[chiave]);
-    if (!Number.isFinite(numero) || numero < 0) {
-      notifica('Inserisci un numero valido.', 'errore');
+    const impostazione = IMPOSTAZIONI.find((i) => i.chiave === chiave)!;
+    const testo = (valori[chiave] ?? '').trim();
+    const numero = Number(testo);
+    if (testo === '' || !Number.isFinite(numero) || numero < impostazione.minimo) {
+      notifica(impostazione.messaggio, 'errore');
       return;
     }
     setSalvataggio(chiave);
@@ -114,7 +118,7 @@ export function ImpostazioniScreen() {
               <div className="campo" style={{ marginBottom: 10 }}>
                 <label>{i.etichetta}</label>
                 <input
-                  type="number" min={0} step="0.01"
+                  type="number" min={i.minimo} step="0.01"
                   value={valori[i.chiave] ?? i.default}
                   onChange={(e) => setValori((v) => ({ ...v, [i.chiave]: e.target.value }))}
                 />
@@ -132,15 +136,17 @@ export function ImpostazioniScreen() {
           <div className="section-card" style={{ borderColor: 'var(--blue)' }}>
             <p className="section-label" style={{ marginBottom: 4 }}>Formula di calcolo prezzi</p>
             <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginBottom: 12, lineHeight: 1.5 }}>
-              Usata dal pulsante "Calcola preventivo" per suggerire il prezzo di ogni fermata, partendo dal costo del fornitore:
+              Usata dal pulsante "Calcola prezzi per fermata" (Partenze › Prezzi) per suggerire il prezzo di ogni fermata, partendo dal costo della quotazione:
               <br />
               <code style={{ fontSize: 'var(--testo-sm)' }}>Posti di pareggio = Posti bus × Soglia di occupazione</code>
               <br />
               <code style={{ fontSize: 'var(--testo-sm)' }}>Prezzo minimo = Costo bus ÷ Posti di pareggio</code>
               <br />
-              <code style={{ fontSize: 'var(--testo-sm)' }}>Prezzo fermata = Prezzo minimo + (tariffa al km × km fino all'arrivo)</code>
+              <code style={{ fontSize: 'var(--testo-sm)' }}>Costo al km per persona = Costo bus ÷ km del tragitto ÷ Posti di pareggio</code>
               <br />
-              Nessuna fermata scende mai sotto il prezzo minimo — chi sale più lontano dall'arrivo paga di più.
+              <code style={{ fontSize: 'var(--testo-sm)' }}>Prezzo fermata = Prezzo minimo + (Costo al km per persona × km di strada fino all'arrivo)</code>
+              <br />
+              Nessuna fermata scende mai sotto il prezzo minimo; la più lontana paga circa il doppio. La stessa soglia decide quando nasce la proposta di un bus in Da confermare.
             </p>
             <div className="campo" style={{ marginBottom: 10 }}>
               <label>Soglia di occupazione assunta per il pareggio (%) — più bassa = prezzi più prudenti/alti</label>
@@ -162,7 +168,7 @@ export function ImpostazioniScreen() {
             <p className="section-label" style={{ marginBottom: 8 }}>Preventivi fornitori</p>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
               <input type="checkbox" checked={notificaNonScelti} onChange={alternaNotificaNonScelti} style={{ width: 'auto' }} />
-              Avvisa via mail i fornitori non scelti, quando ne accetti un altro per lo stesso tragitto
+              Avvisa via mail i fornitori non scelti, quando confermi un bus con il preventivo di un altro
             </label>
           </div>
         </div>

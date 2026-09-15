@@ -123,6 +123,8 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
   // compenso proprio.
   const commissione = stats.commissione;
   const eventiOrdinati = eventi.slice().sort((a, b) => a.data.localeCompare(b.data));
+  // Sugli eventi esclusi il suo link non gli attribuisce la vendita: non si mostrano.
+  const eventiDaPubblicizzare = eventiOrdinati.filter((ev) => !promoter.eventiEsclusi?.includes(ev.id));
   const eventiConVendite = eventiOrdinati.filter((ev) => statsPerEvento[ev.id]);
   const statoEventoIncasso = eventoIncasso ? statsPerEvento[eventoIncasso] : null;
 
@@ -175,14 +177,14 @@ function AreaPromoter({ onErroreSessione }: { onErroreSessione: () => void }) {
           <h1 className="page-title">I tuoi link</h1>
           <p className="page-sub">Un link per ogni evento in vendita: copialo e condividilo dove vuoi. Decidi tu quali pubblicizzare.</p>
 
-          {!eventiOrdinati.length && (
+          {!eventiDaPubblicizzare.length && (
             <div className="stato-vuoto">
               <h2>Nessun evento in vendita</h2>
               <p>Quando OnWay pubblica un nuovo evento, il suo link compare qui.</p>
             </div>
           )}
 
-          {eventiOrdinati.map((ev) => <CardLinkPromoter key={ev.id} evento={ev} onCopia={copiaLink} />)}
+          {eventiDaPubblicizzare.map((ev) => <CardLinkPromoter key={ev.id} evento={ev} onCopia={copiaLink} />)}
         </>
       )}
 

@@ -26,6 +26,18 @@ describe('fonteDi', () => {
     const altra = fonteDi({ ...nessunaFonte, utmSource: 'meta', utmMedium: 'cpc', utmCampaign: 'agosto' }, campagne, nomiPromoter, nomiWhiteLabel);
     expect(altra).toEqual({ tipo: 'utm_non_registrata', chiave: 'utm:meta/cpc', nome: 'meta / cpc' });
   });
+  it('un utm lasciato vuoto nella campagna vale come assente', () => {
+    const conVuoti = [{ id: 'c2', nome: 'Radio', utmSource: 'radio', utmMedium: '', utmCampaign: ' ' }];
+    expect(fonteDi({ ...nessunaFonte, utmSource: 'radio' }, conVuoti, nomiPromoter, nomiWhiteLabel).chiave).toBe('campagna:c2');
+    expect(fonteDi({ ...nessunaFonte, utmSource: 'radio', utmMedium: '' }, conVuoti, nomiPromoter, nomiWhiteLabel).chiave).toBe('campagna:c2');
+  });
+  it('la campagna collegata all\'offerta usata, se gli utm non trovano una campagna', () => {
+    const offerte = new Map([['o1', 'c1']]);
+    expect(fonteDi({ ...nessunaFonte, offertaId: 'o1' }, campagne, nomiPromoter, nomiWhiteLabel, offerte).chiave).toBe('campagna:c1');
+    expect(fonteDi({ ...nessunaFonte, utmSource: 'tiktok', offertaId: 'o1' }, campagne, nomiPromoter, nomiWhiteLabel, offerte).chiave).toBe('campagna:c1');
+    // Offerta senza campagna: conta come prima.
+    expect(fonteDi({ ...nessunaFonte, offertaId: 'o2' }, campagne, nomiPromoter, nomiWhiteLabel, offerte).tipo).toBe('sito');
+  });
   it('senza dati di provenienza è il sito', () => {
     expect(fonteDi(nessunaFonte, campagne, nomiPromoter, nomiWhiteLabel).tipo).toBe('sito');
   });

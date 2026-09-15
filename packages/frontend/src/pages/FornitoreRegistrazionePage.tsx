@@ -103,7 +103,7 @@ export function FornitoreRegistrazionePage() {
         {inviato && (
           <div className="success-box">
             <h2>Registrazione ricevuta</h2>
-            <p>Grazie! Un membro del nostro staff esaminerà i tuoi dati e attiverà l'account — riceverai le richieste di preventivo via email una volta approvato.</p>
+            <p>Grazie! Ti abbiamo mandato un'email di conferma. Un membro del nostro staff esaminerà i tuoi dati: quando la registrazione sarà approvata riceverai un'altra email, e da lì le richieste di preventivo.</p>
           </div>
         )}
       </main>

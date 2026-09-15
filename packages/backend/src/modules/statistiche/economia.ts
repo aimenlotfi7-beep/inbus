@@ -52,6 +52,8 @@ export interface ContestoFonti {
   percentualiPromoter: Map<string, number>;
   nomiWhiteLabel: Map<string, string>;
   coupon: Map<string, CompensoCoupon & { promoterId: string | null }>;
+  /** Offerta → la campagna collegata (solo le offerte che ne hanno una). */
+  campagnaDiOfferta: Map<string, string>;
 }
 
 export interface StruttureEventi {

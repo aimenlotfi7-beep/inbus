@@ -2,11 +2,14 @@ import { Router, type Request, type Response } from 'express';
 import { eq, count, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
-import { fornitori, fornitoriCampiExtraConfig, tragitti, preventiviRichieste, busFisici } from '../../db/schema.js';
+import { amministratori, fornitori, fornitoriCampiExtraConfig, tragitti, preventiviRichieste, busFisici } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
+import { urlSito } from '../../shared/email.service.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
+import { haPermesso } from '../auth/permessi.service.js';
+import { inviaEmailModello } from '../preventivi/email-fornitori.js';
 import { limiteRegistrazione } from '../../shared/rateLimit.js';
 
 const fornitoreSchema = z.object({
@@ -65,6 +68,14 @@ async function collegamenti(id: string) {
   return { partenze: partenze.valore, richiestePreventivo: richiestePreventivo.valore, bus: bus.valore };
 }
 
+/** Chi riceve l'avviso di una nuova registrazione: le utenze attive del
+ *  gestionale che possono approvare i fornitori. */
+async function emailStaffFornitori(): Promise<string[]> {
+  const staff = await db.select({ id: amministratori.id, email: amministratori.email }).from(amministratori).where(eq(amministratori.attivo, true));
+  const conPermesso = await Promise.all(staff.map(async (a) => ((await haPermesso(a.id, 'fornitori.gestisci')) ? a.email : null)));
+  return conPermesso.filter((email): email is string => !!email);
+}
+
 export const fornitoriService = {
   list: () => db.select().from(fornitori),
   getById,
@@ -88,10 +99,16 @@ export const fornitoriService = {
     }
     await db.delete(fornitori).where(eq(fornitori.id, id));
   },
+  /** approvazioneComunicata: solo passando da "In attesa" ad "Approvato",
+   *  se l'email al fornitore è partita (null se non c'era niente da mandare). */
   cambiaStato: async (id: string, stato: 'IN_ATTESA' | 'APPROVATO' | 'DISATTIVATO') => {
-    await getById(id);
+    const prima = await getById(id);
     const [aggiornato] = await db.update(fornitori).set({ stato }).where(eq(fornitori.id, id)).returning();
-    return aggiornato;
+    const approvato = prima.stato === 'IN_ATTESA' && stato === 'APPROVATO';
+    const approvazioneComunicata = approvato && aggiornato.email
+      ? await inviaEmailModello(aggiornato.email, 'fornitore_approvato', { fornitore: aggiornato.nome })
+      : null;
+    return { ...aggiornato, approvazioneComunicata };
   },
   contaInAttesa: async () => {
     const [{ valore }] = await db.select({ valore: count() }).from(fornitori).where(eq(fornitori.stato, 'IN_ATTESA'));
@@ -105,6 +122,12 @@ export const fornitoriService = {
       .where(sql`lower(${fornitori.email}) = ${email.toLowerCase()}`).limit(1);
     if (giaRegistrato) throw new ConflittoDati('Questa email risulta già registrata come fornitore: non serve registrarsi di nuovo.');
     const [nuovo] = await db.insert(fornitori).values({ ...input, email, stato: 'IN_ATTESA' }).returning();
+    // Prima non partiva niente: né la conferma al fornitore né l'avviso allo staff.
+    await inviaEmailModello(email, 'fornitore_registrazione_ricevuta', { fornitore: nuovo.nome });
+    const variabiliStaff = { fornitore: nuovo.nome, email, indirizzo: nuovo.indirizzo ?? '', link: urlSito('/admin.html?sezione=fornitori') };
+    for (const destinatario of await emailStaffFornitori()) {
+      await inviaEmailModello(destinatario, 'fornitore_nuova_registrazione', variabiliStaff);
+    }
     return nuovo;
   },
   listaCampiExtraConfig: () => db.select().from(fornitoriCampiExtraConfig).orderBy(fornitoriCampiExtraConfig.ordine),

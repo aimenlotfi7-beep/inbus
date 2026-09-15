@@ -173,13 +173,19 @@ export function FornitoriScreen() {
   async function cambiaStato(f: Fornitore, stato: StatoFornitore) {
     setAzioneInCorso(true);
     try {
-      await fornitoriApi.cambiaStato(f.id, stato);
+      const esito = await fornitoriApi.cambiaStato(f.id, stato);
       setDaDisattivare(null);
       setDaEliminare(null);
-      const fatto = stato === 'DISATTIVATO'
-        ? `"${f.nome}" disattivato: non riceverà più richieste di preventivo.`
-        : f.stato === 'IN_ATTESA' ? `"${f.nome}" approvato.` : `"${f.nome}" riattivato.`;
-      notifica(fatto, 'successo');
+      if (esito.approvazioneComunicata === false) {
+        notifica(`"${f.nome}" approvato, ma l'email di conferma non è partita: avvisalo tu.`, 'errore');
+      } else {
+        const fatto = stato === 'DISATTIVATO'
+          ? `"${f.nome}" disattivato: non riceverà più richieste di preventivo.`
+          : f.stato === 'IN_ATTESA'
+            ? `"${f.nome}" approvato${esito.approvazioneComunicata ? ': gli è arrivata l\'email di conferma' : ''}.`
+            : `"${f.nome}" riattivato.`;
+        notifica(fatto, 'successo');
+      }
       ricarica();
     } catch (e) {
       notifica(`Cambio di stato non riuscito: ${motivo(e)}`, 'errore');

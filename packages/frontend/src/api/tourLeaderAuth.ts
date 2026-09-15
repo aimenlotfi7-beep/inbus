@@ -60,12 +60,13 @@ export interface StatoBus {
   saliti: number;
 }
 /** bus_sbagliato: la prenotazione è su un altro bus (busGiusto = il suo
- *  riferimento) o non ancora su nessuno (busGiusto null); messaggio già
- *  pronto da mostrare. */
+ *  riferimento) o non ancora su nessuno (busGiusto null); saldo_da_pagare:
+ *  senza saldo non si sale. Il messaggio è già pronto da mostrare. */
 export type EsitoScansione =
   | { esito: 'valido'; nome: string }
   | { esito: 'gia_a_bordo'; nome: string }
   | { esito: 'bus_sbagliato'; nome: string; busGiusto: string | null; messaggio: string }
+  | { esito: 'saldo_da_pagare'; nome: string; messaggio: string }
   | { esito: 'non_valido' };
 
 /** La lista del bus: disponibile solo da 24 ore prima della partenza

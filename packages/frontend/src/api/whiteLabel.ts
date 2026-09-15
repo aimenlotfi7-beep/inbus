@@ -1,6 +1,6 @@
 import { api, apiConToken } from './client';
 import type { BundlePubblicoDettaglio } from './bundle';
-import type { OpzionePartenza } from './types';
+import type { Evento, OpzionePartenza } from './types';
 
 const apiClienteConToken = apiConToken('inbus_cliente_token');
 
@@ -102,6 +102,10 @@ export interface PrenotazioneCreata {
 
 export const whiteLabelApi = {
   getPubblica: (publicWidgetId: string) => api.get<WhiteLabelPubblica>(`/api/public/widget/${publicWidgetId}`),
+  // L'evento completo per il checkout: anche se è nascosto dal sito OnWay.
+  // Per un widget di bundle, l'evento del bundle indicato.
+  evento: (publicWidgetId: string, eventoId?: string) =>
+    api.get<Evento>(`/api/public/widget/${publicWidgetId}/evento${eventoId ? `?eventoId=${encodeURIComponent(eventoId)}` : ''}`),
   opzioniPartenza: (publicWidgetId: string, eventoId?: string, servizioId?: string) =>
     api.get<OpzionePartenza[]>(`/api/public/widget/${publicWidgetId}/opzioni-partenza${eventoId ? `?eventoId=${eventoId}${servizioId ? `&servizioId=${servizioId}` : ''}` : ''}`),
   ordineBundle: (publicWidgetId: string, articoli: Record<string, unknown>[]) =>

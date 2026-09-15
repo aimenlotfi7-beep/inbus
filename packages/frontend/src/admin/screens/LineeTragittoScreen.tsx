@@ -549,7 +549,10 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         <label>Tour leader (facoltativo)
           <select value={formBus.tourLeaderId ?? ''} onChange={(e) => setFormBus({ ...formBus, tourLeaderId: e.target.value || null })}>
             <option value="">— Nessuno —</option>
-            {tourLeaders.map((t) => <option key={t.id} value={t.id}>{t.nome} {t.cognome}</option>)}
+            {/* Gli archiviati non si assegnano; quello già sul bus resta visibile. */}
+            {tourLeaders.filter((t) => t.stato !== 'ARCHIVIATO' || t.id === formBus.tourLeaderId).map((t) => (
+              <option key={t.id} value={t.id}>{t.nome} {t.cognome}{t.stato === 'ARCHIVIATO' ? ' (archiviato)' : ''}</option>
+            ))}
           </select>
         </label>
         <label>Autista (facoltativo)<input value={formBus.autistaNome ?? ''} onChange={(e) => setFormBus({ ...formBus, autistaNome: e.target.value })} /></label>

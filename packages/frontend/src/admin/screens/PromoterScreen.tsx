@@ -33,7 +33,7 @@ export function PromoterScreen() {
   function apriNuovo() { setInModifica(null); setForm(VUOTO); setStatistiche(null); setModaleAperta(true); }
   function apriModifica(p: Promoter) {
     setInModifica(p);
-    setForm({ nome: p.nome, email: p.email, telefono: p.telefono ?? undefined, commissionePercentuale: Number(p.commissionePercentuale) });
+    setForm({ nome: p.nome, email: p.email, telefono: p.telefono ?? undefined, commissionePercentuale: Number(p.commissionePercentuale), eventiEsclusi: p.eventiEsclusi ?? [] });
     setModaleAperta(true);
     promoterApi.statistiche(p.id).then(setStatistiche);
   }

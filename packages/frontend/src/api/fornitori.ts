@@ -41,7 +41,8 @@ export const fornitoriApi = {
   update: (id: string, input: Partial<FornitoreInput>) => api.put<Fornitore>(`/api/fornitori/${id}`, input),
   remove: (id: string) => api.delete<void>(`/api/fornitori/${id}`),
   collegamenti: (id: string) => api.get<CollegamentiFornitore>(`/api/fornitori/${id}/collegamenti`),
-  cambiaStato: (id: string, stato: StatoFornitore) => api.put<Fornitore>(`/api/fornitori/${id}/stato`, { stato }),
+  // approvazioneComunicata: passando da In attesa ad Approvato, se l'email al fornitore è partita.
+  cambiaStato: (id: string, stato: StatoFornitore) => api.put<Fornitore & { approvazioneComunicata: boolean | null }>(`/api/fornitori/${id}/stato`, { stato }),
   contaInAttesa: () => api.get<{ conteggio: number }>('/api/fornitori/conta-in-attesa'),
   // Pubbliche — nessun accesso da amministratore, usate dal form di
   // autoregistrazione (fuori dall'area /admin).

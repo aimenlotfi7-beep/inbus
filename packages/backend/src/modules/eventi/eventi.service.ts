@@ -248,6 +248,18 @@ async function avvisaPartenzaConfermata(tragittoId: string, lineaId: string): Pr
   return esito;
 }
 
+/** Un tour leader archiviato non si assegna a un bus: non entra nemmeno
+ *  nella scansione (tour-leader-auth). */
+async function verificaTourLeaderAssegnabile(tourLeaderId: string | null | undefined) {
+  if (!tourLeaderId) return;
+  const [tl] = await db.select({ stato: tourLeader.stato, nome: tourLeader.nome, cognome: tourLeader.cognome })
+    .from(tourLeader).where(eq(tourLeader.id, tourLeaderId)).limit(1);
+  if (!tl) throw new NonTrovato('Tour leader');
+  if (tl.stato === 'ARCHIVIATO') {
+    throw new ConflittoDati(`${tl.nome} ${tl.cognome} è archiviato: per assegnarlo a un bus rimettilo su «Attivo» in Persone › Tour Leader.`);
+  }
+}
+
 /** Avvisa il tour leader appena assegnato a un bus. Dopo il commit, best
  *  effort: torna false se l'email non parte, non lancia mai. */
 async function avvisaTourLeader(busId: string): Promise<boolean> {
@@ -504,6 +516,24 @@ function conStatoCalcolato<T extends {
   return { ...evento, statoDisponibilita: calcolaStatoAutomatico(tuttiPerIlCalcolo) };
 }
 
+type EventoCompleto = NonNullable<Awaited<ReturnType<typeof db.query.eventi.findFirst<{ with: typeof includeCompleto }>>>>;
+
+/** Un evento come lo vede un cliente (pagina dell'evento o widget White
+ *  Label), se si può aprire: né bozza, né cestino, né passato (il giorno
+ *  dell'evento la pagina serve ancora, i bus devono partire), con almeno un
+ *  tragitto in vendita. "Visibile sul sito" conta solo per il sito OnWay. */
+function eventoPubblico(evento: EventoCompleto | undefined, { ancheNascostoDalSito }: { ancheNascostoDalSito: boolean }) {
+  if (!evento) throw new NonTrovato('Evento');
+  if ((!evento.visibileSito && !ancheNascostoDalSito) || evento.bozza || evento.eliminatoIl || new Date(evento.data) < inizioOggiRoma()) {
+    throw new NonTrovato('Evento');
+  }
+  // Stessa regola della lista: senza nemmeno un tragitto in vendita
+  // l'evento non esiste ancora, nemmeno con un link diretto.
+  const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
+  if (!tuttiITragitti.some((t) => t.attivo && t.stato !== 'DA_CONFERMARE')) throw new NonTrovato('Evento');
+  return eventoPerIlSito(conStatoCalcolato(evento));
+}
+
 /** Inserisce un tragitto (tratta) con le sue fermate — usata sia per i
  *  tragitti liberi sia per quelli dentro un servizio. */
 type FermataInput = z.infer<typeof tragittoSchema>['fermate'][number];
@@ -723,16 +753,19 @@ export const eventiService = {
       where: eq(eventi.slug, slug),
       with: includeCompleto,
     });
-    if (!evento) throw new NonTrovato('Evento');
-    // "Passato" solo dal giorno dopo (ora di Roma): il giorno dell'evento
-    // la pagina serve ancora, i bus devono partire.
-    if (!evento.visibileSito || evento.bozza || evento.eliminatoIl || new Date(evento.data) < inizioOggiRoma()) throw new NonTrovato('Evento');
-    // Stessa regola della lista: senza nemmeno un tragitto confermato,
-    // l'evento non esiste ancora per il sito — nemmeno con un link
-    // diretto allo slug.
-    const tuttiITragitti = [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)];
-    if (!tuttiITragitti.some((t) => t.attivo && t.stato !== 'DA_CONFERMARE')) throw new NonTrovato('Evento');
-    return eventoPerIlSito(conStatoCalcolato(evento));
+    return eventoPubblico(evento, { ancheNascostoDalSito: false });
+  },
+
+  /** L'evento per il widget White Label di un organizzatore: come la pagina
+   *  dell'evento, ma anche se è nascosto dal sito OnWay. "Visibile sul sito"
+   *  riguarda solo il nostro sito (deciso dal proprietario, settembre 2026);
+   *  per fermare anche il widget c'è "Ferma vendite". */
+  async getPerWidget(eventoId: string) {
+    const evento = await db.query.eventi.findFirst({
+      where: eq(eventi.id, eventoId),
+      with: includeCompleto,
+    });
+    return eventoPubblico(evento, { ancheNascostoDalSito: true });
   },
 
   async create(input: CreaEventoInput) {
@@ -1405,6 +1438,7 @@ export const eventiService = {
     });
 
     const tourLeaderId = input.tourLeaderId || undefined;
+    await verificaTourLeaderAssegnabile(tourLeaderId);
     const creata = await db.transaction(async (tx) => {
       const lineeEsistenti = await tx.select().from(linee).where(eq(linee.tragittoId, tragittoDelleFermate.id));
       // Una linea ora si può eliminare: il solo conteggio darebbe nomi
@@ -1471,6 +1505,7 @@ export const eventiService = {
       return a.orario.localeCompare(b.orario);
     });
     const tourLeaderId = input.tourLeaderId || undefined;
+    await verificaTourLeaderAssegnabile(tourLeaderId);
 
     const confermata = await db.transaction(async (tx) => {
       // Stesso lucchetto delle linee automatiche: la linea non sparisce
@@ -1562,6 +1597,7 @@ export const eventiService = {
     // (fermate e partenza confermata comprese), non da qui.
     if (lineaEsiste.daConfermare) throw new ConflittoDati(`${lineaEsiste.nome} è da confermare: usa "Conferma linea".`);
     const tourLeaderId = input.tourLeaderId || undefined;
+    await verificaTourLeaderAssegnabile(tourLeaderId);
 
     const busId = await db.transaction(async (tx) => {
       const [nuovoBus] = await tx.insert(busFisici).values({
@@ -1630,6 +1666,7 @@ export const eventiService = {
     const tourLeaderNuovo = input.tourLeaderId !== undefined ? (input.tourLeaderId || null) : undefined;
     // Email solo per un tour leader assegnato ORA (nuovo o diverso da prima).
     const tourLeaderCambiato = tourLeaderNuovo != null && tourLeaderNuovo !== bus.tourLeaderId;
+    if (tourLeaderCambiato) await verificaTourLeaderAssegnabile(tourLeaderNuovo);
     await db.transaction(async (tx) => {
       await tx.update(busFisici).set({
         ...(input.riferimento !== undefined && { riferimento: input.riferimento }),

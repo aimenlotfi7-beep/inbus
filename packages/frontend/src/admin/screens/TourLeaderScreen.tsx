@@ -48,7 +48,15 @@ export function TourLeaderScreen() {
     : lista;
 
   async function cambiaStato(t: TourLeader, stato: TourLeader['stato']) {
-    await tourLeaderApi.update(t.id, { stato });
+    try {
+      await tourLeaderApi.update(t.id, { stato });
+      // Archiviato = senza accesso alla scansione e non assegnabile ai bus.
+      notifica(stato === 'ARCHIVIATO'
+        ? `${t.nome} ${t.cognome} è archiviato: non può più entrare nella scansione.`
+        : `Stato di ${t.nome} ${t.cognome}: ${ETICHETTE[stato]}.`, 'successo');
+    } catch (e) {
+      notifica(`Stato non cambiato: ${motivoErrore(e)}`, 'errore');
+    }
     ricarica();
   }
   async function elimina(t: TourLeader) {
@@ -137,7 +145,7 @@ export function TourLeaderScreen() {
         }
       />
       <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 6 }}>
-        Le candidature arrivano anche dal form pubblico di autocandidatura. Cambia lo stato per approvarle o archiviarle.
+        Le candidature arrivano anche dal form pubblico di autocandidatura. Cambia lo stato per approvarle o archiviarle: un tour leader archiviato non entra nella scansione e non si assegna ai bus.
       </p>
       <p style={{ color: 'var(--mist)', fontSize: 'var(--testo-md)', marginBottom: 16 }}>
         Modulo pubblico: <code style={{ color: 'var(--paper)' }}>{linkCandidatura}</code>
@@ -164,11 +172,13 @@ export function TourLeaderScreen() {
           },
           {
             etichetta: 'Accesso scansione',
-            render: (t) => (
-              <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '4px 10px' }} onClick={() => attivaAccesso(t)}>
-                {t.passwordAttiva ? 'Manda link per nuova password' : 'Manda link per la password'}
-              </button>
-            ),
+            render: (t) => t.stato === 'ARCHIVIATO'
+              ? <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>Nessun accesso (archiviato)</span>
+              : (
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '4px 10px' }} onClick={() => attivaAccesso(t)}>
+                  {t.passwordAttiva ? 'Manda link per nuova password' : 'Manda link per la password'}
+                </button>
+              ),
           },
         ]}
         onElimina={elimina}

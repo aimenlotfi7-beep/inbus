@@ -73,7 +73,7 @@ qualcun altro, **verde** fatto, **viola** percorso cambiato dopo la quotazione.
 
 ### Numeri
 - Backend: 39 moduli, 58 tabelle, 91 migrazioni del database
-- Test automatici: 122 veloci e 96 con il database (backend), 22 nel gestionale
+- Test automatici: 124 veloci e 112 con il database (backend), 22 nel gestionale
 
 ---
 

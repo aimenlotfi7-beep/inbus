@@ -9,14 +9,17 @@ import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 
+/** Un UTM lasciato vuoto si salva come assente (null), non come testo vuoto. */
+const campoUtm = z.string().trim().transform((v) => v || null).nullable().optional();
+
 const campagnaSchema = z.object({
   nome: z.string().min(1),
   piattaforma: z.string().optional(),
   tipo: z.string().optional(),
-  utmSource: z.string().optional(),
-  utmMedium: z.string().optional(),
-  utmCampaign: z.string().optional(),
-  utmContent: z.string().optional(),
+  utmSource: campoUtm,
+  utmMedium: campoUtm,
+  utmCampaign: campoUtm,
+  utmContent: campoUtm,
   attiva: z.boolean().default(true),
 });
 const aggiornaCampagnaSchema = campagnaSchema.partial();
@@ -55,7 +58,7 @@ async function reportFatturatoPerFonte(dataDa?: Date) {
   const { fonteDi, arrotondaEuro } = await import('../statistiche/calcoli.js');
   const { righe, ctx } = await prenotazioniComeStatistiche(dataDa ? gte(prenotazioni.creataIl, dataDa) : undefined);
 
-  const fontePerRiga = new Map(righe.map((r) => [r.id, fonteDi(r, ctx.campagne, ctx.nomiPromoter, ctx.nomiWhiteLabel)]));
+  const fontePerRiga = new Map(righe.map((r) => [r.id, fonteDi(r, ctx.campagne, ctx.nomiPromoter, ctx.nomiWhiteLabel, ctx.campagnaDiOfferta)]));
   const commissioni = commissioniPer(righe, (r) => fontePerRiga.get(r.id)!.chiave, ctx);
   const gruppi = new Map<string, { fonte: string; tipo: string; numeroPrenotazioni: number; passeggeri: number; fatturato: number; scontoBundleApplicato: number }>();
   for (const r of righe) {

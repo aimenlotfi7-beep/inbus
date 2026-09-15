@@ -38,17 +38,24 @@ export const authService = {
   async richiediResetPassword(email: string) {
     const [admin] = await db.select().from(amministratori).where(eq(amministratori.email, email.toLowerCase())).limit(1);
     if (!admin || !admin.attivo) return; // silenzioso apposta
+    await authService.mandaLinkPassword(admin, ORE_VALIDITA_TOKEN_RESET);
+  },
 
+  /** Il link per scegliere una nuova password: dalla pagina di accesso
+   *  ("Password dimenticata?") o da Amministratori, per un collega (mai una
+   *  password scritta da altri). Torna il link se l'email non parte. */
+  async mandaLinkPassword(admin: { id: string; nome: string; email: string }, ore: number) {
     const token = crypto.randomBytes(24).toString('hex');
-    const scadenza = new Date(Date.now() + ORE_VALIDITA_TOKEN_RESET * 60 * 60 * 1000);
+    const scadenza = new Date(Date.now() + ore * 60 * 60 * 1000);
     await db.update(amministratori).set({ tokenResetPassword: token, tokenResetPasswordScadenza: scadenza }).where(eq(amministratori.id, admin.id));
 
     const link = urlSito(`/admin.html#/reimposta-password/${token}`);
     const { templateEmailService } = await import('../template-email/template-email.service.js');
     const { oggetto, html } = await templateEmailService.renderizza('reset_password', {
-      nome: admin.nome, link, ore_validita: String(ORE_VALIDITA_TOKEN_RESET),
+      nome: admin.nome, link, ore_validita: String(ore),
     });
-    await inviaEmail({ a: admin.email, oggetto, html });
+    const { inviata } = await inviaEmail({ a: admin.email, oggetto, html });
+    return { email: admin.email, emailInviata: inviata, link };
   },
 
   async confermaResetPassword(token: string, nuovaPassword: string) {

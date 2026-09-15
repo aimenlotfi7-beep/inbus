@@ -19,7 +19,7 @@ export const TOOLTIP_DEFAULT: Record<string, string> = {
   cosa_incluso: 'Mostrato sempre in evidenza nella pagina evento, non nascosto in un accordion — es. "Viaggio A/R, posto assegnato". Chiarisci anche cosa NON è incluso (es. il biglietto d\'ingresso), se può generare dubbi.',
   requisiti_evento: 'Mostrato sempre in evidenza nella pagina evento — limiti d\'età, condizioni fisiche richieste, o qualunque altra restrizione che il cliente deve sapere PRIMA di prenotare, non dopo.',
   immagine_intestazione: 'Facoltativa — compare come fascia in cima al biglietto (larga quanto la pagina, ritagliata automaticamente).',
-  visibile_sito: 'Se lo disattivi, l\'evento non compare mai sul sito (anche se è nel futuro). Gli eventi con data già passata comunque non compaiono più sul sito, a prescindere da questo interruttore.',
+  visibile_sito: 'Se lo disattivi, l\'evento non compare sul sito OnWay (anche se è nel futuro), ma il widget White Label dell\'organizzatore continua a venderlo. Per fermare tutto usa "Ferma vendite". Gli eventi con data già passata comunque non compaiono più sul sito.',
   variazioni_intro: 'Cambi di data, luogo, fermate o orari su viaggi già venduti: qui vedi quali clienti sono stati avvisati e come hanno risposto.',
   cestino_intro: 'Niente viene mai cancellato per davvero — se ha prenotazioni collegate, andrebbero perse. Qui trovi tutto quello che hai eliminato, sempre recuperabile.',
   fermate_intro: 'L\'anagrafica dei luoghi fisici — si scelgono da qui componendo i tragitti di un evento, invece di riscrivere ogni volta città e indirizzo.',

@@ -22,7 +22,11 @@ export interface DatiFonte {
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
+  offertaId?: string | null;
 }
+
+/** Un UTM vuoto ("" dal modulo della campagna) vale come assente. */
+const utm = (valore: string | null | undefined) => valore?.trim() || null;
 
 export interface CampagnaFonte {
   id: string;
@@ -41,12 +45,15 @@ export interface Fonte {
 /** La fonte (una sola) di una prenotazione. Stesso ordine del report
  *  "Fatturato per fonte" in Campagne, con il White Label in più: codice
  *  promoter, widget White Label, campagna registrata (stessi utm_source,
- *  utm_medium e utm_campaign), UTM senza campagna, altrimenti il sito. */
+ *  utm_medium e utm_campaign; un campo lasciato vuoto nella campagna vale
+ *  "assente"), campagna collegata all'offerta usata, UTM senza campagna,
+ *  altrimenti il sito. */
 export function fonteDi(
   r: DatiFonte,
   campagne: CampagnaFonte[],
   nomiPromoter: Map<string, string>,
   nomiWhiteLabel: Map<string, string>,
+  campagnaDiOfferta: Map<string, string> = new Map(),
 ): Fonte {
   if (r.promoterCodice) {
     return { tipo: 'promoter', chiave: `promoter:${r.promoterCodice}`, nome: nomiPromoter.get(r.promoterCodice) ?? `Codice ${r.promoterCodice}` };
@@ -55,15 +62,21 @@ export function fonteDi(
     const id = r.whiteLabelId ?? '';
     return { tipo: 'white_label', chiave: `white_label:${id}`, nome: nomiWhiteLabel.get(id) ?? 'White Label' };
   }
-  if (r.utmSource) {
-    const campagna = campagne.find((c) => c.utmSource === r.utmSource
-      && (c.utmMedium ?? null) === (r.utmMedium ?? null)
-      && (c.utmCampaign ?? null) === (r.utmCampaign ?? null));
+  const source = utm(r.utmSource);
+  if (source) {
+    const campagna = campagne.find((c) => utm(c.utmSource) === source
+      && utm(c.utmMedium) === utm(r.utmMedium)
+      && utm(c.utmCampaign) === utm(r.utmCampaign));
     if (campagna) return { tipo: 'campagna', chiave: `campagna:${campagna.id}`, nome: campagna.nome };
+  }
+  const campagnaOfferta = r.offertaId ? campagne.find((c) => c.id === campagnaDiOfferta.get(r.offertaId!)) : undefined;
+  if (campagnaOfferta) return { tipo: 'campagna', chiave: `campagna:${campagnaOfferta.id}`, nome: campagnaOfferta.nome };
+  if (source) {
+    const medium = utm(r.utmMedium);
     return {
       tipo: 'utm_non_registrata',
-      chiave: `utm:${r.utmSource}/${r.utmMedium ?? ''}`,
-      nome: r.utmMedium ? `${r.utmSource} / ${r.utmMedium}` : r.utmSource,
+      chiave: `utm:${source}/${medium ?? ''}`,
+      nome: medium ? `${source} / ${medium}` : source,
     };
   }
   return { tipo: 'sito', chiave: 'sito', nome: 'Sito' };
