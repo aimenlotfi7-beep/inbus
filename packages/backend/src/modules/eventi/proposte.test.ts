@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { propostePerTragitto } from './linee-da-confermare.service.js';
+import { contatorePerTragitto, propostePerTragitto } from './linee-da-confermare.service.js';
 
 // Proposte "da confermare" (regole del proprietario, settembre 2026): il
 // pareggio riparte dopo ogni bus. Bus da 50 e pareggio a 30: 30, 80, 130.
@@ -30,6 +30,35 @@ describe('quando nasce una proposta', () => {
 
   it('senza preventivo non si propone nulla', () => {
     expect(propostePerTragitto({ ...base, postiPareggio: null, passeggeri: 200 })).toEqual([]);
+  });
+});
+
+describe('contatore del pareggio', () => {
+  // Bus da 50, pareggio 30: sempre su 30, per il prossimo bus non ancora proposto.
+  const contatore = (passeggeri: number, extra: Partial<typeof base> & { busConfermati?: number } = {}) =>
+    contatorePerTragitto({ ...base, busConfermati: 0, ...extra, passeggeri });
+
+  it('prima di ogni bus conta per il 1°', () => {
+    expect(contatore(12)).toEqual({ bus: 1, contati: 12, pareggio: 30 });
+  });
+
+  it('al pareggio nasce la proposta e il contatore riparte da 0 per il 2°, finché il 1° non è pieno', () => {
+    expect(contatore(30)).toEqual({ bus: 2, contati: 0, pareggio: 30 });
+    expect(contatore(50)).toEqual({ bus: 2, contati: 0, pareggio: 30 });
+    expect(contatore(62)).toEqual({ bus: 2, contati: 12, pareggio: 30 });
+    expect(contatore(80)).toEqual({ bus: 3, contati: 0, pareggio: 30 });
+  });
+
+  it('un bus confermato conta con i suoi posti veri', () => {
+    expect(contatore(60, { postiConfermati: 54, lineeConfermate: 1, busConfermati: 1 })).toEqual({ bus: 2, contati: 6, pareggio: 30 });
+  });
+
+  it('come Como → Roma: bus da 15, pareggio 9, un bus confermato e 27 passeggeri → 3° bus a 0', () => {
+    expect(contatore(27, { postiPareggio: 9, postiPerBus: 15, postiConfermati: 15, lineeConfermate: 1, busConfermati: 1 })).toEqual({ bus: 3, contati: 0, pareggio: 9 });
+  });
+
+  it('senza quotazione niente contatore', () => {
+    expect(contatorePerTragitto({ ...base, busConfermati: 0, postiPareggio: null, passeggeri: 10 })).toBeNull();
   });
 });
 

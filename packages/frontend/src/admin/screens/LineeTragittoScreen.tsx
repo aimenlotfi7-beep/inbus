@@ -566,9 +566,11 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   // ---- Il prossimo passo: una cosa sola, con un solo pulsante blu ----
   let prossimoPasso: { tono: 'azione' | 'avviso' | 'info'; titolo: string; testo: ReactNode; azione?: { testo: string; onClick: () => void } };
   const mancanoPosti = lineeConfermate.length > 0 ? passeggeriTotali - postiSuiBus : 0;
-  // Il pareggio riparte dopo ogni bus: con dei bus conta chi resta fuori dai loro posti.
-  const passeggeriPerPareggio = lineeConfermate.length > 0 ? Math.max(0, passeggeriTotali - postiSuiBus) : passeggeriTotali;
-  const mancantiAlPareggio = suggerimento?.postiDiPareggio != null ? Math.max(0, Math.ceil(suggerimento.postiDiPareggio - passeggeriPerPareggio)) : null;
+  // Il contatore del pareggio (dal server, stesso conto delle proposte): sempre
+  // per il prossimo bus non ancora proposto, da 0 al pareggio.
+  const contatore = suggerimento?.contatorePareggio ?? null;
+  const mancantiAlPareggio = contatore ? contatore.pareggio - contatore.contati : null;
+  const alPareggioDel = contatore ? ` del ${contatore.bus}° bus` : '';
   if (lineeDaConfermare.length > 0) {
     const prima = lineeDaConfermare[0];
     const diBus = propostaDiBus(prima);
@@ -590,7 +592,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         tono: 'info',
         titolo: 'Nessuna linea ancora',
         testo: mancantiAlPareggio
-          ? `Mancano ${plurale(mancantiAlPareggio, 'passeggero', 'passeggeri')} al pareggio: a quel punto il primo bus da confermare si propone da solo. Se vuoi, puoi creare la linea già adesso.`
+          ? `Mancano ${plurale(mancantiAlPareggio, 'passeggero', 'passeggeri')} al pareggio${alPareggioDel}: a quel punto il primo bus da confermare si propone da solo. Se vuoi, puoi creare la linea già adesso.`
           : 'Il primo bus da confermare si propone da solo quando le prenotazioni raggiungono il pareggio.',
         azione: { testo: 'Crea la linea', onClick: apriNuovaLinea },
       };
@@ -599,7 +601,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       tono: 'avviso',
       titolo: mancanoPosti === 1 ? 'Manca 1 posto' : `Mancano ${mancanoPosti} posti`,
       testo: mancantiAlPareggio
-        ? `I passeggeri confermati sono più dei posti sui bus. Il prossimo bus si propone da solo quando chi resta fuori arriva al pareggio (mancano ${plurale(mancantiAlPareggio, 'passeggero', 'passeggeri')}); se serve, aggiungilo già adesso.`
+        ? `I passeggeri confermati sono più dei posti sui bus. Il ${contatore?.bus}° bus si propone da solo quando chi resta fuori arriva al pareggio (mancano ${plurale(mancantiAlPareggio, 'passeggero', 'passeggeri')}); se serve, aggiungilo già adesso.`
         : 'I passeggeri confermati sono più dei posti sui bus: aggiungi un bus a una linea.',
       azione: { testo: 'Aggiungi un bus', onClick: () => apriAggiungiBus(lineeConfermate[0].id) },
     };
@@ -616,8 +618,45 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     ? `Preventivo scelto di ${rispostaScelta.fornitore.nome} (${formattaEuro(rispostaScelta.risposta.prezzo)}): fornitore, costo e posti sono già scritti, scrivi la targa. Alla conferma riceverà l'email, e chi ha risposto senza essere scelto l'avviso.`
     : 'Nessun preventivo scelto: scrivi fornitore, costo e targa del bus (i posti arrivano dalla quotazione).';
 
-  // Dopo ogni bus il conteggio riparte: chi resta fuori dai posti dei bus.
-  const pareggio = suggerimento?.postiDiPareggio != null ? `${passeggeriPerPareggio} / ${Math.ceil(suggerimento.postiDiPareggio)}` : '—';
+  /** La linea confermata su cui va un bus proposto (null per il primo bus di
+   *  un tragitto o per una linea nuova: quelle restano schede a sé). */
+  const lineaDelBusProposto = (p: Linea) => (p.busPerLinea ? lineeConfermate.find((l) => l.id === p.busPerLinea!.id) ?? null : null);
+
+  /** Una proposta da confermare: nessun bus, i preventivi e un pulsante per
+   *  confermarla a mano. Con `linea` è un bus in più e sta dentro la scheda
+   *  di quella linea; senza, è una scheda a sé (primo bus o linea nuova). */
+  const schedaProposta = (p: Linea, percorso: string, linea?: Linea) => {
+    const diBus = propostaDiBus(p);
+    const motivo = lineeConfermate.length === 0
+      ? 'Proposto in automatico: le prenotazioni hanno raggiunto il pareggio. Confermando il bus nasce la linea con queste fermate.'
+      : diBus
+        ? 'Proposto in automatico: chi resta fuori dai posti dei bus ha raggiunto di nuovo il pareggio. Fa le stesse fermate della linea.'
+        : `Proposta in automatico: le fermate prima di ${p.fermate[0]?.citta ?? 'questa'} sono già coperte dai bus, e da lì in poi i prenotati raggiungono il pareggio.`;
+    const postiPrevisti = postiPrevistiPerLinea ? plurale(postiPrevistiPerLinea, 'posto previsto', 'posti previsti') : '';
+    // Dentro la linea basta "Bus 2": la linea è la scheda stessa.
+    const nome = linea ? p.nome.replace(` · ${linea.nome}`, '') : nomeProposta(p);
+    return (
+      <div key={p.id} id={`proposta-${p.id}`} className={linea ? 'bus-proposto' : 'scheda-linea da-confermare'}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontWeight: 700, margin: 0 }}>{nome} <span className="badge badge-stato-rosso" style={{ marginLeft: 4 }}>Da confermare</span></p>
+            <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', margin: '2px 0 0' }}>
+              {linea ? postiPrevisti || 'Posti della quotazione non indicati' : `${percorso || 'Nessuna fermata'}${postiPrevisti ? ` · ${postiPrevisti}` : ''}`}
+            </p>
+          </div>
+          <button type="button" className="btn btn-ghost btn-piccolo" title="Se hai già un accordo con un fornitore, senza chiedere preventivi" onClick={() => apriConfermaLinea(p)}>{diBus ? 'Conferma a mano' : 'Conferma la linea a mano'}</button>
+        </div>
+        <p style={{ fontSize: 'var(--testo-md)', margin: '10px 0 0' }}>{motivo} Chiedi i preventivi per questo bus, scegli il fornitore e conferma: da quel momento lo smistamento per età ci mette i passeggeri.</p>
+        {!diBus && (
+          <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', margin: '6px 0 0' }}>Preferisci un bus in più su una linea già confermata? Aggiungilo lì: questa proposta sparisce da sola.</p>
+        )}
+        <PreventiviBus proposta={p} tragitto={tragittoVero} puoScegliere={puoScegliereFornitori} onScegli={(scelta) => apriConfermaLinea(p, scelta)} />
+      </div>
+    );
+  };
+
+  // "Pareggio 3° bus: 0 / 9": riparte da 0 appena nasce la proposta del bus prima.
+  const pareggio = contatore ? `${contatore.contati} / ${contatore.pareggio}` : '—';
 
   return (
     <div>
@@ -634,7 +673,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       <div className="riepilogo-numeri">
         <div className="riepilogo-numero"><span>Passeggeri</span><b>{passeggeriTotali}</b></div>
         <div className="riepilogo-numero"><span>Posti sui bus</span><b>{postiSuiBus}</b></div>
-        <div className="riepilogo-numero"><span>Pareggio</span><b>{pareggio}</b></div>
+        <div className="riepilogo-numero"><span>{contatore ? `Pareggio ${contatore.bus}° bus` : 'Pareggio'}</span><b>{pareggio}</b></div>
         <div className="riepilogo-numero"><span>Evento</span><b>{testoGiorni}</b></div>
         {vedeEconomia && datiEconomia && (
           <div className="riepilogo-numero">
@@ -691,33 +730,9 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
       {linee.map((l) => {
         const percorso = l.fermate.map((f) => f.citta).join(' → ');
 
-        // Proposta da confermare: nessun bus, un solo pulsante per confermarla.
-        if (l.daConfermare) {
-          const diBus = propostaDiBus(l);
-          const motivo = lineeConfermate.length === 0
-            ? 'Proposto in automatico: le prenotazioni hanno raggiunto il pareggio. Confermando il bus nasce la linea con queste fermate.'
-            : diBus
-              ? `Proposto in automatico: chi resta fuori dai posti dei bus ha raggiunto di nuovo il pareggio. Il bus va su ${l.busPerLinea?.nome ?? 'la linea'}, con le stesse fermate.`
-              : `Proposta in automatico: le fermate prima di ${l.fermate[0]?.citta ?? 'questa'} sono già coperte dai bus, e da lì in poi i prenotati raggiungono il pareggio.`;
-          return (
-            <div key={l.id} id={`proposta-${l.id}`} className="scheda-linea da-confermare">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ fontWeight: 700, margin: 0 }}>{nomeProposta(l)} <span className="badge badge-stato-rosso" style={{ marginLeft: 4 }}>Da confermare</span></p>
-                  <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', margin: '2px 0 0' }}>
-                    {percorso || 'Nessuna fermata'}{postiPrevistiPerLinea ? ` · ${plurale(postiPrevistiPerLinea, 'posto previsto', 'posti previsti')}` : ''}
-                  </p>
-                </div>
-                <button type="button" className="btn btn-ghost btn-piccolo" title="Se hai già un accordo con un fornitore, senza chiedere preventivi" onClick={() => apriConfermaLinea(l)}>{diBus ? 'Conferma a mano' : 'Conferma la linea a mano'}</button>
-              </div>
-              <p style={{ fontSize: 'var(--testo-md)', margin: '10px 0 0' }}>{motivo} Chiedi i preventivi per questo bus, scegli il fornitore e conferma: da quel momento lo smistamento per età ci mette i passeggeri.</p>
-              {!diBus && (
-                <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', margin: '6px 0 0' }}>Preferisci un bus in più su una linea già confermata? Aggiungilo lì: questa proposta sparisce da sola.</p>
-              )}
-              <PreventiviBus proposta={l} tragitto={tragittoVero} puoScegliere={puoScegliereFornitori} onScegli={(scelta) => apriConfermaLinea(l, scelta)} />
-            </div>
-          );
-        }
+        // Un bus in più proposto su una linea confermata si vede dentro la sua linea, qui sotto.
+        if (l.daConfermare && lineaDelBusProposto(l)) return null;
+        if (l.daConfermare) return schedaProposta(l, percorso);
 
         const prenotazioniLinea = l.fermate.reduce((tot, f) => tot + f.inAttesa + f.versati, 0);
         const postiLinea = l.bus.reduce((tot, b) => tot + (b.postiBus ?? 0), 0);
@@ -833,6 +848,9 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
                 </div>
               );
             })}
+
+            {/* Bus proposti in automatico su questa linea, sotto quelli confermati. */}
+            {lineeDaConfermare.filter((p) => lineaDelBusProposto(p)?.id === l.id).map((p) => schedaProposta(p, percorso, l))}
 
             {pannello?.tipo === 'aggiungi-bus' && pannello.lineaId === l.id ? (
               <div className="pannello-in-linea">

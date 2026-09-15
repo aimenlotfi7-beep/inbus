@@ -79,6 +79,26 @@ export function propostePerTragitto(dati: {
   return proposte;
 }
 
+/** Il contatore del pareggio nella pagina Linee (regola del proprietario,
+ *  settembre 2026): conta sempre per il prossimo bus non ancora proposto,
+ *  da 0 al pareggio, e dice quale bus è ("3° bus"). Parte solo quando tutti
+ *  i bus prima sono pieni: confermati con i loro posti, proposti con i posti
+ *  della quotazione. Stesso conto di propostePerTragitto, quindi arriva al
+ *  pareggio proprio quando nasce la proposta successiva. */
+export interface ContatorePareggio { bus: number; contati: number; pareggio: number }
+
+export function contatorePerTragitto(dati: Parameters<typeof propostePerTragitto>[0] & { busConfermati: number }): ContatorePareggio | null {
+  if (dati.postiPareggio === null || dati.postiPerBus <= 0) return null;
+  const pareggio = Math.max(1, dati.postiPareggio);
+  const proposte = propostePerTragitto(dati).length;
+  const postiDavanti = dati.postiConfermati + proposte * dati.postiPerBus;
+  return {
+    bus: dati.busConfermati + proposte + 1,
+    contati: Math.min(pareggio, Math.max(0, dati.passeggeri - postiDavanti)),
+    pareggio,
+  };
+}
+
 /** Per orario, come creaLinea; quelle senza orario in fondo, nell'ordine del tragitto. */
 function perOrario<T extends { orario: string | null; ordine: number }>(a: T, b: T) {
   if (!a.orario && !b.orario) return a.ordine - b.ordine;
@@ -93,6 +113,7 @@ interface Bozza { id: string; nome: string; ordine: number; creatoIl: Date; ferm
 
 interface StatoProposte {
   necessarie: Proposta[];
+  contatore: ContatorePareggio | null;
   bozze: Bozza[];
   tutte: { id: string; nome: string; ordine: number }[];
   /** Linea a cui va un bus in più, e quanti bus ha già. */
@@ -156,7 +177,7 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
       return !migliore || fermateAttive.length > migliore.fermate.length ? { linea: l, fermate: fermateAttive } : migliore;
     }, null);
 
-  const necessarie = propostePerTragitto({
+  const datiProposte = {
     passeggeri: [...prenotatiPerCitta.values()].reduce((s, n) => s + n, 0),
     postiPareggio: t.preventivoPostiBus ? Math.round(t.preventivoPostiBus * (soglia / 100)) : null,
     postiPerBus,
@@ -164,9 +185,12 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
     lineeConfermate: confermate.length,
     fermateOrdinate,
     fermateLineaPrincipale: principale ? principale.fermate : fermateOrdinate.map((f) => f.id),
-  });
+  };
+  // Come i posti: una linea confermata senza bus vale un bus.
+  const busConfermati = confermate.reduce((tot, l) => tot + Math.max(1, busPerLinea.get(l.id) ?? 0), 0);
   return {
-    necessarie,
+    necessarie: propostePerTragitto(datiProposte),
+    contatore: contatorePerTragitto({ ...datiProposte, busConfermati }),
     bozze,
     tutte: righeLinee,
     principale: principale ? { nome: principale.linea.nome, bus: busPerLinea.get(principale.linea.id) ?? 0 } : null,
@@ -255,6 +279,13 @@ async function allinea(tragittoId: string): Promise<EsitoAllineamento> {
 
 export const lineeDaConfermareService = {
   allinea,
+
+  /** Il contatore del pareggio di un tragitto; null se non in vendita, senza
+   *  quotazione o con l'evento passato. */
+  async contatore(tragittoId: string): Promise<ContatorePareggio | null> {
+    const [soglia, postiPerBus] = await Promise.all([leggiSogliaOccupazionePareggio(), leggiPostiPerBus()]);
+    return (await leggiStato(db, tragittoId, soglia, postiPerBus))?.contatore ?? null;
+  },
 
   /** Dopo una prenotazione, una cancellazione, un preventivo o un cambio di
    *  linee e bus. Non lancia mai: la modifica è già salvata, e in caso di

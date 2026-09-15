@@ -167,6 +167,9 @@ export interface SuggerimentoLinea {
   costo?: number | null;
   postiBus?: number | null;
   fermateSenzaPrenotazioni?: { id: string; citta: string }[];
+  /** Pareggio del prossimo bus non ancora proposto ("3° bus": contati su
+   *  pareggio, mai oltre); null senza quotazione, fuori vendita o a evento passato. */
+  contatorePareggio: { bus: number; contati: number; pareggio: number } | null;
 }
 export interface VenditePerFermata {
   perFermata: { citta: string; confermati: number }[];

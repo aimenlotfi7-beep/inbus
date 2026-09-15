@@ -203,7 +203,13 @@ export const eventiController = {
     res.json(await eventiService.venditePerFermata(req.params.tragittoId));
   },
   async suggerimentoLinea(req: Request, res: Response) {
-    res.json(await eventiService.suggerimentoLinea(req.params.tragittoId));
+    const { lineeDaConfermareService } = await import('./linee-da-confermare.service.js');
+    // Con il contatore del pareggio: lo stesso conto che fa nascere le proposte.
+    const [suggerimento, contatorePareggio] = await Promise.all([
+      eventiService.suggerimentoLinea(req.params.tragittoId),
+      lineeDaConfermareService.contatore(req.params.tragittoId),
+    ]);
+    res.json({ ...suggerimento, contatorePareggio });
   },
 
   async allertePartenzePerEvento(_req: Request, res: Response) {

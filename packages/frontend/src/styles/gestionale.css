@@ -743,6 +743,8 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .toast.toast-urgente{border-left-color:var(--viola);} .toast.toast-urgente .toast-icona{background:var(--viola);}
 .scheda-linea .riga-bus{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; border-top:1px solid var(--line); margin-top:10px; padding-top:10px;}
 .scheda-linea .pannello-in-linea{background:var(--dusk-2); border-radius:10px; padding:12px; margin-top:10px;}
+/* Un bus in più proposto dentro la sua linea: stesso bordo tratteggiato delle proposte. */
+.scheda-linea .bus-proposto{border:1px dashed var(--pink); border-radius:10px; padding:10px 12px; margin-top:10px; background:color-mix(in srgb, var(--pink) 5%, var(--dusk));}
 .nota-margine{font-size:var(--testo-md); margin:-4px 0 12px;}
 .menu-azioni{position:relative; display:inline-block;}
 .menu-azioni-voci{position:absolute; right:0; top:calc(100% + 4px); z-index:30; min-width:190px; padding:4px; display:flex; flex-direction:column; background:var(--dusk); border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12);}
