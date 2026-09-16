@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { prenotazioni } from '../../db/schema.js';
+import { eventi, fermate, prenotazioni } from '../../db/schema.js';
 import { prenotazioniService } from './prenotazioni.service.js';
 import { smistamentoService } from './smistamento.service.js';
 import { creaCliente, creaEvento, creaFermata, creaLineaConBus, creaTragitto, fraGiorni, impostazione, riga, svuotaDatabase } from '../../../test/dati.js';
@@ -87,6 +87,24 @@ describe('smistamento per età', () => {
     await smistamentoService.esegui();
     expect(await busDi(cancellata.pnr)).toBeNull();
     expect(await busDi(valida.pnr)).toBe(bus.id);
+  });
+});
+
+describe('dopo la partenza', () => {
+  it('chi è rimasto senza bus non viene più sistemato e conta come senza posto', async () => {
+    const t = await tragittoInPartenza(6);
+    const p = await prenota(t, 30, 4);
+    // La partenza da Roma diventa di 3 ore fa (oltre le 2 ore di tolleranza).
+    const passata = new Date(Date.now() - 3 * 3600 * 1000);
+    await db.update(eventi).set({ data: inizioGiornoRoma(passata) }).where(eq(eventi.id, t.evento.id));
+    await db.update(fermate).set({ orario: orarioRoma(passata) }).where(eq(fermate.id, t.roma.id));
+    await creaLineaConBus(t.tragitto.id, [t.roma.id, t.firenze.id], 50);
+
+    await smistamentoService.esegui();
+    expect(await busDi(p.pnr)).toBeNull();
+    const anteprima = await smistamentoService.anteprima(t.tragitto.id);
+    expect(anteprima.senzaPosto).toMatchObject({ passeggeri: 4, fuoriTempo: 4 });
+    expect(anteprima.linee[0].bus[0].passeggeri).toBe(0);
   });
 });
 

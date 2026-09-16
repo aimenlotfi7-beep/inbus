@@ -49,8 +49,10 @@ export interface AnteprimaSmistamento {
     lineaId: string; lineaNome: string;
     bus: { busId: string; riferimento: string; postiBus: number | null; passeggeri: number; prenotazioni: number; etaMedia: number | null; perFermata: { citta: string; passeggeri: number }[] }[];
   }[];
-  /** Chi non entra in nessun bus: per fermata, con la grandezza di ogni gruppo. */
-  senzaPosto: { prenotazioni: number; passeggeri: number; perFermata: { citta: string; passeggeri: number; gruppi: number[] }[] };
+  /** Chi non entra in nessun bus: per fermata, con la grandezza di ogni gruppo.
+   *  fuoriTempo: quanti di loro hanno la partenza passata da oltre 2 ore e non
+   *  vengono più sistemati, nemmeno aggiungendo un bus. */
+  senzaPosto: { prenotazioni: number; passeggeri: number; fuoriTempo: number; perFermata: { citta: string; passeggeri: number; gruppi: number[] }[] };
 }
 
 /** Senza bus e dentro la sua finestra: da assegnare in questo giro. */
@@ -120,7 +122,11 @@ async function leggiStatoTragitto(lettore: Lettore, tragittoId: string): Promise
  *  non si può più assegnare (partenza passata da oltre 2 ore) non occupa
  *  posti al posto di chi parte dopo. */
 function simula(stato: StatoTragitto, adesso: Date) {
-  return riempiBus(stato.prenotazioni.filter((p) => p.busId || adesso <= p.finoAl), stato.bus);
+  const esito = riempiBus(stato.prenotazioni.filter((p) => p.busId || adesso <= p.finoAl), stato.bus);
+  // Senza bus e con la partenza passata da oltre 2 ore: non si sistemano più,
+  // e restano senza posto (prima sparivano dal conto e la pagina diceva "tutti hanno un posto").
+  const fuoriTempo = stato.prenotazioni.filter((p) => !p.busId && adesso > p.finoAl);
+  return { ...esito, senzaPosto: [...esito.senzaPosto, ...fuoriTempo], fuoriTempo };
 }
 
 /** Un giro di smistamento su un tragitto, in una transazione che blocca il
@@ -275,7 +281,7 @@ export const smistamentoService = {
   async anteprima(tragittoId: string): Promise<AnteprimaSmistamento> {
     const stato = await leggiStatoTragitto(db, tragittoId);
     if (!stato) throw new NonTrovato('Tragitto');
-    const { carico, senzaPosto } = simula(stato, new Date());
+    const { carico, senzaPosto, fuoriTempo } = simula(stato, new Date());
 
     // Lo smistamento del tragitto comincia con la prima partenza tra le
     // prenotazioni confermate (senza prenotazioni: la prima fermata).
@@ -308,6 +314,7 @@ export const smistamentoService = {
       senzaPosto: {
         prenotazioni: senzaPosto.length,
         passeggeri: senzaPosto.reduce((somma, p) => somma + p.passeggeri, 0),
+        fuoriTempo: fuoriTempo.reduce((somma, p) => somma + p.passeggeri, 0),
         perFermata: ordinaPerPercorso([...new Set(senzaPosto.map((p) => p.fermataCitta))].map((citta) => {
           const gruppi = senzaPosto.filter((p) => p.fermataCitta === citta).map((p) => p.passeggeri);
           return { citta, passeggeri: gruppi.reduce((s, n) => s + n, 0), gruppi };

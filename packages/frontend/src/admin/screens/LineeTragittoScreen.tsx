@@ -618,6 +618,13 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
           : 'Il primo bus da confermare si propone da solo quando le prenotazioni raggiungono il pareggio.',
         azione: { testo: 'Crea la linea', onClick: apriNuovaLinea },
       };
+  } else if (senzaPosto && senzaPosto.fuoriTempo > 0) {
+    // Dopo la partenza lo smistamento non sistema più nessuno: aggiungere un bus non serve.
+    prossimoPasso = {
+      tono: 'avviso',
+      titolo: `${plurale(senzaPosto.passeggeri, 'passeggero', 'passeggeri')} senza bus`,
+      testo: `${testoSenzaPosto}. La partenza è passata da più di 2 ore: lo smistamento non mette più nessuno sui bus, nemmeno su un bus aggiunto adesso. Contatta questi clienti di persona.`,
+    };
   } else if (senzaPosto && senzaPosto.passeggeri > 0) {
     prossimoPasso = {
       tono: 'avviso',
@@ -708,7 +715,10 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         {senzaPosto && lineeConfermate.length > 0 && (
           <div className={`riepilogo-numero ${senzaPosto.passeggeri > 0 ? 'rosso' : 'verde'}`}>
             <span>Senza posto</span><b>{senzaPosto.passeggeri}</b>
-            <small>{senzaPosto.passeggeri > 0 ? testoSenzaPosto : 'Tutti hanno un posto'}</small>
+            <small>
+              {senzaPosto.passeggeri === 0 ? 'Tutti hanno un posto' : testoSenzaPosto}
+              {senzaPosto.fuoriTempo > 0 && ' · partenza passata: non più sistemabili'}
+            </small>
           </div>
         )}
         <div className="riepilogo-numero">

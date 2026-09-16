@@ -2,7 +2,7 @@ import { and, asc, eq, gte, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { busFisici, eventi, fermate, lineaFermate, linee, prenotazioni, tragitti, utenti } from '../../db/schema.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
-import type { Lettore } from '../prenotazioni/partenza.js';
+import { calcolaTempi, leggiOrariTragitto, type Lettore } from '../prenotazioni/partenza.js';
 import { etaPrenotazione, primaFermataDellaLinea, riempiBus, type BusDaRiempire, type GruppoPasseggeri } from '../prenotazioni/riempimento-bus.js';
 import { ricollegaPreventiviBus } from '../preventivi/preventivi-bus.service.js';
 import { invioAutomaticoService } from '../preventivi/invio-automatico.service.js';
@@ -144,8 +144,8 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
 
   const [righePrenotazioni, righeLinee, righeFermate] = await Promise.all([
     lettore.select({
-      id: prenotazioni.id, fermataCitta: prenotazioni.fermataCitta, passeggeri: prenotazioni.passeggeri, creataIl: prenotazioni.creataIl,
-      busId: prenotazioni.busId, dataNascitaTitolare: utenti.dataNascita,
+      id: prenotazioni.id, fermataCitta: prenotazioni.fermataCitta, fermataOrario: prenotazioni.fermataOrario, passeggeri: prenotazioni.passeggeri,
+      creataIl: prenotazioni.creataIl, busId: prenotazioni.busId, dataNascitaTitolare: utenti.dataNascita,
     }).from(prenotazioni).innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
       .where(and(eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA'))),
     lettore.select({ id: linee.id, nome: linee.nome, ordine: linee.ordine, daConfermare: linee.daConfermare, creatoIl: linee.creatoIl })
@@ -193,12 +193,18 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
       ? busLinea.map((b) => ({ busId: b.id, postiBus: b.postiBus ?? 0, fermate: cittaLinea, primaFermata }))
       : [{ busId: `linea-senza-bus-${l.id}`, postiBus: postiPerBus, fermate: cittaLinea, primaFermata }];
   });
-  const gruppi: GruppoPasseggeri[] = righePrenotazioni.map((r) => ({
-    id: r.id, fermataCitta: r.fermataCitta, passeggeri: r.passeggeri, creataIl: r.creataIl,
-    // Un bus di una linea che non c'è più (o di una proposta) non tiene il posto.
-    busId: r.busId && busConfermatiDaRiempire.some((b) => b.busId === r.busId) ? r.busId : null,
-    eta: etaPrenotazione([], r.dataNascitaTitolare, t.eventoData),
-  }));
+  const orari = await leggiOrariTragitto(tragittoId, lettore);
+  const adesso = new Date();
+  const gruppi: GruppoPasseggeri[] = righePrenotazioni
+    .map((r) => ({
+      id: r.id, fermataCitta: r.fermataCitta, passeggeri: r.passeggeri, creataIl: r.creataIl,
+      // Un bus di una linea che non c'è più (o di una proposta) non tiene il posto.
+      busId: r.busId && busConfermatiDaRiempire.some((b) => b.busId === r.busId) ? r.busId : null,
+      eta: etaPrenotazione([], r.dataNascitaTitolare, t.eventoData),
+      // Come lo smistamento: senza bus a oltre 2 ore dalla sua partenza non sale più su nessun bus.
+      fuoriTempo: orari ? adesso > calcolaTempi(orari, r.fermataCitta, r.fermataOrario).smistabileFinoAl : false,
+    }))
+    .filter((g) => g.busId || !g.fuoriTempo);
   // Linea principale: quella confermata con più fermate attive (a parità, la prima creata).
   const idsAttive = new Set(righeFermate.map((f) => f.id));
   const principale = [...confermate]

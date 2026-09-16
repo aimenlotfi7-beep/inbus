@@ -152,8 +152,9 @@ export interface AnteprimaSmistamento {
     lineaId: string; lineaNome: string;
     bus: { busId: string; riferimento: string; postiBus: number | null; passeggeri: number; prenotazioni: number; etaMedia: number | null; perFermata: { citta: string; passeggeri: number }[] }[];
   }[];
-  /** Chi non entra in nessun bus, per fermata, con la grandezza di ogni gruppo (i gruppi non si dividono). */
-  senzaPosto: { prenotazioni: number; passeggeri: number; perFermata: { citta: string; passeggeri: number; gruppi: number[] }[] };
+  /** Chi non entra in nessun bus, per fermata, con la grandezza di ogni gruppo (i gruppi non si dividono).
+   *  fuoriTempo: quanti di loro hanno la partenza passata da oltre 2 ore e non vengono più sistemati. */
+  senzaPosto: { prenotazioni: number; passeggeri: number; fuoriTempo: number; perFermata: { citta: string; passeggeri: number; gruppi: number[] }[] };
 }
 /** Stesse regole delle Statistiche: "incassato" è il valore venduto (un acconto
  *  non saldato vale già il prezzo intero); guadagno = incassato − costo dei
