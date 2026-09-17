@@ -208,7 +208,15 @@ select{
 .btn-ghost.side-logout{background:var(--pink); border-color:var(--pink); color:#fff; flex-shrink:0; font-size:var(--testo-xs); padding:5px 11px;}
 .btn-ghost.side-logout:hover{background:#e0295f; border-color:#e0295f;}
 .main-wrap{flex:1; min-width:0;}
-main{padding:28px clamp(16px,4vw,48px); max-width:1300px; margin:0 auto;}
+/* Larghezza del contenuto: era ferma a 1300px, così su un monitor grande
+   restavano due fasce vuote ai lati mentre le tabelle dentro si
+   stringevano (in Prenotazioni «Cancella» finiva sotto «Reinvia
+   biglietto»). Ora il contenuto usa lo spazio che c'è, con un limite
+   alto solo per i monitor molto larghi. */
+main{padding:28px clamp(16px,4vw,48px); max-width:1700px; margin:0 auto;}
+/* I testi di spiegazione restano su righe corte anche quando la pagina è
+   larghissima: righe lunghe 1600px sarebbero illeggibili. */
+.testo-intro, .stat-nota, .avviso p{max-width:95ch;}
 .tab-panel{width:100%;}
 .panel-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:12px;}
 .panel-head h2{font-family:'Poppins',sans-serif; font-weight:800; text-transform:uppercase; margin:0;}
@@ -322,6 +330,15 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
    layout già a posto), sono in aggiunta per il nuovo lavoro. */
 .btn-piccolo{padding:5px 12px; font-size:var(--testo-md);}
 .btn-piccolissimo{padding:3px 9px; font-size:var(--testo-xs);}
+
+/* Schede affiancate invece che una colonna sola: le pagine fatte di
+   riquadri piccoli (Impostazioni, Tracciamento…) stavano in una colonna
+   stretta con mezzo schermo vuoto a destra e una lista lunghissima da
+   scorrere. Un riquadro che contiene testo lungo prende la classe
+   "larga" e si prende tutta la riga. */
+.griglia-schede{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; align-items:start;}
+.griglia-schede > *{margin-bottom:0;}
+.griglia-schede > .larga{grid-column:1 / -1;}
 
 /* ---------- DASHBOARD ---------- */
 .dash-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:28px;}
@@ -538,18 +555,25 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .wl-sezione{margin-bottom:0;}
 .wl-sezione h3{margin:0 0 4px;}
 .wl-sezione-aiuto{margin:0 0 12px; font-size:var(--testo-md); color:var(--mist); line-height:1.5;}
-.wl-riga{display:grid; grid-template-columns:minmax(0,1fr) minmax(150px,220px); gap:8px 16px; align-items:center; padding:9px 0; border-top:1px solid var(--line);}
-.wl-sezione .wl-riga:first-of-type{border-top:none;}
-.wl-riga-testo label{display:block; font-size:var(--testo-base); font-weight:600;}
-.wl-riga-testo small{display:block; margin-top:2px; font-size:var(--testo-sm); color:var(--mist); line-height:1.4;}
-.wl-riga-campo{width:100%; min-width:0;}
+/* Le voci stanno in colonne affiancate, con il campo SUBITO sotto la sua
+   etichetta: prima erano etichetta a sinistra e campo all'estremo destro
+   della sezione, con in mezzo un vuoto che rendeva difficile capire quale
+   campo apparteneva a quale voce. */
+.wl-campi{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:16px 20px;}
+.wl-riga{display:flex; flex-direction:column; gap:6px; min-width:0;}
+.wl-campo-largo{grid-column:1 / -1;}
+.wl-riga-testo label{display:block; font-size:var(--testo-base); font-weight:600; line-height:1.3;}
+.wl-riga-testo small{display:block; margin-top:2px; font-size:var(--testo-sm); color:var(--mist); line-height:1.35;}
+/* I campi si allineano in fondo alla loro casella: così restano in riga
+   anche quando la voce accanto ha una spiegazione sotto l'etichetta. */
+.wl-riga-campo{width:100%; min-width:0; margin-top:auto;}
 .wl-riga-campo input, .wl-riga-campo select, .wl-riga-campo textarea{width:100%;}
 .wl-colore{display:flex; gap:6px; align-items:center;}
 .wl-colore input[type=color]{width:44px; min-width:44px; height:36px; padding:2px;}
 .wl-misura{display:flex; gap:10px; align-items:center;}
 .wl-misura input[type=range]{flex:1; width:auto;}
 .wl-misura b{min-width:54px; text-align:right; font-variant-numeric:tabular-nums;}
-.wl-riga-immagine{grid-template-columns:minmax(0,1fr) minmax(220px,300px); align-items:start;}
+.wl-riga-immagine{grid-column:1 / -1;}
 .wl-immagine{display:flex; gap:10px; align-items:flex-start;}
 .wl-immagine img{width:56px; height:56px; flex-shrink:0; object-fit:cover; border-radius:8px; border:1px solid var(--line); background:var(--dusk-2);}
 .wl-immagine-vuota{display:flex; align-items:center; justify-content:center; width:56px; height:56px; flex-shrink:0; border:1px dashed var(--line); border-radius:8px; font-size:var(--testo-xs); color:var(--mist);}
@@ -564,13 +588,6 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .wl-scelta button.si[aria-pressed="true"]{background:var(--blue); color:#fff;}
 .wl-scelta button.no[aria-pressed="true"]{background:var(--dusk-2); color:var(--paper);}
 .wl-scelta button:focus-visible{outline:2px solid var(--blue); outline-offset:-2px;}
-.wl-temi-pronti{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px;}
-.wl-tema-pronto{display:flex; flex-direction:column; gap:4px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--dusk); text-align:left; cursor:pointer;}
-.wl-tema-pronto:hover{border-color:var(--blue);}
-.wl-tema-pronto b{font-size:var(--testo-base);}
-.wl-tema-pronto small{font-size:var(--testo-sm); color:var(--mist); line-height:1.35;}
-.wl-tema-campioni{display:flex; gap:4px; margin-bottom:2px;}
-.wl-tema-campioni i{width:18px; height:18px; border-radius:5px; border:1px solid var(--line);}
 .wl-salva{position:sticky; bottom:0; z-index:2; display:flex; flex-wrap:wrap; gap:10px; padding:12px 0; background:linear-gradient(to top, var(--night) 72%, transparent);}
 .wl-anteprima{position:sticky; top:16px; display:flex; flex-direction:column; gap:10px;}
 .wl-anteprima-schermo{display:flex; justify-content:center; align-items:flex-start; min-height:340px; padding:24px 16px; border:1px solid var(--line); border-radius:12px; overflow:hidden;}
@@ -581,8 +598,7 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
   .wl-anteprima{position:static; order:-1;}
 }
 @media (max-width:700px){
-  .wl-riga, .wl-riga-immagine{grid-template-columns:minmax(0,1fr);}
-  .wl-riga-campo{justify-self:stretch;}
+  .wl-campi{grid-template-columns:minmax(0,1fr);}
 }
 
 /* ---------- CHAT ---------- */
@@ -672,7 +688,9 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 /* ---------- LOG / STORICO ---------- */
 
 /* ---------- MODAL WIDE (partecipanti) ---------- */
-.modal-wide{max-width:920px;}
+/* Le finestre del gestionale (moduli, elenchi dentro una finestra) erano
+   strette: 720/920px anche su schermi larghi. */
+.modal-wide{max-width:1100px;}
 #partecipantiCerca, #pagamentiCerca, #pagamentiFiltroEvento{
   background:var(--night); border:1px solid var(--line); border-radius:8px; padding:9px 12px; color:var(--paper); font-size:var(--testo-md); min-width:220px;
 }
@@ -895,7 +913,7 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 }
 .modal-overlay.show{display:flex;}
 .modal{
-  background:var(--dusk); border-radius:16px; padding:28px; width:100%; max-width:720px;
+  background:var(--dusk); border-radius:16px; padding:28px; width:100%; max-width:840px;
   max-height:90vh; overflow-y:auto; position:relative;
 }
 .modal h3{font-family:'Poppins',sans-serif; font-weight:800; text-transform:uppercase; margin-top:0;}
@@ -969,8 +987,12 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
   font-family:'Poppins',sans-serif; font-weight:800; text-transform:uppercase; font-size:var(--testo-4xl); margin:0; flex:1;
 }
 .pagina-sezione-azioni{display:flex; gap:8px; flex-shrink:0;}
+/* I moduli restano stretti (una riga lunga di testo si legge male), ma
+   le pagine "larghe" — tabelle, elenchi affiancati, editor con
+   anteprima — ora arrivano a 1500px invece di 1100: era il motivo per
+   cui l'editor White Label schiacciava le sue voci in una colonnina. */
 .pagina-sezione-corpo{max-width:760px;}
-.pagina-sezione-corpo.larga{max-width:1100px;}
+.pagina-sezione-corpo.larga{max-width:1500px;}
 
 /* ---------- CARD SEZIONE (contenitori tipo "Tratta X", "Bus Y") ---------- */
 .section-card{

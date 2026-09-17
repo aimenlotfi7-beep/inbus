@@ -64,7 +64,7 @@ export function TracciamentoScreen() {
       {caricamento ? (
         <p style={{ color: 'var(--mist)' }}>Carico…</p>
       ) : (
-        <div style={{ maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div className="griglia-schede">
           {CAMPI.map((c) => (
             <div key={c.chiave} className="section-card">
               <div className="campo" style={{ marginBottom: 10 }}>

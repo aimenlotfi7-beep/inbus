@@ -136,7 +136,7 @@ export function SezioneEditor({ titolo, aiuto, children }: { titolo: string; aiu
     <section className="section-card wl-sezione">
       <h3>{titolo}</h3>
       {aiuto && <p className="wl-sezione-aiuto">{aiuto}</p>}
-      {children}
+      <div className="wl-campi">{children}</div>
     </section>
   );
 }

@@ -45,7 +45,7 @@ export function WhiteLabelScreen() {
       ? { artista: ev.artista, data: ev.data, luogo: ev.luogo, citta: ev.citta, descrizione: ev.descrizione }
       : { artista: whiteLabelAttiva.bundleNome ?? 'Il tuo viaggio', data: new Date().toISOString(), luogo: 'Più eventi', citta: 'nel pacchetto', descrizione: null };
     return (
-      <PaginaSezione titolo={`White Label — ${whiteLabelAttiva.organizzatoreNome} · ${whiteLabelAttiva.bundleNome ? `${whiteLabelAttiva.bundleNome} (bundle)` : whiteLabelAttiva.eventoArtista}`} onIndietro={() => { ricarica(); setVista('lista'); }}>
+      <PaginaSezione larga titolo={`White Label — ${whiteLabelAttiva.organizzatoreNome} · ${whiteLabelAttiva.bundleNome ? `${whiteLabelAttiva.bundleNome} (bundle)` : whiteLabelAttiva.eventoArtista}`} onIndietro={() => { ricarica(); setVista('lista'); }}>
         <section className="section-card" style={{ marginBottom: 16 }}>
           <h3 style={{ margin: '0 0 4px' }}>Link e codice da dare al cliente</h3>
           <p style={{ margin: '0 0 12px', fontSize: 'var(--testo-md)', color: 'var(--mist)', lineHeight: 1.5 }}>
@@ -59,8 +59,12 @@ export function WhiteLabelScreen() {
             />
           </div>
         </section>
-        <SelettoreLayoutBiglietto whiteLabel={whiteLabelAttiva} onSalvato={(wl) => setWhiteLabelAttiva(wl)} />
-        <MetaPixelOrganizzatore whiteLabel={whiteLabelAttiva} onSalvato={(wl) => setWhiteLabelAttiva(wl)} />
+        {/* Le due impostazioni piccole stanno affiancate invece che una
+            sotto l'altra: così l'editor grafico comincia subito. */}
+        <div className="griglia-schede" style={{ marginBottom: 16 }}>
+          <SelettoreLayoutBiglietto whiteLabel={whiteLabelAttiva} onSalvato={(wl) => setWhiteLabelAttiva(wl)} />
+          <MetaPixelOrganizzatore whiteLabel={whiteLabelAttiva} onSalvato={(wl) => setWhiteLabelAttiva(wl)} />
+        </div>
         <WhiteLabelEditor
           whiteLabel={whiteLabelAttiva}
           evento={perAnteprima}
@@ -193,7 +197,7 @@ function MetaPixelOrganizzatore({ whiteLabel, onSalvato }: { whiteLabel: WhiteLa
   }
 
   return (
-    <div className="section-card" style={{ maxWidth: 480, marginBottom: 20 }}>
+    <div className="section-card">
       <p className="section-label" style={{ marginBottom: 8 }}>Pixel di Meta dell'organizzatore (facoltativo)</p>
       <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 10 }}>
         Se questo organizzatore ha un suo account pubblicitario Meta, le vendite dal suo widget arriveranno anche al suo pixel — oltre che al nostro, sempre.
@@ -228,7 +232,7 @@ function SelettoreLayoutBiglietto({ whiteLabel, onSalvato }: { whiteLabel: White
   }
 
   return (
-    <div className="section-card" style={{ maxWidth: 480, marginBottom: 20 }}>
+    <div className="section-card">
       <p className="section-label" style={{ marginBottom: 8 }}>Layout biglietto (PDF) di questa White Label</p>
       <p style={{ fontSize: 'var(--testo-md)', color: 'var(--mist)', marginBottom: 10 }}>
         Diverso dal tema qui sotto — questo è il vero documento che il cliente riceve. Se non scegli nulla, usa il layout impostato per l'evento.

@@ -4,7 +4,6 @@ import { notifica } from '../../admin/shared/notifiche';
 import { motivoErrore } from '../../admin/shared/errori';
 import { CampoColore, CampoImmagine, CampoInterruttore, CampoMisura, CampoScelta, CampoTestoTema, SezioneEditor } from './campiTema';
 import { caricaFontTema, piePagina, sfondoPagina, stileCampo, stilePulsante, stileRiquadro, testoPulsante, variabiliTema } from './tema';
-import { TEMI_PRONTI } from './temiPronti';
 import { WhiteLabelPreview } from './WhiteLabelPreview';
 
 /** L'editor grafico di una White Label: a sinistra le scelte, a destra
@@ -69,27 +68,6 @@ export function WhiteLabelEditor({ whiteLabel, evento, onSalvato }: { whiteLabel
   return (
     <div className="wl-editor">
       <div className="wl-scelte">
-        <SezioneEditor titolo="Parti da un tema pronto" aiuto="Cambia colori, font e forme in un colpo solo. Immagini, testi e cosa mostrare restano come li hai impostati.">
-          <div className="wl-temi-pronti">
-            {TEMI_PRONTI.map((t) => (
-              <button
-                key={t.nome}
-                type="button"
-                className="wl-tema-pronto"
-                onClick={() => setTema((attuale) => ({ ...attuale, ...t.parti }))}
-              >
-                <span className="wl-tema-campioni" aria-hidden="true">
-                  <i style={{ background: t.parti.colori.sfondo }} />
-                  <i style={{ background: t.parti.colori.superficie }} />
-                  <i style={{ background: t.parti.colori.cta }} />
-                </span>
-                <b>{t.nome}</b>
-                <small>{t.descrizione}</small>
-              </button>
-            ))}
-          </div>
-        </SezioneEditor>
-
         <SezioneEditor titolo="Marca e immagini" aiuto="Logo e immagini del cliente. Le immagini si caricano dal computer oppure si incolla il loro indirizzo.">
           <CampoImmagine etichetta="Logo" aiuto="Compare in cima alla vetrina." valore={tema.branding.logoUrl} onCambia={(v) => aggiorna('branding', 'logoUrl', v)} />
           <CampoImmagine etichetta="Logo per telefono" aiuto="Facoltativo: se vuoto si usa il logo normale." valore={tema.branding.logoMobileUrl} onCambia={(v) => aggiorna('branding', 'logoMobileUrl', v)} />
@@ -216,7 +194,9 @@ export function WhiteLabelEditor({ whiteLabel, evento, onSalvato }: { whiteLabel
         </SezioneEditor>
 
         <SezioneEditor titolo="Siti autorizzati" aiuto="Uno per riga, per esempio https://www.sitodelcliente.it. È un controllo in più, non l'unico.">
-          <textarea value={domini} onChange={(e) => setDomini(e.target.value)} rows={3} style={{ width: '100%' }} aria-label="Siti autorizzati" />
+          <div className="wl-campo-largo">
+            <textarea value={domini} onChange={(e) => setDomini(e.target.value)} rows={3} style={{ width: '100%' }} aria-label="Siti autorizzati" />
+          </div>
         </SezioneEditor>
 
         <div className="wl-salva">

@@ -221,10 +221,13 @@ export function AmministratoriScreen() {
 
   if (permessiUtenza && !ruoloOwnerTarget) {
     return (
-      <PaginaSezione titolo={`Permessi personali di ${permessiUtenza.nome}`} onIndietro={() => setPermessiUtenza(null)} info={mappaTooltip.permessi_personali_intro ?? TOOLTIP_DEFAULT.permessi_personali_intro}>
+      <PaginaSezione larga titolo={`Permessi personali di ${permessiUtenza.nome}`} onIndietro={() => setPermessiUtenza(null)} info={mappaTooltip.permessi_personali_intro ?? TOOLTIP_DEFAULT.permessi_personali_intro}>
         <p className="testo-intro">
           Di base questa utenza ha i permessi del ruolo "{nomeRuolo(permessiUtenza.ruoloId)}".
         </p>
+        {/* I moduli stanno affiancati: prima era un elenco unico lunghissimo
+            da scorrere, con metà schermo vuoto a destra. */}
+        <div className="griglia-schede">
         {moduli.map((modulo) => (
           <div key={modulo} className="gruppo-modulo">
             <p className="section-label">{modulo}</p>
@@ -239,6 +242,7 @@ export function AmministratoriScreen() {
             })}
           </div>
         ))}
+        </div>
         <button className="btn btn-primary" style={{ width: '100%', marginTop: 14 }} onClick={salvaPermessi}>Salva permessi personali</button>
       </PaginaSezione>
     );

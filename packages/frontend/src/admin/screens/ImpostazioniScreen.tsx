@@ -112,7 +112,7 @@ export function ImpostazioniScreen() {
       {caricamento ? (
         <p style={{ color: 'var(--mist)' }}>Carico…</p>
       ) : (
-        <div style={{ maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div className="griglia-schede">
           {IMPOSTAZIONI.map((i) => (
             <div key={i.chiave} className="section-card">
               <div className="campo" style={{ marginBottom: 10 }}>
@@ -133,7 +133,7 @@ export function ImpostazioniScreen() {
               qui vive la formula usata da "Calcola preventivo" (dentro
               un tragitto, in Prezzi) per suggerire il prezzo di ogni
               fermata dal costo del fornitore. */}
-          <div className="section-card" style={{ borderColor: 'var(--blue)' }}>
+          <div className="section-card larga" style={{ borderColor: 'var(--blue)' }}>
             <p className="section-label" style={{ marginBottom: 4 }}>Formula di calcolo prezzi</p>
             <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginBottom: 12, lineHeight: 1.5 }}>
               Usata dal pulsante "Calcola prezzi per fermata" (Partenze › Prezzi) per suggerire il prezzo di ogni fermata, partendo dal costo della quotazione:

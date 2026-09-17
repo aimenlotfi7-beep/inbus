@@ -176,7 +176,7 @@ export function PrenotazioniScreen() {
         )}
 
         {!caricamento && righeFiltrate.length > 0 && (
-          <div className="table-scroll">
+          <div className="table-scroll adattiva">
             <table className="data-table">
               <thead>
                 <tr>
@@ -216,7 +216,10 @@ export function PrenotazioniScreen() {
                           <span className={`badge ${stato.classe}`}>{stato.etichetta}</span>
                         </button>
                       </td>
-                      <td>
+                      {/* azioni-riga: «Reinvia biglietto» e «Cancella» restano
+                          affiancati; vanno uno sotto l'altro solo quando la
+                          tabella ha davvero poco spazio. */}
+                      <td className="azioni-riga">
                         {r.stato === 'CONFERMATA' ? (
                           <>
                             <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', whiteSpace: 'nowrap', marginRight: 6 }} onClick={() => rigeneraBiglietto(r)} title="Rimanda al cliente il biglietto con il bus (dopo lo smistamento, il giorno prima della partenza)">
