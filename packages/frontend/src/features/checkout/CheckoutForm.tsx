@@ -4,7 +4,8 @@ import { PercorsoBus } from '../PercorsoBus';
 import type { Evento, OpzionePartenza, Servizio } from '../../api/types';
 import { eventiApi } from '../../api/eventi';
 import { prenotazioniApi } from '../../api/prenotazioni';
-import { whiteLabelApi } from '../../api/whiteLabel';
+import { whiteLabelApi, type WhiteLabelTheme } from '../../api/whiteLabel';
+import { famigliaFont } from '../white-label/tema';
 import { listaAttesaApi } from '../../api/listaAttesa';
 import { applicaScontoOfferta } from '../../api/prezzi';
 import { accessoNonValido, clienteAuthApi } from '../../api/clienteAuth';
@@ -61,16 +62,16 @@ function oggiIso(): string {
  * tocca "Scegli" su una partenza — il modulo seleziona quella fermata e
  * torna al passo 1.
  */
-export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaColori, fermataPreselezionata, richiestaPreselezione }: {
+export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaWhiteLabel, fermataPreselezionata, richiestaPreselezione }: {
   evento: Evento; offerta?: OffertaCheckout; onChiudi?: () => void; publicWidgetId?: string;
   fermataPreselezionata?: string;
   /** Cambia a ogni "Scegli" della pagina, anche sulla stessa fermata:
    *  così dopo "Cambia fermata" un nuovo "Scegli" richiude l'elenco. */
   richiestaPreselezione?: number;
-  // Se il checkout arriva da una White Label con un suo tema, questi
-  // colori sovrascrivono quelli del sito per TUTTO il modulo. Facoltativo:
-  // senza, il checkout resta quello del sito OnWay.
-  temaColori?: { sfondo: string; superficie: string; testoPrincipale: string; testoSecondario: string; cta: string; testoCta: string; bordi: string };
+  // Se il checkout arriva da una White Label, il suo tema sovrascrive
+  // colori, font e forme del sito per TUTTO il modulo. Facoltativo: senza,
+  // il checkout resta quello del sito OnWay.
+  temaWhiteLabel?: WhiteLabelTheme;
 }) {
   const [stato, setStato] = useState<Stato>('caricamento');
   // Quale pulsante specifico è stato premuto — 'invio' da solo non basta,
@@ -87,16 +88,22 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaCo
 
   // Le variabili CSS del tema White Label, se presente — sovrascritte
   // qui (non nel foglio di stile) così restano scoped a QUESTO modulo.
-  const styleTema: React.CSSProperties | undefined = temaColori ? {
-    '--paper': temaColori.superficie,
-    '--ink': temaColori.testoPrincipale,
-    '--mist': temaColori.testoSecondario,
-    '--line': temaColori.bordi,
-    '--pink': temaColori.cta,
-    '--cta-sfondo': temaColori.cta,
-    '--cta-testo': temaColori.testoCta,
+  // Oltre ai colori arrivano font, angoli e altezza dei pulsanti: il
+  // cliente finale non deve accorgersi di cambiare piattaforma.
+  const styleTema: React.CSSProperties | undefined = temaWhiteLabel ? {
+    '--paper': temaWhiteLabel.colori.superficie,
+    '--ink': temaWhiteLabel.colori.testoPrincipale,
+    '--mist': temaWhiteLabel.colori.testoSecondario,
+    '--line': temaWhiteLabel.colori.bordi,
+    '--pink': temaWhiteLabel.colori.accento,
+    '--cta-sfondo': temaWhiteLabel.colori.cta,
+    '--cta-testo': temaWhiteLabel.colori.testoCta,
     // Sfondo delle fasce fisse (passi e riepilogo in alto, azioni in basso)
-    '--checkout-fondo': temaColori.superficie,
+    '--checkout-fondo': temaWhiteLabel.colori.superficie,
+    fontFamily: famigliaFont(temaWhiteLabel.tipografia.font),
+    fontSize: temaWhiteLabel.tipografia.dimensioneTestoPx,
+    '--input-radius': `${Math.min(temaWhiteLabel.stile.borderRadiusPx, 16)}px`,
+    '--radius': `${temaWhiteLabel.stile.borderRadiusPx}px`,
   } as React.CSSProperties : undefined;
 
   const [servizioScelto, setServizioScelto] = useState<Servizio | null>(multiServizio ? null : (evento.servizi[0] ?? null));

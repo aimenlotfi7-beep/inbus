@@ -3,6 +3,9 @@ import { z } from 'zod';
 const colore = z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'Colore non valido (usa formato #rrggbb)');
 const urlOpzionale = z.string().url().nullable().optional();
 
+/** Un testo personalizzato: vuoto = si usa quello di serie. */
+const testoOpzionale = z.string().max(200).nullable().optional();
+
 const temaSchema = z.object({
   branding: z.object({
     logoUrl: urlOpzionale,
@@ -11,7 +14,12 @@ const temaSchema = z.object({
     heroImageUrl: urlOpzionale,
     posizioneLogo: z.enum(['in-alto-a-sinistra', 'in-alto-al-centro', 'in-alto-a-destra']),
     dimensioneLogoPx: z.number().min(16).max(200),
-  }),
+    sfondoImmagineUrl: urlOpzionale,
+    sfondoImmagineModo: z.enum(['copri', 'affianca', 'fisso']),
+    sfondoVeloPercentuale: z.number().min(0).max(100),
+    faviconUrl: urlOpzionale,
+    titoloPagina: testoOpzionale,
+  }).partial(),
   colori: z.object({
     sfondo: colore,
     superficie: colore,
@@ -20,21 +28,39 @@ const temaSchema = z.object({
     cta: colore,
     testoCta: colore,
     bordi: colore,
-  }),
+    ctaSecondaria: colore,
+    testoCtaSecondaria: colore,
+    accento: colore,
+    campoSfondo: colore,
+    campoTesto: colore,
+  }).partial(),
   tipografia: z.object({
-    font: z.string().min(1),
+    font: z.string().min(1).max(60),
+    fontTitoli: z.string().max(60).nullable().optional(),
     dimensioneTitoloPx: z.number().min(12).max(64),
     dimensioneTestoPx: z.number().min(10).max(28),
-  }),
+  }).partial(),
   stile: z.object({
     borderRadiusPx: z.number().min(0).max(40),
     stilePulsanti: z.enum(['pieno', 'contorno', 'arrotondato']),
     altezzaPulsantePx: z.number().min(28).max(80),
     spaziaturaPx: z.number().min(4).max(48),
-  }),
+    ombre: z.boolean(),
+    mostraBordi: z.boolean(),
+    larghezzaPx: z.number().min(280).max(1200),
+  }).partial(),
   layout: z.object({
     tipo: z.enum(['card', 'hero', 'horizontal']),
-  }),
+  }).partial(),
+  testi: z.object({
+    titolo: testoOpzionale,
+    sottotitolo: testoOpzionale,
+    pulsante: testoOpzionale,
+    piePagina: testoOpzionale,
+  }).partial(),
+  marchio: z.object({
+    mostraOnWay: z.boolean(),
+  }).partial(),
   elementiVisibili: z.object({
     logo: z.boolean(),
     immagine: z.boolean(),
@@ -47,7 +73,7 @@ const temaSchema = z.object({
     descrizione: z.boolean(),
     cta: z.boolean(),
     informazioni: z.boolean(),
-  }),
+  }).partial(),
 }).partial();
 
 const dominioSchema = z.string().url().refine((u) => {

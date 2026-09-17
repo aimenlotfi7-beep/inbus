@@ -4,6 +4,7 @@ import { whiteLabelApi, type WhiteLabelPubblica } from '../api/whiteLabel';
 import { clienteAuthApi } from '../api/clienteAuth';
 import { salvaTokenCliente, clienteLoggato } from '../features/clienteSessione';
 import { WhiteLabelPreview } from '../features/white-label/WhiteLabelPreview';
+import { applicaTitoloPagina, caricaFontTema, piePagina, sfondoPagina, stileCampo, stilePulsante, stileRiquadro, variabiliTema } from '../features/white-label/tema';
 import { CheckoutForm } from '../features/checkout/CheckoutForm';
 import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
@@ -20,6 +21,14 @@ export function WidgetPubblicoPage() {
   const [erroreVista, setErroreVista] = useState('');
   const [dati, setDati] = useState<WhiteLabelPubblica | null>(null);
   const [eventoCompleto, setEventoCompleto] = useState<Evento | null>(null);
+
+  // Font, titolo della scheda e icona del tema: appena arrivano i dati,
+  // così la pagina sembra del cliente anche nella barra del browser.
+  useEffect(() => {
+    if (!dati) return;
+    caricaFontTema(dati.tema);
+    applicaTitoloPagina(dati.tema, dati.evento?.artista ?? dati.bundle?.nome ?? 'Prenota il tuo viaggio');
+  }, [dati]);
 
   useEffect(() => {
     if (!publicWidgetId) return;
@@ -59,14 +68,16 @@ export function WidgetPubblicoPage() {
     }
   }
 
-  if (vista === 'caricamento') return <Sfondo colore="#14121f"><p style={{ color: '#a99fc2' }}>Carico…</p></Sfondo>;
-  if (vista === 'errore') return <Sfondo colore="#14121f"><p style={{ color: '#a99fc2' }}>{erroreVista}</p></Sfondo>;
+  // Caricamento ed errore: già con i colori del cliente se li conosciamo
+  // (la prima volta sono quelli di serie, non c'è ancora il tema).
+  if (vista === 'caricamento') return <Sfondo tema={dati?.tema}><p style={{ color: dati?.tema.colori.testoSecondario ?? '#a99fc2' }}>Carico…</p></Sfondo>;
+  if (vista === 'errore') return <Sfondo tema={dati?.tema}><p style={{ color: dati?.tema.colori.testoSecondario ?? '#a99fc2' }}>{erroreVista}</p></Sfondo>;
   if (!dati || !publicWidgetId) return null;
 
   if (vista === 'bundle' && dati.bundle && publicWidgetId) {
     const b = dati.bundle;
     return (
-      <div style={{ minHeight: '100vh', background: dati.tema.colori.sfondo, padding: '40px 20px', fontFamily: dati.tema.tipografia.font }}>
+      <div style={{ minHeight: '100vh', padding: '40px 20px', ...sfondoPagina(dati.tema), ...variabiliTema(dati.tema) }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           {!dati.attiva ? (
             <Riquadro tema={dati.tema}><p>Questa pagina non accetta più nuovi acquisti.</p></Riquadro>
@@ -97,18 +108,19 @@ export function WidgetPubblicoPage() {
 
   if (vista === 'checkout' && eventoCompleto) {
     return (
-      <div style={{ minHeight: '100vh', background: dati.tema.colori.sfondo, padding: '40px 20px' }}>
-        <div style={{ maxWidth: 480, margin: '0 auto' }}>
-          <CheckoutForm evento={eventoCompleto} publicWidgetId={publicWidgetId} temaColori={dati.tema.colori} />
+      <div style={{ minHeight: '100vh', padding: '40px 20px', ...sfondoPagina(dati.tema) }}>
+        <div style={{ maxWidth: Math.max(dati.tema.stile.larghezzaPx, 420), margin: '0 auto' }}>
+          <CheckoutForm evento={eventoCompleto} publicWidgetId={publicWidgetId} temaWhiteLabel={dati.tema} />
+          <PiePagina tema={dati.tema} />
         </div>
       </div>
     );
   }
 
   return (
-    <Sfondo colore={dati.tema.colori.sfondo}>
+    <Sfondo tema={dati.tema} conPiePagina={vista !== 'vetrina' || !dati.tema.elementiVisibili.informazioni}>
       {vista === 'vetrina' && (
-        dati.evento && <WhiteLabelPreview tema={dati.tema} evento={dati.evento} larghezza={400} onCtaClick={dati.attiva ? apriPrenotazione : undefined} />
+        dati.evento && <WhiteLabelPreview tema={dati.tema} evento={dati.evento} larghezza={dati.tema.stile.larghezzaPx} onCtaClick={dati.attiva ? apriPrenotazione : undefined} />
       )}
       {vista === 'auth' && <SceltaAuth tema={dati.tema} onLogin={() => setVista('login')} onRegistrati={() => setVista('registrati')} />}
       {vista === 'login' && <FormLogin tema={dati.tema} onFatto={vaiAlCheckout} />}
@@ -123,67 +135,44 @@ export function WidgetPubblicoPage() {
   );
 }
 
-function Sfondo({ colore, children }: { colore: string; children: React.ReactNode }) {
+/** Lo sfondo di tutta la pagina: colore o immagine del tema (di serie
+ *  quello scuro di OnWay finché il tema non è arrivato). La nota in fondo
+ *  si mostra qui solo quando non la mostra già il riquadro (la vetrina ce
+ *  l'ha dentro, altrimenti si leggerebbe due volte). */
+function Sfondo({ tema, conPiePagina = true, children }: { tema?: WhiteLabelPubblica['tema']; conPiePagina?: boolean; children: React.ReactNode }) {
+  const stile = tema ? { ...sfondoPagina(tema), ...variabiliTema(tema) } : { background: '#14121f' };
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: colore, padding: 24 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, ...stile }}>
       {children}
+      {tema && conPiePagina && <PiePagina tema={tema} />}
     </div>
+  );
+}
+
+/** La nota in fondo: quella scritta nel tema e, solo col marchio acceso, OnWay. */
+function PiePagina({ tema }: { tema: WhiteLabelPubblica['tema'] }) {
+  const nota = piePagina(tema);
+  if (!nota) return null;
+  return (
+    <p style={{ margin: '14px 0 0', fontSize: tema.tipografia.dimensioneTestoPx * 0.8, color: tema.colori.testoSecondario, textAlign: 'center' }}>
+      {nota}
+    </p>
   );
 }
 
 function Riquadro({ tema, children }: { tema: WhiteLabelPubblica['tema']; children: React.ReactNode }) {
-  return (
-    <div style={{
-      width: '100%', maxWidth: 400, boxSizing: 'border-box', background: tema.colori.superficie,
-      borderRadius: tema.stile.borderRadiusPx, border: `1px solid ${tema.colori.bordi}`, padding: tema.stile.spaziaturaPx,
-      fontFamily: tema.tipografia.font, color: tema.colori.testoPrincipale,
-    }}>
-      {children}
-    </div>
-  );
+  return <div style={{ ...stileRiquadro(tema), width: '100%', maxWidth: tema.stile.larghezzaPx }}>{children}</div>;
 }
 
 function Campo({ tema, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { tema: WhiteLabelPubblica['tema'] }) {
-  return (
-    <input
-      {...props}
-      style={{
-        width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: Math.min(tema.stile.borderRadiusPx, 8),
-        border: `1px solid ${tema.colori.bordi}`, background: 'transparent', color: tema.colori.testoPrincipale,
-        fontFamily: tema.tipografia.font, fontSize: tema.tipografia.dimensioneTestoPx, marginBottom: 8,
-      }}
-    />
-  );
+  return <input {...props} style={{ ...stileCampo(tema), marginBottom: 8 }} />;
 }
 
 function PulsantePrincipale({ tema, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { tema: WhiteLabelPubblica['tema'] }) {
-  const s = tema.stile, c = tema.colori;
-  return (
-    <button
-      {...props}
-      style={{
-        height: s.altezzaPulsantePx,
-        borderRadius: s.stilePulsanti === 'arrotondato' ? 999 : s.borderRadiusPx,
-        background: s.stilePulsanti === 'contorno' ? 'transparent' : c.cta,
-        color: s.stilePulsanti === 'contorno' ? c.cta : c.testoCta,
-        border: s.stilePulsanti === 'contorno' ? `1.5px solid ${c.cta}` : 'none',
-        fontFamily: tema.tipografia.font, fontWeight: 700, fontSize: tema.tipografia.dimensioneTestoPx,
-        width: '100%', cursor: 'pointer',
-      }}
-    />
-  );
+  return <button {...props} style={stilePulsante(tema)} />;
 }
 function PulsanteSecondario({ tema, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { tema: WhiteLabelPubblica['tema'] }) {
-  return (
-    <button
-      {...props}
-      style={{
-        height: tema.stile.altezzaPulsantePx, borderRadius: tema.stile.borderRadiusPx, background: 'transparent',
-        color: tema.colori.testoSecondario, border: `1px solid ${tema.colori.bordi}`, fontFamily: tema.tipografia.font,
-        fontWeight: 600, fontSize: tema.tipografia.dimensioneTestoPx, width: '100%', cursor: 'pointer', marginTop: 8,
-      }}
-    />
-  );
+  return <button {...props} style={{ ...stilePulsante(tema, 'secondario'), marginTop: 8 }} />;
 }
 function TestoErrore({ children }: { children: React.ReactNode }) {
   if (!children) return null;

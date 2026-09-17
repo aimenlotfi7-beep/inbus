@@ -7,7 +7,11 @@ const apiClienteConToken = apiConToken('inbus_cliente_token');
 export type PosizioneLogo = 'in-alto-a-sinistra' | 'in-alto-al-centro' | 'in-alto-a-destra';
 export type TipoLayout = 'card' | 'hero' | 'horizontal';
 export type StilePulsanti = 'pieno' | 'contorno' | 'arrotondato';
+/** Come si comporta l'immagine di sfondo della pagina. */
+export type ModoSfondo = 'copri' | 'affianca' | 'fisso';
 
+/** Copia identica di packages/backend/src/modules/white-label/white-label.theme.ts:
+ *  tutte le proprietà grafiche personalizzabili di una White Label. */
 export interface WhiteLabelTheme {
   branding: {
     logoUrl: string | null;
@@ -16,6 +20,14 @@ export interface WhiteLabelTheme {
     heroImageUrl: string | null;
     posizioneLogo: PosizioneLogo;
     dimensioneLogoPx: number;
+    /** Immagine di sfondo di tutta la pagina. */
+    sfondoImmagineUrl: string | null;
+    sfondoImmagineModo: ModoSfondo;
+    /** Velo del colore di sfondo sopra l'immagine, 0-100. */
+    sfondoVeloPercentuale: number;
+    faviconUrl: string | null;
+    /** Titolo della scheda del browser; vuoto = nome dell'evento. */
+    titoloPagina: string | null;
   };
   colori: {
     sfondo: string;
@@ -25,9 +37,17 @@ export interface WhiteLabelTheme {
     cta: string;
     testoCta: string;
     bordi: string;
+    ctaSecondaria: string;
+    testoCtaSecondaria: string;
+    /** Prezzi e cose da far notare. */
+    accento: string;
+    campoSfondo: string;
+    campoTesto: string;
   };
   tipografia: {
     font: string;
+    /** Font dei titoli; vuoto = lo stesso del testo. */
+    fontTitoli: string | null;
     dimensioneTitoloPx: number;
     dimensioneTestoPx: number;
   };
@@ -36,9 +56,24 @@ export interface WhiteLabelTheme {
     stilePulsanti: StilePulsanti;
     altezzaPulsantePx: number;
     spaziaturaPx: number;
+    ombre: boolean;
+    mostraBordi: boolean;
+    /** Larghezza massima del contenuto nella pagina a schermo intero. */
+    larghezzaPx: number;
   };
   layout: {
     tipo: TipoLayout;
+  };
+  /** Testi al posto di quelli di serie; vuoto = testo di serie. */
+  testi: {
+    titolo: string | null;
+    sottotitolo: string | null;
+    pulsante: string | null;
+    piePagina: string | null;
+  };
+  marchio: {
+    /** Falso: nessun riferimento a OnWay nella pagina del cliente. */
+    mostraOnWay: boolean;
   };
   elementiVisibili: {
     logo: boolean;
@@ -54,6 +89,12 @@ export interface WhiteLabelTheme {
     informazioni: boolean;
   };
 }
+
+/** I font pronti nell'editor (Google Fonts, più quello di sistema). */
+export const FONT_WHITE_LABEL = [
+  'Poppins', 'Inter', 'Montserrat', 'Roboto', 'Open Sans', 'Lato', 'Nunito', 'Raleway',
+  'Work Sans', 'Space Grotesk', 'Oswald', 'Playfair Display', 'Merriweather', 'Di sistema',
+] as const;
 
 export interface WhiteLabel {
   id: string;

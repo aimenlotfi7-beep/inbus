@@ -39,26 +39,33 @@ export function WhiteLabelScreen() {
 
   if (vista === 'editor' && whiteLabelAttiva) {
     const ev = eventi.find((e) => e.id === whiteLabelAttiva.eventoId);
+    // Con un bundle non c'è un evento singolo: l'anteprima usa il nome del
+    // bundle, così l'editor grafico c'è comunque (prima mancava del tutto).
+    const perAnteprima = ev
+      ? { artista: ev.artista, data: ev.data, luogo: ev.luogo, citta: ev.citta, descrizione: ev.descrizione }
+      : { artista: whiteLabelAttiva.bundleNome ?? 'Il tuo viaggio', data: new Date().toISOString(), luogo: 'Più eventi', citta: 'nel pacchetto', descrizione: null };
     return (
       <PaginaSezione titolo={`White Label — ${whiteLabelAttiva.organizzatoreNome} · ${whiteLabelAttiva.bundleNome ? `${whiteLabelAttiva.bundleNome} (bundle)` : whiteLabelAttiva.eventoArtista}`} onIndietro={() => { ricarica(); setVista('lista'); }}>
-        <div style={{ maxWidth: 480, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <CampoCopiabile etichetta="Link diretto" valore={`${window.location.origin}/w/${whiteLabelAttiva.publicWidgetId}`} link />
-          <CampoCopiabile
-            etichetta="Codice embed"
-            valore={`<div id="inbus-widget"></div>\n<script src="${window.location.origin}/embed.js" data-inbus-widget="${whiteLabelAttiva.publicWidgetId}"></script>`}
-          />
-        </div>
-        {ev && (
-          <>
-            <SelettoreLayoutBiglietto whiteLabel={whiteLabelAttiva} onSalvato={(wl) => setWhiteLabelAttiva(wl)} />
-            <MetaPixelOrganizzatore whiteLabel={whiteLabelAttiva} onSalvato={(wl) => setWhiteLabelAttiva(wl)} />
-            <WhiteLabelEditor
-              whiteLabel={whiteLabelAttiva}
-              evento={{ artista: ev.artista, data: ev.data, luogo: ev.luogo, citta: ev.citta, descrizione: ev.descrizione }}
-              onSalvato={() => { ricarica(); setVista('lista'); }}
+        <section className="section-card" style={{ marginBottom: 16 }}>
+          <h3 style={{ margin: '0 0 4px' }}>Link e codice da dare al cliente</h3>
+          <p style={{ margin: '0 0 12px', fontSize: 'var(--testo-md)', color: 'var(--mist)', lineHeight: 1.5 }}>
+            Il link apre la pagina intera con la grafica qui sotto. Il codice si incolla nel sito del cliente e mostra la stessa cosa dentro una sua pagina.
+          </p>
+          <div className="wl-condivisione">
+            <CampoCopiabile etichetta="Link da condividere" valore={`${window.location.origin}/w/${whiteLabelAttiva.publicWidgetId}`} link />
+            <CampoCopiabile
+              etichetta="Codice da incollare nel sito"
+              valore={`<div id="inbus-widget"></div>\n<script src="${window.location.origin}/embed.js" data-inbus-widget="${whiteLabelAttiva.publicWidgetId}"></script>`}
             />
-          </>
-        )}
+          </div>
+        </section>
+        <SelettoreLayoutBiglietto whiteLabel={whiteLabelAttiva} onSalvato={(wl) => setWhiteLabelAttiva(wl)} />
+        <MetaPixelOrganizzatore whiteLabel={whiteLabelAttiva} onSalvato={(wl) => setWhiteLabelAttiva(wl)} />
+        <WhiteLabelEditor
+          whiteLabel={whiteLabelAttiva}
+          evento={perAnteprima}
+          onSalvato={(wl) => setWhiteLabelAttiva(wl)}
+        />
       </PaginaSezione>
     );
   }

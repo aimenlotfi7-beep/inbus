@@ -119,35 +119,86 @@
     if (this.vista === 'conferma') return this.renderConferma();
   };
 
+  /** Carico ed errore: già con i colori del cliente se il tema è arrivato. */
+  WidgetApp.prototype.stiliMessaggio = function () {
+    var tema = this.dati && this.dati.tema;
+    if (!tema) return 'font-family:' + RIPIEGO_FONT + ';color:#a99fc2;padding:20px;text-align:center;';
+    return 'font-family:' + famigliaFont(tema.tipografia.font) + ';color:' + tema.colori.testoSecondario +
+      ';background:' + tema.colori.superficie + ';border-radius:' + tema.stile.borderRadiusPx + 'px;padding:20px;text-align:center;';
+  };
   WidgetApp.prototype.renderCaricamento = function () {
-    this.root.innerHTML = '<div style="font-family:sans-serif;color:#a99fc2;padding:20px;text-align:center;">Carico...</div>';
+    this.root.innerHTML = stileFont(this.dati && this.dati.tema) + '<div style="' + this.stiliMessaggio() + '">Carico...</div>';
   };
   WidgetApp.prototype.renderErrore = function (messaggio) {
-    this.root.innerHTML = '<div style="font-family:sans-serif;color:#a99fc2;padding:20px;text-align:center;">' + escapeHtml(messaggio) + '</div>';
+    this.root.innerHTML = stileFont(this.dati && this.dati.tema) + '<div style="' + this.stiliMessaggio() + '">' + escapeHtml(messaggio) + '</div>';
   };
 
+  var RIPIEGO_FONT = "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
+
+  /** Il font come lo scrive il CSS ("Di sistema" o vuoto = quello del dispositivo). */
+  function famigliaFont(nome) {
+    var pulito = (nome || '').trim();
+    if (!pulito || pulito.toLowerCase() === 'di sistema') return RIPIEGO_FONT;
+    return "'" + pulito.replace(/'/g, '') + "'," + RIPIEGO_FONT;
+  }
+
+  /** Lo stile dentro lo shadow root: il widget deve occupare spazio nella
+   *  pagina che lo ospita (l'elemento nasce "in riga" e resterebbe alto
+   *  zero), e i font del tema vanno chiesti a Google Fonts con @import,
+   *  perché i <link> della pagina ospite non entrano nello shadow root. */
+  function stileFont(tema) {
+    var base = ':host{display:block;box-sizing:border-box;}';
+    var nomi = (tema ? [tema.tipografia.font, tema.tipografia.fontTitoli] : []).filter(function (n, i, tutti) {
+      var pulito = (n || '').trim();
+      return pulito && pulito.toLowerCase() !== 'di sistema' && tutti.indexOf(n) === i;
+    });
+    var imports = nomi.map(function (n) {
+      return "@import url('https://fonts.googleapis.com/css2?family=" + encodeURIComponent(n.trim()) + ":wght@400;600;700;800&display=swap');";
+    }).join('');
+    // Gli @import vanno prima di qualsiasi altra regola, o il browser li scarta.
+    return '<style>' + imports + base + '</style>';
+  }
+
   function stiliContenitore(tema) {
-    return 'width:100%;max-width:400px;box-sizing:border-box;background:' + tema.colori.superficie +
-      ';border-radius:' + tema.stile.borderRadiusPx + 'px;border:1px solid ' + tema.colori.bordi +
-      ';padding:' + tema.stile.spaziaturaPx + 'px;font-family:' + tema.tipografia.font +
-      ',sans-serif;color:' + tema.colori.testoPrincipale + ';';
+    var s = tema.stile;
+    return 'width:100%;max-width:' + (s.larghezzaPx || 400) + 'px;box-sizing:border-box;background:' + tema.colori.superficie +
+      ';border-radius:' + s.borderRadiusPx + 'px;border:' + (s.mostraBordi === false ? 'none' : '1px solid ' + tema.colori.bordi) +
+      ';box-shadow:' + (s.ombre ? '0 10px 30px rgba(0,0,0,.18)' : 'none') +
+      ';padding:' + s.spaziaturaPx + 'px;font-family:' + famigliaFont(tema.tipografia.font) +
+      ';font-size:' + tema.tipografia.dimensioneTestoPx + 'px;color:' + tema.colori.testoPrincipale + ';';
   }
   function stiliPulsante(tema, secondario) {
     var c = tema.colori, s = tema.stile, t = tema.tipografia;
+    var raggio = s.stilePulsanti === 'arrotondato' ? '999px' : s.borderRadiusPx + 'px';
     if (secondario) {
-      return 'height:' + s.altezzaPulsantePx + 'px;border-radius:' + s.borderRadiusPx + 'px;background:transparent;color:' + c.testoSecondario + ';border:1px solid ' + c.bordi + ';font-family:' + t.font + ',sans-serif;font-weight:600;font-size:' + t.dimensioneTestoPx + 'px;width:100%;cursor:pointer;margin-top:8px;';
+      return 'height:' + s.altezzaPulsantePx + 'px;border-radius:' + raggio +
+        ';background:' + (s.stilePulsanti === 'contorno' ? 'transparent' : c.ctaSecondaria) +
+        ';color:' + c.testoCtaSecondaria + ';border:1px solid ' + c.bordi +
+        ';font-family:' + famigliaFont(t.font) + ';font-weight:600;font-size:' + t.dimensioneTestoPx + 'px;width:100%;cursor:pointer;margin-top:8px;';
     }
     return 'height:' + s.altezzaPulsantePx + 'px;' +
-      'border-radius:' + (s.stilePulsanti === 'arrotondato' ? '999px' : s.borderRadiusPx + 'px') + ';' +
+      'border-radius:' + raggio + ';' +
       'background:' + (s.stilePulsanti === 'contorno' ? 'transparent' : c.cta) + ';' +
       'color:' + (s.stilePulsanti === 'contorno' ? c.cta : c.testoCta) + ';' +
       'border:' + (s.stilePulsanti === 'contorno' ? '1.5px solid ' + c.cta : 'none') + ';' +
-      'font-family:' + t.font + ',sans-serif;font-weight:700;font-size:' + t.dimensioneTestoPx + 'px;width:100%;cursor:pointer;';
+      'font-family:' + famigliaFont(t.font) + ';font-weight:700;font-size:' + t.dimensioneTestoPx + 'px;width:100%;cursor:pointer;';
   }
   function stiliInput(tema) {
-    return 'width:100%;box-sizing:border-box;padding:10px 12px;border-radius:' + Math.min(tema.stile.borderRadiusPx, 8) +
-      'px;border:1px solid ' + tema.colori.bordi + ';background:transparent;color:' + tema.colori.testoPrincipale +
-      ';font-family:' + tema.tipografia.font + ',sans-serif;font-size:' + tema.tipografia.dimensioneTestoPx + 'px;margin-bottom:8px;';
+    return 'width:100%;box-sizing:border-box;padding:10px 12px;border-radius:' + Math.min(tema.stile.borderRadiusPx, 12) +
+      'px;border:1px solid ' + tema.colori.bordi + ';background:' + tema.colori.campoSfondo + ';color:' + tema.colori.campoTesto +
+      ';font-family:' + famigliaFont(tema.tipografia.font) + ';font-size:' + tema.tipografia.dimensioneTestoPx + 'px;margin-bottom:8px;';
+  }
+  /** Il testo del tema, se c'è, altrimenti quello di serie. */
+  function testoTema(tema, campo, diSerie) {
+    var scritto = tema.testi && tema.testi[campo] ? String(tema.testi[campo]).trim() : '';
+    return scritto || diSerie;
+  }
+  /** La nota in fondo: quella del tema e, solo col marchio acceso, OnWay. */
+  function notaPiePagina(tema) {
+    var nota = tema.testi && tema.testi.piePagina ? String(tema.testi.piePagina).trim() : '';
+    var conMarchio = !tema.marchio || tema.marchio.mostraOnWay !== false;
+    if (!conMarchio) return nota;
+    return nota ? nota + ' · Viaggio organizzato da OnWay' : 'Viaggio organizzato da OnWay';
   }
 
   WidgetApp.prototype.renderVetrina = function () {
@@ -156,19 +207,26 @@
     var b = tema.branding, c = tema.colori, t = tema.tipografia, s = tema.stile, l = tema.layout, v = tema.elementiVisibili;
     var dataFormattata = new Date(evento.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    var html = '<div style="' + stiliContenitore(tema) + '">';
+    var html = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">';
     if (v.logo && b.logoUrl) {
       var giustifica = b.posizioneLogo === 'in-alto-al-centro' ? 'center' : b.posizioneLogo === 'in-alto-a-destra' ? 'flex-end' : 'flex-start';
-      html += '<div style="display:flex;justify-content:' + giustifica + ';margin-bottom:' + (s.spaziaturaPx * 0.6) + 'px;"><img src="' + escapeHtml(b.logoUrl) + '" alt="" style="height:' + b.dimensioneLogoPx + 'px;display:block;" /></div>';
+      html += '<div style="display:flex;justify-content:' + giustifica + ';margin-bottom:' + (s.spaziaturaPx * 0.6) + 'px;"><img src="' + escapeHtml(b.logoUrl) + '" alt="" style="height:' + b.dimensioneLogoPx + 'px;max-width:100%;display:block;" /></div>';
     }
-    if (v.immagine && (b.immaginePrincipaleUrl || l.tipo === 'hero')) {
-      var sfondoImg = b.immaginePrincipaleUrl ? 'url(' + b.immaginePrincipaleUrl + ') center/cover' : c.bordi;
+    var immagineVetrina = l.tipo === 'hero' ? (b.heroImageUrl || b.immaginePrincipaleUrl) : (b.immaginePrincipaleUrl || b.heroImageUrl);
+    if (v.immagine && (immagineVetrina || l.tipo === 'hero')) {
+      var sfondoImg = immagineVetrina ? 'url("' + immagineVetrina + '") center/cover' : c.bordi;
       html += '<div style="width:100%;aspect-ratio:' + (l.tipo === 'hero' ? '16/9' : '4/3') + ';background:' + sfondoImg + ';border-radius:' + (s.borderRadiusPx * 0.7) + 'px;margin-bottom:' + (s.spaziaturaPx * 0.6) + 'px;"></div>';
     }
-    if (v.titolo) html += '<h3 style="font-size:' + t.dimensioneTitoloPx + 'px;margin:0 0 ' + (s.spaziaturaPx * 0.3) + 'px;font-weight:800;line-height:1.15;">' + escapeHtml(evento.artista) + '</h3>';
+    if (v.titolo) {
+      html += '<h3 style="font-family:' + famigliaFont(t.fontTitoli || t.font) + ';font-size:' + t.dimensioneTitoloPx + 'px;margin:0 0 ' + (s.spaziaturaPx * 0.3) + 'px;font-weight:800;line-height:1.15;">' + escapeHtml(testoTema(tema, 'titolo', evento.artista)) + '</h3>';
+    }
+    var sottotitolo = testoTema(tema, 'sottotitolo', '');
+    if (sottotitolo) {
+      html += '<p style="font-size:' + t.dimensioneTestoPx + 'px;color:' + c.testoSecondario + ';margin:0 0 ' + (s.spaziaturaPx * 0.4) + 'px;line-height:1.45;">' + escapeHtml(sottotitolo) + '</p>';
+    }
     html += '<div style="font-size:' + t.dimensioneTestoPx + 'px;color:' + c.testoSecondario + ';margin-bottom:' + (s.spaziaturaPx * 0.5) + 'px;line-height:1.5;">';
-    if (v.data) html += '<div>\uD83D\uDCC5 ' + escapeHtml(dataFormattata) + '</div>';
-    if (v.percorso) html += '<div>\uD83D\uDCCD ' + escapeHtml(evento.luogo) + ', ' + escapeHtml(evento.citta) + '</div>';
+    if (v.data) html += '<div>' + escapeHtml(dataFormattata) + '</div>';
+    if (v.percorso) html += '<div>' + escapeHtml(evento.luogo) + ', ' + escapeHtml(evento.citta) + '</div>';
     html += '</div>';
     if (v.descrizione && evento.descrizione) {
       var desc = evento.descrizione.length > 120 ? evento.descrizione.slice(0, 120) + '…' : evento.descrizione;
@@ -178,10 +236,10 @@
     if (!this.dati.attiva) {
       html += '<p style="font-size:' + (t.dimensioneTestoPx * 0.9) + 'px;color:' + c.testoSecondario + ';text-align:center;">Non disponibile per l\'acquisto al momento.</p>';
     } else if (v.cta) {
-      html += '<button id="btn-cta" style="' + stiliPulsante(tema) + '">Prenota ora</button>';
+      html += '<button id="btn-cta" style="' + stiliPulsante(tema) + '">' + escapeHtml(testoTema(tema, 'pulsante', 'Prenota ora')) + '</button>';
     }
-    if (v.informazioni) {
-      html += '<p style="font-size:' + (t.dimensioneTestoPx * 0.8) + 'px;color:' + c.testoSecondario + ';margin-top:' + (s.spaziaturaPx * 0.5) + 'px;text-align:center;">Viaggio organizzato da INBUS</p>';
+    if (v.informazioni && notaPiePagina(tema)) {
+      html += '<p style="font-size:' + (t.dimensioneTestoPx * 0.8) + 'px;color:' + c.testoSecondario + ';margin-top:' + (s.spaziaturaPx * 0.5) + 'px;text-align:center;">' + escapeHtml(notaPiePagina(tema)) + '</p>';
     }
     html += '</div>';
     this.root.innerHTML = html;
@@ -193,7 +251,7 @@
   WidgetApp.prototype.renderAuth = function () {
     var self = this;
     var tema = this.dati.tema;
-    var html = '<div style="' + stiliContenitore(tema) + '">' +
+    var html = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">' +
       '<p style="font-weight:700;margin:0 0 12px;">Accedi o registrati per continuare</p>' +
       '<button id="btn-login" style="' + stiliPulsante(tema) + '">Ho già un account</button>' +
       '<button id="btn-registrati" style="' + stiliPulsante(tema, true) + '">Creo un account nuovo</button>' +
@@ -206,7 +264,7 @@
   WidgetApp.prototype.renderLogin = function () {
     var self = this;
     var tema = this.dati.tema;
-    var html = '<div style="' + stiliContenitore(tema) + '">' +
+    var html = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">' +
       '<p style="font-weight:700;margin:0 0 12px;">Accedi</p>' +
       '<input id="in-email" type="email" placeholder="Email" style="' + stiliInput(tema) + '" />' +
       '<input id="in-password" type="password" placeholder="Password" style="' + stiliInput(tema) + '" />' +
@@ -230,7 +288,7 @@
   WidgetApp.prototype.renderRegistrati = function () {
     var self = this;
     var tema = this.dati.tema;
-    var html = '<div style="' + stiliContenitore(tema) + '">' +
+    var html = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">' +
       '<p style="font-weight:700;margin:0 0 12px;">Crea un account</p>' +
       '<input id="in-nome" placeholder="Nome" style="' + stiliInput(tema) + '" />' +
       '<input id="in-cognome" placeholder="Cognome" style="' + stiliInput(tema) + '" />' +
@@ -257,7 +315,7 @@
 
   WidgetApp.prototype.renderRegistratiFatto = function () {
     var tema = this.dati.tema;
-    this.root.innerHTML = '<div style="' + stiliContenitore(tema) + '">' +
+    this.root.innerHTML = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">' +
       '<p>✓ Controlla la tua email per confermare l\'account, poi torna qui e accedi per completare la prenotazione.</p>' +
       '</div>';
   };
@@ -281,14 +339,14 @@
     var self = this;
     var tema = this.dati.tema;
     if (!this.opzioni) {
-      this.root.innerHTML = '<div style="' + stiliContenitore(tema) + '">Carico le fermate disponibili...</div>';
+      this.root.innerHTML = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">Carico le fermate disponibili...</div>';
       return;
     }
     var opzOptions = this.opzioni.map(function (o) {
       return '<option value="' + o.fermataId + '">' + escapeHtml(o.fermataCitta) + ' — €' + o.prezzoEffettivo + '</option>';
     }).join('');
 
-    var html = '<div style="' + stiliContenitore(tema) + '">' +
+    var html = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">' +
       '<p style="font-weight:700;margin:0 0 12px;">Completa la prenotazione</p>' +
       '<label style="font-size:12px;color:' + tema.colori.testoSecondario + ';">Fermata di partenza</label>' +
       '<select id="in-fermata" style="' + stiliInput(tema) + '">' + opzOptions + '</select>' +
@@ -335,7 +393,7 @@
   WidgetApp.prototype.renderConferma = function () {
     var tema = this.dati.tema;
     var pnr = this.prenotazioneFatta ? this.prenotazioneFatta.pnr : '';
-    this.root.innerHTML = '<div style="' + stiliContenitore(tema) + '">' +
+    this.root.innerHTML = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">' +
       '<p style="font-weight:800;font-size:' + tema.tipografia.dimensioneTitoloPx + 'px;margin:0 0 8px;">✓ Prenotazione confermata</p>' +
       '<p style="color:' + tema.colori.testoSecondario + ';font-size:' + tema.tipografia.dimensioneTestoPx + 'px;">Codice prenotazione: <b>' + escapeHtml(pnr) + '</b>. Riceverai una email di conferma con il tuo biglietto.</p>' +
       '</div>';
