@@ -210,6 +210,12 @@ export const eventiController = {
     res.json(await eventiService.riepilogoEconomico(req.params.id));
   },
 
+  /** I bus in più dell'evento con i loro conti, per il riquadro della pagina Linee. */
+  async simulazioneBus(req: Request, res: Response) {
+    const { simulazioneBusService } = await import('../statistiche/simulazione-bus.service.js');
+    res.json({ evento: await simulazioneBusService.evento(req.params.id) });
+  },
+
   async venditePerFermata(req: Request, res: Response) {
     res.json(await eventiService.venditePerFermata(req.params.tragittoId));
   },

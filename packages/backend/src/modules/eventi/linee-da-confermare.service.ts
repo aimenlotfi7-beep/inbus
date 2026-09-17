@@ -66,16 +66,23 @@ export interface DatiProposte {
   postiPerBus: number;
 }
 
-/** Le proposte che servono, in ordine, e il contatore del pareggio dopo di loro. */
-export function calcolaProposte(dati: DatiProposte): { proposte: Proposta[]; contatore: ContatorePareggio | null } {
-  const { postiPareggio, postiPerBus, fermateOrdinate } = dati;
-  if (postiPareggio === null || postiPerBus <= 0 || fermateOrdinate.length === 0) return { proposte: [], contatore: null };
-  const pareggio = Math.max(1, postiPareggio);
+/** Un bus in più: la proposta, il bus con cui si riprova lo smistamento e
+ *  quanti restavano senza posto prima di lui. */
+export interface PassoBusInPiu { proposta: Proposta; bus: BusDaRiempire; senzaPostoPrima: number }
+
+/** I bus in più uno dopo l'altro, con la regola delle proposte, finché chi
+ *  resta senza posto (e un bus potrebbe portare) è almeno `minimo` e ogni bus
+ *  fa salire qualcuno; al massimo `massimo`. Con minimo = il pareggio sono le
+ *  proposte; la simulazione economica (simulazione-bus.ts) va avanti anche
+ *  sotto il pareggio, con minimo 1: i primi bus sono comunque le proposte,
+ *  perché il bus scelto a ogni passo non dipende dal minimo. */
+export function passiBusInPiu(dati: Omit<DatiProposte, 'postiPareggio'>, minimo: number, massimo: number): { passi: PassoBusInPiu[]; fuori: GruppoPasseggeri[] } {
+  const { postiPerBus, fermateOrdinate } = dati;
   const ordineCitta = fermateOrdinate.map((f) => f.citta);
   const cittaDi = new Map(fermateOrdinate.map((f) => [f.id, f.citta]));
   const postiMassimi = Math.max(postiPerBus, ...dati.bus.map((b) => b.postiBus));
 
-  const proposte: Proposta[] = [];
+  const passi: PassoBusInPiu[] = [];
   const bus = [...dati.bus];
   let senzaPostoPrima = Number.POSITIVE_INFINITY;
   let fuori: GruppoPasseggeri[] = [];
@@ -84,23 +91,33 @@ export function calcolaProposte(dati: DatiProposte): { proposte: Proposta[]; con
     fuori = riempiBus(dati.gruppi, bus).senzaPosto.filter((g) => ordineCitta.includes(g.fermataCitta) && g.passeggeri <= postiMassimi);
     const senzaPosto = fuori.reduce((s, g) => s + g.passeggeri, 0);
     // Un bus in più che non fa salire nessuno (fermate che nessuna proposta copre): ci si ferma.
-    if (senzaPosto < pareggio || senzaPosto >= senzaPostoPrima || proposte.length >= 100) break;
+    if (postiPerBus <= 0 || senzaPosto === 0 || senzaPosto < minimo || senzaPosto >= senzaPostoPrima || passi.length >= massimo) break;
     senzaPostoPrima = senzaPosto;
 
     const primaFuori = Math.min(...fuori.map((g) => ordineCitta.indexOf(g.fermataCitta)));
     const principaleCopre = fuori.every((g) => dati.fermateLineaPrincipale.some((id) => cittaDi.get(id) === g.fermataCitta));
-    const primoBusDelTragitto = dati.lineeConfermate === 0 && proposte.length === 0;
+    const primoBusDelTragitto = dati.lineeConfermate === 0 && passi.length === 0;
     const proposta: Proposta = primoBusDelTragitto || (primaFuori === 0 && principaleCopre)
       ? { tipo: 'bus', fermateIds: dati.fermateLineaPrincipale }
       : { tipo: 'linea', fermateIds: fermateOrdinate.slice(primaFuori).map((f) => f.id) };
-    proposte.push(proposta);
     const cittaProposta = new Set(proposta.fermateIds.map((id) => cittaDi.get(id)).filter((c): c is string => !!c));
-    bus.push({ busId: `proposta-${proposte.length}`, postiBus: postiPerBus, fermate: cittaProposta, primaFermata: primaFermataDellaLinea(cittaProposta, ordineCitta) });
+    const nuovo = { busId: `proposta-${passi.length + 1}`, postiBus: postiPerBus, fermate: cittaProposta, primaFermata: primaFermataDellaLinea(cittaProposta, ordineCitta) };
+    passi.push({ proposta, bus: nuovo, senzaPostoPrima: senzaPosto });
+    bus.push(nuovo);
   }
+  return { passi, fuori };
+}
+
+/** Le proposte che servono, in ordine, e il contatore del pareggio dopo di loro. */
+export function calcolaProposte(dati: DatiProposte): { proposte: Proposta[]; contatore: ContatorePareggio | null } {
+  const { postiPareggio, postiPerBus, fermateOrdinate } = dati;
+  if (postiPareggio === null || postiPerBus <= 0 || fermateOrdinate.length === 0) return { proposte: [], contatore: null };
+  const pareggio = Math.max(1, postiPareggio);
+  const { passi, fuori } = passiBusInPiu(dati, pareggio, 100);
   return {
-    proposte,
+    proposte: passi.map((p) => p.proposta),
     contatore: {
-      bus: dati.busConfermati + proposte.length + 1,
+      bus: dati.busConfermati + passi.length + 1,
       contati: Math.min(pareggio, fuori.reduce((s, g) => s + g.passeggeri, 0)),
       pareggio,
     },
@@ -120,26 +137,33 @@ function perOrario<T extends { orario: string | null; ordine: number }>(a: T, b:
 
 const stesseFermate = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
 
-interface Bozza { id: string; nome: string; ordine: number; creatoIl: Date; fermateIds: string[] }
+export interface Bozza { id: string; nome: string; ordine: number; creatoIl: Date; fermateIds: string[] }
 
-interface StatoProposte {
+/** Una linea confermata senza bus entra nello smistamento come un bus con questo id davanti a quello della linea. */
+export const PREFISSO_LINEA_SENZA_BUS = 'linea-senza-bus-';
+
+export interface StatoProposte {
   necessarie: Proposta[];
   contatore: ContatorePareggio | null;
   bozze: Bozza[];
   tutte: { id: string; nome: string; ordine: number }[];
   /** Linea a cui va un bus in più, e quanti bus ha già. */
   principale: { nome: string; bus: number } | null;
+  /** Quello su cui si sono calcolate le proposte (serve anche alla simulazione economica). */
+  dati: DatiProposte;
 }
 
 /** Legge il tragitto e calcola le proposte che servono. null se il tragitto
  *  non è in vendita, o l'evento è passato o nel cestino: lì le proposte
- *  restano come sono. */
-async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, postiPerBusImpostazioni: number): Promise<StatoProposte | null> {
+ *  restano come sono. Con ancheFuoriVendita (simulazione economica) basta
+ *  che tragitto ed evento non siano eliminati né l'evento passato. */
+async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, postiPerBusImpostazioni: number, opzioni: { ancheFuoriVendita?: boolean } = {}): Promise<StatoProposte | null> {
   const [t] = await lettore.select({
     stato: tragitti.stato, attivo: tragitti.attivo, eliminatoIl: tragitti.eliminatoIl, preventivoPostiBus: tragitti.preventivoPostiBus,
     eventoData: eventi.data, eventoEliminatoIl: eventi.eliminatoIl,
   }).from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId)).where(eq(tragitti.id, tragittoId)).limit(1);
-  if (!t || !t.attivo || t.eliminatoIl || t.eventoEliminatoIl || (t.stato !== 'PREZZATO' && t.stato !== 'CONFERMATO')) return null;
+  if (!t || t.eliminatoIl || t.eventoEliminatoIl) return null;
+  if (!opzioni.ancheFuoriVendita && (!t.attivo || (t.stato !== 'PREZZATO' && t.stato !== 'CONFERMATO'))) return null;
   if (t.eventoData.getTime() < Date.now() - UN_GIORNO_MS) return null;
 
   const [righePrenotazioni, righeLinee, righeFermate] = await Promise.all([
@@ -191,7 +215,7 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
     const busLinea = righeBus.filter((b) => b.lineaId === l.id);
     return busLinea.length > 0
       ? busLinea.map((b) => ({ busId: b.id, postiBus: b.postiBus ?? 0, fermate: cittaLinea, primaFermata }))
-      : [{ busId: `linea-senza-bus-${l.id}`, postiBus: postiPerBus, fermate: cittaLinea, primaFermata }];
+      : [{ busId: `${PREFISSO_LINEA_SENZA_BUS}${l.id}`, postiBus: postiPerBus, fermate: cittaLinea, primaFermata }];
   });
   const orari = await leggiOrariTragitto(tragittoId, lettore);
   const adesso = new Date();
@@ -214,7 +238,7 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
       return !migliore || fermateAttive.length > migliore.fermate.length ? { linea: l, fermate: fermateAttive } : migliore;
     }, null);
 
-  const { proposte, contatore } = calcolaProposte({
+  const dati: DatiProposte = {
     gruppi,
     bus: busConfermatiDaRiempire,
     busConfermati: busConfermatiDaRiempire.length,
@@ -223,13 +247,15 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
     lineeConfermate: confermate.length,
     postiPareggio: t.preventivoPostiBus ? Math.round(t.preventivoPostiBus * (soglia / 100)) : null,
     postiPerBus,
-  });
+  };
+  const { proposte, contatore } = calcolaProposte(dati);
   return {
     necessarie: proposte,
     contatore,
     bozze,
     tutte: righeLinee,
     principale: principale ? { nome: principale.linea.nome, bus: busPerLinea.get(principale.linea.id) ?? 0 } : null,
+    dati,
   };
 }
 
@@ -321,6 +347,12 @@ export const lineeDaConfermareService = {
   async contatore(tragittoId: string): Promise<ContatorePareggio | null> {
     const [soglia, postiPerBus] = await Promise.all([leggiSogliaOccupazionePareggio(), leggiPostiPerBus()]);
     return (await leggiStato(db, tragittoId, soglia, postiPerBus))?.contatore ?? null;
+  },
+
+  /** Lo stato di un tragitto di un evento non ancora passato, anche fuori
+   *  vendita, per la simulazione economica dei bus in più. */
+  statoPerSimulazione(tragittoId: string, soglia: number, postiPerBus: number): Promise<StatoProposte | null> {
+    return leggiStato(db, tragittoId, soglia, postiPerBus, { ancheFuoriVendita: true });
   },
 
   /** Dopo una prenotazione, una cancellazione, un preventivo o un cambio di

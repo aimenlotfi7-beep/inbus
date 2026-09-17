@@ -14,6 +14,7 @@ import type { Evento, Fermata } from '../../api/types';
 import { fornitoriApi, type Fornitore } from '../../api/fornitori';
 import { preventiviApi, type CambioPercorso, type RichiestaConRisposta } from '../../api/preventivi';
 import { PreventiviBus, PreventivoDelBusRiga } from './partenze/PreventiviBus';
+import { RiquadroBusInPiu } from './statistiche/BusInPiu';
 import { tourLeaderApi, type TourLeader } from '../../api/tourleader';
 import { haPermesso } from '../../api/auth';
 import { CampoNumero } from '../shared/CampoNumero';
@@ -118,11 +119,14 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   const [passeggeri, setPasseggeri] = useState<PasseggeroBus[] | null>(null);
   const [errorePasseggeri, setErrorePasseggeri] = useState('');
   const [scaricandoPdfId, setScaricandoPdfId] = useState<string | null>(null);
+  // Cambia a ogni ricarica: il riquadro dei bus in più rilegge i suoi conti.
+  const [versioneDati, setVersioneDati] = useState(0);
 
   // "Carico…" solo la prima volta: dopo una modifica i dati si aggiornano
   // senza smontare la pagina.
   function ricarica() {
     if (!eventoId || !tragittoId) return;
+    setVersioneDati((v) => v + 1);
     Promise.all([eventiApi.getById(eventoId), eventiApi.calcolaBus(eventoId), eventiApi.listaLinee(tragittoId)])
       .then(([ev, c, l]) => { setEvento(ev); setCalcolo(c); setLinee(l); setErrore(''); })
       .catch((e) => setErrore(`Impossibile caricare le linee: ${motivoErrore(e)}`))
@@ -753,6 +757,8 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         </div>
         {prossimoPasso.azione && <button type="button" className="btn btn-primary" onClick={prossimoPasso.azione.onClick}>{prossimoPasso.azione.testo}</button>}
       </div>
+
+      {vedeEconomia && <RiquadroBusInPiu eventoId={idEvento} tragittoId={idTragitto} versione={versioneDati} />}
 
       <p className="section-label" style={{ marginBottom: 8 }}>Fermate</p>
       <div className="tabella-righe fermate-linee">

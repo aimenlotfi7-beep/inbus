@@ -4,6 +4,7 @@ import { ErroreApplicativo } from '../../shared/errors.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { costruisciPeriodo, type Periodo } from './periodo.js';
+import { simulazioneBusService } from './simulazione-bus.service.js';
 import { statisticheService } from './statistiche.service.js';
 
 const filtroSchema = z.object({
@@ -43,4 +44,9 @@ statisticheRouter.get('/clienti', asyncHandler(async (req: Request, res: Respons
 }));
 statisticheRouter.get('/costi', asyncHandler(async (req: Request, res: Response) => {
   res.json(await statisticheService.costi(leggiPeriodo(req)));
+}));
+statisticheRouter.get('/bus-in-piu', asyncHandler(async (req: Request, res: Response) => {
+  const anno = z.coerce.number().int().min(2000).max(2100).safeParse(req.query.anno);
+  if (!anno.success) throw new ErroreApplicativo("Anno non valido: scrivilo con quattro cifre, per esempio 2026.", 400, 'ANNO_NON_VALIDO');
+  res.json(await simulazioneBusService.anno(anno.data));
 }));

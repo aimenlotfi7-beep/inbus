@@ -59,7 +59,8 @@ export interface ContestoFonti {
 }
 
 export interface StruttureEventi {
-  tragitti: { id: string; eventoId: string; nome: string; attivo: boolean; preventivoPostiBus: number | null }[];
+  /** preventivoCosto: il costo di un bus della quotazione (stima dei bus senza costo). */
+  tragitti: { id: string; eventoId: string; nome: string; attivo: boolean; preventivoPostiBus: number | null; preventivoCosto?: string | null }[];
   linee: { id: string; nome: string; tragittoId: string; daConfermare: boolean }[];
   fermateLinee: { lineaId: string; citta: string }[];
   bus: { id: string; lineaId: string | null; costo: string | null; postiBus: number | null }[];
@@ -175,6 +176,77 @@ export function economiaEventi(eventoIds: string[], dati: DatiEventi): Map<strin
     if (!busPerTragitto.has(r.tragittoId)) e.passeggeriSenzaBus += r.passeggeri;
   }
   const commissioni = commissioniPer(dati.righe, (r) => r.eventoId, dati.ctx);
+  for (const [id, e] of risultato) {
+    e.incasso = arrotondaEuro(e.incasso);
+    e.costoBus = arrotondaEuro(e.costoBus);
+    e.commissioni = commissioni.get(id) ?? 0;
+    e.margine = arrotondaEuro(e.incasso - e.costoBus - e.commissioni);
+  }
+  return risultato;
+}
+
+// ---------------------------------------------------------------- Eventi passati (simulazione dei bus)
+
+export interface EconomiaConclusa {
+  /** Passeggeri partiti: quelli saliti su un bus. */
+  passeggeri: number;
+  /** Rimasti senza bus o con una richiesta di rimborso in attesa: rimborsati, non contano. */
+  nonPartiti: number;
+  incasso: number;
+  commissioni: number;
+  bus: number;
+  costoBus: number;
+  /** Bus senza costo stimati con la quotazione del tragitto. */
+  busCostoStimato: number;
+  /** Bus senza costo e senza quotazione: contano 0. */
+  busSenzaCosto: number;
+  /** Partiti su tragitti senza nessun bus registrato: il loro costo manca. */
+  passeggeriSenzaBus: number;
+  margine: number;
+}
+
+/** I conti veri di eventi già passati per la simulazione dei bus (regola del
+ *  proprietario, settembre 2026: chi non parte viene rimborsato, e nessun
+ *  rimborso conta). Conta chi è salito su un bus; chi è rimasto senza bus e
+ *  chi ha un rimborso in attesa no. Un tragitto in cui lo smistamento non ha
+ *  messo nessuno sui bus (viaggi di prima dello smistamento) conta tutti i
+ *  suoi prenotati. Un bus senza costo vale il costo della quotazione. */
+export function economiaEventiConclusi(eventoIds: string[], dati: DatiEventi, rimborsiInAttesa: Set<string>): Map<string, EconomiaConclusa> {
+  const risultato = new Map<string, EconomiaConclusa>(eventoIds.map((id) => [id, {
+    passeggeri: 0, nonPartiti: 0, incasso: 0, commissioni: 0, bus: 0, costoBus: 0, busCostoStimato: 0, busSenzaCosto: 0, passeggeriSenzaBus: 0, margine: 0,
+  }]));
+  const tragittoPerId = new Map(dati.strutture.tragitti.map((t) => [t.id, t]));
+  const tragittoDiLinea = new Map(dati.strutture.linee.map((l) => [l.id, l.tragittoId]));
+  const busIds = new Set<string>();
+  const tragittiConBus = new Set<string>();
+  for (const b of dati.strutture.bus) {
+    const t = b.lineaId ? tragittoPerId.get(tragittoDiLinea.get(b.lineaId) ?? '') : undefined;
+    const e = t ? risultato.get(t.eventoId) : undefined;
+    if (!t || !e) continue;
+    busIds.add(b.id);
+    tragittiConBus.add(t.id);
+    e.bus += 1;
+    if (b.costo !== null) e.costoBus += Number(b.costo);
+    else if (t.preventivoCosto) {
+      e.costoBus += Number(t.preventivoCosto);
+      e.busCostoStimato += 1;
+    } else e.busSenzaCosto += 1;
+  }
+  const smistati = new Set(dati.righe.filter((r) => r.busId && busIds.has(r.busId)).map((r) => r.tragittoId));
+  const partite = dati.righe.filter((r) => !rimborsiInAttesa.has(r.id) && (!smistati.has(r.tragittoId) || (r.busId !== null && busIds.has(r.busId))));
+  const idPartite = new Set(partite.map((r) => r.id));
+  for (const r of dati.righe) {
+    const e = risultato.get(r.eventoId);
+    if (!e) continue;
+    if (!idPartite.has(r.id)) {
+      e.nonPartiti += r.passeggeri;
+      continue;
+    }
+    e.passeggeri += r.passeggeri;
+    e.incasso += r.totale;
+    if (!tragittiConBus.has(r.tragittoId)) e.passeggeriSenzaBus += r.passeggeri;
+  }
+  const commissioni = commissioniPer(partite, (r) => r.eventoId, dati.ctx);
   for (const [id, e] of risultato) {
     e.incasso = arrotondaEuro(e.incasso);
     e.costoBus = arrotondaEuro(e.costoBus);

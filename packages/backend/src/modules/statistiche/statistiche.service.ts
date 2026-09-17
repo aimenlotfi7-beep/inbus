@@ -45,7 +45,7 @@ function plurale(n: number, singolare: string, formaPlurale: string): string {
   return `${n} ${n === 1 ? singolare : formaPlurale}`;
 }
 
-async function aBlocchiDaDb<T>(ids: string[], leggi: (blocco: string[]) => Promise<T[]>): Promise<T[]> {
+export async function aBlocchiDaDb<T>(ids: string[], leggi: (blocco: string[]) => Promise<T[]>): Promise<T[]> {
   if (ids.length === 0) return [];
   return (await Promise.all(aBlocchi(ids, BLOCCO_ID).map(leggi))).flat();
 }
@@ -218,6 +218,7 @@ function sintesiPerTipo(righe: PrenotazioneStatistica[], ctx: ContestoFonti) {
 async function leggiStrutture(eventoIds: string[]): Promise<StruttureEventi> {
   const righeTragitti = await aBlocchiDaDb(eventoIds, (ids) => db.select({
     id: tragitti.id, eventoId: tragitti.eventoId, nome: tragitti.nome, attivo: tragitti.attivo, preventivoPostiBus: tragitti.preventivoPostiBus,
+    preventivoCosto: tragitti.preventivoCosto,
   }).from(tragitti).where(and(inArray(tragitti.eventoId, ids), isNull(tragitti.eliminatoIl))).orderBy(asc(tragitti.nome)));
   const righeLinee = await aBlocchiDaDb(righeTragitti.map((t) => t.id), (ids) => db.select({
     id: linee.id, nome: linee.nome, tragittoId: linee.tragittoId, daConfermare: linee.daConfermare,
@@ -233,7 +234,7 @@ async function leggiStrutture(eventoIds: string[]): Promise<StruttureEventi> {
   return { tragitti: righeTragitti, linee: righeLinee, fermateLinee, bus };
 }
 
-async function caricaDatiEventi(eventoIds: string[]): Promise<DatiEventi> {
+export async function caricaDatiEventi(eventoIds: string[]): Promise<DatiEventi> {
   const [righe, strutture, soglia, postiPerBus] = await Promise.all([
     aBlocchiDaDb(eventoIds, (ids) => leggiPrenotazioni(inArray(prenotazioni.eventoId, ids))),
     leggiStrutture(eventoIds),

@@ -384,6 +384,78 @@ export interface StatisticheCosti {
   };
 }
 
+// ---------------------------------------------------------------- Bus in più
+
+/** linea-senza-bus: linea confermata ancora senza bus; proposta: da
+ *  confermare (raggiunge il pareggio); sotto-pareggio: un bus in più che non
+ *  lo raggiunge. */
+export type TipoBusInPiu = 'linea-senza-bus' | 'proposta' | 'sotto-pareggio';
+
+export interface BusInPiuSimulato {
+  /** Stabile tra un caricamento e l'altro: ci si ricorda l'interruttore. */
+  chiave: string;
+  nome: string;
+  tipo: TipoBusInPiu;
+  lineaId: string | null;
+  posti: number;
+  /** Il preventivo più basso ricevuto per quel bus, altrimenti il costo della quotazione. */
+  costo: number | null;
+  fonteCosto: 'preventivo' | 'quotazione' | null;
+  preventivi: number;
+}
+
+export interface TragittoSimulato {
+  id: string;
+  nome: string;
+  passeggeri: number;
+  inAttesaDiRimborso: number;
+  busConfermati: number;
+  costoBusConfermati: number;
+  busCostoStimato: number;
+  busSenzaCosto: number;
+  postiPareggio: number | null;
+  busInPiu: BusInPiuSimulato[];
+  /** [passeggeri che partono, incasso, commissioni]; indice = combinazione
+   *  degli interruttori (bit i acceso = parte il bus in più i). */
+  esiti: [number, number, number][];
+}
+
+export interface EventoSimulato {
+  id: string;
+  artista: string;
+  citta: string;
+  data: string;
+  anno: number;
+  tragitti: TragittoSimulato[];
+}
+
+export interface EventoConcluso {
+  id: string;
+  artista: string;
+  citta: string;
+  data: string;
+  passeggeri: number;
+  nonPartiti: number;
+  incasso: number;
+  commissioni: number;
+  bus: number;
+  costoBus: number;
+  busCostoStimato: number;
+  busSenzaCosto: number;
+  passeggeriSenzaBus: number;
+  margine: number;
+}
+
+export interface StatisticheBusInPiu {
+  anno: number;
+  /** Anni da scegliere, dal più recente. */
+  anni: number[];
+  /** Tutti gli eventi ancora da fare, di ogni anno. */
+  inVendita: EventoSimulato[];
+  /** Eventi già passati dell'anno scelto, con i numeri veri. */
+  conclusi: EventoConcluso[];
+}
+
 function query(f: FiltroPeriodo) {
   return `dal=${encodeURIComponent(f.dal)}&al=${encodeURIComponent(f.al)}&confronto=${f.confronto}`;
 }
@@ -396,4 +468,7 @@ export const statisticheApi = {
   vendite: (f: FiltroPeriodo) => api.get<StatisticheVendite>(`/api/statistiche/vendite?${query(f)}`),
   clienti: (f: FiltroPeriodo) => api.get<StatisticheClienti>(`/api/statistiche/clienti?${query(f)}`),
   costi: (f: FiltroPeriodo) => api.get<StatisticheCosti>(`/api/statistiche/costi?${query(f)}`),
+  busInPiu: (anno: number) => api.get<StatisticheBusInPiu>(`/api/statistiche/bus-in-piu?anno=${anno}`),
+  /** Un solo evento, per la pagina Linee (null se è già passato). */
+  busInPiuEvento: (eventoId: string) => api.get<{ evento: EventoSimulato | null }>(`/api/eventi/${encodeURIComponent(eventoId)}/simulazione-bus`),
 };

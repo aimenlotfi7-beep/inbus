@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Confronto, FiltroPeriodo } from '../../../api/statistiche';
 import { PanelHead } from '../../shared/PanelHead';
+import { BusInPiu } from './BusInPiu';
 import { Clienti } from './Clienti';
 import { chiaveFiltro, ProtezioneErrori } from './comuni';
 import { CostiFornitori } from './CostiFornitori';
@@ -12,7 +13,7 @@ import {
 } from './periodo';
 import { VenditeCanali } from './VenditeCanali';
 
-type IdScheda = 'panoramica' | 'eventi' | 'vendite' | 'clienti' | 'costi';
+type IdScheda = 'panoramica' | 'eventi' | 'vendite' | 'clienti' | 'costi' | 'bus-in-piu';
 
 const SCHEDE: { id: IdScheda; etichetta: string }[] = [
   { id: 'panoramica', etichetta: 'Panoramica' },
@@ -20,7 +21,11 @@ const SCHEDE: { id: IdScheda; etichetta: string }[] = [
   { id: 'vendite', etichetta: 'Vendite e canali' },
   { id: 'clienti', etichetta: 'Clienti' },
   { id: 'costi', etichetta: 'Costi e fornitori' },
+  { id: 'bus-in-piu', etichetta: 'Bus in più' },
 ];
+
+/** Bus in più ha il suo filtro (l'anno): niente periodo. */
+const SCHEDE_SENZA_PERIODO: IdScheda[] = ['bus-in-piu'];
 
 /** Solo queste schede mostrano un confronto: le altre non hanno il menu
  *  "Confronto" e chiedono sempre "nessuno" (cambiarlo non le ricarica). */
@@ -112,36 +117,40 @@ export function StatisticheScreen() {
         ))}
       </div>
 
-      <div className="stat-filtri">
-        <label className="stat-campo">
-          <span>Periodo</span>
-          <select value={preset} onChange={(e) => cambiaPreset(e.target.value as PresetPeriodo)}>
-            {PRESET_PERIODO.map((p) => <option key={p.id} value={p.id}>{p.etichetta}</option>)}
-          </select>
-        </label>
-        {personalizzato && (
-          <>
+      {!SCHEDE_SENZA_PERIODO.includes(scheda) && (
+        <>
+          <div className="stat-filtri">
             <label className="stat-campo">
-              <span>Dal</span>
-              <input type="date" value={dalScelto} onChange={(e) => setDalScelto(e.target.value)} />
+              <span>Periodo</span>
+              <select value={preset} onChange={(e) => cambiaPreset(e.target.value as PresetPeriodo)}>
+                {PRESET_PERIODO.map((p) => <option key={p.id} value={p.id}>{p.etichetta}</option>)}
+              </select>
             </label>
-            <label className="stat-campo">
-              <span>Al</span>
-              <input type="date" value={alScelto} min={dalScelto || undefined} onChange={(e) => setAlScelto(e.target.value)} />
-            </label>
-          </>
-        )}
-        {usaConfronto && (
-          <label className="stat-campo">
-            <span>Confronto</span>
-            <select value={confronto} onChange={(e) => setConfronto(e.target.value as Confronto)}>
-              {OPZIONI_CONFRONTO.map((c) => <option key={c.id} value={c.id}>{c.etichetta}</option>)}
-            </select>
-          </label>
-        )}
-        {testoInfo && <p className="stat-periodo">{testoInfo}</p>}
-      </div>
-      <p className="stat-errore-date" aria-live="polite">{personalizzato ? erroreDateMostrato : null}</p>
+            {personalizzato && (
+              <>
+                <label className="stat-campo">
+                  <span>Dal</span>
+                  <input type="date" value={dalScelto} onChange={(e) => setDalScelto(e.target.value)} />
+                </label>
+                <label className="stat-campo">
+                  <span>Al</span>
+                  <input type="date" value={alScelto} min={dalScelto || undefined} onChange={(e) => setAlScelto(e.target.value)} />
+                </label>
+              </>
+            )}
+            {usaConfronto && (
+              <label className="stat-campo">
+                <span>Confronto</span>
+                <select value={confronto} onChange={(e) => setConfronto(e.target.value as Confronto)}>
+                  {OPZIONI_CONFRONTO.map((c) => <option key={c.id} value={c.id}>{c.etichetta}</option>)}
+                </select>
+              </label>
+            )}
+            {testoInfo && <p className="stat-periodo">{testoInfo}</p>}
+          </div>
+          <p className="stat-errore-date" aria-live="polite">{personalizzato ? erroreDateMostrato : null}</p>
+        </>
+      )}
 
       <ProtezioneErrori chiave={`${scheda}|${chiaveFiltro(filtro)}`}>
         {scheda === 'panoramica' && <Panoramica filtro={filtro} onPeriodo={setInfoPeriodo} />}
@@ -149,6 +158,7 @@ export function StatisticheScreen() {
         {scheda === 'vendite' && <VenditeCanali filtro={filtro} onPeriodo={setInfoPeriodo} />}
         {scheda === 'clienti' && <Clienti filtro={filtro} onPeriodo={setInfoPeriodo} />}
         {scheda === 'costi' && <CostiFornitori filtro={filtro} onPeriodo={setInfoPeriodo} />}
+        {scheda === 'bus-in-piu' && <BusInPiu />}
       </ProtezioneErrori>
     </div>
   );

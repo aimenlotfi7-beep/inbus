@@ -95,3 +95,4 @@ eventiRouter.delete('/:id/bus/:busId', richiedeAuth, richiedePermesso('eventi.cr
 eventiRouter.get('/:id/bus/:busId/passeggeri', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.listaPasseggeriBus));
 eventiRouter.get('/:id/bus/:busId/passeggeri/pdf', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.pdfPasseggeriBus));
 eventiRouter.get('/:id/riepilogo-economico', richiedeAuth, richiedePermesso('eventi.economia'), asyncHandler(eventiController.riepilogoEconomico));
+eventiRouter.get('/:id/simulazione-bus', richiedeAuth, richiedePermesso('eventi.economia'), asyncHandler(eventiController.simulazioneBus));
