@@ -43,10 +43,14 @@ describe('evento in vendita', () => {
 
     const evento = await simulazioneBusService.evento(s.evento.id);
     const [t] = evento!.tragitti;
-    expect(t).toMatchObject({ passeggeri: 7, busConfermati: 1, costoBusConfermati: 250, postiPareggio: 2 });
-    expect(t.busInPiu).toEqual([expect.objectContaining({ tipo: 'proposta', lineaId: proposta.id, costo: 300, fonteCosto: 'quotazione', preventivi: 0 })]);
-    // Spento: partono i 4 di Roma (160 €) e i 3 di Firenze sono rimborsati. Acceso: partono tutti.
-    expect(t.esiti).toEqual([[4, 160, 0], [7, 250, 0]]);
+    expect(t).toMatchObject({ passeggeri: 7, incasso: 250 });
+    expect(t.linee.map((l) => [l.nome, l.fermate])).toEqual([['Linea 1', ['Roma', 'Firenze']], [proposta.nome, ['Firenze']]]);
+    expect(t.bus.map((b) => [b.nome, b.tipo, b.linea, b.interruttore, b.costo, b.fonteCosto])).toEqual([
+      ['Bus 1', 'confermato', 0, null, 250, 'bus'],
+      ['Bus 1', 'proposta', 1, 0, 300, 'quotazione'],
+    ]);
+    // Spento: partono i 4 di Roma (160 €) e i 3 di Firenze sono rimborsati. Acceso: i 3 di Firenze sul bus in più.
+    expect(t.esiti).toEqual([[[4, 160, 0, 0, 0], [0, 0, 0, 0, 0]], [[4, 160, 0, 0, 0], [3, 90, 0, 0, 0]]]);
   });
 
   it('con un preventivo per quel bus vale il più basso', async () => {
@@ -60,7 +64,7 @@ describe('evento in vendita', () => {
       await db.insert(preventiviRisposte).values({ richiestaId: richiesta.id, prezzo, postiBus: 4 });
     }
     const [t] = (await simulazioneBusService.evento(s.evento.id))!.tragitti;
-    expect(t.busInPiu[0]).toMatchObject({ costo: 220, fonteCosto: 'preventivo', preventivi: 2 });
+    expect(t.bus[1]).toMatchObject({ costo: 220, fonteCosto: 'preventivo', preventivi: 2 });
   });
 
   it('una richiesta di rimborso in attesa tiene il posto ma non conta', async () => {
@@ -68,7 +72,21 @@ describe('evento in vendita', () => {
     await db.insert(richiesteRimborso).values({ prenotazioneId: s.romaB.id });
     const [t] = (await simulazioneBusService.evento(s.evento.id))!.tragitti;
     expect(t.inAttesaDiRimborso).toBe(2);
-    expect(t.esiti[0]).toEqual([2, 80, 0]);
+    expect(t.esiti[0][0]).toEqual([2, 80, 0, 0, 0]);
+  });
+
+  it('di un acconto conta solo quanto è stato pagato; il saldo che manca è a parte', async () => {
+    const s = await scenarioBase({ tragitto: { preventivoPostiBus: 50, preventivoCosto: '500' } });
+    await creaLineaConBus(s.tragitto.id, [s.roma.id, s.firenze.id], 50);
+    const cliente = await creaCliente();
+    const p = await prenotazioniService.crea(riga({ eventoId: s.evento.id, tragittoId: s.tragitto.id, fermataId: s.roma.id }, cliente, { passeggeri: 2, tipoPagamento: 'ACCONTO' }), cliente.id);
+    const [salvata] = await db.select({ totale: prenotazioni.totale }).from(prenotazioni).where(eq(prenotazioni.id, p.id));
+    const acconto = Number(salvata.totale);
+    // 2 posti da 40 €: l'acconto è meno degli 80 € del prezzo intero.
+    expect(acconto).toBeLessThan(80);
+    const [t] = (await simulazioneBusService.evento(s.evento.id))!.tragitti;
+    expect(t.incasso).toBe(acconto);
+    expect(t.esiti[0][0]).toEqual([2, acconto, 0, 0, 80 - acconto]);
   });
 
   it('un evento passato non ha niente da simulare', async () => {
@@ -94,9 +112,12 @@ describe('anno', () => {
     const anno = giornoARoma(data).anno;
     const risultato = await simulazioneBusService.anno(anno);
 
-    expect(risultato.conclusi).toEqual([expect.objectContaining({
-      id: passato.evento.id, passeggeri: 2, nonPartiti: 1, incasso: 80, costoBus: 500, busCostoStimato: 1, margine: -420,
-    })]);
+    expect(risultato.conclusi.map((e) => e.id)).toEqual([passato.evento.id]);
+    const [t] = risultato.conclusi[0].tragitti;
+    expect(t.passeggeri).toBe(3);
+    expect(t.bus.map((b) => [b.nome, b.costo, b.fonteCosto])).toEqual([['Bus 1', 500, 'quotazione']]);
+    // Sul bus i 2 saliti (80 €); quello rimasto a terra non conta.
+    expect(t.esiti).toEqual([[[2, 80, 0, 0, 0]]]);
     expect(risultato.inVendita.map((e) => e.id)).toEqual([inVendita.evento.id]);
     expect(risultato.anni).toContain(anno);
   });

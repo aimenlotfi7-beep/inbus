@@ -2,13 +2,13 @@ import { arrotondaEuro } from '../statistiche/calcoli.js';
 import { riempiBus, type BusDaRiempire, type GruppoPasseggeri } from '../prenotazioni/riempimento-bus.js';
 import { passiBusInPiu, PREFISSO_LINEA_SENZA_BUS, type StatoProposte } from './linee-da-confermare.service.js';
 
-/** Simulazione economica dei bus in più di un tragitto (Statistiche › Bus in
- *  più e pagina Linee). Nessun database qui: si prova da sola in
- *  simulazione-bus.test.ts.
+/** Simulazione economica dei bus (Statistiche › Bus in più e pagina Linee).
+ *  Nessun database qui: si prova da sola in simulazione-bus.test.ts.
  *
  *  Regole decise dal proprietario (settembre 2026): serve a capire se
  *  conviene far partire un bus per chi resta fuori, anche sotto il pareggio
- *  (per immagine o altre esigenze).
+ *  (per immagine o altre esigenze), guardando incasso e spesa totali, per
+ *  linea e per bus.
  *  - i bus in più sono, in ordine: le linee confermate ancora senza bus, le
  *    proposte da confermare, poi altri bus con la stessa regola delle
  *    proposte finché resta qualcuno che un bus può portare;
@@ -16,39 +16,89 @@ import { passiBusInPiu, PREFISSO_LINEA_SENZA_BUS, type StatoProposte } from './l
  *    simulazione, non conferma niente;
  *  - chi non trova posto sui bus che partono viene rimborsato: il suo incasso
  *    e le sue commissioni non contano;
- *  - chi sale lo decide la regola dello smistamento (gruppi interi, solo sui
- *    bus che si fermano alla loro fermata): per questo ogni combinazione di
- *    interruttori si calcola qui, e la pagina sceglie quella accesa. */
+ *  - incasso = quanto è stato pagato davvero: di un acconto non saldato solo
+ *    l'acconto; i saldi che mancano si mostrano a parte e non contano;
+ *  - spesa = costo dei bus che partono + commissioni dei promoter + quote
+ *    White Label dei passeggeri che partono;
+ *  - chi sale e su quale bus lo decide la regola dello smistamento (gruppi
+ *    interi, solo sui bus che si fermano alla loro fermata): per questo ogni
+ *    combinazione di interruttori si calcola qui, e la pagina sceglie quella
+ *    accesa. */
 
 /** Bus in più simulati al massimo per tragitto: le combinazioni sono 2^n. */
 export const MAX_BUS_IN_PIU = 8;
 
 export interface GruppoConIncasso extends GruppoPasseggeri {
-  /** Valore della prenotazione (un acconto conta già intero). */
+  /** Quanto ha pagato davvero finora: per un acconto non saldato solo l'acconto
+   *  (proprietario, settembre 2026). */
   incasso: number;
-  commissioni: number;
+  /** Il saldo che manca ancora (0 se ha pagato tutto): non conta nel risultato. */
+  daIncassare: number;
+  /** Commissione del promoter su questa prenotazione. */
+  promoter: number;
+  /** Quota dell'organizzatore White Label. */
+  whiteLabel: number;
   /** Con un rimborso in attesa tiene il suo posto ma non conta: né passeggeri né incasso. */
   rimborsoInAttesa: boolean;
 }
 
-/** Un bus nello smistamento simulato: `interruttore` è la sua posizione tra i
- *  bus in più, null per un bus confermato (parte sempre). */
-export interface BusSimulato extends BusDaRiempire { interruttore: number | null }
+/** confermato: bus vero; linea-senza-bus: linea confermata senza bus;
+ *  proposta: da confermare (raggiunge il pareggio); sotto-pareggio: bus in
+ *  più che non lo raggiunge; senza-bus: passeggeri di un viaggio passato mai
+ *  smistato (contano, ma non sono su un bus). */
+export type TipoBusSimulato = 'confermato' | 'linea-senza-bus' | 'proposta' | 'sotto-pareggio' | 'senza-bus';
 
-export type TipoBusInPiu = 'linea-senza-bus' | 'proposta' | 'sotto-pareggio';
-
-export interface BusInPiu {
+/** Un bus nello smistamento simulato. `interruttore` è la sua posizione tra i
+ *  bus in più, null per un bus che parte sempre. */
+export interface BusDellaSimulazione extends BusDaRiempire {
+  interruttore: number | null;
   /** Stabile tra un caricamento e l'altro: la pagina ci ricorda l'interruttore. */
   chiave: string;
-  nome: string;
-  tipo: TipoBusInPiu;
-  /** La riga di `linee` (linea senza bus o proposta salvata): i suoi preventivi. */
-  lineaId: string | null;
-  posti: number;
+  tipo: TipoBusSimulato;
+  riferimento: string | null;
+  lineaChiave: string;
+  lineaNome: string;
+  /** La riga di `linee` di cui leggere i preventivi (proposte e linee senza bus). */
+  lineaIdPreventivi: string | null;
 }
 
-/** [passeggeri che partono, incasso, commissioni] per una combinazione. */
-export type EsitoCombinazione = [number, number, number];
+/** Nella risposta: una linea con le sue fermate in ordine. */
+export interface LineaSimulata { chiave: string; nome: string; fermate: string[] }
+
+export interface BusSimulato {
+  chiave: string;
+  /** "Bus 2": numerato dentro la sua linea. */
+  nome: string;
+  riferimento: string | null;
+  tipo: TipoBusSimulato;
+  /** Posizione in `linee`. */
+  linea: number;
+  posti: number;
+  interruttore: number | null;
+  /** Costo del bus: quello registrato, il preventivo più basso o la quotazione; null se non c'è. */
+  costo: number | null;
+  fonteCosto: 'bus' | 'preventivo' | 'quotazione' | null;
+  preventivi: number;
+}
+
+/** Per un bus in una combinazione: [passeggeri, incasso (pagato davvero),
+ *  commissioni promoter, quote White Label, saldi ancora da incassare]. */
+export type EsitoBus = [number, number, number, number, number];
+
+export interface TragittoSimulato {
+  id: string;
+  nome: string;
+  /** Tutti i passeggeri delle prenotazioni confermate (anche chi resta a terra). */
+  passeggeri: number;
+  inAttesaDiRimborso: number;
+  /** Pagato davvero da tutte le prenotazioni confermate, senza quelle con un
+   *  rimborso in attesa: meno l'incasso di chi parte, è quanto vale chi resta a terra. */
+  incasso: number;
+  linee: LineaSimulata[];
+  bus: BusSimulato[];
+  /** esiti[combinazione][bus]: combinazione = bit i acceso se parte il bus in più i. */
+  esiti: EsitoBus[][];
+}
 
 const stesseFermate = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
 
@@ -56,66 +106,100 @@ const stesseFermate = (a: string[], b: string[]) => a.length === b.length && [..
  *  (al massimo `massimo`). */
 export function busDellaSimulazione(
   tragittoId: string,
-  stato: Pick<StatoProposte, 'dati' | 'necessarie' | 'bozze' | 'tutte' | 'principale'>,
+  stato: Pick<StatoProposte, 'dati' | 'necessarie' | 'bozze' | 'principale' | 'infoBus'>,
   massimo = MAX_BUS_IN_PIU,
-): { bus: BusSimulato[]; inPiu: BusInPiu[] } {
+): BusDellaSimulazione[] {
   const { dati } = stato;
-  const inPiu: BusInPiu[] = [];
-  const nomeLinea = new Map(stato.tutte.map((l) => [l.id, l.nome]));
-  const bus: BusSimulato[] = dati.bus.map((b) => {
-    if (!b.busId.startsWith(PREFISSO_LINEA_SENZA_BUS) || inPiu.length >= massimo) return { ...b, interruttore: null };
-    const lineaId = b.busId.slice(PREFISSO_LINEA_SENZA_BUS.length);
-    inPiu.push({ chiave: `linea:${lineaId}`, nome: `Bus 1 · ${nomeLinea.get(lineaId) ?? 'linea senza bus'}`, tipo: 'linea-senza-bus', lineaId, posti: b.postiBus });
-    return { ...b, interruttore: inPiu.length - 1 };
+  let interruttori = 0;
+  const bus: BusDellaSimulazione[] = dati.bus.map((b) => {
+    const info = stato.infoBus.get(b.busId);
+    const lineaId = info?.lineaId ?? b.busId;
+    const comune = { ...b, riferimento: info?.riferimento ?? null, lineaChiave: `linea:${lineaId}`, lineaNome: info?.lineaNome ?? 'Linea' };
+    if (!b.busId.startsWith(PREFISSO_LINEA_SENZA_BUS)) {
+      return { ...comune, interruttore: null, chiave: b.busId, tipo: 'confermato', lineaIdPreventivi: null };
+    }
+    const interruttore = interruttori < massimo ? interruttori++ : null;
+    return { ...comune, interruttore, chiave: `linea:${lineaId}`, tipo: 'linea-senza-bus', lineaIdPreventivi: lineaId };
   });
 
-  if (dati.fermateOrdinate.length === 0 || inPiu.length >= massimo) return { bus, inPiu };
+  if (dati.fermateOrdinate.length === 0 || interruttori >= massimo) return bus;
   const cittaDi = new Map(dati.fermateOrdinate.map((f) => [f.id, f.citta]));
-  const { passi } = passiBusInPiu(dati, 1, massimo - inPiu.length);
-  let busSullaPrincipale = 0;
+  const { passi } = passiBusInPiu(dati, 1, massimo - interruttori);
   passi.forEach((passo, i) => {
     const diBus = passo.proposta.tipo === 'bus';
-    if (diBus) busSullaPrincipale += 1;
     const proposta = i < stato.necessarie.length;
     const bozza = proposta ? stato.bozze[i] : undefined;
     const salvata = bozza && stesseFermate(bozza.fermateIds, passo.proposta.fermateIds) ? bozza : undefined;
-    const nomeCalcolato = !diBus
-      ? `Linea nuova da ${cittaDi.get(passo.proposta.fermateIds[0]) ?? 'una fermata successiva'}`
-      : stato.principale
-        ? `Bus ${stato.principale.bus + busSullaPrincipale} · ${stato.principale.nome}`
-        : busSullaPrincipale === 1 ? 'Primo bus' : `Bus ${busSullaPrincipale}`;
-    inPiu.push({
+    // Un bus in più va sulla linea principale; una linea nuova è una linea a sé.
+    const linea = diBus && stato.principale
+      ? { chiave: `linea:${stato.principale.id}`, nome: stato.principale.nome }
+      : {
+        chiave: `linea-nuova:${passo.proposta.fermateIds.join('-')}`,
+        nome: salvata?.nome ?? (diBus ? 'Linea nuova' : `Linea nuova da ${cittaDi.get(passo.proposta.fermateIds[0]) ?? 'una fermata successiva'}`),
+      };
+    bus.push({
+      ...passo.bus,
+      busId: `bus-in-piu-${i + 1}`,
+      interruttore: interruttori++,
       chiave: salvata ? `proposta:${salvata.id}` : `${tragittoId}:bus-in-piu:${i + 1}`,
-      // Il nome che la proposta ha nella pagina Linee.
-      nome: salvata ? (!stato.principale && i === 0 ? `Primo bus · ${salvata.nome}` : salvata.nome) : nomeCalcolato,
       tipo: proposta ? 'proposta' : 'sotto-pareggio',
-      lineaId: salvata?.id ?? null,
-      posti: passo.bus.postiBus,
+      riferimento: null,
+      lineaChiave: linea.chiave,
+      lineaNome: linea.nome,
+      lineaIdPreventivi: salvata?.id ?? null,
     });
-    bus.push({ ...passo.bus, busId: `bus-in-piu-${i + 1}`, interruttore: inPiu.length - 1 });
   });
-  return { bus, inPiu };
+  return bus;
 }
 
 /** Per ogni combinazione di interruttori (il bit i acceso = parte il bus in
- *  più i) chi parte e quanto porta. Chi non sale su nessun bus che parte è
- *  rimborsato: non conta. */
-export function esitiCombinazioni(gruppi: GruppoConIncasso[], bus: BusSimulato[]): EsitoCombinazione[] {
+ *  più i), per ogni bus: chi parte su quel bus e quanto porta. Un bus che non
+ *  parte ha tutto a zero; chi non sale su nessun bus è rimborsato e non conta. */
+export function esitiCombinazioni(gruppi: GruppoConIncasso[], bus: BusDellaSimulazione[]): EsitoBus[][] {
   const interruttori = bus.reduce((max, b) => (b.interruttore === null ? max : Math.max(max, b.interruttore + 1)), 0);
-  const esiti: EsitoCombinazione[] = [];
+  const posizione = new Map(bus.map((b, i) => [b.busId, i]));
+  const esiti: EsitoBus[][] = [];
   for (let combinazione = 0; combinazione < 2 ** interruttori; combinazione++) {
     const partono = bus.filter((b) => b.interruttore === null || (combinazione & (1 << b.interruttore)) !== 0);
-    const fuori = new Set(riempiBus(gruppi, partono).senzaPosto.map((g) => g.id));
-    let passeggeri = 0;
-    let incasso = 0;
-    let commissioni = 0;
+    const { assegnazioni } = riempiBus(gruppi, partono);
+    const perBus = bus.map((): EsitoBus => [0, 0, 0, 0, 0]);
     for (const g of gruppi) {
-      if (fuori.has(g.id) || g.rimborsoInAttesa) continue;
-      passeggeri += g.passeggeri;
-      incasso += g.incasso;
-      commissioni += g.commissioni;
+      const busId = g.busId ?? assegnazioni.get(g.id);
+      const i = busId ? posizione.get(busId) : undefined;
+      if (i === undefined || g.rimborsoInAttesa) continue;
+      const e = perBus[i];
+      e[0] += g.passeggeri;
+      e[1] += g.incasso;
+      e[2] += g.promoter;
+      e[3] += g.whiteLabel;
+      e[4] += g.daIncassare;
     }
-    esiti.push([passeggeri, arrotondaEuro(incasso), arrotondaEuro(commissioni)]);
+    esiti.push(perBus.map(([p, ...euro]) => [p, ...euro.map(arrotondaEuro)] as EsitoBus));
   }
   return esiti;
+}
+
+/** Linee e bus della risposta, con i bus numerati dentro la loro linea
+ *  e le fermate delle linee nell'ordine del percorso. */
+export function lineeEBus(
+  bus: BusDellaSimulazione[],
+  ordineCitta: string[],
+  costo: (b: BusDellaSimulazione) => Pick<BusSimulato, 'costo' | 'fonteCosto' | 'preventivi'>,
+): { linee: LineaSimulata[]; bus: BusSimulato[] } {
+  const linee: LineaSimulata[] = [];
+  const contati = new Map<string, number>();
+  const risultato = bus.map((b): BusSimulato => {
+    let indice = linee.findIndex((l) => l.chiave === b.lineaChiave);
+    if (indice < 0) {
+      linee.push({ chiave: b.lineaChiave, nome: b.lineaNome, fermate: ordineCitta.filter((c) => b.fermate.has(c)) });
+      indice = linee.length - 1;
+    }
+    const numero = (contati.get(b.lineaChiave) ?? 0) + 1;
+    contati.set(b.lineaChiave, numero);
+    return {
+      chiave: b.chiave, nome: `Bus ${numero}`, riferimento: b.riferimento, tipo: b.tipo, linea: indice, posti: b.postiBus,
+      interruttore: b.interruttore, ...costo(b),
+    };
+  });
+  return { linee, bus: risultato };
 }

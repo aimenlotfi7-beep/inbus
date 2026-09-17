@@ -3,21 +3,19 @@ import { db } from '../../db/client.js';
 import { busFisici, eventi, prenotazioni, preventiviRichieste, preventiviRisposte, richiesteRimborso, tragitti } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
 import { giornoARoma } from '../../shared/formato.js';
-import { lineeDaConfermareService, PREFISSO_LINEA_SENZA_BUS } from '../eventi/linee-da-confermare.service.js';
-import { busDellaSimulazione, esitiCombinazioni, type BusInPiu, type EsitoCombinazione } from '../eventi/simulazione-bus.js';
+import { lineeDaConfermareService } from '../eventi/linee-da-confermare.service.js';
+import { busDellaSimulazione, esitiCombinazioni, lineeEBus, type BusSimulato, type TragittoSimulato } from '../eventi/simulazione-bus.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
-import { arrotondaEuro } from './calcoli.js';
-import { commissioniPer, economiaEventiConclusi, type EconomiaConclusa } from './economia.js';
+import { commissioniPer, sommaPagati, tragittiConclusi } from './economia.js';
 import { inizioGiornoRoma, oggiRoma } from './periodo.js';
 import { aBlocchiDaDb, caricaDatiEventi, prenotazioniComeStatistiche } from './statistiche.service.js';
 
-/** Statistiche › Bus in più e riquadro della pagina Linee: se far partire
- *  più bus, anche sotto il pareggio, porta in guadagno, pareggio o perdita.
- *  Per evento, per tutti gli eventi in vendita e per anno (gennaio-dicembre,
- *  per data dell'evento). Gli eventi passati hanno i numeri veri; quelli
- *  ancora da fare la simulazione (eventi/simulazione-bus.ts), con gli
- *  interruttori scelti nella pagina. I tipi della risposta sono in
- *  packages/frontend/src/api/statistiche.ts. */
+/** Statistiche › Bus in più e riquadro della pagina Linee: incasso, spesa e
+ *  risultato dei bus, totali, per linea e per bus, per evento, per tutti gli
+ *  eventi in vendita e per anno (gennaio-dicembre, per data dell'evento).
+ *  Gli eventi passati hanno i numeri veri; quelli ancora da fare la
+ *  simulazione (eventi/simulazione-bus.ts), con gli interruttori scelti nella
+ *  pagina. I tipi della risposta sono in packages/frontend/src/api/statistiche.ts. */
 
 /** Come le proposte: un evento resta "da fare" fino a un giorno dopo la sua data. */
 const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
@@ -25,32 +23,6 @@ const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
 const eventoValido = and(isNull(eventi.eliminatoIl), eq(eventi.bozza, false));
 const colonneEvento = { id: eventi.id, artista: eventi.artista, citta: eventi.citta, data: eventi.data, bozza: eventi.bozza, eliminatoIl: eventi.eliminatoIl };
 type RigaEvento = { id: string; artista: string; citta: string; data: Date };
-
-export type FonteCosto = 'preventivo' | 'quotazione' | null;
-
-export interface BusInPiuConCosto extends BusInPiu {
-  /** Il preventivo più basso ricevuto per quel bus, altrimenti il costo della quotazione. */
-  costo: number | null;
-  fonteCosto: FonteCosto;
-  preventivi: number;
-}
-
-export interface TragittoSimulato {
-  id: string;
-  nome: string;
-  /** Tutti i passeggeri delle prenotazioni confermate. */
-  passeggeri: number;
-  inAttesaDiRimborso: number;
-  busConfermati: number;
-  /** Costo dei bus confermati; un bus senza costo vale la quotazione. */
-  costoBusConfermati: number;
-  busCostoStimato: number;
-  busSenzaCosto: number;
-  postiPareggio: number | null;
-  busInPiu: BusInPiuConCosto[];
-  /** Indice = combinazione degli interruttori (bit i = parte il bus in più i). */
-  esiti: EsitoCombinazione[];
-}
 
 export interface EventoSimulato {
   id: string;
@@ -61,19 +33,21 @@ export interface EventoSimulato {
   tragitti: TragittoSimulato[];
 }
 
-export interface EventoConcluso extends EconomiaConclusa {
-  id: string;
-  artista: string;
-  citta: string;
-  data: string;
-}
-
 async function rimborsiInAttesa(eventoIds: string[]): Promise<Set<string>> {
   const righe = await aBlocchiDaDb(eventoIds, (ids) => db.select({ id: richiesteRimborso.prenotazioneId }).from(richiesteRimborso)
     .innerJoin(prenotazioni, eq(prenotazioni.id, richiesteRimborso.prenotazioneId))
     .where(and(eq(richiesteRimborso.stato, 'IN_ATTESA'), inArray(prenotazioni.eventoId, ids))));
   return new Set(righe.map((r) => r.id));
 }
+
+const eventoInRisposta = (e: RigaEvento, tragittiEvento: TragittoSimulato[]): EventoSimulato => ({
+  id: e.id,
+  artista: e.artista,
+  citta: e.citta,
+  data: e.data.toISOString(),
+  anno: giornoARoma(e.data).anno,
+  tragitti: tragittiEvento,
+});
 
 async function simulaEventi(righeEventi: RigaEvento[]): Promise<EventoSimulato[]> {
   const ids = righeEventi.map((e) => e.id);
@@ -87,16 +61,16 @@ async function simulaEventi(righeEventi: RigaEvento[]): Promise<EventoSimulato[]
     leggiPostiPerBus(),
   ]);
   const rigaPerId = new Map(righe.map((r) => [r.id, r]));
-  const commissioniPerPrenotazione = commissioniPer(righe, (r) => r.id, ctx);
+  const promoterPerPrenotazione = commissioniPer(righe, (r) => r.id, ctx, { quoteWhiteLabel: false });
 
   // Un tragitto alla volta: ognuno legge linee, bus, fermate e prenotazioni come le proposte.
   const letture = [];
   for (const t of righeTragitti) {
     const stato = await lineeDaConfermareService.statoPerSimulazione(t.id, soglia, postiPerBus);
-    if (stato) letture.push({ t, stato, ...busDellaSimulazione(t.id, stato) });
+    if (stato) letture.push({ t, stato, bus: busDellaSimulazione(t.id, stato) });
   }
-  const lineeIds = [...new Set(letture.flatMap((l) => l.inPiu.map((b) => b.lineaId)).filter((id): id is string => id !== null))];
-  const busVeriIds = letture.flatMap((l) => l.bus.filter((b) => b.interruttore === null && !b.busId.startsWith(PREFISSO_LINEA_SENZA_BUS)).map((b) => b.busId));
+  const lineeIds = [...new Set(letture.flatMap((l) => l.bus.map((b) => b.lineaIdPreventivi)).filter((id): id is string => id !== null))];
+  const busVeriIds = letture.flatMap((l) => l.bus.filter((b) => b.tipo === 'confermato').map((b) => b.busId));
   const [risposte, costiBus] = await Promise.all([
     aBlocchiDaDb(lineeIds, (blocco) => db.select({ lineaId: preventiviRichieste.lineaId, prezzo: preventiviRisposte.prezzo }).from(preventiviRisposte)
       .innerJoin(preventiviRichieste, eq(preventiviRichieste.id, preventiviRisposte.richiestaId))
@@ -108,60 +82,48 @@ async function simulaEventi(righeEventi: RigaEvento[]): Promise<EventoSimulato[]
   const costoBus = new Map(costiBus.map((b) => [b.id, b.costo === null ? null : Number(b.costo)]));
 
   const tragittiPerEvento = new Map<string, TragittoSimulato[]>();
-  for (const { t, stato, bus, inPiu } of letture) {
+  for (const { t, stato, bus } of letture) {
     const quotazione = t.preventivoCosto === null ? null : Number(t.preventivoCosto);
-    const confermati = bus.filter((b) => b.interruttore === null);
-    let costoBusConfermati = 0;
-    let busCostoStimato = 0;
-    let busSenzaCosto = 0;
-    for (const b of confermati) {
-      const costo = costoBus.get(b.busId) ?? null;
-      if (costo !== null) costoBusConfermati += costo;
-      else if (quotazione !== null) {
-        costoBusConfermati += quotazione;
-        busCostoStimato += 1;
-      } else busSenzaCosto += 1;
-    }
     const gruppi = stato.dati.gruppi.map((g) => {
       const riga = rigaPerId.get(g.id);
-      return { ...g, incasso: riga?.totale ?? 0, commissioni: commissioniPerPrenotazione.get(g.id) ?? 0, rimborsoInAttesa: inAttesa.has(g.id) };
+      return {
+        ...g,
+        // Solo quanto è stato pagato davvero; il saldo che manca a parte.
+        incasso: riga?.pagato ?? 0,
+        daIncassare: riga ? Math.max(0, riga.totale - riga.pagato) : 0,
+        promoter: promoterPerPrenotazione.get(g.id) ?? 0,
+        whiteLabel: Number(riga?.quotaWhiteLabel ?? 0),
+        rimborsoInAttesa: inAttesa.has(g.id),
+      };
+    });
+    const { linee, bus: busRisposta } = lineeEBus(bus, stato.dati.fermateOrdinate.map((f) => f.citta), (b): Pick<BusSimulato, 'costo' | 'fonteCosto' | 'preventivi'> => {
+      const registrato = b.tipo === 'confermato' ? costoBus.get(b.busId) ?? null : null;
+      if (registrato !== null) return { costo: registrato, fonteCosto: 'bus', preventivi: 0 };
+      const prezzi = b.lineaIdPreventivi ? prezziPerLinea.get(b.lineaIdPreventivi) ?? [] : [];
+      if (prezzi.length > 0) return { costo: Math.min(...prezzi), fonteCosto: 'preventivo', preventivi: prezzi.length };
+      return { costo: quotazione, fonteCosto: quotazione === null ? null : 'quotazione', preventivi: 0 };
     });
     const righeTragitto = righe.filter((r) => r.tragittoId === t.id);
-    const simulato: TragittoSimulato = {
+    const passeggeri = righeTragitto.reduce((s, r) => s + r.passeggeri, 0);
+    // I tragitti senza prenotati né bus non hanno niente da mostrare.
+    if (passeggeri === 0 && busRisposta.length === 0) continue;
+    tragittiPerEvento.set(t.eventoId, [...(tragittiPerEvento.get(t.eventoId) ?? []), {
       id: t.id,
       nome: t.nome,
-      passeggeri: righeTragitto.reduce((s, r) => s + r.passeggeri, 0),
+      passeggeri,
       inAttesaDiRimborso: righeTragitto.filter((r) => inAttesa.has(r.id)).reduce((s, r) => s + r.passeggeri, 0),
-      busConfermati: confermati.length,
-      costoBusConfermati: arrotondaEuro(costoBusConfermati),
-      busCostoStimato,
-      busSenzaCosto,
-      postiPareggio: stato.dati.postiPareggio,
-      busInPiu: inPiu.map((b): BusInPiuConCosto => {
-        const prezzi = b.lineaId ? prezziPerLinea.get(b.lineaId) ?? [] : [];
-        return prezzi.length > 0
-          ? { ...b, costo: Math.min(...prezzi), fonteCosto: 'preventivo', preventivi: prezzi.length }
-          : { ...b, costo: quotazione, fonteCosto: quotazione === null ? null : 'quotazione', preventivi: 0 };
-      }),
+      incasso: sommaPagati(righeTragitto.filter((r) => !inAttesa.has(r.id))),
+      linee,
+      bus: busRisposta,
       esiti: esitiCombinazioni(gruppi, bus),
-    };
-    tragittiPerEvento.set(t.eventoId, [...(tragittiPerEvento.get(t.eventoId) ?? []), simulato]);
+    }]);
   }
-
-  return righeEventi.map((e) => ({
-    id: e.id,
-    artista: e.artista,
-    citta: e.citta,
-    data: e.data.toISOString(),
-    anno: giornoARoma(e.data).anno,
-    // I tragitti senza prenotati, bus o bus in più non hanno niente da mostrare.
-    tragitti: (tragittiPerEvento.get(e.id) ?? []).filter((t) => t.passeggeri > 0 || t.busConfermati > 0 || t.busInPiu.length > 0),
-  }));
+  return righeEventi.map((e) => eventoInRisposta(e, tragittiPerEvento.get(e.id) ?? []));
 }
 
 export const simulazioneBusService = {
   /** Gli eventi in vendita (di ogni anno) e i conti veri degli eventi già
-   *  passati dell'anno scelto. */
+   *  passati dell'anno scelto, nella stessa forma. */
   async anno(anno: number) {
     const confine = new Date(Date.now() - UN_GIORNO_MS);
     const inizio = inizioGiornoRoma({ anno, mese: 1, giorno: 1 });
@@ -179,16 +141,14 @@ export const simulazioneBusService = {
       caricaDatiEventi(idsPassati),
       rimborsiInAttesa(idsPassati),
     ]);
-    const economia = economiaEventiConclusi(idsPassati, datiPassati, rimborsiPassati);
+    const conclusi = tragittiConclusi(idsPassati, datiPassati, rimborsiPassati);
 
     return {
       anno,
       // Gli anni con almeno un evento, più quello di oggi e quello scelto.
       anni: [...new Set([...anniEventi.map((r) => r.anno), oggiRoma().anno, anno])].sort((a, b) => b - a),
       inVendita: simulati.filter((e) => e.tragitti.length > 0),
-      conclusi: passati
-        .map((e): EventoConcluso => ({ id: e.id, artista: e.artista, citta: e.citta, data: e.data.toISOString(), ...economia.get(e.id)! }))
-        .filter((e) => e.passeggeri > 0 || e.nonPartiti > 0 || e.bus > 0),
+      conclusi: passati.map((e) => eventoInRisposta(e, conclusi.get(e.id) ?? [])).filter((e) => e.tragitti.length > 0),
     };
   },
 

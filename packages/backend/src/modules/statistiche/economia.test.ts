@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  commissioniPer, costiMancanti, costoCompleto, economiaEventi, economiaEventiConclusi, lineeEventi, sottoPareggio,
+  commissioniPer, costiMancanti, costoCompleto, economiaEventi, lineeEventi, sottoPareggio, tragittiConclusi,
   type ContestoFonti, type DatiEventi, type PrenotazioneStatistica, type StruttureEventi,
 } from './economia.js';
 
@@ -92,7 +92,7 @@ describe('economiaEventi', () => {
   });
 });
 
-describe('economiaEventiConclusi (eventi passati: chi non parte è rimborsato)', () => {
+describe('tragittiConclusi (eventi passati: chi non parte è rimborsato)', () => {
   const strutture: StruttureEventi = {
     tragitti: [
       { id: 't1', eventoId: 'e1', nome: 'Bologna-Milano', attivo: true, preventivoPostiBus: 50, preventivoCosto: '900' },
@@ -102,7 +102,7 @@ describe('economiaEventiConclusi (eventi passati: chi non parte è rimborsato)',
       { id: 'l1', nome: 'Linea 1', tragittoId: 't1', daConfermare: false },
       { id: 'l2', nome: 'Linea 1', tragittoId: 't2', daConfermare: false },
     ],
-    fermateLinee: [],
+    fermateLinee: [{ lineaId: 'l1', citta: 'Bologna' }, { lineaId: 'l1', citta: 'Modena' }],
     bus: [
       { id: 'b1', lineaId: 'l1', costo: '1000', postiBus: 50 },
       { id: 'b2', lineaId: 'l1', costo: null, postiBus: 50 },
@@ -110,32 +110,31 @@ describe('economiaEventiConclusi (eventi passati: chi non parte è rimborsato)',
     ],
   };
 
-  it('conta solo chi è salito su un bus; senza bus o con un rimborso in attesa non conta', () => {
-    const inAttesa = prenotazione({ tragittoId: 't1', busId: 'b1', passeggeri: 2, totale: 100 });
-    const e = economiaEventiConclusi(['e1'], dati([
-      prenotazione({ tragittoId: 't1', busId: 'b1', passeggeri: 40, totale: 2000, promoterCodice: 'GIULIA' }),
-      prenotazione({ tragittoId: 't1', busId: null, passeggeri: 3, totale: 150, promoterCodice: 'GIULIA' }),
+  it('per bus conta solo chi ci è salito; senza bus o con un rimborso in attesa non conta', () => {
+    const inAttesa = prenotazione({ tragittoId: 't1', busId: 'b1', passeggeri: 2, totale: 100, pagato: 100 });
+    const [t1] = tragittiConclusi(['e1'], dati([
+      prenotazione({ tragittoId: 't1', busId: 'b1', passeggeri: 40, totale: 2000, pagato: 2000, promoterCodice: 'GIULIA', quotaWhiteLabel: '15.00' }),
+      // Un acconto: pagati 100 € su 250 €.
+      prenotazione({ tragittoId: 't1', busId: 'b2', passeggeri: 5, totale: 250, pagato: 100, tipoPagamento: 'ACCONTO', saldoPagato: false }),
+      prenotazione({ tragittoId: 't1', busId: null, passeggeri: 3, totale: 150, pagato: 150, promoterCodice: 'GIULIA' }),
       inAttesa,
     ], strutture), new Set([inAttesa.id])).get('e1')!;
-    expect(e.passeggeri).toBe(40);
-    expect(e.nonPartiti).toBe(5);
-    expect(e.incasso).toBe(2000);
-    expect(e.commissioni).toBe(200);
-    // b2 senza costo vale la quotazione del suo tragitto; b3 non ha né costo né quotazione.
-    expect(e.bus).toBe(3);
-    expect(e.costoBus).toBe(1900);
-    expect(e.busCostoStimato).toBe(1);
-    expect(e.busSenzaCosto).toBe(1);
-    expect(e.margine).toBe(2000 - 1900 - 200);
+    // Pagato davvero senza il rimborso in attesa: anche i 3 rimasti a terra (150 €).
+    expect(t1).toMatchObject({ passeggeri: 50, inAttesaDiRimborso: 2, incasso: 2250 });
+    expect(t1.linee).toEqual([{ chiave: 'linea:l1', nome: 'Linea 1', fermate: ['Bologna', 'Modena'] }]);
+    // b2 senza costo vale la quotazione del suo tragitto.
+    expect(t1.bus.map((b) => [b.nome, b.costo, b.fonteCosto])).toEqual([['Bus 1', 1000, 'bus'], ['Bus 2', 900, 'quotazione']]);
+    // [passeggeri, incasso pagato, commissioni promoter (10%), quote White Label, saldi da incassare]
+    expect(t1.esiti).toEqual([[[40, 2000, 200, 15, 0], [5, 100, 0, 0, 150]]]);
   });
 
-  it('un tragitto mai smistato (viaggi di prima) conta tutti i prenotati', () => {
-    const e = economiaEventiConclusi(['e1'], dati([
-      prenotazione({ tragittoId: 't2', fermataCitta: 'Firenze', passeggeri: 10, totale: 500 }),
+  it('un bus senza costo né quotazione resta senza costo; un tragitto mai smistato conta tutti i prenotati', () => {
+    const conclusi = tragittiConclusi(['e1'], dati([
+      prenotazione({ tragittoId: 't2', fermataCitta: 'Firenze', passeggeri: 10, totale: 500, pagato: 500 }),
     ], strutture), new Set()).get('e1')!;
-    expect(e.passeggeri).toBe(10);
-    expect(e.nonPartiti).toBe(0);
-    expect(e.passeggeriSenzaBus).toBe(0);
+    const t2 = conclusi.find((t) => t.id === 't2')!;
+    expect(t2.bus.map((b) => [b.nome, b.tipo, b.costo])).toEqual([['Bus 1', 'confermato', null], ['Passeggeri senza bus', 'senza-bus', 0]]);
+    expect(t2.esiti).toEqual([[[0, 0, 0, 0, 0], [10, 500, 0, 0, 0]]]);
   });
 });
 

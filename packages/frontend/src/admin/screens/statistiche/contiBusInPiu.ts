@@ -1,13 +1,16 @@
-import type { BusInPiuSimulato, EventoConcluso, EventoSimulato, TragittoSimulato } from '../../../api/statistiche';
+import type { BusSimulato, EventoSimulato, LineaSimulata, TragittoSimulato } from '../../../api/statistiche';
 
-/** I conti della simulazione dei bus in più (Statistiche › Bus in più e
- *  pagina Linee), senza React: si provano in contiBusInPiu.test.ts.
+/** I conti di Statistiche › Bus in più e del riquadro della pagina Linee,
+ *  senza React: si provano in contiBusInPiu.test.ts.
  *
- *  Il server manda, per ogni tragitto, chi parte e quanto porta in ogni
- *  combinazione di interruttori; qui si sceglie quella accesa e si tolgono
- *  i costi dei bus che partono. Le scelte (parte / non parte, costo scritto a
- *  mano) sono solo una simulazione: non confermano niente e restano in
- *  questo browser. */
+ *  Il server manda, per ogni tragitto, chi parte su ogni bus e quanto porta
+ *  in ogni combinazione di interruttori; qui si sceglie quella accesa e si
+ *  aggiungono i costi dei bus che partono. Decisioni del proprietario
+ *  (settembre 2026): incasso = quanto è stato pagato davvero (di un acconto
+ *  solo l'acconto), i saldi che mancano sono a parte e non contano; spesa =
+ *  costo dei bus + commissioni dei promoter + quote White Label. Le scelte
+ *  (parte / non parte, costo scritto a mano) sono solo una simulazione: non
+ *  confermano niente e restano in questo browser. */
 
 export interface SceltaBus {
   parte?: boolean;
@@ -18,107 +21,118 @@ export type Scelte = Record<string, SceltaBus>;
 
 const CHIAVE_SCELTE = 'inbus.gestionale.busInPiu';
 
-/** Di serie partono i bus che raggiungono il pareggio (linee senza bus e
- *  proposte); quelli sotto il pareggio no. */
-export const parteDiSerie = (b: BusInPiuSimulato) => b.tipo !== 'sotto-pareggio';
-export const parte = (b: BusInPiuSimulato, scelte: Scelte) => scelte[b.chiave]?.parte ?? parteDiSerie(b);
-export const costoDi = (b: BusInPiuSimulato, scelte: Scelte): number | null => scelte[b.chiave]?.costo ?? b.costo;
+export interface Voce {
+  passeggeri: number;
+  posti: number;
+  /** Pagato davvero: di un acconto non saldato solo l'acconto (proprietario, settembre 2026). */
+  incasso: number;
+  /** Saldi ancora da pagare: si mostrano, ma non contano nel risultato. */
+  daIncassare: number;
+  promoter: number;
+  whiteLabel: number;
+  costoBus: number;
+  bus: number;
+  /** Bus che partono senza nessun costo: contano 0. */
+  busSenzaCosto: number;
+}
 
 const arrotonda = (n: number) => Math.round(n * 100) / 100;
+export const voceVuota = (): Voce => ({ passeggeri: 0, posti: 0, incasso: 0, daIncassare: 0, promoter: 0, whiteLabel: 0, costoBus: 0, bus: 0, busSenzaCosto: 0 });
+export const spesa = (v: Voce) => arrotonda(v.costoBus + v.promoter + v.whiteLabel);
+export const risultato = (v: Voce) => arrotonda(v.incasso - spesa(v));
+
+export function somma(voci: Voce[]): Voce {
+  const s = voceVuota();
+  for (const v of voci) {
+    s.passeggeri += v.passeggeri;
+    s.posti += v.posti;
+    s.incasso += v.incasso;
+    s.daIncassare += v.daIncassare;
+    s.promoter += v.promoter;
+    s.whiteLabel += v.whiteLabel;
+    s.costoBus += v.costoBus;
+    s.bus += v.bus;
+    s.busSenzaCosto += v.busSenzaCosto;
+  }
+  return { ...s, incasso: arrotonda(s.incasso), daIncassare: arrotonda(s.daIncassare), promoter: arrotonda(s.promoter), whiteLabel: arrotonda(s.whiteLabel), costoBus: arrotonda(s.costoBus) };
+}
 
 /** Guadagno, pareggio (sotto l'euro di differenza) o perdita. */
 export type Giudizio = 'guadagno' | 'pareggio' | 'perdita';
-export function giudizio(margine: number): Giudizio {
-  if (Math.abs(margine) < 1) return 'pareggio';
-  return margine > 0 ? 'guadagno' : 'perdita';
+export function giudizio(n: number): Giudizio {
+  if (Math.abs(n) < 1) return 'pareggio';
+  return n > 0 ? 'guadagno' : 'perdita';
 }
 
-export interface Conti {
-  /** Passeggeri che partono. */
-  passeggeri: number;
-  /** Senza posto sui bus che partono, o con un rimborso in attesa: rimborsati. */
-  rimborsati: number;
-  incasso: number;
-  commissioni: number;
-  bus: number;
-  costoBus: number;
-  /** Bus che partono senza nessun costo (né preventivo, né quotazione, né scritto a mano): contano 0. */
-  busSenzaCosto: number;
-  margine: number;
-}
-
-export const contiVuoti = (): Conti => ({ passeggeri: 0, rimborsati: 0, incasso: 0, commissioni: 0, bus: 0, costoBus: 0, busSenzaCosto: 0, margine: 0 });
-
-export function sommaConti(tutti: Conti[]): Conti {
-  const s = contiVuoti();
-  for (const c of tutti) {
-    s.passeggeri += c.passeggeri;
-    s.rimborsati += c.rimborsati;
-    s.incasso += c.incasso;
-    s.commissioni += c.commissioni;
-    s.bus += c.bus;
-    s.costoBus += c.costoBus;
-    s.busSenzaCosto += c.busSenzaCosto;
-    s.margine += c.margine;
-  }
-  return { ...s, incasso: arrotonda(s.incasso), commissioni: arrotonda(s.commissioni), costoBus: arrotonda(s.costoBus), margine: arrotonda(s.margine) };
-}
+/** Un bus con l'interruttore: i bus confermati (e i viaggi passati) partono sempre. */
+export const conInterruttore = (b: BusSimulato) => b.interruttore !== null;
+/** Di serie partono i bus che raggiungono il pareggio (linee senza bus e proposte); quelli sotto no. */
+export const parteDiSerie = (b: BusSimulato) => b.tipo !== 'sotto-pareggio';
+export const parte = (b: BusSimulato, scelte: Scelte) => !conInterruttore(b) || (scelte[b.chiave]?.parte ?? parteDiSerie(b));
+export const costoDi = (b: BusSimulato, scelte: Scelte): number | null => (conInterruttore(b) ? scelte[b.chiave]?.costo ?? b.costo : b.costo);
 
 /** Il numero della combinazione accesa: il bit i per il bus in più i che parte. */
 export function combinazione(t: TragittoSimulato, scelte: Scelte): number {
-  return t.busInPiu.reduce((c, b, i) => (parte(b, scelte) ? c | (1 << i) : c), 0);
+  return t.bus.reduce((c, b) => (b.interruttore !== null && parte(b, scelte) ? c | (1 << b.interruttore) : c), 0);
 }
 
-function contiCombinazione(t: TragittoSimulato, scelte: Scelte, numero: number): Conti {
-  const [passeggeri, incasso, commissioni] = t.esiti[numero] ?? [0, 0, 0];
-  let costoBus = t.costoBusConfermati;
-  let bus = t.busConfermati;
-  let busSenzaCosto = t.busSenzaCosto;
-  t.busInPiu.forEach((b, i) => {
-    if ((numero & (1 << i)) === 0) return;
-    bus += 1;
-    const costo = costoDi(b, scelte);
-    if (costo === null) busSenzaCosto += 1;
-    else costoBus += costo;
+/** I numeri di un bus in una combinazione in cui parte. */
+function voceBus(t: TragittoSimulato, i: number, numero: number, scelte: Scelte): Voce {
+  const b = t.bus[i];
+  const [passeggeri, incasso, promoter, whiteLabel, daIncassare] = t.esiti[numero]?.[i] ?? [0, 0, 0, 0, 0];
+  const costo = costoDi(b, scelte);
+  const veroBus = b.tipo !== 'senza-bus';
+  return {
+    passeggeri, posti: b.posti, incasso, daIncassare, promoter, whiteLabel,
+    costoBus: costo ?? 0, bus: veroBus ? 1 : 0, busSenzaCosto: veroBus && costo === null ? 1 : 0,
+  };
+}
+
+export interface RigaBus {
+  bus: BusSimulato;
+  parte: boolean;
+  /** Se parte, i suoi numeri; se non parte, quelli che avrebbe partendo (con gli altri bus come sono scelti). */
+  voce: Voce;
+}
+export interface RigaLinea { linea: LineaSimulata; voce: Voce; bus: RigaBus[] }
+/** A terra: chi non trova posto sui bus che partono (sarebbe rimborsato) e
+ *  quanto valgono le sue prenotazioni. Chi ha già chiesto il rimborso non c'è. */
+export interface ATerra { passeggeri: number; valore: number }
+export interface ContiTragitto { tragitto: TragittoSimulato; voce: Voce; aTerra: ATerra; linee: RigaLinea[] }
+export interface ContiEvento { evento: EventoSimulato; voce: Voce; aTerra: ATerra; tragitti: ContiTragitto[] }
+
+const sommaATerra = (tutti: ATerra[]): ATerra => ({
+  passeggeri: tutti.reduce((s, a) => s + a.passeggeri, 0),
+  valore: arrotonda(tutti.reduce((s, a) => s + a.valore, 0)),
+});
+
+export function contiTragitto(t: TragittoSimulato, scelte: Scelte): ContiTragitto {
+  const accesa = combinazione(t, scelte);
+  const righe = t.bus.map((b, i): RigaBus => {
+    const parteOra = parte(b, scelte);
+    const numero = parteOra || b.interruttore === null ? accesa : accesa | (1 << b.interruttore);
+    return { bus: b, parte: parteOra, voce: voceBus(t, i, numero, scelte) };
   });
-  return {
-    passeggeri,
-    rimborsati: Math.max(0, t.passeggeri - passeggeri),
-    incasso,
-    commissioni,
-    bus,
-    costoBus: arrotonda(costoBus),
-    busSenzaCosto,
-    margine: arrotonda(incasso - costoBus - commissioni),
+  const linee = t.linee.map((linea, indice): RigaLinea => {
+    const bus = righe.filter((r) => r.bus.linea === indice);
+    return { linea, bus, voce: somma(bus.filter((r) => r.parte).map((r) => r.voce)) };
+  });
+  const voce = somma(linee.map((l) => l.voce));
+  const aTerra = {
+    passeggeri: Math.max(0, t.passeggeri - t.inAttesaDiRimborso - voce.passeggeri),
+    valore: Math.max(0, arrotonda(t.incasso - voce.incasso)),
   };
+  return { tragitto: t, voce, aTerra, linee };
 }
 
-export const contiTragitto = (t: TragittoSimulato, scelte: Scelte): Conti => contiCombinazione(t, scelte, combinazione(t, scelte));
-export const contiEvento = (e: EventoSimulato, scelte: Scelte): Conti => sommaConti(e.tragitti.map((t) => contiTragitto(t, scelte)));
-/** Solo i bus confermati: tutti i bus in più spenti. */
-export const contiSoloConfermati = (e: EventoSimulato): Conti => sommaConti(e.tragitti.map((t) => contiCombinazione(t, {}, 0)));
-
-/** Cosa cambia facendo partire il bus in più i, con gli altri come sono scelti. */
-export function effettoBus(t: TragittoSimulato, i: number, scelte: Scelte) {
-  const acceso = combinazione(t, scelte) | (1 << i);
-  const spento = acceso & ~(1 << i);
-  const [passeggeriCon, incassoCon, commissioniCon] = t.esiti[acceso] ?? [0, 0, 0];
-  const [passeggeriSenza, incassoSenza, commissioniSenza] = t.esiti[spento] ?? [0, 0, 0];
-  const incassoNetto = arrotonda(incassoCon - commissioniCon - (incassoSenza - commissioniSenza));
-  const costo = costoDi(t.busInPiu[i], scelte);
-  return {
-    passeggeri: passeggeriCon - passeggeriSenza,
-    incassoNetto,
-    costo,
-    risultato: costo === null ? null : arrotonda(incassoNetto - costo),
-  };
+export function contiEvento(e: EventoSimulato, scelte: Scelte): ContiEvento {
+  const tragitti = e.tragitti.map((t) => contiTragitto(t, scelte));
+  return { evento: e, voce: somma(tragitti.map((t) => t.voce)), aTerra: sommaATerra(tragitti.map((t) => t.aTerra)), tragitti };
 }
 
-export function contiConcluso(e: EventoConcluso): Conti {
-  return {
-    passeggeri: e.passeggeri, rimborsati: e.nonPartiti, incasso: e.incasso, commissioni: e.commissioni,
-    bus: e.bus, costoBus: e.costoBus, busSenzaCosto: e.busSenzaCosto, margine: e.margine,
-  };
+export function contiEventi(eventi: EventoSimulato[], scelte: Scelte): { voce: Voce; aTerra: ATerra } {
+  const tutti = eventi.map((e) => contiEvento(e, scelte));
+  return { voce: somma(tutti.map((c) => c.voce)), aTerra: sommaATerra(tutti.map((c) => c.aTerra)) };
 }
 
 // ---------------------------------------------------------------- Scelte ricordate nel browser
@@ -151,7 +165,7 @@ export function salvaScelte(scelte: Scelte) {
 }
 
 /** Cambia una scelta; tornata come di serie (e senza costo a mano) sparisce. */
-export function conScelta(scelte: Scelte, b: BusInPiuSimulato, cambio: SceltaBus): Scelte {
+export function conScelta(scelte: Scelte, b: BusSimulato, cambio: SceltaBus): Scelte {
   const nuova: SceltaBus = { ...scelte[b.chiave], ...cambio };
   if (nuova.parte === parteDiSerie(b)) delete nuova.parte;
   if (nuova.costo === undefined) delete nuova.costo;

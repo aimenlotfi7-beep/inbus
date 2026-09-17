@@ -57,8 +57,10 @@ type ModaleLinea = { tipo: 'nuova' } | { tipo: 'conferma'; linea: Linea };
  *  confermare" (props espliciti, niente lettura di URL).
  *
  *  Disposizione: in alto i numeri per decidere (passeggeri, posti sui
- *  bus, pareggio, giorni all'evento, margine), poi un solo "prossimo
- *  passo", poi le fermate in tabella e le linee con dentro i loro bus.
+ *  bus, pareggio, giorni all'evento), poi un solo "prossimo passo", poi
+ *  incasso e spesa dei bus (RiquadroBusInPiu; niente riquadro "Margine",
+ *  che contava chi è a terra senza il costo del bus che lo porterebbe),
+ *  poi le fermate in tabella e le linee con dentro i loro bus.
  *
  *  I posti sui bus non si assegnano a mano: li decide lo smistamento
  *  automatico per età il giorno prima della partenza (gruppi uniti, dal
@@ -733,14 +735,6 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
           <span>Evento</span><b>{testoGiorni}</b>
           <small>{anteprima?.giaSmistato ? 'Passeggeri sui bus' : anteprima?.smistamentoIl ? `Smistamento dal ${formattaDataOra(anteprima.smistamentoIl)}` : 'Smistamento il giorno prima'}</small>
         </div>
-        {vedeEconomia && datiEconomia && (
-          <div className="riepilogo-numero">
-            <span>Margine</span>
-            <b style={{ color: datiEconomia.costoCensito ? (datiEconomia.guadagno >= 0 ? 'var(--green)' : 'var(--pink)') : undefined }}>
-              {datiEconomia.costoCensito ? formattaEuro(datiEconomia.guadagno) : '—'}
-            </b>
-          </div>
-        )}
       </div>
 
       {cambioPercorso && (

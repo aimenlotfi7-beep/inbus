@@ -480,57 +480,55 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .stat-info > span:first-child{color:var(--mist);}
 .stat-info > span:last-child{text-align:right; font-weight:600;}
 
-/* Bus in più (BusInPiu.tsx): un interruttore «Parte / Non parte» per bus.
-   Verde guadagno, ambra pareggio, rosso perdita; il bus che parte ha il bordo
-   pieno blu, quello spento tratteggiato. */
-.sim-spiegazione{margin:0 0 14px; max-width:72ch; font-size:var(--testo-md); line-height:1.5; color:var(--mist);}
-.sim-giudizio{display:inline-block; padding:2px 9px; border-radius:999px; font-size:var(--testo-xs); font-weight:700; letter-spacing:.3px; white-space:nowrap; vertical-align:middle;}
+/* Bus in più (BusInPiu.tsx): una tabella evento → linea → bus con incasso,
+   spesa e risultato. Verde guadagno, ambra pareggio, rosso perdita; un bus
+   che non parte è grigio. */
+.sim-tabella{min-width:680px;}
+.sim-tabella th:first-child{width:38%;}
+.sim-tabella td{vertical-align:top;}
+.sim-tabella .stat-num .stat-sotto{white-space:normal;}
+.sim-tabella tr.sim-evento > td{background:var(--dusk-2); font-weight:700; cursor:pointer;}
+.sim-tabella tr.sim-evento:hover > td{background:color-mix(in srgb, var(--blue) 7%, var(--dusk-2));}
+.sim-tabella tr.sim-evento.sim-fisso > td{cursor:default;}
+.sim-tabella tr.sim-evento.sim-fisso:hover > td{background:var(--dusk-2);}
+.sim-tabella tr.sim-tragitto > td{font-weight:700;}
+.sim-tabella tr.sim-corrente > td{background:color-mix(in srgb, var(--blue) 6%, var(--dusk));}
+.sim-tragitti-sintesi{display:flex; flex-wrap:wrap; gap:2px 12px; margin-top:4px; font-size:var(--testo-sm); font-weight:400; color:var(--paper);}
+.sim-tabella tr.sim-linea > td{font-weight:600;}
+.sim-tabella tr.sim-linea > td:first-child{padding-left:24px;}
+.sim-tabella tr.sim-bus > td:first-child{padding-left:44px;}
+.sim-tabella tr.sim-spento > td, .sim-tabella tr.sim-spento .stat-sotto{color:var(--mist);}
+.sim-tabella tr.sim-totale > td{font-weight:700; border-top:2px solid var(--line);}
+.sim-tabella tr.sim-costo-riga > td{padding-left:44px; background:color-mix(in srgb, var(--blue) 4%, var(--dusk));}
+.sim-apri{display:inline-flex; align-items:baseline; padding:0; border:none; background:none; font:inherit; font-weight:inherit; text-align:left; color:var(--paper); cursor:pointer;}
+.sim-tabella tr.sim-cliccabile > td{cursor:pointer;}
+.sim-tabella tr.sim-cliccabile:hover > td{background:color-mix(in srgb, var(--blue) 4%, var(--dusk));}
+.sim-tabella tr.sim-corrente.sim-cliccabile:hover > td{background:color-mix(in srgb, var(--blue) 9%, var(--dusk));}
+.sim-apri:focus-visible, .sim-link:focus-visible{outline:2px solid var(--blue); outline-offset:2px; border-radius:4px;}
+.sim-freccia{display:inline-block; width:16px; color:var(--mist);}
+.sim-posti{font-weight:400; color:var(--mist);}
+.sim-nome-bus{display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px 8px;}
+.sim-nome-bus > span:first-child{font-weight:600;}
+.sim-tipo{padding:1px 8px; border-radius:999px; font-size:var(--testo-xs); font-weight:600; white-space:nowrap; background:var(--dusk-2); color:var(--mist);}
+.sim-tipo.proposta{background:color-mix(in srgb, var(--blue) 12%, transparent); color:#1d4ed8;}
+.sim-tipo.sotto-pareggio{background:color-mix(in srgb, var(--amber) 18%, transparent); color:#b45309;}
+.sim-giudizio{display:inline-block; padding:1px 8px; border-radius:999px; font-size:var(--testo-xs); font-weight:700; white-space:nowrap;}
 .sim-giudizio.guadagno{background:var(--green-dim); color:#15803d;}
 .sim-giudizio.pareggio{background:color-mix(in srgb, var(--amber) 18%, transparent); color:#b45309;}
 .sim-giudizio.perdita{background:color-mix(in srgb, var(--pink) 12%, transparent); color:#b91c1c;}
+.sim-valore{font-weight:700;}
 .sim-valore.guadagno{color:#15803d;}
 .sim-valore.pareggio{color:#b45309;}
 .sim-valore.perdita{color:#b91c1c;}
-.sim-eventi{display:flex; flex-direction:column; gap:10px; margin:0; padding:0; list-style:none;}
-.sim-evento{min-width:0; border:1px solid var(--line); border-radius:12px;}
-.sim-evento-testa{display:grid; grid-template-columns:minmax(0,1fr) auto auto 16px; align-items:center; gap:6px 18px; width:100%; padding:12px 14px; border:none; border-radius:12px; background:none; font:inherit; text-align:left; color:var(--paper); cursor:pointer;}
-.sim-evento-testa:hover{background:color-mix(in srgb, var(--blue) 4%, var(--dusk));}
-.sim-evento-testa:focus-visible{outline:2px solid var(--blue); outline-offset:-2px;}
-.sim-evento-nome{min-width:0; overflow-wrap:anywhere;}
-.sim-evento-bus{font-size:var(--testo-md); text-align:right;}
-.sim-freccia{color:var(--mist);}
-.sim-evento-corpo{display:flex; flex-direction:column; gap:14px; padding:4px 14px 14px; border-top:1px solid var(--line);}
-.sim-evento-corpo .stat-didascalia{margin:0;}
-.sim-conti{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 14px; padding:8px 12px; border-radius:10px; background:var(--dusk-2); font-size:var(--testo-md); line-height:1.45; font-variant-numeric:tabular-nums;}
-.sim-conti-margine{display:inline-flex; align-items:center; gap:8px; white-space:nowrap; font-variant-numeric:tabular-nums;}
-.sim-conti-margine b{font-size:var(--testo-lg);}
-.sim-tragitto{display:flex; flex-direction:column; gap:8px; min-width:0; padding-top:10px;}
-.sim-tragitto-nome{margin:0; font-size:var(--testo-base); font-weight:700;}
-.sim-confermati{margin:0; font-size:var(--testo-md); color:var(--mist);}
-.sim-bus-elenco{display:flex; flex-direction:column; gap:8px; margin:0; padding:0; list-style:none;}
-.sim-bus{display:grid; grid-template-columns:minmax(0,1fr) minmax(150px,210px) auto; align-items:center; gap:8px 16px; padding:10px 12px; border:1px dashed color-mix(in srgb, var(--mist) 45%, var(--line)); border-radius:10px;}
-.sim-bus.parte{border-style:solid; border-color:color-mix(in srgb, var(--blue) 50%, var(--line)); background:color-mix(in srgb, var(--blue) 4%, var(--dusk));}
-.sim-bus-nome{min-width:0; overflow-wrap:anywhere;}
-.sim-bus-costo{display:flex; flex-direction:column; gap:3px; min-width:0; font-size:var(--testo-xs); color:var(--mist);}
-.sim-bus-costo > span{font-weight:700; text-transform:uppercase; letter-spacing:.5px;}
-.sim-bus-costo input{padding-top:6px; padding-bottom:6px; font-size:var(--testo-md);}
-.sim-bus-costo small{font-size:var(--testo-xs); line-height:1.3;}
-.sim-bus-effetto{grid-column:1 / -1; margin:0; font-size:var(--testo-md); line-height:1.45;}
 .sim-scelta{display:inline-flex; flex-shrink:0; overflow:hidden; border:1px solid var(--line); border-radius:999px; background:var(--dusk);}
-.sim-scelta button{padding:7px 14px; border:none; background:none; font:inherit; font-size:var(--testo-md); font-weight:600; color:var(--mist); cursor:pointer; white-space:nowrap;}
+.sim-scelta button{padding:3px 10px; border:none; background:none; font:inherit; font-size:var(--testo-sm); font-weight:600; color:var(--mist); cursor:pointer; white-space:nowrap;}
 .sim-scelta button + button{border-left:1px solid var(--line);}
 .sim-scelta button.parte[aria-pressed="true"]{background:var(--blue); color:#fff;}
 .sim-scelta button.non-parte[aria-pressed="true"]{background:var(--dusk-2); color:var(--paper);}
 .sim-scelta button:focus-visible{outline:2px solid var(--blue); outline-offset:-2px;}
-.sim-riquadro .sim-tragitto{padding-top:0;}
-@media (max-width:700px){
-  .sim-evento-testa{grid-template-columns:minmax(0,1fr) 16px;}
-  .sim-evento-bus, .sim-evento-testa .sim-conti-margine{grid-column:1; text-align:left;}
-  .sim-freccia{grid-column:2; grid-row:1;}
-  .sim-bus{grid-template-columns:minmax(0,1fr);}
-  .sim-scelta{justify-self:start;}
-}
-@media (prefers-reduced-motion:reduce){ .sim-evento-testa{transition:none;} }
+.sim-link{padding:0; border:none; background:none; font:inherit; font-size:var(--testo-sm); font-weight:600; color:var(--blue); text-decoration:underline dotted; text-underline-offset:3px; cursor:pointer;}
+.sim-costo{display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; font-size:var(--testo-md); font-weight:400;}
+.sim-riquadro .table-scroll{margin:0;}
 
 /* ---------- CHAT ---------- */
 @media (max-width:760px){ .chat-layout{grid-template-columns:1fr; height:auto;} }

@@ -386,38 +386,52 @@ export interface StatisticheCosti {
 
 // ---------------------------------------------------------------- Bus in più
 
-/** linea-senza-bus: linea confermata ancora senza bus; proposta: da
- *  confermare (raggiunge il pareggio); sotto-pareggio: un bus in più che non
- *  lo raggiunge. */
-export type TipoBusInPiu = 'linea-senza-bus' | 'proposta' | 'sotto-pareggio';
+/** confermato: bus vero; linea-senza-bus: linea confermata senza bus;
+ *  proposta: da confermare (raggiunge il pareggio); sotto-pareggio: bus in
+ *  più che non lo raggiunge; senza-bus: passeggeri di un viaggio passato mai
+ *  smistato (contano, ma non sono su un bus). */
+export type TipoBusSimulato = 'confermato' | 'linea-senza-bus' | 'proposta' | 'sotto-pareggio' | 'senza-bus';
 
-export interface BusInPiuSimulato {
-  /** Stabile tra un caricamento e l'altro: ci si ricorda l'interruttore. */
+export interface LineaSimulata {
   chiave: string;
   nome: string;
-  tipo: TipoBusInPiu;
-  lineaId: string | null;
+  /** Città nell'ordine del percorso. */
+  fermate: string[];
+}
+
+export interface BusSimulato {
+  /** Stabile tra un caricamento e l'altro: ci si ricorda l'interruttore. */
+  chiave: string;
+  /** "Bus 2", numerato dentro la sua linea. */
+  nome: string;
+  riferimento: string | null;
+  tipo: TipoBusSimulato;
+  /** Posizione in `linee`. */
+  linea: number;
   posti: number;
-  /** Il preventivo più basso ricevuto per quel bus, altrimenti il costo della quotazione. */
+  /** Posizione tra i bus in più (bit della combinazione); null per un bus che parte sempre. */
+  interruttore: number | null;
+  /** Costo registrato, preventivo più basso o quotazione; null se non c'è. */
   costo: number | null;
-  fonteCosto: 'preventivo' | 'quotazione' | null;
+  fonteCosto: 'bus' | 'preventivo' | 'quotazione' | null;
   preventivi: number;
 }
 
 export interface TragittoSimulato {
   id: string;
   nome: string;
+  /** Tutti i passeggeri delle prenotazioni confermate (anche chi resta a terra). */
   passeggeri: number;
   inAttesaDiRimborso: number;
-  busConfermati: number;
-  costoBusConfermati: number;
-  busCostoStimato: number;
-  busSenzaCosto: number;
-  postiPareggio: number | null;
-  busInPiu: BusInPiuSimulato[];
-  /** [passeggeri che partono, incasso, commissioni]; indice = combinazione
-   *  degli interruttori (bit i acceso = parte il bus in più i). */
-  esiti: [number, number, number][];
+  /** Pagato davvero da tutte le prenotazioni senza quelle con un rimborso in
+   *  attesa: meno l'incasso di chi parte, è quanto vale chi resta a terra. */
+  incasso: number;
+  linee: LineaSimulata[];
+  bus: BusSimulato[];
+  /** esiti[combinazione][bus] = [passeggeri, incasso pagato davvero (di un
+   *  acconto solo l'acconto), commissioni promoter, quote White Label, saldi
+   *  ancora da incassare]; combinazione = bit i acceso se parte il bus in più i. */
+  esiti: [number, number, number, number, number][][];
 }
 
 export interface EventoSimulato {
@@ -429,31 +443,14 @@ export interface EventoSimulato {
   tragitti: TragittoSimulato[];
 }
 
-export interface EventoConcluso {
-  id: string;
-  artista: string;
-  citta: string;
-  data: string;
-  passeggeri: number;
-  nonPartiti: number;
-  incasso: number;
-  commissioni: number;
-  bus: number;
-  costoBus: number;
-  busCostoStimato: number;
-  busSenzaCosto: number;
-  passeggeriSenzaBus: number;
-  margine: number;
-}
-
 export interface StatisticheBusInPiu {
   anno: number;
   /** Anni da scegliere, dal più recente. */
   anni: number[];
   /** Tutti gli eventi ancora da fare, di ogni anno. */
   inVendita: EventoSimulato[];
-  /** Eventi già passati dell'anno scelto, con i numeri veri. */
-  conclusi: EventoConcluso[];
+  /** Eventi già passati dell'anno scelto, con i numeri veri (nessun interruttore). */
+  conclusi: EventoSimulato[];
 }
 
 function query(f: FiltroPeriodo) {

@@ -229,7 +229,7 @@ async function leggiStrutture(eventoIds: string[]): Promise<StruttureEventi> {
       .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId))
       .where(inArray(lineaFermate.lineaId, ids)).orderBy(asc(lineaFermate.ordine))),
     aBlocchiDaDb(lineeIds, (ids) => db.select({ id: busFisici.id, lineaId: busFisici.lineaId, costo: busFisici.costo, postiBus: busFisici.postiBus })
-      .from(busFisici).where(inArray(busFisici.lineaId, ids))),
+      .from(busFisici).where(inArray(busFisici.lineaId, ids)).orderBy(asc(busFisici.creatoIl), asc(busFisici.id))),
   ]);
   return { tragitti: righeTragitti, linee: righeLinee, fermateLinee, bus };
 }

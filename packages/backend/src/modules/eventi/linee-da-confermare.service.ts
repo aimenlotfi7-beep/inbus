@@ -148,9 +148,11 @@ export interface StatoProposte {
   bozze: Bozza[];
   tutte: { id: string; nome: string; ordine: number }[];
   /** Linea a cui va un bus in più, e quanti bus ha già. */
-  principale: { nome: string; bus: number } | null;
+  principale: { id: string; nome: string; bus: number } | null;
   /** Quello su cui si sono calcolate le proposte (serve anche alla simulazione economica). */
   dati: DatiProposte;
+  /** Per ogni bus di dati.bus (anche le linee senza bus): la sua linea e il riferimento del bus. */
+  infoBus: Map<string, { lineaId: string; lineaNome: string; riferimento: string | null }>;
 }
 
 /** Legge il tragitto e calcola le proposte che servono. null se il tragitto
@@ -180,7 +182,7 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
   const idsLinee = righeLinee.map((l) => l.id);
   const [righeBus, righeLineaFermate] = idsLinee.length
     ? await Promise.all([
-      lettore.select({ id: busFisici.id, lineaId: busFisici.lineaId, postiBus: busFisici.postiBus }).from(busFisici)
+      lettore.select({ id: busFisici.id, lineaId: busFisici.lineaId, postiBus: busFisici.postiBus, riferimento: busFisici.riferimento }).from(busFisici)
         .where(inArray(busFisici.lineaId, idsLinee)).orderBy(asc(busFisici.creatoIl), asc(busFisici.id)),
       lettore.select({ lineaId: lineaFermate.lineaId, fermataId: lineaFermate.fermataId, citta: fermate.citta }).from(lineaFermate)
         .innerJoin(fermate, eq(fermate.id, lineaFermate.fermataId)).where(inArray(lineaFermate.lineaId, idsLinee)),
@@ -249,13 +251,20 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
     postiPerBus,
   };
   const { proposte, contatore } = calcolaProposte(dati);
+  const infoBus: StatoProposte['infoBus'] = new Map();
+  for (const l of confermate) {
+    const busLinea = righeBus.filter((b) => b.lineaId === l.id);
+    if (busLinea.length === 0) infoBus.set(`${PREFISSO_LINEA_SENZA_BUS}${l.id}`, { lineaId: l.id, lineaNome: l.nome, riferimento: null });
+    for (const b of busLinea) infoBus.set(b.id, { lineaId: l.id, lineaNome: l.nome, riferimento: b.riferimento });
+  }
   return {
     necessarie: proposte,
     contatore,
     bozze,
     tutte: righeLinee,
-    principale: principale ? { nome: principale.linea.nome, bus: busPerLinea.get(principale.linea.id) ?? 0 } : null,
+    principale: principale ? { id: principale.linea.id, nome: principale.linea.nome, bus: busPerLinea.get(principale.linea.id) ?? 0 } : null,
     dati,
+    infoBus,
   };
 }
 
