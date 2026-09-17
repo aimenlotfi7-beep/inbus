@@ -127,13 +127,18 @@ export function commissioniPer(
 export interface EconomiaEvento {
   passeggeri: number;
   prenotazioni: number;
+  /** Previsto: un acconto non saldato conta già per il prezzo intero. */
   incasso: number;
+  /** Pagato davvero finora (di un acconto solo l'acconto). */
+  incassato: number;
   bus: number;
   busSenzaCosto: number;
   costoBus: number;
   commissioni: number;
   /** incasso − costo dei bus − commissioni (promoter e quote White Label). */
   margine: number;
+  /** Lo stesso con quanto è stato pagato davvero: incassato − costo dei bus − commissioni. */
+  margineAOggi: number;
   postiSuiBus: number;
   /** Passeggeri dei tragitti con posti sui bus: servono al riempimento. */
   passeggeriConBus: number;
@@ -149,7 +154,7 @@ export const costiMancanti = (e: EconomiaEvento) => e.passeggeri > 0 && !costoCo
 
 export function economiaEventi(eventoIds: string[], dati: DatiEventi): Map<string, EconomiaEvento> {
   const risultato = new Map<string, EconomiaEvento>(eventoIds.map((id) => [id, {
-    passeggeri: 0, prenotazioni: 0, incasso: 0, bus: 0, busSenzaCosto: 0, costoBus: 0, commissioni: 0, margine: 0,
+    passeggeri: 0, prenotazioni: 0, incasso: 0, incassato: 0, bus: 0, busSenzaCosto: 0, costoBus: 0, commissioni: 0, margine: 0, margineAOggi: 0,
     postiSuiBus: 0, passeggeriConBus: 0, passeggeriSenzaBus: 0,
   }]));
   const eventoDiTragitto = new Map(dati.strutture.tragitti.map((t) => [t.id, t.eventoId]));
@@ -173,15 +178,18 @@ export function economiaEventi(eventoIds: string[], dati: DatiEventi): Map<strin
     e.passeggeri += r.passeggeri;
     e.prenotazioni += 1;
     e.incasso += r.totale;
+    e.incassato += r.pagato;
     if ((postiPerTragitto.get(r.tragittoId) ?? 0) > 0) e.passeggeriConBus += r.passeggeri;
     if (!busPerTragitto.has(r.tragittoId)) e.passeggeriSenzaBus += r.passeggeri;
   }
   const commissioni = commissioniPer(dati.righe, (r) => r.eventoId, dati.ctx);
   for (const [id, e] of risultato) {
     e.incasso = arrotondaEuro(e.incasso);
+    e.incassato = arrotondaEuro(e.incassato);
     e.costoBus = arrotondaEuro(e.costoBus);
     e.commissioni = commissioni.get(id) ?? 0;
     e.margine = arrotondaEuro(e.incasso - e.costoBus - e.commissioni);
+    e.margineAOggi = arrotondaEuro(e.incassato - e.costoBus - e.commissioni);
   }
   return risultato;
 }
@@ -190,6 +198,8 @@ export function economiaEventi(eventoIds: string[], dati: DatiEventi): Map<strin
 
 /** Quanto è stato pagato davvero: di un acconto non saldato solo l'acconto. */
 export const sommaPagati = (righe: { pagato: number }[]) => arrotondaEuro(righe.reduce((s, r) => s + r.pagato, 0));
+/** I saldi che mancano: prezzo previsto meno quanto è stato pagato. */
+export const sommaDaIncassare = (righe: { totale: number; pagato: number }[]) => arrotondaEuro(righe.reduce((s, r) => s + Math.max(0, r.totale - r.pagato), 0));
 
 /** Chi è partito: [passeggeri, incasso pagato davvero, commissioni promoter, quote White Label, saldi da incassare]. */
 function esitoRighe(righe: PrenotazioneStatistica[], promoter: number): EsitoBus {
@@ -198,7 +208,7 @@ function esitoRighe(righe: PrenotazioneStatistica[], promoter: number): EsitoBus
     sommaPagati(righe),
     promoter,
     arrotondaEuro(righe.reduce((s, r) => s + Number(r.quotaWhiteLabel ?? 0), 0)),
-    arrotondaEuro(righe.reduce((s, r) => s + Math.max(0, r.totale - r.pagato), 0)),
+    sommaDaIncassare(righe),
   ];
 }
 
@@ -252,6 +262,7 @@ export function tragittiConclusi(eventoIds: string[], dati: DatiEventi, rimborsi
       passeggeri: sommaPasseggeri(righe),
       inAttesaDiRimborso: sommaPasseggeri(righe.filter((r) => rimborsiInAttesa.has(r.id))),
       incasso: sommaPagati(partiteTragitto),
+      daIncassare: sommaDaIncassare(partiteTragitto),
       linee,
       bus,
       esiti: [esito],
@@ -275,10 +286,15 @@ export interface LineaCalcolata {
   posti: number;
   passeggeri: number;
   postiPareggio: number | null;
+  /** Previsto (un acconto conta per intero). */
   incasso: number;
+  /** Pagato davvero. */
+  incassato: number;
   costo: number | null;
   costoCompleto: boolean;
   margine: number | null;
+  /** incassato − costo − commissioni; null senza bus. */
+  margineAOggi: number | null;
 }
 
 /** Una riga per linea, con la stessa regola dei posti di
@@ -307,6 +323,7 @@ export function lineeEventi(dati: DatiEventi): LineaCalcolata[] {
     const coperte = new Set(citta);
     const righe = daConfermare ? [] : (righePerTragitto.get(l.tragittoId) ?? []).filter((r) => coperte.has(r.fermataCitta));
     const incasso = sommaTotali(righe);
+    const incassato = sommaPagati(righe);
     const costo = conBus ? arrotondaEuro(bus.reduce((s, b) => s + Number(b.costo ?? 0), 0)) : null;
     const commissioni = costo === null ? 0 : commissioniPer(righe, () => l.id, dati.ctx).get(l.id) ?? 0;
     return [{
@@ -323,9 +340,11 @@ export function lineeEventi(dati: DatiEventi): LineaCalcolata[] {
       passeggeri: sommaPasseggeri(righe),
       postiPareggio: conBus && posti > 0 ? Math.round(posti * (dati.soglia / 100)) : null,
       incasso,
+      incassato,
       costo,
       costoCompleto: conBus && bus.every((b) => b.costo !== null),
       margine: costo === null ? null : arrotondaEuro(incasso - costo - commissioni),
+      margineAOggi: costo === null ? null : arrotondaEuro(incassato - costo - commissioni),
     }];
   });
 
@@ -335,11 +354,13 @@ export function lineeEventi(dati: DatiEventi): LineaCalcolata[] {
     const righe = righePerTragitto.get(tragittoId) ?? [];
     const passeggeri = sommaPasseggeri(righe);
     const incasso = righe.reduce((s, r) => s + r.totale, 0);
+    const incassato = righe.reduce((s, r) => s + r.pagato, 0);
     let senzaPosto = passeggeri - lineeTragitto.filter((l) => !l.daConfermare).reduce((s, l) => s + l.posti, 0);
     for (const l of inAttesa) {
       const presi = Math.max(0, Math.min(senzaPosto, l.posti));
       l.passeggeri = presi;
       l.incasso = passeggeri > 0 ? arrotondaEuro((incasso * presi) / passeggeri) : 0;
+      l.incassato = passeggeri > 0 ? arrotondaEuro((incassato * presi) / passeggeri) : 0;
       senzaPosto -= presi;
     }
   }

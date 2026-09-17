@@ -3,9 +3,11 @@ import { api } from './client';
 /** Statistiche del gestionale (sezione Statistiche). Tutti gli importi sono
  *  in euro, già numeri. Le date "dal"/"al" sono giorni di Roma (YYYY-MM-DD),
  *  entrambi compresi. Contano solo le prenotazioni CONFERMATE di eventi non
- *  in bozza e non nel cestino. L'incasso è il valore delle prenotazioni: un
- *  acconto non ancora saldato conta già per il prezzo intero (quanto manca da
- *  incassare è in Vendite, pagamento.daIncassare). */
+ *  in bozza e non nel cestino. Due voci separate (proprietario, settembre
+ *  2026): `incasso` è il previsto, il valore delle prenotazioni (un acconto non
+ *  ancora saldato conta già per il prezzo intero); `incassato` è quanto è stato
+ *  pagato davvero. Allo stesso modo `margine` è previsto e `margineAOggi` usa
+ *  l'incassato. */
 
 export type Confronto = 'anno' | 'precedente' | 'nessuno';
 export type Granularita = 'giorno' | 'settimana' | 'mese';
@@ -42,6 +44,7 @@ export interface RigaFonteSintesi {
   prenotazioni: number;
   passeggeri: number;
   incasso: number;
+  incassato: number;
 }
 
 export interface RigaFonte extends RigaFonteSintesi {
@@ -59,6 +62,7 @@ export interface StatistichePanoramica {
     passeggeri: Valore;
     prenotazioni: Valore;
     incasso: Valore;
+    incassato: Valore;
     /** incasso ÷ passeggeri; 0 se nessun passeggero. */
     ricavoPerPasseggero: Valore;
     /** Passeggeri per intervallo; precedente allineato per posizione. */
@@ -69,10 +73,12 @@ export interface StatistichePanoramica {
     eventi: Valore;
     passeggeri: Valore;
     incasso: Valore;
+    incassato: Valore;
     costoBus: Valore;
     /** Commissioni promoter + quote White Label. */
     commissioni: Valore;
     margine: Valore;
+    margineAOggi: Valore;
     /** Passeggeri ÷ posti dei bus confermati, in %, solo sui tragitti con bus. null = nessun bus. */
     riempimentoBus: { attuale: number | null; precedente: number | null };
     /** Eventi del periodo con passeggeri e costi dei bus incompleti (un bus
@@ -123,6 +129,7 @@ export interface RigaEventoStatistiche {
   giorniAllaPartenza: number;
   passeggeri: number;
   incasso: number;
+  incassato: number;
   /** Posti dei bus confermati (linee con bus). */
   postiSuiBus: number;
   /** passeggeri ÷ postiSuiBus in %; null senza bus. */
@@ -138,6 +145,7 @@ export interface RigaEventoStatistiche {
   /** incasso − costo bus − commissioni; null se l'evento non ha nessun bus
    *  (con costoCompleto false il costo dei bus è parziale). */
   margine: number | null;
+  margineAOggi: number | null;
   venditeFermate: boolean;
 }
 
@@ -166,10 +174,12 @@ export interface RigaLineaStatistiche {
   assegnati: number;
   saliti: number;
   incasso: number;
+  incassato: number;
   /** null per le linee senza bus. */
   costo: number | null;
   costoCompleto: boolean;
   margine: number | null;
+  margineAOggi: number | null;
 }
 
 export interface RigaFermataStatistiche {
@@ -178,6 +188,7 @@ export interface RigaFermataStatistiche {
   attiva: boolean;
   passeggeri: number;
   incasso: number;
+  incassato: number;
   /** Prezzo attuale della fermata, se impostato. */
   prezzo: number | null;
   /** Giorni medi tra prenotazione ed evento, pesati sui passeggeri. */
@@ -200,6 +211,7 @@ export interface StatisticheEvento {
     passeggeri: number;
     prenotazioni: number;
     incasso: number;
+    incassato: number;
     prezzoMedio: number | null;
     postiSuiBus: number;
     listaAttesa: number;
@@ -209,6 +221,7 @@ export interface StatisticheEvento {
     costoBus: number | null;
     commissioni: number;
     margine: number | null;
+    margineAOggi: number | null;
   };
   /** Passeggeri accumulati per giorni alla partenza: giorni[i] va dal più
    *  lontano a 0; evento[i] null per i giorni non ancora arrivati. */
@@ -236,6 +249,7 @@ export interface RigaPromoter {
   prenotazioni: number;
   passeggeri: number;
   incasso: number;
+  incassato: number;
   commissione: number;
   /** Passeggeri per intervallo del periodo. */
   andamento: number[];
@@ -250,6 +264,7 @@ export interface RigaCoupon {
    *  momento del saldo non ha lo sconto registrato). */
   sconto: number;
   incasso: number;
+  incassato: number;
 }
 
 export interface RigaOfferta {
@@ -259,6 +274,7 @@ export interface RigaOfferta {
   prenotazioni: number;
   passeggeri: number;
   incasso: number;
+  incassato: number;
 }
 
 export interface StatisticheVendite {
@@ -279,7 +295,7 @@ export interface StatisticheVendite {
     /** Euro che mancano ai saldi ancora da pagare. */
     daIncassare: number;
   };
-  bundle: { prenotazioni: number; passeggeri: number; incasso: number; sconto: number };
+  bundle: { prenotazioni: number; passeggeri: number; incasso: number; incassato: number; sconto: number };
 }
 
 // ---------------------------------------------------------------- Clienti
@@ -317,12 +333,14 @@ export interface RigaMargineEvento {
   data: string;
   passeggeri: number;
   incasso: number;
+  incassato: number;
   bus: number;
   costoBus: number;
   costoCompleto: boolean;
   commissioni: number;
   /** incasso − costo bus − commissioni; con costoCompleto false il costo è parziale. */
   margine: number;
+  margineAOggi: number;
 }
 
 export interface RigaFornitoreStatistiche {
@@ -354,9 +372,11 @@ export interface StatisticheCosti {
   /** Eventi con la data nel periodo. */
   totali: {
     incasso: number;
+    incassato: number;
     costoBus: number;
     commissioni: number;
     margine: number;
+    margineAOggi: number;
     eventiConCostiMancanti: number;
   };
   eventi: RigaMargineEvento[];
@@ -423,9 +443,11 @@ export interface TragittoSimulato {
   /** Tutti i passeggeri delle prenotazioni confermate (anche chi resta a terra). */
   passeggeri: number;
   inAttesaDiRimborso: number;
-  /** Pagato davvero da tutte le prenotazioni senza quelle con un rimborso in
-   *  attesa: meno l'incasso di chi parte, è quanto vale chi resta a terra. */
+  /** Pagato davvero da tutte le prenotazioni senza quelle con un rimborso in attesa. */
   incasso: number;
+  /** I loro saldi che mancano: con `incasso` è il previsto; meno quello di chi
+   *  parte, è quanto vale chi resta a terra. */
+  daIncassare: number;
   linee: LineaSimulata[];
   bus: BusSimulato[];
   /** esiti[combinazione][bus] = [passeggeri, incasso pagato davvero (di un

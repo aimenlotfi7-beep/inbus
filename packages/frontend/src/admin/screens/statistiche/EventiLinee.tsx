@@ -6,7 +6,7 @@ import {
 import { formattaEuro, plurale } from '../../../shared/formato';
 import {
   BottoneCsv, Caricamento, chiaveFiltro, ETICHETTA_FONTE, formattaEuroIntero, formattaNumero, formattaPercentuale,
-  GrigliaKpi, Kpi, KpiExtra, pluraleNumero, Scheda, useDati, useSegnalaPeriodo, Vuoto, type PropsScheda,
+  GrigliaKpi, Incassati, Kpi, KpiExtra, MargineAOggi, pluraleNumero, Scheda, useDati, useSegnalaPeriodo, Vuoto, type PropsScheda,
 } from './comuni';
 import { nomeFileCsv, scaricaCsv } from './csv';
 import { BarreOrizzontali, GraficoRitmo, GrigliaPosti, MiniBarra, POSTI_MASSIMI_GRIGLIA } from './grafici';
@@ -72,12 +72,12 @@ function esportaEventi(righe: RigaEventoStatistiche[], nomeFile: string) {
     nomeFile,
     [
       'Evento', 'Città', 'Luogo', 'Data', 'Giorni alla partenza', 'Passeggeri', 'Posti sui bus', 'Riempimento %',
-      'Incasso €', 'Costo bus €', 'Costi completi', 'Commissioni €', 'Margine €', 'Linee sotto il pareggio',
-      'Linee da confermare', 'Percorsi cambiati', "Lista d'attesa", 'Vendite ferme',
+      'Incasso previsto €', 'Incassato €', 'Costo bus €', 'Costi completi', 'Commissioni €', 'Margine previsto €', 'Margine a oggi €',
+      'Linee sotto il pareggio', 'Linee da confermare', 'Percorsi cambiati', "Lista d'attesa", 'Vendite ferme',
     ],
     righe.map((r) => [
       r.artista, r.citta, r.luogo, formattaGiorno(r.data), r.giorniAllaPartenza, r.passeggeri, r.postiSuiBus, r.riempimento,
-      r.incasso, r.costoBus, r.costoCompleto, r.commissioni, r.margine, r.lineeSottoPareggio,
+      r.incasso, r.incassato, r.costoBus, r.costoCompleto, r.commissioni, r.margine, r.margineAOggi, r.lineeSottoPareggio,
       r.lineeDaConfermare, r.percorsiCambiati, r.listaAttesa, r.venditeFermate,
     ]),
   );
@@ -95,8 +95,8 @@ function TabellaEventi({ righe, vuoto, onApri }: { righe: RigaEventoStatistiche[
             <th className="stat-num">Passeggeri</th>
             <th className="stat-num">Posti sui bus</th>
             <th>Riempimento</th>
-            <th className="stat-num">Incasso</th>
-            <th className="stat-num">Margine</th>
+            <th className="stat-num">Incasso previsto</th>
+            <th className="stat-num">Margine previsto</th>
             <th>Da fare</th>
           </tr>
         </thead>
@@ -124,11 +124,15 @@ function TabellaEventi({ righe, vuoto, onApri }: { righe: RigaEventoStatistiche[
                   ? <span className="stat-spento">—</span>
                   : <MiniBarra valore={r.riempimento} massimo={100} testo={formattaPercentuale(r.riempimento)} />}
               </td>
-              <td className="stat-num">{formattaEuroIntero(r.incasso)}</td>
+              <td className="stat-num">
+                {formattaEuroIntero(r.incasso)}
+                <Incassati incassato={r.incassato} previsto={r.incasso} />
+              </td>
               <td className="stat-num">
                 {r.margine === null ? <span className="stat-spento">—</span> : (
                   <>
                     <span className={r.margine < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(r.margine)}</span>
+                    <MargineAOggi aOggi={r.margineAOggi} previsto={r.margine} />
                     {!r.costoCompleto && <span className="stat-sotto"><span className="badge attenzione">costi incompleti</span></span>}
                   </>
                 )}
@@ -203,8 +207,11 @@ function SchedaEvento({ d }: { d: StatisticheEvento }) {
         <Kpi etichetta="Passeggeri" valore={formattaNumero(s.passeggeri)}>
           <KpiExtra>{pluraleNumero(s.prenotazioni, 'prenotazione', 'prenotazioni')}</KpiExtra>
         </Kpi>
-        <Kpi etichetta="Incasso" valore={formattaEuroIntero(s.incasso)}>
+        <Kpi etichetta="Incasso previsto" valore={formattaEuroIntero(s.incasso)}>
           {s.prezzoMedio !== null && <KpiExtra>prezzo medio {formattaEuro(s.prezzoMedio)}</KpiExtra>}
+        </Kpi>
+        <Kpi etichetta="Incassato" valore={formattaEuroIntero(s.incassato)}>
+          {s.incasso - s.incassato >= 1 && <KpiExtra>mancano {formattaEuroIntero(s.incasso - s.incassato)} di saldi</KpiExtra>}
         </Kpi>
         <Kpi etichetta="Posti sui bus confermati" valore={formattaNumero(s.postiSuiBus)}>
           {s.postiSuiBus === 0 && <KpiExtra>nessun bus confermato</KpiExtra>}
@@ -214,8 +221,9 @@ function SchedaEvento({ d }: { d: StatisticheEvento }) {
           <Kpi etichetta="Saliti a bordo" valore={`${formattaNumero(s.saliti)} su ${formattaNumero(s.partecipanti)}`} />
         )}
         {s.margine !== null && (
-          <Kpi etichetta="Margine" valore={formattaEuroIntero(s.margine)} tono={s.margine < 0 ? 'negativo' : undefined}>
+          <Kpi etichetta="Margine previsto" valore={formattaEuroIntero(s.margine)} tono={s.margine < 0 ? 'negativo' : undefined}>
             <KpiExtra>costo bus {formattaEuroIntero(s.costoBus ?? 0)} · commissioni {formattaEuroIntero(s.commissioni)}</KpiExtra>
+            <MargineAOggi aOggi={s.margineAOggi} previsto={s.margine} />
           </Kpi>
         )}
       </GrigliaKpi>
@@ -251,9 +259,9 @@ function SchedaEvento({ d }: { d: StatisticheEvento }) {
             disabilitato={d.fermate.length === 0}
             onScarica={() => scaricaCsv(
               nomeFileCsv(`fermate ${ev.artista} ${formattaGiorno(ev.data)}`),
-              ['Tragitto', 'Fermata', 'Attiva', 'Passeggeri', 'Prezzo €', 'Incasso €', 'Anticipo medio (giorni)', "Lista d'attesa"],
+              ['Tragitto', 'Fermata', 'Attiva', 'Passeggeri', 'Prezzo €', 'Incasso previsto €', 'Incassato €', 'Anticipo medio (giorni)', "Lista d'attesa"],
               d.fermate.map((f) => [
-                f.tragittoNome, f.citta, f.attiva, f.passeggeri, f.prezzo, f.incasso,
+                f.tragittoNome, f.citta, f.attiva, f.passeggeri, f.prezzo, f.incasso, f.incassato,
                 f.anticipoMedioGiorni === null ? null : Math.round(f.anticipoMedioGiorni), f.listaAttesa,
               ]),
             )}
@@ -269,7 +277,7 @@ function SchedaEvento({ d }: { d: StatisticheEvento }) {
                   <th>Fermata</th>
                   <th>Passeggeri</th>
                   <th className="stat-num">Prezzo</th>
-                  <th className="stat-num">Incasso</th>
+                  <th className="stat-num">Incasso previsto</th>
                   <th className="stat-num">Anticipo medio</th>
                   <th className="stat-num">Lista d'attesa</th>
                 </tr>
@@ -284,7 +292,10 @@ function SchedaEvento({ d }: { d: StatisticheEvento }) {
                     </td>
                     <td><MiniBarra valore={f.passeggeri} massimo={maxPasseggeriFermata} testo={formattaNumero(f.passeggeri)} /></td>
                     <td className="stat-num">{f.prezzo === null ? <span className="stat-spento">—</span> : formattaEuro(f.prezzo)}</td>
-                    <td className="stat-num">{formattaEuroIntero(f.incasso)}</td>
+                    <td className="stat-num">
+                      {formattaEuroIntero(f.incasso)}
+                      <Incassati incassato={f.incassato} previsto={f.incasso} />
+                    </td>
                     <td className="stat-num">
                       {f.anticipoMedioGiorni === null
                         ? <span className="stat-spento">—</span>
@@ -349,9 +360,15 @@ function BloccoLinea({ l }: { l: RigaLineaStatistiche }) {
       <GrigliaPosti posti={l.posti} venduti={l.passeggeri} pareggio={pareggio} daConfermare={l.daConfermare} />
       <p className="stat-linea-posti">{formattaNumero(l.passeggeri)} su {pluraleNumero(l.posti, 'posto', 'posti')} · {situazione}</p>
       <div className="stat-info">
-        <span>Incasso</span>
+        <span>Incasso previsto</span>
         <span>{formattaEuroIntero(l.incasso)}</span>
       </div>
+      {Math.abs(l.incasso - l.incassato) >= 1 && (
+        <div className="stat-info">
+          <span>Incassato</span>
+          <span>{formattaEuroIntero(l.incassato)}</span>
+        </div>
+      )}
       <div className="stat-info">
         <span>Costo</span>
         <span>
@@ -367,8 +384,14 @@ function BloccoLinea({ l }: { l: RigaLineaStatistiche }) {
       </div>
       {l.margine !== null && (
         <div className="stat-info">
-          <span>Margine</span>
+          <span>Margine previsto</span>
           <span className={l.margine < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(l.margine)}</span>
+        </div>
+      )}
+      {l.margineAOggi !== null && l.margine !== null && Math.abs(l.margine - l.margineAOggi) >= 1 && (
+        <div className="stat-info">
+          <span>Margine a oggi</span>
+          <span className={l.margineAOggi < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(l.margineAOggi)}</span>
         </div>
       )}
       {l.assegnati > 0 && (

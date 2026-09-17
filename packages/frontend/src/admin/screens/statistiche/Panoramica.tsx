@@ -10,7 +10,7 @@ import { PERMESSO_SEZIONE } from '../../shared/permessiSezioni';
 import { useSessione } from '../../shared/SessioneContext';
 import {
   chiaveFiltro, ErroreStatistiche, ETICHETTA_FONTE, formattaEuroIntero, formattaNumero, formattaPercentuale,
-  GrigliaKpi, Kpi, NotaCostiMancanti, Scheda, useDati, useSegnalaPeriodo, Variazione, VariazionePunti, Vuoto,
+  GrigliaKpi, Kpi, MargineAOggi, NotaCostiMancanti, Scheda, useDati, useSegnalaPeriodo, Variazione, VariazionePunti, Vuoto,
   type PropsScheda, type StatoDati,
 } from './comuni';
 import { BarraProiettile, BarreOrizzontali, GraficoAndamento } from './grafici';
@@ -89,10 +89,13 @@ function ContenutoPanoramica({ d, confronto, aggiorno, avvisi }: {
           <Kpi etichetta="Prenotazioni" valore={formattaNumero(v.prenotazioni.attuale)}>
             <Variazione valore={v.prenotazioni} formatta={formattaNumero} />
           </Kpi>
-          <Kpi etichetta="Incasso" valore={formattaEuroIntero(v.incasso.attuale)}>
+          <Kpi etichetta="Incasso previsto" valore={formattaEuroIntero(v.incasso.attuale)}>
             <Variazione valore={v.incasso} formatta={formattaEuroIntero} />
           </Kpi>
-          <Kpi etichetta="Incasso per passeggero" valore={formattaEuro(v.ricavoPerPasseggero.attuale)}>
+          <Kpi etichetta="Incassato" valore={formattaEuroIntero(v.incassato.attuale)}>
+            <Variazione valore={v.incassato} formatta={formattaEuroIntero} />
+          </Kpi>
+          <Kpi etichetta="Incasso previsto per passeggero" valore={formattaEuro(v.ricavoPerPasseggero.attuale)}>
             <Variazione valore={v.ricavoPerPasseggero} formatta={formattaEuro} />
           </Kpi>
         </GrigliaKpi>
@@ -112,14 +115,16 @@ function ContenutoPanoramica({ d, confronto, aggiorno, avvisi }: {
         <DaGuardare stato={avvisi} />
       </div>
 
-      <Scheda titolo="Incasso per fonte" classe={attenuato}>
+      <Scheda titolo="Incasso previsto per fonte" classe={attenuato}>
         <BarreOrizzontali
-          ariaLabel="Incasso per fonte, per data d'acquisto"
+          ariaLabel="Incasso previsto per fonte, per data d'acquisto"
           righe={d.perFonte.map((r, k) => ({
             chiave: `${r.tipo}-${k}`,
             etichetta: ETICHETTA_FONTE[r.tipo],
             valore: r.incasso,
-            testo: formattaEuroIntero(r.incasso),
+            testo: Math.abs(r.incasso - r.incassato) < 1
+              ? formattaEuroIntero(r.incasso)
+              : `${formattaEuroIntero(r.incasso)} · incassati ${formattaEuroIntero(r.incassato)}`,
           }))}
         />
       </Scheda>
@@ -133,8 +138,11 @@ function ContenutoPanoramica({ d, confronto, aggiorno, avvisi }: {
           <Kpi etichetta="Passeggeri" valore={formattaNumero(e.passeggeri.attuale)}>
             <Variazione valore={e.passeggeri} formatta={formattaNumero} />
           </Kpi>
-          <Kpi etichetta="Incasso" valore={formattaEuroIntero(e.incasso.attuale)}>
+          <Kpi etichetta="Incasso previsto" valore={formattaEuroIntero(e.incasso.attuale)}>
             <Variazione valore={e.incasso} formatta={formattaEuroIntero} />
+          </Kpi>
+          <Kpi etichetta="Incassato" valore={formattaEuroIntero(e.incassato.attuale)}>
+            <Variazione valore={e.incassato} formatta={formattaEuroIntero} />
           </Kpi>
           <Kpi
             etichetta="Riempimento dei bus"
@@ -158,8 +166,9 @@ function ContenutoPanoramica({ d, confronto, aggiorno, avvisi }: {
           <Kpi etichetta="Commissioni" valore={formattaEuroIntero(e.commissioni.attuale)}>
             <Variazione valore={e.commissioni} formatta={formattaEuroIntero} neutra />
           </Kpi>
-          <Kpi etichetta="Margine" valore={formattaEuroIntero(e.margine.attuale)} tono={e.margine.attuale < 0 ? 'negativo' : undefined}>
+          <Kpi etichetta="Margine previsto" valore={formattaEuroIntero(e.margine.attuale)} tono={e.margine.attuale < 0 ? 'negativo' : undefined}>
             <Variazione valore={e.margine} formatta={formattaEuroIntero} />
+            <MargineAOggi aOggi={e.margineAOggi.attuale} previsto={e.margine.attuale} />
           </Kpi>
         </GrigliaKpi>
         <NotaCostiMancanti eventi={e.eventiConCostiMancanti} />

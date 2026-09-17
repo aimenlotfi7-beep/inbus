@@ -100,7 +100,7 @@ export function StatisticheScreen() {
     <div>
       <PanelHead
         titolo="Statistiche"
-        info="Contano solo le prenotazioni confermate. Gli eventi in bozza o nel cestino non entrano nei conti. Un acconto non ancora saldato conta già per il prezzo intero."
+        info="Contano solo le prenotazioni confermate. Gli eventi in bozza o nel cestino non entrano nei conti. «Previsto» è il valore delle prenotazioni: un acconto non ancora saldato conta già per il prezzo intero. «Incassato» è quanto è stato pagato davvero. Il margine previsto usa il previsto, quello «a oggi» l'incassato."
       />
 
       <div className="mini-tabs">

@@ -246,6 +246,20 @@ export function VariazionePunti({ attuale, precedente }: { attuale: number; prec
   );
 }
 
+/** Sotto un incasso previsto: quanto è stato pagato davvero, se è diverso
+ *  (acconti non ancora saldati). Due voci separate, decise dal proprietario
+ *  (settembre 2026). */
+export function Incassati({ incassato, previsto }: { incassato: number; previsto: number }) {
+  if (Math.abs(previsto - incassato) < 1) return null;
+  return <span className="stat-sotto">incassati {formattaEuroIntero(incassato)}</span>;
+}
+
+/** Sotto un margine previsto: quello con i soldi già entrati, se è diverso. */
+export function MargineAOggi({ aOggi, previsto }: { aOggi: number | null; previsto: number | null }) {
+  if (aOggi === null || previsto === null || Math.abs(previsto - aOggi) < 1) return null;
+  return <span className="stat-sotto">a oggi <span className={aOggi < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(aOggi)}</span></span>;
+}
+
 export function NotaCostiMancanti({ eventi }: { eventi: number }) {
   if (eventi <= 0) return null;
   return (

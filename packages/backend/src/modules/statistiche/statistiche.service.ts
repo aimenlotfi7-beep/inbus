@@ -16,7 +16,7 @@ import {
   curvaCumulativa, etaAl, fasciaAnticipo, fasciaEta, fonteDi, mediaCurve, mediana, percentuale, raggruppa, type Fonte, type TipoFonte,
 } from './calcoli.js';
 import {
-  commissioniPer, costiMancanti, costoCompleto, economiaEventi, lineeEventi, sommaPasseggeri, sommaTotali, sottoPareggio,
+  commissioniPer, costiMancanti, costoCompleto, economiaEventi, lineeEventi, sommaPagati, sommaPasseggeri, sommaTotali, sottoPareggio,
   type ContestoFonti, type DatiEventi, type EconomiaEvento, type PrenotazioneStatistica, type StruttureEventi,
 } from './economia.js';
 import { giorniTra, indiceIntervallo, inizioGiornoRoma, oggiRoma, periodoPerRisposta, type Intervallo, type Periodo } from './periodo.js';
@@ -201,16 +201,17 @@ export async function prenotazioniComeStatistiche(condizione: SQL | undefined) {
 }
 
 function sintesiPerTipo(righe: PrenotazioneStatistica[], ctx: ContestoFonti) {
-  const perTipo = new Map<TipoFonte, { tipo: TipoFonte; nome: string; prenotazioni: number; passeggeri: number; incasso: number }>();
+  const perTipo = new Map<TipoFonte, { tipo: TipoFonte; nome: string; prenotazioni: number; passeggeri: number; incasso: number; incassato: number }>();
   for (const r of righe) {
     const { tipo } = fonteDellaRiga(r, ctx);
-    const voce = perTipo.get(tipo) ?? { tipo, nome: NOMI_TIPO_FONTE[tipo], prenotazioni: 0, passeggeri: 0, incasso: 0 };
+    const voce = perTipo.get(tipo) ?? { tipo, nome: NOMI_TIPO_FONTE[tipo], prenotazioni: 0, passeggeri: 0, incasso: 0, incassato: 0 };
     voce.prenotazioni += 1;
     voce.passeggeri += r.passeggeri;
     voce.incasso += r.totale;
+    voce.incassato += r.pagato;
     perTipo.set(tipo, voce);
   }
-  return [...perTipo.values()].map((v) => ({ ...v, incasso: arrotondaEuro(v.incasso) })).sort((a, b) => b.incasso - a.incasso);
+  return [...perTipo.values()].map((v) => ({ ...v, incasso: arrotondaEuro(v.incasso), incassato: arrotondaEuro(v.incassato) })).sort((a, b) => b.incasso - a.incasso);
 }
 
 // ---------------------------------------------------------------- Tragitti, linee e bus
@@ -301,7 +302,7 @@ export const statisticheService = {
     const vendite = (rr: PrenotazioneStatistica[]) => {
       const passeggeri = sommaPasseggeri(rr);
       const incasso = sommaTotali(rr);
-      return { passeggeri, prenotazioni: rr.length, incasso, ricavo: passeggeri > 0 ? arrotondaEuro(incasso / passeggeri) : 0 };
+      return { passeggeri, prenotazioni: rr.length, incasso, incassato: sommaPagati(rr), ricavo: passeggeri > 0 ? arrotondaEuro(incasso / passeggeri) : 0 };
     };
     const va = vendite(righe);
     const vc = righeConfronto ? vendite(righeConfronto) : null;
@@ -318,9 +319,11 @@ export const statisticheService = {
         eventi: ids.length,
         passeggeri: somma((e) => e.passeggeri),
         incasso: arrotondaEuro(somma((e) => e.incasso)),
+        incassato: arrotondaEuro(somma((e) => e.incassato)),
         costoBus: arrotondaEuro(somma((e) => e.costoBus)),
         commissioni: arrotondaEuro(somma((e) => e.commissioni)),
         margine: arrotondaEuro(somma((e) => e.margine)),
+        margineAOggi: arrotondaEuro(somma((e) => e.margineAOggi)),
         riempimento: posti > 0 ? percentuale(somma((e) => e.passeggeriConBus), posti) : null,
         costiMancanti: economia.filter(costiMancanti).length,
       };
@@ -334,6 +337,7 @@ export const statisticheService = {
         passeggeri: { attuale: va.passeggeri, precedente: vc?.passeggeri ?? null },
         prenotazioni: { attuale: va.prenotazioni, precedente: vc?.prenotazioni ?? null },
         incasso: { attuale: va.incasso, precedente: vc?.incasso ?? null },
+        incassato: { attuale: va.incassato, precedente: vc?.incassato ?? null },
         ricavoPerPasseggero: { attuale: va.ricavo, precedente: vc?.ricavo ?? null },
         andamento: andamento.map((attuale, i) => ({ attuale, precedente: andamentoConfronto ? andamentoConfronto[i] ?? null : null })),
       },
@@ -341,9 +345,11 @@ export const statisticheService = {
         eventi: { attuale: ea.eventi, precedente: ec?.eventi ?? null },
         passeggeri: { attuale: ea.passeggeri, precedente: ec?.passeggeri ?? null },
         incasso: { attuale: ea.incasso, precedente: ec?.incasso ?? null },
+        incassato: { attuale: ea.incassato, precedente: ec?.incassato ?? null },
         costoBus: { attuale: ea.costoBus, precedente: ec?.costoBus ?? null },
         commissioni: { attuale: ea.commissioni, precedente: ec?.commissioni ?? null },
         margine: { attuale: ea.margine, precedente: ec?.margine ?? null },
+        margineAOggi: { attuale: ea.margineAOggi, precedente: ec?.margineAOggi ?? null },
         riempimentoBus: { attuale: ea.riempimento, precedente: ec?.riempimento ?? null },
         eventiConCostiMancanti: ea.costiMancanti,
       },
@@ -485,6 +491,7 @@ export const statisticheService = {
         giorniAllaPartenza: giorniTra(oggi, giornoARoma(e.data)),
         passeggeri: eco.passeggeri,
         incasso: eco.incasso,
+        incassato: eco.incassato,
         postiSuiBus: eco.postiSuiBus,
         riempimento: eco.postiSuiBus > 0 ? percentuale(eco.passeggeriConBus, eco.postiSuiBus) : null,
         lineeSottoPareggio: lineeEvento.filter(sottoPareggio).length,
@@ -495,6 +502,7 @@ export const statisticheService = {
         costoCompleto: costoCompleto(eco),
         commissioni: eco.commissioni,
         margine: haBus ? eco.margine : null,
+        margineAOggi: haBus ? eco.margineAOggi : null,
         venditeFermate: e.venditeFermate,
       };
     };
@@ -557,6 +565,7 @@ export const statisticheService = {
         passeggeri: eco.passeggeri,
         prenotazioni: eco.prenotazioni,
         incasso: eco.incasso,
+        incassato: eco.incassato,
         prezzoMedio: eco.passeggeri > 0 ? arrotondaEuro(eco.incasso / eco.passeggeri) : null,
         postiSuiBus: eco.postiSuiBus,
         listaAttesa: attese.length,
@@ -565,6 +574,7 @@ export const statisticheService = {
         costoBus: eco.bus > 0 ? eco.costoBus : null,
         commissioni: eco.commissioni,
         margine: eco.bus > 0 ? eco.margine : null,
+        margineAOggi: eco.bus > 0 ? eco.margineAOggi : null,
       },
       ritmo: {
         giorni,
@@ -580,7 +590,7 @@ export const statisticheService = {
         id: l.id, nome: l.nome, tragittoNome: l.tragittoNome, daConfermare: l.daConfermare, fermate: l.fermate,
         posti: l.posti, passeggeri: l.passeggeri, postiPareggio: l.postiPareggio,
         assegnati: salitiPerLinea.get(l.id)?.assegnati ?? 0, saliti: salitiPerLinea.get(l.id)?.saliti ?? 0,
-        incasso: l.incasso, costo: l.costo, costoCompleto: l.costoCompleto, margine: l.margine,
+        incasso: l.incasso, incassato: l.incassato, costo: l.costo, costoCompleto: l.costoCompleto, margine: l.margine, margineAOggi: l.margineAOggi,
       })),
       fermate: await fermateEvento(id, dati, attese),
       perFonte: sintesiPerTipo(dati.righe, dati.ctx),
@@ -594,13 +604,14 @@ export const statisticheService = {
 
     const fontePerRiga = new Map(righe.map((r) => [r.id, fonteDellaRiga(r, ctx)]));
     const commissioniFonte = commissioniPer(righe, (r) => fontePerRiga.get(r.id)!.chiave, ctx);
-    const fonti = new Map<string, { tipo: TipoFonte; nome: string; prenotazioni: number; passeggeri: number; incasso: number }>();
+    const fonti = new Map<string, { tipo: TipoFonte; nome: string; prenotazioni: number; passeggeri: number; incasso: number; incassato: number }>();
     for (const r of righe) {
       const f = fontePerRiga.get(r.id)!;
-      const voce = fonti.get(f.chiave) ?? { tipo: f.tipo, nome: f.nome, prenotazioni: 0, passeggeri: 0, incasso: 0 };
+      const voce = fonti.get(f.chiave) ?? { tipo: f.tipo, nome: f.nome, prenotazioni: 0, passeggeri: 0, incasso: 0, incassato: 0 };
       voce.prenotazioni += 1;
       voce.passeggeri += r.passeggeri;
       voce.incasso += r.totale;
+      voce.incassato += r.pagato;
       fonti.set(f.chiave, voce);
     }
 
@@ -628,7 +639,7 @@ export const statisticheService = {
       fonti: [...fonti.entries()].map(([chiave, v]) => {
         const incasso = arrotondaEuro(v.incasso);
         const commissione = commissioniFonte.get(chiave) ?? 0;
-        return { ...v, incasso, commissione, margineNetto: arrotondaEuro(incasso - commissione) };
+        return { ...v, incasso, incassato: arrotondaEuro(v.incassato), commissione, margineNetto: arrotondaEuro(incasso - commissione) };
       }).sort((a, b) => b.incasso - a.incasso),
       promoter: [...perPromoter.entries()].map(([codice, rr]) => ({
         id: ctx.idPromoter.get(codice) ?? null,
@@ -637,6 +648,7 @@ export const statisticheService = {
         prenotazioni: rr.length,
         passeggeri: sommaPasseggeri(rr),
         incasso: sommaTotali(rr),
+        incassato: sommaPagati(rr),
         commissione: commissioniPromoter.get(codice) ?? 0,
         andamento: perIntervallo(rr, (r) => r.creataIl, (r) => r.passeggeri, p.intervalli),
       })).sort((a, b) => b.incasso - a.incasso),
@@ -649,6 +661,7 @@ export const statisticheService = {
           passeggeri: sommaPasseggeri(rr),
           sconto: arrotondaEuro(rr.reduce((s, r) => s + Number(r.sconto), 0)),
           incasso: sommaTotali(rr),
+          incassato: sommaPagati(rr),
         };
       }).sort((a, b) => b.incasso - a.incasso),
       offerte: [...perOfferta.entries()].map(([offertaId, rr]) => ({
@@ -658,6 +671,7 @@ export const statisticheService = {
         prenotazioni: rr.length,
         passeggeri: sommaPasseggeri(rr),
         incasso: sommaTotali(rr),
+        incassato: sommaPagati(rr),
       })).sort((a, b) => b.incasso - a.incasso),
       anticipo: FASCE_ANTICIPO.map((f, i) => ({ fascia: f.etichetta, passeggeri: anticipo[i], percentuale: percentuale(anticipo[i], passeggeriTotali) })),
       pagamento: {
@@ -671,6 +685,7 @@ export const statisticheService = {
         prenotazioni: righeBundle.length,
         passeggeri: sommaPasseggeri(righeBundle),
         incasso: sommaTotali(righeBundle),
+        incassato: sommaPagati(righeBundle),
         sconto: arrotondaEuro(righeBundle.reduce((s, r) => s + Number(r.scontoBundle ?? 0), 0)),
       },
     };
@@ -779,9 +794,11 @@ export const statisticheService = {
       periodo: periodoPerRisposta(p),
       totali: {
         incasso: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.incasso, 0)),
+        incassato: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.incassato, 0)),
         costoBus: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.costoBus, 0)),
         commissioni: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.commissioni, 0)),
         margine: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.margine, 0)),
+        margineAOggi: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.margineAOggi, 0)),
         eventiConCostiMancanti: tuttiEco.filter(costiMancanti).length,
       },
       eventi: eventiPeriodo
@@ -789,8 +806,8 @@ export const statisticheService = {
         .filter(({ eco }) => eco.passeggeri > 0 || eco.bus > 0)
         .map(({ e, eco }) => ({
           id: e.id, artista: e.artista, citta: e.citta, data: e.data.toISOString(),
-          passeggeri: eco.passeggeri, incasso: eco.incasso, bus: eco.bus, costoBus: eco.costoBus, costoCompleto: costoCompleto(eco),
-          commissioni: eco.commissioni, margine: eco.margine,
+          passeggeri: eco.passeggeri, incasso: eco.incasso, incassato: eco.incassato, bus: eco.bus, costoBus: eco.costoBus, costoCompleto: costoCompleto(eco),
+          commissioni: eco.commissioni, margine: eco.margine, margineAOggi: eco.margineAOggi,
         })),
       fornitori: fornitoriPeriodo,
       tratte: await tratteConPartenza(righeTratte),
@@ -856,12 +873,13 @@ async function fermateEvento(eventoId: string, dati: DatiEventi, attese: { tragi
   const nomeTragitto = new Map(nomiTragitti.map((t) => [t.id, t.eliminatoIl ? `${t.nome} (eliminato)` : t.nome]));
   const chiave = (tragittoId: string, citta: string) => `${tragittoId} ${citta}`;
 
-  const prenotate = new Map<string, { passeggeri: number; incasso: number; giorniPesati: number }>();
+  const prenotate = new Map<string, { passeggeri: number; incasso: number; incassato: number; giorniPesati: number }>();
   for (const r of dati.righe) {
     const k = chiave(r.tragittoId, r.fermataCitta);
-    const voce = prenotate.get(k) ?? { passeggeri: 0, incasso: 0, giorniPesati: 0 };
+    const voce = prenotate.get(k) ?? { passeggeri: 0, incasso: 0, incassato: 0, giorniPesati: 0 };
     voce.passeggeri += r.passeggeri;
     voce.incasso += r.totale;
+    voce.incassato += r.pagato;
     voce.giorniPesati += Math.max(0, giorniTra(giornoARoma(r.creataIl), giornoARoma(r.eventoData))) * r.passeggeri;
     prenotate.set(k, voce);
   }
@@ -892,6 +910,7 @@ async function fermateEvento(eventoId: string, dati: DatiEventi, attese: { tragi
       ...f,
       passeggeri: vendute?.passeggeri ?? 0,
       incasso: arrotondaEuro(vendute?.incasso ?? 0),
+      incassato: arrotondaEuro(vendute?.incassato ?? 0),
       anticipoMedioGiorni: vendute && vendute.passeggeri > 0 ? Math.round(vendute.giorniPesati / vendute.passeggeri) : null,
     };
   });

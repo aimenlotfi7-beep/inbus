@@ -4,7 +4,7 @@ import { CampoNumero } from '../../shared/CampoNumero';
 import { InfoTooltip } from '../../shared/InfoTooltip';
 import { Caricamento, ErroreStatistiche, formattaEuroIntero, formattaNumero, pluraleNumero, Scheda, useDati, Vuoto } from './comuni';
 import {
-  conInterruttore, conScelta, contiEvento, contiEventi, costoDi, giudizio, leggiScelte, risultato, salvaScelte, spesa,
+  conInterruttore, conScelta, contiEvento, contiEventi, costoDi, giudizio, leggiScelte, previsto, risultato, risultatoAOggi, salvaScelte, spesa,
   type ATerra, type ContiTragitto, type SceltaBus, type Scelte, type Voce,
 } from './contiBusInPiu';
 import { formattaGiorno, oggiRoma } from './periodo';
@@ -65,19 +65,23 @@ function Intestazione({ primaColonna }: { primaColonna: string }) {
         <th>{primaColonna}</th>
         <th className="stat-num">
           Passeggeri
-          <InfoTooltip fisso>Chi parte sui bus (sul bus: passeggeri / posti). «A terra»: chi non trova posto sui bus che partono e quanto ha già pagato; se nessun bus lo porta viene rimborsato, quindi non entra nell'incasso. Per sapere se quei soldi coprono un bus in più guarda la riga di quel bus.</InfoTooltip>
+          <InfoTooltip fisso>Chi parte sui bus (sul bus: passeggeri / posti). «A terra»: chi non trova posto sui bus che partono e quanto valgono le sue prenotazioni; se nessun bus lo porta viene rimborsato, quindi non conta. Per sapere se quei soldi coprono un bus in più guarda la riga di quel bus.</InfoTooltip>
         </th>
         <th className="stat-num">
-          Incasso
-          <InfoTooltip fisso>Quanto hanno pagato davvero i passeggeri che partono: di un acconto non ancora saldato conta solo l'acconto. Sotto, in piccolo, i saldi che devono ancora arrivare: non contano nel risultato. Chi resta a terra o ha un rimborso in attesa non conta.</InfoTooltip>
+          Incassato
+          <InfoTooltip fisso>I soldi già entrati dai passeggeri che partono: di un acconto non ancora saldato conta solo l'acconto.</InfoTooltip>
+        </th>
+        <th className="stat-num">
+          Previsto
+          <InfoTooltip fisso>Quanto incasserai da chi parte quando avranno pagato tutti: l'incassato più i saldi che mancano (scritti sotto). Chi resta a terra o ha un rimborso in attesa non conta.</InfoTooltip>
         </th>
         <th className="stat-num">
           Spesa
           <InfoTooltip fisso>Costo dei bus che partono più le commissioni dei promoter e le quote White Label dei loro passeggeri. Il costo di un bus in più è il preventivo più basso ricevuto, altrimenti la quotazione.</InfoTooltip>
         </th>
         <th className="stat-num">
-          Risultato
-          <InfoTooltip fisso>Incasso meno spesa: verde guadagno, rosso perdita, arancio pareggio (meno di 1 € di differenza). Nella riga dell'evento è la somma di tutti i suoi tragitti: così vedi se il guadagno di un tragitto copre la perdita di un altro.</InfoTooltip>
+          Risultato previsto
+          <InfoTooltip fisso>Previsto meno spesa: verde guadagno, rosso perdita, arancio pareggio (meno di 1 € di differenza). Sotto, in piccolo, il risultato a oggi con i soldi già entrati. Nella riga dell'evento è la somma di tutti i suoi tragitti: così vedi se il guadagno di un tragitto copre la perdita di un altro.</InfoTooltip>
         </th>
       </tr>
     </thead>
@@ -95,13 +99,16 @@ function CellePasseggeri({ voce, aTerra, conPosti = false }: { voce: Voce; aTerr
   );
 }
 
-/** Pagato davvero; sotto, i saldi che devono ancora arrivare (non contano nel risultato). */
-function CellaIncasso({ voce }: { voce: Voce }) {
+/** Incassato (pagato davvero) e previsto (con i saldi che mancano), in due colonne. */
+function CelleIncasso({ voce }: { voce: Voce }) {
   return (
-    <td className="stat-num">
-      {euro(voce.incasso)}
-      {voce.daIncassare > 0 && <span className="stat-sotto">da incassare {euro(voce.daIncassare)}</span>}
-    </td>
+    <>
+      <td className="stat-num">{euro(voce.incasso)}</td>
+      <td className="stat-num">
+        {euro(previsto(voce))}
+        {voce.daIncassare > 0 && <span className="stat-sotto">mancano {euro(voce.daIncassare)}</span>}
+      </td>
+    </>
   );
 }
 
@@ -121,12 +128,17 @@ function CellaSpesa({ voce }: { voce: Voce }) {
   );
 }
 
+/** Il risultato previsto in evidenza; sotto, quello a oggi se i saldi non sono ancora arrivati tutti. */
 function CellaRisultato({ voce, conGiudizio = false, spento = false }: { voce: Voce; conGiudizio?: boolean; spento?: boolean }) {
   const r = risultato(voce);
+  const oggi = risultatoAOggi(voce);
   return (
     <td className="stat-num">
       <span className={spento ? undefined : `sim-valore ${giudizio(r)}`}>{euro(r)}</span>
       {conGiudizio && <span className="stat-sotto"><Giudizio valore={r} /></span>}
+      {voce.daIncassare > 0 && (
+        <span className="stat-sotto">a oggi <b className={spento ? undefined : `sim-valore ${giudizio(oggi)}`}>{euro(oggi)}</b></span>
+      )}
     </td>
   );
 }
@@ -207,7 +219,7 @@ function RigheLinee({ conti, scelte, onCambia, modifica, onModifica, aperti }: P
                 </span>
               </td>
               <CellePasseggeri voce={l.voce} conPosti />
-              <CellaIncasso voce={l.voce} />
+              <CelleIncasso voce={l.voce} />
               <CellaSpesa voce={l.voce} />
               <CellaRisultato voce={l.voce} spento={spenta} />
             </tr>
@@ -237,13 +249,13 @@ function RigheLinee({ conti, scelte, onCambia, modifica, onModifica, aperti }: P
                       </span>
                     </td>
                     <CellePasseggeri voce={r.voce} conPosti />
-                    <CellaIncasso voce={r.voce} />
+                    <CelleIncasso voce={r.voce} />
                     <CellaSpesa voce={r.voce} />
                     <CellaRisultato voce={r.voce} spento={!r.parte} />
                   </tr>
                   {onCambia && modifica === b.chiave && (
                     <tr className="sim-costo-riga">
-                      <td colSpan={5}>
+                      <td colSpan={6}>
                         <span className="sim-costo">
                           <label htmlFor={`costo-${b.chiave}`}>Costo di {b.nome} ({l.linea.nome})</label>
                           <CampoNumero
@@ -286,7 +298,7 @@ function RigaTragitto({ conti, aperti, diSerie, sotto, classe = '' }: { conti: C
         {sotto && <span className="stat-sotto">{sotto}</span>}
       </td>
       <CellePasseggeri voce={conti.voce} aTerra={conti.aTerra} />
-      <CellaIncasso voce={conti.voce} />
+      <CelleIncasso voce={conti.voce} />
       <CellaSpesa voce={conti.voce} />
       <CellaRisultato voce={conti.voce} conGiudizio />
     </tr>
@@ -318,7 +330,7 @@ function TabellaEventi({ eventi, scelte, onCambia, apertiIniziali }: { eventi: E
                     <RisultatiTragitti tragitti={c.tragitti} />
                   </td>
                   <CellePasseggeri voce={c.voce} aTerra={c.aTerra} />
-                  <CellaIncasso voce={c.voce} />
+                  <CelleIncasso voce={c.voce} />
                   <CellaSpesa voce={c.voce} />
                   <CellaRisultato voce={c.voce} conGiudizio />
                 </tr>
@@ -385,7 +397,7 @@ export function RiquadroBusInPiu({ eventoId, tragittoId, versione }: { eventoId:
                     <RisultatiTragitti tragitti={evento.tragitti} />
                   </td>
                   <CellePasseggeri voce={evento.voce} aTerra={evento.aTerra} />
-                  <CellaIncasso voce={evento.voce} />
+                  <CelleIncasso voce={evento.voce} />
                   <CellaSpesa voce={evento.voce} />
                   <CellaRisultato voce={evento.voce} conGiudizio />
                 </tr>
@@ -404,7 +416,7 @@ export function RiquadroBusInPiu({ eventoId, tragittoId, versione }: { eventoId:
                 <tr className="sim-evento sim-fisso">
                   <td>Questo tragitto</td>
                   <CellePasseggeri voce={questo.voce} aTerra={questo.aTerra} />
-                  <CellaIncasso voce={questo.voce} />
+                  <CelleIncasso voce={questo.voce} />
                   <CellaSpesa voce={questo.voce} />
                   <CellaRisultato voce={questo.voce} conGiudizio />
                 </tr>
@@ -447,7 +459,7 @@ function RigaRiepilogo({ nome, sotto, voce, aTerra, forte = false }: { nome: str
     <tr className={forte ? 'sim-totale' : undefined}>
       <td>{nome}{sotto && <span className="stat-sotto">{sotto}</span>}</td>
       <CellePasseggeri voce={voce} aTerra={aTerra} />
-      <CellaIncasso voce={voce} />
+      <CelleIncasso voce={voce} />
       <CellaSpesa voce={voce} />
       <CellaRisultato voce={voce} conGiudizio />
     </tr>

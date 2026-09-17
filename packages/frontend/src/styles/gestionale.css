@@ -483,8 +483,8 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 /* Bus in più (BusInPiu.tsx): una tabella evento → linea → bus con incasso,
    spesa e risultato. Verde guadagno, ambra pareggio, rosso perdita; un bus
    che non parte è grigio. */
-.sim-tabella{min-width:680px;}
-.sim-tabella th:first-child{width:38%;}
+.sim-tabella{min-width:760px;}
+.sim-tabella th:first-child{width:30%;}
 .sim-tabella td{vertical-align:top;}
 .sim-tabella .stat-num .stat-sotto{white-space:normal;}
 .sim-tabella tr.sim-evento > td{background:var(--dusk-2); font-weight:700; cursor:pointer;}

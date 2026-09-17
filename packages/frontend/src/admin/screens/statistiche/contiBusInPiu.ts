@@ -6,11 +6,13 @@ import type { BusSimulato, EventoSimulato, LineaSimulata, TragittoSimulato } fro
  *  Il server manda, per ogni tragitto, chi parte su ogni bus e quanto porta
  *  in ogni combinazione di interruttori; qui si sceglie quella accesa e si
  *  aggiungono i costi dei bus che partono. Decisioni del proprietario
- *  (settembre 2026): incasso = quanto è stato pagato davvero (di un acconto
- *  solo l'acconto), i saldi che mancano sono a parte e non contano; spesa =
- *  costo dei bus + commissioni dei promoter + quote White Label. Le scelte
- *  (parte / non parte, costo scritto a mano) sono solo una simulazione: non
- *  confermano niente e restano in questo browser. */
+ *  (settembre 2026): incassato = quanto è stato pagato davvero (di un acconto
+ *  solo l'acconto) e previsto = incassato + saldi che mancano, voci separate;
+ *  il risultato previsto (previsto − spesa) è quello in evidenza, quello a
+ *  oggi (incassato − spesa) in piccolo; spesa = costo dei bus + commissioni
+ *  dei promoter + quote White Label. Le scelte (parte / non parte, costo
+ *  scritto a mano) sono solo una simulazione: non confermano niente e restano
+ *  in questo browser. */
 
 export interface SceltaBus {
   parte?: boolean;
@@ -24,9 +26,9 @@ const CHIAVE_SCELTE = 'inbus.gestionale.busInPiu';
 export interface Voce {
   passeggeri: number;
   posti: number;
-  /** Pagato davvero: di un acconto non saldato solo l'acconto (proprietario, settembre 2026). */
+  /** Incassato: pagato davvero, di un acconto non saldato solo l'acconto. */
   incasso: number;
-  /** Saldi ancora da pagare: si mostrano, ma non contano nel risultato. */
+  /** Saldi ancora da pagare: con l'incassato fanno il previsto. */
   daIncassare: number;
   promoter: number;
   whiteLabel: number;
@@ -39,7 +41,12 @@ export interface Voce {
 const arrotonda = (n: number) => Math.round(n * 100) / 100;
 export const voceVuota = (): Voce => ({ passeggeri: 0, posti: 0, incasso: 0, daIncassare: 0, promoter: 0, whiteLabel: 0, costoBus: 0, bus: 0, busSenzaCosto: 0 });
 export const spesa = (v: Voce) => arrotonda(v.costoBus + v.promoter + v.whiteLabel);
-export const risultato = (v: Voce) => arrotonda(v.incasso - spesa(v));
+/** Incassato + saldi che mancano. */
+export const previsto = (v: Voce) => arrotonda(v.incasso + v.daIncassare);
+/** Risultato previsto: quello in evidenza. */
+export const risultato = (v: Voce) => arrotonda(previsto(v) - spesa(v));
+/** Risultato con i soldi già entrati. */
+export const risultatoAOggi = (v: Voce) => arrotonda(v.incasso - spesa(v));
 
 export function somma(voci: Voce[]): Voce {
   const s = voceVuota();
@@ -96,7 +103,7 @@ export interface RigaBus {
 }
 export interface RigaLinea { linea: LineaSimulata; voce: Voce; bus: RigaBus[] }
 /** A terra: chi non trova posto sui bus che partono (sarebbe rimborsato) e
- *  quanto valgono le sue prenotazioni. Chi ha già chiesto il rimborso non c'è. */
+ *  quanto valgono le sue prenotazioni (previsto). Chi ha già chiesto il rimborso non c'è. */
 export interface ATerra { passeggeri: number; valore: number }
 export interface ContiTragitto { tragitto: TragittoSimulato; voce: Voce; aTerra: ATerra; linee: RigaLinea[] }
 export interface ContiEvento { evento: EventoSimulato; voce: Voce; aTerra: ATerra; tragitti: ContiTragitto[] }
@@ -120,7 +127,7 @@ export function contiTragitto(t: TragittoSimulato, scelte: Scelte): ContiTragitt
   const voce = somma(linee.map((l) => l.voce));
   const aTerra = {
     passeggeri: Math.max(0, t.passeggeri - t.inAttesaDiRimborso - voce.passeggeri),
-    valore: Math.max(0, arrotonda(t.incasso - voce.incasso)),
+    valore: Math.max(0, arrotonda(t.incasso + t.daIncassare - previsto(voce))),
   };
   return { tragitto: t, voce, aTerra, linee };
 }

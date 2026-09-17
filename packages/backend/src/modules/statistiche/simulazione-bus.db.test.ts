@@ -43,7 +43,7 @@ describe('evento in vendita', () => {
 
     const evento = await simulazioneBusService.evento(s.evento.id);
     const [t] = evento!.tragitti;
-    expect(t).toMatchObject({ passeggeri: 7, incasso: 250 });
+    expect(t).toMatchObject({ passeggeri: 7, incasso: 250, daIncassare: 0 });
     expect(t.linee.map((l) => [l.nome, l.fermate])).toEqual([['Linea 1', ['Roma', 'Firenze']], [proposta.nome, ['Firenze']]]);
     expect(t.bus.map((b) => [b.nome, b.tipo, b.linea, b.interruttore, b.costo, b.fonteCosto])).toEqual([
       ['Bus 1', 'confermato', 0, null, 250, 'bus'],
@@ -85,7 +85,7 @@ describe('evento in vendita', () => {
     // 2 posti da 40 €: l'acconto è meno degli 80 € del prezzo intero.
     expect(acconto).toBeLessThan(80);
     const [t] = (await simulazioneBusService.evento(s.evento.id))!.tragitti;
-    expect(t.incasso).toBe(acconto);
+    expect(t).toMatchObject({ incasso: acconto, daIncassare: 80 - acconto });
     expect(t.esiti[0][0]).toEqual([2, acconto, 0, 0, 80 - acconto]);
   });
 

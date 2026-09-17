@@ -2,7 +2,7 @@ import { statisticheApi, type StatisticheCosti } from '../../../api/statistiche'
 import { formattaEuro, plurale } from '../../../shared/formato';
 import {
   BottoneCsv, Caricamento, chiaveFiltro, formattaEuroIntero, formattaNumero, formattaPercentuale, GrigliaKpi, Kpi,
-  NotaCostiMancanti, Scheda, useDati, useSegnalaPeriodo, Vuoto, type PropsScheda,
+  MargineAOggi, NotaCostiMancanti, Scheda, useDati, useSegnalaPeriodo, Vuoto, type PropsScheda,
 } from './comuni';
 import { nomeFileCsv, scaricaCsv } from './csv';
 import { Colonne } from './grafici';
@@ -43,10 +43,13 @@ function ContenutoCosti({ d }: { d: StatisticheCosti }) {
   return (
     <>
       <GrigliaKpi>
-        <Kpi etichetta="Incasso" valore={formattaEuroIntero(t.incasso)} />
+        <Kpi etichetta="Incasso previsto" valore={formattaEuroIntero(t.incasso)} />
+        <Kpi etichetta="Incassato" valore={formattaEuroIntero(t.incassato)} />
         <Kpi etichetta="Costo dei bus" valore={formattaEuroIntero(t.costoBus)} />
         <Kpi etichetta="Commissioni" valore={formattaEuroIntero(t.commissioni)} />
-        <Kpi etichetta="Margine" valore={formattaEuroIntero(t.margine)} tono={t.margine < 0 ? 'negativo' : undefined} />
+        <Kpi etichetta="Margine previsto" valore={formattaEuroIntero(t.margine)} tono={t.margine < 0 ? 'negativo' : undefined}>
+          <MargineAOggi aOggi={t.margineAOggi} previsto={t.margine} />
+        </Kpi>
       </GrigliaKpi>
       <NotaCostiMancanti eventi={t.eventiConCostiMancanti} />
 
@@ -58,8 +61,8 @@ function ContenutoCosti({ d }: { d: StatisticheCosti }) {
             disabilitato={eventi.length === 0}
             onScarica={() => scaricaCsv(
               nomeFileCsv('margine per evento', d.periodo),
-              ['Evento', 'Città', 'Data', 'Passeggeri', 'Bus', 'Incasso €', 'Costo bus €', 'Costi completi', 'Commissioni €', 'Margine €'],
-              eventi.map((e) => [e.artista, e.citta, formattaGiorno(e.data), e.passeggeri, e.bus, e.incasso, e.costoBus, e.costoCompleto, e.commissioni, e.margine]),
+              ['Evento', 'Città', 'Data', 'Passeggeri', 'Bus', 'Incasso previsto €', 'Incassato €', 'Costo bus €', 'Costi completi', 'Commissioni €', 'Margine previsto €', 'Margine a oggi €'],
+              eventi.map((e) => [e.artista, e.citta, formattaGiorno(e.data), e.passeggeri, e.bus, e.incasso, e.incassato, e.costoBus, e.costoCompleto, e.commissioni, e.margine, e.margineAOggi]),
             )}
           />
         )}
@@ -73,10 +76,11 @@ function ContenutoCosti({ d }: { d: StatisticheCosti }) {
                   <th>Data</th>
                   <th className="stat-num">Passeggeri</th>
                   <th className="stat-num">Bus</th>
-                  <th className="stat-num">Incasso</th>
+                  <th className="stat-num">Incasso previsto</th>
+                  <th className="stat-num">Incassato</th>
                   <th className="stat-num">Costo bus</th>
                   <th className="stat-num">Commissioni</th>
-                  <th className="stat-num">Margine</th>
+                  <th className="stat-num">Margine previsto</th>
                 </tr>
               </thead>
               <tbody>
@@ -90,12 +94,16 @@ function ContenutoCosti({ d }: { d: StatisticheCosti }) {
                     <td className="stat-num">{formattaNumero(e.passeggeri)}</td>
                     <td className="stat-num">{formattaNumero(e.bus)}</td>
                     <td className="stat-num">{formattaEuroIntero(e.incasso)}</td>
+                    <td className="stat-num">{formattaEuroIntero(e.incassato)}</td>
                     <td className="stat-num">
                       {formattaEuroIntero(e.costoBus)}
                       {!e.costoCompleto && <span className="stat-sotto"><span className="badge attenzione">costi incompleti</span></span>}
                     </td>
                     <td className="stat-num">{formattaEuroIntero(e.commissioni)}</td>
-                    <td className="stat-num"><span className={e.margine < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(e.margine)}</span></td>
+                    <td className="stat-num">
+                      <span className={e.margine < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(e.margine)}</span>
+                      <MargineAOggi aOggi={e.margineAOggi} previsto={e.margine} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -106,10 +114,12 @@ function ContenutoCosti({ d }: { d: StatisticheCosti }) {
                   <td className="stat-num">{formattaNumero(somma((e) => e.passeggeri))}</td>
                   <td className="stat-num">{formattaNumero(somma((e) => e.bus))}</td>
                   <td className="stat-num">{formattaEuroIntero(somma((e) => e.incasso))}</td>
+                  <td className="stat-num">{formattaEuroIntero(somma((e) => e.incassato))}</td>
                   <td className="stat-num">{formattaEuroIntero(somma((e) => e.costoBus))}</td>
                   <td className="stat-num">{formattaEuroIntero(somma((e) => e.commissioni))}</td>
                   <td className="stat-num">
                     <span className={margineTotale < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(margineTotale)}</span>
+                    <MargineAOggi aOggi={somma((e) => e.margineAOggi)} previsto={margineTotale} />
                   </td>
                 </tr>
               </tfoot>

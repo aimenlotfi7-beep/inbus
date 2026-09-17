@@ -90,6 +90,13 @@ describe('economiaEventi', () => {
     expect(costoCompleto(e)).toBe(true);
     expect(costiMancanti(e)).toBe(false);
   });
+  it('incasso previsto e incassato separati: di un acconto non saldato conta solo quanto è stato pagato', () => {
+    const e = economiaEventi(['e1'], dati([
+      prenotazione({ tragittoId: 't1', passeggeri: 20, totale: 1000, pagato: 1000 }),
+      prenotazione({ tragittoId: 't1', passeggeri: 10, totale: 500, pagato: 100, tipoPagamento: 'ACCONTO', saldoPagato: false }),
+    ], strutture)).get('e1')!;
+    expect(e).toMatchObject({ incasso: 1500, incassato: 1100, margine: 500, margineAOggi: 100 });
+  });
 });
 
 describe('tragittiConclusi (eventi passati: chi non parte è rimborsato)', () => {
@@ -120,7 +127,7 @@ describe('tragittiConclusi (eventi passati: chi non parte è rimborsato)', () =>
       inAttesa,
     ], strutture), new Set([inAttesa.id])).get('e1')!;
     // Pagato davvero senza il rimborso in attesa: anche i 3 rimasti a terra (150 €).
-    expect(t1).toMatchObject({ passeggeri: 50, inAttesaDiRimborso: 2, incasso: 2250 });
+    expect(t1).toMatchObject({ passeggeri: 50, inAttesaDiRimborso: 2, incasso: 2250, daIncassare: 150 });
     expect(t1.linee).toEqual([{ chiave: 'linea:l1', nome: 'Linea 1', fermate: ['Bologna', 'Modena'] }]);
     // b2 senza costo vale la quotazione del suo tragitto.
     expect(t1.bus.map((b) => [b.nome, b.costo, b.fonteCosto])).toEqual([['Bus 1', 1000, 'bus'], ['Bus 2', 900, 'quotazione']]);

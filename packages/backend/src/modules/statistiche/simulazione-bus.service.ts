@@ -6,7 +6,7 @@ import { giornoARoma } from '../../shared/formato.js';
 import { lineeDaConfermareService } from '../eventi/linee-da-confermare.service.js';
 import { busDellaSimulazione, esitiCombinazioni, lineeEBus, type BusSimulato, type TragittoSimulato } from '../eventi/simulazione-bus.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
-import { commissioniPer, sommaPagati, tragittiConclusi } from './economia.js';
+import { commissioniPer, sommaDaIncassare, sommaPagati, tragittiConclusi } from './economia.js';
 import { inizioGiornoRoma, oggiRoma } from './periodo.js';
 import { aBlocchiDaDb, caricaDatiEventi, prenotazioniComeStatistiche } from './statistiche.service.js';
 
@@ -113,6 +113,7 @@ async function simulaEventi(righeEventi: RigaEvento[]): Promise<EventoSimulato[]
       passeggeri,
       inAttesaDiRimborso: righeTragitto.filter((r) => inAttesa.has(r.id)).reduce((s, r) => s + r.passeggeri, 0),
       incasso: sommaPagati(righeTragitto.filter((r) => !inAttesa.has(r.id))),
+      daIncassare: sommaDaIncassare(righeTragitto.filter((r) => !inAttesa.has(r.id))),
       linee,
       bus: busRisposta,
       esiti: esitiCombinazioni(gruppi, bus),

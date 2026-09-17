@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BusSimulato, EventoSimulato, TragittoSimulato } from '../../../api/statistiche';
-import { conScelta, contiEvento, contiTragitto, giudizio, risultato, spesa } from './contiBusInPiu';
+import { conScelta, contiEvento, contiTragitto, giudizio, previsto, risultato, risultatoAOggi, spesa } from './contiBusInPiu';
 
 // Bus in più (proprietario, settembre 2026): interruttore per ogni bus, chi non
 // parte è rimborsato, spesa = bus + commissioni, numeri per linea e per bus.
@@ -13,7 +13,7 @@ function bus(o: Partial<BusSimulato> = {}): BusSimulato {
  *  Bus 3 sotto il pareggio (600 €). Esiti per bus: [passeggeri, incasso pagato, promoter, White Label, saldi da incassare]. */
 function tragitto(o: Partial<TragittoSimulato> = {}): TragittoSimulato {
   return {
-    id: 't1', nome: 'Da Como', passeggeri: 32, inAttesaDiRimborso: 0, incasso: 1085,
+    id: 't1', nome: 'Da Como', passeggeri: 32, inAttesaDiRimborso: 0, incasso: 1085, daIncassare: 0,
     linee: [{ chiave: 'linea:l1', nome: 'Linea 1', fermate: ['Como', 'Saronno'] }],
     bus: [
       bus({ chiave: 'B1' }),
@@ -77,11 +77,18 @@ describe('conti di un tragitto', () => {
     expect(contiTragitto(senza, {}).voce).toMatchObject({ costoBus: 550, busSenzaCosto: 1 });
   });
 
-  it('di un acconto conta solo quanto è stato pagato; i saldi che mancano sono a parte e non cambiano il risultato', () => {
+  it('incassato (di un acconto solo l\'acconto) e previsto separati; risultato previsto e a oggi', () => {
     // Solo il bus confermato: 15 passeggeri, pagati 300 € di acconti su 525 €.
     const c = contiTragitto(tragitto({ bus: [bus({ chiave: 'B1' })], esiti: [[[15, 300, 20, 0, 225]]] }), {});
     expect(c.voce).toMatchObject({ incasso: 300, daIncassare: 225 });
-    expect(risultato(c.voce)).toBe(300 - 550 - 20);
+    expect(previsto(c.voce)).toBe(525);
+    expect(risultato(c.voce)).toBe(525 - 550 - 20);
+    expect(risultatoAOggi(c.voce)).toBe(300 - 550 - 20);
+  });
+
+  it('chi è a terra vale il previsto delle sue prenotazioni', () => {
+    // 1085 € pagati + 105 € di saldi in tutto; partono prenotazioni per 1015 € previsti.
+    expect(contiTragitto(tragitto({ daIncassare: 105 }), {}).aTerra).toEqual({ passeggeri: 2, valore: 175 });
   });
 
   it('i passeggeri senza bus di un viaggio passato contano, ma non sono un bus', () => {

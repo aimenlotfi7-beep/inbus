@@ -16,8 +16,9 @@ import { passiBusInPiu, PREFISSO_LINEA_SENZA_BUS, type StatoProposte } from './l
  *    simulazione, non conferma niente;
  *  - chi non trova posto sui bus che partono viene rimborsato: il suo incasso
  *    e le sue commissioni non contano;
- *  - incasso = quanto è stato pagato davvero: di un acconto non saldato solo
- *    l'acconto; i saldi che mancano si mostrano a parte e non contano;
+ *  - incassato (quanto è stato pagato davvero: di un acconto solo l'acconto)
+ *    e previsto (con i saldi che mancano) sono voci separate; il risultato
+ *    previsto è quello in evidenza, quello a oggi in piccolo;
  *  - spesa = costo dei bus che partono + commissioni dei promoter + quote
  *    White Label dei passeggeri che partono;
  *  - chi sale e su quale bus lo decide la regola dello smistamento (gruppi
@@ -92,8 +93,11 @@ export interface TragittoSimulato {
   passeggeri: number;
   inAttesaDiRimborso: number;
   /** Pagato davvero da tutte le prenotazioni confermate, senza quelle con un
-   *  rimborso in attesa: meno l'incasso di chi parte, è quanto vale chi resta a terra. */
+   *  rimborso in attesa. */
   incasso: number;
+  /** I loro saldi che mancano: con `incasso` è il previsto; meno quello di chi
+   *  parte, è quanto vale chi resta a terra. */
+  daIncassare: number;
   linee: LineaSimulata[];
   bus: BusSimulato[];
   /** esiti[combinazione][bus]: combinazione = bit i acceso se parte il bus in più i. */

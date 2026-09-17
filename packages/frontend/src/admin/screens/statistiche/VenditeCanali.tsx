@@ -2,7 +2,7 @@ import { statisticheApi, type RigaFonte, type StatisticheVendite, type TipoFonte
 import { formattaEuro } from '../../../shared/formato';
 import {
   BottoneCsv, Caricamento, chiaveFiltro, ETICHETTA_FONTE, formattaEuroIntero, formattaNumero, formattaPercentuale,
-  GrigliaKpi, Kpi, KpiExtra, pluraleNumero, Scheda, useDati, useSegnalaPeriodo, Vuoto, type PropsScheda,
+  GrigliaKpi, Incassati, Kpi, KpiExtra, MargineAOggi, pluraleNumero, Scheda, useDati, useSegnalaPeriodo, Vuoto, type PropsScheda,
 } from './comuni';
 import { nomeFileCsv, scaricaCsv } from './csv';
 import { BarraDivisa, Colonne, MiniBarra, Minigrafico } from './grafici';
@@ -28,6 +28,7 @@ function CellaFonte({ tipo, nome }: { tipo: TipoFonte; nome: string }) {
 function ContenutoVendite({ d }: { d: StatisticheVendite }) {
   const somma = (campo: (r: RigaFonte) => number) => d.fonti.reduce((s, r) => s + campo(r), 0);
   const incasso = somma((r) => r.incasso);
+  const incassato = somma((r) => r.incassato);
   const commissioni = somma((r) => r.commissione);
   const margine = somma((r) => r.margineNetto);
   const maxIncasso = Math.max(0, ...d.fonti.map((r) => r.incasso));
@@ -36,11 +37,15 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
   return (
     <>
       <GrigliaKpi>
-        <Kpi etichetta="Incasso" valore={formattaEuroIntero(incasso)} />
+        <Kpi etichetta="Incasso previsto" valore={formattaEuroIntero(incasso)} />
+        <Kpi etichetta="Incassato" valore={formattaEuroIntero(incassato)} />
         <Kpi etichetta="Commissioni" valore={formattaEuroIntero(commissioni)} />
-        <Kpi etichetta="Margine netto" valore={formattaEuroIntero(margine)} tono={margine < 0 ? 'negativo' : undefined} />
+        <Kpi etichetta="Margine netto previsto" valore={formattaEuroIntero(margine)} tono={margine < 0 ? 'negativo' : undefined}>
+          <MargineAOggi aOggi={incassato - commissioni} previsto={margine} />
+        </Kpi>
         <Kpi etichetta="Bundle" valore={formattaEuroIntero(d.bundle.incasso)}>
           <KpiExtra>{pluraleNumero(d.bundle.passeggeri, 'passeggero', 'passeggeri')}</KpiExtra>
+          <Incassati incassato={d.bundle.incassato} previsto={d.bundle.incasso} />
         </Kpi>
       </GrigliaKpi>
 
@@ -51,8 +56,8 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
             disabilitato={d.fonti.length === 0}
             onScarica={() => scaricaCsv(
               nomeFileCsv('incasso per fonte', d.periodo),
-              ['Tipo', 'Fonte', 'Prenotazioni', 'Passeggeri', 'Incasso €', 'Commissione €', 'Margine netto €'],
-              d.fonti.map((r) => [ETICHETTA_FONTE[r.tipo], r.nome, r.prenotazioni, r.passeggeri, r.incasso, r.commissione, r.margineNetto]),
+              ['Tipo', 'Fonte', 'Prenotazioni', 'Passeggeri', 'Incasso previsto €', 'Incassato €', 'Commissione €', 'Margine netto previsto €', 'Margine netto a oggi €'],
+              d.fonti.map((r) => [ETICHETTA_FONTE[r.tipo], r.nome, r.prenotazioni, r.passeggeri, r.incasso, r.incassato, r.commissione, r.margineNetto, r.incassato - r.commissione]),
             )}
           />
         )}
@@ -65,9 +70,9 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
                   <th>Fonte</th>
                   <th className="stat-num">Prenotazioni</th>
                   <th className="stat-num">Passeggeri</th>
-                  <th>Incasso</th>
+                  <th>Incasso previsto</th>
                   <th className="stat-num">Commissione</th>
-                  <th className="stat-num">Margine netto</th>
+                  <th className="stat-num">Margine netto previsto</th>
                 </tr>
               </thead>
               <tbody>
@@ -76,10 +81,14 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
                     <td><CellaFonte tipo={r.tipo} nome={r.nome} /></td>
                     <td className="stat-num">{formattaNumero(r.prenotazioni)}</td>
                     <td className="stat-num">{formattaNumero(r.passeggeri)}</td>
-                    <td><MiniBarra valore={r.incasso} massimo={maxIncasso} testo={formattaEuroIntero(r.incasso)} /></td>
+                    <td>
+                      <MiniBarra valore={r.incasso} massimo={maxIncasso} testo={formattaEuroIntero(r.incasso)} />
+                      <span className="stat-mini-rientro"><Incassati incassato={r.incassato} previsto={r.incasso} /></span>
+                    </td>
                     <td className="stat-num">{r.commissione > 0 ? formattaEuroIntero(r.commissione) : <span className="stat-spento">—</span>}</td>
                     <td className="stat-num">
                       <span className={r.margineNetto < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(r.margineNetto)}</span>
+                      <MargineAOggi aOggi={r.incassato - r.commissione} previsto={r.margineNetto} />
                     </td>
                   </tr>
                 ))}
@@ -89,9 +98,15 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
                   <td>Totale</td>
                   <td className="stat-num">{formattaNumero(somma((r) => r.prenotazioni))}</td>
                   <td className="stat-num">{formattaNumero(somma((r) => r.passeggeri))}</td>
-                  <td><span className="stat-mini-rientro">{formattaEuroIntero(incasso)}</span></td>
+                  <td>
+                    <span className="stat-mini-rientro">{formattaEuroIntero(incasso)}</span>
+                    <span className="stat-mini-rientro"><Incassati incassato={incassato} previsto={incasso} /></span>
+                  </td>
                   <td className="stat-num">{formattaEuroIntero(commissioni)}</td>
-                  <td className="stat-num"><span className={margine < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(margine)}</span></td>
+                  <td className="stat-num">
+                    <span className={margine < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(margine)}</span>
+                    <MargineAOggi aOggi={incassato - commissioni} previsto={margine} />
+                  </td>
                 </tr>
               </tfoot>
             </table>
@@ -106,8 +121,8 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
             disabilitato={d.promoter.length === 0}
             onScarica={() => scaricaCsv(
               nomeFileCsv('promoter', d.periodo),
-              ['Promoter', 'Codice', 'Prenotazioni', 'Passeggeri', 'Incasso €', 'Commissione €'],
-              d.promoter.map((r) => [r.nome, r.codice, r.prenotazioni, r.passeggeri, r.incasso, r.commissione]),
+              ['Promoter', 'Codice', 'Prenotazioni', 'Passeggeri', 'Incasso previsto €', 'Incassato €', 'Commissione €'],
+              d.promoter.map((r) => [r.nome, r.codice, r.prenotazioni, r.passeggeri, r.incasso, r.incassato, r.commissione]),
             )}
           />
         )}
@@ -120,7 +135,7 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
                   <th>Promoter</th>
                   <th className="stat-num">Prenotazioni</th>
                   <th className="stat-num">Passeggeri</th>
-                  <th className="stat-num">Incasso</th>
+                  <th className="stat-num">Incasso previsto</th>
                   <th className="stat-num">Commissione</th>
                   <th>Andamento</th>
                 </tr>
@@ -134,7 +149,10 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
                     </td>
                     <td className="stat-num">{formattaNumero(r.prenotazioni)}</td>
                     <td className="stat-num">{formattaNumero(r.passeggeri)}</td>
-                    <td className="stat-num">{formattaEuroIntero(r.incasso)}</td>
+                    <td className="stat-num">
+                      {formattaEuroIntero(r.incasso)}
+                      <Incassati incassato={r.incassato} previsto={r.incasso} />
+                    </td>
                     <td className="stat-num">{formattaEuroIntero(r.commissione)}</td>
                     <td>
                       <Minigrafico
@@ -189,8 +207,8 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
             disabilitato={d.coupon.length === 0}
             onScarica={() => scaricaCsv(
               nomeFileCsv('codici sconto', d.periodo),
-              ['Codice', 'Promoter', 'Usi', 'Passeggeri', 'Sconto €', 'Incasso €'],
-              d.coupon.map((c) => [c.codice, c.promoterNome, c.usi, c.passeggeri, c.sconto, c.incasso]),
+              ['Codice', 'Promoter', 'Usi', 'Passeggeri', 'Sconto €', 'Incasso previsto €', 'Incassato €'],
+              d.coupon.map((c) => [c.codice, c.promoterNome, c.usi, c.passeggeri, c.sconto, c.incasso, c.incassato]),
             )}
           />
         )}
@@ -205,7 +223,7 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
                   <th className="stat-num">Usi</th>
                   <th className="stat-num">Passeggeri</th>
                   <th className="stat-num">Sconto</th>
-                  <th className="stat-num">Incasso</th>
+                  <th className="stat-num">Incasso previsto</th>
                 </tr>
               </thead>
               <tbody>
@@ -216,7 +234,10 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
                     <td className="stat-num">{formattaNumero(c.usi)}</td>
                     <td className="stat-num">{formattaNumero(c.passeggeri)}</td>
                     <td className="stat-num">{formattaEuro(c.sconto)}</td>
-                    <td className="stat-num">{formattaEuroIntero(c.incasso)}</td>
+                    <td className="stat-num">
+                      {formattaEuroIntero(c.incasso)}
+                      <Incassati incassato={c.incassato} previsto={c.incasso} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -235,7 +256,7 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
                   <th>Evento</th>
                   <th className="stat-num">Prenotazioni</th>
                   <th className="stat-num">Passeggeri</th>
-                  <th className="stat-num">Incasso</th>
+                  <th className="stat-num">Incasso previsto</th>
                 </tr>
               </thead>
               <tbody>
@@ -245,7 +266,10 @@ function ContenutoVendite({ d }: { d: StatisticheVendite }) {
                     <td>{o.eventoArtista}</td>
                     <td className="stat-num">{formattaNumero(o.prenotazioni)}</td>
                     <td className="stat-num">{formattaNumero(o.passeggeri)}</td>
-                    <td className="stat-num">{formattaEuroIntero(o.incasso)}</td>
+                    <td className="stat-num">
+                      {formattaEuroIntero(o.incasso)}
+                      <Incassati incassato={o.incassato} previsto={o.incasso} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
