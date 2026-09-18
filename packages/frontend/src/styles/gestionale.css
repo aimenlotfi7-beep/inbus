@@ -593,6 +593,16 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .wl-anteprima-schermo{display:flex; justify-content:center; align-items:flex-start; min-height:340px; padding:24px 16px; border:1px solid var(--line); border-radius:12px; overflow:hidden;}
 .wl-anteprima-nota{margin:0; font-size:var(--testo-sm); color:var(--mist); line-height:1.45;}
 .wl-condivisione{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px;}
+/* Eventi in vendita su una White Label: una riga per evento (nome, stato, azioni) e sotto l'aggiunta. */
+.wl-eventi{display:flex; flex-direction:column; border:1px solid var(--line); border-radius:10px; margin-bottom:14px;}
+.wl-evento{padding:10px 14px;}
+.wl-evento + .wl-evento{border-top:1px solid var(--line);}
+.wl-evento-riga{display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px;}
+.wl-evento-nome{display:flex; flex-direction:column; gap:2px; flex:1 1 240px; min-width:0;}
+.wl-evento-azioni{display:flex; flex-wrap:wrap; gap:6px; margin-left:auto;}
+.wl-aggiungi-evento{display:flex; flex-wrap:wrap; align-items:center; gap:10px;}
+.wl-aggiungi-evento label{font-weight:600; font-size:var(--testo-base);}
+.wl-aggiungi-evento select{flex:1 1 280px; max-width:560px;}
 @media (max-width:1100px){
   .wl-editor{grid-template-columns:minmax(0,1fr);}
   .wl-anteprima{position:static; order:-1;}

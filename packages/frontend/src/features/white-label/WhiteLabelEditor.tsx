@@ -4,7 +4,8 @@ import { notifica } from '../../admin/shared/notifiche';
 import { motivoErrore } from '../../admin/shared/errori';
 import { CampoColore, CampoImmagine, CampoInterruttore, CampoMisura, CampoScelta, CampoTestoTema, SezioneEditor } from './campiTema';
 import { caricaFontTema, piePagina, sfondoPagina, stileCampo, stilePulsante, stileRiquadro, testoPulsante, variabiliTema } from './tema';
-import { WhiteLabelPreview } from './WhiteLabelPreview';
+import { WhiteLabelPreview, type DatiEventoPreview } from './WhiteLabelPreview';
+import { ElencoEventi, type DatiCard } from './ElencoEventi';
 
 /** L'editor grafico di una White Label: a sinistra le scelte, a destra
  *  l'anteprima dal vivo di quello che vede il cliente finale (vetrina,
@@ -17,10 +18,8 @@ import { WhiteLabelPreview } from './WhiteLabelPreview';
  *  immagini, font, forme, colori di ogni parte e testi. */
 
 type Dispositivo = 'grande' | 'telefono';
-type Schermata = 'vetrina' | 'accesso' | 'checkout';
+type Schermata = 'elenco' | 'vetrina' | 'accesso' | 'checkout';
 const LARGHEZZE: Record<Dispositivo, number> = { grande: 420, telefono: 300 };
-
-interface DatiEvento { artista: string; data: string; luogo: string; citta: string; descrizione?: string | null }
 
 const ETICHETTE_ELEMENTI: Record<keyof WhiteLabelTheme['elementiVisibili'], string> = {
   logo: 'Logo',
@@ -36,10 +35,12 @@ const ETICHETTE_ELEMENTI: Record<keyof WhiteLabelTheme['elementiVisibili'], stri
   informazioni: 'Nota in fondo',
 };
 
-export function WhiteLabelEditor({ whiteLabel, evento, onSalvato }: { whiteLabel: WhiteLabel; evento: DatiEvento; onSalvato: (wl: WhiteLabel) => void }) {
+/** eventi: le card per l'anteprima "Più eventi" (non per un bundle). */
+export function WhiteLabelEditor({ whiteLabel, evento, eventi, onSalvato }: { whiteLabel: WhiteLabel; evento: DatiEventoPreview; eventi?: DatiCard[]; onSalvato: (wl: WhiteLabel) => void }) {
   const [tema, setTema] = useState<WhiteLabelTheme>(whiteLabel.tema);
   const [dispositivo, setDispositivo] = useState<Dispositivo>('grande');
-  const [schermata, setSchermata] = useState<Schermata>('vetrina');
+  // Con più eventi il cliente vede prima le card: l'anteprima parte da lì.
+  const [schermata, setSchermata] = useState<Schermata>(eventi && eventi.length > 1 ? 'elenco' : 'vetrina');
   const [salvando, setSalvando] = useState(false);
   const [domini, setDomini] = useState(whiteLabel.dominiAutorizzati.join('\n'));
 
@@ -170,6 +171,9 @@ export function WhiteLabelEditor({ whiteLabel, evento, onSalvato }: { whiteLabel
           <CampoTestoTema etichetta="Sottotitolo" segnaposto="(nessuno)" valore={tema.testi.sottotitolo} onCambia={(v) => aggiorna('testi', 'sottotitolo', v)} />
           <CampoTestoTema etichetta="Testo del pulsante" segnaposto="Prenota ora" valore={tema.testi.pulsante} onCambia={(v) => aggiorna('testi', 'pulsante', v)} />
           <CampoTestoTema etichetta="Nota in fondo" segnaposto="(nessuna)" valore={tema.testi.piePagina} onCambia={(v) => aggiorna('testi', 'piePagina', v)} />
+          {eventi && (
+            <CampoTestoTema etichetta="Titolo sopra le card" aiuto="Quando gli eventi sono più di uno. Nel codice incollato nel sito del cliente non compare: lì il titolo lo mette la sua pagina." segnaposto="Scegli il tuo viaggio" valore={tema.testi.titoloElenco} onCambia={(v) => aggiorna('testi', 'titoloElenco', v)} />
+          )}
           <CampoTestoTema etichetta="Titolo della scheda del browser" aiuto="Solo per il link diretto; vuoto = nome dell'evento." segnaposto={evento.artista} valore={tema.branding.titoloPagina} onCambia={(v) => aggiorna('branding', 'titoloPagina', v)} />
         </SezioneEditor>
 
@@ -209,6 +213,7 @@ export function WhiteLabelEditor({ whiteLabel, evento, onSalvato }: { whiteLabel
 
       <div className="wl-anteprima">
         <div className="mini-tabs">
+          {eventi && <button type="button" className={`mini-tab${schermata === 'elenco' ? ' active' : ''}`} onClick={() => setSchermata('elenco')}>Più eventi</button>}
           <button type="button" className={`mini-tab${schermata === 'vetrina' ? ' active' : ''}`} onClick={() => setSchermata('vetrina')}>Vetrina</button>
           <button type="button" className={`mini-tab${schermata === 'accesso' ? ' active' : ''}`} onClick={() => setSchermata('accesso')}>Accesso</button>
           <button type="button" className={`mini-tab${schermata === 'checkout' ? ' active' : ''}`} onClick={() => setSchermata('checkout')}>Prenotazione</button>
@@ -218,6 +223,9 @@ export function WhiteLabelEditor({ whiteLabel, evento, onSalvato }: { whiteLabel
           <button type="button" className={`mini-tab${dispositivo === 'telefono' ? ' active' : ''}`} onClick={() => setDispositivo('telefono')}>Telefono</button>
         </div>
         <div className="wl-anteprima-schermo" style={{ ...sfondoPagina(tema), ...variabiliTema(tema) }}>
+          {schermata === 'elenco' && eventi && (
+            <ElencoEventi tema={tema} eventi={eventi.length > 1 ? eventi : [...eventi, ...ESEMPI_CARD].slice(0, 3)} larghezzaMassima={LARGHEZZE[dispositivo]} larghezzaCard={170} />
+          )}
           {schermata === 'vetrina' && <WhiteLabelPreview tema={tema} evento={evento} larghezza={LARGHEZZE[dispositivo]} />}
           {schermata === 'accesso' && <AnteprimaAccesso tema={tema} larghezza={LARGHEZZE[dispositivo]} />}
           {schermata === 'checkout' && <AnteprimaCheckout tema={tema} larghezza={LARGHEZZE[dispositivo]} />}
@@ -227,6 +235,12 @@ export function WhiteLabelEditor({ whiteLabel, evento, onSalvato }: { whiteLabel
     </div>
   );
 }
+
+/** Con meno di due eventi, l'anteprima delle card si completa con esempi. */
+const ESEMPI_CARD: DatiCard[] = [
+  { id: 'esempio-1', artista: 'Evento di esempio', data: new Date(Date.now() + 40 * 86400000).toISOString(), luogo: 'Arena', citta: 'Verona', immagineUrl: null, prezzoMinimo: 35 },
+  { id: 'esempio-2', artista: 'Altro evento di esempio', data: new Date(Date.now() + 70 * 86400000).toISOString(), luogo: 'Stadio', citta: 'Roma', immagineUrl: null, prezzoMinimo: 42 },
+];
 
 /** Come vede l'accesso il cliente finale (stesso tema della pagina vera). */
 function AnteprimaAccesso({ tema, larghezza }: { tema: WhiteLabelTheme; larghezza: number }) {

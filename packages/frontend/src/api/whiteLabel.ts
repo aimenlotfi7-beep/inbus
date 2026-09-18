@@ -70,6 +70,8 @@ export interface WhiteLabelTheme {
     sottotitolo: string | null;
     pulsante: string | null;
     piePagina: string | null;
+    /** Titolo sopra le card, quando la White Label ha più eventi. */
+    titoloElenco: string | null;
   };
   marchio: {
     /** Falso: nessun riferimento a OnWay nella pagina del cliente. */
@@ -96,10 +98,22 @@ export const FONT_WHITE_LABEL = [
   'Work Sans', 'Space Grotesk', 'Oswald', 'Playfair Display', 'Merriweather', 'Di sistema',
 ] as const;
 
+/** Com'è oggi un evento dell'elenco di una White Label. */
+export type StatoEventoWhiteLabel = 'in-vendita' | 'vendite-ferme' | 'passato' | 'bozza' | 'cestino';
+
+/** Un evento in vendita su una White Label (elenco del gestionale). */
+export interface EventoDellaWhiteLabel {
+  id: string;
+  slug: string;
+  artista: string;
+  citta: string;
+  data: string;
+  stato: StatoEventoWhiteLabel;
+}
+
 export interface WhiteLabel {
   id: string;
   organizzatoreId: string;
-  eventoId: string | null;
   bundleId: string | null;
   publicWidgetId: string;
   metaPixelId: string | null;
@@ -109,12 +123,14 @@ export interface WhiteLabel {
   tema: WhiteLabelTheme;
   layoutBigliettoId: string | null;
   organizzatoreNome: string;
-  eventoArtista: string | null;
   bundleNome: string | null;
+  /** Gli eventi in vendita (uno o più, dal più vicino); vuoto per un bundle. */
+  eventi: EventoDellaWhiteLabel[];
 }
 export interface WhiteLabelInput {
   organizzatoreId: string;
-  eventoId?: string;
+  /** Uno o più eventi (altri si aggiungono dopo), oppure un bundle. */
+  eventiIds?: string[];
   bundleId?: string;
   attiva?: boolean;
   dominiAutorizzati?: string[];
@@ -124,13 +140,30 @@ export interface WhiteLabelInput {
   metaCapiToken?: string | null;
 }
 
+/** Un evento come card della pagina pubblica, con il prezzo vero. */
+export interface CardEvento {
+  id: string;
+  slug: string;
+  artista: string;
+  data: string;
+  luogo: string;
+  citta: string;
+  descrizione: string | null;
+  immagineUrl: string | null;
+  /** Il "da … €": la fermata più economica in vendita; null se non c'è un prezzo. */
+  prezzoMinimo: number | null;
+}
+
 export interface WhiteLabelPubblica {
   attiva: boolean;
   tema: WhiteLabelTheme;
   dominiAutorizzati: string[];
   /** Pixel di Meta DI QUESTO organizzatore, se lo ha impostato — mai il token. */
   metaPixelId: string | null;
-  evento: { id: string; slug: string; artista: string; data: string; luogo: string; citta: string; descrizione: string | null } | null;
+  /** L'evento da aprire subito: l'unico in vendita, o quello del link (?evento=). null = si sceglie dalle card. */
+  evento: CardEvento | null;
+  /** Gli eventi in vendita, dal più vicino (vuoto per un bundle). */
+  eventi: CardEvento[];
   bundle: BundlePubblicoDettaglio | null;
 }
 
@@ -142,7 +175,9 @@ export interface PrenotazioneCreata {
 }
 
 export const whiteLabelApi = {
-  getPubblica: (publicWidgetId: string) => api.get<WhiteLabelPubblica>(`/api/public/widget/${publicWidgetId}`),
+  // evento: lo slug di un evento solo (link o codice di quell'evento).
+  getPubblica: (publicWidgetId: string, evento?: string | null) =>
+    api.get<WhiteLabelPubblica>(`/api/public/widget/${publicWidgetId}${evento ? `?evento=${encodeURIComponent(evento)}` : ''}`),
   // L'evento completo per il checkout: anche se è nascosto dal sito OnWay.
   // Per un widget di bundle, l'evento del bundle indicato.
   evento: (publicWidgetId: string, eventoId?: string) =>
@@ -157,6 +192,8 @@ export const whiteLabelApi = {
   getById: (id: string) => api.get<WhiteLabel>(`/api/admin/white-label/${id}`),
   create: (input: WhiteLabelInput) => api.post<WhiteLabel>('/api/admin/white-label', input),
   update: (id: string, input: Partial<WhiteLabelInput>) => api.put<WhiteLabel>(`/api/admin/white-label/${id}`, input),
+  /** Sostituisce l'elenco degli eventi: link, codice e grafica restano gli stessi. */
+  impostaEventi: (id: string, eventiIds: string[]) => api.put<WhiteLabel>(`/api/admin/white-label/${id}/eventi`, { eventiIds }),
   rigeneraWidgetId: (id: string) => api.post<WhiteLabel>(`/api/admin/white-label/${id}/rigenera-widget-id`, {}),
   remove: (id: string) => api.delete<void>(`/api/admin/white-label/${id}`),
 };

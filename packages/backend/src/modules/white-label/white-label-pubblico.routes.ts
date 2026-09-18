@@ -20,12 +20,15 @@ import { WhiteLabelDisattivata } from './white-label.errors.js';
  *  "cosa vede il pubblico" con "cosa vede l'amministratore". */
 export const whiteLabelPubblicoRouter = Router();
 
+// ?evento= (slug o id): il link o il codice di un evento solo della White Label.
 whiteLabelPubblicoRouter.get('/:publicWidgetId', asyncHandler(async (req: Request, res: Response) => {
-  res.json(await whiteLabelService.getPubblicaDaWidgetId(req.params.publicWidgetId));
+  const evento = typeof req.query.evento === 'string' ? req.query.evento : undefined;
+  res.json(await whiteLabelService.getPubblicaDaWidgetId(req.params.publicWidgetId, evento));
 }));
 
-/** L'evento che il widget può mostrare: il suo, oppure (widget di un
- *  bundle) quello richiesto con ?eventoId=, solo se fa parte del bundle. */
+/** L'evento che il widget può mostrare: uno del suo elenco (?eventoId=,
+ *  senza richiesta l'unico), oppure (widget di un bundle) quello richiesto,
+ *  solo se fa parte del bundle. */
 async function eventoDelWidget(publicWidgetId: string, eventoIdRichiesto: unknown) {
   const wl = await whiteLabelService.getPubblicaConIdInterno(publicWidgetId);
   if (wl.bundleId) {
@@ -35,8 +38,7 @@ async function eventoDelWidget(publicWidgetId: string, eventoIdRichiesto: unknow
     if (!b.eventiIds.includes(eventoId)) throw new ErroreApplicativo('Questo evento non fa parte del bundle.', 400, 'EVENT_NOT_AVAILABLE');
     return { eventoId, perBundle: true };
   }
-  if (!wl.eventoId) throw new ErroreApplicativo('Widget non valido.', 400, 'WIDGET_NON_VALIDO');
-  return { eventoId: wl.eventoId, perBundle: false };
+  return { eventoId: await whiteLabelService.eventoDellElenco(wl.id, eventoIdRichiesto), perBundle: false };
 }
 
 /** L'evento completo per il checkout del widget. Non passa dalla pagina
@@ -95,8 +97,8 @@ whiteLabelPubblicoRouter.post(
     const wl = await whiteLabelService.getPubblicaConIdInterno(req.params.publicWidgetId);
     if (!wl.attiva) throw new WhiteLabelDisattivata();
     if (wl.bundleId) throw new ErroreApplicativo('Questo widget vende un bundle: usa /ordine.', 400, 'WIDGET_BUNDLE');
-    if (req.body.eventoId !== wl.eventoId) {
-      throw new ErroreApplicativo('Questo widget può prenotare solo il proprio evento.', 400, 'EVENT_NOT_AVAILABLE');
+    if (!(await whiteLabelService.idsEventi(wl.id)).includes(req.body.eventoId)) {
+      throw new ErroreApplicativo('Questo evento non si prenota da qui.', 400, 'EVENT_NOT_AVAILABLE');
     }
 
     const nuova = await prenotazioniService.crea(req.body, req.cliente!.sub, { canale: 'WHITE_LABEL', whiteLabelId: wl.id }, { ip: req.ip, userAgent: req.headers['user-agent'] });

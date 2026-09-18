@@ -1,12 +1,14 @@
 import type { WhiteLabelTheme } from '../../api/whiteLabel';
-import { fontTitoli, piePagina, stilePulsante, stileRiquadro, testoPulsante, titoloVetrina, sottotitoloVetrina } from './tema';
+import { fontTitoli, piePagina, stilePulsante, stileRiquadro, testoPrezzoDa, testoPulsante, titoloVetrina, sottotitoloVetrina } from './tema';
 
-interface DatiEventoPreview {
+export interface DatiEventoPreview {
   artista: string;
   data: string;
   luogo: string;
   citta: string;
   descrizione?: string | null;
+  /** Il "da … €" vero dell'evento; senza, la riga del prezzo non c'è. */
+  prezzoMinimo?: number | null;
 }
 
 /**
@@ -24,6 +26,8 @@ export function WhiteLabelPreview({ tema, evento, larghezza = 360, onCtaClick }:
   const dataFormattata = new Date(evento.data).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
   const sottotitolo = sottotitoloVetrina(tema);
   const nota = piePagina(tema);
+  // Prima era sempre "da 30,00 €", anche sulla pagina vera: ora il prezzo dell'evento.
+  const prezzo = testoPrezzoDa(evento.prezzoMinimo);
   const spazio = stile.spaziaturaPx;
 
   return (
@@ -86,9 +90,9 @@ export function WhiteLabelPreview({ tema, evento, larghezza = 360, onCtaClick }:
         </div>
       )}
 
-      {elementiVisibili.prezzo && (
+      {elementiVisibili.prezzo && prezzo && (
         <div style={{ marginBottom: spazio * 0.6 }}>
-          <span style={{ fontFamily: fontTitoli(tema), fontSize: tipografia.dimensioneTitoloPx * 0.75, fontWeight: 800, color: colori.accento }}>da 30,00 €</span>
+          <span style={{ fontFamily: fontTitoli(tema), fontSize: tipografia.dimensioneTitoloPx * 0.75, fontWeight: 800, color: colori.accento }}>{prezzo}</span>
         </div>
       )}
 

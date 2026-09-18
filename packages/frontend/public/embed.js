@@ -22,6 +22,12 @@
  * JavaScript puro, zero dipendenze: gira su siti di terzi. Il codice da
  * dare ai clienti è lo stesso di prima; data-inbus-api non serve più (la
  * pagina dentro la finestra sa già a quale server parlare).
+ *
+ * data-inbus-evento="slug" (facoltativo): con una White Label di più
+ * eventi, il codice di un evento solo (settembre 2026). Senza: tutti gli
+ * eventi in card, o dritti alla prenotazione se ce n'è uno solo.
+ * data-inbus-contenitore="id" (facoltativo, di serie "inbus-widget"): il
+ * riquadro in cui mettersi, così più codici stanno nella stessa pagina.
  */
 (function () {
   'use strict';
@@ -32,15 +38,18 @@
     console.error('[OnWay widget] Manca data-inbus-widget sul tag <script>: il widget non può caricarsi senza.');
     return;
   }
+  var evento = script.getAttribute('data-inbus-evento');
+  var idContenitore = script.getAttribute('data-inbus-contenitore') || 'inbus-widget';
   // Il nostro sito è quello da cui arriva questo file.
   var sito = new URL(script.src, window.location.href).origin;
 
   function monta() {
-    var contenitore = document.getElementById('inbus-widget');
+    var contenitore = document.getElementById(idContenitore);
     if (contenitore && contenitore.querySelector('iframe[data-inbus-widget]')) return;
 
     var finestra = document.createElement('iframe');
-    finestra.src = sito + '/w/' + encodeURIComponent(publicWidgetId) + '?incorporato=1';
+    finestra.src = sito + '/w/' + encodeURIComponent(publicWidgetId) + '?incorporato=1' +
+      (evento ? '&evento=' + encodeURIComponent(evento) : '');
     finestra.title = 'Prenotazione del viaggio';
     finestra.setAttribute('data-inbus-widget', publicWidgetId);
     finestra.setAttribute('scrolling', 'no');

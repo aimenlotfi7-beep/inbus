@@ -1,11 +1,11 @@
 import { Router, type Request, type Response } from 'express';
-import { eq, and, sql, isNotNull } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
-import { organizzatori, organizzatoreEventi, eventi, prenotazioni, whiteLabel, bundle } from '../../db/schema.js';
+import { organizzatori, organizzatoreEventi, eventi, prenotazioni, whiteLabel, whiteLabelEventi, bundle } from '../../db/schema.js';
 import { NonTrovato, NonAutorizzato } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { limiteAutenticazione } from '../../shared/rateLimit.js';
@@ -76,36 +76,13 @@ export const organizzatoriService = {
     // una volta sola, così chi la usa dopo (sia il riepilogo generale
     // che il dettaglio per evento) riceve sempre numeri veri, mai un
     // crash tipo ".toFixed non è una funzione" su una stringa.
-    const righe = await db
-      .select({
-        eventoId: eventi.id,
-        eventoArtista: eventi.artista,
-        numeroPrenotazioni: sql<string>`count(distinct ${prenotazioni.id})`,
-        viaggiatori: sql<string>`coalesce(sum(${prenotazioni.passeggeri}), 0)`,
-        fatturato: sql<string>`coalesce(sum(${prenotazioni.totale}), 0)`,
-        quotaOrganizzatore: sql<string>`coalesce(sum(${prenotazioni.commissioneImportoSnapshot}), 0)`,
-      })
-      .from(whiteLabel)
-      .innerJoin(eventi, eq(whiteLabel.eventoId, eventi.id))
-      .leftJoin(prenotazioni, and(eq(prenotazioni.whiteLabelId, whiteLabel.id), eq(prenotazioni.stato, 'CONFERMATA')))
-      .where(eq(whiteLabel.organizzatoreId, organizzatoreId))
-      .groupBy(eventi.id, eventi.artista);
-
-    const perEvento = righe.map((r) => ({
-      eventoId: r.eventoId,
-      eventoArtista: r.eventoArtista,
-      numeroPrenotazioni: Number(r.numeroPrenotazioni),
-      viaggiatori: Number(r.viaggiatori),
-      fatturato: Number(r.fatturato),
-      quotaOrganizzatore: Number(r.quotaOrganizzatore),
-    }));
-
-    // Gli acquisti BUNDLE dal suo widget contano anche sotto ogni
-    // evento (ogni prenotazione ha il suo eventoId e il suo totale già
-    // netto sconto) — come deciso: riga bundle a parte E righe per
-    // evento. Si sommano alle righe sopra, o creano la riga se
-    // l'evento non ha una white label propria.
-    const daBundle = await db
+    // Tutte le vendite dai suoi widget (di eventi e di bundle), per evento
+    // della prenotazione: ognuna ha il suo eventoId e il suo totale già
+    // netto sconto. Gli acquisti bundle contano anche sotto ogni evento
+    // (come deciso: riga bundle a parte E righe per evento), e una White
+    // Label con più eventi dà una riga per evento. Un evento tolto
+    // dall'elenco resta con le sue vendite.
+    const vendite = await db
       .select({
         eventoId: eventi.id,
         eventoArtista: eventi.artista,
@@ -117,13 +94,29 @@ export const organizzatoriService = {
       .from(prenotazioni)
       .innerJoin(whiteLabel, eq(prenotazioni.whiteLabelId, whiteLabel.id))
       .innerJoin(eventi, eq(prenotazioni.eventoId, eventi.id))
-      .where(and(eq(whiteLabel.organizzatoreId, organizzatoreId), isNotNull(whiteLabel.bundleId), eq(prenotazioni.stato, 'CONFERMATA')))
+      .where(and(eq(whiteLabel.organizzatoreId, organizzatoreId), eq(prenotazioni.stato, 'CONFERMATA')))
       .groupBy(eventi.id, eventi.artista);
-    for (const r of daBundle) {
-      const esistente = perEvento.find((e) => e.eventoId === r.eventoId);
-      const agg = { numeroPrenotazioni: Number(r.numeroPrenotazioni), viaggiatori: Number(r.viaggiatori), fatturato: Number(r.fatturato), quotaOrganizzatore: Number(r.quotaOrganizzatore) };
-      if (esistente) { esistente.numeroPrenotazioni += agg.numeroPrenotazioni; esistente.viaggiatori += agg.viaggiatori; esistente.fatturato += agg.fatturato; esistente.quotaOrganizzatore += agg.quotaOrganizzatore; }
-      else perEvento.push({ eventoId: r.eventoId, eventoArtista: r.eventoArtista, ...agg });
+
+    const perEvento = vendite.map((r) => ({
+      eventoId: r.eventoId,
+      eventoArtista: r.eventoArtista,
+      numeroPrenotazioni: Number(r.numeroPrenotazioni),
+      viaggiatori: Number(r.viaggiatori),
+      fatturato: Number(r.fatturato),
+      quotaOrganizzatore: Number(r.quotaOrganizzatore),
+    }));
+
+    // Gli eventi in vendita sulle sue White Label compaiono anche senza vendite.
+    const inElenco = await db
+      .selectDistinct({ eventoId: eventi.id, eventoArtista: eventi.artista })
+      .from(whiteLabelEventi)
+      .innerJoin(whiteLabel, eq(whiteLabelEventi.whiteLabelId, whiteLabel.id))
+      .innerJoin(eventi, eq(whiteLabelEventi.eventoId, eventi.id))
+      .where(eq(whiteLabel.organizzatoreId, organizzatoreId));
+    for (const e of inElenco) {
+      if (!perEvento.some((r) => r.eventoId === e.eventoId)) {
+        perEvento.push({ ...e, numeroPrenotazioni: 0, viaggiatori: 0, fatturato: 0, quotaOrganizzatore: 0 });
+      }
     }
     return perEvento;
   },

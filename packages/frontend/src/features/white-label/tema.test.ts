@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WhiteLabelTheme } from '../../api/whiteLabel';
-import { conTrasparenza, famigliaFont, fontDaCaricare, piePagina, sfondoPagina, stilePulsante, testoPulsante, titoloVetrina } from './tema';
+import { conTrasparenza, famigliaFont, fontDaCaricare, piePagina, sfondoPagina, stilePulsante, testoPrezzoDa, testoPulsante, titoloElenco, titoloVetrina } from './tema';
 
 // Il tema di una White Label diventa stile vero: font, sfondo, pulsanti e
 // marchio (proprietario, settembre 2026: con alcuni clienti OnWay non si
@@ -21,7 +21,7 @@ const tema: WhiteLabelTheme = {
   tipografia: { font: 'Poppins', fontTitoli: null, dimensioneTitoloPx: 22, dimensioneTestoPx: 14 },
   stile: { borderRadiusPx: 10, stilePulsanti: 'pieno', altezzaPulsantePx: 46, spaziaturaPx: 16, ombre: false, mostraBordi: true, larghezzaPx: 420 },
   layout: { tipo: 'card' },
-  testi: { titolo: null, sottotitolo: null, pulsante: null, piePagina: null },
+  testi: { titolo: null, sottotitolo: null, pulsante: null, piePagina: null, titoloElenco: null },
   marchio: { mostraOnWay: true },
   elementiVisibili: {
     logo: true, immagine: true, titolo: true, data: true, percorso: true, fermate: true,
@@ -86,6 +86,13 @@ describe('testi e marchio', () => {
     const personalizzato = { ...tema, testi: { ...tema.testi, pulsante: 'Acquista il posto', titolo: 'Il nostro viaggio' } };
     expect(testoPulsante(personalizzato)).toBe('Acquista il posto');
     expect(titoloVetrina(personalizzato, 'Concerto')).toBe('Il nostro viaggio');
+  });
+
+  it('card: titolo di serie o scritto nel tema; il prezzo è quello vero, o niente', () => {
+    expect(titoloElenco(tema)).toBe('Scegli il tuo viaggio');
+    expect(titoloElenco({ ...tema, testi: { ...tema.testi, titoloElenco: 'I nostri viaggi' } })).toBe('I nostri viaggi');
+    expect(testoPrezzoDa(39)).toMatch(/^da 39,00\s€$/);
+    expect(testoPrezzoDa(null)).toBeNull();
   });
 
   it('col marchio spento nessun riferimento a OnWay', () => {

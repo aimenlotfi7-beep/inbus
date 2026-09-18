@@ -85,6 +85,8 @@ export interface WhiteLabelTheme {
     sottotitolo: string | null;
     pulsante: string | null;
     piePagina: string | null;
+    /** Titolo sopra le card, quando la White Label ha più eventi. */
+    titoloElenco: string | null;
   };
   marchio: {
     /** Falso: nessun riferimento a OnWay nella pagina del cliente. */
@@ -163,6 +165,7 @@ export const DEFAULT_WHITE_LABEL_THEME: WhiteLabelTheme = {
     sottotitolo: null,
     pulsante: null,
     piePagina: null,
+    titoloElenco: null,
   },
   marchio: {
     mostraOnWay: true,

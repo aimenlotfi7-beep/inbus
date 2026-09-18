@@ -34,3 +34,29 @@ export function applicaScontoOfferta(prezzoNormale: number, offerta: { scontoPer
   if (!offerta) return prezzoNormale;
   return prezzoNormale * (1 - Number(offerta.scontoPercentuale) / 100);
 }
+
+interface TragittoConPrezzi {
+  attivo: boolean;
+  stato: string;
+  prezzoExtra: string;
+  fermate: { attivo: boolean; prezzo: string | null }[];
+}
+
+/**
+ * Il "da … €" di un evento: il prezzo più basso tra le fermate che si
+ * possono comprare (tragitto attivo e in vendita, fermata accesa), con
+ * l'extra della tratta. Senza nessun prezzo di fermata, il prezzo
+ * dell'evento; null se non c'è niente. Stessa regola di
+ * prezzoMinimoEvento nel frontend (api/prezzi.ts).
+ */
+export function prezzoMinimoEvento(evento: { prezzo: string | null; tragitti: TragittoConPrezzi[]; servizi: { tragitti: TragittoConPrezzi[] }[] }): number | null {
+  const prezzi: number[] = [];
+  for (const tragitto of [...evento.tragitti, ...evento.servizi.flatMap((s) => s.tragitti)]) {
+    if (!tragitto.attivo || tragitto.stato === 'DA_CONFERMARE') continue;
+    for (const f of tragitto.fermate) {
+      if (f.attivo && f.prezzo) prezzi.push(Number(f.prezzo) + Number(tragitto.prezzoExtra ?? 0));
+    }
+  }
+  if (prezzi.length > 0) return Math.min(...prezzi);
+  return evento.prezzo ? Number(evento.prezzo) : null;
+}

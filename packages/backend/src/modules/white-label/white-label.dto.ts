@@ -57,6 +57,7 @@ const temaSchema = z.object({
     sottotitolo: testoOpzionale,
     pulsante: testoOpzionale,
     piePagina: testoOpzionale,
+    titoloElenco: testoOpzionale,
   }).partial(),
   marchio: z.object({
     mostraOnWay: z.boolean(),
@@ -80,9 +81,14 @@ const dominioSchema = z.string().url().refine((u) => {
   try { return !!new URL(u).hostname; } catch { return false; }
 }, 'Deve essere un URL completo, es. https://www.esempio.it');
 
+/** Gli eventi in vendita su una White Label, scelti uno per uno. */
+const eventiIdsSchema = z.array(z.string().min(1)).max(50, 'Al massimo 50 eventi per White Label.');
+
 export const creaWhiteLabelSchema = z.object({
   organizzatoreId: z.string().min(1),
-  // Uno dei due: white label di un evento, oppure di un bundle.
+  // Uno dei due: eventi (uno o più; eventoId è il modo di prima, per un
+  // evento solo), oppure un bundle.
+  eventiIds: eventiIdsSchema.optional(),
   eventoId: z.string().min(1).optional(),
   bundleId: z.string().min(1).optional(),
   dominiAutorizzati: z.array(dominioSchema).default([]),
@@ -90,7 +96,11 @@ export const creaWhiteLabelSchema = z.object({
   layoutBigliettoId: z.string().nullable().optional(),
   metaPixelId: z.string().nullable().optional(),
   metaCapiToken: z.string().nullable().optional(),
-}).refine((d) => !!d.eventoId !== !!d.bundleId, { message: 'Indica un evento oppure un bundle (uno solo).', path: ['eventoId'] });
+}).refine((d) => (!!d.eventoId || (d.eventiIds?.length ?? 0) > 0) !== !!d.bundleId, { message: 'Indica uno o più eventi oppure un bundle.', path: ['eventiIds'] });
+
+/** L'elenco nuovo degli eventi (sostituisce quello di prima). Vuoto è ammesso:
+ *  la pagina dice che non ci sono viaggi in vendita finché non se ne aggiunge uno. */
+export const impostaEventiSchema = z.object({ eventiIds: eventiIdsSchema });
 
 export const aggiornaWhiteLabelSchema = z.object({
   attiva: z.boolean().optional(),

@@ -1,10 +1,11 @@
 import { useEffect, useId, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { whiteLabelApi, type WhiteLabelPubblica } from '../api/whiteLabel';
+import { whiteLabelApi, type CardEvento, type WhiteLabelPubblica } from '../api/whiteLabel';
 import { clienteAuthApi } from '../api/clienteAuth';
 import { salvaTokenCliente, clienteLoggato } from '../features/clienteSessione';
 import { WhiteLabelPreview } from '../features/white-label/WhiteLabelPreview';
-import { applicaTitoloPagina, caricaFontTema, piePagina, sfondoPagina, stileCampo, stilePulsante, stileRiquadro, variabiliTema } from '../features/white-label/tema';
+import { ElencoEventi } from '../features/white-label/ElencoEventi';
+import { applicaTitoloPagina, caricaFontTema, piePagina, sfondoPagina, stileCampo, stilePulsante, stileRiquadro, titoloElenco, variabiliTema } from '../features/white-label/tema';
 import { CheckoutForm } from '../features/checkout/CheckoutForm';
 import { ErroreApi } from '../api/client';
 import type { Evento } from '../api/types';
@@ -14,19 +15,23 @@ import { inizializzaGA4Widget, tracciaPaginaGA4 } from '../features/googleAnalyt
 import { tracciaAcquistoRegistrato, valoreAcquisto } from '../features/tracciaAcquisto';
 import { ConsensoWidget } from '../features/white-label/ConsensoWidget';
 
-type Vista = 'caricamento' | 'errore' | 'vetrina' | 'auth' | 'login' | 'registrati' | 'registrati-fatto' | 'checkout' | 'bundle';
+type Vista = 'caricamento' | 'errore' | 'elenco' | 'vetrina' | 'auth' | 'login' | 'registrati' | 'registrati-fatto' | 'checkout' | 'bundle';
 
 export function WidgetPubblicoPage() {
   const { publicWidgetId } = useParams<{ publicWidgetId: string }>();
   // ?incorporato=1: la pagina è dentro il sito del cliente, nella finestra
   // creata dal codice da incollare (public/embed.js). Niente sfondo di
   // pagina né altezza a schermo intero: solo il riquadro, sopra lo sfondo
-  // del sito che la ospita.
+  // del sito che la ospita. ?evento=slug: il link o il codice di un evento
+  // solo di una White Label che ne ha più d'uno.
   const [parametri] = useSearchParams();
   const incorporato = parametri.get('incorporato') === '1';
+  const eventoDelLink = parametri.get('evento');
   const [vista, setVista] = useState<Vista>('caricamento');
   const [erroreVista, setErroreVista] = useState('');
   const [dati, setDati] = useState<WhiteLabelPubblica | null>(null);
+  // L'evento che si sta prenotando: l'unico, quello del link o quello scelto tra le card.
+  const [scelto, setScelto] = useState<CardEvento | null>(null);
   const [eventoCompleto, setEventoCompleto] = useState<Evento | null>(null);
 
   useFinestraIncorporata(incorporato, vista);
@@ -36,18 +41,20 @@ export function WidgetPubblicoPage() {
   useEffect(() => {
     if (!dati) return;
     caricaFontTema(dati.tema);
-    applicaTitoloPagina(dati.tema, dati.evento?.artista ?? dati.bundle?.nome ?? 'Prenota il tuo viaggio');
-  }, [dati]);
+    applicaTitoloPagina(dati.tema, scelto?.artista ?? dati.bundle?.nome ?? (dati.eventi.length > 1 ? titoloElenco(dati.tema) : 'Prenota il tuo viaggio'));
+  }, [dati, scelto]);
 
   useEffect(() => {
     if (!publicWidgetId) return;
-    whiteLabelApi.getPubblica(publicWidgetId)
+    whiteLabelApi.getPubblica(publicWidgetId, eventoDelLink)
       // Widget di un bundle: il flusso è lungo (eventi, fermate, dati), quindi
       // l'accesso si fa PRIMA, non in fondo — così niente si perde tra un
-      // passaggio e l'altro. Il widget evento resta com'era.
+      // passaggio e l'altro. Con gli eventi: dritti alla vetrina se ce n'è
+      // uno solo (o il link ne indica uno), altrimenti le card.
       .then((d) => {
         setDati(d);
-        setVista(d.bundle ? (clienteLoggato() ? 'bundle' : 'auth') : 'vetrina');
+        setScelto(d.evento);
+        setVista(d.bundle ? (clienteLoggato() ? 'bundle' : 'auth') : d.evento ? 'vetrina' : 'elenco');
         // Pixel di INBUS + quello dell'organizzatore se presente, e GA4:
         // partono solo con il consenso chiesto da ConsensoWidget. Dentro il
         // sito del cliente niente tracciamento né banner: lì i cookie li
@@ -58,21 +65,37 @@ export function WidgetPubblicoPage() {
         }
       })
       .catch((e) => { setErroreVista(e instanceof ErroreApi ? e.message : 'Impossibile caricare questa pagina.'); setVista('errore'); });
-  }, [publicWidgetId, incorporato]);
+  }, [publicWidgetId, incorporato, eventoDelLink]);
 
-  async function apriPrenotazione() {
-    if (clienteLoggato()) await vaiAlCheckout();
+  async function apriPrenotazione(evento: CardEvento | null = scelto) {
+    if (clienteLoggato()) await vaiAlCheckout(evento);
     else setVista('auth');
   }
 
-  async function vaiAlCheckout() {
+  /** Dalle card: la card ha già data, luogo e prezzo, quindi si va dritti alla prenotazione. */
+  function scegliEvento(eventoId: string) {
+    const evento = dati?.eventi.find((e) => e.id === eventoId) ?? null;
+    setScelto(evento);
+    apriPrenotazione(evento);
+  }
+
+  // Con più eventi, da ogni passo si torna alle card; non dal link o dal
+  // codice di un evento solo (il cliente lo mette nella pagina di quell'evento).
+  const conElenco = !!dati && !dati.bundle && dati.eventi.length > 1 && !(eventoDelLink && dati.evento);
+  function tornaAllElenco() {
+    setScelto(null);
+    setEventoCompleto(null);
+    setVista('elenco');
+  }
+
+  async function vaiAlCheckout(evento: CardEvento | null = scelto) {
     if (!dati) return;
     if (dati.bundle) { setVista('bundle'); return; }
-    if (!dati.evento) return;
+    if (!evento) return;
     setVista('caricamento');
     try {
       // Non la pagina pubblica del sito: l'evento può essere nascosto da OnWay e in vendita qui.
-      const ev = await whiteLabelApi.evento(publicWidgetId!);
+      const ev = await whiteLabelApi.evento(publicWidgetId!, evento.id);
       setEventoCompleto(ev);
       setVista('checkout');
     } catch (e) {
@@ -131,12 +154,14 @@ export function WidgetPubblicoPage() {
   }
 
   if (vista === 'checkout' && eventoCompleto) {
+    const larghezza = Math.max(dati.tema.stile.larghezzaPx, 420);
     return (
       <div className="tema-wl" style={pagina}>
+        {conElenco && <div style={{ maxWidth: larghezza, margin: '0 auto 10px' }}><TornaAllElenco tema={dati.tema} onClick={tornaAllElenco} /></div>}
         {/* Nel riquadro del tema, come vetrina e accesso: i testi della
             prenotazione sono pensati per il colore dei riquadri, non per lo
             sfondo della pagina. */}
-        <div style={{ ...stileRiquadro(dati.tema), maxWidth: Math.max(dati.tema.stile.larghezzaPx, 420), margin: '0 auto' }}>
+        <div style={{ ...stileRiquadro(dati.tema), maxWidth: larghezza, margin: '0 auto' }}>
           <CheckoutForm evento={eventoCompleto} publicWidgetId={publicWidgetId} temaWhiteLabel={dati.tema} />
           <PiePagina tema={dati.tema} />
           {!incorporato && <ConsensoWidget tema={dati.tema} />}
@@ -147,11 +172,24 @@ export function WidgetPubblicoPage() {
 
   return (
     <Sfondo tema={dati.tema} incorporato={incorporato} conPiePagina={vista !== 'vetrina' || !dati.tema.elementiVisibili.informazioni}>
+      {conElenco && vista !== 'elenco' && (
+        <div style={{ width: '100%', maxWidth: dati.tema.stile.larghezzaPx }}><TornaAllElenco tema={dati.tema} onClick={tornaAllElenco} /></div>
+      )}
+      {vista === 'elenco' && (dati.eventi.length > 0 ? (
+        <>
+          <ElencoEventi tema={dati.tema} eventi={dati.eventi} onScegli={dati.attiva ? scegliEvento : undefined} senzaIntestazione={incorporato} />
+          {!dati.attiva && <Riquadro tema={dati.tema}><p style={{ margin: 0 }}>Questa pagina non accetta più nuove prenotazioni.</p></Riquadro>}
+        </>
+      ) : (
+        <Riquadro tema={dati.tema}>
+          <p style={{ margin: 0, textAlign: 'center' }}>Al momento non ci sono viaggi in vendita. Torna a trovarci presto.</p>
+        </Riquadro>
+      ))}
       {vista === 'vetrina' && (
-        dati.evento && <WhiteLabelPreview tema={dati.tema} evento={dati.evento} larghezza={dati.tema.stile.larghezzaPx} onCtaClick={dati.attiva ? apriPrenotazione : undefined} />
+        scelto && <WhiteLabelPreview tema={dati.tema} evento={scelto} larghezza={dati.tema.stile.larghezzaPx} onCtaClick={dati.attiva ? () => apriPrenotazione() : undefined} />
       )}
       {vista === 'auth' && <SceltaAuth tema={dati.tema} onLogin={() => setVista('login')} onRegistrati={() => setVista('registrati')} />}
-      {vista === 'login' && <FormLogin tema={dati.tema} onFatto={vaiAlCheckout} />}
+      {vista === 'login' && <FormLogin tema={dati.tema} onFatto={() => vaiAlCheckout()} />}
       {vista === 'registrati' && <FormRegistrati tema={dati.tema} onFatto={() => setVista('registrati-fatto')} />}
       {vista === 'registrati-fatto' && (
         <Riquadro tema={dati.tema}>
@@ -244,6 +282,22 @@ function PiePagina({ tema }: { tema: WhiteLabelPubblica['tema'] }) {
     <p style={{ margin: '14px 0 0', fontSize: tema.tipografia.dimensioneTestoPx * 0.8, color: tema.colori.testoSecondario, textAlign: 'center' }}>
       {nota}
     </p>
+  );
+}
+
+/** "← Tutti i viaggi": con più eventi, da ogni passo si torna alle card. */
+function TornaAllElenco({ tema, onClick }: { tema: WhiteLabelPubblica['tema']; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer', color: tema.colori.testoSecondario,
+        fontFamily: 'inherit', fontSize: tema.tipografia.dimensioneTestoPx * 0.9, fontWeight: 600,
+      }}
+    >
+      ← Tutti i viaggi
+    </button>
   );
 }
 

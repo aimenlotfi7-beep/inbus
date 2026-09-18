@@ -1015,9 +1015,10 @@ export const organizzatoreEventi = pgTable('organizzatore_eventi', {
 export const whiteLabel = pgTable('white_label', {
   id: id(),
   organizzatoreId: text('organizzatore_id').notNull().references(() => organizzatori.id, { onDelete: 'cascade' }),
-  // Una white label è per un EVENTO oppure per un BUNDLE (uno dei due,
-  // mai entrambi — vincolo nello schema Zod). eventoId era NOT NULL:
-  // reso nullable per fare posto al bundle.
+  // Una white label vende EVENTI (elenco in whiteLabelEventi, da
+  // settembre 2026) oppure un BUNDLE. eventoId è l'evento delle White
+  // Label di prima, copiato nell'elenco dalla migrazione 0094: non si
+  // legge né si scrive più, resta solo per poter tornare indietro.
   eventoId: text('evento_id').references(() => eventi.id, { onDelete: 'cascade' }),
   bundleId: text('bundle_id').references(() => bundle.id, { onDelete: 'cascade' }),
   // Identificativo pubblico, mai un ID interno sequenziale — è quello
@@ -1049,6 +1050,21 @@ export const whiteLabel = pgTable('white_label', {
   aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 }, (t) => ({
   unicaPerCoppia: unique('white_label_org_evento_unico').on(t.organizzatoreId, t.eventoId),
+}));
+
+// Gli eventi in vendita su una White Label (proprietario, settembre 2026):
+// uno o più, scelti uno per uno. Con uno il cliente va dritto alla
+// prenotazione, con due o più sceglie tra le card. L'anno dopo si
+// aggiunge il nuovo evento e si toglie il vecchio: grafica, link e codice
+// incollato dal cliente restano gli stessi. Le vendite restano legate
+// alla White Label (prenotazioni.white_label_id) anche a evento tolto.
+export const whiteLabelEventi = pgTable('white_label_eventi', {
+  whiteLabelId: text('white_label_id').notNull().references(() => whiteLabel.id, { onDelete: 'cascade' }),
+  eventoId: text('evento_id').notNull().references(() => eventi.id, { onDelete: 'cascade' }),
+  aggiuntoIl: timestamp('aggiunto_il').notNull().defaultNow(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.whiteLabelId, t.eventoId] }),
+  perEvento: index('white_label_eventi_evento_idx').on(t.eventoId),
 }));
 
 // ---------------------------------------------------------------------

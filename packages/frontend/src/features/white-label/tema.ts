@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { WhiteLabelTheme } from '../../api/whiteLabel';
+import { formattaEuro } from '../../shared/formato';
 
 /** Come il tema di una White Label diventa stile vero: font, colori,
  *  sfondi, pulsanti, riquadri e campi. Un posto solo, così l'anteprima
@@ -183,6 +184,14 @@ export function stileCampo(tema: WhiteLabelTheme): CSSProperties {
 export const testoPulsante = (tema: WhiteLabelTheme) => tema.testi.pulsante?.trim() || 'Prenota ora';
 export const titoloVetrina = (tema: WhiteLabelTheme, diSerie: string) => tema.testi.titolo?.trim() || diSerie;
 export const sottotitoloVetrina = (tema: WhiteLabelTheme) => tema.testi.sottotitolo?.trim() || '';
+/** Il titolo sopra le card di una White Label con più eventi. */
+export const titoloElenco = (tema: WhiteLabelTheme) => tema.testi.titoloElenco?.trim() || 'Scegli il tuo viaggio';
+
+/** "da 39,00 €" per la vetrina e le card; niente se l'evento non ha un prezzo. */
+export function testoPrezzoDa(prezzo: number | null | undefined): string | null {
+  if (prezzo === null || prezzo === undefined) return null;
+  return `da ${formattaEuro(prezzo)}`;
+}
 
 /** La riga in fondo: la nota scritta nel tema e, solo se il marchio è
  *  acceso, "Viaggio organizzato da OnWay". */

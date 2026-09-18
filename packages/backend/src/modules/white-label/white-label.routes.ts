@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { whiteLabelService } from './white-label.service.js';
-import { creaWhiteLabelSchema, aggiornaWhiteLabelSchema } from './white-label.dto.js';
+import { creaWhiteLabelSchema, aggiornaWhiteLabelSchema, impostaEventiSchema } from './white-label.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
@@ -23,6 +23,10 @@ whiteLabelRouter.post('/', richiedePermesso('white-label.gestisci'), valida(crea
 }));
 whiteLabelRouter.put('/:id', richiedePermesso('white-label.gestisci'), valida(aggiornaWhiteLabelSchema), asyncHandler(async (req: Request, res: Response) => {
   res.json(await whiteLabelService.update(req.params.id, req.body));
+}));
+// L'elenco degli eventi in vendita (sostituisce quello di prima): link e codice non cambiano.
+whiteLabelRouter.put('/:id/eventi', richiedePermesso('white-label.gestisci'), valida(impostaEventiSchema), asyncHandler(async (req: Request, res: Response) => {
+  res.json(await whiteLabelService.impostaEventi(req.params.id, req.body.eventiIds));
 }));
 whiteLabelRouter.post('/:id/rigenera-widget-id', richiedePermesso('white-label.gestisci'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await whiteLabelService.rigeneraPublicWidgetId(req.params.id));
