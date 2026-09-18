@@ -4,7 +4,8 @@ import { eq, and, asc, gte, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { preventiviRichieste, preventiviRisposte, fornitori, tragitti, eventi, fermate, linee, lineaFermate } from '../../db/schema.js';
-import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
+import { NonTrovato, ConflittoDati, ErroreApplicativo } from '../../shared/errors.js';
+import { nomeAllegatoSicuro, tipoDalContenuto } from '../../shared/tipoFile.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
@@ -385,12 +386,21 @@ export const preventiviService = {
     const chiusa = motivoChiusura(richiesta, tragitto);
     if (chiusa) throw new ConflittoDati(chiusa);
     if (await linkScaduto(richiesta, false)) throw new ConflittoDati('Questo link è scaduto — se vuole ancora inviare un preventivo, contatti direttamente chi le ha scritto.');
+    // Il file arriva da fuori (chiunque può registrarsi come fornitore) e
+    // finirà sul computer di chi lo scarica dal gestionale: solo PDF o
+    // immagini veri, con il nome e l'estensione del contenuto vero.
+    let fileNome = input.fileNome;
+    if (input.fileContenuto) {
+      const tipo = tipoDalContenuto(Buffer.from(input.fileContenuto.slice(0, 64), 'base64'));
+      if (!tipo) throw new ErroreApplicativo('Il file allegato deve essere un PDF o un\'immagine (JPG, PNG).', 400, 'FILE_NON_AMMESSO');
+      fileNome = nomeAllegatoSicuro(input.fileNome, tipo);
+    }
     try {
       const [nuova] = await db.insert(preventiviRisposte).values({
         richiestaId: richiesta.id,
         prezzo: input.prezzo.toFixed(2),
         postiBus: input.postiBus,
-        fileNome: input.fileNome,
+        fileNome,
         fileContenuto: input.fileContenuto,
       }).returning();
       return { id: nuova.id, prezzo: nuova.prezzo, postiBus: nuova.postiBus, fileNome: nuova.fileNome };

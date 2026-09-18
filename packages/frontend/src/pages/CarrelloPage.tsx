@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCarrello, type ArticoloCarrello } from '../features/carrello/CarrelloContext';
-import { leggiCookieMeta } from '../features/metaPixel';
+import { leggiCookieMeta, nuovoEventIdMeta } from '../features/metaPixel';
 import { tracciaAcquistoRegistrato, valoreAcquisto } from '../features/tracciaAcquisto';
 import { clienteAuthApi, type DatiCliente } from '../api/clienteAuth';
 import { prenotazioniApi } from '../api/prenotazioni';
@@ -125,8 +125,9 @@ export function CarrelloPage() {
     if (!loggato && !articoli[0]?.cliente.dataNascita) { setDatiMancanti(true); return; }
     setInviando(true);
     // Un solo eventId per l'intero ordine: la Conversions API manda UN
-    // evento Purchase con il totale, non uno per riga.
-    const metaEventId = crypto.randomUUID();
+    // evento Purchase con il totale, non uno per riga (e solo con il
+    // consenso marketing del cliente, vedi nuovoEventIdMeta).
+    const metaEventId = nuovoEventIdMeta();
     const { fbp, fbc } = leggiCookieMeta();
     const righe = articoli.map((a) => {
       // Un bundle ha una provenienza sola; altrimenti vale quella di ogni articolo.

@@ -16,7 +16,7 @@ import { EtichettaPosti, SceltaFermata } from './SceltaFermata';
 import { Stepper } from './Stepper';
 import { CampoTesto } from './CampoTesto';
 import { provenienzaDaUrl } from './provenienza';
-import { tracciaInizioPrenotazione, leggiCookieMeta } from '../metaPixel';
+import { tracciaInizioPrenotazione, leggiCookieMeta, nuovoEventIdMeta } from '../metaPixel';
 import { tracciaInizioCheckoutGA4 } from '../googleAnalytics';
 import { tracciaAcquistoRegistrato, valoreAcquisto } from '../tracciaAcquisto';
 import { formattaEuro, plurale } from '../../shared/formato';
@@ -444,9 +444,10 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaWh
     setMessaggioErrore('');
     try {
       const { promoterCodice, utmSource, utmMedium, utmCampaign, utmContent } = provenienzaDaUrl();
-      // Il pixel di INBUS traccia sempre (anche dal widget White Label);
-      // se l'organizzatore ha il suo pixel, lo stesso evento arriva anche a lui.
-      const metaEventId = crypto.randomUUID();
+      // Il pixel di INBUS traccia (anche dal widget White Label) solo con
+      // il consenso marketing; se l'organizzatore ha il suo pixel, lo
+      // stesso evento arriva anche a lui.
+      const metaEventId = nuovoEventIdMeta();
       const { fbp, fbc } = leggiCookieMeta();
       const payloadPrenotazione = {
         eventoId: evento.id,

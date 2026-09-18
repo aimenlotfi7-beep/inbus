@@ -25,8 +25,19 @@ function leggiConsenso(): ConsensoCookie | null {
   }
 }
 
-function salvaConsenso(valore: ConsensoCookie) {
+export function salvaConsenso(valore: ConsensoCookie) {
   localStorage.setItem(CHIAVE_CONSENSO, JSON.stringify(valore));
+  window.dispatchEvent(new Event('inbus-consenso-cookie-cambiato'));
+}
+
+/** Vero se il visitatore ha già scelto (accettato, rifiutato o personalizzato). */
+export function consensoGiaScelto(): boolean {
+  return leggiConsenso() !== null;
+}
+
+/** Dimentica la scelta: il banner ricompare e si può scegliere di nuovo. */
+export function riapriSceltaCookie() {
+  localStorage.removeItem(CHIAVE_CONSENSO);
   window.dispatchEvent(new Event('inbus-consenso-cookie-cambiato'));
 }
 
@@ -167,7 +178,7 @@ export function LinkPreferenzeCookie() {
     <button
       type="button"
       className="link-preferenze-cookie"
-      onClick={() => { localStorage.removeItem(CHIAVE_CONSENSO); window.dispatchEvent(new Event('inbus-consenso-cookie-cambiato')); }}
+      onClick={riapriSceltaCookie}
     >
       Preferenze cookie
     </button>

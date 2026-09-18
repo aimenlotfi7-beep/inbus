@@ -5,6 +5,7 @@ import { iscrivitiListaAttesaSchema } from './lista-attesa.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
+import { limitePnr, limiteRegistrazione } from '../../shared/rateLimit.js';
 
 const finalizzaSchema = z.object({
   tragittoId: z.string().min(1),
@@ -47,10 +48,10 @@ export const listaAttesaController = {
 export const listaAttesaRouter = Router();
 
 // Pubbliche: iscrizione dal checkout del sito, finalizzazione dal link email.
-listaAttesaRouter.post('/', valida(iscrivitiListaAttesaSchema), asyncHandler(listaAttesaController.iscriviti));
+listaAttesaRouter.post('/', limiteRegistrazione, valida(iscrivitiListaAttesaSchema), asyncHandler(listaAttesaController.iscriviti));
 // Le proprie iscrizioni: /api/cliente-auth/me/lista-attesa (con l'account).
-listaAttesaRouter.get('/finalizza/:token', asyncHandler(listaAttesaController.getByToken));
-listaAttesaRouter.post('/finalizza/:token', valida(finalizzaSchema), asyncHandler(listaAttesaController.finalizza));
+listaAttesaRouter.get('/finalizza/:token', limitePnr, asyncHandler(listaAttesaController.getByToken));
+listaAttesaRouter.post('/finalizza/:token', limitePnr, valida(finalizzaSchema), asyncHandler(listaAttesaController.finalizza));
 
 // Amministrazione: elenco per evento (sezione "Lista d'attesa" nella
 // scheda evento) e promozione (manda l'email con il link).

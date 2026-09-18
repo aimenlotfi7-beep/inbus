@@ -5,6 +5,7 @@ import { AuthShell } from '../features/AuthShell';
 import { CampoTesto } from '../features/checkout/CampoTesto';
 import { CampoPassword } from '../features/CampoPassword';
 import { useSeoTags } from '../features/useSeoTags';
+import { percorsoInterno } from '../shared/percorsoInterno';
 import '../styles/account.css';
 
 export function RegistratiPage() {
@@ -20,7 +21,7 @@ export function RegistratiPage() {
   const [errore, setErrore] = useState('');
   const [caricamento, setCaricamento] = useState(false);
   const [inviata, setInviata] = useState(false);
-  const dopo = searchParams.get('dopo') || '/'; // stessa scelta di AccediPage.tsx — dopo la registrazione, torna al sito normale
+  const dopo = percorsoInterno(searchParams.get('dopo')); // stessa scelta di AccediPage.tsx — dopo la registrazione, torna al sito normale
 
   useSeoTags({
     title: 'Crea il tuo account — OnWay',

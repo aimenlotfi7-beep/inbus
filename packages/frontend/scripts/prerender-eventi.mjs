@@ -25,6 +25,17 @@ function escapeHtml(testo) {
   return String(testo).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// Stessi formati del sito (formattaEuro/formattaData in src/shared/formato.ts):
+// l'anteprima di un link condiviso deve dire le stesse cose della pagina.
+const euro = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
+const dataEvento = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Rome' });
+
+/** JSON dentro <script>: un "</script>" scritto nel nome di un evento non
+ *  deve poter chiudere il tag e far eseguire quello che viene dopo. */
+function jsonPerScript(valore) {
+  return JSON.stringify(valore).replace(/</g, '\\u003c');
+}
+
 function prezzoMinimo(evento) {
   const prezzi = [];
   const tuttiITragitti = [...(evento.tragitti ?? []), ...(evento.servizi ?? []).flatMap((s) => s.tragitti ?? [])];
@@ -40,8 +51,10 @@ function prezzoMinimo(evento) {
 function costruisciHtml(template, evento) {
   const prezzo = prezzoMinimo(evento);
   const url = `${siteUrl}/eventi/${evento.slug}`;
-  const titolo = `${evento.artista} — ${evento.luogo}, ${evento.citta} | INBUS`;
-  const descrizione = `Bus per ${evento.artista} il ${new Date(evento.data).toLocaleDateString('it-IT')} a ${evento.citta}${prezzo !== null ? ` — a partire da €${prezzo.toFixed(2)}` : ''}. Prenota il tuo posto con INBUS.`;
+  // Stessi testi di EventoPage.tsx (useSeoTags): il nome pubblico è OnWay.
+  const titolo = `${evento.artista} — ${evento.luogo}, ${evento.citta} | OnWay`;
+  const descrizione = (evento.descrizioneSeo && String(evento.descrizioneSeo).trim())
+    || `Bus per ${evento.artista} il ${dataEvento.format(new Date(evento.data))} a ${evento.citta}${prezzo !== null ? ` — a partire da ${euro.format(prezzo)}` : ''}. Prenota il tuo posto con OnWay.`;
   const immagine = evento.immagini?.[0]?.url;
 
   const jsonLd = {
@@ -63,7 +76,7 @@ function costruisciHtml(template, evento) {
   html = html.replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${escapeHtml(descrizione)}">`);
   html = html.replace(/<meta property="og:type"[^>]*>/, `<meta property="og:type" content="website">\n<meta property="og:url" content="${escapeHtml(url)}">${immagine ? `\n<meta property="og:image" content="${escapeHtml(immagine)}">` : ''}`);
   html = html.replace(/<meta name="twitter:card"[^>]*>/, `<meta name="twitter:card" content="${immagine ? 'summary_large_image' : 'summary'}">`);
-  html = html.replace('</head>', `<link rel="canonical" href="${escapeHtml(url)}">\n<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>\n</head>`);
+  html = html.replace('</head>', `<link rel="canonical" href="${escapeHtml(url)}">\n<script type="application/ld+json">${jsonPerScript(jsonLd)}</script>\n</head>`);
   return html;
 }
 
@@ -127,8 +140,8 @@ async function main() {
 
 function costruisciHtmlTour(template, t) {
   const url = `${siteUrl}/tour/${t.slug}`;
-  const titolo = `${t.nome} — Tutte le date | INBUS`;
-  const descrizione = (t.descrizioneSeo && String(t.descrizioneSeo).trim()) || `${t.numeroEventi} date disponibili per ${t.nome}. Scegli la tua e prenota con INBUS.`;
+  const titolo = `${t.nome} — Tutte le date | OnWay`;
+  const descrizione = (t.descrizioneSeo && String(t.descrizioneSeo).trim()) || `${t.numeroEventi} date disponibili per ${t.nome}. Scegli la tua e prenota con OnWay.`;
   const immagine = t.copertinaUrl;
   let html = template;
   html = html.replace(/<title>.*?<\/title>/s, `<title>${escapeHtml(titolo)}</title>`);
@@ -141,8 +154,8 @@ function costruisciHtmlTour(template, t) {
 
 function costruisciHtmlBundle(template, b) {
   const url = `${siteUrl}/bundle/${b.slug}`;
-  const titolo = `${b.nome} — Bundle | INBUS`;
-  const descrizione = (b.descrizione && String(b.descrizione).slice(0, 160)) || `Più eventi insieme con il ${Number(b.scontoPercentuale)}% di sconto. Prenota con INBUS.`;
+  const titolo = `${b.nome} — Bundle | OnWay`;
+  const descrizione = (b.descrizione && String(b.descrizione).slice(0, 160)) || `Più eventi insieme con il ${Number(b.scontoPercentuale)}% di sconto. Prenota con OnWay.`;
   const immagine = b.copertinaUrl;
   let html = template;
   html = html.replace(/<title>.*?<\/title>/s, `<title>${escapeHtml(titolo)}</title>`);

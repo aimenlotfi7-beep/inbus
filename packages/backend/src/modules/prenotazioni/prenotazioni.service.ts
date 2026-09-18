@@ -516,7 +516,9 @@ export const prenotazioniService = {
     const emailConfermaInviata = await inviaConfermaPrenotazione(risultato);
     // Meta Conversions API — best-effort, dopo che la prenotazione è già
     // confermata: un problema con l'API di Meta non deve mai bloccare o
-    // ritardare la risposta al cliente.
+    // ritardare la risposta al cliente. metaEventId arriva solo se il
+    // cliente ha accettato i cookie di marketing (nuovoEventIdMeta nel
+    // sito): senza, i suoi dati non partono verso Meta.
     if (input.metaEventId) {
       inviaEventoMetaSeConfigurato({
         nomeEvento: 'Purchase', eventId: input.metaEventId, valore: Number(risultato.totaleComplessivo),

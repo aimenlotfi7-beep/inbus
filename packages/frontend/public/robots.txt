@@ -1,4 +1,22 @@
 User-agent: *
 Allow: /
+# Aree private e pagine personali: niente da mostrare nei motori di ricerca.
+Disallow: /admin.html
+Disallow: /account
+Disallow: /carrello
+Disallow: /accedi
+Disallow: /registrati
+Disallow: /password-dimenticata
+Disallow: /reimposta-password/
+Disallow: /verifica-email/
+Disallow: /promoter
+Disallow: /organizzatore
+Disallow: /tour-leader
+Disallow: /scansione
+Disallow: /finalizza/
+Disallow: /variazione/
+Disallow: /completa-saldo/
+Disallow: /fornitore/preventivo/
+Disallow: /w/
 
 Sitemap: https://inbus-production.up.railway.app/sitemap.xml

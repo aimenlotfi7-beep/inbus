@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
+import { limitePnr } from '../../shared/rateLimit.js';
 import { listaVariazioni, infoRispostaVariazione, rispondiVariazione } from './variazioni.service.js';
 
 export const variazioniRouter = Router();
@@ -16,6 +17,7 @@ variazioniRouter.get('/', richiedeAuth, richiedePermesso('prenotazioni.pagamenti
 // mail, nessun login richiesto (il token stesso fa da autenticazione,
 // come già per "/finalizza/:token" della lista d'attesa).
 export const variazioniRispostePubblicheRouter = Router();
+variazioniRispostePubblicheRouter.use(limitePnr);
 
 variazioniRispostePubblicheRouter.get('/:token', asyncHandler(async (req: Request, res: Response) => {
   res.json(await infoRispostaVariazione(req.params.token));

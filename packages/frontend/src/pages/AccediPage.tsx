@@ -6,6 +6,7 @@ import { AuthShell } from '../features/AuthShell';
 import { CampoTesto } from '../features/checkout/CampoTesto';
 import { CampoPassword } from '../features/CampoPassword';
 import { useSeoTags } from '../features/useSeoTags';
+import { percorsoInterno } from '../shared/percorsoInterno';
 import '../styles/account.css';
 
 export function AccediPage() {
@@ -24,7 +25,7 @@ export function AccediPage() {
   // chi ha appena cliccato "Accedi" dall'intestazione vuole tornare a
   // navigare il sito come chiunque altro, non finire dritto nella
   // sezione account (ci arriva cliccando il proprio nome, quando vuole).
-  const dopo = searchParams.get('dopo') || '/';
+  const dopo = percorsoInterno(searchParams.get('dopo'));
   const sessioneScaduta = searchParams.get('motivo') === 'scaduta';
 
   useSeoTags({

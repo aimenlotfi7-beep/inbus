@@ -12,6 +12,7 @@ import { BundleFlusso } from '../features/bundle/BundleFlusso';
 import { inizializzaMetaPixelWidget } from '../features/metaPixel';
 import { inizializzaGA4Widget, tracciaPaginaGA4 } from '../features/googleAnalytics';
 import { tracciaAcquistoRegistrato, valoreAcquisto } from '../features/tracciaAcquisto';
+import { ConsensoWidget } from '../features/white-label/ConsensoWidget';
 
 type Vista = 'caricamento' | 'errore' | 'vetrina' | 'auth' | 'login' | 'registrati' | 'registrati-fatto' | 'checkout' | 'bundle';
 
@@ -39,10 +40,10 @@ export function WidgetPubblicoPage() {
       .then((d) => {
         setDati(d);
         setVista(d.bundle ? (clienteLoggato() ? 'bundle' : 'auth') : 'vetrina');
-        // Pixel di INBUS sempre + quello dell'organizzatore se presente
-        // (vedi la nota nella funzione sul banner cookie mancante qui).
+        // Pixel di INBUS + quello dell'organizzatore se presente, e GA4:
+        // partono solo con il consenso chiesto da ConsensoWidget.
         inizializzaMetaPixelWidget(d.metaPixelId);
-        inizializzaGA4Widget().then(() => tracciaPaginaGA4(window.location.pathname, document.title));
+        inizializzaGA4Widget(() => tracciaPaginaGA4(window.location.pathname, document.title));
       })
       .catch((e) => { setErroreVista(e instanceof ErroreApi ? e.message : 'Impossibile caricare questa pagina.'); setVista('errore'); });
   }, [publicWidgetId]);
@@ -101,6 +102,7 @@ export function WidgetPubblicoPage() {
               }}
             />
           )}
+          <ConsensoWidget tema={dati.tema} />
         </div>
       </div>
     );
@@ -112,6 +114,7 @@ export function WidgetPubblicoPage() {
         <div style={{ maxWidth: Math.max(dati.tema.stile.larghezzaPx, 420), margin: '0 auto' }}>
           <CheckoutForm evento={eventoCompleto} publicWidgetId={publicWidgetId} temaWhiteLabel={dati.tema} />
           <PiePagina tema={dati.tema} />
+          <ConsensoWidget tema={dati.tema} />
         </div>
       </div>
     );
@@ -131,6 +134,7 @@ export function WidgetPubblicoPage() {
           <PulsanteSecondario tema={dati.tema} onClick={() => setVista('login')}>Accedi ora</PulsanteSecondario>
         </Riquadro>
       )}
+      <ConsensoWidget tema={dati.tema} />
     </Sfondo>
   );
 }

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { env } from './config/env.js';
 import { gestoreErrori } from './shared/http.js';
+import { intestazioniSicurezza } from './shared/intestazioniSicurezza.js';
 import { registroAttivita } from './shared/registroAttivita.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { eventiRouter } from './modules/eventi/eventi.routes.js';
@@ -46,6 +47,16 @@ import { sitemapRouter } from './modules/sitemap/sitemap.routes.js';
 export function creaApp() {
   const app = express();
 
+  // Su Railway ogni richiesta passa da UN proxy prima di arrivare qui:
+  // senza questa riga Express vedeva l'indirizzo del proxy invece di
+  // quello del visitatore, e i limiti anti-abuso (rateLimit.ts) valevano
+  // per tutti i visitatori insieme. Con 1 si prende l'indirizzo che il
+  // proxy di Railway ha aggiunto, quello che un visitatore non può
+  // falsificare.
+  app.set('trust proxy', 1);
+  app.disable('x-powered-by');
+  app.use(intestazioniSicurezza);
+
   // CORS dinamico in base al percorso, non fisso: le rotte pubbliche
   // del widget e l'accesso cliente devono funzionare da QUALSIASI sito
   // (è il punto stesso del widget incorporato — non sappiamo in
@@ -57,10 +68,13 @@ export function creaApp() {
     callback(null, { origin: aperto ? true : env.CORS_ORIGIN });
   }));
   // Default di Express (100kb) troppo piccolo per un PDF allegato in
-  // base64 (i preventivi dei fornitori) — anche un PDF semplice lo
-  // supera facilmente, fallendo altrimenti in silenzio con un errore
-  // generico "Payload Too Large".
-  app.use(express.json({ limit: '15mb' }));
+  // base64 (i preventivi dei fornitori, anche quelli caricati dal
+  // gestionale in Eventi/Partenze): lì si arriva a 15MB. Altrove bastano
+  // 2MB (testi delle pagine e delle email compresi): accettare 15MB
+  // ovunque permetteva a chiunque di intasare il server con richieste
+  // enormi su qualunque indirizzo.
+  app.use(['/api/preventivi', '/api/eventi'], express.json({ limit: '15mb' }));
+  app.use(express.json({ limit: '2mb' }));
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
   // Ogni modifica riuscita fatta dal gestionale finisce nel registro attività.

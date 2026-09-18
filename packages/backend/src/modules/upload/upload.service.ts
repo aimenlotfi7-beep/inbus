@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { env } from '../../config/env.js';
 import { ErroreApplicativo } from '../../shared/errors.js';
+import { contenutoCorrispondeAlTipo } from '../../shared/tipoFile.js';
 
 let client: S3Client | null = null;
 
@@ -43,6 +44,9 @@ export const uploadService = {
     const estensione = TIPI_AMMESSI[mimeType];
     if (!estensione) {
       throw new ErroreApplicativo(`Tipo di file non ammesso: ${mimeType}. Sono ammessi: immagini (JPG/PNG/WEBP/GIF) e PDF.`);
+    }
+    if (!contenutoCorrispondeAlTipo(buffer, mimeType)) {
+      throw new ErroreApplicativo('Il contenuto del file non corrisponde al suo tipo: prova a salvarlo di nuovo come JPG, PNG o PDF.');
     }
 
     const nomeFile = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${estensione}`;

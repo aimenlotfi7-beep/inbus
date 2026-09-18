@@ -69,12 +69,19 @@ export function inizializzaGA4() {
   window.addEventListener('inbus-consenso-cookie-cambiato', provaACaricare);
 }
 
-/** Per la pagina del WIDGET — stesso gap noto e accettato del Pixel
- *  (vedi inizializzaMetaPixelWidget in metaPixel.ts): nessun banner
- *  cookie lì, quindi qui NON si controlla haConsensoPer(). */
-export async function inizializzaGA4Widget() {
-  const { ga4Id, googleAdsId } = await assicuraTracciamentoCache();
-  if (ga4Id || googleAdsId) caricaScript(ga4Id, googleAdsId);
+/** Per la pagina del WIDGET — come il Pixel (inizializzaMetaPixelWidget
+ *  in metaPixel.ts): solo con il consenso "marketing", anche se arriva
+ *  dopo. dopoIlCaricamento serve a contare la pagina appena GA4 c'è. */
+export function inizializzaGA4Widget(dopoIlCaricamento?: () => void) {
+  async function provaACaricare() {
+    if (!haConsensoPer('marketing')) return;
+    const { ga4Id, googleAdsId } = await assicuraTracciamentoCache();
+    if (!ga4Id && !googleAdsId) return;
+    caricaScript(ga4Id, googleAdsId);
+    dopoIlCaricamento?.();
+  }
+  provaACaricare();
+  window.addEventListener('inbus-consenso-cookie-cambiato', provaACaricare);
 }
 
 /** Una pagina vista — chiamala a ogni cambio di rotta (vedi Layout,

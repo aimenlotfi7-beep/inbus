@@ -5,6 +5,7 @@ import { creaCouponSchema, aggiornaCouponSchema } from './coupon.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
+import { limiteCoupon } from '../../shared/rateLimit.js';
 
 export const couponRouter = Router();
 
@@ -12,6 +13,7 @@ export const couponRouter = Router();
  *  subito lo sconto vero prima di procedere, senza dover accedere. */
 couponRouter.post(
   '/valida',
+  limiteCoupon,
   valida(z.object({ codice: z.string().min(1), importo: z.number().positive(), eventoId: z.string().optional(), emailCliente: z.string().email().optional() })),
   asyncHandler(async (req: Request, res: Response) => {
     const { sconto, coupon: c } = await couponService.valida(req.body.codice, req.body.importo, req.body.eventoId, req.body.emailCliente);
