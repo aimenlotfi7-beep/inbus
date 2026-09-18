@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { whiteLabelApi, type WhiteLabelPubblica } from '../api/whiteLabel';
 import { clienteAuthApi } from '../api/clienteAuth';
 import { salvaTokenCliente, clienteLoggato } from '../features/clienteSessione';
@@ -18,10 +18,18 @@ type Vista = 'caricamento' | 'errore' | 'vetrina' | 'auth' | 'login' | 'registra
 
 export function WidgetPubblicoPage() {
   const { publicWidgetId } = useParams<{ publicWidgetId: string }>();
+  // ?incorporato=1: la pagina è dentro il sito del cliente, nella finestra
+  // creata dal codice da incollare (public/embed.js). Niente sfondo di
+  // pagina né altezza a schermo intero: solo il riquadro, sopra lo sfondo
+  // del sito che la ospita.
+  const [parametri] = useSearchParams();
+  const incorporato = parametri.get('incorporato') === '1';
   const [vista, setVista] = useState<Vista>('caricamento');
   const [erroreVista, setErroreVista] = useState('');
   const [dati, setDati] = useState<WhiteLabelPubblica | null>(null);
   const [eventoCompleto, setEventoCompleto] = useState<Evento | null>(null);
+
+  useFinestraIncorporata(incorporato, vista);
 
   // Font, titolo della scheda e icona del tema: appena arrivano i dati,
   // così la pagina sembra del cliente anche nella barra del browser.
@@ -41,12 +49,16 @@ export function WidgetPubblicoPage() {
         setDati(d);
         setVista(d.bundle ? (clienteLoggato() ? 'bundle' : 'auth') : 'vetrina');
         // Pixel di INBUS + quello dell'organizzatore se presente, e GA4:
-        // partono solo con il consenso chiesto da ConsensoWidget.
-        inizializzaMetaPixelWidget(d.metaPixelId);
-        inizializzaGA4Widget(() => tracciaPaginaGA4(window.location.pathname, document.title));
+        // partono solo con il consenso chiesto da ConsensoWidget. Dentro il
+        // sito del cliente niente tracciamento né banner: lì i cookie li
+        // gestisce il sito che ospita (come faceva il vecchio codice).
+        if (!incorporato) {
+          inizializzaMetaPixelWidget(d.metaPixelId);
+          inizializzaGA4Widget(() => tracciaPaginaGA4(window.location.pathname, document.title));
+        }
       })
       .catch((e) => { setErroreVista(e instanceof ErroreApi ? e.message : 'Impossibile caricare questa pagina.'); setVista('errore'); });
-  }, [publicWidgetId]);
+  }, [publicWidgetId, incorporato]);
 
   async function apriPrenotazione() {
     if (clienteLoggato()) await vaiAlCheckout();
@@ -71,14 +83,21 @@ export function WidgetPubblicoPage() {
 
   // Caricamento ed errore: già con i colori del cliente se li conosciamo
   // (la prima volta sono quelli di serie, non c'è ancora il tema).
-  if (vista === 'caricamento') return <Sfondo tema={dati?.tema}><p style={{ color: dati?.tema.colori.testoSecondario ?? '#a99fc2' }}>Carico…</p></Sfondo>;
-  if (vista === 'errore') return <Sfondo tema={dati?.tema}><p style={{ color: dati?.tema.colori.testoSecondario ?? '#a99fc2' }}>{erroreVista}</p></Sfondo>;
+  if (vista === 'caricamento') return <Sfondo tema={dati?.tema} incorporato={incorporato}><p style={{ color: dati?.tema.colori.testoSecondario ?? '#a99fc2' }}>Carico…</p></Sfondo>;
+  if (vista === 'errore') return <Sfondo tema={dati?.tema} incorporato={incorporato}><p style={{ color: dati?.tema.colori.testoSecondario ?? '#a99fc2' }}>{erroreVista}</p></Sfondo>;
   if (!dati || !publicWidgetId) return null;
+
+  // Pagina intera: sfondo del tema e almeno l'altezza dello schermo. Dentro
+  // il sito del cliente: nessuno sfondo e l'altezza del contenuto, con un
+  // filo di margine per le ombre dei riquadri.
+  const pagina = (conVariabili: boolean): React.CSSProperties => incorporato
+    ? { padding: 6, ...(conVariabili ? variabiliTema(dati.tema) : {}) }
+    : { minHeight: '100vh', padding: '40px 20px', ...sfondoPagina(dati.tema), ...(conVariabili ? variabiliTema(dati.tema) : {}) };
 
   if (vista === 'bundle' && dati.bundle && publicWidgetId) {
     const b = dati.bundle;
     return (
-      <div style={{ minHeight: '100vh', padding: '40px 20px', ...sfondoPagina(dati.tema), ...variabiliTema(dati.tema) }}>
+      <div style={pagina(true)}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           {!dati.attiva ? (
             <Riquadro tema={dati.tema}><p>Questa pagina non accetta più nuovi acquisti.</p></Riquadro>
@@ -102,7 +121,7 @@ export function WidgetPubblicoPage() {
               }}
             />
           )}
-          <ConsensoWidget tema={dati.tema} />
+          {!incorporato && <ConsensoWidget tema={dati.tema} />}
         </div>
       </div>
     );
@@ -110,18 +129,18 @@ export function WidgetPubblicoPage() {
 
   if (vista === 'checkout' && eventoCompleto) {
     return (
-      <div style={{ minHeight: '100vh', padding: '40px 20px', ...sfondoPagina(dati.tema) }}>
+      <div style={pagina(false)}>
         <div style={{ maxWidth: Math.max(dati.tema.stile.larghezzaPx, 420), margin: '0 auto' }}>
           <CheckoutForm evento={eventoCompleto} publicWidgetId={publicWidgetId} temaWhiteLabel={dati.tema} />
           <PiePagina tema={dati.tema} />
-          <ConsensoWidget tema={dati.tema} />
+          {!incorporato && <ConsensoWidget tema={dati.tema} />}
         </div>
       </div>
     );
   }
 
   return (
-    <Sfondo tema={dati.tema} conPiePagina={vista !== 'vetrina' || !dati.tema.elementiVisibili.informazioni}>
+    <Sfondo tema={dati.tema} incorporato={incorporato} conPiePagina={vista !== 'vetrina' || !dati.tema.elementiVisibili.informazioni}>
       {vista === 'vetrina' && (
         dati.evento && <WhiteLabelPreview tema={dati.tema} evento={dati.evento} larghezza={dati.tema.stile.larghezzaPx} onCtaClick={dati.attiva ? apriPrenotazione : undefined} />
       )}
@@ -134,7 +153,7 @@ export function WidgetPubblicoPage() {
           <PulsanteSecondario tema={dati.tema} onClick={() => setVista('login')}>Accedi ora</PulsanteSecondario>
         </Riquadro>
       )}
-      <ConsensoWidget tema={dati.tema} />
+      {!incorporato && <ConsensoWidget tema={dati.tema} />}
     </Sfondo>
   );
 }
@@ -142,15 +161,73 @@ export function WidgetPubblicoPage() {
 /** Lo sfondo di tutta la pagina: colore o immagine del tema (di serie
  *  quello scuro di OnWay finché il tema non è arrivato). La nota in fondo
  *  si mostra qui solo quando non la mostra già il riquadro (la vetrina ce
- *  l'ha dentro, altrimenti si leggerebbe due volte). */
-function Sfondo({ tema, conPiePagina = true, children }: { tema?: WhiteLabelPubblica['tema']; conPiePagina?: boolean; children: React.ReactNode }) {
-  const stile = tema ? { ...sfondoPagina(tema), ...variabiliTema(tema) } : { background: '#14121f' };
+ *  l'ha dentro, altrimenti si leggerebbe due volte). Dentro il sito del
+ *  cliente niente sfondo e niente altezza a schermo intero: si vede il
+ *  sito che ospita, e la finestra è alta quanto il contenuto. */
+function Sfondo({ tema, incorporato = false, conPiePagina = true, children }: { tema?: WhiteLabelPubblica['tema']; incorporato?: boolean; conPiePagina?: boolean; children: React.ReactNode }) {
+  const stile: React.CSSProperties = incorporato
+    ? { padding: 6, ...(tema ? variabiliTema(tema) : {}) }
+    : { minHeight: '100vh', justifyContent: 'center', padding: 24, ...(tema ? { ...sfondoPagina(tema), ...variabiliTema(tema) } : { background: '#14121f' }) };
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, ...stile }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, ...stile }}>
       {children}
       {tema && conPiePagina && <PiePagina tema={tema} />}
     </div>
   );
+}
+
+/** Dentro il sito del cliente (codice da incollare, public/embed.js) la
+ *  pagina vive in una finestra: sfondo trasparente al posto di quello del
+ *  sito OnWay, e a ogni cambio di altezza lo dice alla pagina che la
+ *  ospita, che allarga o stringe la finestra (niente barre di
+ *  scorrimento). A ogni passo nuovo chiede di riportarla in vista. */
+function useFinestraIncorporata(incorporato: boolean, vista: Vista) {
+  useEffect(() => {
+    if (!incorporato) return;
+    const { documentElement: html, body } = document;
+    const prima = [html.style.background, body.style.background];
+    html.style.background = 'transparent';
+    body.style.background = 'transparent';
+    const radice = document.getElementById('root');
+    let dimensioni: ResizeObserver | undefined;
+    let modifiche: MutationObserver | undefined;
+    if (radice && window.parent !== window) {
+      // Due sorveglianze: i cambi di dimensione (immagini e font che
+      // arrivano) e i cambi del contenuto (fermate caricate, passi della
+      // prenotazione), che scattano anche quando il browser non ridisegna.
+      dimensioni = new ResizeObserver(mandaAltezza);
+      dimensioni.observe(radice);
+      modifiche = new MutationObserver(mandaAltezza);
+      modifiche.observe(radice, { childList: true, subtree: true, characterData: true });
+      mandaAltezza();
+    }
+    return () => {
+      dimensioni?.disconnect();
+      modifiche?.disconnect();
+      html.style.background = prima[0];
+      body.style.background = prima[1];
+    };
+  }, [incorporato]);
+
+  // A ogni schermata nuova l'altezza si manda subito, senza aspettare che il
+  // browser ridisegni (ResizeObserver resta per i cambi dentro la stessa
+  // schermata, come i passi della prenotazione).
+  useEffect(() => {
+    if (!incorporato || window.parent === window) return;
+    mandaAltezza();
+    window.parent.postMessage({ tipo: 'inbus-widget-passo' }, '*');
+  }, [incorporato, vista]);
+}
+
+let ultimaAltezzaMandata = 0;
+/** L'altezza del contenuto alla pagina che ospita (solo se è cambiata). */
+function mandaAltezza() {
+  const radice = document.getElementById('root');
+  if (!radice || window.parent === window) return;
+  const altezza = Math.ceil(radice.getBoundingClientRect().height);
+  if (altezza === ultimaAltezzaMandata) return;
+  ultimaAltezzaMandata = altezza;
+  window.parent.postMessage({ tipo: 'inbus-widget-altezza', altezza }, '*');
 }
 
 /** La nota in fondo: quella scritta nel tema e, solo col marchio acceso, OnWay. */
