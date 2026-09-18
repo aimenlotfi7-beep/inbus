@@ -188,10 +188,14 @@ export function HomePage() {
             <div className="hero-azioni">
               <a className="btn btn-primary btn-lg" href="#eventi" onClick={(e) => { e.preventDefault(); vaiAgliEventi(); }}>Vedi gli eventi</a>
             </div>
-            <div className="hero-stats">
-              <div className="stat"><b>{caricamento ? '—' : numeroPartenze}</b><span>{etichettaPartenzeMostrata}</span></div>
-              <div className="stat"><b>{caricamento ? '—' : cittaPartenza.length}</b><span>{t('hero_statistica2_etichetta', 'Città di partenza')}</span></div>
-            </div>
+            {/* Senza partenze in vendita i numeri non si mostrano: "0 partenze
+                attive" in apertura dice al visitatore che il sito è vuoto. */}
+            {(caricamento || numeroPartenze > 0) && (
+              <div className="hero-stats">
+                <div className="stat"><b>{caricamento ? '—' : numeroPartenze}</b><span>{etichettaPartenzeMostrata}</span></div>
+                <div className="stat"><b>{caricamento ? '—' : cittaPartenza.length}</b><span>{t('hero_statistica2_etichetta', 'Città di partenza')}</span></div>
+              </div>
+            )}
           </div>
 
           {desktop && vetrina.length > 0 && (

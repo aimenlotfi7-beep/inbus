@@ -135,6 +135,12 @@
 .pagina-auth .auth-link-riga{
   margin:var(--sp-5) 0 0; text-align:center; font-size:var(--t-caption); color:var(--sup-testo-2);
 }
+/* Condizioni e privacy sotto "Crea l'account": chi si registra deve
+   sapere, prima, cosa accetta e come vengono trattati i suoi dati. */
+.pagina-auth .auth-nota-legale{
+  margin:var(--sp-3) 0 0; text-align:center; font-size:var(--t-caption); line-height:var(--lh-normal); color:var(--sup-testo-2);
+}
+.pagina-auth .auth-nota-legale a{ color:var(--sup-testo); text-decoration:underline; text-underline-offset:3px; }
 .pagina-auth .auth-link-riga a,
 .pagina-auth .auth-piede a{
   color:var(--sup-testo); font-weight:600; text-decoration:underline; text-underline-offset:3px;

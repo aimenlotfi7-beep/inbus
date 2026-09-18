@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { whiteLabelApi, type WhiteLabelPubblica } from '../api/whiteLabel';
 import { clienteAuthApi } from '../api/clienteAuth';
@@ -168,8 +168,27 @@ function Riquadro({ tema, children }: { tema: WhiteLabelPubblica['tema']; childr
   return <div style={{ ...stileRiquadro(tema), width: '100%', maxWidth: tema.stile.larghezzaPx }}>{children}</div>;
 }
 
-function Campo({ tema, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { tema: WhiteLabelPubblica['tema'] }) {
-  return <input {...props} style={{ ...stileCampo(tema), marginBottom: 8 }} />;
+/** Campo con l'etichetta sopra, non solo il testo grigio dentro: quello
+ *  sparisce appena si scrive, e nei campi data il telefono non lo mostra
+ *  proprio (la data di nascita restava un campo senza nome). */
+function Campo({ tema, etichetta, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { tema: WhiteLabelPubblica['tema']; etichetta: string }) {
+  const id = useId();
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <label htmlFor={id} style={{ display: 'block', margin: '0 0 4px', fontSize: tema.tipografia.dimensioneTestoPx * 0.85, color: tema.colori.testoSecondario }}>{etichetta}</label>
+      <input id={id} {...props} style={stileCampo(tema)} />
+    </div>
+  );
+}
+
+/** Condizioni e privacy prima di creare l'account (l'account è lo stesso del sito). */
+function NotaLegale({ tema }: { tema: WhiteLabelPubblica['tema'] }) {
+  return (
+    <p style={{ margin: '10px 0 0', textAlign: 'center', lineHeight: 1.5, fontSize: tema.tipografia.dimensioneTestoPx * 0.8, color: tema.colori.testoSecondario }}>
+      Creando l'account accetti le <a href="/pagina/termini" target="_blank" rel="noopener" style={{ color: 'inherit' }}>condizioni</a> e
+      confermi di aver letto l'<a href="/pagina/privacy" target="_blank" rel="noopener" style={{ color: 'inherit' }}>informativa privacy</a>.
+    </p>
+  );
 }
 
 function PulsantePrincipale({ tema, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { tema: WhiteLabelPubblica['tema'] }) {
@@ -215,11 +234,13 @@ function FormLogin({ tema, onFatto }: { tema: WhiteLabelPubblica['tema']; onFatt
 
   return (
     <Riquadro tema={tema}>
-      <p style={{ fontWeight: 700, margin: '0 0 12px' }}>Accedi</p>
-      <Campo tema={tema} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <Campo tema={tema} type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      <TestoErrore>{errore}</TestoErrore>
-      <PulsantePrincipale tema={tema} onClick={invia} disabled={caricamento}>{caricamento ? 'Accesso…' : 'Accedi'}</PulsantePrincipale>
+      <form onSubmit={(e) => { e.preventDefault(); invia(); }}>
+        <p style={{ fontWeight: 700, margin: '0 0 12px' }}>Accedi</p>
+        <Campo tema={tema} etichetta="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Campo tema={tema} etichetta="Password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+        <TestoErrore>{errore}</TestoErrore>
+        <PulsantePrincipale tema={tema} type="submit" disabled={caricamento}>{caricamento ? 'Accesso…' : 'Accedi'}</PulsantePrincipale>
+      </form>
     </Riquadro>
   );
 }
@@ -250,15 +271,18 @@ function FormRegistrati({ tema, onFatto }: { tema: WhiteLabelPubblica['tema']; o
 
   return (
     <Riquadro tema={tema}>
-      <p style={{ fontWeight: 700, margin: '0 0 12px' }}>Crea un account</p>
-      <Campo tema={tema} placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
-      <Campo tema={tema} placeholder="Cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} />
-      <Campo tema={tema} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <Campo tema={tema} placeholder="Telefono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-      <Campo tema={tema} type="date" placeholder="Data di nascita" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} />
-      <Campo tema={tema} type="password" placeholder="Password (almeno 8 caratteri)" value={password} onChange={(e) => setPassword(e.target.value)} />
-      <TestoErrore>{errore}</TestoErrore>
-      <PulsantePrincipale tema={tema} onClick={invia} disabled={caricamento}>{caricamento ? 'Creazione…' : 'Crea account'}</PulsantePrincipale>
+      <form onSubmit={(e) => { e.preventDefault(); invia(); }}>
+        <p style={{ fontWeight: 700, margin: '0 0 12px' }}>Crea un account</p>
+        <Campo tema={tema} etichetta="Nome" autoComplete="given-name" required value={nome} onChange={(e) => setNome(e.target.value)} />
+        <Campo tema={tema} etichetta="Cognome" autoComplete="family-name" required value={cognome} onChange={(e) => setCognome(e.target.value)} />
+        <Campo tema={tema} etichetta="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Campo tema={tema} etichetta="Telefono (facoltativo)" type="tel" autoComplete="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+        <Campo tema={tema} etichetta="Data di nascita" type="date" autoComplete="bday" required value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} />
+        <Campo tema={tema} etichetta="Password (almeno 8 caratteri)" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+        <TestoErrore>{errore}</TestoErrore>
+        <PulsantePrincipale tema={tema} type="submit" disabled={caricamento}>{caricamento ? 'Creazione…' : 'Crea account'}</PulsantePrincipale>
+        <NotaLegale tema={tema} />
+      </form>
     </Riquadro>
   );
 }

@@ -37,6 +37,10 @@
   var script = document.currentScript;
   var publicWidgetId = script ? script.getAttribute('data-inbus-widget') : null;
   var apiBase = (script && script.getAttribute('data-inbus-api')) || API_BASE_DEFAULT;
+  // Il sito da cui arriva questo file: lì stanno condizioni e privacy.
+  var sitoBase = script && script.src ? new URL(script.src).origin : '';
+  // Prezzi come nel sito ("39,00 €"), non "€39".
+  var euro = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
 
   if (!publicWidgetId) {
     console.error('[INBUS widget] Manca data-inbus-widget sul tag <script> — il widget non può caricarsi senza.');
@@ -100,10 +104,14 @@
     if (corpo) opzioni.body = JSON.stringify(corpo);
     if (conToken && this.token) opzioni.headers['Authorization'] = 'Bearer ' + this.token;
     return fetch(this.apiBase + percorso, opzioni).then(function (res) {
-      return res.json().then(function (json) {
+      // Una risposta che non è JSON (per esempio una pagina d'errore) non
+      // deve finire al cliente come "Unexpected token…".
+      return res.json().catch(function () { return {}; }).then(function (json) {
         if (!res.ok) throw new Error(json.messaggio || json.errore || 'Qualcosa è andato storto, riprova.');
         return json;
       });
+    }, function () {
+      throw new Error('Connessione non riuscita: controlla la rete e riprova.');
     });
   };
 
@@ -127,7 +135,7 @@
       ';background:' + tema.colori.superficie + ';border-radius:' + tema.stile.borderRadiusPx + 'px;padding:20px;text-align:center;';
   };
   WidgetApp.prototype.renderCaricamento = function () {
-    this.root.innerHTML = stileFont(this.dati && this.dati.tema) + '<div style="' + this.stiliMessaggio() + '">Carico...</div>';
+    this.root.innerHTML = stileFont(this.dati && this.dati.tema) + '<div style="' + this.stiliMessaggio() + '">Carico…</div>';
   };
   WidgetApp.prototype.renderErrore = function (messaggio) {
     this.root.innerHTML = stileFont(this.dati && this.dati.tema) + '<div style="' + this.stiliMessaggio() + '">' + escapeHtml(messaggio) + '</div>';
@@ -188,6 +196,29 @@
       'px;border:1px solid ' + tema.colori.bordi + ';background:' + tema.colori.campoSfondo + ';color:' + tema.colori.campoTesto +
       ';font-family:' + famigliaFont(tema.tipografia.font) + ';font-size:' + tema.tipografia.dimensioneTestoPx + 'px;margin-bottom:8px;';
   }
+  /** Un campo con l'etichetta sopra (come Campo in WidgetPubblicoPage.tsx):
+   *  il solo testo grigio dentro sparisce appena si scrive, e nei campi
+   *  data il telefono non lo mostra proprio. */
+  function campo(tema, id, etichetta, tipo, attributi, valore) {
+    return '<label for="' + id + '" style="display:block;margin:0 0 4px;font-size:' + (tema.tipografia.dimensioneTestoPx * 0.85) +
+      'px;color:' + tema.colori.testoSecondario + ';">' + escapeHtml(etichetta) + '</label>' +
+      '<input id="' + id + '" type="' + (tipo || 'text') + '" ' + (attributi || '') +
+      (valore ? ' value="' + escapeHtml(valore) + '"' : '') + ' style="' + stiliInput(tema) + '" />';
+  }
+  function titoletto(tema, testo) {
+    return '<p style="font-weight:700;margin:' + (tema.stile.spaziaturaPx * 0.4) + 'px 0 8px;">' + escapeHtml(testo) + '</p>';
+  }
+  /** Condizioni e privacy prima di creare l'account (è lo stesso account del sito). */
+  function notaLegale(tema) {
+    var stileLink = 'color:inherit;text-decoration:underline;';
+    return '<p style="margin:10px 0 0;text-align:center;line-height:1.5;font-size:' + (tema.tipografia.dimensioneTestoPx * 0.8) + 'px;color:' + tema.colori.testoSecondario + ';">' +
+      'Creando l\'account accetti le <a href="' + sitoBase + '/pagina/termini" target="_blank" rel="noopener" style="' + stileLink + '">condizioni</a> e ' +
+      'confermi di aver letto l\'<a href="' + sitoBase + '/pagina/privacy" target="_blank" rel="noopener" style="' + stileLink + '">informativa privacy</a>.</p>';
+  }
+  function testoErrore() {
+    return '<p id="msg-errore" role="alert" style="color:#e05c5c;font-size:12px;margin:0 0 8px;"></p>';
+  }
+
   /** Il testo del tema, se c'è, altrimenti quello di serie. */
   function testoTema(tema, campo, diSerie) {
     var scritto = tema.testi && tema.testi[campo] ? String(tema.testi[campo]).trim() : '';
@@ -214,7 +245,9 @@
     }
     var immagineVetrina = l.tipo === 'hero' ? (b.heroImageUrl || b.immaginePrincipaleUrl) : (b.immaginePrincipaleUrl || b.heroImageUrl);
     if (v.immagine && (immagineVetrina || l.tipo === 'hero')) {
-      var sfondoImg = immagineVetrina ? 'url("' + immagineVetrina + '") center/cover' : c.bordi;
+      // Apici singoli: dentro style="…" le virgolette doppie chiudevano
+      // l'attributo e l'immagine non compariva mai.
+      var sfondoImg = immagineVetrina ? "url('" + String(immagineVetrina).replace(/'/g, '%27').replace(/"/g, '%22').replace(/\\/g, '%5C') + "') center/cover" : c.bordi;
       html += '<div style="width:100%;aspect-ratio:' + (l.tipo === 'hero' ? '16/9' : '4/3') + ';background:' + sfondoImg + ';border-radius:' + (s.borderRadiusPx * 0.7) + 'px;margin-bottom:' + (s.spaziaturaPx * 0.6) + 'px;"></div>';
     }
     if (v.titolo) {
@@ -261,55 +294,75 @@
     this.root.querySelector('#btn-registrati').addEventListener('click', function () { self.vista = 'registrati'; self.render(); });
   };
 
+  /** Invio del modulo (anche con il tasto Invio): il pulsante si spegne
+   *  finché il server non risponde, così un doppio clic non manda due volte. */
+  WidgetApp.prototype.alInvio = function (azione) {
+    var self = this;
+    var modulo = this.root.querySelector('#modulo');
+    modulo.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var pulsante = modulo.querySelector('button[type=submit]');
+      var errore = self.root.querySelector('#msg-errore');
+      errore.textContent = '';
+      pulsante.disabled = true;
+      azione().catch(function (err) {
+        errore.textContent = err.message;
+        pulsante.disabled = false;
+      });
+    });
+  };
+  WidgetApp.prototype.valore = function (id) {
+    return this.root.querySelector('#' + id).value.trim();
+  };
+
   WidgetApp.prototype.renderLogin = function () {
     var self = this;
     var tema = this.dati.tema;
-    var html = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">' +
+    this.root.innerHTML = stileFont(tema) + '<form id="modulo" style="' + stiliContenitore(tema) + '">' +
       '<p style="font-weight:700;margin:0 0 12px;">Accedi</p>' +
-      '<input id="in-email" type="email" placeholder="Email" style="' + stiliInput(tema) + '" />' +
-      '<input id="in-password" type="password" placeholder="Password" style="' + stiliInput(tema) + '" />' +
-      '<p id="msg-errore" style="color:#e05c5c;font-size:12px;margin:0 0 8px;"></p>' +
-      '<button id="btn-invia" style="' + stiliPulsante(tema) + '">Accedi</button>' +
-      '</div>';
-    this.root.innerHTML = html;
-    this.root.querySelector('#btn-invia').addEventListener('click', function () {
-      var email = self.root.querySelector('#in-email').value;
-      var password = self.root.querySelector('#in-password').value;
-      self.chiamata('POST', '/api/cliente-auth/login', { email: email, password: password })
+      campo(tema, 'in-email', 'Email', 'email', 'autocomplete="email" required') +
+      campo(tema, 'in-password', 'Password', 'password', 'autocomplete="current-password" required') +
+      testoErrore() +
+      '<button type="submit" style="' + stiliPulsante(tema) + '">Accedi</button>' +
+      '</form>';
+    this.alInvio(function () {
+      return self.chiamata('POST', '/api/cliente-auth/login', { email: self.valore('in-email'), password: self.root.querySelector('#in-password').value })
         .then(function (r) {
           self.token = r.token;
           self.vista = 'prenotazione';
           self.caricaOpzioniECambiaVista();
-        })
-        .catch(function (err) { self.root.querySelector('#msg-errore').textContent = err.message; });
+        });
     });
   };
 
   WidgetApp.prototype.renderRegistrati = function () {
     var self = this;
     var tema = this.dati.tema;
-    var html = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">' +
+    // La data di nascita è obbligatoria per il server (i gruppi sui bus si
+    // formano per età): senza, la registrazione da qui falliva sempre.
+    this.root.innerHTML = stileFont(tema) + '<form id="modulo" style="' + stiliContenitore(tema) + '">' +
       '<p style="font-weight:700;margin:0 0 12px;">Crea un account</p>' +
-      '<input id="in-nome" placeholder="Nome" style="' + stiliInput(tema) + '" />' +
-      '<input id="in-cognome" placeholder="Cognome" style="' + stiliInput(tema) + '" />' +
-      '<input id="in-email" type="email" placeholder="Email" style="' + stiliInput(tema) + '" />' +
-      '<input id="in-telefono" placeholder="Telefono" style="' + stiliInput(tema) + '" />' +
-      '<input id="in-password" type="password" placeholder="Password (almeno 8 caratteri)" style="' + stiliInput(tema) + '" />' +
-      '<p id="msg-errore" style="color:#e05c5c;font-size:12px;margin:0 0 8px;"></p>' +
-      '<button id="btn-invia" style="' + stiliPulsante(tema) + '">Crea account</button>' +
-      '</div>';
-    this.root.innerHTML = html;
-    this.root.querySelector('#btn-invia').addEventListener('click', function () {
+      campo(tema, 'in-nome', 'Nome', 'text', 'autocomplete="given-name" required') +
+      campo(tema, 'in-cognome', 'Cognome', 'text', 'autocomplete="family-name" required') +
+      campo(tema, 'in-email', 'Email', 'email', 'autocomplete="email" required') +
+      campo(tema, 'in-telefono', 'Telefono (facoltativo)', 'tel', 'autocomplete="tel"') +
+      campo(tema, 'in-nascita', 'Data di nascita', 'date', 'autocomplete="bday" required') +
+      campo(tema, 'in-password', 'Password (almeno 8 caratteri)', 'password', 'autocomplete="new-password" minlength="8" required') +
+      testoErrore() +
+      '<button type="submit" style="' + stiliPulsante(tema) + '">Crea account</button>' +
+      notaLegale(tema) +
+      '</form>';
+    this.alInvio(function () {
       var corpo = {
-        nome: self.root.querySelector('#in-nome').value,
-        cognome: self.root.querySelector('#in-cognome').value,
-        email: self.root.querySelector('#in-email').value,
-        telefono: self.root.querySelector('#in-telefono').value,
+        nome: self.valore('in-nome'),
+        cognome: self.valore('in-cognome'),
+        email: self.valore('in-email'),
+        telefono: self.valore('in-telefono') || undefined,
+        dataNascita: self.valore('in-nascita'),
         password: self.root.querySelector('#in-password').value,
       };
-      self.chiamata('POST', '/api/cliente-auth/registrati', corpo)
-        .then(function () { self.vista = 'registrati-fatto'; self.render(); })
-        .catch(function (err) { self.root.querySelector('#msg-errore').textContent = err.message; });
+      return self.chiamata('POST', '/api/cliente-auth/registrati', corpo)
+        .then(function () { self.vista = 'registrati-fatto'; self.render(); });
     });
   };
 
@@ -339,32 +392,57 @@
     var self = this;
     var tema = this.dati.tema;
     if (!this.opzioni) {
-      this.root.innerHTML = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">Carico le fermate disponibili...</div>';
+      this.root.innerHTML = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">Carico le fermate disponibili…</div>';
       return;
     }
+    // Città, orario di andata e prezzo, come nel sito.
     var opzOptions = this.opzioni.map(function (o) {
-      return '<option value="' + o.fermataId + '">' + escapeHtml(o.fermataCitta) + ' — €' + o.prezzoEffettivo + '</option>';
+      return '<option value="' + escapeHtml(o.fermataId) + '">' + escapeHtml(o.fermataCitta) + ' (' + escapeHtml(o.fermataOrario || 'orario da definire') + ') — ' + euro.format(o.prezzoEffettivo) + '</option>';
     }).join('');
+    var stileEtichetta = 'display:block;margin:0 0 4px;font-size:' + (tema.tipografia.dimensioneTestoPx * 0.85) + 'px;color:' + tema.colori.testoSecondario + ';';
 
-    var html = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">' +
+    this.root.innerHTML = stileFont(tema) + '<form id="modulo" style="' + stiliContenitore(tema) + '">' +
       '<p style="font-weight:700;margin:0 0 12px;">Completa la prenotazione</p>' +
-      '<label style="font-size:12px;color:' + tema.colori.testoSecondario + ';">Fermata di partenza</label>' +
+      '<label for="in-fermata" style="' + stileEtichetta + '">Fermata di partenza</label>' +
       '<select id="in-fermata" style="' + stiliInput(tema) + '">' + opzOptions + '</select>' +
-      '<label style="font-size:12px;color:' + tema.colori.testoSecondario + ';">Passeggeri</label>' +
-      '<input id="in-passeggeri" type="number" min="1" max="20" value="1" style="' + stiliInput(tema) + '" />' +
-      '<input id="in-nome" placeholder="Nome" style="' + stiliInput(tema) + '" />' +
-      '<input id="in-cognome" placeholder="Cognome" style="' + stiliInput(tema) + '" />' +
-      '<input id="in-email" type="email" placeholder="Email" style="' + stiliInput(tema) + '" />' +
-      '<input id="in-telefono" placeholder="Telefono" style="' + stiliInput(tema) + '" />' +
-      '<p id="msg-errore" style="color:#e05c5c;font-size:12px;margin:0 0 8px;"></p>' +
-      '<button id="btn-invia" style="' + stiliPulsante(tema) + '">Conferma prenotazione</button>' +
-      '</div>';
-    this.root.innerHTML = html;
+      campo(tema, 'in-passeggeri', 'Passeggeri', 'number', 'min="1" max="20" required', '1') +
+      titoletto(tema, 'I tuoi dati') +
+      campo(tema, 'in-nome', 'Nome', 'text', 'autocomplete="given-name" required') +
+      campo(tema, 'in-cognome', 'Cognome', 'text', 'autocomplete="family-name" required') +
+      campo(tema, 'in-email', 'Email', 'email', 'autocomplete="email" required') +
+      campo(tema, 'in-telefono', 'Telefono', 'tel', 'autocomplete="tel" minlength="4" required') +
+      '<div id="altri-passeggeri"></div>' +
+      testoErrore() +
+      '<button type="submit" style="' + stiliPulsante(tema) + '">Conferma prenotazione</button>' +
+      '</form>';
 
-    this.root.querySelector('#btn-invia').addEventListener('click', function () {
+    // Nome e cognome di ogni passeggero oltre a chi prenota: il server li
+    // chiede sempre, e senza le prenotazioni per più persone fallivano.
+    // Quando cambia il numero, quello già scritto resta.
+    var contenitore = this.root.querySelector('#altri-passeggeri');
+    var campoPasseggeri = this.root.querySelector('#in-passeggeri');
+    function aggiornaAltri() {
+      var n = Math.min(20, Math.max(1, parseInt(campoPasseggeri.value, 10) || 1));
+      var scritti = {};
+      contenitore.querySelectorAll('input').forEach(function (i) { scritti[i.id] = i.value; });
+      var html = '';
+      for (var p = 2; p <= n; p++) {
+        html += titoletto(tema, 'Passeggero ' + p) +
+          campo(tema, 'in-p' + p + '-nome', 'Nome', 'text', 'required', scritti['in-p' + p + '-nome']) +
+          campo(tema, 'in-p' + p + '-cognome', 'Cognome', 'text', 'required', scritti['in-p' + p + '-cognome']);
+      }
+      contenitore.innerHTML = html;
+    }
+    campoPasseggeri.addEventListener('input', aggiornaAltri);
+
+    this.alInvio(function () {
       var fermataId = self.root.querySelector('#in-fermata').value;
       var opzioneScelta = self.opzioni.filter(function (o) { return o.fermataId === fermataId; })[0];
-      var passeggeri = parseInt(self.root.querySelector('#in-passeggeri').value, 10) || 1;
+      var passeggeri = Math.min(20, Math.max(1, parseInt(campoPasseggeri.value, 10) || 1));
+      var partecipanti = [];
+      for (var p = 2; p <= passeggeri; p++) {
+        partecipanti.push({ nome: self.valore('in-p' + p + '-nome'), cognome: self.valore('in-p' + p + '-cognome') });
+      }
       var corpo = {
         eventoId: self.dati.evento.id,
         tragittoId: opzioneScelta ? opzioneScelta.tragittoId : undefined,
@@ -373,20 +451,19 @@
         tipoPagamento: 'COMPLETO',
         metodoPagamento: 'DA_CONCORDARE',
         cliente: {
-          nome: self.root.querySelector('#in-nome').value,
-          cognome: self.root.querySelector('#in-cognome').value,
-          email: self.root.querySelector('#in-email').value,
-          telefono: self.root.querySelector('#in-telefono').value,
+          nome: self.valore('in-nome'),
+          cognome: self.valore('in-cognome'),
+          email: self.valore('in-email'),
+          telefono: self.valore('in-telefono'),
         },
-        partecipanti: [],
+        partecipanti: partecipanti,
       };
-      self.chiamata('POST', '/api/public/widget/' + encodeURIComponent(self.widgetId) + '/prenota', corpo, true)
+      return self.chiamata('POST', '/api/public/widget/' + encodeURIComponent(self.widgetId) + '/prenota', corpo, true)
         .then(function (r) {
           self.prenotazioneFatta = r;
           self.vista = 'conferma';
           self.render();
-        })
-        .catch(function (err) { self.root.querySelector('#msg-errore').textContent = err.message; });
+        });
     });
   };
 
@@ -395,7 +472,7 @@
     var pnr = this.prenotazioneFatta ? this.prenotazioneFatta.pnr : '';
     this.root.innerHTML = stileFont(tema) + '<div style="' + stiliContenitore(tema) + '">' +
       '<p style="font-weight:800;font-size:' + tema.tipografia.dimensioneTitoloPx + 'px;margin:0 0 8px;">✓ Prenotazione confermata</p>' +
-      '<p style="color:' + tema.colori.testoSecondario + ';font-size:' + tema.tipografia.dimensioneTestoPx + 'px;">Codice prenotazione: <b>' + escapeHtml(pnr) + '</b>. Riceverai una email di conferma con il tuo biglietto.</p>' +
+      '<p style="color:' + tema.colori.testoSecondario + ';font-size:' + tema.tipografia.dimensioneTestoPx + 'px;">Il tuo codice è <b>' + escapeHtml(pnr) + '</b>. Ti abbiamo mandato la conferma via email; il biglietto con il numero del bus arriva via email prima della partenza.</p>' +
       '</div>';
   };
 

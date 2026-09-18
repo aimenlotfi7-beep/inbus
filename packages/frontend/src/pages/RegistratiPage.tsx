@@ -117,6 +117,10 @@ export function RegistratiPage() {
         <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={caricamento}>
           {caricamento ? 'Creazione in corso…' : "Crea l'account"}
         </button>
+        <p className="auth-nota-legale">
+          Creando l'account accetti le <a href="/pagina/termini" target="_blank" rel="noopener">condizioni</a> e
+          confermi di aver letto l'<a href="/pagina/privacy" target="_blank" rel="noopener">informativa privacy</a>.
+        </p>
       </form>
 
       <p className="auth-link-riga">

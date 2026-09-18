@@ -233,8 +233,11 @@ function AnteprimaAccesso({ tema, larghezza }: { tema: WhiteLabelTheme; larghezz
   return (
     <div style={{ ...stileRiquadro(tema), width: larghezza }}>
       <p style={{ fontWeight: 700, margin: `0 0 ${tema.stile.spaziaturaPx * 0.7}px`, fontSize: tema.tipografia.dimensioneTestoPx }}>Accedi o registrati per continuare</p>
-      <input readOnly value="mario.rossi@email.it" style={{ ...stileCampo(tema), marginBottom: 8 }} />
-      <input readOnly type="password" value="password" style={{ ...stileCampo(tema), marginBottom: 10 }} />
+      {/* Come nella pagina vera (Campo in WidgetPubblicoPage): etichetta sopra ogni campo. */}
+      <span style={{ display: 'block', margin: '0 0 4px', fontSize: tema.tipografia.dimensioneTestoPx * 0.85, color: tema.colori.testoSecondario }}>Email</span>
+      <input readOnly value="mario.rossi@email.it" aria-label="Email (esempio)" style={{ ...stileCampo(tema), marginBottom: 10 }} />
+      <span style={{ display: 'block', margin: '0 0 4px', fontSize: tema.tipografia.dimensioneTestoPx * 0.85, color: tema.colori.testoSecondario }}>Password</span>
+      <input readOnly type="password" value="password" aria-label="Password (esempio)" style={{ ...stileCampo(tema), marginBottom: 10 }} />
       <button type="button" style={stilePulsante(tema)} disabled>Accedi</button>
       <button type="button" style={{ ...stilePulsante(tema, 'secondario'), marginTop: 8 }} disabled>Creo un account nuovo</button>
       <NotaAnteprima tema={tema} />
