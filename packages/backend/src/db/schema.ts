@@ -446,6 +446,9 @@ export const fermate = pgTable('fermate', {
   // restando configurata (stesso principio già usato per tragitti.attivo
   // — non si elimina, si sospende).
   attivo: boolean('attivo').notNull().default(true),
+  // Quando il controllo delle soglie l'ha spenta (settembre 2026): se dopo
+  // la si riattiva a mano, il controllo non la rispegne ogni ora.
+  spentaPerSogliaIl: timestamp('spenta_per_soglia_il'),
 }, (t) => ({
   perTragitto: index('fermate_tragitto_idx').on(t.tragittoId),
 }));
@@ -1050,6 +1053,22 @@ export const whiteLabel = pgTable('white_label', {
   aggiornatoIl: timestamp('aggiornato_il').notNull().defaultNow(),
 }, (t) => ({
   unicaPerCoppia: unique('white_label_org_evento_unico').on(t.organizzatoreId, t.eventoId),
+}));
+
+// Richieste già eseguite (settembre 2026, controllo della logica): un
+// acquisto ripetuto con la stessa chiave (doppio clic, ripetizione dopo un
+// timeout, due schede) restituisce la risposta della prima volta invece di
+// creare una seconda prenotazione. La chiave la genera il sito a ogni
+// tentativo; si scrive nella stessa transazione dell'acquisto, quindi una
+// richiesta fallita non la lascia occupata. Le righe vecchie si cancellano
+// ogni giorno (shared/idempotenza.ts).
+export const richiesteIdempotenti = pgTable('richieste_idempotenti', {
+  ambito: text('ambito').notNull(),
+  chiave: text('chiave').notNull(),
+  risposta: jsonb('risposta'),
+  creataIl: timestamp('creata_il').notNull().defaultNow(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.ambito, t.chiave] }),
 }));
 
 // Gli eventi in vendita su una White Label (proprietario, settembre 2026):

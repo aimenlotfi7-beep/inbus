@@ -44,14 +44,25 @@ export async function utenteAttivoPerEmail(email: string) {
 }
 
 export const clienteAuthService = {
-  /** Registrazione — se l'email esiste già ma senza password (un
-   *  cliente "vecchio", da prima che servisse un account), la fa
-   *  diventare un account vero invece di rifiutarla: altrimenti chi ha
-   *  già prenotato in passato resterebbe bloccato fuori per sempre. */
+  /** Registrazione. Se l'email esiste già ma senza password (un cliente che
+   *  ha comprato come ospite) non si rifiuta, altrimenti resterebbe fuori
+   *  per sempre: gli si manda il link per scegliere la password.
+   *
+   *  Controllo della logica (settembre 2026): prima la password scritta nel
+   *  modulo si salvava subito su quell'account, e chiunque conoscesse
+   *  l'email di un cliente ospite poteva registrarsi al posto suo — se il
+   *  cliente apriva l'email di conferma, l'account restava con la password
+   *  dell'altro (e nome e data di nascita venivano sovrascritti). Ora la
+   *  password la sceglie solo chi legge quella casella di posta, e i dati
+   *  dell'account non si toccano. */
   async registrati(input: { email: string; password: string; nome: string; cognome: string; telefono?: string; citta?: string; dataNascita: Date; codiceReferral?: string }) {
     const email = input.email.toLowerCase();
     const esistente = await utenteAttivoPerEmail(email);
     if (esistente?.passwordHash) throw new ConflittoDati('Esiste già un account con questa email — prova ad accedere, o recupera la password.');
+    if (esistente) {
+      await this.invitaAImpostarePassword(esistente.id);
+      return;
+    }
 
     // "Invita un amico" — solo se questo utente non ha GIÀ un invitante
     // (un utente "fantasma" creato da una prenotazione precedente come
@@ -61,7 +72,7 @@ export const clienteAuthService = {
     // sbagliato/inesistente non blocca la registrazione — si ignora e
     // basta, non è un errore da mostrare a chi si registra.
     let invitanteId: string | null = null;
-    if (input.codiceReferral && !esistente?.invitatoDaUtenteId) {
+    if (input.codiceReferral) {
       const [invitante] = await db.select({ id: utenti.id }).from(utenti).where(eq(utenti.codiceReferral, input.codiceReferral.toUpperCase())).limit(1);
       if (invitante) invitanteId = invitante.id;
     }
@@ -70,22 +81,19 @@ export const clienteAuthService = {
     const token = generaToken();
     const scadenza = new Date(Date.now() + ORE_VALIDITA_TOKEN_VERIFICA * 60 * 60 * 1000);
 
-    if (esistente) {
-      await db.update(utenti).set({
-        passwordHash, nome: input.nome, cognome: input.cognome,
-        telefono: input.telefono ?? esistente.telefono,
-        citta: input.citta ?? esistente.citta,
-        dataNascita: input.dataNascita,
-        emailVerificata: false, tokenVerificaEmail: token, tokenVerificaScadenza: scadenza,
-        ...(invitanteId && { invitatoDaUtenteId: invitanteId }),
-      }).where(eq(utenti.id, esistente.id));
-    } else {
+    try {
       await db.insert(utenti).values({
         email, passwordHash, nome: input.nome, cognome: input.cognome, telefono: input.telefono, citta: input.citta,
         dataNascita: input.dataNascita,
         tokenVerificaEmail: token, tokenVerificaScadenza: scadenza,
         invitatoDaUtenteId: invitanteId,
       });
+    } catch (err) {
+      // Due registrazioni insieme con la stessa email: la seconda trova l'email presa.
+      if (err && typeof err === 'object' && 'code' in err && err.code === '23505') {
+        throw new ConflittoDati('Esiste già un account con questa email — prova ad accedere, o recupera la password.');
+      }
+      throw err;
     }
 
     // Il bonus dell'amico invitato arriva quando conferma l'email
@@ -177,10 +185,13 @@ export const clienteAuthService = {
       throw new ConflittoDati('Questa email ha già un account — accedi per continuare con questo acquisto.');
     }
     if (esistente) {
+      // Solo i dati che mancano: chi conosce l'email di un altro cliente
+      // ospite non deve potergli cambiare nome o data di nascita (quella
+      // decide l'ordine sui bus) con un acquisto, magari fatto fallire apposta.
       await db.update(utenti).set({
-        nome: input.nome, cognome: input.cognome,
-        telefono: input.telefono || esistente.telefono, citta: input.citta || esistente.citta,
-        dataNascita: input.dataNascita,
+        nome: esistente.nome || input.nome, cognome: esistente.cognome || input.cognome,
+        telefono: esistente.telefono || input.telefono || null, citta: esistente.citta || input.citta || null,
+        dataNascita: esistente.dataNascita ?? input.dataNascita,
       }).where(eq(utenti.id, esistente.id));
       return { utenteId: esistente.id, nuovo: false };
     }
@@ -241,7 +252,12 @@ export const clienteAuthService = {
    *  fa scoprire quali email sono già registrate). */
   async richiediResetPassword(email: string) {
     const [u] = await db.select().from(utenti).where(eq(utenti.email, email.toLowerCase())).limit(1);
-    if (!u || !u.passwordHash) return;
+    if (!u || u.eliminatoIl) return;
+    // Cliente che ha comprato come ospite: riceve il link per sceglierla la prima volta.
+    if (!u.passwordHash) {
+      await this.invitaAImpostarePassword(u.id);
+      return;
+    }
 
     const token = generaToken();
     const scadenza = new Date(Date.now() + ORE_VALIDITA_TOKEN_VERIFICA * 60 * 60 * 1000);

@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { amministratori, eventi, eventoResponsabile, ruoli } from '../../db/schema.js';
@@ -138,8 +138,21 @@ collaboratoriRouter.put('/evento/:eventoId', richiedePermesso('collaboratori.ges
     compensoTipo: req.body.compensoTipo,
     compensoValore: req.body.compensoValore.toFixed(2),
   };
+  // Il segno "pagato" si toglie solo se cambia davvero qualcosa (persona,
+  // tipo o cifra): prima anche un salvataggio uguale, o un doppio clic, lo
+  // toglieva, e il compenso risultava da pagare una seconda volta.
+  const cambiato = sql`(${eventoResponsabile.amministratoreId} IS DISTINCT FROM excluded.amministratore_id
+    OR ${eventoResponsabile.compensoTipo} IS DISTINCT FROM excluded.compenso_tipo
+    OR ${eventoResponsabile.compensoValore} IS DISTINCT FROM excluded.compenso_valore)`;
   await db.insert(eventoResponsabile).values({ eventoId, ...valori })
-    .onConflictDoUpdate({ target: eventoResponsabile.eventoId, set: { ...valori, pagatoIl: null, importoPagato: null } });
+    .onConflictDoUpdate({
+      target: eventoResponsabile.eventoId,
+      set: {
+        ...valori,
+        pagatoIl: sql`CASE WHEN ${cambiato} THEN NULL ELSE ${eventoResponsabile.pagatoIl} END`,
+        importoPagato: sql`CASE WHEN ${cambiato} THEN NULL ELSE ${eventoResponsabile.importoPagato} END`,
+      },
+    });
   const [voce] = await conCompenso(await leggiAssegnazioni({ eventoId }));
   res.json(voce);
 }));

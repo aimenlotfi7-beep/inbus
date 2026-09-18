@@ -4,6 +4,7 @@ import { lineeDaConfermareService } from '../modules/eventi/linee-da-confermare.
 import { creditoService } from '../modules/credito/credito.service.js';
 import { disattivaFermateSottoSoglia } from '../modules/variazioni/variazioni.service.js';
 import { invioAutomaticoService } from '../modules/preventivi/invio-automatico.service.js';
+import { pulisciRichiesteVecchie } from './idempotenza.js';
 
 const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
 const UN_ORA_MS = 60 * 60 * 1000;
@@ -17,7 +18,7 @@ const UN_ORA_MS = 60 * 60 * 1000;
  *  peggiore dei casi un promemoria/credito arriva con qualche ora di
  *  ritardo, mai perso). */
 export function avviaSchedulerPromemoriaSaldo() {
-  async function esegui() {
+  const esegui = unGiroAllaVolta(async () => {
     try {
       const { inviate } = await prenotazioniService.inviaPromemoriaSaldo();
       if (inviate > 0) console.log(`Promemoria saldo inviati: ${inviate}.`);
@@ -30,7 +31,13 @@ export function avviaSchedulerPromemoriaSaldo() {
     } catch (err) {
       console.error('Errore durante la maturazione del credito fedeltà:', err);
     }
-  }
+    try {
+      const tolte = await pulisciRichiesteVecchie();
+      if (tolte > 0) console.log(`Chiavi delle richieste già eseguite tolte (più vecchie di una settimana): ${tolte}.`);
+    } catch (err) {
+      console.error('Errore durante la pulizia delle chiavi delle richieste:', err);
+    }
+  });
 
   esegui(); // controllo subito all'avvio, poi ogni 24 ore
   setInterval(esegui, UN_GIORNO_MS);
@@ -45,7 +52,7 @@ export function avviaSchedulerPromemoriaSaldo() {
  *  smistamento partono anche subito dopo prenotazioni e modifiche ai bus:
  *  questo giro è la rete di sicurezza (es. soglia di pareggio cambiata). */
 export function avviaSchedulerRiordinoEta() {
-  async function esegui() {
+  const esegui = unGiroAllaVolta(async () => {
     // Prima le soglie (una fermata che non ce l'ha fatta va disattivata
     // e comunicata PRIMA dello smistamento — altrimenti si rischierebbe
     // di assegnare posti su una fermata che sta per sparire).
@@ -77,8 +84,24 @@ export function avviaSchedulerRiordinoEta() {
     } catch (err) {
       console.error('Errore durante lo smistamento sui bus:', err);
     }
-  }
+  });
 
   esegui();
   setInterval(esegui, UN_ORA_MS);
+}
+
+/** Un giro alla volta: se il precedente è ancora in corso (database lento,
+ *  tanti invii) quello nuovo salta, invece di partire insieme e mandare
+ *  due volte le stesse email. */
+function unGiroAllaVolta(giro: () => Promise<void>) {
+  let inCorso = false;
+  return async () => {
+    if (inCorso) return;
+    inCorso = true;
+    try {
+      await giro();
+    } finally {
+      inCorso = false;
+    }
+  };
 }

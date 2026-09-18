@@ -2,12 +2,21 @@ import { eq, desc, and, or, isNull, gt, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { offerteEvento, eventi } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
-import { inizioOggiRoma } from '../../shared/formato.js';
+import { fineGiornoRoma, inizioGiornoRoma, inizioOggiRoma } from '../../shared/formato.js';
 import { eventoPerIlSito, includeCompleto } from '../eventi/eventi.service.js';
 import type { CreaOffertaInput, aggiornaOffertaSchema } from './offerte.dto.js';
 import type { z } from 'zod';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Come i coupon: giorni interi, ora di Roma ("valida fino al 30/09" vale
+ *  tutto il 30). Prima il confronto era con la mezzanotte UTC e l'offerta
+ *  scadeva alle 2 di notte dell'ultimo giorno. */
+function controllaDate(o: { validoDal: Date | null; validoAl: Date | null }) {
+  const adesso = new Date();
+  if (o.validoDal && adesso < inizioGiornoRoma(o.validoDal)) throw new ConflittoDati('Questa offerta non è ancora disponibile.');
+  if (o.validoAl && adesso >= fineGiornoRoma(o.validoAl)) throw new ConflittoDati('Questa offerta è scaduta.');
+}
 
 export const offerteService = {
   async listByEvento(eventoId: string) {
@@ -65,9 +74,7 @@ export const offerteService = {
     const [o] = await db.select().from(offerteEvento).where(eq(offerteEvento.slug, slug)).limit(1);
     if (!o) throw new NonTrovato('Offerta');
     if (!o.attiva) throw new ConflittoDati('Questa offerta non è più attiva.');
-    const adesso = new Date();
-    if (o.validoDal && adesso < o.validoDal) throw new ConflittoDati('Questa offerta non è ancora disponibile.');
-    if (o.validoAl && adesso > o.validoAl) throw new ConflittoDati('Questa offerta è scaduta.');
+    controllaDate(o);
     if (o.limiteUtilizzi !== null && o.utilizzi >= o.limiteUtilizzi) throw new ConflittoDati('Questa offerta è esaurita.');
 
     // Query "nuda" prima (senza immagini/tratte/fermate) — la pagina
@@ -99,9 +106,7 @@ export const offerteService = {
     if (!o) throw new NonTrovato('Offerta');
     if (o.eventoId !== eventoId) throw new ConflittoDati('Questa offerta non è valida per questo evento.');
     if (!o.attiva) throw new ConflittoDati('Questa offerta non è più attiva.');
-    const adesso = new Date();
-    if (o.validoDal && adesso < o.validoDal) throw new ConflittoDati('Questa offerta non è ancora disponibile.');
-    if (o.validoAl && adesso > o.validoAl) throw new ConflittoDati('Questa offerta è scaduta.');
+    controllaDate(o);
 
     const [aggiornata] = await tx.update(offerteEvento)
       .set({ utilizzi: sql`${offerteEvento.utilizzi} + 1` })

@@ -34,6 +34,7 @@ export async function inviaEventoMetaSeConfigurato(
 }
 
 import { verificaComposizione, ripartisciSconto } from '../bundle/bundle-regole.js';
+import { unaVolta } from '../../shared/idempotenza.js';
 import { couponService, scontoCoupon } from '../coupon/coupon.service.js';
 import { formattaData, formattaEuro, inizioOggiRoma } from '../../shared/formato.js';
 import { segnalaEmailNonPartita } from '../../shared/registroEmail.js';
@@ -507,12 +508,16 @@ export const prenotazioniService = {
    * (il rischio concreto che c'era nel prototipo basato su localStorage).
    */
   async crea(input: CreaPrenotazioneInput, utenteId: string, canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }, richiesta?: { ip?: string; userAgent?: string }) {
-    const risultato = await db.transaction(async (tx) => {
+    // Con la chiave della richiesta la stessa prenotazione arrivata due
+    // volte (doppio clic, ripetizione) si crea una volta sola: la seconda
+    // riceve la risposta della prima, senza email né altro.
+    const { risultato, ripetuta } = await db.transaction((tx) => unaVolta(tx, `prenotazione:${utenteId}`, input.chiaveRichiesta, async () => {
       const couponOrdine = await prenotaCouponOrdine(tx, [input], await emailUtente(tx, utenteId));
       const riga = await creaRigaInterna(tx, input, utenteId, canaleVendita, undefined, couponOrdine);
       verificaCouponUsato(couponOrdine);
       return riga;
-    });
+    }));
+    if (ripetuta) return { ...risultato, emailConfermaInviata: true };
     const emailConfermaInviata = await inviaConfermaPrenotazione(risultato);
     // Meta Conversions API — best-effort, dopo che la prenotazione è già
     // confermata: un problema con l'API di Meta non deve mai bloccare o
@@ -536,7 +541,7 @@ export const prenotazioniService = {
    *  prenotazione a metà creata. Ogni articolo resta comunque una vera
    *  prenotazione a sé, con il suo PNR, il suo biglietto, la sua email
    *  — semplicemente in più raggruppate sotto lo stesso ordine. */
-  async creaOrdine(articoli: CreaPrenotazioneInput[], utenteId: string, bundleId?: string, canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }, richiesta?: { ip?: string; userAgent?: string }) {
+  async creaOrdine(articoli: CreaPrenotazioneInput[], utenteId: string, bundleId?: string, canaleVendita?: { canale: 'WHITE_LABEL'; whiteLabelId: string }, richiesta?: { ip?: string; userAgent?: string; chiave?: string }) {
     if (articoli.length === 0) {
       throw new ErroreApplicativo('Il carrello è vuoto.', 400, 'CARRELLO_VUOTO');
     }
@@ -583,7 +588,8 @@ export const prenotazioniService = {
         : a
     )));
 
-    const { ordine, righe } = await db.transaction(async (tx) => {
+    // Stesso ordine arrivato due volte con la stessa chiave: una volta sola.
+    const { risultato: creato, ripetuta } = await db.transaction((tx) => unaVolta(tx, `ordine:${utenteId}`, richiesta?.chiave, async () => {
       const couponOrdine = await prenotaCouponOrdine(tx, articoli, await emailUtente(tx, utenteId));
       const righeCreate = [];
       for (const [i, articolo] of articoli.entries()) {
@@ -598,7 +604,9 @@ export const prenotazioniService = {
       }).returning();
       await tx.update(prenotazioni).set({ ordineId: nuovoOrdine.id }).where(inArray(prenotazioni.id, righeCreate.map((r) => r.id)));
       return { ordine: nuovoOrdine, righe: righeCreate };
-    });
+    }));
+    const { ordine, righe } = creato;
+    if (ripetuta) return { ordine, prenotazioni: righe.map((r) => ({ ...r, ordineId: ordine.id })), emailConfermaNonInviate: 0 };
 
     // Fuori dalla transazione, come per la prenotazione singola — un
     // biglietto/email per ciascun articolo dell'ordine.

@@ -21,6 +21,7 @@ import { tracciaInizioPrenotazione, leggiCookieMeta, nuovoEventIdMeta } from '..
 import { tracciaInizioCheckoutGA4 } from '../googleAnalytics';
 import { tracciaAcquistoRegistrato, valoreAcquisto } from '../tracciaAcquisto';
 import { formattaEuro, plurale } from '../../shared/formato';
+import { creaChiaviRichiesta } from '../../shared/chiaveRichiesta';
 import { MESSAGGIO_CONNESSIONE, testoErrore } from '../../shared/errori';
 import { comportamentoScorrimento } from '../../shared/movimento';
 import { Icona } from '../Icone';
@@ -78,6 +79,10 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaWh
   // Quale pulsante specifico è stato premuto — 'invio' da solo non basta,
   // altrimenti "Conferma" e "Conferma con acconto" si accenderebbero insieme.
   const [azioneInCorso, setAzioneInCorso] = useState<'acquista' | 'prenota' | 'lista-attesa' | null>(null);
+  // Doppio clic e richieste ripetute: un invio alla volta, e la stessa
+  // chiave per gli stessi dati (il server crea una prenotazione sola).
+  const invioInCorso = useRef(false);
+  const [chiaviRichiesta] = useState(creaChiaviRichiesta);
   // Se l'evento ha più di un servizio, prima bisogna sceglierne uno: un
   // passo in più, davanti agli altri. Con zero o un servizio si va dritti.
   const multiServizio = evento.servizi.length >= 2;
@@ -440,6 +445,11 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaWh
 
   async function confermaPrenotazione(tipoPagamento: 'COMPLETO' | 'ACCONTO') {
     if (!opzioneScelta) return;
+    // Un doppio clic prima che il pulsante si disattivi non parte due volte;
+    // e se ripartisse, la chiave della richiesta fa sì che il server crei
+    // una prenotazione sola.
+    if (invioInCorso.current) return;
+    invioInCorso.current = true;
     setStato('invio');
     setAzioneInCorso(tipoPagamento === 'COMPLETO' ? 'acquista' : 'prenota');
     setMessaggioErrore('');
@@ -471,11 +481,15 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaWh
         ...(fbp && { metaFbp: fbp }),
         ...(fbc && { metaFbc: fbc }),
       };
+      // La chiave dipende dai dati dell'acquisto, non dall'id per Meta che cambia a ogni clic.
+      const { metaEventId: _idMeta, metaFbp: _fbp, metaFbc: _fbc, ...datiAcquisto } = payloadPrenotazione;
+      const conChiave = { ...payloadPrenotazione, chiaveRichiesta: chiaviRichiesta.per(datiAcquisto) };
       // Dentro il widget White Label la prenotazione passa da un endpoint
       // diverso (stessa logica lato server, più l'attribuzione del canale).
       const prenotazione = publicWidgetId
-        ? await whiteLabelApi.prenota(publicWidgetId, payloadPrenotazione)
-        : await prenotazioniApi.crea(payloadPrenotazione);
+        ? await whiteLabelApi.prenota(publicWidgetId, conChiave)
+        : await prenotazioniApi.crea(conChiave);
+      chiaviRichiesta.dimentica();
       setPnrConfermato(prenotazione.pnr);
       tracciaAcquistoRegistrato({ valore: valoreAcquisto([prenotazione]), codice: prenotazione.pnr, eventIdMeta: metaEventId, nome: evento.artista });
       setStato('confermato');
@@ -483,6 +497,8 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaWh
       setMessaggioErrore(testoErrore(e));
       setStato('errore');
       setAzioneInCorso(null);
+    } finally {
+      invioInCorso.current = false;
     }
   }
 

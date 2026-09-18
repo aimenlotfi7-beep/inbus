@@ -1,4 +1,4 @@
-import { eq, and, desc, lt, inArray } from 'drizzle-orm';
+import { eq, and, desc, lt, inArray, sql } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { db } from '../../db/client.js';
 import { listaAttesa, eventi, fermate, tragitti, utenti } from '../../db/schema.js';
@@ -14,18 +14,29 @@ export const listaAttesaService = {
     // "Ferma vendite": niente prenotazioni, e nemmeno la lista d'attesa.
     if (evento.venditeFermate) throw new ConflittoDati('Le prenotazioni per questo evento sono chiuse.');
 
-    const [riga] = await db.insert(listaAttesa).values({
-      eventoId: input.eventoId,
-      nome: input.cliente.nome,
-      cognome: input.cliente.cognome,
-      email: input.cliente.email.toLowerCase(),
-      telefono: input.cliente.telefono,
-      passeggeri: input.passeggeri,
-      tragittoId: input.tragittoId,
-      fermataId: input.fermataId,
-      partecipantiJson: JSON.stringify(input.partecipanti),
-    }).returning();
-    return riga;
+    const email = input.cliente.email.toLowerCase();
+    return db.transaction(async (tx) => {
+      // Una iscrizione in attesa per email ed evento: un doppio clic o un
+      // invio ripetuto restituisce quella che c'è già invece di mettere la
+      // stessa persona due volte in coda. Il blocco fa passare una
+      // richiesta alla volta per la stessa coppia email-evento.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`lista-attesa:${input.eventoId}:${email}`}))`);
+      const [giaIscritta] = await tx.select().from(listaAttesa)
+        .where(and(eq(listaAttesa.eventoId, input.eventoId), eq(listaAttesa.email, email), eq(listaAttesa.stato, 'IN_ATTESA'))).limit(1);
+      if (giaIscritta) return giaIscritta;
+      const [riga] = await tx.insert(listaAttesa).values({
+        eventoId: input.eventoId,
+        nome: input.cliente.nome,
+        cognome: input.cliente.cognome,
+        email,
+        telefono: input.cliente.telefono,
+        passeggeri: input.passeggeri,
+        tragittoId: input.tragittoId,
+        fermataId: input.fermataId,
+        partecipantiJson: JSON.stringify(input.partecipanti),
+      }).returning();
+      return riga;
+    });
   },
 
   /** Elenco iscrizioni alla lista d'attesa per un evento, con il nome

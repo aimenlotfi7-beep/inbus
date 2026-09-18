@@ -18,7 +18,9 @@ async function getById(id: string) {
 /** Lo sconto di un coupon su un importo: percentuale, oppure l'importo
  *  fisso senza mai superare l'importo. */
 export function scontoCoupon(c: { tipo: 'PERCENTUALE' | 'FISSO'; valore: string }, importo: number): number {
-  return c.tipo === 'PERCENTUALE' ? importo * (Number(c.valore) / 100) : Math.min(Number(c.valore), importo);
+  const sconto = c.tipo === 'PERCENTUALE' ? importo * (Number(c.valore) / 100) : Number(c.valore);
+  // Mai più dell'importo né sotto zero, qualunque valore sia salvato.
+  return Math.max(0, Math.min(sconto, importo));
 }
 
 /** Il coupon con questo codice se oggi è usabile da questo cliente: attivo,
@@ -63,7 +65,11 @@ export const couponService = {
   },
 
   async update(id: string, input: z.infer<typeof aggiornaCouponSchema>) {
-    await getById(id);
+    const attuale = await getById(id);
+    // Con i valori uniti (il gestionale può mandare solo il valore o solo il tipo).
+    const tipo = input.tipo ?? attuale.tipo;
+    const valore = input.valore ?? Number(attuale.valore);
+    if (tipo === 'PERCENTUALE' && valore > 100) throw new ErroreApplicativo('Lo sconto in percentuale non può superare il 100%.', 400, 'COUPON_NON_VALIDO');
     const [aggiornato] = await db.update(coupon).set({
       ...(input.codice !== undefined && { codice: input.codice }),
       ...(input.tipo !== undefined && { tipo: input.tipo }),

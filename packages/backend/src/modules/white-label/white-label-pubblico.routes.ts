@@ -73,7 +73,7 @@ whiteLabelPubblicoRouter.post(
     const wl = await whiteLabelService.getPubblicaConIdInterno(req.params.publicWidgetId);
     if (!wl.attiva) throw new WhiteLabelDisattivata();
     if (!wl.bundleId) throw new ErroreApplicativo('Questo widget non vende un bundle.', 400, 'WIDGET_NON_BUNDLE');
-    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente!.sub, wl.bundleId, { canale: 'WHITE_LABEL', whiteLabelId: wl.id }, { ip: req.ip, userAgent: req.headers['user-agent'] });
+    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente!.sub, wl.bundleId, { canale: 'WHITE_LABEL', whiteLabelId: wl.id }, { ip: req.ip, userAgent: req.headers['user-agent'], chiave: req.body.chiaveRichiesta });
     for (const riga of risultato.prenotazioni) {
       const { percentuale, importo } = await commissioniService.calcolaSnapshot(wl.organizzatoreId, riga.totaleComplessivo);
       await db.update(prenotazioni).set({ commissionePercentualeSnapshot: String(percentuale), commissioneImportoSnapshot: String(importo) }).where(eq(prenotazioni.id, riga.id));

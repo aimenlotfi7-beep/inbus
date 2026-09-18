@@ -30,7 +30,7 @@ export const prenotazioniController = {
    *  server lo ricalcola sempre da zero sommando ogni articolo. */
   async creaOrdine(req: Request, res: Response) {
     if (!req.cliente) throw new NonAutorizzato();
-    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente.sub, req.body.bundleId, undefined, { ip: req.ip, userAgent: req.headers['user-agent'] });
+    const risultato = await prenotazioniService.creaOrdine(req.body.articoli, req.cliente.sub, req.body.bundleId, undefined, { ip: req.ip, userAgent: req.headers['user-agent'], chiave: req.body.chiaveRichiesta });
     res.status(201).json(risultato);
   },
   /** D1(b) — stesso ordine di creaOrdine sopra, ma per chi acquista
@@ -44,10 +44,10 @@ export const prenotazioniController = {
    *  a buon fine, per questo è isolato nel proprio try/catch. */
   async creaOrdineOspite(req: Request, res: Response) {
     const { clienteAuthService } = await import('../cliente-auth/cliente-auth.service.js');
-    const { email, nome, cognome, telefono, citta, dataNascita, articoli, bundleId } = req.body;
+    const { email, nome, cognome, telefono, citta, dataNascita, articoli, bundleId, chiaveRichiesta } = req.body;
     const { utenteId, nuovo } = await clienteAuthService.trovaOCreaUtenteOspite({ email, nome, cognome, telefono, citta, dataNascita });
 
-    const risultato = await prenotazioniService.creaOrdine(articoli, utenteId, bundleId, undefined, { ip: req.ip, userAgent: req.headers['user-agent'] });
+    const risultato = await prenotazioniService.creaOrdine(articoli, utenteId, bundleId, undefined, { ip: req.ip, userAgent: req.headers['user-agent'], chiave: chiaveRichiesta });
 
     // Solo per un account nuovo: un'email a parte con il link per la password.
     let invitoPasswordInviato = false;

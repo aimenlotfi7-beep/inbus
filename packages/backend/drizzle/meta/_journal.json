@@ -666,6 +666,13 @@
       "when": 1789768230170,
       "tag": "0094_white_label_eventi",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1789770902783,
+      "tag": "0095_richieste_idempotenti_e_vincoli",
+      "breakpoints": true
     }
   ]
 }

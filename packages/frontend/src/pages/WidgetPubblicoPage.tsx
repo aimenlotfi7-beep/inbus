@@ -14,6 +14,7 @@ import { inizializzaMetaPixelWidget } from '../features/metaPixel';
 import { inizializzaGA4Widget, tracciaPaginaGA4 } from '../features/googleAnalytics';
 import { tracciaAcquistoRegistrato, valoreAcquisto } from '../features/tracciaAcquisto';
 import { ConsensoWidget } from '../features/white-label/ConsensoWidget';
+import { creaChiaviRichiesta } from '../shared/chiaveRichiesta';
 
 type Vista = 'caricamento' | 'errore' | 'elenco' | 'vetrina' | 'auth' | 'login' | 'registrati' | 'registrati-fatto' | 'checkout' | 'bundle';
 
@@ -33,6 +34,7 @@ export function WidgetPubblicoPage() {
   // L'evento che si sta prenotando: l'unico, quello del link o quello scelto tra le card.
   const [scelto, setScelto] = useState<CardEvento | null>(null);
   const [eventoCompleto, setEventoCompleto] = useState<Evento | null>(null);
+  const [chiaviRichiesta] = useState(creaChiaviRichiesta);
 
   useFinestraIncorporata(incorporato, vista);
 
@@ -136,11 +138,14 @@ export function WidgetPubblicoPage() {
               mostraSceltaAcconto
               testoConferma="Conferma l'acquisto"
               onConferma={async ({ righe, passeggeri, cliente, partecipanti, tipoPagamento }) => {
-                const risultato = await whiteLabelApi.ordineBundle(publicWidgetId, righe.map(({ evento, opzione }) => ({
+                const articoli = righe.map(({ evento, opzione }) => ({
                   eventoId: evento.id, tragittoId: opzione.tragittoId, fermataId: opzione.fermataId, passeggeri,
                   // Nessun pagamento online reale ancora: non registrare "Carta".
                   tipoPagamento, metodoPagamento: 'DA_CONCORDARE', cliente, partecipanti,
-                })));
+                }));
+                // Stessi dati = stessa chiave: un ordine ripetuto si crea una volta sola.
+                const risultato = await whiteLabelApi.ordineBundle(publicWidgetId, articoli, chiaviRichiesta.per(articoli));
+                chiaviRichiesta.dimentica();
                 // Stesso tracciamento del carrello del sito (prima il bundle del widget non ne mandava nessuno).
                 tracciaAcquistoRegistrato({ valore: valoreAcquisto(risultato.prenotazioni), codice: risultato.ordine?.id ?? risultato.prenotazioni[0]?.pnr ?? '', nome: b.nome });
                 return { pnr: risultato.prenotazioni.map((p) => p.pnr) };

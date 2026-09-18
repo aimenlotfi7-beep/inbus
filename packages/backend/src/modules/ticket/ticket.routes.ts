@@ -3,12 +3,15 @@ import { z } from 'zod';
 import { ticketService } from './ticket.service.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
+import { limitePnr } from '../../shared/rateLimit.js';
 
 export const ticketRouter = Router();
 
-/** Elenco biglietti di una prenotazione — solo quelli davvero emessi. */
+/** Elenco biglietti di una prenotazione — solo quelli davvero emessi. Con il
+ *  limite dei PNR: senza, si potevano provare coppie PNR-email a raffica. */
 ticketRouter.get(
   '/:pnr/lista',
+  limitePnr,
   valida(z.object({ email: z.string().email() }), 'query'),
   asyncHandler(async (req: Request, res: Response) => {
     res.json(await ticketService.bigliettiPerCliente(req.params.pnr, String(req.query.email)));

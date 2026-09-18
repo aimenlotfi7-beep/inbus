@@ -351,6 +351,7 @@ export async function disattivaFermateSottoSoglia() {
     indirizzo: fermate.indirizzo,
     orario: fermate.orario,
     sogliaMinima: fermate.sogliaMinima,
+    spentaPerSogliaIl: fermate.spentaPerSogliaIl,
   }).from(fermate)
     .innerJoin(tragitti, eq(tragitti.id, fermate.tragittoId))
     .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
@@ -394,7 +395,9 @@ export async function disattivaFermateSottoSoglia() {
 
       // Già spenta per soglia in questa finestra e poi riattivata a mano
       // dal gestionale: è una scelta, non la si rispegne ogni ora con
-      // nuove email.
+      // nuove email. Il segno sulla fermata vale anche senza prenotati (lì
+      // non nasce nessuna variazione, e prima la fermata si rispegneva).
+      if (f.spentaPerSogliaIl && f.spentaPerSogliaIl >= tempi.disponibileDal) continue;
       const [giaGestita] = await db.select({ id: variazioni.id }).from(variazioni)
         .where(and(
           eq(variazioni.tragittoId, f.tragittoId), eq(variazioni.fermataDescrizione, f.citta),
@@ -409,7 +412,7 @@ export async function disattivaFermateSottoSoglia() {
       const partecipantiAttuali = Number(conteggio?.tot ?? 0);
       if (partecipantiAttuali >= soglia) continue; // soglia raggiunta, nessuna azione
 
-      await db.update(fermate).set({ attivo: false }).where(eq(fermate.id, f.fermataId));
+      await db.update(fermate).set({ attivo: false, spentaPerSogliaIl: adesso }).where(eq(fermate.id, f.fermataId));
       disattivate++;
       // Non lancia mai, e un cliente non raggiunto non ferma gli altri.
       const esito = await generaComunicazioniVariazione(f.tragittoId, [{

@@ -4,12 +4,15 @@ import { richiesteRimborsoService } from './richieste-rimborso.service.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
+import { limitePnr } from '../../shared/rateLimit.js';
 
 export const richiesteRimborsoRouter = Router();
 
-/** Pubblica: è il cliente stesso a inviarla, dalla sua area personale. */
+/** Pubblica: è il cliente stesso a inviarla, dalla sua area personale. Con
+ *  il limite dei PNR (dice se PNR ed email combaciano: niente tentativi a raffica). */
 richiesteRimborsoRouter.post(
   '/',
+  limitePnr,
   valida(z.object({ pnr: z.string().min(1), email: z.string().email(), motivo: z.string().optional() })),
   asyncHandler(async (req: Request, res: Response) => {
     const nuova = await richiesteRimborsoService.richiedi(req.body.pnr, req.body.email, req.body.motivo);

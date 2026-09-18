@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, isNull, sql, gte, lt, asc, ne } from 'drizzle-orm';
+import { and, eq, ilike, inArray, isNull, notInArray, sql, gte, lt, asc, ne } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
   eventi,
@@ -23,6 +23,7 @@ import crypto from 'node:crypto';
 import { NonTrovato, ConflittoDati, ErroreApplicativo } from '../../shared/errors.js';
 import { busNonTrovato, generaPdfPasseggeriBus, leggiSchedaBus, passeggeriDelBus, type PasseggeroBus } from './passeggeri-bus.service.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
+import { confrontaPerEta, etaPrenotazione } from '../prenotazioni/riempimento-bus.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema } from './eventi.dto.js';
@@ -379,6 +380,36 @@ type AzioneSuiBus = 'rimuovi_bus' | 'elimina_linea';
 
 function testoPostiVenduti(n: number) {
   return n === 1 ? "c'è già 1 posto venduto" : `ci sono già ${n} posti venduti`;
+}
+
+/** Posti di un bus abbassati sotto i passeggeri già assegnati (controllo
+ *  della logica, settembre 2026: prima 50 passeggeri restavano su un bus da
+ *  30). Scendono i gruppi in più dal fondo dell'ordine di riempimento (i più
+ *  giovani, poi chi ha prenotato dopo), mai divisi; lo smistamento, che
+ *  parte subito dopo, li mette su un altro bus o li lascia senza posto
+ *  (rosso in Partenze). Quanti gruppi ha tolto. */
+async function liberaPostiOltreCapienza(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], busId: string, postiBus: number): Promise<number> {
+  const assegnate = await tx.select({
+    id: prenotazioni.id, passeggeri: prenotazioni.passeggeri, creataIl: prenotazioni.creataIl, fermataCitta: prenotazioni.fermataCitta,
+    dataNascita: utenti.dataNascita, eventoData: eventi.data,
+  }).from(prenotazioni)
+    .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
+    .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
+    .where(and(eq(prenotazioni.busId, busId), eq(prenotazioni.stato, 'CONFERMATA')));
+  let occupati = assegnate.reduce((somma, p) => somma + p.passeggeri, 0);
+  if (occupati <= postiBus) return 0;
+  const dalFondo = assegnate
+    .map((p) => ({ id: p.id, fermataCitta: p.fermataCitta, passeggeri: p.passeggeri, creataIl: p.creataIl, busId, eta: etaPrenotazione([], p.dataNascita, p.eventoData) }))
+    .sort(confrontaPerEta)
+    .reverse();
+  const daTogliere: string[] = [];
+  for (const gruppo of dalFondo) {
+    if (occupati <= postiBus) break;
+    daTogliere.push(gruppo.id);
+    occupati -= gruppo.passeggeri;
+  }
+  await tx.update(prenotazioni).set({ busId: null }).where(inArray(prenotazioni.id, daTogliere));
+  return daTogliere.length;
 }
 
 async function ricalcolaPostiTragitto(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], tragittoId: string, azione?: AzioneSuiBus) {
@@ -917,17 +948,18 @@ export const eventiService = {
         for (const tragitto of input.tragitti.filter((l) => !l.servizioId)) bersagli.push({ servizioId: null, tragitto });
       }
 
+      // Servizi rimasti fuori dal form: si eliminano DOPO aver sistemato i
+      // tragitti (più sotto). Prima si eliminavano subito, e la
+      // cancellazione a cascata del database portava via anche i tragitti
+      // che il form stava solo spostando (da due servizi a uno): fermate,
+      // linee, bus e preventivi persi, o il salvataggio che falliva se
+      // c'erano prenotazioni (controllo della logica, settembre 2026).
+      const serviziDaEliminare: string[] = [];
       if (input.servizi) {
         const serviziEsistenti = await tx.select().from(servizi).where(eq(servizi.eventoId, id));
         const idsInviati = new Set(input.servizi.filter((p) => p.id).map((p) => p.id));
-
-        // Un servizio rimasto fuori dal form viene eliminato — le sue
-        // tratte, semplicemente non comparendo più tra i bersagli qui
-        // sotto, verranno trattate come eliminazione vera dal
-        // passaggio unico più avanti (stesso controllo prenotazioni).
         for (const esistente of serviziEsistenti) {
-          if (idsInviati.has(esistente.id)) continue;
-          await tx.delete(servizi).where(eq(servizi.id, esistente.id));
+          if (!idsInviati.has(esistente.id)) serviziDaEliminare.push(esistente.id);
         }
 
         for (const servizio of input.servizi) {
@@ -954,6 +986,14 @@ export const eventiService = {
       // da ogni bersaglio" e trattata per errore come eliminazione.
       if (input.tragitti || input.servizi) {
         await sincronizzaTuttiITragitti(tx, id, bersagli);
+      }
+
+      // Ora i tragitti spostati hanno già il servizio nuovo; quelli tolti
+      // (nel cestino) si staccano dal servizio, così eliminarlo non li
+      // cancella per davvero insieme alla loro storia.
+      for (const servizioId of serviziDaEliminare) {
+        await tx.update(tragitti).set({ servizioId: null }).where(eq(tragitti.servizioId, servizioId));
+        await tx.delete(servizi).where(eq(servizi.id, servizioId));
       }
     });
 
@@ -1640,6 +1680,18 @@ export const eventiService = {
     await db.transaction(async (tx) => {
       await tx.delete(lineaFermate).where(eq(lineaFermate.lineaId, lineaId));
       await tx.insert(lineaFermate).values(fermateOrdinate.map((f, ordine) => ({ lineaId, fermataId: f.id, ordine })));
+      // Chi sale a una fermata che la linea non tocca più lascia il bus:
+      // prima restava sul bus di una linea che non passa più da lui (con
+      // il biglietto di quel bus). Lo smistamento, che parte subito dopo,
+      // lo mette su un bus che passa di lì e gli manda il biglietto nuovo.
+      const busDellaLinea = (await tx.select({ id: busFisici.id }).from(busFisici).where(eq(busFisici.lineaId, lineaId))).map((b) => b.id);
+      if (busDellaLinea.length > 0) {
+        await tx.update(prenotazioni).set({ busId: null }).where(and(
+          inArray(prenotazioni.busId, busDellaLinea),
+          eq(prenotazioni.stato, 'CONFERMATA'),
+          notInArray(prenotazioni.fermataCitta, [...new Set(fermateOrdinate.map((f) => f.citta))]),
+        ));
+      }
       await ricalcolaPostiTragitto(tx, lineaEsiste.tragittoId);
     });
     // Dopo il salvataggio: chi è su una fermata esclusa rimasta senza linea viene avvisato.
@@ -1680,7 +1732,12 @@ export const eventiService = {
       }).where(eq(busFisici.id, busId));
       if (input.postiBus !== undefined && bus.lineaId) {
         const [lineaVera] = await tx.select().from(linee).where(eq(linee.id, bus.lineaId)).limit(1);
-        if (lineaVera) await ricalcolaPostiTragitto(tx, lineaVera.tragittoId);
+        if (lineaVera) {
+          // Il tragitto bloccato come nello smistamento, poi i posti in più tolti.
+          await tx.select({ id: tragitti.id }).from(tragitti).where(eq(tragitti.id, lineaVera.tragittoId)).for('update');
+          await liberaPostiOltreCapienza(tx, busId, input.postiBus);
+          await ricalcolaPostiTragitto(tx, lineaVera.tragittoId);
+        }
       }
     });
     const tourLeaderAvvisato = tourLeaderCambiato ? await avvisaTourLeader(busId) : null;

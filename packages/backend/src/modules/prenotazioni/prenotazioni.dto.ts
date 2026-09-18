@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { chiaveRichiestaSchema } from '../../shared/idempotenza.js';
 
 export const clienteCheckoutSchema = z.object({
   email: z.string().email(),
@@ -44,6 +45,9 @@ export const creaPrenotazioneSchema = z.object({
   // (che è già coperto da "cliente" qui sopra) — quindi deve essere
   // lungo esattamente passeggeri-1.
   partecipanti: z.array(partecipanteSchema).default([]),
+  // Doppio clic e ripetizioni: la stessa chiave = la stessa prenotazione
+  // (shared/idempotenza.ts). Dentro un carrello vale quella dell'ordine.
+  chiaveRichiesta: chiaveRichiestaSchema,
 }).refine(
   (v) => v.partecipanti.length === v.passeggeri - 1,
   { message: 'Il numero di partecipanti aggiuntivi deve essere passeggeri-1 (il richiedente conta come primo passeggero).', path: ['partecipanti'] }
@@ -59,6 +63,7 @@ export const creaOrdineSchema = z.object({
   // bundle (composizione, passeggeri, finestra, interruttori) vengono
   // verificate lato server in creaOrdine, e lo sconto ripartito per riga.
   bundleId: z.string().optional(),
+  chiaveRichiesta: chiaveRichiestaSchema,
 });
 
 /** D1(b) — stesso ordine di sopra, più l'identità di chi acquista SENZA
@@ -70,6 +75,7 @@ export const creaOrdineSchema = z.object({
 export const creaOrdineOspiteSchema = z.object({
   articoli: z.array(creaPrenotazioneSchema).min(1, 'Il carrello è vuoto.').max(20, 'Troppi articoli in un unico ordine.'),
   bundleId: z.string().optional(),
+  chiaveRichiesta: chiaveRichiestaSchema,
   email: z.string().email(),
   nome: z.string().min(1),
   cognome: z.string().min(1),

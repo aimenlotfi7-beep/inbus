@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCarrello, type ArticoloCarrello } from '../features/carrello/CarrelloContext';
 import { leggiCookieMeta, nuovoEventIdMeta } from '../features/metaPixel';
@@ -14,6 +14,7 @@ import { formattaDataCard, inizialiDi } from '../features/eventi/EventoCard';
 import { Icona } from '../features/Icone';
 import { formattaData, formattaEuro, plurale } from '../shared/formato';
 import { MESSAGGIO_CONNESSIONE, testoErrore } from '../shared/errori';
+import { creaChiaviRichiesta } from '../shared/chiaveRichiesta';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 /** Giorni prima della partenza entro cui va saldato il resto — stesso
@@ -53,6 +54,8 @@ export function CarrelloPage() {
   const prefisso = useId();
   const [cliente, setCliente] = useState<DatiCliente | null>(null);
   const [inviando, setInviando] = useState(false);
+  const invioInCorso = useRef(false);
+  const [chiaviRichiesta] = useState(creaChiaviRichiesta);
   const [errore, setErrore] = useState('');
   const [datiMancanti, setDatiMancanti] = useState(false);
   const [esito, setEsito] = useState<Esito | null>(null);
@@ -120,9 +123,13 @@ export function CarrelloPage() {
   }
 
   async function confermaPrenotazione() {
+    // Un doppio clic prima che il pulsante si disattivi non parte due volte;
+    // e la chiave della richiesta fa sì che il server crei un ordine solo.
+    if (invioInCorso.current) return;
     setErrore('');
     setDatiMancanti(false);
     if (!loggato && !articoli[0]?.cliente.dataNascita) { setDatiMancanti(true); return; }
+    invioInCorso.current = true;
     setInviando(true);
     // Un solo eventId per l'intero ordine: la Conversions API manda UN
     // evento Purchase con il totale, non uno per riga (e solo con il
@@ -154,9 +161,14 @@ export function CarrelloPage() {
         ...(fbc && { metaFbc: fbc }),
       };
     });
+    // La chiave dipende dai dati dell'ordine, non dagli id per Meta che cambiano a ogni clic.
+    const chiaveRichiesta = chiaviRichiesta.per({
+      loggato, bundleId: bundle?.id ?? null,
+      righe: righe.map(({ metaEventId: _idMeta, metaFbp: _fbp, metaFbc: _fbc, ...resto }) => resto),
+    });
     try {
       const risultato = loggato
-        ? await prenotazioniApi.creaOrdine(righe, bundle?.id)
+        ? await prenotazioniApi.creaOrdine(righe, bundle?.id, chiaveRichiesta)
         : await prenotazioniApi.creaOrdineOspite({
             email: articoli[0].cliente.email,
             nome: articoli[0].cliente.nome,
@@ -166,7 +178,9 @@ export function CarrelloPage() {
             dataNascita: articoli[0].cliente.dataNascita!,
             articoli: righe,
             bundleId: bundle?.id,
+            chiaveRichiesta,
           });
+      chiaviRichiesta.dimentica();
       setEsito({
         righe: risultato.prenotazioni.map((p) => ({ pnr: p.pnr, artista: articoli.find((a) => a.eventoId === p.eventoId)?.eventoArtista ?? 'Prenotazione' })),
         email: loggato ? (cliente?.email ?? articoli[0].cliente.email) : articoli[0].cliente.email,
@@ -187,6 +201,7 @@ export function CarrelloPage() {
         setErrore(testoErrore(e));
       }
     } finally {
+      invioInCorso.current = false;
       setInviando(false);
     }
   }

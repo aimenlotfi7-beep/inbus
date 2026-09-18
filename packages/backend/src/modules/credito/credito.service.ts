@@ -16,26 +16,7 @@ export const creditoService = {
   async maturaCreditoSubito(prenotazioneId: string) {
     const creditoPerPasseggero = await leggiCreditoPerPasseggero();
     if (creditoPerPasseggero <= 0) return;
-
-    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, prenotazioneId)).limit(1);
-    if (!p || p.creditoMaturato) return;
-
-    const [{ numeroPasseggeri }] = await db
-      .select({ numeroPasseggeri: sql<number>`count(*)::int` })
-      .from(partecipantiPrenotazione)
-      .where(eq(partecipantiPrenotazione.prenotazioneId, prenotazioneId));
-    const importo = (numeroPasseggeri * creditoPerPasseggero).toFixed(2);
-
-    await db.transaction(async (tx) => {
-      await tx.insert(movimentiCredito).values({
-        utenteId: p.utenteId,
-        importo,
-        motivo: `Prenotazione confermata — PNR ${p.pnr}`,
-        prenotazioneId: p.id,
-      });
-      await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} + ${importo}` }).where(eq(utenti.id, p.utenteId));
-      await tx.update(prenotazioni).set({ creditoMaturato: true }).where(eq(prenotazioni.id, p.id));
-    });
+    await maturaUnaVolta(prenotazioneId, creditoPerPasseggero, (pnr) => `Prenotazione confermata — PNR ${pnr}`);
   },
 
   /** Toglie il credito già maturato da una prenotazione, se ce n'era —
@@ -43,47 +24,50 @@ export const creditoService = {
    *  saldo del cliente sotto zero (se nel frattempo l'ha già speso
    *  altrove, si toglie solo quanto resta disponibile). */
   async revocaCreditoSePresente(prenotazioneId: string) {
-    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, prenotazioneId)).limit(1);
-    if (!p || !p.creditoMaturato) return;
-
-    const [{ importo: importoOriginale }] = await db
-      .select({ importo: sql<string>`coalesce(sum(${movimentiCredito.importo}), '0')` })
-      .from(movimentiCredito)
-      .where(and(eq(movimentiCredito.prenotazioneId, prenotazioneId), sql`${movimentiCredito.importo} > 0`));
-    const importo = Number(importoOriginale);
-    if (importo <= 0) return;
-
-    const [u] = await db.select({ credito: utenti.creditoDisponibile }).from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
-    const daTogliere = Math.min(importo, Number(u?.credito ?? 0));
-
     await db.transaction(async (tx) => {
-      if (daTogliere > 0) {
-        await tx.insert(movimentiCredito).values({
-          utenteId: p.utenteId,
-          importo: (-daTogliere).toFixed(2),
-          motivo: `Rimborso approvato — PNR ${p.pnr}`,
-          prenotazioneId: p.id,
-        });
-        await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} - ${daTogliere.toFixed(2)}` }).where(eq(utenti.id, p.utenteId));
-      }
-      await tx.update(prenotazioni).set({ creditoMaturato: false }).where(eq(prenotazioni.id, p.id));
+      // Il segno "maturato" si toglie per primo, con la condizione: due
+      // revoche insieme (doppio clic, due amministratori) ne fanno una sola.
+      const [p] = await tx.update(prenotazioni).set({ creditoMaturato: false })
+        .where(and(eq(prenotazioni.id, prenotazioneId), eq(prenotazioni.creditoMaturato, true)))
+        .returning();
+      if (!p) return;
+
+      const [{ importo: importoOriginale }] = await tx
+        .select({ importo: sql<string>`coalesce(sum(${movimentiCredito.importo}), '0')` })
+        .from(movimentiCredito)
+        .where(and(eq(movimentiCredito.prenotazioneId, prenotazioneId), sql`${movimentiCredito.importo} > 0`));
+      const importo = Number(importoOriginale);
+      if (importo <= 0) return;
+
+      // Riga del cliente bloccata: il saldo letto qui è quello che si aggiorna.
+      const [u] = await tx.select({ credito: utenti.creditoDisponibile }).from(utenti).where(eq(utenti.id, p.utenteId)).for('update').limit(1);
+      const daTogliere = Math.min(importo, Number(u?.credito ?? 0));
+      if (daTogliere <= 0) return;
+      await tx.insert(movimentiCredito).values({
+        utenteId: p.utenteId,
+        importo: (-daTogliere).toFixed(2),
+        motivo: `Rimborso approvato — PNR ${p.pnr}`,
+        prenotazioneId: p.id,
+      });
+      await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} - ${daTogliere.toFixed(2)}::numeric` }).where(eq(utenti.id, p.utenteId));
     });
   },
 
   /** Rimborso approvato: il credito che il cliente aveva usato su questa
    *  prenotazione torna disponibile. Una volta sola: il movimento di
-   *  restituzione, se c'è già, lo impedisce. */
+   *  restituzione, se c'è già, lo impedisce (con la prenotazione bloccata,
+   *  così due chiamate insieme non passano entrambe il controllo). */
   async restituisciCreditoUsato(prenotazioneId: string) {
-    const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, prenotazioneId)).limit(1);
-    const importo = p ? Number(p.creditoUsato) : 0;
-    if (!p || importo <= 0) return;
-    const motivo = `Credito restituito — rimborso PNR ${p.pnr}`;
     await db.transaction(async (tx) => {
+      const [p] = await tx.select().from(prenotazioni).where(eq(prenotazioni.id, prenotazioneId)).for('update').limit(1);
+      const importo = p ? Number(p.creditoUsato) : 0;
+      if (!p || importo <= 0) return;
+      const motivo = `Credito restituito — rimborso PNR ${p.pnr}`;
       const [giaFatto] = await tx.select({ id: movimentiCredito.id }).from(movimentiCredito)
         .where(and(eq(movimentiCredito.prenotazioneId, p.id), eq(movimentiCredito.motivo, motivo))).limit(1);
       if (giaFatto) return;
       await tx.insert(movimentiCredito).values({ utenteId: p.utenteId, importo: importo.toFixed(2), motivo, prenotazioneId: p.id });
-      await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} + ${importo.toFixed(2)}` }).where(eq(utenti.id, p.utenteId));
+      await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} + ${importo.toFixed(2)}::numeric` }).where(eq(utenti.id, p.utenteId));
     });
   },
 
@@ -111,23 +95,7 @@ export const creditoService = {
 
     let maturate = 0;
     for (const p of daMaturare) {
-      const [{ numeroPasseggeri }] = await db
-        .select({ numeroPasseggeri: sql<number>`count(*)::int` })
-        .from(partecipantiPrenotazione)
-        .where(eq(partecipantiPrenotazione.prenotazioneId, p.prenotazioneId));
-      const importo = (numeroPasseggeri * creditoPerPasseggero).toFixed(2);
-
-      await db.transaction(async (tx) => {
-        await tx.insert(movimentiCredito).values({
-          utenteId: p.utenteId,
-          importo,
-          motivo: `Viaggio completato — PNR ${p.pnr}`,
-          prenotazioneId: p.prenotazioneId,
-        });
-        await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} + ${importo}` }).where(eq(utenti.id, p.utenteId));
-        await tx.update(prenotazioni).set({ creditoMaturato: true }).where(eq(prenotazioni.id, p.prenotazioneId));
-      });
-      maturate++;
+      if (await maturaUnaVolta(p.prenotazioneId, creditoPerPasseggero, (pnr) => `Viaggio completato — PNR ${pnr}`)) maturate++;
     }
     return { maturate };
   },
@@ -145,9 +113,14 @@ export const creditoService = {
    *  buon fine (o viceversa). Non lascia mai il saldo sotto zero. */
   async usaCredito(tx: typeof db, utenteId: string, importo: number, prenotazioneId: string, pnr: string) {
     if (importo <= 0) return;
-    const [u] = await tx.select({ credito: utenti.creditoDisponibile }).from(utenti).where(eq(utenti.id, utenteId)).limit(1);
-    const disponibile = u ? Number(u.credito) : 0;
-    if (importo > disponibile) throw new ConflittoDati('Il credito disponibile è cambiato — riprova.');
+    // Controllo e sottrazione nello stesso comando: prima si leggeva il
+    // saldo e poi si toglieva, e due prenotazioni insieme dello stesso
+    // cliente spendevano due volte lo stesso credito (saldo negativo).
+    const [scalato] = await tx.update(utenti)
+      .set({ creditoDisponibile: sql`${utenti.creditoDisponibile} - ${importo.toFixed(2)}::numeric` })
+      .where(and(eq(utenti.id, utenteId), sql`${utenti.creditoDisponibile} >= ${importo.toFixed(2)}::numeric`))
+      .returning({ id: utenti.id });
+    if (!scalato) throw new ConflittoDati('Il credito disponibile è cambiato — riprova.');
 
     await tx.insert(movimentiCredito).values({
       utenteId,
@@ -155,7 +128,6 @@ export const creditoService = {
       motivo: `Usato su prenotazione — PNR ${pnr}`,
       prenotazioneId,
     });
-    await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} - ${importo.toFixed(2)}` }).where(eq(utenti.id, utenteId));
   },
 
   /** "Invita un amico" — il codice personale si genera solo la prima
@@ -223,13 +195,40 @@ export const creditoService = {
     if (importo <= 0) return;
 
     await db.transaction(async (tx) => {
+      // Il segno "bonus dato" per primo, con la condizione: due biglietti
+      // emessi insieme non danno il bonus due volte.
+      const [primo] = await tx.update(utenti).set({ bonusReferralInvitanteErogato: true })
+        .where(and(eq(utenti.id, p.utenteId), eq(utenti.bonusReferralInvitanteErogato, false)))
+        .returning({ id: utenti.id });
+      if (!primo) return;
       await tx.insert(movimentiCredito).values({
         utenteId: amico.invitatoDa!,
         importo: importo.toFixed(2),
         motivo: `Amico invitato${amico.nome ? ` (${amico.nome})` : ''} — prima prenotazione confermata`,
       });
       await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} + ${importo.toFixed(2)}` }).where(eq(utenti.id, amico.invitatoDa!));
-      await tx.update(utenti).set({ bonusReferralInvitanteErogato: true }).where(eq(utenti.id, p.utenteId));
     });
   },
 };
+
+/** Accredita il credito fedeltà di una prenotazione una volta sola: il
+ *  segno "maturato" si mette per primo, con la condizione, nella stessa
+ *  transazione. Prima si controllava e poi si scriveva: due chiamate
+ *  insieme (biglietto emesso e giro della notte, o due emissioni)
+ *  accreditavano due volte. true se ha accreditato adesso. */
+async function maturaUnaVolta(prenotazioneId: string, creditoPerPasseggero: number, motivo: (pnr: string) => string): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const [p] = await tx.update(prenotazioni).set({ creditoMaturato: true })
+      .where(and(eq(prenotazioni.id, prenotazioneId), eq(prenotazioni.creditoMaturato, false)))
+      .returning();
+    if (!p) return false;
+    const [{ numeroPasseggeri }] = await tx
+      .select({ numeroPasseggeri: sql<number>`count(*)::int` })
+      .from(partecipantiPrenotazione)
+      .where(eq(partecipantiPrenotazione.prenotazioneId, prenotazioneId));
+    const importo = (numeroPasseggeri * creditoPerPasseggero).toFixed(2);
+    await tx.insert(movimentiCredito).values({ utenteId: p.utenteId, importo, motivo: motivo(p.pnr), prenotazioneId: p.id });
+    await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} + ${importo}::numeric` }).where(eq(utenti.id, p.utenteId));
+    return true;
+  });
+}

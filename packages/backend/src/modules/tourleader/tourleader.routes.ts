@@ -53,20 +53,35 @@ async function verificaEmailLibera(email: string, messaggio: string, escludiId?:
 
 const EMAIL_GIA_USATA = 'Esiste già un tour leader con questa email.';
 
+/** Un inserimento alla volta per la stessa email (controllo della logica,
+ *  settembre 2026): un doppio invio del modulo creava due tour leader uguali,
+ *  e l'accesso alla scansione ne sceglieva uno a caso. Un blocco del
+ *  database invece di un vincolo, che fallirebbe sui doppioni già salvati. */
+async function conEmailBloccata<T>(email: string, lavoro: () => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`tour-leader:${email.toLowerCase()}`}))`);
+    return lavoro();
+  });
+}
+
 export const tourLeaderService = {
   list: async () => (await db.select().from(tourLeader)).map(senzaPassword),
   getById,
   candidati: async (input: z.infer<typeof candidaturaSchema>) => {
-    await verificaEmailLibera(input.email, 'Con questa email c\'è già una candidatura: ti ricontatteremo noi.');
-    const [nuovo] = await db.insert(tourLeader).values({ ...input, stato: 'CANDIDATO' }).returning();
+    const [nuovo] = await conEmailBloccata(input.email, async () => {
+      await verificaEmailLibera(input.email, 'Con questa email c\'è già una candidatura: ti ricontatteremo noi.');
+      return db.insert(tourLeader).values({ ...input, stato: 'CANDIDATO' }).returning();
+    });
     return senzaPassword(nuovo);
   },
   // Censimento diretto dal gestionale (non passa dal form pubblico): chi
   // lo crea decide subito lo stato, di default ATTIVO dato che è già
   // stato valutato per essere censito qui.
   creaAmministrativo: async (input: z.infer<typeof candidaturaSchema> & { stato?: 'CANDIDATO' | 'ATTIVO' | 'ARCHIVIATO' }) => {
-    await verificaEmailLibera(input.email, EMAIL_GIA_USATA);
-    const [nuovo] = await db.insert(tourLeader).values({ ...input, stato: input.stato ?? 'ATTIVO' }).returning();
+    const [nuovo] = await conEmailBloccata(input.email, async () => {
+      await verificaEmailLibera(input.email, EMAIL_GIA_USATA);
+      return db.insert(tourLeader).values({ ...input, stato: input.stato ?? 'ATTIVO' }).returning();
+    });
     return senzaPassword(nuovo);
   },
   update: async (id: string, input: z.infer<typeof aggiornaSchema>) => {

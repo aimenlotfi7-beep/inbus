@@ -200,6 +200,12 @@ describe('compenso del responsabile', () => {
     expect(pagato.corpo).toMatchObject({ importoPagato: 50 });
     expect(pagato.corpo.pagatoIl).toBeTruthy();
 
+    // Salvato di nuovo uguale (o un doppio clic): resta pagato. Cambiata la cifra: da ripagare.
+    const uguale = await chiama('PUT', `/collaboratori/evento/${altro.evento.id}`, proprietario.id, { amministratoreId: luca.id, compensoTipo: 'FISSO', compensoValore: 50 });
+    expect(uguale.corpo.pagatoIl).toBeTruthy();
+    const cambiato = await chiama('PUT', `/collaboratori/evento/${altro.evento.id}`, proprietario.id, { amministratoreId: luca.id, compensoTipo: 'FISSO', compensoValore: 60 });
+    expect(cambiato.corpo.pagatoIl).toBeNull();
+
     const elimina = await chiama('DELETE', `/amministratori/${luca.id}`, proprietario.id);
     expect(elimina.stato).toBe(409);
     expect(elimina.corpo.errore).toMatch(/responsabile di 2 eventi/);

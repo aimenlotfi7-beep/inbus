@@ -184,8 +184,8 @@ export const whiteLabelApi = {
     api.get<Evento>(`/api/public/widget/${publicWidgetId}/evento${eventoId ? `?eventoId=${encodeURIComponent(eventoId)}` : ''}`),
   opzioniPartenza: (publicWidgetId: string, eventoId?: string, servizioId?: string) =>
     api.get<OpzionePartenza[]>(`/api/public/widget/${publicWidgetId}/opzioni-partenza${eventoId ? `?eventoId=${eventoId}${servizioId ? `&servizioId=${servizioId}` : ''}` : ''}`),
-  ordineBundle: (publicWidgetId: string, articoli: Record<string, unknown>[]) =>
-    apiClienteConToken.post<{ ordine: { id: string; totale: string }; prenotazioni: { pnr: string; totale: string; totaleComplessivo?: number }[] }>(`/api/public/widget/${publicWidgetId}/ordine`, { articoli }),
+  ordineBundle: (publicWidgetId: string, articoli: Record<string, unknown>[], chiaveRichiesta?: string) =>
+    apiClienteConToken.post<{ ordine: { id: string; totale: string }; prenotazioni: { pnr: string; totale: string; totaleComplessivo?: number }[] }>(`/api/public/widget/${publicWidgetId}/ordine`, { articoli, ...(chiaveRichiesta && { chiaveRichiesta }) }),
   prenota: (publicWidgetId: string, input: Record<string, unknown>) =>
     apiClienteConToken.post<PrenotazioneCreata>(`/api/public/widget/${publicWidgetId}/prenota`, input),
   list: () => api.get<WhiteLabel[]>('/api/admin/white-label'),

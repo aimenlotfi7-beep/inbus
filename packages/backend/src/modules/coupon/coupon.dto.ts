@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const creaCouponSchema = z.object({
+const campiCoupon = z.object({
   codice: z.string().min(3).transform((v) => v.toUpperCase()),
   tipo: z.enum(['PERCENTUALE', 'FISSO']),
   valore: z.number().positive(),
@@ -26,5 +26,15 @@ export const creaCouponSchema = z.object({
   // Voucher personale — assegnato a questo cliente, mai un codice pubblico.
   utenteId: z.string().nullable().optional(),
 });
+
+/** Una percentuale oltre 100 (errore di battitura: 150%) porterebbe il
+ *  totale sotto zero. Nella modifica il tipo può non arrivare: lì il
+ *  controllo lo rifà il servizio con i valori uniti. */
+const percentualiValide = (v: { tipo?: 'PERCENTUALE' | 'FISSO'; valore?: number; compensoTipo?: 'PERCENTUALE' | 'FISSO' | null; compensoValore?: number | null }, ctx: z.RefinementCtx) => {
+  if (v.tipo === 'PERCENTUALE' && v.valore !== undefined && v.valore > 100) ctx.addIssue({ code: 'custom', path: ['valore'], message: 'Lo sconto in percentuale non può superare il 100%.' });
+  if (v.compensoTipo === 'PERCENTUALE' && v.compensoValore != null && v.compensoValore > 100) ctx.addIssue({ code: 'custom', path: ['compensoValore'], message: 'Il compenso in percentuale non può superare il 100%.' });
+};
+
+export const creaCouponSchema = campiCoupon.superRefine(percentualiValide);
 export type CreaCouponInput = z.infer<typeof creaCouponSchema>;
-export const aggiornaCouponSchema = creaCouponSchema.partial();
+export const aggiornaCouponSchema = campiCoupon.partial().superRefine(percentualiValide);
