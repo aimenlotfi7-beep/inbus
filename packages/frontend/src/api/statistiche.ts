@@ -77,6 +77,8 @@ export interface StatistichePanoramica {
     costoBus: Valore;
     /** Commissioni promoter + quote White Label. */
     commissioni: Valore;
+    /** Compensi dei responsabili degli eventi (collaboratori). */
+    compensi: Valore;
     margine: Valore;
     margineAOggi: Valore;
     /** Passeggeri ÷ posti dei bus confermati, in %, solo sui tragitti con bus. null = nessun bus. */
@@ -142,8 +144,10 @@ export interface RigaEventoStatistiche {
   costoBus: number | null;
   costoCompleto: boolean;
   commissioni: number;
-  /** incasso − costo bus − commissioni; null se l'evento non ha nessun bus
-   *  (con costoCompleto false il costo dei bus è parziale). */
+  /** Compenso del responsabile dell'evento; 0 se non c'è. */
+  compenso: number;
+  /** incasso − costo bus − commissioni − compenso; null se l'evento non ha
+   *  nessun bus (con costoCompleto false il costo dei bus è parziale). */
   margine: number | null;
   margineAOggi: number | null;
   venditeFermate: boolean;
@@ -220,6 +224,8 @@ export interface StatisticheEvento {
     saliti: number;
     costoBus: number | null;
     commissioni: number;
+    /** Compenso del responsabile dell'evento; 0 se non c'è. */
+    compenso: number;
     margine: number | null;
     margineAOggi: number | null;
   };
@@ -338,7 +344,9 @@ export interface RigaMargineEvento {
   costoBus: number;
   costoCompleto: boolean;
   commissioni: number;
-  /** incasso − costo bus − commissioni; con costoCompleto false il costo è parziale. */
+  /** Compenso del responsabile dell'evento; 0 se non c'è. */
+  compenso: number;
+  /** incasso − costo bus − commissioni − compenso; con costoCompleto false il costo è parziale. */
   margine: number;
   margineAOggi: number;
 }
@@ -375,6 +383,8 @@ export interface StatisticheCosti {
     incassato: number;
     costoBus: number;
     commissioni: number;
+    /** Compensi dei responsabili degli eventi (collaboratori). */
+    compensi: number;
     margine: number;
     margineAOggi: number;
     eventiConCostiMancanti: number;
@@ -462,7 +472,15 @@ export interface EventoSimulato {
   citta: string;
   data: string;
   anno: number;
+  /** Il compenso del responsabile dell'evento, se c'è: si calcola sulla combinazione scelta (contiBusInPiu.ts). */
+  compenso: RegolaCompensoEvento | null;
   tragitti: TragittoSimulato[];
+}
+
+/** FISSO in euro; per le percentuali un numero da 0 a 100. */
+export interface RegolaCompensoEvento {
+  tipo: 'FISSO' | 'PERCENTUALE_INCASSO' | 'PERCENTUALE_MARGINE';
+  valore: number;
 }
 
 export interface StatisticheBusInPiu {

@@ -1267,7 +1267,30 @@ export const amministratori = pgTable('amministratori', {
   attivo: boolean('attivo').notNull().default(true),
   tokenResetPassword: text('token_reset_password'),
   tokenResetPasswordScadenza: timestamp('token_reset_password_scadenza'),
+  // Collaboratore (proprietario, settembre 2026): vede e gestisce solo gli
+  // eventi di cui è responsabile (eventoResponsabile), e al massimo le
+  // funzioni che il server sa limitare a quegli eventi
+  // (PERMESSI_COLLABORATORE in permessi.service.ts). Ignorato per il
+  // proprietario, che vede sempre tutto.
+  soloEventiAssegnati: boolean('solo_eventi_assegnati').notNull().default(false),
 });
+
+// Il responsabile operativo di un evento (uno per evento) e il suo compenso,
+// scelto evento per evento: fisso in euro, o percentuale sull'incasso o sul
+// margine dell'evento (compenso-responsabile.ts). Il valore resta quello
+// scritto qui finché il proprietario non lo cambia: le regole generali non
+// lo toccano. pagatoIl/importoPagato: quando il proprietario lo segna pagato.
+export const eventoResponsabile = pgTable('evento_responsabile', {
+  eventoId: text('evento_id').primaryKey().references(() => eventi.id, { onDelete: 'cascade' }),
+  amministratoreId: text('amministratore_id').notNull().references(() => amministratori.id),
+  compensoTipo: text('compenso_tipo', { enum: ['FISSO', 'PERCENTUALE_INCASSO', 'PERCENTUALE_MARGINE'] }).notNull().default('FISSO'),
+  compensoValore: numeric('compenso_valore', { precision: 10, scale: 2 }).notNull().default('0'),
+  assegnatoIl: timestamp('assegnato_il').notNull().defaultNow(),
+  pagatoIl: timestamp('pagato_il'),
+  importoPagato: numeric('importo_pagato', { precision: 10, scale: 2 }),
+}, (t) => ({
+  perResponsabile: index('evento_responsabile_amministratore_idx').on(t.amministratoreId),
+}));
 
 // Eccezioni per singolo amministratore: se presente una riga, sovrascrive
 // quello che darebbe il ruolo. `concesso = true` forza il permesso anche

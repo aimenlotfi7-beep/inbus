@@ -1018,6 +1018,24 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 /* Sfondi tenui presi dai colori del tema chiaro: prima erano quelli del
    vecchio tema scuro, e "neutro" (bianco al 6%) su fondo bianco non si
    vedeva proprio. */
+/* Scheda dell'utenza: "vede solo gli eventi di cui è responsabile". */
+.scelta-collaboratore{display:flex; gap:10px; align-items:flex-start; margin:4px 0 18px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--dusk); cursor:pointer;}
+.scelta-collaboratore input{margin-top:3px;}
+.scelta-collaboratore b{display:block; font-size:var(--testo-base);}
+.scelta-collaboratore small{display:block; margin-top:4px; font-size:var(--testo-sm); color:var(--mist); line-height:1.45;}
+/* Scheda evento › Responsabile: chi, tipo di compenso e cifra affiancati finché c'è spazio. */
+.campi-responsabile{display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:8px;}
+.campi-responsabile .campo{margin-bottom:0;}
+/* Card in Eventi: chi è il responsabile, e il clic apre la sua scheda. */
+.btn.card-responsabile{display:block; width:100%; margin-top:4px; padding:3px 0; border:none; background:none; text-align:left; font-size:var(--testo-sm); font-weight:500; color:var(--mist); white-space:normal; line-height:1.35;}
+.btn.card-responsabile b{font-weight:600; color:var(--paper);}
+.btn.card-responsabile:hover{text-decoration:underline; background:none;}
+/* Compensi collaboratori: scelta dell'evento da assegnare, in una riga. */
+.assegna-evento{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:0 0 18px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--dusk);}
+.assegna-evento label{font-weight:600; font-size:var(--testo-base);}
+.assegna-evento select{flex:1 1 280px; max-width:520px;}
+/* Seconda riga di una cella (città e data sotto il nome, "definitivo" sotto una cifra). */
+.testo-secondario{color:var(--mist); font-size:var(--testo-sm);}
 .badge.coperta{background:var(--green-dim); color:var(--green);}
 .badge.attenzione{background:color-mix(in srgb, var(--amber) 16%, transparent); color:#b45309;}
 .badge.neutro{background:var(--dusk-2); color:var(--mist);}

@@ -55,6 +55,18 @@ export function richiedePermesso(chiave: string) {
   };
 }
 
+/** Da usare DOPO richiedeAuth: chiude una funzione ai collaboratori con
+ *  "solo gli eventi assegnati" anche quando il permesso che la regola lo
+ *  avrebbero (lista d'attesa e comunicazioni stanno sotto i permessi degli
+ *  eventi). Proprietario, settembre 2026: il collaboratore fa la parte
+ *  operativa, clienti e vendite li gestisce il team OnWay. */
+export function nonPerCollaboratori(req: Request, _res: Response, next: NextFunction) {
+  if (!req.admin) return next(new NonAutorizzato());
+  permessiEffettivi(req.admin.sub).then((eff) => {
+    next(eff.soloEventiAssegnati ? new VietatoDaiPermessi('Questa parte la gestisce il team OnWay') : undefined);
+  }, next);
+}
+
 /** Da usare DOPO richiedeAuth: consente l'accesso solo a chi ha ruolo "owner". */
 export function richiedeOwner(req: Request, _res: Response, next: NextFunction) {
   if (!req.admin) throw new NonAutorizzato();

@@ -6,9 +6,12 @@ export interface Amministratore {
   email: string;
   ruoloId: string;
   attivo: boolean;
+  /** Collaboratore: vede e gestisce solo gli eventi di cui è responsabile. */
+  soloEventiAssegnati: boolean;
 }
 export interface AmministratoreInput {
-  nome: string; email: string; password?: string; ruoloId?: string; attivo?: boolean;
+  /** Per un collaboratore (soloEventiAssegnati) il ruolo lo mette il server: "Collaboratore". */
+  nome: string; email: string; password?: string; ruoloId?: string; attivo?: boolean; soloEventiAssegnati?: boolean;
 }
 export interface LogRiga {
   id: string;
@@ -20,6 +23,8 @@ export interface LogRiga {
 export interface EccezionePermesso { chiave: string; concesso: boolean; }
 export interface PermessiUtenza {
   ruoloOwner: boolean;
+  /** Collaboratore: permessiRuolo sono quelli operativi di serie, e solo quelli si possono togliere o ridare. */
+  collaboratore: boolean;
   permessiRuolo: string[]; // ['*'] se il ruolo è owner
   eccezioni: EccezionePermesso[];
   effettivi: string[]; // ['*'] se owner

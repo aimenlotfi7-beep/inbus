@@ -9,6 +9,8 @@ import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { PaginaSezione } from '../shared/PaginaSezione';
 import { MappaPunti } from '../shared/MappaPunti';
 import { Modale } from '../shared/Modale';
+import { haPermesso } from '../../api/auth';
+import { useSessione } from '../shared/SessioneContext';
 
 const VUOTO: Partial<FornitoreInput> = { nome: '', partitaIva: '', referente: '', telefono: '', email: '', indirizzo: '', note: '', invioAutomatico: false };
 
@@ -47,6 +49,10 @@ function emailSpezzabile(email: string) {
 }
 
 export function FornitoriScreen() {
+  // Chi può solo vedere (es. un collaboratore) non ha i pulsanti che il server rifiuterebbe.
+  const sessione = useSessione();
+  const puoGestire = haPermesso(sessione, 'fornitori.gestisci');
+  const puoEliminare = haPermesso(sessione, 'fornitori.elimina');
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
   const [caricato, setCaricato] = useState(false);
   const [inModifica, setInModifica] = useState<Fornitore | null>(null);
@@ -352,9 +358,13 @@ export function FornitoriScreen() {
       <PanelHead titolo="Fornitori" azione={
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-ghost" onClick={() => setVistaCartina((v) => !v)}>{vistaCartina ? 'Vedi elenco' : 'Vedi su cartina'}</button>
-          <button className="btn btn-ghost" onClick={() => setGestisciCampiExtraAperto(true)}>Campi extra</button>
-          <button className="btn btn-ghost" onClick={copiaLinkRegistrazione}>Link registrazione</button>
-          <button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo fornitore</button>
+          {puoGestire && (
+            <>
+              <button className="btn btn-ghost" onClick={() => setGestisciCampiExtraAperto(true)}>Campi extra</button>
+              <button className="btn btn-ghost" onClick={copiaLinkRegistrazione}>Link registrazione</button>
+              <button className="btn btn-primary" onClick={apriNuovo}>+ Nuovo fornitore</button>
+            </>
+          )}
         </div>
       } />
       {inAttesaCount > 0 && (
@@ -372,7 +382,7 @@ export function FornitoriScreen() {
         <p className="testo-intro">Carico i fornitori…</p>
       ) : fornitoriOrdinati.length === 0 ? (
         <p className="testo-intro">
-          {ricerca.trim() ? 'Nessun fornitore corrisponde alla ricerca.' : 'Nessun fornitore ancora: aggiungine uno con "+ Nuovo fornitore" oppure condividi il link di registrazione.'}
+          {ricerca.trim() ? 'Nessun fornitore corrisponde alla ricerca.' : puoGestire ? 'Nessun fornitore ancora: aggiungine uno con "+ Nuovo fornitore" oppure condividi il link di registrazione.' : 'Nessun fornitore ancora.'}
         </p>
       ) : (
         <TabellaGenerica
@@ -406,15 +416,15 @@ export function FornitoriScreen() {
               render: (f) => (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span className={`badge ${CLASSE_STATO[f.stato]}`} style={{ whiteSpace: 'nowrap' }}>{ETICHETTA_STATO[f.stato]}</span>
-                  {f.stato === 'IN_ATTESA' && <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '2px 8px' }} disabled={azioneInCorso} onClick={() => cambiaStato(f, 'APPROVATO')}>Approva</button>}
-                  {f.stato === 'APPROVATO' && <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '2px 8px', color: 'var(--pink)' }} onClick={() => setDaDisattivare(f)}>Disattiva</button>}
-                  {f.stato === 'DISATTIVATO' && <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '2px 8px' }} disabled={azioneInCorso} onClick={() => cambiaStato(f, 'APPROVATO')}>Riattiva</button>}
+                  {puoGestire && f.stato === 'IN_ATTESA' && <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '2px 8px' }} disabled={azioneInCorso} onClick={() => cambiaStato(f, 'APPROVATO')}>Approva</button>}
+                  {puoGestire && f.stato === 'APPROVATO' && <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '2px 8px', color: 'var(--pink)' }} onClick={() => setDaDisattivare(f)}>Disattiva</button>}
+                  {puoGestire && f.stato === 'DISATTIVATO' && <button className="btn btn-ghost" style={{ fontSize: 'var(--testo-xs)', padding: '2px 8px' }} disabled={azioneInCorso} onClick={() => cambiaStato(f, 'APPROVATO')}>Riattiva</button>}
                 </div>
               ),
             },
           ]}
-          onModifica={apriModifica}
-          onElimina={apriEliminazione}
+          onModifica={puoGestire ? apriModifica : undefined}
+          onElimina={puoEliminare ? apriEliminazione : undefined}
         />
       )}
 

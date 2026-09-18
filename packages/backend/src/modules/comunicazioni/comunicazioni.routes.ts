@@ -5,7 +5,7 @@ import { db } from '../../db/client.js';
 import { comunicazioni, prenotazioni, utenti, tragitti, fermate, conversazioniChat, messaggiChat, eventi } from '../../db/schema.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
+import { nonPerCollaboratori, richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { inviaEmail } from '../../shared/email.service.js';
 import { escapaHtml } from '../../shared/formato.js';
 
@@ -107,7 +107,8 @@ export const comunicazioniService = {
 };
 
 export const comunicazioniRouter = Router();
-comunicazioniRouter.use(richiedeAuth);
+// Scrivere ai clienti lo fa il team OnWay, non i collaboratori.
+comunicazioniRouter.use(richiedeAuth, nonPerCollaboratori);
 
 comunicazioniRouter.get('/evento/:eventoId', richiedePermesso('eventi.crea'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await comunicazioniService.list(req.params.eventoId));

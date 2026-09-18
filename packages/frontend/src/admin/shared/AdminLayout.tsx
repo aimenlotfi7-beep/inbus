@@ -9,6 +9,7 @@ import { chatApi } from '../../api/chat';
 import { plurale } from '../../shared/formato';
 import { SEZIONE_PARTENZE, type TabPartenze } from '../screens/partenze/tipi';
 import { COSA_DA_FARE, palliniPartenze, type VocePallino } from '../screens/partenze/statiPartenze';
+import { puoVedereSezione } from './permessiSezioni';
 
 export type SezioneGestionale =
   | 'statistiche' | 'eventi' | 'bundle' | 'tour' | 'vetrina' | 'calendario' | 'cestino'
@@ -18,6 +19,7 @@ export type SezioneGestionale =
   | 'fornitori' | 'fermate' | 'tragitti'
   | 'chat' | 'contenuti' | 'comunicazioni'
   | 'amministratori' | 'ruoli' | 'impostazioni' | 'tracciamento' | 'template-email' | 'layout-biglietto' | 'testi-tooltip'
+  | 'compensi' | 'mio-compenso'
   | 'beta-tragitti-vicini'
   // "linee" non compare in nessun GRUPPI qui sotto: non è una voce di
   // menu, si raggiunge solo dal pulsante "Gestisci Linee" dentro un
@@ -29,6 +31,8 @@ export type SezioneGestionale =
 // "owner" vede sempre tutto (haPermesso lo gestisce automaticamente).
 const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; permesso: string }[] }[] = [
   { titolo: 'Eventi', voci: [
+    // Per chi è responsabile di eventi (vedi puoVedereSezione), non un permesso.
+    { id: 'mio-compenso', label: 'Il mio compenso', permesso: '' },
     { id: 'eventi', label: 'Eventi', permesso: 'eventi.visualizza' },
     { id: 'bundle', label: 'Bundle', permesso: 'bundle.visualizza' },
     { id: 'tour', label: 'Tour', permesso: 'tour.visualizza' },
@@ -70,6 +74,7 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'organizzatori', label: 'Organizzatori', permesso: 'organizzatori.visualizza' },
     { id: 'white-label', label: 'White Label', permesso: 'white-label.visualizza' },
     { id: 'tourleader', label: 'Tour Leader', permesso: 'tourleader.visualizza' },
+    { id: 'compensi', label: 'Compensi collaboratori', permesso: 'collaboratori.gestisci' },
   ]},
   { titolo: 'Logistica', voci: [
     { id: 'fornitori', label: 'Fornitori', permesso: 'fornitori.visualizza' },
@@ -137,7 +142,7 @@ export function AdminLayout({
   useEffect(() => {
     if (haPermesso(sessione, 'eventi.partenze')) {
       eventiApi.elencoPartenze({ soloInProgramma: true }).then((p) => setPalliniPartenzeVoci(palliniPartenze(p))).catch(() => {});
-      listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
+      if (puoVedereSezione(sessione, 'lista-attesa')) listaAttesaApi.contaInAttesa().then((r) => setInAttesa(r.conteggio)).catch(() => {});
     }
     if (haPermesso(sessione, 'prenotazioni.pagamenti')) {
       richiesteRimborsoApi.contaInAttesa().then((r) => setRimborsiInAttesa(r.conteggio)).catch(() => {});
@@ -195,7 +200,7 @@ export function AdminLayout({
   // Filtro sia i gruppi che le voci in base a ciò che l'utente loggato
   // può vedere: un gruppo compare solo se ha almeno una voce visibile.
   const gruppiVisibili = GRUPPI
-    .map((gruppo) => ({ ...gruppo, voci: gruppo.voci.filter((v) => haPermesso(sessione, v.permesso)) }))
+    .map((gruppo) => ({ ...gruppo, voci: gruppo.voci.filter((v) => puoVedereSezione(sessione, v.id)) }))
     .filter((gruppo) => gruppo.voci.length > 0);
 
   return (

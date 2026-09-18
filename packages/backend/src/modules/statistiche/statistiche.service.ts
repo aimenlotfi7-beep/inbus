@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, sql, type SQL } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
-  busFisici, campagne, coupon, eventi, fermate, fornitori, lineaFermate, linee, listaAttesa, offerteEvento, organizzatori,
+  busFisici, campagne, coupon, eventi, eventoResponsabile, fermate, fornitori, lineaFermate, linee, listaAttesa, offerteEvento, organizzatori,
   partecipantiPrenotazione, preventiviRichieste, preventiviRisposte, prenotazioni, promoter, richiesteRimborso, tragitti, utenti,
   whiteLabel,
 } from '../../db/schema.js';
@@ -20,6 +20,7 @@ import {
   type ContestoFonti, type DatiEventi, type EconomiaEvento, type PrenotazioneStatistica, type StruttureEventi,
 } from './economia.js';
 import { giorniTra, indiceIntervallo, inizioGiornoRoma, oggiRoma, periodoPerRisposta, type Intervallo, type Periodo } from './periodo.js';
+import type { RegolaCompenso } from '../collaboratori/compenso.js';
 
 /** Statistiche del gestionale: legge i dati e li passa ai conti puri di
  *  calcoli.ts ed economia.ts. Contano solo le prenotazioni CONFERMATE di
@@ -236,13 +237,22 @@ async function leggiStrutture(eventoIds: string[]): Promise<StruttureEventi> {
 }
 
 export async function caricaDatiEventi(eventoIds: string[]): Promise<DatiEventi> {
-  const [righe, strutture, soglia, postiPerBus] = await Promise.all([
+  const [righe, strutture, soglia, postiPerBus, compensi] = await Promise.all([
     aBlocchiDaDb(eventoIds, (ids) => leggiPrenotazioni(inArray(prenotazioni.eventoId, ids))),
     leggiStrutture(eventoIds),
     leggiSogliaOccupazionePareggio(),
     leggiPostiPerBus(),
+    leggiCompensi(eventoIds),
   ]);
-  return { righe, strutture, ctx: await leggiContestoFonti(righe), soglia, postiPerBus };
+  return { righe, strutture, ctx: await leggiContestoFonti(righe), soglia, postiPerBus, compensi };
+}
+
+/** Il compenso dei responsabili operativi di questi eventi (una spesa dell'evento). */
+export async function leggiCompensi(eventoIds: string[]): Promise<Map<string, RegolaCompenso>> {
+  const righe = await aBlocchiDaDb(eventoIds, (ids) => db.select({
+    eventoId: eventoResponsabile.eventoId, tipo: eventoResponsabile.compensoTipo, valore: eventoResponsabile.compensoValore,
+  }).from(eventoResponsabile).where(inArray(eventoResponsabile.eventoId, ids)));
+  return new Map(righe.map((r) => [r.eventoId, { tipo: r.tipo, valore: Number(r.valore) }]));
 }
 
 async function contaListaAttesa(eventoIds: string[]) {
@@ -322,6 +332,7 @@ export const statisticheService = {
         incassato: arrotondaEuro(somma((e) => e.incassato)),
         costoBus: arrotondaEuro(somma((e) => e.costoBus)),
         commissioni: arrotondaEuro(somma((e) => e.commissioni)),
+        compensi: arrotondaEuro(somma((e) => e.compenso)),
         margine: arrotondaEuro(somma((e) => e.margine)),
         margineAOggi: arrotondaEuro(somma((e) => e.margineAOggi)),
         riempimento: posti > 0 ? percentuale(somma((e) => e.passeggeriConBus), posti) : null,
@@ -348,6 +359,7 @@ export const statisticheService = {
         incassato: { attuale: ea.incassato, precedente: ec?.incassato ?? null },
         costoBus: { attuale: ea.costoBus, precedente: ec?.costoBus ?? null },
         commissioni: { attuale: ea.commissioni, precedente: ec?.commissioni ?? null },
+        compensi: { attuale: ea.compensi, precedente: ec?.compensi ?? null },
         margine: { attuale: ea.margine, precedente: ec?.margine ?? null },
         margineAOggi: { attuale: ea.margineAOggi, precedente: ec?.margineAOggi ?? null },
         riempimentoBus: { attuale: ea.riempimento, precedente: ec?.riempimento ?? null },
@@ -501,6 +513,7 @@ export const statisticheService = {
         costoBus: haBus ? eco.costoBus : null,
         costoCompleto: costoCompleto(eco),
         commissioni: eco.commissioni,
+        compenso: eco.compenso,
         margine: haBus ? eco.margine : null,
         margineAOggi: haBus ? eco.margineAOggi : null,
         venditeFermate: e.venditeFermate,
@@ -573,6 +586,7 @@ export const statisticheService = {
         saliti: partecipanti.filter((pt) => pt.salitoIl).length,
         costoBus: eco.bus > 0 ? eco.costoBus : null,
         commissioni: eco.commissioni,
+        compenso: eco.compenso,
         margine: eco.bus > 0 ? eco.margine : null,
         margineAOggi: eco.bus > 0 ? eco.margineAOggi : null,
       },
@@ -797,6 +811,7 @@ export const statisticheService = {
         incassato: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.incassato, 0)),
         costoBus: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.costoBus, 0)),
         commissioni: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.commissioni, 0)),
+        compensi: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.compenso, 0)),
         margine: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.margine, 0)),
         margineAOggi: arrotondaEuro(tuttiEco.reduce((s, e) => s + e.margineAOggi, 0)),
         eventiConCostiMancanti: tuttiEco.filter(costiMancanti).length,
@@ -807,7 +822,7 @@ export const statisticheService = {
         .map(({ e, eco }) => ({
           id: e.id, artista: e.artista, citta: e.citta, data: e.data.toISOString(),
           passeggeri: eco.passeggeri, incasso: eco.incasso, incassato: eco.incassato, bus: eco.bus, costoBus: eco.costoBus, costoCompleto: costoCompleto(eco),
-          commissioni: eco.commissioni, margine: eco.margine, margineAOggi: eco.margineAOggi,
+          commissioni: eco.commissioni, compenso: eco.compenso, margine: eco.margine, margineAOggi: eco.margineAOggi,
         })),
       fornitori: fornitoriPeriodo,
       tratte: await tratteConPartenza(righeTratte),

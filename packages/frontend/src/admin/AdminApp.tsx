@@ -5,7 +5,7 @@ import { AdminHome } from './screens/AdminHome';
 import { StatisticheScreen } from './screens/statistiche/StatisticheScreen';
 import { SessioneContext } from './shared/SessioneContext';
 import { NavigazioneContext } from './shared/NavigazioneContext';
-import { PERMESSO_SEZIONE } from './shared/permessiSezioni';
+import { puoVedereSezione } from './shared/permessiSezioni';
 import { EventiScreen } from './screens/EventiScreen';
 import { VetrinaScreen } from './screens/VetrinaScreen';
 import { CalendarioScreen } from './screens/CalendarioScreen';
@@ -42,7 +42,9 @@ import { TracciamentoScreen } from './screens/TracciamentoScreen';
 import { TemplateEmailScreen } from './screens/TemplateEmailScreen';
 import { LayoutBigliettoScreen } from './screens/LayoutBigliettoScreen';
 import { AnalisiPercorsiScreen } from './screens/beta/AnalisiPercorsiScreen';
-import { authApi, haPermesso, type SessioneAdmin } from '../api/auth';
+import { CompensiScreen } from './screens/CompensiScreen';
+import { MioCompensoScreen } from './screens/MioCompensoScreen';
+import { authApi, type SessioneAdmin } from '../api/auth';
 import { Toaster } from './shared/Toaster';
 import { ConfermeHost } from './shared/conferma';
 
@@ -89,6 +91,8 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   'template-email': TemplateEmailScreen,
   'layout-biglietto': LayoutBigliettoScreen,
   'beta-tragitti-vicini': AnalisiPercorsiScreen,
+  compensi: CompensiScreen,
+  'mio-compenso': MioCompensoScreen,
 };
 
 /** Legge la sezione attiva dall'indirizzo (?sezione=...) — così se
@@ -152,7 +156,7 @@ export function AdminApp() {
   }
 
   function cambiaSezione(s: SezioneGestionale, parametriExtra?: Record<string, string | null>) {
-    if (sessione && !haPermesso(sessione, PERMESSO_SEZIONE[s])) return; // difesa extra, oltre al menu già filtrato
+    if (sessione && !puoVedereSezione(sessione, s)) return; // difesa extra, oltre al menu già filtrato
     setSezione(s, parametriExtra);
     // Cambiando sezione si riparte sempre dall'inizio — altrimenti, se
     // si era scorsa in basso la sezione precedente, ci si ritrova nel

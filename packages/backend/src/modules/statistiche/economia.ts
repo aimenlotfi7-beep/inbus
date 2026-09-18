@@ -1,6 +1,7 @@
 import { calcolaCommissioneRighe, type RegolaCompensoPromoter } from '../../shared/commissioneRighe.js';
 import type { BusSimulato, EsitoBus, LineaSimulata, TragittoSimulato } from '../eventi/simulazione-bus.js';
 import { arrotondaEuro, raggruppa, type CampagnaFonte } from './calcoli.js';
+import { calcolaCompenso, type RegolaCompenso } from '../collaboratori/compenso.js';
 
 /** I conti economici delle statistiche che non leggono il database (i dati
  *  li prepara statistiche.service.ts): commissioni, economia per evento,
@@ -75,6 +76,8 @@ export interface DatiEventi {
   soglia: number;
   /** Posti di un bus quando il preventivo non li dice (Impostazioni). */
   postiPerBus: number;
+  /** Il compenso del responsabile operativo, per gli eventi che ne hanno uno. */
+  compensi?: Map<string, RegolaCompenso>;
 }
 
 export const sommaPasseggeri = (righe: { passeggeri: number }[]) => righe.reduce((s, r) => s + r.passeggeri, 0);
@@ -135,9 +138,12 @@ export interface EconomiaEvento {
   busSenzaCosto: number;
   costoBus: number;
   commissioni: number;
-  /** incasso − costo dei bus − commissioni (promoter e quote White Label). */
+  /** Compenso del responsabile operativo (0 senza responsabile): previsto e a oggi. */
+  compenso: number;
+  compensoAOggi: number;
+  /** incasso − costo dei bus − commissioni (promoter e quote White Label) − compenso del responsabile. */
   margine: number;
-  /** Lo stesso con quanto è stato pagato davvero: incassato − costo dei bus − commissioni. */
+  /** Lo stesso con quanto è stato pagato davvero: incassato − costo dei bus − commissioni − compenso a oggi. */
   margineAOggi: number;
   postiSuiBus: number;
   /** Passeggeri dei tragitti con posti sui bus: servono al riempimento. */
@@ -154,7 +160,8 @@ export const costiMancanti = (e: EconomiaEvento) => e.passeggeri > 0 && !costoCo
 
 export function economiaEventi(eventoIds: string[], dati: DatiEventi): Map<string, EconomiaEvento> {
   const risultato = new Map<string, EconomiaEvento>(eventoIds.map((id) => [id, {
-    passeggeri: 0, prenotazioni: 0, incasso: 0, incassato: 0, bus: 0, busSenzaCosto: 0, costoBus: 0, commissioni: 0, margine: 0, margineAOggi: 0,
+    passeggeri: 0, prenotazioni: 0, incasso: 0, incassato: 0, bus: 0, busSenzaCosto: 0, costoBus: 0, commissioni: 0,
+    compenso: 0, compensoAOggi: 0, margine: 0, margineAOggi: 0,
     postiSuiBus: 0, passeggeriConBus: 0, passeggeriSenzaBus: 0,
   }]));
   const eventoDiTragitto = new Map(dati.strutture.tragitti.map((t) => [t.id, t.eventoId]));
@@ -188,8 +195,16 @@ export function economiaEventi(eventoIds: string[], dati: DatiEventi): Map<strin
     e.incassato = arrotondaEuro(e.incassato);
     e.costoBus = arrotondaEuro(e.costoBus);
     e.commissioni = commissioni.get(id) ?? 0;
-    e.margine = arrotondaEuro(e.incasso - e.costoBus - e.commissioni);
-    e.margineAOggi = arrotondaEuro(e.incassato - e.costoBus - e.commissioni);
+    const margine = arrotondaEuro(e.incasso - e.costoBus - e.commissioni);
+    const margineAOggi = arrotondaEuro(e.incassato - e.costoBus - e.commissioni);
+    // Il compenso del responsabile si calcola sui numeri PRIMA di togliere
+    // sé stesso (la percentuale sul margine è sul margine dell'evento).
+    const regola = dati.compensi?.get(id);
+    const compenso = regola ? calcolaCompenso(regola, { incasso: e.incasso, incassato: e.incassato, margine, margineAOggi }) : { previsto: 0, aOggi: 0 };
+    e.compenso = compenso.previsto;
+    e.compensoAOggi = compenso.aOggi;
+    e.margine = arrotondaEuro(margine - compenso.previsto);
+    e.margineAOggi = arrotondaEuro(margineAOggi - compenso.aOggi);
   }
   return risultato;
 }

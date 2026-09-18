@@ -37,6 +37,8 @@ function ContenutoCosti({ d }: { d: StatisticheCosti }) {
   const eventi = d.eventi;
   const somma = (campo: (r: StatisticheCosti['eventi'][number]) => number) => eventi.reduce((s, r) => s + campo(r), 0);
   const margineTotale = somma((e) => e.margine);
+  // La colonna dei compensi solo se nel periodo c'è un evento con un responsabile pagato.
+  const conCompensi = eventi.some((e) => e.compenso > 0);
   const c = d.cancellazioni;
   const r = d.rimborsi;
 
@@ -47,6 +49,7 @@ function ContenutoCosti({ d }: { d: StatisticheCosti }) {
         <Kpi etichetta="Incassato" valore={formattaEuroIntero(t.incassato)} />
         <Kpi etichetta="Costo dei bus" valore={formattaEuroIntero(t.costoBus)} />
         <Kpi etichetta="Commissioni" valore={formattaEuroIntero(t.commissioni)} />
+        {t.compensi > 0 && <Kpi etichetta="Compensi collaboratori" valore={formattaEuroIntero(t.compensi)} />}
         <Kpi etichetta="Margine previsto" valore={formattaEuroIntero(t.margine)} tono={t.margine < 0 ? 'negativo' : undefined}>
           <MargineAOggi aOggi={t.margineAOggi} previsto={t.margine} />
         </Kpi>
@@ -61,8 +64,8 @@ function ContenutoCosti({ d }: { d: StatisticheCosti }) {
             disabilitato={eventi.length === 0}
             onScarica={() => scaricaCsv(
               nomeFileCsv('margine per evento', d.periodo),
-              ['Evento', 'Città', 'Data', 'Passeggeri', 'Bus', 'Incasso previsto €', 'Incassato €', 'Costo bus €', 'Costi completi', 'Commissioni €', 'Margine previsto €', 'Margine a oggi €'],
-              eventi.map((e) => [e.artista, e.citta, formattaGiorno(e.data), e.passeggeri, e.bus, e.incasso, e.incassato, e.costoBus, e.costoCompleto, e.commissioni, e.margine, e.margineAOggi]),
+              ['Evento', 'Città', 'Data', 'Passeggeri', 'Bus', 'Incasso previsto €', 'Incassato €', 'Costo bus €', 'Costi completi', 'Commissioni €', 'Compenso responsabile €', 'Margine previsto €', 'Margine a oggi €'],
+              eventi.map((e) => [e.artista, e.citta, formattaGiorno(e.data), e.passeggeri, e.bus, e.incasso, e.incassato, e.costoBus, e.costoCompleto, e.commissioni, e.compenso, e.margine, e.margineAOggi]),
             )}
           />
         )}
@@ -80,6 +83,7 @@ function ContenutoCosti({ d }: { d: StatisticheCosti }) {
                   <th className="stat-num">Incassato</th>
                   <th className="stat-num">Costo bus</th>
                   <th className="stat-num">Commissioni</th>
+                  {conCompensi && <th className="stat-num">Compenso responsabile</th>}
                   <th className="stat-num">Margine previsto</th>
                 </tr>
               </thead>
@@ -100,6 +104,7 @@ function ContenutoCosti({ d }: { d: StatisticheCosti }) {
                       {!e.costoCompleto && <span className="stat-sotto"><span className="badge attenzione">costi incompleti</span></span>}
                     </td>
                     <td className="stat-num">{formattaEuroIntero(e.commissioni)}</td>
+                    {conCompensi && <td className="stat-num">{e.compenso > 0 ? formattaEuroIntero(e.compenso) : <span className="stat-spento">—</span>}</td>}
                     <td className="stat-num">
                       <span className={e.margine < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(e.margine)}</span>
                       <MargineAOggi aOggi={e.margineAOggi} previsto={e.margine} />
@@ -117,6 +122,7 @@ function ContenutoCosti({ d }: { d: StatisticheCosti }) {
                   <td className="stat-num">{formattaEuroIntero(somma((e) => e.incassato))}</td>
                   <td className="stat-num">{formattaEuroIntero(somma((e) => e.costoBus))}</td>
                   <td className="stat-num">{formattaEuroIntero(somma((e) => e.commissioni))}</td>
+                  {conCompensi && <td className="stat-num">{formattaEuroIntero(somma((e) => e.compenso))}</td>}
                   <td className="stat-num">
                     <span className={margineTotale < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(margineTotale)}</span>
                     <MargineAOggi aOggi={somma((e) => e.margineAOggi)} previsto={margineTotale} />

@@ -12,10 +12,21 @@ import { SchedaEventoModale } from './eventi/SchedaEventoModale';
 import { useSelezioneUrl } from '../shared/useSelezioneUrl';
 import { Modale } from '../shared/Modale';
 import { formattaData, formattaEuro } from '../../shared/formato';
+import { haPermesso } from '../../api/auth';
+import { collaboratoriApi } from '../../api/collaboratori';
+import { useSessione } from '../shared/SessioneContext';
 
 export function EventiScreen() {
   const [eventi, setEventi] = useState<Evento[]>([]);
   const [inModifica, setInModifica] = useState<Evento | null>(null);
+  // Responsabile degli eventi (collaboratori): il nome sulla card e il
+  // pulsante che apre la scheda sul responsabile, solo a chi li gestisce.
+  const sessione = useSessione();
+  const gestisceCollaboratori = haPermesso(sessione, 'collaboratori.gestisci');
+  // Senza il permesso (es. un collaboratore) il server risponderebbe 403: niente pulsante.
+  const puoEliminare = haPermesso(sessione, 'eventi.elimina');
+  const [responsabili, setResponsabili] = useState<Map<string, string>>(new Map());
+  const [tabScheda, setTabScheda] = useState<'dettagli' | 'responsabile'>('dettagli');
   // L'evento aperto sopravvive a un ricaricamento della pagina (?eventoId=
   // nell'URL) — prima si perdeva sempre, tornando all'elenco.
   const { id: eventoIdUrl, apri: apriUrl, chiudi: chiudiUrl } = useSelezioneUrl('eventi', 'eventoId');
@@ -26,7 +37,13 @@ export function EventiScreen() {
 
   function ricarica() {
     eventiApi.list().then(setEventi);
+    if (gestisceCollaboratori) {
+      collaboratoriApi.compensi()
+        .then((l) => setResponsabili(new Map(l.map((c) => [c.eventoId, c.responsabile]))))
+        .catch(() => setResponsabili(new Map()));
+    }
   }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(ricarica, []);
 
   const oggi = new Date();
@@ -65,7 +82,8 @@ export function EventiScreen() {
   // vero (es. tragitti aggiunti in un salvataggio precedente non
   // ancora ricaricato in questa schermata), mostrando dati vecchi
   // nell'editor pur essendo tutto corretto sul server.
-  async function apriModifica(ev: Evento) {
+  async function apriModifica(ev: Evento, tab: 'dettagli' | 'responsabile' = 'dettagli') {
+    setTabScheda(tab);
     apriUrl(ev.id);
     setInModifica(ev); // subito, per non far vedere un editor vuoto mentre carica
     try {
@@ -120,7 +138,15 @@ export function EventiScreen() {
   }
 
   if (modaleAperta) {
-    return <SchedaEventoModale evento={inModifica} tabIniziale="dettagli" soloQuestaTab onClose={() => { setNuovoInCorso(false); chiudiUrl(); setInModifica(null); }} onSalvato={ricarica} />;
+    return (
+      <SchedaEventoModale
+        evento={inModifica}
+        tabIniziale={inModifica ? tabScheda : 'dettagli'}
+        soloQuestaTab
+        onClose={() => { setNuovoInCorso(false); chiudiUrl(); setInModifica(null); setTabScheda('dettagli'); if (tabScheda === 'responsabile') ricarica(); }}
+        onSalvato={ricarica}
+      />
+    );
   }
 
   const stilePulsanteCard = { fontSize: 'var(--testo-sm)', color: 'var(--mist)', padding: '2px 6px', border: 'none', whiteSpace: 'nowrap' } as const;
@@ -147,11 +173,22 @@ export function EventiScreen() {
             badge={ev.bozza ? 'Bozza' : ev.venditeFermate ? 'Vendite ferme' : undefined}
             extra={(() => {
               const p = prezzoMinimoEvento(ev);
+              const responsabile = responsabili.get(ev.id);
               return (
-                <p>
-                  {p !== null ? <b style={{ color: 'var(--paper)' }}>da {formattaEuro(p)}</b> : ''}
-                  {!ev.visibileSito && ' · nascosto'}
-                </p>
+                <>
+                  <p>
+                    {p !== null ? <b style={{ color: 'var(--paper)' }}>da {formattaEuro(p)}</b> : ''}
+                    {!ev.visibileSito && ' · nascosto'}
+                  </p>
+                  {gestisceCollaboratori && (
+                    <button
+                      type="button" className="btn btn-ghost card-responsabile"
+                      onClick={(e) => { e.stopPropagation(); apriModifica(ev, 'responsabile'); }}
+                    >
+                      {responsabile ? <>Responsabile: <b>{responsabile}</b></> : 'Assegna un responsabile'}
+                    </button>
+                  )}
+                </>
               );
             })()}
             footer={
@@ -170,9 +207,11 @@ export function EventiScreen() {
                       {venditeInSalvataggio === ev.id ? 'Salvo…' : ev.venditeFermate ? 'Riapri vendite' : 'Ferma vendite'}
                     </button>
                   )}
-                  <button type="button" className="btn btn-ghost" style={stilePulsanteCard} onClick={(e) => { e.stopPropagation(); setDaEliminare(ev); }} aria-label={`Elimina ${ev.artista}`}>
-                    Elimina
-                  </button>
+                  {puoEliminare && (
+                    <button type="button" className="btn btn-ghost" style={stilePulsanteCard} onClick={(e) => { e.stopPropagation(); setDaEliminare(ev); }} aria-label={`Elimina ${ev.artista}`}>
+                      Elimina
+                    </button>
+                  )}
                 </span>
               </div>
             }

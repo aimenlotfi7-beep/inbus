@@ -11,6 +11,10 @@ export interface SessioneAdmin {
    *  presenti e futuri). Usa la funzione haPermesso() qui sotto per
    *  controllare, così il caso '*' è gestito in automatico ovunque. */
   permessi: string[];
+  /** Collaboratore: il server gli manda solo i suoi eventi. */
+  soloEventiAssegnati?: boolean;
+  /** Di quanti eventi è responsabile (con un compenso): > 0 mostra "Il mio compenso". */
+  eventiAssegnati?: number;
 }
 
 export interface AdminLoginResponse {

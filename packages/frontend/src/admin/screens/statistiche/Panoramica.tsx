@@ -166,6 +166,11 @@ function ContenutoPanoramica({ d, confronto, aggiorno, avvisi }: {
           <Kpi etichetta="Commissioni" valore={formattaEuroIntero(e.commissioni.attuale)}>
             <Variazione valore={e.commissioni} formatta={formattaEuroIntero} neutra />
           </Kpi>
+          {(e.compensi.attuale > 0 || (e.compensi.precedente ?? 0) > 0) && (
+            <Kpi etichetta="Compensi collaboratori" valore={formattaEuroIntero(e.compensi.attuale)}>
+              <Variazione valore={e.compensi} formatta={formattaEuroIntero} neutra />
+            </Kpi>
+          )}
           <Kpi etichetta="Margine previsto" valore={formattaEuroIntero(e.margine.attuale)} tono={e.margine.attuale < 0 ? 'negativo' : undefined}>
             <Variazione valore={e.margine} formatta={formattaEuroIntero} />
             <MargineAOggi aOggi={e.margineAOggi.attuale} previsto={e.margine.attuale} />

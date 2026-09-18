@@ -103,6 +103,9 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   { chiave: 'utenze.crea', etichetta: 'Creare nuove utenze del gestionale', modulo: 'Amministrazione' },
   { chiave: 'utenze.gestisci', etichetta: 'Modificare/disattivare/eliminare utenze esistenti', modulo: 'Amministrazione' },
   { chiave: 'permessi.gestisci', etichetta: 'Definire ruoli e le relative autorizzazioni', modulo: 'Amministrazione' },
+  // Chi è responsabile di un evento e quanto guadagna: denaro, quindi un
+  // permesso a sé (il proprietario lo ha sempre).
+  { chiave: 'collaboratori.gestisci', etichetta: 'Assegnare gli eventi ai collaboratori e gestire i loro compensi', modulo: 'Amministrazione' },
   { chiave: 'impostazioni.gestisci', etichetta: 'Modificare le impostazioni generali (es. posti per bus)', modulo: 'Amministrazione' },
   { chiave: 'template-email.gestisci', etichetta: 'Modificare il testo delle email automatiche', modulo: 'Amministrazione' },
   { chiave: 'layout-biglietto.gestisci', etichetta: 'Comporre la grafica del biglietto digitale', modulo: 'Amministrazione' },

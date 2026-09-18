@@ -6,9 +6,10 @@ import { giornoARoma } from '../../shared/formato.js';
 import { lineeDaConfermareService } from '../eventi/linee-da-confermare.service.js';
 import { busDellaSimulazione, esitiCombinazioni, lineeEBus, type BusSimulato, type TragittoSimulato } from '../eventi/simulazione-bus.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
+import type { RegolaCompenso } from '../collaboratori/compenso.js';
 import { commissioniPer, sommaDaIncassare, sommaPagati, tragittiConclusi } from './economia.js';
 import { inizioGiornoRoma, oggiRoma } from './periodo.js';
-import { aBlocchiDaDb, caricaDatiEventi, prenotazioniComeStatistiche } from './statistiche.service.js';
+import { aBlocchiDaDb, caricaDatiEventi, leggiCompensi, prenotazioniComeStatistiche } from './statistiche.service.js';
 
 /** Statistiche › Bus in più e riquadro della pagina Linee: incasso, spesa e
  *  risultato dei bus, totali, per linea e per bus, per evento, per tutti gli
@@ -30,6 +31,9 @@ export interface EventoSimulato {
   citta: string;
   data: string;
   anno: number;
+  /** Il compenso del responsabile dell'evento: il gestionale lo calcola sulla
+   *  combinazione di bus scelta (collaboratori/compenso.ts). */
+  compenso: RegolaCompenso | null;
   tragitti: TragittoSimulato[];
 }
 
@@ -40,25 +44,27 @@ async function rimborsiInAttesa(eventoIds: string[]): Promise<Set<string>> {
   return new Set(righe.map((r) => r.id));
 }
 
-const eventoInRisposta = (e: RigaEvento, tragittiEvento: TragittoSimulato[]): EventoSimulato => ({
+const eventoInRisposta = (e: RigaEvento, tragittiEvento: TragittoSimulato[], compensi: Map<string, RegolaCompenso>): EventoSimulato => ({
   id: e.id,
   artista: e.artista,
   citta: e.citta,
   data: e.data.toISOString(),
   anno: giornoARoma(e.data).anno,
+  compenso: compensi.get(e.id) ?? null,
   tragitti: tragittiEvento,
 });
 
 async function simulaEventi(righeEventi: RigaEvento[]): Promise<EventoSimulato[]> {
   const ids = righeEventi.map((e) => e.id);
   if (ids.length === 0) return [];
-  const [{ righe, ctx }, inAttesa, righeTragitti, soglia, postiPerBus] = await Promise.all([
+  const [{ righe, ctx }, inAttesa, righeTragitti, soglia, postiPerBus, compensi] = await Promise.all([
     prenotazioniComeStatistiche(inArray(prenotazioni.eventoId, ids)),
     rimborsiInAttesa(ids),
     db.select({ id: tragitti.id, eventoId: tragitti.eventoId, nome: tragitti.nome, preventivoCosto: tragitti.preventivoCosto })
       .from(tragitti).where(and(inArray(tragitti.eventoId, ids), isNull(tragitti.eliminatoIl))).orderBy(asc(tragitti.nome)),
     leggiSogliaOccupazionePareggio(),
     leggiPostiPerBus(),
+    leggiCompensi(ids),
   ]);
   const rigaPerId = new Map(righe.map((r) => [r.id, r]));
   const promoterPerPrenotazione = commissioniPer(righe, (r) => r.id, ctx, { quoteWhiteLabel: false });
@@ -119,7 +125,7 @@ async function simulaEventi(righeEventi: RigaEvento[]): Promise<EventoSimulato[]
       esiti: esitiCombinazioni(gruppi, bus),
     }]);
   }
-  return righeEventi.map((e) => eventoInRisposta(e, tragittiPerEvento.get(e.id) ?? []));
+  return righeEventi.map((e) => eventoInRisposta(e, tragittiPerEvento.get(e.id) ?? [], compensi));
 }
 
 export const simulazioneBusService = {
@@ -149,7 +155,7 @@ export const simulazioneBusService = {
       // Gli anni con almeno un evento, più quello di oggi e quello scelto.
       anni: [...new Set([...anniEventi.map((r) => r.anno), oggiRoma().anno, anno])].sort((a, b) => b - a),
       inVendita: simulati.filter((e) => e.tragitti.length > 0),
-      conclusi: passati.map((e) => eventoInRisposta(e, conclusi.get(e.id) ?? [])).filter((e) => e.tragitti.length > 0),
+      conclusi: passati.map((e) => eventoInRisposta(e, conclusi.get(e.id) ?? [], datiPassati.compensi ?? new Map())).filter((e) => e.tragitti.length > 0),
     };
   },
 

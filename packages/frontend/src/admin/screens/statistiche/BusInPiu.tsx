@@ -77,11 +77,11 @@ function Intestazione({ primaColonna }: { primaColonna: string }) {
         </th>
         <th className="stat-num">
           Spesa
-          <InfoTooltip fisso>Costo dei bus che partono più le commissioni dei promoter e le quote White Label dei loro passeggeri. Il costo di un bus in più è il preventivo più basso ricevuto, altrimenti la quotazione.</InfoTooltip>
+          <InfoTooltip fisso>Costo dei bus che partono più le commissioni dei promoter e le quote White Label dei loro passeggeri. Il costo di un bus in più è il preventivo più basso ricevuto, altrimenti la quotazione. Se l'evento ha un responsabile, nella riga dell'evento c'è anche il suo compenso, calcolato su chi parte.</InfoTooltip>
         </th>
         <th className="stat-num">
           Risultato previsto
-          <InfoTooltip fisso>Previsto meno spesa: verde guadagno, rosso perdita, arancio pareggio (meno di 1 € di differenza). Sotto, in piccolo, il risultato a oggi con i soldi già entrati. Nella riga dell'evento è la somma di tutti i suoi tragitti: così vedi se il guadagno di un tragitto copre la perdita di un altro.</InfoTooltip>
+          <InfoTooltip fisso>Previsto meno spesa: verde guadagno, rosso perdita, arancio pareggio (meno di 1 € di differenza). Sotto, in piccolo, il risultato a oggi con i soldi già entrati. Nella riga dell'evento è la somma di tutti i suoi tragitti, meno l'eventuale compenso del responsabile: così vedi se il guadagno di un tragitto copre la perdita di un altro.</InfoTooltip>
         </th>
       </tr>
     </thead>
@@ -116,11 +116,12 @@ function CellaSpesa({ voce }: { voce: Voce }) {
   return (
     <td className="stat-num">
       {euro(spesa(voce))}
-      {(voce.promoter > 0 || voce.whiteLabel > 0) && (
+      {(voce.promoter > 0 || voce.whiteLabel > 0 || voce.compenso > 0) && (
         <span className="stat-sotto">
           bus {euro(voce.costoBus)}
           {voce.promoter > 0 && <> · promoter {euro(voce.promoter)}</>}
           {voce.whiteLabel > 0 && <> · White Label {euro(voce.whiteLabel)}</>}
+          {voce.compenso > 0 && <> · responsabile {euro(voce.compenso)}</>}
         </span>
       )}
       {voce.busSenzaCosto > 0 && <span className="stat-sotto stat-negativo">{pluraleNumero(voce.busSenzaCosto, 'bus senza costo', 'bus senza costo')}</span>}
@@ -413,12 +414,13 @@ export function RiquadroBusInPiu({ eventoId, tragittoId, versione }: { eventoId:
               </>
             ) : (
               <>
+                {/* Un solo tragitto: è l'evento intero, compenso del responsabile compreso. */}
                 <tr className="sim-evento sim-fisso">
                   <td>Questo tragitto</td>
-                  <CellePasseggeri voce={questo.voce} aTerra={questo.aTerra} />
-                  <CelleIncasso voce={questo.voce} />
-                  <CellaSpesa voce={questo.voce} />
-                  <CellaRisultato voce={questo.voce} conGiudizio />
+                  <CellePasseggeri voce={evento.voce} aTerra={evento.aTerra} />
+                  <CelleIncasso voce={evento.voce} />
+                  <CellaSpesa voce={evento.voce} />
+                  <CellaRisultato voce={evento.voce} conGiudizio />
                 </tr>
                 {righeLinee(questo)}
               </>

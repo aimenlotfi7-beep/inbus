@@ -36,6 +36,7 @@ export function AmministratoriScreen() {
   const [permessiUtenza, setPermessiUtenza] = useState<Amministratore | null>(null);
   const [permessiRuolo, setPermessiRuolo] = useState<string[]>([]);
   const [ruoloOwnerTarget, setRuoloOwnerTarget] = useState(false);
+  const [collaboratoreTarget, setCollaboratoreTarget] = useState(false);
   const [statoPermessi, setStatoPermessi] = useState<Record<string, StatoPermesso>>({});
   const [ricerca, setRicerca] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -54,17 +55,26 @@ export function AmministratoriScreen() {
   function nomeRuolo(ruoloId: string) {
     return ruoliAssegnabili.find((r) => r.id === ruoloId)?.nome ?? '—';
   }
+  // Il ruolo di sistema dei collaboratori (lo crea il server) non ha permessi
+  // suoi: si ottiene con la casella, non scegliendolo dall'elenco.
+  const ruoliVeri = ruoliAssegnabili.filter((r) => r.nome !== 'Collaboratore');
 
   const adminFiltrati = ricerca.trim()
     ? admin.filter((a) => `${a.nome} ${a.email} ${nomeRuolo(a.ruoloId)}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : admin;
 
-  function apriNuovo() { setInModifica(null); setForm({ ...VUOTO, ruoloId: ruoliAssegnabili[0]?.id ?? '' }); setModaleAperta(true); }
-  function apriModifica(a: Amministratore) { setInModifica(a); setForm({ nome: a.nome, email: a.email, ruoloId: a.ruoloId, attivo: a.attivo }); setModaleAperta(true); }
+  function apriNuovo() { setInModifica(null); setForm({ ...VUOTO, ruoloId: ruoliVeri[0]?.id ?? '' }); setModaleAperta(true); }
+  function cambiaCollaboratore(attivo: boolean) {
+    // Togliendo la casella a un collaboratore serve un ruolo vero, da scegliere.
+    const ruoloValido = ruoliVeri.some((r) => r.id === form.ruoloId);
+    setForm({ ...form, soloEventiAssegnati: attivo, ruoloId: attivo || ruoloValido ? form.ruoloId : '' });
+  }
+  function apriModifica(a: Amministratore) { setInModifica(a); setForm({ nome: a.nome, email: a.email, ruoloId: a.ruoloId, attivo: a.attivo, soloEventiAssegnati: a.soloEventiAssegnati }); setModaleAperta(true); }
 
   async function salva() {
     if (salvando) return;
-    if (!form.nome.trim() || !form.email.trim() || !form.ruoloId || (!inModifica && !form.password)) {
+    const senzaRuolo = !form.soloEventiAssegnati && !form.ruoloId;
+    if (!form.nome.trim() || !form.email.trim() || senzaRuolo || (!inModifica && !form.password)) {
       notifica(inModifica ? 'Compila nome, email e ruolo.' : 'Compila nome, email, password e ruolo.', 'errore');
       return;
     }
@@ -138,9 +148,11 @@ export function AmministratoriScreen() {
       }
       setPermessiUtenza(a);
       setRuoloOwnerTarget(dati.ruoloOwner);
+      setCollaboratoreTarget(dati.collaboratore);
       setPermessiRuolo(dati.permessiRuolo);
       const stato: Record<string, StatoPermesso> = {};
-      for (const p of permessiAssegnabili) {
+      // Un collaboratore: solo le voci operative, che ha tutte di serie.
+      for (const p of permessiAssegnabili.filter((x) => !dati.collaboratore || dati.permessiRuolo.includes(x.chiave))) {
         const daRuolo = dati.permessiRuolo.includes(p.chiave);
         const eccezione = dati.eccezioni.find((e) => e.chiave === p.chiave);
         if (eccezione) stato[p.chiave] = eccezione.concesso ? 'extra' : 'negato';
@@ -178,10 +190,12 @@ export function AmministratoriScreen() {
     }
   }
 
-  const moduli = Array.from(new Set(permessiAssegnabili.map((p) => p.modulo)));
+  // Per un collaboratore solo le voci operative (le sole che il server gli lascia).
+  const permessiVisibili = collaboratoreTarget ? permessiAssegnabili.filter((p) => permessiRuolo.includes(p.chiave)) : permessiAssegnabili;
+  const moduli = Array.from(new Set(permessiVisibili.map((p) => p.modulo)));
 
   const ETICHETTA_STATO: Record<StatoPermesso, string> = {
-    ruolo: 'Dal ruolo',
+    ruolo: collaboratoreTarget ? 'Attivo' : 'Dal ruolo',
     extra: 'Concesso in più',
     negato: 'Tolto',
     nessuno: 'Non attivo',
@@ -196,19 +210,44 @@ export function AmministratoriScreen() {
         <div className="campo"><label>Nome</label><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
         <div className="campo"><label>Email</label><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
         {!inModifica && <div className="campo"><label>Password</label><input type="password" value={form.password ?? ''} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>}
-        <div className="campo">
-          <label>Ruolo</label>
-          <select value={form.ruoloId} onChange={(e) => setForm({ ...form, ruoloId: e.target.value })}>
-            {ruoliAssegnabili.map((r) => (
-              <option key={r.id} value={r.id}>{r.nome}</option>
-            ))}
-          </select>
-          {ruoliAssegnabili.length === 0 && (
-            <p className="testo-intro" style={{ fontSize: 'var(--testo-md)', marginTop: 6, marginBottom: 0 }}>
-              Nessun ruolo assegnabile trovato: vai in "Ruoli" e crea prima un ruolo con permessi tuoi o inferiori.
-            </p>
-          )}
-        </div>
+        {/* Collaboratori (proprietario, settembre 2026): la casella dà i
+            permessi operativi al posto del ruolo, e il server la applica a
+            ogni funzione. Mai sulla propria utenza. */}
+        {inModifica?.id !== sessione?.id && (
+          <label className="scelta-collaboratore">
+            <input type="checkbox" checked={!!form.soloEventiAssegnati} onChange={(e) => cambiaCollaboratore(e.target.checked)} />
+            <span>
+              <b>Collaboratore: vede solo gli eventi di cui è responsabile</b>
+              <small>
+                Per chi fa la parte operativa: in Eventi, Partenze e Calendario trova solo gli eventi che gli assegni (e
+                quelli che crea lui), e ha già tutti i permessi per gestirli, senza scegliere un ruolo. Prenotazioni, lista
+                d'attesa, comunicazioni ai clienti, statistiche, promoter, White Label, coupon e impostazioni restano al team
+                OnWay. Gli eventi si assegnano in Eventi («Assegna un responsabile» sulla card) o in Compensi collaboratori.
+              </small>
+            </span>
+          </label>
+        )}
+        {form.soloEventiAssegnati ? (
+          <p className="testo-secondario" style={{ margin: '-6px 0 18px' }}>
+            Ruolo: Collaboratore. Se vuoi togliergli qualcosa (per esempio creare eventi nuovi), dopo il salvataggio usa
+            «Personalizza» nella sua riga.
+          </p>
+        ) : (
+          <div className="campo">
+            <label>Ruolo</label>
+            <select value={form.ruoloId} onChange={(e) => setForm({ ...form, ruoloId: e.target.value })}>
+              {!form.ruoloId && <option value="">Scegli un ruolo…</option>}
+              {ruoliVeri.map((r) => (
+                <option key={r.id} value={r.id}>{r.nome}</option>
+              ))}
+            </select>
+            {ruoliVeri.length === 0 && (
+              <p className="testo-intro" style={{ fontSize: 'var(--testo-md)', marginTop: 6, marginBottom: 0 }}>
+                Nessun ruolo assegnabile trovato: vai in "Ruoli" e crea prima un ruolo con permessi tuoi o inferiori.
+              </p>
+            )}
+          </div>
+        )}
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={salva} disabled={salvando}>{salvando ? 'Salvo…' : 'Salva amministratore'}</button>
         {inModifica && inModifica.attivo && (
           <button type="button" className="btn btn-ghost" style={{ width: '100%', marginTop: 10 }} onClick={() => mandaLinkPassword(inModifica)}>
@@ -223,7 +262,9 @@ export function AmministratoriScreen() {
     return (
       <PaginaSezione larga titolo={`Permessi personali di ${permessiUtenza.nome}`} onIndietro={() => setPermessiUtenza(null)} info={mappaTooltip.permessi_personali_intro ?? TOOLTIP_DEFAULT.permessi_personali_intro}>
         <p className="testo-intro">
-          Di base questa utenza ha i permessi del ruolo "{nomeRuolo(permessiUtenza.ruoloId)}".
+          {collaboratoreTarget
+            ? 'È un collaboratore: di serie ha tutta la parte operativa dei suoi eventi. Tocca una voce per togliergliela (o ridargliela). Prenotazioni, clienti, statistiche e il resto restano al team OnWay.'
+            : `Di base questa utenza ha i permessi del ruolo "${nomeRuolo(permessiUtenza.ruoloId)}".`}
         </p>
         {/* I moduli stanno affiancati: prima era un elenco unico lunghissimo
             da scorrere, con metà schermo vuoto a destra. */}
@@ -231,7 +272,7 @@ export function AmministratoriScreen() {
         {moduli.map((modulo) => (
           <div key={modulo} className="gruppo-modulo">
             <p className="section-label">{modulo}</p>
-            {permessiAssegnabili.filter((p) => p.modulo === modulo).map((p) => {
+            {permessiVisibili.filter((p) => p.modulo === modulo).map((p) => {
               const stato = statoPermessi[p.chiave] ?? 'nessuno';
               return (
                 <button key={p.chiave} type="button" onClick={() => ciclaStato(p.chiave)} className="riga-cliccabile">
@@ -260,7 +301,7 @@ export function AmministratoriScreen() {
         colonne={[
           { etichetta: 'Nome', render: (a) => <b>{a.nome}</b> },
           { etichetta: 'Email', render: (a) => a.email },
-          { etichetta: 'Ruolo', render: (a) => nomeRuolo(a.ruoloId) },
+          { etichetta: 'Ruolo', render: (a) => <>{nomeRuolo(a.ruoloId)}{a.soloEventiAssegnati && <><br /><span className="testo-secondario">solo i suoi eventi</span></>}</> },
           {
             etichetta: 'Stato',
             render: (a) => (

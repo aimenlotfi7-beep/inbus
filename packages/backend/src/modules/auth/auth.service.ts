@@ -76,6 +76,7 @@ export const authService = {
     if (!admin || !admin.attivo) throw new NonAutorizzato();
     const [ruolo] = await db.select().from(ruoli).where(eq(ruoli.id, admin.ruoloId)).limit(1);
     const eff = await permessiEffettivi(admin.id);
+    const { eventiAssegnatiA } = await import('../collaboratori/collaboratori.routes.js');
 
     return {
       id: admin.id,
@@ -85,6 +86,9 @@ export const authService = {
       ruoloNome: ruolo?.nome ?? null,
       owner: eff.owner,
       permessi: eff.owner ? ['*'] : Array.from(eff.permessi),
+      // Collaboratore: il gestionale mostra solo i suoi eventi e "Il mio compenso".
+      soloEventiAssegnati: eff.soloEventiAssegnati,
+      eventiAssegnati: await eventiAssegnatiA(admin.id),
     };
   },
 

@@ -30,7 +30,9 @@ function tragitto(o: Partial<TragittoSimulato> = {}): TragittoSimulato {
   };
 }
 
-const evento = (tragitti: TragittoSimulato[]): EventoSimulato => ({ id: 'e1', artista: 'Stadio', citta: 'Roma', data: '2026-10-27T00:00:00.000Z', anno: 2026, tragitti });
+const evento = (tragitti: TragittoSimulato[], compenso: EventoSimulato['compenso'] = null): EventoSimulato => ({
+  id: 'e1', artista: 'Stadio', citta: 'Roma', data: '2026-10-27T00:00:00.000Z', anno: 2026, compenso, tragitti,
+});
 
 describe('conti di un tragitto', () => {
   it('di serie parte la proposta e non il bus sotto il pareggio: chi resta fuori è a terra', () => {
@@ -106,6 +108,31 @@ describe('evento e giudizio', () => {
     const c = contiEvento(evento([tragitto(), tragitto({ id: 't2' })]), {});
     expect(risultato(c.voce)).toBe(-340);
     expect(c.aTerra).toEqual({ passeggeri: 4, valore: 140 });
+  });
+
+  // Compenso del responsabile (proprietario, settembre 2026): una spesa
+  // dell'evento intero, sui passeggeri che partono con i bus scelti.
+  it('compenso fisso: una spesa dell\'evento, non dei tragitti', () => {
+    const c = contiEvento(evento([tragitto(), tragitto({ id: 't2' })], { tipo: 'FISSO', valore: 300 }), {});
+    expect(c.voce).toMatchObject({ compenso: 300, compensoAOggi: 300 });
+    expect(risultato(c.voce)).toBe(-640);
+    expect(c.tragitti.map((t) => t.voce.compenso)).toEqual([0, 0]);
+  });
+
+  it('compenso sull\'incasso: segue i bus che partono', () => {
+    const regola = { tipo: 'PERCENTUALE_INCASSO', valore: 10 } as const;
+    expect(contiEvento(evento([tragitto()], regola), {}).voce.compenso).toBe(101.5);
+    expect(contiEvento(evento([tragitto()], regola), { B3: { parte: true } }).voce.compenso).toBe(108.5);
+  });
+
+  it('compenso sul margine: niente se l\'evento è in perdita; a oggi sui soldi già entrati', () => {
+    const regola = { tipo: 'PERCENTUALE_MARGINE', valore: 10 } as const;
+    expect(contiEvento(evento([tragitto()], regola), {}).voce.compenso).toBe(0);
+    // Solo il bus confermato a 300 €: previsto 525 − 300 − 20 = 205, a oggi 300 − 320 = −20.
+    const c = contiEvento(evento([tragitto({ bus: [bus({ chiave: 'B1', costo: 300 })], esiti: [[[15, 300, 20, 0, 225]]] })], regola), {});
+    expect(c.voce).toMatchObject({ compenso: 20.5, compensoAOggi: 0 });
+    expect(risultato(c.voce)).toBe(184.5);
+    expect(risultatoAOggi(c.voce)).toBe(-20);
   });
 
   it('guadagno, pareggio sotto l\'euro, perdita', () => {

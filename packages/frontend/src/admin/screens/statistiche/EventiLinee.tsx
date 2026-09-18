@@ -72,12 +72,12 @@ function esportaEventi(righe: RigaEventoStatistiche[], nomeFile: string) {
     nomeFile,
     [
       'Evento', 'Città', 'Luogo', 'Data', 'Giorni alla partenza', 'Passeggeri', 'Posti sui bus', 'Riempimento %',
-      'Incasso previsto €', 'Incassato €', 'Costo bus €', 'Costi completi', 'Commissioni €', 'Margine previsto €', 'Margine a oggi €',
+      'Incasso previsto €', 'Incassato €', 'Costo bus €', 'Costi completi', 'Commissioni €', 'Compenso responsabile €', 'Margine previsto €', 'Margine a oggi €',
       'Linee sotto il pareggio', 'Linee da confermare', 'Percorsi cambiati', "Lista d'attesa", 'Vendite ferme',
     ],
     righe.map((r) => [
       r.artista, r.citta, r.luogo, formattaGiorno(r.data), r.giorniAllaPartenza, r.passeggeri, r.postiSuiBus, r.riempimento,
-      r.incasso, r.incassato, r.costoBus, r.costoCompleto, r.commissioni, r.margine, r.margineAOggi, r.lineeSottoPareggio,
+      r.incasso, r.incassato, r.costoBus, r.costoCompleto, r.commissioni, r.compenso, r.margine, r.margineAOggi, r.lineeSottoPareggio,
       r.lineeDaConfermare, r.percorsiCambiati, r.listaAttesa, r.venditeFermate,
     ]),
   );
@@ -222,7 +222,10 @@ function SchedaEvento({ d }: { d: StatisticheEvento }) {
         )}
         {s.margine !== null && (
           <Kpi etichetta="Margine previsto" valore={formattaEuroIntero(s.margine)} tono={s.margine < 0 ? 'negativo' : undefined}>
-            <KpiExtra>costo bus {formattaEuroIntero(s.costoBus ?? 0)} · commissioni {formattaEuroIntero(s.commissioni)}</KpiExtra>
+            <KpiExtra>
+              costo bus {formattaEuroIntero(s.costoBus ?? 0)} · commissioni {formattaEuroIntero(s.commissioni)}
+              {s.compenso > 0 && <> · compenso del responsabile {formattaEuroIntero(s.compenso)}</>}
+            </KpiExtra>
             <MargineAOggi aOggi={s.margineAOggi} previsto={s.margine} />
           </Kpi>
         )}

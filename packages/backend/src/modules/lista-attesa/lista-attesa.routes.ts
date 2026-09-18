@@ -4,7 +4,7 @@ import { listaAttesaService } from './lista-attesa.service.js';
 import { iscrivitiListaAttesaSchema } from './lista-attesa.dto.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
-import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
+import { nonPerCollaboratori, richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { limitePnr, limiteRegistrazione } from '../../shared/rateLimit.js';
 
 const finalizzaSchema = z.object({
@@ -54,10 +54,12 @@ listaAttesaRouter.get('/finalizza/:token', limitePnr, asyncHandler(listaAttesaCo
 listaAttesaRouter.post('/finalizza/:token', limitePnr, valida(finalizzaSchema), asyncHandler(listaAttesaController.finalizza));
 
 // Amministrazione: elenco per evento (sezione "Lista d'attesa" nella
-// scheda evento) e promozione (manda l'email con il link).
-listaAttesaRouter.get('/allerte', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.contaInAttesa));
-listaAttesaRouter.get('/allerte-per-evento', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.contaInAttesaPerEvento));
-listaAttesaRouter.get('/conta-per-evento-e-stato', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.contaPerEventoEStato));
-listaAttesaRouter.get('/eventi/:eventoId', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.listByEvento));
-listaAttesaRouter.post('/:id/promuovi', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(listaAttesaController.promuovi));
-listaAttesaRouter.post('/evento/:eventoId/promuovi-tutte', richiedeAuth, richiedePermesso('eventi.crea'), asyncHandler(listaAttesaController.promuoviTutte));
+// scheda evento) e promozione (manda l'email con il link). Sono clienti:
+// le gestisce il team OnWay, non i collaboratori.
+const gestionale = [richiedeAuth, nonPerCollaboratori];
+listaAttesaRouter.get('/allerte', ...gestionale, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.contaInAttesa));
+listaAttesaRouter.get('/allerte-per-evento', ...gestionale, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.contaInAttesaPerEvento));
+listaAttesaRouter.get('/conta-per-evento-e-stato', ...gestionale, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.contaPerEventoEStato));
+listaAttesaRouter.get('/eventi/:eventoId', ...gestionale, richiedePermesso('eventi.partenze'), asyncHandler(listaAttesaController.listByEvento));
+listaAttesaRouter.post('/:id/promuovi', ...gestionale, richiedePermesso('eventi.crea'), asyncHandler(listaAttesaController.promuovi));
+listaAttesaRouter.post('/evento/:eventoId/promuovi-tutte', ...gestionale, richiedePermesso('eventi.crea'), asyncHandler(listaAttesaController.promuoviTutte));

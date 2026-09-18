@@ -6,6 +6,7 @@ import { db } from '../../db/client.js';
 import { preventiviRichieste, preventiviRisposte, fornitori, tragitti, eventi, fermate, linee, lineaFermate } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati, ErroreApplicativo } from '../../shared/errors.js';
 import { nomeAllegatoSicuro, tipoDalContenuto } from '../../shared/tipoFile.js';
+import { eventoDaLinea, eventoDaRichiestaPreventivo, eventoDaRispostaPreventivo, eventoDaTragitto, limitaAgliEventiAssegnati } from '../../shared/eventiAssegnati.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
@@ -513,6 +514,12 @@ export const preventiviService = {
 };
 
 export const preventiviRouter = Router();
+
+// Un collaboratore tocca solo i preventivi dei suoi eventi (shared/eventiAssegnati.ts).
+preventiviRouter.param('tragittoId', limitaAgliEventiAssegnati(eventoDaTragitto));
+preventiviRouter.param('lineaId', limitaAgliEventiAssegnati(eventoDaLinea));
+preventiviRouter.param('richiestaId', limitaAgliEventiAssegnati(eventoDaRichiestaPreventivo));
+preventiviRouter.param('id', limitaAgliEventiAssegnati(eventoDaRispostaPreventivo));
 
 // ---------------------------------------------------------------------
 // ROTTE PUBBLICHE — il fornitore risponde tramite il link ricevuto via

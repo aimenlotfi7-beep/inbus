@@ -9,18 +9,47 @@ import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { senzaSegreti } from '../../shared/segreti.js';
 import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
-import { permessiEffettivi } from '../auth/permessi.service.js';
+import { PERMESSI_COLLABORATORE, permessiEffettivi, puoAssegnare } from '../auth/permessi.service.js';
+import { eventiAssegnatiA } from '../collaboratori/collaboratori.routes.js';
 
-const creaAdminSchema = z.object({
+const campiAdmin = z.object({
   nome: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(6),
-  ruoloId: z.string().min(1),
+  // Per un collaboratore non serve: ha il ruolo di sistema "Collaboratore".
+  ruoloId: z.string().min(1).optional(),
+  // Collaboratore: vede e gestisce solo gli eventi di cui è responsabile.
+  soloEventiAssegnati: z.boolean().optional(),
 });
-const aggiornaAdminSchema = creaAdminSchema.partial().omit({ password: true }).extend({
+const creaAdminSchema = campiAdmin.refine((d) => d.soloEventiAssegnati || !!d.ruoloId, { message: 'Scegli il ruolo', path: ['ruoloId'] });
+const aggiornaAdminSchema = campiAdmin.partial().omit({ password: true }).extend({
   password: z.string().min(6).optional(),
   attivo: z.boolean().optional(),
 });
+
+const NOME_RUOLO_COLLABORATORE = 'Collaboratore';
+
+/** Il ruolo dei collaboratori, creato la prima volta che serve: nessun
+ *  permesso suo, quelli operativi arrivano dalla casella "solo gli eventi di
+ *  cui è responsabile" (PERMESSI_COLLABORATORE). Così per un collaboratore
+ *  non si deve preparare un ruolo apposta (proprietario, settembre 2026). */
+async function ruoloCollaboratore(): Promise<string> {
+  await db.insert(ruoli).values({
+    nome: NOME_RUOLO_COLLABORATORE,
+    descrizione: 'Collaboratori esterni: la parte operativa dei loro eventi. I permessi li dà la casella «Vede solo gli eventi di cui è responsabile»; si tolgono dai permessi personali.',
+    owner: false,
+  }).onConflictDoNothing();
+  const [ruolo] = await db.select().from(ruoli).where(eq(ruoli.nome, NOME_RUOLO_COLLABORATORE)).limit(1);
+  if (!ruolo || ruolo.owner) throw new ConflittoDati(`Il ruolo "${NOME_RUOLO_COLLABORATORE}" è un ruolo proprietario: rinominalo in Ruoli.`);
+  return ruolo.id;
+}
+
+/** Un collaboratore riceve i permessi operativi: può crearlo solo chi li ha. */
+async function controllaCollaboratore(adminId: string) {
+  if (!(await puoAssegnare(adminId, [...PERMESSI_COLLABORATORE]))) {
+    throw new VietatoDaiPermessi('Per creare un collaboratore devi avere tu tutti i permessi di eventi e partenze.');
+  }
+}
 
 async function getById(id: string) {
   const [a] = await db.select().from(amministratori).where(eq(amministratori.id, id)).limit(1);
@@ -50,10 +79,11 @@ export const amministratoriService = {
   // Mai hash e token nelle risposte (shared/segreti.ts).
   list: async () => (await db.select().from(amministratori)).map(senzaSegreti),
   getById,
-  create: async (input: z.infer<typeof creaAdminSchema>) => {
+  create: async (input: z.infer<typeof creaAdminSchema> & { ruoloId: string }) => {
     const [nuovo] = await db.insert(amministratori).values({
       nome: input.nome, email: input.email.toLowerCase(),
       passwordHash: await bcrypt.hash(input.password, 10), ruoloId: input.ruoloId,
+      soloEventiAssegnati: input.soloEventiAssegnati ?? false,
     }).returning();
     return senzaSegreti(nuovo);
   },
@@ -64,6 +94,7 @@ export const amministratoriService = {
       ...(input.email !== undefined && { email: input.email.toLowerCase() }),
       ...(input.ruoloId !== undefined && { ruoloId: input.ruoloId }),
       ...(input.attivo !== undefined && { attivo: input.attivo }),
+      ...(input.soloEventiAssegnati !== undefined && { soloEventiAssegnati: input.soloEventiAssegnati }),
       ...(input.password && { passwordHash: await bcrypt.hash(input.password, 10) }),
     }).where(eq(amministratori.id, id)).returning();
     return senzaSegreti(aggiornato);
@@ -87,6 +118,11 @@ amministratoriRouter.post(
   valida(creaAdminSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const eff = await permessiEffettivi(req.admin!.sub);
+    if (req.body.soloEventiAssegnati) {
+      await controllaCollaboratore(req.admin!.sub);
+      res.status(201).json(await amministratoriService.create({ ...req.body, ruoloId: await ruoloCollaboratore() }));
+      return;
+    }
     const assegnabile = await ruoloEAssegnabileDa(req.body.ruoloId, eff);
     if (!assegnabile) {
       throw new VietatoDaiPermessi("Non puoi creare un'utenza con un ruolo che ha più permessi di quelli che hai tu.");
@@ -108,6 +144,20 @@ amministratoriRouter.put(
     const [ruoloAttuale] = await db.select().from(ruoli).where(eq(ruoli.id, target.ruoloId)).limit(1);
     if (!eff.owner && ruoloAttuale?.owner) {
       throw new VietatoDaiPermessi("Solo il proprietario può modificare un'altra utenza proprietaria.");
+    }
+    // Collaboratore: il ruolo è quello di sistema. Mai su sé stessi né su un
+    // proprietario (si perderebbe l'accesso completo); tolta la casella serve
+    // di nuovo un ruolo vero.
+    if (req.body.soloEventiAssegnati === true && !target.soloEventiAssegnati) {
+      if (target.id === req.admin!.sub) throw new ConflittoDati('Non puoi limitare la tua utenza ai soli eventi assegnati.');
+      if (ruoloAttuale?.owner) throw new ConflittoDati("Un proprietario vede sempre tutto: per un collaboratore crea un'utenza a parte.");
+      await controllaCollaboratore(req.admin!.sub);
+    }
+    if (req.body.soloEventiAssegnati === true || (req.body.soloEventiAssegnati === undefined && target.soloEventiAssegnati)) {
+      req.body.ruoloId = await ruoloCollaboratore();
+    } else if (req.body.soloEventiAssegnati === false && target.soloEventiAssegnati
+      && (!req.body.ruoloId || req.body.ruoloId === target.ruoloId)) {
+      throw new ConflittoDati('Togliendo «solo gli eventi di cui è responsabile» scegli il ruolo che avrà ora.');
     }
     if (req.body.ruoloId !== undefined) {
       const assegnabile = await ruoloEAssegnabileDa(req.body.ruoloId, eff);
@@ -162,6 +212,12 @@ amministratoriRouter.delete(
         throw new ConflittoDati("Non puoi eliminare l'unica utenza proprietaria rimasta.");
       }
     }
+    // Chi è responsabile di eventi ha compensi da registrare: prima si
+    // tolgono le assegnazioni (o si disattiva l'utenza, che le conserva).
+    const assegnati = await eventiAssegnatiA(target.id);
+    if (assegnati > 0) {
+      throw new ConflittoDati(`${target.nome} è responsabile di ${assegnati === 1 ? 'un evento' : `${assegnati} eventi`}: toglilo dagli eventi, oppure disattiva l'utenza.`);
+    }
     await amministratoriService.remove(req.params.id);
     res.status(204).send();
   })
@@ -186,10 +242,13 @@ amministratoriRouter.get(
       : (await db.select().from(ruoloPermessi).where(eq(ruoloPermessi.ruoloId, target.ruoloId))).map((r) => r.permessoChiave);
     const eccezioni = await db.select().from(amministratorePermessi).where(eq(amministratorePermessi.amministratoreId, target.id));
     const eff = await permessiEffettivi(target.id);
+    const collaboratore = target.soloEventiAssegnati && !ruolo?.owner;
 
     res.json({
       ruoloOwner: ruolo?.owner ?? false,
-      permessiRuolo: delRuolo,
+      // Un collaboratore parte da tutta la parte operativa, e solo quella si può modificare.
+      collaboratore,
+      permessiRuolo: collaboratore ? [...PERMESSI_COLLABORATORE] : delRuolo,
       eccezioni: eccezioni.map((e) => ({ chiave: e.permessoChiave, concesso: e.concesso })),
       effettivi: eff.owner ? ['*'] : Array.from(eff.permessi),
     });
@@ -205,6 +264,10 @@ amministratoriRouter.put(
     const [ruoloTarget] = await db.select().from(ruoli).where(eq(ruoli.id, target.ruoloId)).limit(1);
     if (ruoloTarget?.owner) {
       throw new ConflittoDati('Il proprietario ha già tutti i permessi: non servono eccezioni personali.');
+    }
+    if (target.soloEventiAssegnati) {
+      const fuori = req.body.eccezioni.filter((e: { chiave: string }) => !PERMESSI_COLLABORATORE.has(e.chiave));
+      if (fuori.length > 0) throw new ConflittoDati('A un collaboratore si possono togliere o ridare solo i permessi della parte operativa.');
     }
 
     const eff = await permessiEffettivi(req.admin!.sub);

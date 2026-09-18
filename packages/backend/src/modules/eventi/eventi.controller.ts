@@ -7,13 +7,17 @@ import { NonTrovato, VietatoDaiPermessi } from '../../shared/errors.js';
 import { haPermesso } from '../auth/permessi.service.js';
 import { invioAutomaticoService } from '../preventivi/invio-automatico.service.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
+import { db } from '../../db/client.js';
+import { eventoResponsabile } from '../../db/schema.js';
+import { eventiConsentitiPer, soloConsentiti, soloEventiConsentiti } from '../../shared/eventiAssegnati.js';
 
 export const eventiController = {
   // Letture pubbliche (authFacoltativa): req.admin c'è solo con un'utenza
   // del gestionale, che vede anche bozze e dati interni dei tragitti.
   async list(req: Request, res: Response) {
     const eventi = await eventiService.list(req.query as unknown as ListaEventiQuery, { perGestionale: !!req.admin });
-    res.json(eventi);
+    // Dal gestionale un collaboratore vede solo i suoi eventi (il sito, senza token, tutti).
+    res.json(req.admin ? await soloConsentiti(req, eventi, (e) => e.id) : eventi);
   },
 
   async getById(req: Request, res: Response) {
@@ -32,6 +36,11 @@ export const eventiController = {
 
   async create(req: Request, res: Response) {
     const id = await eventiService.create(req.body as CreaEventoInput);
+    // Un evento creato da un collaboratore è suo: altrimenti, appena creato,
+    // sparirebbe dal suo gestionale. Il compenso lo decide poi il proprietario.
+    if (req.admin && await eventiConsentitiPer(req)) {
+      await db.insert(eventoResponsabile).values({ eventoId: id, amministratoreId: req.admin.sub });
+    }
     const evento = await eventiService.getById(id);
     res.status(201).json(evento);
   },
@@ -229,15 +238,15 @@ export const eventiController = {
     res.json({ ...suggerimento, contatorePareggio });
   },
 
-  async allertePartenzePerEvento(_req: Request, res: Response) {
-    res.json(await eventiService.allertePartenzePerEvento());
+  async allertePartenzePerEvento(req: Request, res: Response) {
+    res.json(await soloEventiConsentiti(req, await eventiService.allertePartenzePerEvento()));
   },
   /** ?inProgramma=1: senza gli eventi passati (pallini del menu). */
   async elencoPartenze(req: Request, res: Response) {
-    res.json(await eventiService.elencoPartenze({ soloInProgramma: req.query.inProgramma === '1' }));
+    res.json(await soloConsentiti(req, await eventiService.elencoPartenze({ soloInProgramma: req.query.inProgramma === '1' }), (r) => r.evento.id));
   },
-  async statistichePerEvento(_req: Request, res: Response) {
-    res.json(await eventiService.statistichePerEvento());
+  async statistichePerEvento(req: Request, res: Response) {
+    res.json(await soloEventiConsentiti(req, await eventiService.statistichePerEvento()));
   },
   async tragittoHaPrenotazioniConfermate(req: Request, res: Response) {
     res.json(await eventiService.tragittoHaPrenotazioniConfermate(req.params.tragittoId));

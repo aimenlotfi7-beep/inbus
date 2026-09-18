@@ -24,6 +24,7 @@ import { comunicazioniRouter } from './modules/comunicazioni/comunicazioni.route
 import { tourLeaderRouter } from './modules/tourleader/tourleader.routes.js';
 import { chatRouter } from './modules/chat/chat.routes.js';
 import { amministratoriRouter } from './modules/amministratori/amministratori.routes.js';
+import { collaboratoriRouter } from './modules/collaboratori/collaboratori.routes.js';
 import { statisticheRouter } from './modules/statistiche/statistiche.routes.js';
 import { ruoliRouter } from './modules/ruoli/ruoli.routes.js';
 import { impostazioniRouter } from './modules/impostazioni/impostazioni.routes.js';
@@ -102,6 +103,7 @@ export function creaApp() {
   app.use('/api/tour-leader', tourLeaderRouter);
   app.use('/api/chat', chatRouter);
   app.use('/api/amministratori', amministratoriRouter);
+  app.use('/api/collaboratori', collaboratoriRouter);
   app.use('/api/statistiche', statisticheRouter);
   app.use('/api/ruoli', ruoliRouter);
   app.use('/api/impostazioni', impostazioniRouter);

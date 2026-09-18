@@ -1,4 +1,19 @@
 import type { SezioneGestionale } from './AdminLayout';
+import { haPermesso, type SessioneAdmin } from '../../api/auth';
+
+/** Sezioni che un collaboratore ("solo gli eventi assegnati") non vede:
+ *  clienti e vendite li gestisce il team OnWay (proprietario, settembre
+ *  2026; il server le chiude con nonPerCollaboratori), e le anagrafiche di
+ *  fermate e tragitti salvati le può solo leggere dentro i suoi eventi. */
+const SOLO_TEAM_ONWAY: ReadonlySet<SezioneGestionale> = new Set<SezioneGestionale>(['lista-attesa', 'comunicazioni', 'fermate', 'tragitti']);
+
+/** Se la sessione può aprire una sezione: il suo permesso, e per "Il mio
+ *  compenso" l'essere responsabile di almeno un evento. */
+export function puoVedereSezione(sessione: SessioneAdmin | null, sezione: SezioneGestionale): boolean {
+  if (sezione === 'mio-compenso') return (sessione?.eventiAssegnati ?? 0) > 0;
+  if (sessione?.soloEventiAssegnati && SOLO_TEAM_ONWAY.has(sezione)) return false;
+  return haPermesso(sessione, PERMESSO_SEZIONE[sezione]);
+}
 
 // Permesso richiesto per ogni sezione, usato per bloccare l'accesso
 // diretto (non solo nascondere la voce di menu) se qualcuno perde un
@@ -47,4 +62,7 @@ export const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   'template-email': 'template-email.gestisci',
   'layout-biglietto': 'layout-biglietto.gestisci',
   'beta-tragitti-vicini': 'eventi.partenze',
+  compensi: 'collaboratori.gestisci',
+  // Nessun permesso: la vede chi è responsabile di eventi (puoVedereSezione).
+  'mio-compenso': '',
 };

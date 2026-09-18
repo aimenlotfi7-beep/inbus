@@ -11,6 +11,8 @@ import { Modale } from '../shared/Modale';
 import { TOOLTIP_DEFAULT } from '../tooltipDefaults';
 import { useMappaTooltip } from '../shared/useMappaTooltip';
 import { CampoCopiabile } from '../shared/CampoCopiabile';
+import { haPermesso } from '../../api/auth';
+import { useSessione } from '../shared/SessioneContext';
 
 const ETICHETTE: Record<TourLeader['stato'], string> = { CANDIDATO: 'Candidato', ATTIVO: 'Attivo', ARCHIVIATO: 'Archiviato' };
 
@@ -20,6 +22,8 @@ const VUOTO: CandidaturaInput & { stato: TourLeader['stato'] } = {
 
 export function TourLeaderScreen() {
   const mappaTooltip = useMappaTooltip();
+  // Chi può solo vedere (es. un collaboratore) non ha le azioni che il server rifiuterebbe.
+  const puoGestire = haPermesso(useSessione(), 'tourleader.gestisci');
   const [lista, setLista] = useState<TourLeader[]>([]);
   const [ricerca, setRicerca] = useState('');
   const [linkCopiato, setLinkCopiato] = useState(false);
@@ -140,7 +144,7 @@ export function TourLeaderScreen() {
         azione={
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-ghost" onClick={copiaLink}>{linkCopiato ? '✓ Link copiato' : 'Copia link candidatura'}</button>
-            <button className="btn btn-primary" onClick={apriNuovo}>+ Censisci tour leader</button>
+            {puoGestire && <button className="btn btn-primary" onClick={apriNuovo}>+ Censisci tour leader</button>}
           </div>
         }
       />
@@ -162,26 +166,28 @@ export function TourLeaderScreen() {
           { etichetta: 'Città', render: (t) => t.citta ?? '—' },
           {
             etichetta: 'Stato',
-            render: (t) => (
+            render: (t) => (puoGestire ? (
               <select value={t.stato} onChange={(e) => cambiaStato(t, e.target.value as TourLeader['stato'])} style={{ background: 'var(--night)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 8px', color: 'var(--paper)' }}>
                 {Object.entries(ETICHETTE).map(([valore, etichetta]) => (
                   <option key={valore} value={valore}>{etichetta}</option>
                 ))}
               </select>
-            ),
+            ) : ETICHETTE[t.stato]),
           },
           {
             etichetta: 'Accesso scansione',
             render: (t) => t.stato === 'ARCHIVIATO'
               ? <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>Nessun accesso (archiviato)</span>
-              : (
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '4px 10px' }} onClick={() => attivaAccesso(t)}>
-                  {t.passwordAttiva ? 'Manda link per nuova password' : 'Manda link per la password'}
-                </button>
-              ),
+              : !puoGestire
+                ? <span style={{ color: 'var(--mist)', fontSize: 'var(--testo-sm)' }}>{t.passwordAttiva ? 'Attivo' : 'Password non ancora scelta'}</span>
+                : (
+                  <button type="button" className="btn btn-ghost" style={{ fontSize: 'var(--testo-sm)', padding: '4px 10px' }} onClick={() => attivaAccesso(t)}>
+                    {t.passwordAttiva ? 'Manda link per nuova password' : 'Manda link per la password'}
+                  </button>
+                ),
           },
         ]}
-        onElimina={elimina}
+        onElimina={puoGestire ? elimina : undefined}
       />
 
       {linkNonInviato && (

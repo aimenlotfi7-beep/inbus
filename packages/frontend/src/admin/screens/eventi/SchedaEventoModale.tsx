@@ -26,6 +26,9 @@ import { PartenzeTab } from '../partenze/PartenzeTab';
 import { ListaAttesaTab } from './ListaAttesaTab';
 import { ComunicazioniTab } from './ComunicazioniTab';
 import { OfferteTab } from './OfferteTab';
+import { ResponsabileTab } from './ResponsabileTab';
+import { useSessione } from '../../shared/SessioneContext';
+import { haPermesso } from '../../../api/auth';
 
 const VUOTO: EventoInput = { artista: '', genere: '', categoria: null, luogo: '', citta: '', data: '', inEvidenza: false, accontoEur: 10, immagini: [], tragitti: [] };
 
@@ -68,7 +71,7 @@ export function SchedaEventoModale({
   evento, tabIniziale = 'dettagli', soloQuestaTab = false, contestoPartenze, onClose, onSalvato,
 }: {
   evento: Evento | null; // null = nuovo evento
-  tabIniziale?: 'dettagli' | 'partenze' | 'lista-attesa' | 'offerte' | 'comunicazioni';
+  tabIniziale?: 'dettagli' | 'partenze' | 'lista-attesa' | 'offerte' | 'comunicazioni' | 'responsabile';
   // Se vero, nasconde del tutto le altre tab — usato dalle sezioni
   // principali del menu (Partenze, Lista d'attesa, Offerte), che devono
   // occuparsi solo della propria competenza, senza poter navigare per
@@ -95,7 +98,8 @@ export function SchedaEventoModale({
   const [categorie, setCategorie] = useState<Categoria[]>([]);
   const [layoutDisponibili, setLayoutDisponibili] = useState<LayoutBiglietto[]>([]);
   const [form, setForm] = useState<EventoInput>(VUOTO);
-  const [tabAttiva, setTabAttiva] = useState<'dettagli' | 'partenze' | 'lista-attesa' | 'offerte' | 'comunicazioni'>(tabIniziale);
+  const [tabAttiva, setTabAttiva] = useState<'dettagli' | 'partenze' | 'lista-attesa' | 'offerte' | 'comunicazioni' | 'responsabile'>(tabIniziale);
+  const sessione = useSessione();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [subTabImmagini, setSubTabImmagini] = useState<'immagini' | 'biglietto'>('immagini');
   // Tratte comprimibili come in Partenze — le nuove restano aperte per
@@ -1080,7 +1084,7 @@ export function SchedaEventoModale({
     const titoloTab = soloQuestaTab
       ? (tabIniziale === 'partenze' && contestoPartenze
         ? TITOLI_PARTENZE[contestoPartenze.tabOrigine]
-        : { dettagli: 'Modifica evento', partenze: 'Partenze', 'lista-attesa': "Lista d'attesa", offerte: 'Offerte', comunicazioni: 'Comunicazioni' }[tabIniziale])
+        : { dettagli: 'Modifica evento', partenze: 'Partenze', 'lista-attesa': "Lista d'attesa", offerte: 'Offerte', comunicazioni: 'Comunicazioni', responsabile: 'Responsabile' }[tabIniziale])
       : 'Modifica evento';
     return (
       <PaginaSezione titolo={`${titoloTab} — ${evento.artista}`} onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)} larga={tabAttiva === 'partenze'}>
@@ -1090,7 +1094,8 @@ export function SchedaEventoModale({
             <button type="button" className={`mini-tab${tabAttiva === 'partenze' ? ' active' : ''}`} onClick={() => setTabAttiva('partenze')}>Partenze</button>
             <button type="button" className={`mini-tab${tabAttiva === 'lista-attesa' ? ' active' : ''}`} onClick={() => setTabAttiva('lista-attesa')}>Lista d'attesa</button>
             {evento && <button type="button" className={`mini-tab${tabAttiva === 'comunicazioni' ? ' active' : ''}`} onClick={() => setTabAttiva('comunicazioni')}>Comunicazioni</button>}
-            <button type="button" className={`mini-tab${tabAttiva === 'offerte' ? ' active' : ''}`} onClick={() => setTabAttiva('offerte')}>Offerte</button>
+            {haPermesso(sessione, 'offerte.gestisci') && <button type="button" className={`mini-tab${tabAttiva === 'offerte' ? ' active' : ''}`} onClick={() => setTabAttiva('offerte')}>Offerte</button>}
+            {haPermesso(sessione, 'collaboratori.gestisci') && <button type="button" className={`mini-tab${tabAttiva === 'responsabile' ? ' active' : ''}`} onClick={() => setTabAttiva('responsabile')}>Responsabile</button>}
           </div>
         )}
 
@@ -1098,6 +1103,7 @@ export function SchedaEventoModale({
         {tabAttiva === 'lista-attesa' && <ListaAttesaTab eventoId={evento.id} servizi={(evento.servizi ?? []).map((s) => ({ key: s.id, nome: s.nome }))} />}
         {tabAttiva === 'comunicazioni' && evento && <ComunicazioniTab evento={evento} />}
         {tabAttiva === 'offerte' && <OfferteTab eventoId={evento.id} nomeEvento={evento.artista} />}
+        {tabAttiva === 'responsabile' && <ResponsabileTab eventoId={evento.id} />}
         {tabAttiva === 'dettagli' && (
           <>
             {/* In modifica sono vere e proprie tab, non un percorso da

@@ -5,8 +5,16 @@ import { creaEventoSchema, aggiornaEventoSchema, listaEventiQuerySchema, aggiorn
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { authFacoltativa, richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
+import { eventoDaBus, eventoDaEvento, eventoDaLinea, eventoDaTragitto, limitaAgliEventiAssegnati } from '../../shared/eventiAssegnati.js';
 
 export const eventiRouter = Router();
+
+// Un collaboratore tocca solo i suoi eventi (shared/eventiAssegnati.ts):
+// ogni indirizzo con uno di questi parametri è controllato da qui.
+eventiRouter.param('id', limitaAgliEventiAssegnati(eventoDaEvento));
+eventiRouter.param('tragittoId', limitaAgliEventiAssegnati(eventoDaTragitto));
+eventiRouter.param('lineaId', limitaAgliEventiAssegnati(eventoDaLinea));
+eventiRouter.param('busId', limitaAgliEventiAssegnati(eventoDaBus));
 
 // Lettura: pubblica (il sito e l'app cliente le usano senza login). Con
 // un'utenza del gestionale arrivano anche bozze e dati interni dei tragitti.

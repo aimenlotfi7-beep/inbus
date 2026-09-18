@@ -1,4 +1,4 @@
-import type { BusSimulato, EventoSimulato, LineaSimulata, TragittoSimulato } from '../../../api/statistiche';
+import type { BusSimulato, EventoSimulato, LineaSimulata, RegolaCompensoEvento, TragittoSimulato } from '../../../api/statistiche';
 
 /** I conti di Statistiche › Bus in più e del riquadro della pagina Linee,
  *  senza React: si provano in contiBusInPiu.test.ts.
@@ -10,7 +10,8 @@ import type { BusSimulato, EventoSimulato, LineaSimulata, TragittoSimulato } fro
  *  solo l'acconto) e previsto = incassato + saldi che mancano, voci separate;
  *  il risultato previsto (previsto − spesa) è quello in evidenza, quello a
  *  oggi (incassato − spesa) in piccolo; spesa = costo dei bus + commissioni
- *  dei promoter + quote White Label. Le scelte (parte / non parte, costo
+ *  dei promoter + quote White Label (+ il compenso del responsabile, solo
+ *  sull'evento intero: `contiEvento`). Le scelte (parte / non parte, costo
  *  scritto a mano) sono solo una simulazione: non confermano niente e restano
  *  in questo browser. */
 
@@ -36,17 +37,35 @@ export interface Voce {
   bus: number;
   /** Bus che partono senza nessun costo: contano 0. */
   busSenzaCosto: number;
+  /** Compenso del responsabile dell'evento, previsto e a oggi: 0 sotto l'evento
+   *  (tragitti, linee e bus), perché è dell'evento intero. */
+  compenso: number;
+  compensoAOggi: number;
 }
 
 const arrotonda = (n: number) => Math.round(n * 100) / 100;
-export const voceVuota = (): Voce => ({ passeggeri: 0, posti: 0, incasso: 0, daIncassare: 0, promoter: 0, whiteLabel: 0, costoBus: 0, bus: 0, busSenzaCosto: 0 });
-export const spesa = (v: Voce) => arrotonda(v.costoBus + v.promoter + v.whiteLabel);
+export const voceVuota = (): Voce => ({
+  passeggeri: 0, posti: 0, incasso: 0, daIncassare: 0, promoter: 0, whiteLabel: 0, costoBus: 0, bus: 0, busSenzaCosto: 0, compenso: 0, compensoAOggi: 0,
+});
+export const spesa = (v: Voce) => arrotonda(v.costoBus + v.promoter + v.whiteLabel + v.compenso);
 /** Incassato + saldi che mancano. */
 export const previsto = (v: Voce) => arrotonda(v.incasso + v.daIncassare);
 /** Risultato previsto: quello in evidenza. */
 export const risultato = (v: Voce) => arrotonda(previsto(v) - spesa(v));
-/** Risultato con i soldi già entrati. */
-export const risultatoAOggi = (v: Voce) => arrotonda(v.incasso - spesa(v));
+/** Risultato con i soldi già entrati (e il compenso maturato su quelli). */
+export const risultatoAOggi = (v: Voce) => arrotonda(v.incasso - (v.costoBus + v.promoter + v.whiteLabel + v.compensoAOggi));
+
+/** Il compenso del responsabile: la stessa regola del server
+ *  (packages/backend/src/modules/collaboratori/compenso.ts). Sulla percentuale
+ *  del margine niente compenso se l'evento è in perdita. */
+export function compensoResponsabile(regola: RegolaCompensoEvento, base: { incasso: number; incassato: number; margine: number; margineAOggi: number }) {
+  const quota = regola.valore / 100;
+  switch (regola.tipo) {
+    case 'FISSO': return { previsto: arrotonda(regola.valore), aOggi: arrotonda(regola.valore) };
+    case 'PERCENTUALE_INCASSO': return { previsto: arrotonda(base.incasso * quota), aOggi: arrotonda(base.incassato * quota) };
+    case 'PERCENTUALE_MARGINE': return { previsto: arrotonda(Math.max(0, base.margine) * quota), aOggi: arrotonda(Math.max(0, base.margineAOggi) * quota) };
+  }
+}
 
 export function somma(voci: Voce[]): Voce {
   const s = voceVuota();
@@ -60,8 +79,14 @@ export function somma(voci: Voce[]): Voce {
     s.costoBus += v.costoBus;
     s.bus += v.bus;
     s.busSenzaCosto += v.busSenzaCosto;
+    s.compenso += v.compenso;
+    s.compensoAOggi += v.compensoAOggi;
   }
-  return { ...s, incasso: arrotonda(s.incasso), daIncassare: arrotonda(s.daIncassare), promoter: arrotonda(s.promoter), whiteLabel: arrotonda(s.whiteLabel), costoBus: arrotonda(s.costoBus) };
+  return {
+    ...s,
+    incasso: arrotonda(s.incasso), daIncassare: arrotonda(s.daIncassare), promoter: arrotonda(s.promoter), whiteLabel: arrotonda(s.whiteLabel),
+    costoBus: arrotonda(s.costoBus), compenso: arrotonda(s.compenso), compensoAOggi: arrotonda(s.compensoAOggi),
+  };
 }
 
 /** Guadagno, pareggio (sotto l'euro di differenza) o perdita. */
@@ -91,7 +116,7 @@ function voceBus(t: TragittoSimulato, i: number, numero: number, scelte: Scelte)
   const veroBus = b.tipo !== 'senza-bus';
   return {
     passeggeri, posti: b.posti, incasso, daIncassare, promoter, whiteLabel,
-    costoBus: costo ?? 0, bus: veroBus ? 1 : 0, busSenzaCosto: veroBus && costo === null ? 1 : 0,
+    costoBus: costo ?? 0, bus: veroBus ? 1 : 0, busSenzaCosto: veroBus && costo === null ? 1 : 0, compenso: 0, compensoAOggi: 0,
   };
 }
 
@@ -132,9 +157,16 @@ export function contiTragitto(t: TragittoSimulato, scelte: Scelte): ContiTragitt
   return { tragitto: t, voce, aTerra, linee };
 }
 
+/** L'evento intero: i suoi tragitti più il compenso del responsabile,
+ *  calcolato su chi parte con i bus scelti (chi resta a terra è rimborsato). */
 export function contiEvento(e: EventoSimulato, scelte: Scelte): ContiEvento {
   const tragitti = e.tragitti.map((t) => contiTragitto(t, scelte));
-  return { evento: e, voce: somma(tragitti.map((t) => t.voce)), aTerra: sommaATerra(tragitti.map((t) => t.aTerra)), tragitti };
+  const base = somma(tragitti.map((t) => t.voce));
+  const compenso = e.compenso
+    ? compensoResponsabile(e.compenso, { incasso: previsto(base), incassato: base.incasso, margine: risultato(base), margineAOggi: risultatoAOggi(base) })
+    : null;
+  const voce = compenso ? { ...base, compenso: compenso.previsto, compensoAOggi: compenso.aOggi } : base;
+  return { evento: e, voce, aTerra: sommaATerra(tragitti.map((t) => t.aTerra)), tragitti };
 }
 
 export function contiEventi(eventi: EventoSimulato[], scelte: Scelte): { voce: Voce; aTerra: ATerra } {

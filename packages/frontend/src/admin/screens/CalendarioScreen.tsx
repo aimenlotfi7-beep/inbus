@@ -6,6 +6,8 @@ import { PanelHead } from '../shared/PanelHead';
 import { notifica } from '../shared/notifiche';
 import { motivoErrore } from '../shared/errori';
 import { giorniAllaData, plurale } from '../../shared/formato';
+import { puoVedereSezione } from '../shared/permessiSezioni';
+import { useSessione } from '../shared/SessioneContext';
 
 const ETICHETTA_STATO: Record<string, string> = {
   POCHI_POSTI: 'Pochi posti',
@@ -18,12 +20,15 @@ export function CalendarioScreen() {
   const [statistiche, setStatistiche] = useState<Record<string, { partecipanti: number; busCensiti: number }>>({});
   const [allerte, setAllerte] = useState<Record<string, number>>({});
   const [inAttesaPerEvento, setInAttesaPerEvento] = useState<Record<string, number>>({});
+  // La lista d'attesa non la vede un collaboratore (la gestisce il team OnWay).
+  const vedeListaAttesa = puoVedereSezione(useSessione(), 'lista-attesa');
 
   useEffect(() => {
     eventiApi.list().then(setEventi).catch((e) => notifica(`Eventi non caricati: ${motivoErrore(e)}`, 'errore'));
     eventiApi.statistichePerEvento().then(setStatistiche).catch(() => {});
     eventiApi.allertePartenzePerEvento().then(setAllerte).catch(() => {});
-    listaAttesaApi.contaInAttesaPerEvento().then(setInAttesaPerEvento).catch(() => {});
+    if (vedeListaAttesa) listaAttesaApi.contaInAttesaPerEvento().then(setInAttesaPerEvento).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const perMese = eventi

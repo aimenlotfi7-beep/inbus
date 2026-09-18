@@ -652,6 +652,13 @@
       "when": 1789461481168,
       "tag": "0092_compenso_promoter_alla_vendita",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1789763441704,
+      "tag": "0093_responsabile_evento",
+      "breakpoints": true
     }
   ]
 }
