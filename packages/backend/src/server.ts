@@ -17,14 +17,30 @@ dns.setDefaultResultOrder('ipv4first');
 
 const app = creaApp();
 
+// Un lavoro lanciato "in sottofondo" (smistamento subito dopo una
+// prenotazione, avviso a Meta, richieste ai fornitori…) che fallisce senza
+// che nessuno raccolga l'errore spegneva TUTTO il server: di serie Node si
+// ferma. Lo si scrive nei log e il sito resta acceso per tutti gli altri.
+process.on('unhandledRejection', (motivo) => {
+  console.error('Lavoro in sottofondo fallito senza gestione (il server resta acceso):', motivo);
+});
+
 sincronizzaPermessi()
   .then(() => sincronizzaTemplateEmail())
   .then(() => sincronizzaLayoutBiglietto())
   .then(() => {
-    app.listen(env.PORT, () => {
+    const server = app.listen(env.PORT, () => {
       console.log(`INBUS API in ascolto su http://localhost:${env.PORT} (${env.NODE_ENV})`);
       avviaSchedulerPromemoriaSaldo();
       avviaSchedulerRiordinoEta();
+    });
+    // A ogni aggiornamento Railway chiede al server vecchio di fermarsi
+    // (SIGTERM): prima di uscire si finiscono le richieste già iniziate,
+    // così una prenotazione a metà non si interrompe. Al massimo 10 secondi.
+    process.once('SIGTERM', () => {
+      console.log('Arresto richiesto: finisco le richieste in corso e chiudo.');
+      server.close(() => process.exit(0));
+      setTimeout(() => process.exit(0), 10_000).unref();
     });
   })
   .catch((err) => {

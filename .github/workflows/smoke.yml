@@ -34,3 +34,18 @@ jobs:
           echo "$corpo" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);if(!Array.isArray(j)&&!Array.isArray(j.eventi))process.exit(1)})'
       - name: Sito pubblico raggiungibile
         run: curl --fail --silent --show-error --max-time 20 -o /dev/null https://inbus-eosin.vercel.app/
+      # Le protezioni del browser (vercel.json) e del server
+      # (intestazioniSicurezza.ts) non devono sparire senza che nessuno
+      # se ne accorga, per esempio dopo una modifica alla configurazione.
+      - name: Protezioni del sito attive
+        run: |
+          intestazioni=$(curl --fail --silent --show-error --max-time 20 -D - -o /dev/null https://inbus-eosin.vercel.app/)
+          echo "$intestazioni" | grep -qi '^content-security-policy:.*script-src'
+          echo "$intestazioni" | grep -qi '^x-content-type-options: nosniff'
+          intestazioni=$(curl --fail --silent --show-error --max-time 20 -D - -o /dev/null https://inbus-eosin.vercel.app/admin.html)
+          echo "$intestazioni" | grep -qi "^content-security-policy:.*frame-ancestors 'none'"
+      - name: Protezioni del server attive
+        run: |
+          intestazioni=$(curl --fail --silent --show-error --max-time 20 -D - -o /dev/null https://inbus-production.up.railway.app/api/health)
+          echo "$intestazioni" | grep -qi '^x-content-type-options: nosniff'
+          if echo "$intestazioni" | grep -qi '^x-powered-by:'; then exit 1; fi
