@@ -58,7 +58,19 @@ export function applicaTitoloPagina(tema: WhiteLabelTheme, titoloDiSerie: string
 /** Le variabili CSS del tema: si mettono su un contenitore e valgono per tutto quello che c'è dentro. */
 export function variabiliTema(tema: WhiteLabelTheme): CSSProperties {
   const { colori, stile, tipografia } = tema;
+  // Forma dei pulsanti come stilePulsante qui sotto, per i pulsanti della
+  // prenotazione che vengono dai fogli di stile del sito (checkout.css,
+  // blocco "PRENOTAZIONE DENTRO LA WHITE LABEL").
+  const contorno = stile.stilePulsanti === 'contorno';
   return {
+    '--wl-pulsante-fondo': contorno ? 'transparent' : colori.cta,
+    '--wl-pulsante-testo': contorno ? colori.cta : colori.testoCta,
+    '--wl-pulsante-bordo': contorno ? colori.cta : 'transparent',
+    '--wl-pulsante2-fondo': contorno ? 'transparent' : colori.ctaSecondaria,
+    '--wl-pulsante2-testo': colori.testoCtaSecondaria,
+    '--wl-pulsante-raggio': stile.stilePulsanti === 'arrotondato' ? '999px' : `${stile.borderRadiusPx}px`,
+    // Riquadri rialzati e passaggio del mouse: il testo del tema, appena accennato.
+    '--wl-velo': conTrasparenza(colori.testoPrincipale, 6),
     '--wl-sfondo': colori.sfondo,
     '--wl-superficie': colori.superficie,
     '--wl-testo': colori.testoPrincipale,

@@ -89,15 +89,18 @@ export function WidgetPubblicoPage() {
 
   // Pagina intera: sfondo del tema e almeno l'altezza dello schermo. Dentro
   // il sito del cliente: nessuno sfondo e l'altezza del contenuto, con un
-  // filo di margine per le ombre dei riquadri.
-  const pagina = (conVariabili: boolean): React.CSSProperties => incorporato
-    ? { padding: 6, ...(conVariabili ? variabiliTema(dati.tema) : {}) }
-    : { minHeight: '100vh', padding: '40px 20px', ...sfondoPagina(dati.tema), ...(conVariabili ? variabiliTema(dati.tema) : {}) };
+  // filo di margine per le ombre dei riquadri. Sempre con le variabili del
+  // tema e la classe tema-wl: la prenotazione (CheckoutForm, BundleFlusso)
+  // usa i fogli di stile del sito e lì prende i colori del cliente
+  // (checkout.css, "PRENOTAZIONE DENTRO LA WHITE LABEL").
+  const pagina: React.CSSProperties = incorporato
+    ? { padding: 6, ...variabiliTema(dati.tema) }
+    : { minHeight: '100vh', padding: '40px 20px', ...sfondoPagina(dati.tema), ...variabiliTema(dati.tema) };
 
   if (vista === 'bundle' && dati.bundle && publicWidgetId) {
     const b = dati.bundle;
     return (
-      <div style={pagina(true)}>
+      <div className="tema-wl" style={pagina}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           {!dati.attiva ? (
             <Riquadro tema={dati.tema}><p>Questa pagina non accetta più nuovi acquisti.</p></Riquadro>
@@ -129,8 +132,11 @@ export function WidgetPubblicoPage() {
 
   if (vista === 'checkout' && eventoCompleto) {
     return (
-      <div style={pagina(false)}>
-        <div style={{ maxWidth: Math.max(dati.tema.stile.larghezzaPx, 420), margin: '0 auto' }}>
+      <div className="tema-wl" style={pagina}>
+        {/* Nel riquadro del tema, come vetrina e accesso: i testi della
+            prenotazione sono pensati per il colore dei riquadri, non per lo
+            sfondo della pagina. */}
+        <div style={{ ...stileRiquadro(dati.tema), maxWidth: Math.max(dati.tema.stile.larghezzaPx, 420), margin: '0 auto' }}>
           <CheckoutForm evento={eventoCompleto} publicWidgetId={publicWidgetId} temaWhiteLabel={dati.tema} />
           <PiePagina tema={dati.tema} />
           {!incorporato && <ConsensoWidget tema={dati.tema} />}
@@ -169,7 +175,7 @@ function Sfondo({ tema, incorporato = false, conPiePagina = true, children }: { 
     ? { padding: 6, ...(tema ? variabiliTema(tema) : {}) }
     : { minHeight: '100vh', justifyContent: 'center', padding: 24, ...(tema ? { ...sfondoPagina(tema), ...variabiliTema(tema) } : { background: '#14121f' }) };
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, ...stile }}>
+    <div className="tema-wl" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, ...stile }}>
       {children}
       {tema && conPiePagina && <PiePagina tema={tema} />}
     </div>

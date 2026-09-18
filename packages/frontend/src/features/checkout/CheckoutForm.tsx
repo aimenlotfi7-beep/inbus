@@ -15,6 +15,7 @@ import { useCarrello } from '../carrello/CarrelloContext';
 import { EtichettaPosti, SceltaFermata } from './SceltaFermata';
 import { Stepper } from './Stepper';
 import { CampoTesto } from './CampoTesto';
+import { NotaLegaleAcquisto } from './NotaLegaleAcquisto';
 import { provenienzaDaUrl } from './provenienza';
 import { tracciaInizioPrenotazione, leggiCookieMeta, nuovoEventIdMeta } from '../metaPixel';
 import { tracciaInizioCheckoutGA4 } from '../googleAnalytics';
@@ -852,6 +853,7 @@ export function CheckoutForm({ evento, offerta, onChiudi, publicWidgetId, temaWh
                   {/* Nessun sistema di pagamento collegato: niente campi carta,
                       l'ordine si registra come "Da concordare". */}
                   <p className="checkout-nota">Non paghi ora online: la prenotazione viene registrata e concordiamo il pagamento con te.</p>
+                  <NotaLegaleAcquisto />
 
                   <div className="checkout-azioni">
                     <button type="button" className="btn btn-primary btn-lg btn-block" disabled={invio} onClick={() => confermaPrenotazione('COMPLETO')}>

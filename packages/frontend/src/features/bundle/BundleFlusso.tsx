@@ -7,6 +7,7 @@ import { clienteLoggato } from '../clienteSessione';
 import { SelettoreFermata } from '../checkout/SelettoreFermata';
 import { Stepper } from '../checkout/Stepper';
 import { CampoTesto } from '../checkout/CampoTesto';
+import { NotaLegaleAcquisto } from '../checkout/NotaLegaleAcquisto';
 import { formattaDataBreve } from '../checkout/CheckoutForm';
 import { inizialiDi } from '../eventi/EventoCard';
 import { Icona } from '../Icone';
@@ -543,6 +544,10 @@ export function BundleFlusso({ bundle, caricaEvento, caricaOpzioni, onConferma, 
                         </label>
                       </fieldset>
                     )}
+
+                    {/* Nel widget l'acquisto si chiude qui (sul sito passa dal
+                        carrello, che ha già la sua nota). */}
+                    {mostraSceltaAcconto && <NotaLegaleAcquisto conPrivacy />}
 
                     {erroreInvio && <p className="campo-errore" role="alert">{erroreInvio}</p>}
                     <div className="checkout-nav">

@@ -15,6 +15,57 @@
    bundle usano ancora.
    ============================================================ */
 
+/* ---------- PRENOTAZIONE DENTRO LA WHITE LABEL ----------
+   Nella pagina White Label (link e codice da incollare) il contenitore ha
+   la classe .tema-wl e le variabili --wl-* del tema del cliente
+   (variabiliTema in features/white-label/tema.ts). Il disegno del sito è
+   fatto a coppie "carta / inchiostro": qui la carta diventa il colore dei
+   riquadri del tema, l'inchiostro il suo testo e il giallo OnWay il
+   pulsante del cliente. Così ogni parte resta leggibile con qualunque
+   tema, chiaro o scuro: prima etichette e link erano grigio scuro su
+   fondo scuro, i campi bianchi e il pulsante giallo OnWay. */
+.tema-wl,
+.tema-wl :is(.superficie-chiara, .superficie-scura, .checkout-form, .checkout-modal, .saldo-modal, .travel-card, .percorso-popup-card){
+  --ow-paper: var(--wl-superficie);
+  --ow-paper-2: var(--wl-velo);
+  --ow-surface: var(--wl-superficie);
+  --ow-surface-2: var(--wl-velo);
+  --ow-night: var(--wl-testo);
+  --ow-ink: var(--wl-testo);
+  --ow-muted: var(--wl-testo-2);
+  --ow-muted-ink: var(--wl-testo-2);
+  --ow-line: var(--wl-bordi);
+  --ow-line-ink: var(--wl-bordi);
+  --ow-accent: var(--wl-cta);
+  --ow-accent-press: var(--wl-cta);
+  --sup-testo: var(--wl-testo);
+  --sup-testo-2: var(--wl-testo-2);
+  --sup-bordo: var(--wl-bordi);
+  --sup-focus: var(--wl-accento);
+  --btn-testo: var(--wl-testo);
+  --btn-bordo: var(--wl-bordi);
+  --btn-bordo-hover: var(--wl-testo);
+  --btn-sfondo-hover: var(--wl-velo);
+  --campo-sfondo: var(--wl-campo-sfondo);
+  --campo-testo: var(--wl-campo-testo);
+  --campo-bordo: var(--wl-bordi);
+  --campo-etichetta: var(--wl-testo-2);
+  --campo-placeholder: var(--wl-testo-2);
+  --checkout-fondo: var(--wl-superficie);
+}
+.tema-wl .checkout-form{ color:var(--sup-testo); }
+/* Pulsanti con i colori e la forma scelti nel gestionale. */
+.tema-wl .btn{ border-radius:var(--wl-pulsante-raggio); }
+.tema-wl .btn-primary, .tema-wl .btn-primary:hover{
+  background:var(--wl-pulsante-fondo); color:var(--wl-pulsante-testo); border:1.5px solid var(--wl-pulsante-bordo);
+  box-shadow:none; transform:none;
+}
+.tema-wl .btn-primary:hover{ filter:brightness(.95); }
+.tema-wl .btn-secondary{ background:var(--wl-pulsante2-fondo); color:var(--wl-pulsante2-testo); border-color:var(--wl-bordi); }
+/* Dove il sito scrive in inchiostro sul giallo: passo attivo e bollini. */
+.tema-wl .stepper-voce.attivo .stepper-cerchio,
+.tema-wl .bundle-flusso .badge{ background:var(--wl-cta); border-color:var(--wl-cta); color:var(--wl-cta-testo); }
+
 /* ---------- MODULO ---------- */
 .checkout-form{ display:flex; flex-direction:column; gap:var(--sp-5); width:100%; min-width:0; }
 .checkout-form h3{ margin:0; font-family:var(--font-sans); font-size:var(--t-h3); font-weight:800; letter-spacing:-.01em; text-transform:none; }
