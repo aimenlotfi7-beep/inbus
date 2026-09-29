@@ -16,7 +16,7 @@ export type SezioneGestionale =
   | 'partenze-orari' | 'partenze-preventivi' | 'partenze-prezzi' | 'partenze-da-confermare' | 'partenze-confermato' | 'partenze-passate'
   | 'transazioni' | 'pagamenti' | 'coupon' | 'voucher' | 'campagne' | 'lista-attesa' | 'offerte' | 'rimborsi' | 'variazioni'
   | 'utenti' | 'promoter' | 'organizzatori' | 'white-label' | 'tourleader'
-  | 'fornitori' | 'fermate' | 'tragitti'
+  | 'fornitori' | 'pagamenti-fornitori' | 'fermate' | 'tragitti'
   | 'chat' | 'contenuti' | 'comunicazioni'
   | 'amministratori' | 'ruoli' | 'impostazioni' | 'tracciamento' | 'template-email' | 'layout-biglietto' | 'testi-tooltip'
   | 'compensi' | 'mio-compenso'
@@ -91,6 +91,11 @@ export const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: str
     // (eventi/tragitti/fermate), nessuna scrittura e nessun collegamento
     // dentro Partenze — si può togliere in qualunque momento.
     { id: 'beta-tragitti-vicini', label: 'Tragitti vicini (in prova)', permesso: 'eventi.partenze' },
+  ]},
+  // I soldi che escono: oggi una voce sola, ma è amministrazione, non
+  // anagrafica dei partner — tenerla lì la nasconderebbe.
+  { titolo: 'Amministrazione', voci: [
+    { id: 'pagamenti-fornitori', label: 'Pagamenti fornitori', permesso: 'pagamenti-fornitori.visualizza' },
   ]},
   { titolo: 'Squadra', voci: [
     { id: 'amministratori', label: 'Amministratori', permesso: 'utenze.gestisci' },

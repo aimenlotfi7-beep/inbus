@@ -72,6 +72,10 @@ export const REGISTRO_PERMESSI: DefinizionePermesso[] = [
   { chiave: 'fornitori.visualizza', etichetta: 'Visualizzare fornitori', modulo: 'Fornitori' },
   { chiave: 'fornitori.gestisci', etichetta: 'Creare/modificare fornitori', modulo: 'Fornitori' },
   { chiave: 'fornitori.elimina', etichetta: 'Eliminare fornitori', modulo: 'Fornitori' },
+  // Soldi che escono: chi vede l'anagrafica dei fornitori non vede per
+  // forza quanto si deve loro, quindi permessi a sé (nessun ereditaDa).
+  { chiave: 'pagamenti-fornitori.visualizza', etichetta: 'Vedere i pagamenti ai fornitori (fatture, scadenze, importi)', modulo: 'Fornitori' },
+  { chiave: 'pagamenti-fornitori.gestisci', etichetta: 'Registrare pagamenti e fatture dei fornitori', modulo: 'Fornitori' },
 
   // Tragitti
   { chiave: 'tragitti.visualizza', etichetta: 'Visualizzare percorsi salvati', modulo: 'Percorsi salvati' },

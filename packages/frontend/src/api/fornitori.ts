@@ -27,12 +27,14 @@ export interface CampoExtraConfig {
   ordine: number;
 }
 
-/** Quante partenze, richieste di preventivo e bus puntano a un
- *  fornitore: se almeno una, il server non lo lascia eliminare. */
+/** Quante partenze, richieste di preventivo, bus e spese registrate
+ *  puntano a un fornitore: se almeno una, il server non lo lascia
+ *  eliminare. */
 export interface CollegamentiFornitore {
   partenze: number;
   richiestePreventivo: number;
   bus: number;
+  spese: number;
 }
 
 export const fornitoriApi = {

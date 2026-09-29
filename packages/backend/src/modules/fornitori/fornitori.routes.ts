@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { eq, count, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
-import { amministratori, fornitori, fornitoriCampiExtraConfig, tragitti, preventiviRichieste, busFisici } from '../../db/schema.js';
+import { amministratori, fornitori, fornitoriCampiExtraConfig, tragitti, preventiviRichieste, busFisici, speseFornitore } from '../../db/schema.js';
 import { NonTrovato, ConflittoDati } from '../../shared/errors.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
@@ -60,12 +60,13 @@ async function getById(id: string) {
 // l'eliminazione è bloccata, e il gestionale propone di disattivarlo.
 async function collegamenti(id: string) {
   await getById(id);
-  const [[partenze], [richiestePreventivo], [bus]] = await Promise.all([
+  const [[partenze], [richiestePreventivo], [bus], [spese]] = await Promise.all([
     db.select({ valore: count() }).from(tragitti).where(eq(tragitti.fornitoreId, id)),
     db.select({ valore: count() }).from(preventiviRichieste).where(eq(preventiviRichieste.fornitoreId, id)),
     db.select({ valore: count() }).from(busFisici).where(eq(busFisici.fornitoreId, id)),
+    db.select({ valore: count() }).from(speseFornitore).where(eq(speseFornitore.fornitoreId, id)),
   ]);
-  return { partenze: partenze.valore, richiestePreventivo: richiestePreventivo.valore, bus: bus.valore };
+  return { partenze: partenze.valore, richiestePreventivo: richiestePreventivo.valore, bus: bus.valore, spese: spese.valore };
 }
 
 /** Chi riceve l'avviso di una nuova registrazione: le utenze attive del
@@ -94,8 +95,8 @@ export const fornitoriService = {
   },
   remove: async (id: string) => {
     const c = await collegamenti(id);
-    if (c.partenze + c.richiestePreventivo + c.bus > 0) {
-      throw new ConflittoDati('Non si può eliminare: il fornitore è collegato a partenze, preventivi o bus e si perderebbe lo storico. Disattivalo invece.');
+    if (c.partenze + c.richiestePreventivo + c.bus + c.spese > 0) {
+      throw new ConflittoDati('Non si può eliminare: il fornitore è collegato a partenze, preventivi, bus o pagamenti registrati e si perderebbe lo storico. Disattivalo invece.');
     }
     await db.delete(fornitori).where(eq(fornitori.id, id));
   },

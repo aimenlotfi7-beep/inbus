@@ -31,6 +31,7 @@ function descriviCollegamenti(c: CollegamentiFornitore) {
   if (c.partenze) voci.push(`${c.partenze} ${c.partenze === 1 ? 'partenza' : 'partenze'}`);
   if (c.richiestePreventivo) voci.push(`${c.richiestePreventivo} ${c.richiestePreventivo === 1 ? 'richiesta di preventivo' : 'richieste di preventivo'}`);
   if (c.bus) voci.push(`${c.bus} bus`);
+  if (c.spese) voci.push(`${c.spese} ${c.spese === 1 ? 'spesa registrata' : 'spese registrate'}`);
   return voci.length > 1 ? `${voci.slice(0, -1).join(', ')} e ${voci[voci.length - 1]}` : (voci[0] ?? '');
 }
 
@@ -351,7 +352,7 @@ export function FornitoriScreen() {
 
   const collegamentiDaEliminare = daEliminare?.collegamenti;
   const eliminazioneBloccata = !!collegamentiDaEliminare
-    && collegamentiDaEliminare.partenze + collegamentiDaEliminare.richiestePreventivo + collegamentiDaEliminare.bus > 0;
+    && collegamentiDaEliminare.partenze + collegamentiDaEliminare.richiestePreventivo + collegamentiDaEliminare.bus + collegamentiDaEliminare.spese > 0;
 
   return (
     <div>

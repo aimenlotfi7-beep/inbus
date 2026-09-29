@@ -5,7 +5,7 @@ import { haPermesso, type SessioneAdmin } from '../../api/auth';
  *  clienti e vendite li gestisce il team OnWay (proprietario, settembre
  *  2026; il server le chiude con nonPerCollaboratori), e le anagrafiche di
  *  fermate e tragitti salvati le può solo leggere dentro i suoi eventi. */
-const SOLO_TEAM_ONWAY: ReadonlySet<SezioneGestionale> = new Set<SezioneGestionale>(['lista-attesa', 'comunicazioni', 'fermate', 'tragitti', 'beta-tragitti-vicini']);
+const SOLO_TEAM_ONWAY: ReadonlySet<SezioneGestionale> = new Set<SezioneGestionale>(['lista-attesa', 'comunicazioni', 'fermate', 'tragitti', 'beta-tragitti-vicini', 'pagamenti-fornitori']);
 
 /** Se la sessione può aprire una sezione: il suo permesso, e per "Il mio
  *  compenso" l'essere responsabile di almeno un evento. */
@@ -33,6 +33,7 @@ export const PERMESSO_SEZIONE: Record<SezioneGestionale, string> = {
   variazioni: 'prenotazioni.pagamenti',
   utenti: 'utenti.visualizza',
   fornitori: 'fornitori.visualizza',
+  'pagamenti-fornitori': 'pagamenti-fornitori.visualizza',
   fermate: 'tragitti.visualizza',
   tragitti: 'tragitti.visualizza',
   promoter: 'promoter.visualizza',

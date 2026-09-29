@@ -1502,6 +1502,73 @@ export const templateEmail = pgTable('template_email', {
 });
 
 // ---------------------------------------------------------------------
+// PAGAMENTI AI FORNITORI (amministrazione)
+// ---------------------------------------------------------------------
+// Proprietario, settembre 2026: l'amministrazione deve vedere in un
+// posto solo quanto si deve ai fornitori, con i dati della fattura, e
+// segnare i pagamenti (anche in più volte: acconto e saldo).
+//
+// Una "spesa" è un impegno verso un fornitore. Nasce da sola dai bus
+// confermati che hanno fornitore e costo (origine BUS: la stessa cifra
+// che le Statistiche usano come costo del bus, così i due numeri non
+// possono divergere) oppure si aggiunge a mano (origine MANUALE:
+// pedaggi, parcheggi, extra concordati dopo).
+export const origineSpesaFornitoreEnum = pgEnum('origine_spesa_fornitore', ['BUS', 'MANUALE']);
+export const metodoPagamentoFornitoreEnum = pgEnum('metodo_pagamento_fornitore', ['BONIFICO', 'CONTANTI', 'CARTA', 'ALTRO']);
+
+export const speseFornitore = pgTable('spese_fornitore', {
+  id: id(),
+  fornitoreId: text('fornitore_id').notNull().references(() => fornitori.id, { onDelete: 'restrict' }),
+  // L'evento e il bus a cui si riferisce, quando la spesa nasce da un
+  // bus confermato: se l'evento viene eliminato la spesa resta (si deve
+  // comunque pagare), senza collegamento.
+  eventoId: text('evento_id').references(() => eventi.id, { onDelete: 'set null' }),
+  busId: text('bus_id').references(() => busFisici.id, { onDelete: 'set null' }),
+  origine: origineSpesaFornitoreEnum('origine').notNull().default('MANUALE'),
+  descrizione: text('descrizione').notNull(),
+  importo: numeric('importo', { precision: 10, scale: 2 }).notNull(),
+  // Dati della fattura ricevuta (facoltativi: la spesa esiste anche
+  // prima che la fattura arrivi). Il PDF si carica come ogni altro file
+  // del gestionale e qui resta solo il link.
+  numeroFattura: text('numero_fattura'),
+  dataFattura: timestamp('data_fattura'),
+  scadenza: timestamp('scadenza'),
+  fatturaUrl: text('fattura_url'),
+  note: text('note'),
+  // Annullata = non si deve più pagare (fattura sbagliata, bus saltato):
+  // sparisce dai totali ma resta nello storico.
+  annullata: boolean('annullata').notNull().default(false),
+  creataIl: timestamp('creata_il').notNull().defaultNow(),
+  aggiornataIl: timestamp('aggiornata_il').notNull().defaultNow(),
+}, (t) => ({
+  // Un bus confermato genera UNA spesa sola, anche se il giro di
+  // allineamento passa due volte insieme.
+  unaPerBus: uniqueIndex('spese_fornitore_una_per_bus').on(t.busId).where(sql`${t.busId} is not null`),
+  perFornitore: index('spese_fornitore_fornitore_idx').on(t.fornitoreId),
+  perEvento: index('spese_fornitore_evento_idx').on(t.eventoId),
+}));
+
+// Ogni versamento fatto al fornitore per una spesa: acconto e saldo
+// sono semplicemente due righe qui. Lo stato della spesa (da pagare /
+// parziale / pagata) non è una colonna: si calcola dalla somma di
+// queste righe, così non può restare indietro rispetto ai pagamenti.
+export const pagamentiFornitore = pgTable('pagamenti_fornitore', {
+  id: id(),
+  spesaId: text('spesa_id').notNull().references(() => speseFornitore.id, { onDelete: 'cascade' }),
+  importo: numeric('importo', { precision: 10, scale: 2 }).notNull(),
+  pagatoIl: timestamp('pagato_il').notNull(),
+  metodo: metodoPagamentoFornitoreEnum('metodo').notNull().default('BONIFICO'),
+  // Numero del bonifico, CRO, o qualunque riferimento utile a ritrovarlo.
+  riferimento: text('riferimento'),
+  note: text('note'),
+  // Chi lo ha registrato nel gestionale (resta anche se l'utenza sparisce).
+  registratoDa: text('registrato_da').references(() => amministratori.id, { onDelete: 'set null' }),
+  creatoIl: timestamp('creato_il').notNull().defaultNow(),
+}, (t) => ({
+  perSpesa: index('pagamenti_fornitore_spesa_idx').on(t.spesaId),
+}));
+
+// ---------------------------------------------------------------------
 // RELAZIONI (per le query .with{} di Drizzle)
 // ---------------------------------------------------------------------
 export const eventiRelations = relations(eventi, ({ many }) => ({

@@ -11,6 +11,7 @@ import { utentiRouter } from './modules/utenti/utenti.routes.js';
 import { pagineRouter, contenutiRouter } from './modules/pagine/pagine.routes.js';
 import { couponRouter } from './modules/coupon/coupon.routes.js';
 import { fornitoriRouter } from './modules/fornitori/fornitori.routes.js';
+import { pagamentiFornitoriRouter } from './modules/pagamenti-fornitori/pagamenti-fornitori.routes.js';
 import { preventiviRouter } from './modules/preventivi/preventivi.routes.js';
 import { bundleRouter } from './modules/bundle/bundle.routes.js';
 import { tourRouter } from './modules/tour/tour.routes.js';
@@ -90,6 +91,7 @@ export function creaApp() {
   app.use('/api/contenuti', contenutiRouter);
   app.use('/api/coupon', couponRouter);
   app.use('/api/fornitori', fornitoriRouter);
+  app.use('/api/pagamenti-fornitori', pagamentiFornitoriRouter);
   app.use('/api/preventivi', preventiviRouter);
   app.use('/api/bundle', bundleRouter);
   app.use('/api/tour', tourRouter);

@@ -781,6 +781,23 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .evento-card .meta-row{display:flex; justify-content:space-between; margin-top:12px; font-size:var(--testo-md);}
 .evento-card .posti-basso{color:var(--amber);}
 
+/* Riga di filtri che usa tutta la larghezza: le voci stanno affiancate
+   finché ci stanno, poi vanno a capo (mai una colonna di campi con
+   mezzo schermo vuoto a destra). */
+.filtri-riga{display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:16px;}
+.filtri-riga label{
+  display:flex; flex-direction:column; gap:6px; font-size:var(--testo-sm); color:var(--mist);
+  font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+}
+.filtri-riga input, .filtri-riga select{
+  font-family:'Poppins',sans-serif; font-size:var(--testo-base); color:var(--paper);
+  background:var(--dusk); border:1px solid var(--line); border-radius:var(--input-radius); padding:9px 12px;
+}
+.filtri-riga .filtro-largo{flex:1 1 260px;}
+.filtri-riga .filtro-largo input{width:100%;}
+/* Pulsanti in fondo a un modale: sempre in fondo a destra, affiancati. */
+.modal-azioni{display:flex; gap:10px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap;}
+
 /* ---------- FORM ---------- */
 .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px;}
 .form-grid label{

@@ -1,4 +1,4 @@
-{
+﻿{
   "version": "7",
   "dialect": "postgresql",
   "entries": [
@@ -672,6 +672,13 @@
       "version": "7",
       "when": 1789770902783,
       "tag": "0095_richieste_idempotenti_e_vincoli",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1790674478817,
+      "tag": "0096_pagamenti_fornitori",
       "breakpoints": true
     }
   ]

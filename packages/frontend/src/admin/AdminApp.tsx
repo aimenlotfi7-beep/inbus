@@ -18,6 +18,7 @@ import { UtentiScreen } from './screens/UtentiScreen';
 import { BundleScreen } from './screens/bundle/BundleScreen';
 import { TourScreen } from './screens/TourScreen';
 import { FornitoriScreen } from './screens/FornitoriScreen';
+import { PagamentiFornitoriScreen } from './screens/PagamentiFornitoriScreen';
 import { PercorsiSalvatiScreen } from './screens/PercorsiSalvatiScreen';
 import { FermateScreen } from './screens/FermateScreen';
 import { PromoterScreen } from './screens/PromoterScreen';
@@ -62,6 +63,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   variazioni: VariazioniScreen,
   utenti: UtentiScreen,
   fornitori: FornitoriScreen,
+  'pagamenti-fornitori': PagamentiFornitoriScreen,
   fermate: FermateScreen,
   tragitti: PercorsiSalvatiScreen,
   promoter: PromoterScreen,
