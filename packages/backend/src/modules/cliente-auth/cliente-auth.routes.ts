@@ -206,8 +206,8 @@ clienteAuthRouter.put(
 
 /** "Invita un amico" — codice personale (generato al primo utilizzo)
  *  e lo storico di chi è stato invitato: "in sospeso" (registrato, non
- *  ha ancora prenotato) o "completato" (ha prenotato, il bonus è
- *  scattato). Niente email/dati sensibili dell'amico, solo nome e
+ *  ha ancora viaggiato) o "completato" (ha fatto il suo primo viaggio,
+ *  il bonus è scattato). Niente email/dati sensibili dell'amico, solo nome e
  *  stato — a chi invita basta sapere "a che punto è", non altro. */
 clienteAuthRouter.get('/me/referral', richiedeAuthCliente, asyncHandler(async (req: Request, res: Response) => {
   if (!req.cliente) throw new NonAutorizzato();

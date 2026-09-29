@@ -174,6 +174,9 @@ export const richiesteRimborsoService = {
         throw err;
       }
       await creditoService.revocaCreditoSePresente(p.id);
+      // Se su questo viaggio era scattato il bonus "invita un amico",
+      // torna indietro anche quello: il viaggio non c'è più stato.
+      await creditoService.revocaBonusReferralSePresente(p.id);
       await restituisciUtilizzi(p);
       // Meta continuerebbe altrimenti a considerare valido per sempre
       // un acquisto ormai rimborsato — le sue campagne ottimizzerebbero

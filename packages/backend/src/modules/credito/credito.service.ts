@@ -32,10 +32,13 @@ export const creditoService = {
         .returning();
       if (!p) return;
 
+      // Solo i movimenti DI QUESTO cliente: alla stessa prenotazione può
+      // essere legato anche il bonus "invita un amico", che però è finito
+      // sul saldo di chi lo ha invitato (lo toglie revocaBonusReferralSePresente).
       const [{ importo: importoOriginale }] = await tx
         .select({ importo: sql<string>`coalesce(sum(${movimentiCredito.importo}), '0')` })
         .from(movimentiCredito)
-        .where(and(eq(movimentiCredito.prenotazioneId, prenotazioneId), sql`${movimentiCredito.importo} > 0`));
+        .where(and(eq(movimentiCredito.prenotazioneId, prenotazioneId), eq(movimentiCredito.utenteId, p.utenteId), sql`${movimentiCredito.importo} > 0`));
       const importo = Number(importoOriginale);
       if (importo <= 0) return;
 
@@ -170,43 +173,120 @@ export const creditoService = {
     });
   },
 
-  /** Il bonus di CHI INVITA — solo quando l'amico invitato conferma
-   *  davvero la SUA prima prenotazione (non basta essersi iscritto),
-   *  stesso principio di "nessun bonus per un invito finto mai usato
-   *  per viaggiare davvero". Chiamata nello stesso punto in cui matura
-   *  il credito normale (biglietto emesso) — se questa non è la prima
-   *  prenotazione confermata dell'amico, o il bonus è già stato dato
-   *  per lui, non fa nulla (bonusReferralInvitanteErogato lo impedisce
-   *  anche in caso di doppia chiamata). */
-  async maturaBonusReferralInvitanteSeAmicoNuovo(prenotazioneId: string) {
-    const [p] = await db.select({ utenteId: prenotazioni.utenteId }).from(prenotazioni).where(eq(prenotazioni.id, prenotazioneId)).limit(1);
-    if (!p) return;
+  /** Il bonus di CHI INVITA — solo DOPO il primo viaggio dell'amico
+   *  invitato (proprietario, settembre 2026: prima arrivava all'emissione
+   *  del biglietto, ma senza pagamento online bastava prenotare per farlo
+   *  scattare, e restava anche dopo un rimborso). Ora lo dà il giro
+   *  giornaliero su una prenotazione già viaggiata, pagata per intero e
+   *  ancora confermata; resta legato a quella prenotazione, così un
+   *  rimborso approvato lo toglie (revocaBonusReferralSePresente).
+   *  bonusReferralInvitanteErogato lo rende comunque una volta sola,
+   *  anche con due chiamate insieme. */
+  async maturaBonusReferralInvitanteSeAmicoNuovo(prenotazioneId: string): Promise<boolean> {
+    // Controllo qui (non solo in chi chiama): il bonus non deve mai
+    // partire per un viaggio non ancora avvenuto o non saldato.
+    const [p] = await db.select({ utenteId: prenotazioni.utenteId })
+      .from(prenotazioni)
+      .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
+      .where(and(
+        eq(prenotazioni.id, prenotazioneId),
+        eq(prenotazioni.stato, 'CONFERMATA'),
+        eq(prenotazioni.saldoPagato, true),
+        lt(eventi.data, inizioOggiRoma()),
+      ))
+      .limit(1);
+    if (!p) return false;
     const [amico] = await db.select({ invitatoDa: utenti.invitatoDaUtenteId, bonusGiaDato: utenti.bonusReferralInvitanteErogato, nome: utenti.nome })
       .from(utenti).where(eq(utenti.id, p.utenteId)).limit(1);
-    if (!amico?.invitatoDa || amico.bonusGiaDato) return;
-
-    // "Prima prenotazione vera" = nessun'altra prenotazione CONFERMATA
-    // con biglietto già emesso, a parte questa.
-    const [{ numeroAltre }] = await db.select({ numeroAltre: sql<number>`count(*)::int` }).from(prenotazioni)
-      .where(and(eq(prenotazioni.utenteId, p.utenteId), eq(prenotazioni.stato, 'CONFERMATA'), eq(prenotazioni.ticketStato, 'EMESSO'), sql`${prenotazioni.id} != ${prenotazioneId}`));
-    if (numeroAltre > 0) return;
+    if (!amico?.invitatoDa || amico.bonusGiaDato) return false;
 
     const importo = await leggiCreditoReferralInvitante();
-    if (importo <= 0) return;
+    if (importo <= 0) return false;
 
-    await db.transaction(async (tx) => {
-      // Il segno "bonus dato" per primo, con la condizione: due biglietti
-      // emessi insieme non danno il bonus due volte.
+    return db.transaction(async (tx) => {
+      // Il segno "bonus dato" per primo, con la condizione: due giri
+      // insieme non danno il bonus due volte.
       const [primo] = await tx.update(utenti).set({ bonusReferralInvitanteErogato: true })
         .where(and(eq(utenti.id, p.utenteId), eq(utenti.bonusReferralInvitanteErogato, false)))
         .returning({ id: utenti.id });
-      if (!primo) return;
+      if (!primo) return false;
       await tx.insert(movimentiCredito).values({
         utenteId: amico.invitatoDa!,
         importo: importo.toFixed(2),
-        motivo: `Amico invitato${amico.nome ? ` (${amico.nome})` : ''} — prima prenotazione confermata`,
+        motivo: `Amico invitato${amico.nome ? ` (${amico.nome})` : ''} — primo viaggio fatto`,
+        prenotazioneId,
       });
       await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} + ${importo.toFixed(2)}` }).where(eq(utenti.id, amico.invitatoDa!));
+      return true;
+    });
+  },
+
+  /** Giro giornaliero (scheduler): cerca i primi viaggi già fatti dagli
+   *  amici invitati e paga il bonus a chi li ha invitati. Guarda solo
+   *  chi è stato invitato e non ha ancora fatto scattare il bonus,
+   *  quindi di norma trova zero o poche righe. */
+  async maturaBonusReferralViaggiConclusi() {
+    const importo = await leggiCreditoReferralInvitante();
+    if (importo <= 0) return { pagati: 0 };
+
+    const daPagare = await db
+      .select({ prenotazioneId: prenotazioni.id })
+      .from(prenotazioni)
+      .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
+      .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
+      .where(and(
+        eq(prenotazioni.stato, 'CONFERMATA'),
+        eq(prenotazioni.saldoPagato, true),
+        lt(eventi.data, inizioOggiRoma()),
+        sql`${utenti.invitatoDaUtenteId} is not null`,
+        eq(utenti.bonusReferralInvitanteErogato, false),
+      ));
+
+    let pagati = 0;
+    for (const p of daPagare) {
+      if (await creditoService.maturaBonusReferralInvitanteSeAmicoNuovo(p.prenotazioneId)) pagati++;
+    }
+    return { pagati };
+  },
+
+  /** Rimborso approvato su quel primo viaggio: il bonus torna indietro a
+   *  chi aveva invitato (se lo ha ancora) e l'amico torna "senza bonus
+   *  dato", così il bonus potrà scattare su un viaggio vero successivo.
+   *  Il segno si toglie per primo, con la condizione: due rimborsi
+   *  insieme non tolgono il bonus due volte, e non si scende sotto zero. */
+  async revocaBonusReferralSePresente(prenotazioneId: string) {
+    await db.transaction(async (tx) => {
+      const [p] = await tx.select({ utenteId: prenotazioni.utenteId, pnr: prenotazioni.pnr })
+        .from(prenotazioni).where(eq(prenotazioni.id, prenotazioneId)).limit(1);
+      if (!p) return;
+
+      // Il movimento del bonus è legato a questa prenotazione ma è sul
+      // saldo di CHI HA INVITATO: lo si cerca così.
+      const [bonus] = await tx.select({ utenteId: movimentiCredito.utenteId, importo: movimentiCredito.importo })
+        .from(movimentiCredito)
+        .where(and(
+          eq(movimentiCredito.prenotazioneId, prenotazioneId),
+          sql`${movimentiCredito.utenteId} != ${p.utenteId}`,
+          sql`${movimentiCredito.importo} > 0`,
+        ))
+        .limit(1);
+      if (!bonus) return;
+
+      const [tolto] = await tx.update(utenti).set({ bonusReferralInvitanteErogato: false })
+        .where(and(eq(utenti.id, p.utenteId), eq(utenti.bonusReferralInvitanteErogato, true)))
+        .returning({ id: utenti.id });
+      if (!tolto) return;
+
+      const [invitante] = await tx.select({ credito: utenti.creditoDisponibile }).from(utenti).where(eq(utenti.id, bonus.utenteId)).for('update').limit(1);
+      const daTogliere = Math.min(Number(bonus.importo), Number(invitante?.credito ?? 0));
+      if (daTogliere <= 0) return;
+      await tx.insert(movimentiCredito).values({
+        utenteId: bonus.utenteId,
+        importo: (-daTogliere).toFixed(2),
+        motivo: `Bonus amico annullato — rimborso PNR ${p.pnr}`,
+        prenotazioneId,
+      });
+      await tx.update(utenti).set({ creditoDisponibile: sql`${utenti.creditoDisponibile} - ${daTogliere.toFixed(2)}::numeric` }).where(eq(utenti.id, bonus.utenteId));
     });
   },
 };

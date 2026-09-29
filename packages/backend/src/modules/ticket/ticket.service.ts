@@ -137,8 +137,9 @@ export const ticketService = {
 
     try {
       const { creditoService } = await import('../credito/credito.service.js');
+      // Il bonus "invita un amico" NON si dà qui: arriva dopo il primo
+      // viaggio davvero fatto dall'amico (giro giornaliero).
       await creditoService.maturaCreditoSubito(p.id);
-      await creditoService.maturaBonusReferralInvitanteSeAmicoNuovo(p.id);
     } catch (err) {
       console.error(`Maturazione credito fallita per PNR ${p.pnr} (biglietto comunque emesso):`, err);
     }

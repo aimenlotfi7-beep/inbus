@@ -601,8 +601,8 @@ function SezioneInvitaAmico() {
     <section className="acc-sezione">
       <h1>Invita un amico</h1>
       <p className="testo-intro">
-        Condividi il tuo link: quando un amico si registra e completa la sua prima prenotazione, un bonus finisce sul
-        credito di tutti e due.
+        Condividi il tuo link: il tuo amico riceve il suo bonus appena si registra, il tuo arriva sul tuo credito dopo
+        il suo primo viaggio.
       </p>
 
       {!dati && <p className="acc-caricamento">Carico…</p>}
@@ -640,7 +640,7 @@ function SezioneInvitaAmico() {
               {inSospeso.map((i, idx) => (
                 <div className="riga-elenco" key={idx}>
                   <span>{i.nome}</span>
-                  <span className="quando">Registrato, non ha ancora prenotato</span>
+                  <span className="quando">Registrato — il tuo bonus arriva dopo il suo primo viaggio</span>
                 </div>
               ))}
             </div>

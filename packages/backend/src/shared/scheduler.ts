@@ -32,6 +32,12 @@ export function avviaSchedulerPromemoriaSaldo() {
       console.error('Errore durante la maturazione del credito fedeltà:', err);
     }
     try {
+      const { pagati } = await creditoService.maturaBonusReferralViaggiConclusi();
+      if (pagati > 0) console.log(`Bonus "invita un amico" accreditati dopo il primo viaggio: ${pagati}.`);
+    } catch (err) {
+      console.error('Errore durante l\'accredito dei bonus "invita un amico":', err);
+    }
+    try {
       const tolte = await pulisciRichiesteVecchie();
       if (tolte > 0) console.log(`Chiavi delle richieste già eseguite tolte (più vecchie di una settimana): ${tolte}.`);
     } catch (err) {
