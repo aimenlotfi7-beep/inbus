@@ -24,7 +24,7 @@ import { PromoterScreen } from './screens/PromoterScreen';
 import { OrganizzatoriScreen } from './screens/OrganizzatoriScreen';
 import { WhiteLabelScreen } from './screens/WhiteLabelScreen';
 import { TourLeaderScreen } from './screens/TourLeaderScreen';
-import { CouponScreen } from './screens/CouponScreen';
+import { CodiciScontoScreen } from './screens/CodiciScontoScreen';
 import { VoucherScreen } from './screens/VoucherScreen';
 import { CampagneScreen } from './screens/CampagneScreen';
 import { ChatScreen } from './screens/ChatScreen';
@@ -68,7 +68,7 @@ const SCHERMATE: Record<SezioneGestionale, React.ComponentType> = {
   organizzatori: OrganizzatoriScreen,
   'white-label': WhiteLabelScreen,
   tourleader: TourLeaderScreen,
-  coupon: CouponScreen,
+  coupon: CodiciScontoScreen,
   voucher: VoucherScreen,
   campagne: CampagneScreen,
   'lista-attesa': ListaAttesaScreen,

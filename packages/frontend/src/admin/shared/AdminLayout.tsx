@@ -29,14 +29,24 @@ export type SezioneGestionale =
 
 // Ogni voce dichiara il permesso che serve per vederla. Chi ha ruolo
 // "owner" vede sempre tutto (haPermesso lo gestisce automaticamente).
-const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; permesso: string }[] }[] = [
-  { titolo: 'Eventi', voci: [
+// Ordine dei gruppi: da quello che si apre ogni giorno a quello che si
+// apre quasi mai (riordino deciso dal proprietario, settembre 2026).
+// Prima le Statistiche erano dentro "Sistema", i soldi erano divisi tra
+// Vendite, Customer Care e Marketing, il Cestino stava tra le impostazioni
+// e "Persone" mescolava partner e squadra.
+export const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; permesso: string }[] }[] = [
+  { titolo: 'Andamento', voci: [
+    { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
+    { id: 'calendario', label: 'Calendario', permesso: 'eventi.calendario' },
     // Per chi è responsabile di eventi (vedi puoVedereSezione), non un permesso.
     { id: 'mio-compenso', label: 'Il mio compenso', permesso: '' },
+  ]},
+  { titolo: 'Eventi', voci: [
     { id: 'eventi', label: 'Eventi', permesso: 'eventi.visualizza' },
     { id: 'bundle', label: 'Bundle', permesso: 'bundle.visualizza' },
     { id: 'tour', label: 'Tour', permesso: 'tour.visualizza' },
-    { id: 'calendario', label: 'Calendario', permesso: 'eventi.calendario' },
+    { id: 'vetrina', label: 'Vetrina', permesso: 'eventi.vetrina' },
+    { id: 'cestino', label: 'Cestino', permesso: 'eventi.cestino' },
   ]},
   { titolo: 'Partenze', voci: [
     { id: 'partenze-orari', label: 'Orari', permesso: 'eventi.partenze' },
@@ -45,56 +55,55 @@ const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; pe
     { id: 'partenze-da-confermare', label: 'Da confermare', permesso: 'eventi.partenze' },
     { id: 'partenze-confermato', label: 'Confermate', permesso: 'eventi.partenze' },
     { id: 'partenze-passate', label: 'Passate', permesso: 'eventi.partenze' },
-    { id: 'variazioni', label: 'Variazioni', permesso: 'prenotazioni.pagamenti' },
   ]},
   { titolo: 'Vendite', voci: [
     { id: 'transazioni', label: 'Prenotazioni', permesso: 'prenotazioni.transazioni' },
+    { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
     { id: 'lista-attesa', label: "Lista d'attesa", permesso: 'eventi.partenze' },
   ]},
-  { titolo: 'Marketing', voci: [
-    { id: 'campagne', label: 'Campagne', permesso: 'campagne.gestisci' },
-    { id: 'tracciamento', label: 'Tracciamento', permesso: 'impostazioni.gestisci' },
-    { id: 'coupon', label: 'Coupon', permesso: 'coupon.visualizza' },
-    { id: 'offerte', label: 'Offerte', permesso: 'offerte.gestisci' },
-    { id: 'vetrina', label: 'Vetrina', permesso: 'eventi.vetrina' },
-    { id: 'contenuti', label: 'Contenuti sito', permesso: 'pagine.gestisci' },
-    { id: 'template-email', label: 'Testo email', permesso: 'template-email.gestisci' },
-    { id: 'layout-biglietto', label: 'Layout biglietto', permesso: 'layout-biglietto.gestisci' },
-  ]},
   { titolo: 'Customer Care', voci: [
-    { id: 'pagamenti', label: 'Pagamenti', permesso: 'prenotazioni.pagamenti' },
     { id: 'rimborsi', label: 'Rimborsi', permesso: 'prenotazioni.pagamenti' },
-    { id: 'utenti', label: 'Utenti', permesso: 'utenti.visualizza' },
-    { id: 'voucher', label: 'Voucher', permesso: 'coupon.visualizza' },
+    // Le risposte dei clienti a un viaggio cambiato: è assistenza, non operativo.
+    { id: 'variazioni', label: 'Variazioni', permesso: 'prenotazioni.pagamenti' },
+    { id: 'utenti', label: 'Clienti', permesso: 'utenti.visualizza' },
     { id: 'chat', label: 'Chat', permesso: 'chat.visualizza' },
     { id: 'comunicazioni', label: 'Comunicazioni', permesso: 'eventi.crea' },
   ]},
-  { titolo: 'Persone', voci: [
-    { id: 'promoter', label: 'Promoter', permesso: 'promoter.visualizza' },
+  { titolo: 'Promozioni', voci: [
+    { id: 'campagne', label: 'Campagne', permesso: 'campagne.gestisci' },
+    { id: 'offerte', label: 'Offerte', permesso: 'offerte.gestisci' },
+    // Coupon pubblici e voucher personali insieme, con due linguette
+    // (CodiciScontoScreen): la voce 'voucher' resta raggiungibile da un
+    // vecchio indirizzo salvato, ma non è più nel menu.
+    { id: 'coupon', label: 'Codici sconto', permesso: 'coupon.visualizza' },
+    { id: 'tracciamento', label: 'Tracciamento', permesso: 'impostazioni.gestisci' },
+  ]},
+  { titolo: 'Partner', voci: [
     { id: 'organizzatori', label: 'Organizzatori', permesso: 'organizzatori.visualizza' },
     { id: 'white-label', label: 'White Label', permesso: 'white-label.visualizza' },
+    { id: 'promoter', label: 'Promoter', permesso: 'promoter.visualizza' },
+    { id: 'fornitori', label: 'Fornitori', permesso: 'fornitori.visualizza' },
+  ]},
+  { titolo: 'Anagrafiche', voci: [
+    { id: 'fermate', label: 'Fermate', permesso: 'tragitti.visualizza' },
+    { id: 'tragitti', label: 'Tragitti salvati', permesso: 'tragitti.visualizza' },
+    // Strumento ancora in prova: SOLO lettura dei dati già esistenti
+    // (eventi/tragitti/fermate), nessuna scrittura e nessun collegamento
+    // dentro Partenze — si può togliere in qualunque momento.
+    { id: 'beta-tragitti-vicini', label: 'Tragitti vicini (in prova)', permesso: 'eventi.partenze' },
+  ]},
+  { titolo: 'Squadra', voci: [
+    { id: 'amministratori', label: 'Amministratori', permesso: 'utenze.gestisci' },
+    { id: 'ruoli', label: 'Ruoli', permesso: 'permessi.gestisci' },
     { id: 'tourleader', label: 'Tour Leader', permesso: 'tourleader.visualizza' },
     { id: 'compensi', label: 'Compensi collaboratori', permesso: 'collaboratori.gestisci' },
   ]},
-  { titolo: 'Logistica', voci: [
-    { id: 'fornitori', label: 'Fornitori', permesso: 'fornitori.visualizza' },
-    { id: 'fermate', label: 'Fermate', permesso: 'tragitti.visualizza' },
-    { id: 'tragitti', label: 'Tragitti salvati', permesso: 'tragitti.visualizza' },
-  ]},
-  { titolo: 'Sistema', voci: [
-    { id: 'amministratori', label: 'Amministratori', permesso: 'utenze.gestisci' },
-    { id: 'ruoli', label: 'Ruoli', permesso: 'permessi.gestisci' },
-    { id: 'cestino', label: 'Cestino', permesso: 'eventi.cestino' },
-    { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
-    { id: 'testi-tooltip', label: 'Testi tooltip', permesso: 'impostazioni.gestisci' },
+  { titolo: 'Impostazioni', voci: [
     { id: 'impostazioni', label: 'Impostazioni', permesso: 'impostazioni.gestisci' },
-  ]},
-  // Sezione a parte per gli strumenti ancora in prova — SOLO lettura
-  // dei dati già esistenti (eventi/tragitti/fermate), nessuna scrittura
-  // e nessun collegamento dentro le schermate di Partenze: può essere
-  // tolta o cambiata in qualunque momento senza toccare nient'altro.
-  { titolo: 'Beta', voci: [
-    { id: 'beta-tragitti-vicini', label: 'Tragitti vicini', permesso: 'eventi.partenze' },
+    { id: 'testi-tooltip', label: 'Testi tooltip', permesso: 'impostazioni.gestisci' },
+    { id: 'template-email', label: 'Testo email', permesso: 'template-email.gestisci' },
+    { id: 'layout-biglietto', label: 'Layout biglietto', permesso: 'layout-biglietto.gestisci' },
+    { id: 'contenuti', label: 'Contenuti sito', permesso: 'pagine.gestisci' },
   ]},
 ];
 
