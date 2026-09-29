@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   pagamentiFornitoriApi,
   type ElencoPagamentiFornitori, type FiltriSpese, type MetodoPagamento,
