@@ -5,6 +5,10 @@ node_modules/
 dist/
 packages/frontend/dist/
 
+# Appunti del compilatore TypeScript: cambiano a ogni compilazione e
+# sporcavano ogni commit (si rigenerano da soli).
+*.tsbuildinfo
+
 # File d'ambiente con segreti — MAI da caricare su GitHub
 .env
 .env.local

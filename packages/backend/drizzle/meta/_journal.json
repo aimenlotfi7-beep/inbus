@@ -283,13 +283,6 @@
       "breakpoints": true
     },
     {
-      "idx": 40,
-      "version": "7",
-      "when": 1787608487603,
-      "tag": "0040_arrivo_per_servizio",
-      "breakpoints": true
-    },
-    {
       "idx": 41,
       "version": "7",
       "when": 1787636855193,
