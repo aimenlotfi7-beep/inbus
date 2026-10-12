@@ -125,7 +125,13 @@ async function calcolaTotaleReale(p: typeof prenotazioni.$inferSelect) {
   // Prenotazioni più vecchie: prezzo attuale della fermata, come prima.
   const [evento] = await db.select().from(eventi).where(eq(eventi.id, p.eventoId)).limit(1);
   const [tragitto] = await db.select().from(tragitti).where(eq(tragitti.id, p.tragittoId)).limit(1);
-  const [fermata] = await db.select().from(fermate).where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.tragittoId, p.tragittoId))).limit(1);
+  const [fermata] = await db.select().from(fermate)
+    .where(p.fermataId
+      // Dalla fermata scelta davvero: due fermate con la stessa città
+      // nello stesso tragitto hanno prezzi diversi (proprietario, ottobre 2026).
+      ? eq(fermate.id, p.fermataId)
+      : and(eq(fermate.citta, p.fermataCitta), eq(fermate.tragittoId, p.tragittoId)))
+    .limit(1);
   const prezzoNormale = prezzoNormaleFermata(fermata, evento, tragitto);
 
   let prezzoEffettivo = prezzoNormale;
@@ -388,6 +394,7 @@ async function creaRigaInterna(
       pnr: generaPnr(),
       eventoId: input.eventoId,
       tragittoId: input.tragittoId,
+      fermataId: fermata.id,
       fermataCitta: fermata.citta,
       fermataIndirizzo: fermata.indirizzo,
       fermataOrario: fermata.orario,
@@ -847,13 +854,21 @@ export const prenotazioniService = {
 
       // Se la fermata aveva un suo limite specifico, restituisco il
       // posto anche lì, altrimenti quella fermata resterebbe segnata
-      // come "esaurita" per sempre anche dopo la cancellazione. La
-      // prenotazione non salva l'id della fermata (solo città+bus, come
-      // altrove nel codice), quindi la ritrovo così.
+      // come "esaurita" per sempre anche dopo la cancellazione.
+      // Dalla fermata scelta davvero (proprietario, ottobre 2026): con
+      // due fermate della stessa città nello stesso tragitto, il nome
+      // le colpiva entrambe e liberava posti dove non erano occupati.
+      // Il nome resta la riserva per le prenotazioni di prima, dove
+      // l'id non c'è.
       await tx
         .update(fermate)
         .set({ postiPrenotati: sql`GREATEST(0, ${fermate.postiPrenotati} - ${p.passeggeri})` })
-        .where(and(eq(fermate.citta, p.fermataCitta), eq(fermate.tragittoId, p.tragittoId), sql`${fermate.postiMax} IS NOT NULL`));
+        .where(and(
+          p.fermataId
+            ? eq(fermate.id, p.fermataId)
+            : and(eq(fermate.citta, p.fermataCitta), eq(fermate.tragittoId, p.tragittoId)),
+          sql`${fermate.postiMax} IS NOT NULL`,
+        ));
 
       return { ...aggiornata, appenaCancellata: true };
     });

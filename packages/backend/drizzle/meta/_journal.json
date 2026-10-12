@@ -680,6 +680,13 @@
       "when": 1791834408283,
       "tag": "0097_rimborsi_completati",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1791835537370,
+      "tag": "0098_fermata_sulla_prenotazione",
+      "breakpoints": true
     }
   ]
 }

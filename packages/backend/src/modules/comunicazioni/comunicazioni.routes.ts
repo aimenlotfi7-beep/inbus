@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { eq, and, inArray, desc } from 'drizzle-orm';
+import { eq, and, inArray, desc, isNull, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/client.js';
 import { comunicazioni, prenotazioni, utenti, tragitti, fermate, conversazioniChat, messaggiChat, eventi } from '../../db/schema.js';
@@ -25,14 +25,19 @@ async function trovaDestinatari(eventoId: string, filtro: FiltroComunicazione) {
   const condizioni = [eq(prenotazioni.eventoId, eventoId), eq(prenotazioni.stato, 'CONFERMATA')];
 
   if (filtro.fermataId) {
-    // Le prenotazioni non hanno una chiave esterna vera alla fermata
-    // (salvano città/indirizzo come testo, non un id) — quindi si
-    // risale prima alla città della fermata scelta, e si filtra per
-    // quella città DENTRO la tratta giusta (il nome città da solo
-    // potrebbe ripetersi su tratte diverse).
+    // Dalla fermata scelta (proprietario, ottobre 2026): le prenotazioni
+    // salvano il suo id. Quelle di prima hanno solo il nome della città,
+    // e si riconoscono ancora così dentro la tratta giusta (il nome da
+    // solo potrebbe ripetersi su tratte diverse).
     const [fermataScelta] = await db.select().from(fermate).where(eq(fermate.id, filtro.fermataId)).limit(1);
     if (!fermataScelta) return [];
-    condizioni.push(eq(prenotazioni.tragittoId, fermataScelta.tragittoId), eq(prenotazioni.fermataCitta, fermataScelta.citta));
+    condizioni.push(
+      eq(prenotazioni.tragittoId, fermataScelta.tragittoId),
+      or(
+        eq(prenotazioni.fermataId, fermataScelta.id),
+        and(isNull(prenotazioni.fermataId), eq(prenotazioni.fermataCitta, fermataScelta.citta)),
+      )!,
+    );
   } else if (filtro.tragittoId) {
     condizioni.push(eq(prenotazioni.tragittoId, filtro.tragittoId));
   } else if (filtro.servizioIds.length > 0) {

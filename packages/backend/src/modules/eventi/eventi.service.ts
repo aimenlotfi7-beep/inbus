@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, isNull, notInArray, sql, gte, lt, asc, ne } from 'drizzle-orm';
+import { and, eq, ilike, inArray, isNotNull, isNull, notInArray, or, sql, gte, lt, asc, ne } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
   eventi,
@@ -1121,17 +1121,25 @@ export const eventiService = {
     // quelle marcate "Partenza", un concetto tolto insieme al campo
     // "tipo" — la sola presenza di una soglia scritta basta a dire che
     // va controllata).
-    const fermateConSoglia = tragittiDaMostrare.flatMap((t) => t.fermate.filter((f) => f.sogliaMinima != null).map((f) => ({ tragittoId: t.id, citta: f.citta })));
-    const contiPartenza = new Map<string, number>(); // chiave: `${tragittoId}::${citta}`
+    // Per fermata, non per nome di città (proprietario, ottobre 2026):
+    // con due punti di salita nella stessa città la soglia di uno
+    // contava anche i passeggeri dell'altro. Le prenotazioni di prima
+    // senza fermataId si contano ancora per nome (chiave di riserva).
+    const fermateConSoglia = tragittiDaMostrare.flatMap((t) => t.fermate.filter((f) => f.sogliaMinima != null).map((f) => ({ tragittoId: t.id, id: f.id })));
+    const contiPartenza = new Map<string, number>(); // chiave: id della fermata, o `${tragittoId}::${citta}`
     if (fermateConSoglia.length > 0) {
       const righe = await db.select({
         tragittoId: prenotazioni.tragittoId,
+        fermataId: prenotazioni.fermataId,
         citta: prenotazioni.fermataCitta,
         tot: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)`,
       }).from(prenotazioni)
         .where(and(inArray(prenotazioni.tragittoId, [...new Set(fermateConSoglia.map((f) => f.tragittoId))]), eq(prenotazioni.stato, 'CONFERMATA')))
-        .groupBy(prenotazioni.tragittoId, prenotazioni.fermataCitta);
-      for (const r of righe) contiPartenza.set(`${r.tragittoId}::${r.citta}`, Number(r.tot));
+        .groupBy(prenotazioni.tragittoId, prenotazioni.fermataId, prenotazioni.fermataCitta);
+      for (const r of righe) {
+        const chiave = r.fermataId ?? `${r.tragittoId}::${r.citta}`;
+        contiPartenza.set(chiave, (contiPartenza.get(chiave) ?? 0) + Number(r.tot));
+      }
     }
 
     // Una sola query per la regione di TUTTE le fermate collegate
@@ -1166,7 +1174,9 @@ export const eventiService = {
         const postiDisponibiliFermata = f.postiMax != null
           ? Math.min(tragitto.postiDisponibili, Math.max(0, f.postiMax - f.postiPrenotati))
           : tragitto.postiDisponibili;
-        const partecipantiAttuali = f.sogliaMinima != null ? (contiPartenza.get(`${tragitto.id}::${f.citta}`) ?? 0) : null;
+        const partecipantiAttuali = f.sogliaMinima != null
+          ? (contiPartenza.get(f.id) ?? 0) + (contiPartenza.get(`${tragitto.id}::${f.citta}`) ?? 0)
+          : null;
         opzioni.push({
           tragittoId: tragitto.id,
           postiDisponibili: postiDisponibiliFermata,
@@ -1686,10 +1696,19 @@ export const eventiService = {
       // lo mette su un bus che passa di lì e gli manda il biglietto nuovo.
       const busDellaLinea = (await tx.select({ id: busFisici.id }).from(busFisici).where(eq(busFisici.lineaId, lineaId))).map((b) => b.id);
       if (busDellaLinea.length > 0) {
+        // Per fermata, non per nome di città (proprietario, ottobre
+        // 2026): con due punti di salita nella stessa città, chi saliva
+        // a quello tolto dalla linea restava sul bus. Le prenotazioni di
+        // prima, senza fermataId, si riconoscono ancora per nome.
+        const idCoperti = fermateOrdinate.map((f) => f.id);
+        const cittaCoperte = [...new Set(fermateOrdinate.map((f) => f.citta))];
         await tx.update(prenotazioni).set({ busId: null }).where(and(
           inArray(prenotazioni.busId, busDellaLinea),
           eq(prenotazioni.stato, 'CONFERMATA'),
-          notInArray(prenotazioni.fermataCitta, [...new Set(fermateOrdinate.map((f) => f.citta))]),
+          or(
+            and(isNotNull(prenotazioni.fermataId), notInArray(prenotazioni.fermataId, idCoperti)),
+            and(isNull(prenotazioni.fermataId), notInArray(prenotazioni.fermataCitta, cittaCoperte)),
+          ),
         ));
       }
       await ricalcolaPostiTragitto(tx, lineaEsiste.tragittoId);

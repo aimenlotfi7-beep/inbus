@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, gte, ilike, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, inArray, isNotNull, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { variazioni, variazioniRisposte, prenotazioni, richiesteRimborso, eventi, tragitti, utenti, fermate, linee, lineaFermate } from '../../db/schema.js';
 import { calcolaTempi, leggiOrariTragitto } from '../prenotazioni/partenza.js';
@@ -9,11 +9,14 @@ import { leggiSogliaPosticipoMinuti } from '../impostazioni/impostazioni.routes.
 import { templateEmailService } from '../template-email/template-email.service.js';
 import { NonTrovato } from '../../shared/errors.js';
 
-export type FermataConfronto = { citta: string; indirizzo?: string | null; orario?: string | null; attivo?: boolean | null };
+/** `id` quando si sa di quale fermata si parla (proprietario, ottobre
+ *  2026: con due fermate omonime nello stesso tragitto il nome non
+ *  basta); senza id si usa il nome, come si è sempre fatto. */
+export type FermataConfronto = { id?: string | null; citta: string; indirizzo?: string | null; orario?: string | null; attivo?: boolean | null };
 
 /** Una variazione da comunicare. Con fermataVecchia valorizzata tocca
- *  chi ha prenotato su QUELLA fermata (città); con fermataVecchia null
- *  tocca tutte le prenotazioni confermate del tragitto (data o luogo
+ *  chi ha prenotato su QUELLA fermata; con fermataVecchia null tocca
+ *  tutte le prenotazioni confermate del tragitto (data o luogo
  *  dell'evento cambiati). */
 export type VariazioneRilevata = { fermataVecchia: FermataConfronto | null; descrizione: string };
 
@@ -115,13 +118,17 @@ export async function rilevaVariazioni(
 }
 
 /** Le prenotazioni toccate da una variazione: confermate, del tragitto,
- *  sulla città della fermata (matching per città, come già fa tutto il
- *  resto dell'app — le prenotazioni salvano la città come testo, non un
- *  riferimento) oppure tutte quelle del tragitto se citta è null. Una
- *  sola definizione, usata sia per l'invio vero sia per l'anteprima. */
-function condizioniPrenotazioniToccate(tragittoId: string, citta: string | null): SQL[] {
+ *  su QUELLA fermata (dal suo id quando c'è, altrimenti dal nome della
+ *  città — e per nome anche per le prenotazioni di prima, che l'id non
+ *  ce l'hanno), oppure tutte quelle del tragitto se la fermata è null.
+ *  Una sola definizione, usata sia per l'invio vero sia per l'anteprima. */
+function condizioniPrenotazioniToccate(tragittoId: string, fermata: FermataConfronto | null): SQL[] {
   const condizioni: SQL[] = [eq(prenotazioni.tragittoId, tragittoId), eq(prenotazioni.stato, 'CONFERMATA')];
-  if (citta !== null) condizioni.push(eq(prenotazioni.fermataCitta, citta));
+  if (fermata) {
+    condizioni.push(fermata.id
+      ? or(eq(prenotazioni.fermataId, fermata.id), and(isNull(prenotazioni.fermataId), eq(prenotazioni.fermataCitta, fermata.citta)))!
+      : eq(prenotazioni.fermataCitta, fermata.citta));
+  }
   return condizioni;
 }
 
@@ -134,12 +141,11 @@ export async function anteprimaComunicazioni(
 ): Promise<{ fermata: string; descrizione: string; clienti: number; prenotazioniIds: string[] }[]> {
   const righe: { fermata: string; descrizione: string; clienti: number; prenotazioniIds: string[] }[] = [];
   for (const v of variazioniRilevate) {
-    const citta = v.fermataVecchia?.citta ?? null;
     const toccate = await db.select({ id: prenotazioni.id })
       .from(prenotazioni)
       .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
-      .where(and(...condizioniPrenotazioniToccate(tragittoId, citta)));
-    righe.push({ fermata: citta ?? '', descrizione: v.descrizione, clienti: toccate.length, prenotazioniIds: toccate.map((p) => p.id) });
+      .where(and(...condizioniPrenotazioniToccate(tragittoId, v.fermataVecchia)));
+    righe.push({ fermata: v.fermataVecchia?.citta ?? '', descrizione: v.descrizione, clienti: toccate.length, prenotazioniIds: toccate.map((p) => p.id) });
   }
   return righe;
 }
@@ -176,16 +182,15 @@ export async function generaComunicazioniVariazione(
     const perPrenotazione = new Map<string, { pnr: string; email: string; nome: string | null; descrizioni: string[]; token: string }>();
     for (const v of variazioniRilevate) {
       try {
-        const citta = v.fermataVecchia?.citta ?? null;
         const prenotazioniToccate = await db
           .select({ prenotazione: prenotazioni, clienteEmail: utenti.email, clienteNome: utenti.nome })
           .from(prenotazioni)
           .innerJoin(utenti, eq(utenti.id, prenotazioni.utenteId))
-          .where(and(...condizioniPrenotazioniToccate(tragittoId, citta)));
+          .where(and(...condizioniPrenotazioniToccate(tragittoId, v.fermataVecchia)));
         if (prenotazioniToccate.length === 0) continue; // nessuno ha ancora prenotato, nessuna comunicazione da mandare
 
         const [nuovaVariazione] = await db.insert(variazioni).values({
-          tragittoId, fermataDescrizione: citta ?? '', descrizione: v.descrizione,
+          tragittoId, fermataDescrizione: v.fermataVecchia?.citta ?? '', descrizione: v.descrizione,
         }).returning();
 
         for (const { prenotazione: p, clienteEmail, clienteNome } of prenotazioniToccate) {
@@ -408,7 +413,7 @@ export async function disattivaFermateSottoSoglia() {
       // Garantita non-nulla dal filtro isNotNull qui sopra.
       const soglia = f.sogliaMinima!;
       const [conteggio] = await db.select({ tot: sql<number>`coalesce(sum(${prenotazioni.passeggeri}), 0)` }).from(prenotazioni)
-        .where(and(eq(prenotazioni.tragittoId, f.tragittoId), eq(prenotazioni.fermataCitta, f.citta), eq(prenotazioni.stato, 'CONFERMATA')));
+        .where(and(...condizioniPrenotazioniToccate(f.tragittoId, { id: f.fermataId, citta: f.citta })));
       const partecipantiAttuali = Number(conteggio?.tot ?? 0);
       if (partecipantiAttuali >= soglia) continue; // soglia raggiunta, nessuna azione
 
@@ -416,7 +421,7 @@ export async function disattivaFermateSottoSoglia() {
       disattivate++;
       // Non lancia mai, e un cliente non raggiunto non ferma gli altri.
       const esito = await generaComunicazioniVariazione(f.tragittoId, [{
-        fermataVecchia: { citta: f.citta, indirizzo: f.indirizzo, orario: f.orario },
+        fermataVecchia: { id: f.fermataId, citta: f.citta, indirizzo: f.indirizzo, orario: f.orario },
         descrizione: `La fermata di "${f.citta}" ${TESTO_SOGLIA} necessario (${partecipantiAttuali} su ${soglia} richiesti) — non è più prevista per questa partenza.`,
       }]);
       emailNonInviate += esito.emailNonInviate;

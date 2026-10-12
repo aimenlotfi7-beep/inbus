@@ -59,6 +59,7 @@ async function leggiPrenotazioni(condizione: SQL | undefined): Promise<Prenotazi
     ordineId: prenotazioni.ordineId,
     eventoId: prenotazioni.eventoId,
     tragittoId: prenotazioni.tragittoId,
+    fermataId: prenotazioni.fermataId,
     fermataCitta: prenotazioni.fermataCitta,
     busId: prenotazioni.busId,
     utenteId: prenotazioni.utenteId,
@@ -101,21 +102,25 @@ async function leggiPrenotazioni(condizione: SQL | undefined): Promise<Prenotazi
  *  calcolato come al saldo (prezzo attuale della fermata, offerta, sconto): i
  *  numeri di un periodo non cambiano quando arriva il saldo, e il confronto
  *  con un periodo già tutto saldato non penalizza quello in corso. */
-async function totaliPrevisti(righe: { id: string; tragittoId: string; fermataCitta: string; passeggeri: number; totale: string; sconto: string; scontoBundle: string | null; offertaId: string | null }[]) {
+async function totaliPrevisti(righe: { id: string; tragittoId: string; fermataId: string | null; fermataCitta: string; passeggeri: number; totale: string; sconto: string; scontoBundle: string | null; offertaId: string | null }[]) {
   const previsti = new Map<string, number>();
   if (righe.length === 0) return previsti;
   const tragittiIds = [...new Set(righe.map((r) => r.tragittoId))];
   const offerteIds = [...new Set(righe.map((r) => r.offertaId).filter((id): id is string => id !== null))];
   const [righeFermate, righeTragitti, righeOfferte] = await Promise.all([
-    aBlocchiDaDb(tragittiIds, (ids) => db.select({ tragittoId: fermate.tragittoId, citta: fermate.citta, prezzo: fermate.prezzo })
+    aBlocchiDaDb(tragittiIds, (ids) => db.select({ id: fermate.id, tragittoId: fermate.tragittoId, citta: fermate.citta, prezzo: fermate.prezzo })
       .from(fermate).where(inArray(fermate.tragittoId, ids)).orderBy(asc(fermate.ordine))),
     aBlocchiDaDb(tragittiIds, (ids) => db.select({ id: tragitti.id, prezzoExtra: tragitti.prezzoExtra, prezzoEvento: eventi.prezzo })
       .from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId)).where(inArray(tragitti.id, ids))),
     aBlocchiDaDb(offerteIds, (ids) => db.select({ id: offerteEvento.id, scontoPercentuale: offerteEvento.scontoPercentuale })
       .from(offerteEvento).where(inArray(offerteEvento.id, ids))),
   ]);
+  // Per id della fermata, e per nome solo come riserva (prenotazioni di
+  // prima di ottobre 2026): con due fermate omonime nello stesso
+  // tragitto il prezzo previsto si leggeva da una delle due a caso.
   const fermataPer = new Map<string, { prezzo: string | null }>();
   for (const f of righeFermate) {
+    fermataPer.set(f.id, f);
     const chiave = `${f.tragittoId} ${f.citta}`;
     if (!fermataPer.has(chiave)) fermataPer.set(chiave, f);
   }
@@ -124,7 +129,7 @@ async function totaliPrevisti(righe: { id: string; tragittoId: string; fermataCi
   for (const r of righe) {
     const t = tragittoPer.get(r.tragittoId);
     const prezzo = applicaScontoOfferta(
-      prezzoNormaleFermata(fermataPer.get(`${r.tragittoId} ${r.fermataCitta}`), t ? { prezzo: t.prezzoEvento } : undefined, t),
+      prezzoNormaleFermata(fermataPer.get(r.fermataId ?? `${r.tragittoId} ${r.fermataCitta}`), t ? { prezzo: t.prezzoEvento } : undefined, t),
       r.offertaId ? offertaPer.get(r.offertaId) : undefined,
     );
     // Mai meno dell'acconto: se il prezzo della fermata non c'è più resta quello.

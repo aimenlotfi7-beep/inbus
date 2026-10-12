@@ -13,6 +13,9 @@ export interface PrenotazioneStatistica {
   ordineId: string | null;
   eventoId: string;
   tragittoId: string;
+  /** La fermata scelta (vuota per le prenotazioni di prima di ottobre 2026
+   *  dove due fermate omonime non la rendevano riconoscibile). */
+  fermataId: string | null;
   fermataCitta: string;
   busId: string | null;
   utenteId: string;

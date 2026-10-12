@@ -806,6 +806,17 @@ export const prenotazioni = pgTable('prenotazioni', {
   pnr: text('pnr').notNull().unique(),
   eventoId: text('evento_id').notNull().references(() => eventi.id),
   tragittoId: text('tragitto_id').notNull().references(() => tragitti.id),
+  // QUALE fermata ha scelto il cliente (proprietario, ottobre 2026).
+  // Prima c'era solo il nome della città qui sotto, e due punti di
+  // salita nella stessa città dello stesso tragitto ("Milano
+  // Lampugnano" e "Milano Famagosta") si confondevano: i posti
+  // prenotati tornavano liberi su entrambi e il prezzo si leggeva da
+  // una delle due a caso. Vuoto solo per le prenotazioni di prima dove
+  // la città non bastava a riconoscerla, e se la fermata viene
+  // eliminata (lo storico resta leggibile grazie a fermataCitta).
+  fermataId: text('fermata_id').references(() => fermate.id, { onDelete: 'set null' }),
+  // Il nome della città COM'ERA all'acquisto: resta anche se la fermata
+  // cambia nome o sparisce (biglietto, email, contabilità).
   fermataCitta: text('fermata_citta').notNull(),
   // Su quale bus/Linea è stata assegnata questa prenotazione — vuoto
   // finché non è stato costruito nessun bus che copre la sua fermata,
@@ -915,6 +926,7 @@ export const prenotazioni = pgTable('prenotazioni', {
   perStato: index('prenotazioni_stato_idx').on(t.stato),
   perUtente: index('prenotazioni_utente_idx').on(t.utenteId),
   perFermata: index('prenotazioni_fermata_citta_idx').on(t.tragittoId, t.fermataCitta),
+  perFermataId: index('prenotazioni_fermata_idx').on(t.fermataId),
 }));
 
 // Un partecipante per passeggero della prenotazione (il richiedente è
