@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { coupon, prenotazioni, promoter } from '../../db/schema.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
+import { codiceGiaUsato } from './promoter.routes.js';
 import { prenotazioniComeStatistiche } from '../statistiche/statistiche.service.js';
 import { commissioniPer } from '../statistiche/economia.js';
 import { creaCoupon, riga, scenarioBase, svuotaDatabase } from '../../../test/dati.js';
@@ -22,6 +23,22 @@ async function commissioneTotale() {
   const { righe, ctx } = await prenotazioniComeStatistiche(undefined);
   return commissioniPer(righe, () => 'tutto', ctx, { quoteWhiteLabel: false }).get('tutto') ?? 0;
 }
+
+describe('codice del promoter', () => {
+  it('un codice già comparso in una vendita non è più libero, nemmeno a promoter eliminato', async () => {
+    // Le vendite si attribuiscono al codice: riusarlo per un promoter
+    // nuovo gli regalerebbe le vendite — e le commissioni — del vecchio
+    // (controllo della logica, ottobre 2026).
+    const s = await scenarioBase();
+    const p = await creaPromoter('10');
+    await prenotazioniService.crea(riga({ eventoId: s.evento.id, tragittoId: s.tragitto.id, fermataId: s.roma.id }, s.cliente, { promoterCodice: 'GIU123' }), s.cliente.id);
+
+    expect(await codiceGiaUsato('GIU123')).toBe(true);
+    await db.delete(promoter).where(eq(promoter.id, p.id));
+    expect(await codiceGiaUsato('GIU123')).toBe(true);
+    expect(await codiceGiaUsato('GIU124')).toBe(false);
+  });
+});
 
 describe('compenso del promoter fissato alla vendita', () => {
   it('cambiare poi la percentuale del promoter non cambia la commissione', async () => {

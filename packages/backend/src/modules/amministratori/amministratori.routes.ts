@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { db } from '../../db/client.js';
@@ -75,6 +75,40 @@ export async function registraLog(amministratoreId: string | null, azione: strin
   await db.insert(logAttivita).values({ amministratoreId, azione, dettaglio });
 }
 
+type Lettore = Pick<typeof db, 'select'>;
+
+/** Se questa utenza ha un ruolo proprietario. */
+async function eProprietario(lettore: Lettore, id: string): Promise<boolean> {
+  const [r] = await lettore.select({ owner: ruoli.owner }).from(amministratori)
+    .innerJoin(ruoli, eq(ruoli.id, amministratori.ruoloId))
+    .where(eq(amministratori.id, id)).limit(1);
+  return !!r?.owner;
+}
+
+/** Se, a parte `escluso`, resta almeno un'altra utenza proprietaria —
+ *  `soloAttive` per la disattivazione (serve qualcuno che possa entrare),
+ *  tutte per l'eliminazione (una disattivata si può riattivare). */
+async function restaUnProprietario(lettore: Lettore, escluso: string, soloAttive: boolean): Promise<boolean> {
+  const [altro] = await lettore.select({ id: amministratori.id }).from(amministratori)
+    .innerJoin(ruoli, eq(ruoli.id, amministratori.ruoloId))
+    .where(and(eq(ruoli.owner, true), ne(amministratori.id, escluso), ...(soloAttive ? [eq(amministratori.attivo, true)] : [])))
+    .limit(1);
+  return !!altro;
+}
+
+/** "Resta almeno un proprietario" controllato e scritto nella STESSA
+ *  transazione (controllo della logica, ottobre 2026): prima si contava
+ *  e poi si scriveva, e due proprietari che si disattivavano a vicenda
+ *  nello stesso istante passavano entrambi il controllo — nessuno
+ *  poteva più entrare nel gestionale. Il blocco fa passare una
+ *  disattivazione (o eliminazione) di proprietari alla volta. */
+async function conProprietariBloccati<T>(lavoro: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('amministratori:proprietari'))`);
+    return lavoro(tx);
+  });
+}
+
 export const amministratoriService = {
   // Mai hash e token nelle risposte (shared/segreti.ts).
   list: async () => (await db.select().from(amministratori)).map(senzaSegreti),
@@ -89,19 +123,34 @@ export const amministratoriService = {
   },
   update: async (id: string, input: z.infer<typeof aggiornaAdminSchema>) => {
     await getById(id);
-    const [aggiornato] = await db.update(amministratori).set({
+    const valori = {
       ...(input.nome !== undefined && { nome: input.nome }),
       ...(input.email !== undefined && { email: input.email.toLowerCase() }),
       ...(input.ruoloId !== undefined && { ruoloId: input.ruoloId }),
       ...(input.attivo !== undefined && { attivo: input.attivo }),
       ...(input.soloEventiAssegnati !== undefined && { soloEventiAssegnati: input.soloEventiAssegnati }),
       ...(input.password && { passwordHash: await bcrypt.hash(input.password, 10) }),
-    }).where(eq(amministratori.id, id)).returning();
+    };
+    if (input.attivo === false) {
+      return conProprietariBloccati(async (tx) => {
+        if (await eProprietario(tx, id) && !(await restaUnProprietario(tx, id, true))) {
+          throw new ConflittoDati("Non puoi disattivare l'unica utenza proprietaria attiva.");
+        }
+        const [aggiornato] = await tx.update(amministratori).set(valori).where(eq(amministratori.id, id)).returning();
+        return senzaSegreti(aggiornato);
+      });
+    }
+    const [aggiornato] = await db.update(amministratori).set(valori).where(eq(amministratori.id, id)).returning();
     return senzaSegreti(aggiornato);
   },
   remove: async (id: string) => {
     await getById(id);
-    await db.delete(amministratori).where(eq(amministratori.id, id));
+    await conProprietariBloccati(async (tx) => {
+      if (await eProprietario(tx, id) && !(await restaUnProprietario(tx, id, false))) {
+        throw new ConflittoDati("Non puoi eliminare l'unica utenza proprietaria rimasta.");
+      }
+      await tx.delete(amministratori).where(eq(amministratori.id, id));
+    });
   },
   log: (limite = 100) => db.select().from(logAttivita).orderBy(desc(logAttivita.data)).limit(limite),
 };
@@ -165,16 +214,11 @@ amministratoriRouter.put(
         throw new VietatoDaiPermessi('Non puoi assegnare un ruolo con più permessi di quelli che hai tu.');
       }
     }
-    // Disattivare: mai sé stessi (si resterebbe fuori) né l'ultimo proprietario attivo.
-    if (req.body.attivo === false && target.attivo) {
-      if (target.id === req.admin!.sub) throw new ConflittoDati('Non puoi disattivare la tua utenza.');
-      if (ruoloAttuale?.owner) {
-        const proprietariAttivi = await db.select({ id: amministratori.id }).from(amministratori)
-          .where(and(eq(amministratori.ruoloId, target.ruoloId), eq(amministratori.attivo, true)));
-        if (proprietariAttivi.filter((a) => a.id !== target.id).length === 0) {
-          throw new ConflittoDati("Non puoi disattivare l'unica utenza proprietaria attiva.");
-        }
-      }
+    // Mai disattivare sé stessi: si resterebbe fuori. Che resti almeno un
+    // proprietario attivo lo controlla il service, nella stessa
+    // transazione della scrittura (due disattivazioni insieme).
+    if (req.body.attivo === false && target.attivo && target.id === req.admin!.sub) {
+      throw new ConflittoDati('Non puoi disattivare la tua utenza.');
     }
     res.json(await amministratoriService.update(req.params.id, req.body));
   })
@@ -205,12 +249,10 @@ amministratoriRouter.delete(
     const target = await getById(req.params.id);
     const eff = await permessiEffettivi(req.admin!.sub);
     const [ruoloTarget] = await db.select().from(ruoli).where(eq(ruoli.id, target.ruoloId)).limit(1);
-    if (ruoloTarget?.owner) {
-      if (!eff.owner) throw new VietatoDaiPermessi("Solo il proprietario può eliminare un'utenza proprietaria.");
-      const altriOwner = await db.select().from(amministratori).where(eq(amministratori.ruoloId, target.ruoloId));
-      if (altriOwner.filter((a) => a.id !== target.id).length === 0) {
-        throw new ConflittoDati("Non puoi eliminare l'unica utenza proprietaria rimasta.");
-      }
+    // Che resti almeno un'altra utenza proprietaria lo controlla il
+    // service, nella stessa transazione dell'eliminazione.
+    if (ruoloTarget?.owner && !eff.owner) {
+      throw new VietatoDaiPermessi("Solo il proprietario può eliminare un'utenza proprietaria.");
     }
     // Chi è responsabile di eventi ha compensi da registrare: prima si
     // tolgono le assegnazioni (o si disattiva l'utenza, che le conserva).

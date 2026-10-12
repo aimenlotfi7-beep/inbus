@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { coupon, prenotazioni, richiesteRimborso, tragitti, utenti } from '../../db/schema.js';
+import { coupon, movimentiCredito, prenotazioni, richiesteRimborso, tragitti, utenti } from '../../db/schema.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
 import { richiesteRimborsoService } from './richieste-rimborso.service.js';
 import { creaCliente, creaCoupon, creaEvento, creaFermata, creaTragitto, impostazione, riga, scenarioBase, svuotaDatabase } from '../../../test/dati.js';
@@ -88,6 +88,42 @@ describe('rimborso approvato', () => {
     expect(esiti.filter((e) => e.status === 'fulfilled')).toHaveLength(1);
     expect(esiti.find((e) => e.status === 'rejected')).toMatchObject({ reason: { statusCode: 409 } });
     expect(await creditoDi(s.cliente.id)).toBe(10);
+  });
+});
+
+describe('rimborso rimasto a metà', () => {
+  it('il giro giornaliero lo porta a termine: credito e uso del coupon tornano', async () => {
+    const s = await scenarioBase();
+    await creaCoupon({ codice: 'META5', tipo: 'FISSO', valore: '5', usiMax: 1 });
+    await db.update(utenti).set({ creditoDisponibile: '10' }).where(eq(utenti.id, s.cliente.id));
+    const p = await prenotazioniService.crea(riga({ eventoId: s.evento.id, tragittoId: s.tragitto.id, fermataId: s.roma.id }, s.cliente, { couponCodice: 'META5', usaCredito: true }), s.cliente.id);
+    const richiesta = await richiesteRimborsoService.richiedi(p.pnr, s.cliente.email);
+    await richiesteRimborsoService.approva(richiesta.id);
+
+    // Come se il server si fosse fermato dopo la cancellazione, prima
+    // delle restituzioni: il segno "completato" vuoto e l'uso del coupon
+    // ancora occupato.
+    await db.update(richiesteRimborso).set({ completatoIl: null }).where(eq(richiesteRimborso.id, richiesta.id));
+    await db.update(coupon).set({ usiAttuali: 1 }).where(eq(coupon.codice, 'META5'));
+    await db.update(utenti).set({ creditoDisponibile: '0' }).where(eq(utenti.id, s.cliente.id));
+    await db.delete(movimentiCredito).where(eq(movimentiCredito.prenotazioneId, (await db.select().from(prenotazioni).where(eq(prenotazioni.pnr, p.pnr)))[0].id));
+
+    expect(await richiesteRimborsoService.completaRimborsiInterrotti()).toEqual({ completati: 1 });
+    expect(await usi('META5')).toBe(0);
+    expect(await creditoDi(s.cliente.id)).toBe(10);
+    expect((await db.select().from(richiesteRimborso).where(eq(richiesteRimborso.id, richiesta.id)))[0].completatoIl).not.toBeNull();
+  });
+
+  it('su un rimborso già completato il giro non restituisce niente una seconda volta', async () => {
+    const s = await scenarioBase();
+    await creaCoupon({ codice: 'UNAVOLTA', tipo: 'FISSO', valore: '5', usiMax: 2 });
+    const p = await prenotazioniService.crea(riga({ eventoId: s.evento.id, tragittoId: s.tragitto.id, fermataId: s.roma.id }, s.cliente, { couponCodice: 'UNAVOLTA' }), s.cliente.id);
+    const richiesta = await richiesteRimborsoService.richiedi(p.pnr, s.cliente.email);
+    await richiesteRimborsoService.approva(richiesta.id);
+    expect(await usi('UNAVOLTA')).toBe(0);
+
+    expect(await richiesteRimborsoService.completaRimborsiInterrotti()).toEqual({ completati: 0 });
+    expect(await usi('UNAVOLTA')).toBe(0);
   });
 });
 

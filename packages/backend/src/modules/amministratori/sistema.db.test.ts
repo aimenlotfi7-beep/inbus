@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import { creaApp } from '../../app.js';
 import { env } from '../../config/env.js';
 import { db } from '../../db/client.js';
-import { promoter, promoterEventi } from '../../db/schema.js';
+import { amministratori, promoter, promoterEventi } from '../../db/schema.js';
 import { creaAmministratore, creaEvento, svuotaDatabase } from '../../../test/dati.js';
 import { posta } from '../../../test/posta.js';
 
@@ -48,6 +48,31 @@ describe('Amministratori', () => {
     expect((await chiama('PUT', `/amministratori/${collega.id}`, token, { attivo: false })).corpo.attivo).toBe(false);
     expect((await chiama('PUT', `/amministratori/${collega.id}`, token, { attivo: true })).corpo.attivo).toBe(true);
     expect((await chiama('PUT', `/amministratori/${io.id}`, token, { attivo: false })).stato).toBe(409);
+  });
+
+  it('due proprietari che si disattivano a vicenda nello stesso istante: uno solo passa', async () => {
+    // Controllo della logica, ottobre 2026: prima si contava e poi si
+    // scriveva, e restavano fuori tutti e due — nessuno poteva più
+    // entrare nel gestionale.
+    const uno = await creaAmministratore({ owner: true });
+    const due = await creaAmministratore({ owner: true });
+    const esiti = await Promise.all([
+      chiama('PUT', `/amministratori/${due.id}`, tokenAdmin(uno.id), { attivo: false }),
+      chiama('PUT', `/amministratori/${uno.id}`, tokenAdmin(due.id), { attivo: false }),
+    ]);
+    expect(esiti.filter((e) => e.stato === 200)).toHaveLength(1);
+    expect(esiti.filter((e) => e.stato === 409)).toHaveLength(1);
+    const attivi = (await db.select().from(amministratori)).filter((a) => a.attivo);
+    expect(attivi).toHaveLength(1);
+  });
+
+  it("l'ultimo proprietario non si elimina, nemmeno con un altro ruolo proprietario disattivato", async () => {
+    const io = await creaAmministratore({ owner: true });
+    const altro = await creaAmministratore({ owner: true, attivo: false });
+    // Ce n'è un altro (disattivato, riattivabile): l'eliminazione passa.
+    expect((await chiama('DELETE', `/amministratori/${altro.id}`, tokenAdmin(io.id))).stato).toBe(204);
+    // Ora è l'unico rimasto.
+    expect((await chiama('DELETE', `/amministratori/${io.id}`, tokenAdmin(io.id))).stato).toBe(409);
   });
 
   it('il link per una nuova password parte per email', async () => {

@@ -49,6 +49,12 @@ async function disponibilitaLista(busId: string) {
   return { disponibile: disponibileDal !== null && Date.now() >= disponibileDal.getTime(), disponibileDal };
 }
 
+function messaggioListaNonDisponibile(disponibileDal: Date | null): string {
+  return disponibileDal
+    ? `La lista passeggeri sarà disponibile dal ${formattaData(disponibileDal)} alle ${formattaOra(disponibileDal)}, dopo lo smistamento sui bus.`
+    : 'La lista passeggeri sarà disponibile il giorno prima della partenza, dopo lo smistamento sui bus.';
+}
+
 export const controlloAccessiService = {
   /** Bus assegnati a questo tour leader — su più eventi anche
    *  contemporaneamente, mostra sempre tutto (l'app di scansione serve
@@ -137,8 +143,19 @@ export const controlloAccessiService = {
    *  uno dei suoi bus. Serve per il check-in manuale quando il QR non si
    *  legge o il cliente non ce l'ha a portata di mano. */
   async cerca(tourLeaderId: string, query: string, busId?: string) {
-    const mieiBus = await busDelTourLeader(tourLeaderId);
-    if (busId && !mieiBus.some((b) => b.id === busId)) throw new VietatoDaiPermessi('Questo bus non ti è assegnato.');
+    const tuttiIMieiBus = await busDelTourLeader(tourLeaderId);
+    if (busId && !tuttiIMieiBus.some((b) => b.id === busId)) throw new VietatoDaiPermessi('Questo bus non ti è assegnato.');
+
+    // Stessa finestra della lista passeggeri, 24 ore prima della
+    // partenza (controllo della logica, ottobre 2026): prima la ricerca
+    // mostrava nomi e PNR quando la lista era ancora chiusa.
+    if (busId) {
+      const { disponibile, disponibileDal } = await disponibilitaLista(busId);
+      if (!disponibile) throw new ConflittoDati(messaggioListaNonDisponibile(disponibileDal));
+    }
+    const disponibilita = await Promise.all(tuttiIMieiBus.map(async (b) => ({ bus: b, ...(await disponibilitaLista(b.id)) })));
+    const mieiBus = disponibilita.filter((d) => d.disponibile).map((d) => d.bus);
+
     const q = query.trim().toLowerCase();
     if (mieiBus.length === 0 || q.length < 2) return [];
     const tragittiIds = [...new Set(mieiBus.map((b) => b.tragittoId))];
@@ -268,11 +285,7 @@ export const controlloAccessiService = {
   async pdfPasseggeri(busId: string, tourLeaderId: string) {
     await verificaProprietaBus(busId, tourLeaderId);
     const { disponibile, disponibileDal } = await disponibilitaLista(busId);
-    if (!disponibile) {
-      throw new ConflittoDati(disponibileDal
-        ? `La lista passeggeri sarà disponibile dal ${formattaData(disponibileDal)} alle ${formattaOra(disponibileDal)}, dopo lo smistamento sui bus.`
-        : 'La lista passeggeri sarà disponibile il giorno prima della partenza, dopo lo smistamento sui bus.');
-    }
+    if (!disponibile) throw new ConflittoDati(messaggioListaNonDisponibile(disponibileDal));
     return generaPdfPasseggeriBus(busId);
   },
 };

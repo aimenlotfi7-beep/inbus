@@ -38,6 +38,13 @@ export function avviaSchedulerPromemoriaSaldo() {
       console.error('Errore durante l\'accredito dei bonus "invita un amico":', err);
     }
     try {
+      const { richiesteRimborsoService } = await import('../modules/richieste-rimborso/richieste-rimborso.service.js');
+      const { completati } = await richiesteRimborsoService.completaRimborsiInterrotti();
+      if (completati > 0) console.log(`Rimborsi approvati rimasti a metà e portati a termine: ${completati}.`);
+    } catch (err) {
+      console.error('Errore durante il completamento dei rimborsi interrotti:', err);
+    }
+    try {
       const tolte = await pulisciRichiesteVecchie();
       if (tolte > 0) console.log(`Chiavi delle richieste già eseguite tolte (più vecchie di una settimana): ${tolte}.`);
     } catch (err) {

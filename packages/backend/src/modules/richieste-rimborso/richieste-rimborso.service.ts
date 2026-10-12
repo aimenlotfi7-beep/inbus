@@ -50,21 +50,37 @@ async function prendiInCarico(id: string, stato: 'APPROVATA' | 'RIFIUTATA', note
 /** Rimborso approvato: il cliente riprende il credito che aveva usato, e
  *  coupon e offerta tornano disponibili per un uso (il coupon solo se
  *  nessun'altra riga ancora valida dello stesso ordine lo usa: vale una
- *  volta per ordine). */
-async function restituisciUtilizzi(p: typeof prenotazioni.$inferSelect) {
+ *  volta per ordine).
+ *
+ *  Gli usi di coupon e offerta si scalano una volta sola: si scrivono
+ *  nella stessa transazione del segno "completato" sulla richiesta
+ *  (controllo della logica, ottobre 2026), così se il server si ferma
+ *  nel mezzo si può riprovare senza scalarli due volte. Il credito
+ *  restituito è già di per sé ripetibile (lo impedisce il movimento
+ *  già registrato). */
+async function restituisciUtilizzi(richiestaId: string, p: typeof prenotazioni.$inferSelect) {
   await creditoService.restituisciCreditoUsato(p.id);
-  if (p.couponCodice) {
-    const altreRighe = p.ordineId
-      ? await db.select({ id: prenotazioni.id }).from(prenotazioni)
-        .where(and(eq(prenotazioni.ordineId, p.ordineId), eq(prenotazioni.couponCodice, p.couponCodice), eq(prenotazioni.stato, 'CONFERMATA'))).limit(1)
-      : [];
-    if (altreRighe.length === 0) {
-      await db.update(coupon).set({ usiAttuali: sql`greatest(${coupon.usiAttuali} - 1, 0)` }).where(eq(coupon.codice, p.couponCodice));
+  await db.transaction(async (tx) => {
+    // Il segno per primo, con la condizione: due giri insieme (o il giro
+    // di riparazione mentre l'admin approva) non restituiscono due volte.
+    const [presa] = await tx.update(richiesteRimborso).set({ completatoIl: new Date() })
+      .where(and(eq(richiesteRimborso.id, richiestaId), sql`${richiesteRimborso.completatoIl} is null`))
+      .returning({ id: richiesteRimborso.id });
+    if (!presa) return;
+
+    if (p.couponCodice) {
+      const altreRighe = p.ordineId
+        ? await tx.select({ id: prenotazioni.id }).from(prenotazioni)
+          .where(and(eq(prenotazioni.ordineId, p.ordineId), eq(prenotazioni.couponCodice, p.couponCodice), eq(prenotazioni.stato, 'CONFERMATA'))).limit(1)
+        : [];
+      if (altreRighe.length === 0) {
+        await tx.update(coupon).set({ usiAttuali: sql`greatest(${coupon.usiAttuali} - 1, 0)` }).where(eq(coupon.codice, p.couponCodice));
+      }
     }
-  }
-  if (p.offertaId) {
-    await db.update(offerteEvento).set({ utilizzi: sql`greatest(${offerteEvento.utilizzi} - 1, 0)` }).where(eq(offerteEvento.id, p.offertaId));
-  }
+    if (p.offertaId) {
+      await tx.update(offerteEvento).set({ utilizzi: sql`greatest(${offerteEvento.utilizzi} - 1, 0)` }).where(eq(offerteEvento.id, p.offertaId));
+    }
+  });
 }
 
 export const richiesteRimborsoService = {
@@ -177,7 +193,7 @@ export const richiesteRimborsoService = {
       // Se su questo viaggio era scattato il bonus "invita un amico",
       // torna indietro anche quello: il viaggio non c'è più stato.
       await creditoService.revocaBonusReferralSePresente(p.id);
-      await restituisciUtilizzi(p);
+      await restituisciUtilizzi(r.id, p);
       // Meta continuerebbe altrimenti a considerare valido per sempre
       // un acquisto ormai rimborsato — le sue campagne ottimizzerebbero
       // (e i tuoi numeri di ritorno pubblicitario risulterebbero)
@@ -202,5 +218,30 @@ export const richiesteRimborsoService = {
     const r = await prendiInCarico(id, 'RIFIUTATA', noteAdmin);
     const clienteAvvisato = await avvisaCliente(r.prenotazioneId, { tipo: 'rifiutato', motivo: noteAdmin });
     return { clienteAvvisato };
+  },
+
+  /** Giro giornaliero (scheduler): finisce i rimborsi approvati rimasti
+   *  a metà. Approvare fa più cose in fila — cancella la prenotazione,
+   *  ridà il credito usato, libera coupon e offerta — e un riavvio del
+   *  server nel mezzo lasciava il cliente senza il suo credito, senza
+   *  che nessuno se ne accorgesse (controllo della logica, ottobre
+   *  2026). Qui si riprende da dove si era interrotto: tutte le
+   *  operazioni sono ripetibili senza danno e il segno "completato"
+   *  impedisce di scalare due volte gli usi di coupon e offerte. */
+  async completaRimborsiInterrotti() {
+    const interrotti = await db.select({ id: richiesteRimborso.id, prenotazioneId: richiesteRimborso.prenotazioneId })
+      .from(richiesteRimborso)
+      .where(and(eq(richiesteRimborso.stato, 'APPROVATA'), sql`${richiesteRimborso.completatoIl} is null`));
+
+    let completati = 0;
+    for (const r of interrotti) {
+      const [p] = await db.select().from(prenotazioni).where(eq(prenotazioni.id, r.prenotazioneId)).limit(1);
+      if (!p) continue;
+      await creditoService.revocaCreditoSePresente(p.id);
+      await creditoService.revocaBonusReferralSePresente(p.id);
+      await restituisciUtilizzi(r.id, p);
+      completati++;
+    }
+    return { completati };
   },
 };

@@ -21,9 +21,30 @@ function generaTokenReset() {
   return crypto.randomBytes(24).toString('hex');
 }
 
-function generaCodice(nome: string) {
+/** Se questo codice è già di un promoter di adesso, o è già comparso in
+ *  una vendita (anche di un promoter poi eliminato). */
+export async function codiceGiaUsato(codice: string): Promise<boolean> {
+  const [giaPromoter] = await db.select({ id: promoter.id }).from(promoter).where(eq(promoter.codice, codice)).limit(1);
+  if (giaPromoter) return true;
+  const [giaVenduto] = await db.select({ id: prenotazioni.id }).from(prenotazioni).where(eq(prenotazioni.promoterCodice, codice)).limit(1);
+  return !!giaVenduto;
+}
+
+/** Il codice che il promoter condivide. Non basta che sia libero tra i
+ *  promoter di adesso: le vendite si attribuiscono proprio a questo
+ *  codice (prenotazioni.promoter_codice), quindi un codice già comparso
+ *  in una vendita passata — di un promoter poi eliminato — farebbe
+ *  risultare quelle vendite, e le commissioni, al promoter nuovo
+ *  (controllo della logica, ottobre 2026). Qui si scartano entrambi. */
+async function generaCodice(nome: string): Promise<string> {
   const base = nome.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'PROMO';
-  return `${base}${Math.floor(Math.random() * 900 + 100)}`;
+  for (let tentativo = 0; tentativo < 20; tentativo++) {
+    const codice = `${base}${Math.floor(Math.random() * 900 + 100)}`;
+    if (!(await codiceGiaUsato(codice))) return codice;
+  }
+  // Tutti i 900 numeri di questo nome sono occupati: un codice casuale
+  // più lungo, che resta leggibile ma non si scontra con niente.
+  return `${base}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 }
 
 /** Il codice opaco di un link (promoter, evento) — mai derivato dal
@@ -94,11 +115,14 @@ export const promoterService = {
   getById,
 
   async create(input: z.infer<typeof creaPromoterSchema>) {
+    // Il codice si sceglie prima della transazione: deve guardare anche
+    // le vendite passate (vedi generaCodice).
+    const codice = await generaCodice(input.nome);
     return db.transaction(async (tx) => {
       const [nuovo] = await tx.insert(promoter).values({
         nome: input.nome, email: input.email.toLowerCase(), telefono: input.telefono,
         passwordHash: await bcrypt.hash(input.password, 10),
-        codice: generaCodice(input.nome),
+        codice,
         commissionePercentuale: input.commissionePercentuale.toFixed(2),
         note: input.note,
       }).returning();

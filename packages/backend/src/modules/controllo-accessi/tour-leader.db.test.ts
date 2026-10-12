@@ -8,7 +8,7 @@ import { tourLeaderAuthService } from '../tour-leader-auth/tour-leader-auth.serv
 import { tourLeaderService } from '../tourleader/tourleader.routes.js';
 import { eventiService } from '../eventi/eventi.service.js';
 import { controlloAccessiService } from './controllo-accessi.service.js';
-import { creaLineaConBus, riga, scenarioBase, svuotaDatabase } from '../../../test/dati.js';
+import { creaLineaConBus, fraGiorni, riga, scenarioBase, svuotaDatabase } from '../../../test/dati.js';
 
 // Tour leader e scansione dei biglietti: senza saldo non si sale, un tour
 // leader archiviato non entra e non si assegna, l'email non ha maiuscole.
@@ -49,6 +49,32 @@ describe('scansione del QR', () => {
     expect(esito.esito).toBe('saldo_da_pagare');
     const [p] = await db.select().from(partecipantiPrenotazione).where(eq(partecipantiPrenotazione.id, partecipanteId));
     expect(p.ticketUtilizzatoIl).toBeNull();
+  });
+});
+
+describe('ricerca di un passeggero', () => {
+  /** Un passeggero sul bus di un tour leader, su un evento a `giorni` da oggi. */
+  async function passeggeroSuEventoFra(giorni: number) {
+    const s = await scenarioBase({ evento: { data: fraGiorni(giorni) } });
+    const tl = await creaTourLeader();
+    const { bus } = await creaLineaConBus(s.tragitto.id, [s.roma.id], 50);
+    await db.update(busFisici).set({ tourLeaderId: tl.id }).where(eq(busFisici.id, bus.id));
+    const p = await prenotazioniService.crea(riga({ eventoId: s.evento.id, tragittoId: s.tragitto.id, fermataId: s.roma.id }, s.cliente), s.cliente.id);
+    await db.update(prenotazioni).set({ busId: bus.id }).where(eq(prenotazioni.pnr, p.pnr));
+    return { tl, bus };
+  }
+
+  it('dentro le 24 ore trova il passeggero', async () => {
+    const { tl } = await passeggeroSuEventoFra(0);
+    expect(await controlloAccessiService.cerca(tl.id, 'rossi')).toHaveLength(1);
+  });
+
+  it('prima delle 24 ore non mostra niente, come la lista passeggeri', async () => {
+    // Controllo della logica, ottobre 2026: la lista si apre 24 ore
+    // prima, ma la ricerca mostrava nomi e PNR in qualunque momento.
+    const { tl, bus } = await passeggeroSuEventoFra(30);
+    expect(await controlloAccessiService.cerca(tl.id, 'rossi')).toEqual([]);
+    await expect(controlloAccessiService.cerca(tl.id, 'rossi', bus.id)).rejects.toMatchObject({ statusCode: 409 });
   });
 });
 

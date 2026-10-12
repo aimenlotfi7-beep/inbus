@@ -1469,6 +1469,14 @@ export const richiesteRimborso = pgTable('richieste_rimborso', {
   noteAdmin: text('note_admin'),
   richiestaIl: timestamp('richiesta_il').notNull().defaultNow(),
   gestitaIl: timestamp('gestita_il'),
+  // Approvare un rimborso fa più cose in fila: cancella la prenotazione,
+  // ridà il credito usato, libera coupon e offerta. Questo segno si
+  // scrive nella stessa transazione delle restituzioni (controllo della
+  // logica, ottobre 2026): se il server si ferma nel mezzo resta vuoto,
+  // e il giro giornaliero (completaRimborsiInterrotti) finisce il
+  // lavoro. Senza di esso non si potrebbe riprovare: gli usi di coupon
+  // e offerte si scalerebbero due volte.
+  completatoIl: timestamp('completato_il'),
 }, (t) => ({
   // Al massimo UNA richiesta "in attesa" per prenotazione — non un
   // controllo applicativo (SELECT poi INSERT, con una finestra dove
