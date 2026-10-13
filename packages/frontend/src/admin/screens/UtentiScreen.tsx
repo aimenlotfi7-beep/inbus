@@ -4,6 +4,7 @@ import { PanelHead } from '../shared/PanelHead';
 import { RicercaSezione } from '../shared/RicercaSezione';
 import { TabellaGenerica } from '../shared/TabellaGenerica';
 import { Modale } from '../shared/Modale';
+import { useSelezioneUrl } from '../shared/useSelezioneUrl';
 import { motivoErrore } from '../shared/errori';
 import { statoPrenotazioneAdmin } from '../shared/statoPrenotazioneAdmin';
 import { formattaData, formattaEuro, plurale } from '../../shared/formato';
@@ -16,6 +17,8 @@ export function UtentiScreen() {
   const [prenotazioni, setPrenotazioni] = useState<PrenotazioneUtente[] | null>(null);
   const [errorePrenotazioni, setErrorePrenotazioni] = useState('');
   const utenteAperto = useRef<string | null>(null);
+  // Il cliente aperto resta nell'indirizzo, come per gli eventi.
+  const { id: utenteIdUrl, apri: apriUrl, chiudi: chiudiUrl } = useSelezioneUrl('utenti', 'utenteId');
 
   function caricaElenco() {
     setErroreElenco('');
@@ -24,6 +27,15 @@ export function UtentiScreen() {
   useEffect(caricaElenco, []);
 
   const elenco = utenti ?? [];
+
+  // Arrivando con ?utenteId= (dalla ricerca della home, o ricaricando la
+  // pagina) la scheda di quel cliente si apre da sola: prima si finiva
+  // nell'elenco e bisognava cercarlo di nuovo a mano.
+  useEffect(() => {
+    if (!utenteIdUrl || selezionato || elenco.length === 0) return;
+    const trovato = elenco.find((u) => u.id === utenteIdUrl);
+    if (trovato) apriUtente(trovato);
+  }, [utenteIdUrl, selezionato, elenco]);
   const utentiFiltrati = ricerca.trim()
     ? elenco.filter((u) => `${u.nome ?? ''} ${u.cognome ?? ''} ${u.email} ${u.citta ?? ''}`.toLowerCase().includes(ricerca.trim().toLowerCase()))
     : elenco;
@@ -32,6 +44,7 @@ export function UtentiScreen() {
     // Solo la risposta del cliente aperto per ultimo: prima, aprendo un
     // altro cliente durante il caricamento, compariva lo storico di quello prima.
     utenteAperto.current = u.id;
+    if (u.id !== utenteIdUrl) apriUrl(u.id);
     setSelezionato(u);
     setPrenotazioni(null);
     setErrorePrenotazioni('');
@@ -42,7 +55,8 @@ export function UtentiScreen() {
 
   return (
     <div>
-      <PanelHead titolo="Utenti" />
+      {/* "Clienti" come nel menu: "Utenti" si confondeva con le utenze del gestionale. */}
+      <PanelHead titolo="Clienti" />
       <RicercaSezione valore={ricerca} onChange={setRicerca} placeholder="Cerca per nome, email o città…" />
       {erroreElenco && (
         <p className="avviso avviso-errore" role="alert">
@@ -66,7 +80,7 @@ export function UtentiScreen() {
       )}
 
       {selezionato && (
-        <Modale titolo={`${selezionato.nome ?? ''} ${selezionato.cognome ?? ''}`.trim() || selezionato.email} onClose={() => { utenteAperto.current = null; setSelezionato(null); }}>
+        <Modale titolo={`${selezionato.nome ?? ''} ${selezionato.cognome ?? ''}`.trim() || selezionato.email} onClose={() => { utenteAperto.current = null; setSelezionato(null); chiudiUrl(); }}>
           <p className="testo-intro">{selezionato.email}{selezionato.telefono ? ` · ${selezionato.telefono}` : ''}</p>
           {Number(selezionato.creditoDisponibile) > 0 && (
             <p className="testo-intro" style={{ color: 'var(--green)', fontWeight: 700, marginTop: 4 }}>
