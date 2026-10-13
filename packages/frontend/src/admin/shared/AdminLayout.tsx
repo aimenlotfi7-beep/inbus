@@ -34,6 +34,12 @@ export type SezioneGestionale =
 // Prima le Statistiche erano dentro "Sistema", i soldi erano divisi tra
 // Vendite, Customer Care e Marketing, il Cestino stava tra le impostazioni
 // e "Persone" mescolava partner e squadra.
+/** Le voci che mostrano un pallino con un conteggio preso dal server
+ *  (le voci di Partenze hanno il loro, calcolato da elencoPartenze).
+ *  Esportata per il test del menu: una di queste sezioni rinominata o
+ *  tolta dal menu perderebbe il suo avviso senza che nessuno lo noti. */
+export const SEZIONI_CON_AVVISO = ['lista-attesa', 'rimborsi', 'chat', 'fornitori'] as const;
+
 export const GRUPPI: { titolo: string; voci: { id: SezioneGestionale; label: string; permesso: string }[] }[] = [
   { titolo: 'Andamento', voci: [
     { id: 'statistiche', label: 'Statistiche', permesso: 'statistiche.visualizza' },
@@ -193,11 +199,16 @@ export function AdminLayout({
   function notificaVoce(id: string): number {
     const voce = vocePartenze(id);
     if (voce) return palliniPartenzeVoci?.perVoce[voce] ?? 0;
-    if (id === 'lista-attesa') return inAttesa;
-    if (id === 'rimborsi') return rimborsiInAttesa;
-    if (id === 'chat') return chatNonLette;
-    if (id === 'fornitori') return fornitoriInAttesa;
-    return 0;
+    // Il tipo lega i conteggi ai nomi delle sezioni: rinominando una
+    // voce il compilatore si ferma qui, invece di lasciare un avviso
+    // spento in silenzio (vedi SEZIONI_CON_AVVISO e menu.test.ts).
+    const conteggi: Record<(typeof SEZIONI_CON_AVVISO)[number], number> = {
+      'lista-attesa': inAttesa,
+      rimborsi: rimborsiInAttesa,
+      chat: chatNonLette,
+      fornitori: fornitoriInAttesa,
+    };
+    return conteggi[id as (typeof SEZIONI_CON_AVVISO)[number]] ?? 0;
   }
 
   // Il menu a tendina (solo mobile) è un pannello a SCHERMO INTERO

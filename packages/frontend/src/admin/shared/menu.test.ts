@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GRUPPI, type SezioneGestionale } from './AdminLayout';
+import { GRUPPI, SEZIONI_CON_AVVISO, type SezioneGestionale } from './AdminLayout';
 import { PERMESSO_SEZIONE } from './permessiSezioni';
 
 // Il menu di sinistra è stato riorganizzato (proprietario, settembre
@@ -32,6 +32,15 @@ describe('menu del gestionale', () => {
   it('il permesso di ogni voce è quello che protegge la sezione', () => {
     const diversi = vociDelMenu.filter((v) => v.permesso !== PERMESSO_SEZIONE[v.id]).map((v) => v.id);
     expect(diversi).toEqual([]);
+  });
+
+  it('le voci che mostrano un pallino di avviso sono nel menu', () => {
+    // Un rinominare o spostare fuori dal menu una di queste voci
+    // spegnerebbe il suo avviso senza errori: i conteggi (rimborsi in
+    // attesa, chat non lette, lista d'attesa, fornitori da approvare)
+    // arrivano dal server e si mostrano solo sulla voce con questo id.
+    const nelMenu = new Set(vociDelMenu.map((v) => v.id));
+    expect(SEZIONI_CON_AVVISO.filter((s) => !nelMenu.has(s))).toEqual([]);
   });
 
   it('ogni gruppo ha un titolo e almeno una voce', () => {
