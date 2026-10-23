@@ -78,6 +78,37 @@ export async function leggiSogliaPosticipoMinuti(): Promise<number> {
   return Number.isFinite(valore) && valore >= 0 ? valore : 0;
 }
 
+/** Quanti giorni prima dell'evento si decide il piano dei bus
+ *  (proprietario, ottobre 2026): fino a quel momento si raccolgono le
+ *  prenotazioni e non si prende nessun impegno — le richieste di
+ *  preventivo per i singoli bus non partono. A quella data il sistema
+ *  costruisce il piano e le richieste partono. Il singolo evento può
+ *  avere una data propria (eventi.decisione_piano_il), per anticipare
+ *  quando i numeri sono già maturi o rimandare quando sono fermi. */
+export const CHIAVE_GIORNI_DECISIONE_PIANO = 'giorni_decisione_piano';
+const DEFAULT_GIORNI_DECISIONE_PIANO = 30;
+
+export async function leggiGiorniDecisionePiano(): Promise<number> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_GIORNI_DECISIONE_PIANO)).limit(1);
+  const valore = riga ? Number(riga.valore) : NaN;
+  return Number.isFinite(valore) && valore >= 0 ? valore : DEFAULT_GIORNI_DECISIONE_PIANO;
+}
+
+/** Quanti giorni prima dell'evento chiudono le vendite. Diverso da
+ *  "Ferma vendite" (l'interruttore sulla card, che blocca tutto, lista
+ *  d'attesa compresa): qui si chiudono solo gli acquisti e la lista
+ *  d'attesa resta aperta, così chi arriva tardi si segna comunque.
+ *  Anche questa si può sovrascrivere sul singolo evento
+ *  (eventi.fine_vendite_il). */
+export const CHIAVE_GIORNI_FINE_VENDITE = 'giorni_fine_vendite';
+const DEFAULT_GIORNI_FINE_VENDITE = 2;
+
+export async function leggiGiorniFineVendite(): Promise<number> {
+  const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_GIORNI_FINE_VENDITE)).limit(1);
+  const valore = riga ? Number(riga.valore) : NaN;
+  return Number.isFinite(valore) && valore >= 0 ? valore : DEFAULT_GIORNI_FINE_VENDITE;
+}
+
 /** Raggio in km (linea d'aria) di default per cercare i fornitori
  *  vicini alla partenza di un tragitto, quando si richiede un
  *  preventivo — modificabile per singola richiesta, questo è solo il
@@ -203,6 +234,8 @@ const REGOLE_NUMERI: Record<string, { minimo: number; massimo?: number; messaggi
   [CHIAVE_CREDITO_REFERRAL_INVITANTE]: { minimo: 0, messaggio: 'Inserisci un importo da 0 in su.' },
   [CHIAVE_CREDITO_REFERRAL_AMICO]: { minimo: 0, messaggio: 'Inserisci un importo da 0 in su.' },
   [CHIAVE_SOGLIA_POSTICIPO_MINUTI]: { minimo: 0, messaggio: 'Inserisci un numero di minuti da 0 in su.' },
+  [CHIAVE_GIORNI_DECISIONE_PIANO]: { minimo: 0, massimo: 365, messaggio: 'Inserisci i giorni prima dell\'evento, da 0 a 365.' },
+  [CHIAVE_GIORNI_FINE_VENDITE]: { minimo: 0, massimo: 365, messaggio: 'Inserisci i giorni prima dell\'evento, da 0 a 365.' },
 };
 
 impostazioniRouter.put(

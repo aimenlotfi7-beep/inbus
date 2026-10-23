@@ -21,6 +21,8 @@ const IMPOSTAZIONI: { chiave: string; etichetta: string; default: string; minimo
   { chiave: 'soglia_posticipo_variazione_minuti', etichetta: 'Soglia posticipo per notifica variazione (minuti — l\'anticipo e il cambio città/indirizzo notificano sempre, senza soglia; 0 = avvisa sempre anche per il posticipo)', default: '0', minimo: 0, messaggio: 'Inserisci un numero di minuti da 0 in su.' },
   { chiave: 'giorni_validita_link_preventivo', etichetta: 'Giorni di validità del link inviato ai fornitori per rispondere a una richiesta (dopo, il link risulta scaduto; chi ha già risposto continua a vedere la sua risposta)', default: '60', minimo: 1, messaggio: 'Il link deve valere almeno 1 giorno.' },
   { chiave: 'raggio_km_preventivo', etichetta: 'Raggio (km, linea d\'aria) entro cui i fornitori ricevono le richieste automatiche di quotazione e preventivo', default: '40', minimo: 1, messaggio: 'Il raggio deve essere di almeno 1 km.' },
+  { chiave: 'giorni_decisione_piano', etichetta: 'Quanti giorni prima dell\'evento si decide il piano dei bus (fino a quel momento si raccolgono prenotazioni e nessuna richiesta di preventivo parte; la singola scheda evento può avere una data propria)', default: '30', minimo: 0, messaggio: 'Inserisci i giorni prima dell\'evento, da 0 a 365.' },
+  { chiave: 'giorni_fine_vendite', etichetta: 'Quanti giorni prima dell\'evento chiudono le vendite (dopo non si compra più, ma la lista d\'attesa resta aperta; la singola scheda evento può avere una data propria)', default: '2', minimo: 0, messaggio: 'Inserisci i giorni prima dell\'evento, da 0 a 365.' },
 ];
 
 // Chiave della formula prezzi (sezione dedicata più sotto, separata

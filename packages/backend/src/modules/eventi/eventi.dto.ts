@@ -87,6 +87,11 @@ const creaEventoBase = z.object({
   accontoEur: z.number().positive().optional(),
   statoDisponibilita: z.enum(['POCHI_POSTI', 'NUOVI_POSTI', 'ESAURITO']).nullable().optional(),
   visibileSito: z.boolean().default(true),
+  // Le due date del piano bus (proprietario, ottobre 2026). Vuote =
+  // valgono i giorni impostati in Impostazioni; null le rimette ai
+  // valori generali dopo averle scritte.
+  decisionePianoIl: z.coerce.date().nullable().optional(),
+  fineVenditeIl: z.coerce.date().nullable().optional(),
   bozza: z.boolean().optional(),
   descrizione: z.string().optional(),
   descrizioneSeo: z.string().optional(),

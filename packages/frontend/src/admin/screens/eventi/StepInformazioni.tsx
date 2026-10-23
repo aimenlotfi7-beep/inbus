@@ -97,6 +97,35 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
             <EtichettaTooltip testo="Visibile sul sito" chiave="visibile_sito" mappaTooltip={mappaTooltip} />
           </label>
         </div>
+
+        {/* Le due date del piano bus, solo per questo evento: vuote
+            valgono quelle generali di Impostazioni (proprietario,
+            ottobre 2026). */}
+        <p className="section-label">Date di questo evento</p>
+        <div className="form-grid">
+          <label>Decisione del piano bus
+            <input
+              type="date"
+              aria-label="Data di decisione del piano bus"
+              value={form.decisionePianoIl ?? ''}
+              onChange={(e) => setForm({ ...form, decisionePianoIl: e.target.value || null })}
+            />
+            <small className="testo-secondario">
+              Fino a questa data si raccolgono prenotazioni e nessuna richiesta di preventivo parte. Vuota: vale quella generale.
+            </small>
+          </label>
+          <label>Fine vendite
+            <input
+              type="date"
+              aria-label="Data di fine vendite"
+              value={form.fineVenditeIl ?? ''}
+              onChange={(e) => setForm({ ...form, fineVenditeIl: e.target.value || null })}
+            />
+            <small className="testo-secondario">
+              Da questa data non si compra più, ma la lista d'attesa resta aperta. Vuota: vale quella generale.
+            </small>
+          </label>
+        </div>
       </>
     )}
 

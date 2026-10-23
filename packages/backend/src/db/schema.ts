@@ -148,6 +148,19 @@ export const eventi = pgTable('eventi', {
   // il link o dal widget White Label. Le vendite non si fermano mai da sole
   // per i posti dei bus: questo è l'unico interruttore.
   venditeFermate: boolean('vendite_fermate').notNull().default(false),
+  // Le due date del piano bus (proprietario, ottobre 2026). Vuote =
+  // valgono i giorni impostati in Impostazioni (giorni_decisione_piano,
+  // giorni_fine_vendite) contati dalla data dell'evento; scritte qui,
+  // valgono per questo evento e basta.
+  //
+  // decisionePianoIl: fino a quel momento si raccolgono prenotazioni e
+  // NON parte nessuna richiesta di preventivo per i bus; da lì il
+  // sistema costruisce il piano e le richieste partono. Si anticipa
+  // quando i numeri sono già maturi, si rimanda quando sono fermi.
+  decisionePianoIl: timestamp('decisione_piano_il'),
+  // fineVenditeIl: da lì nessuno può più comprare, ma la lista d'attesa
+  // resta aperta — diverso da venditeFermate qui sopra, che blocca tutto.
+  fineVenditeIl: timestamp('fine_vendite_il'),
   // Vero mentre l'evento è ancora in fase di creazione, non ancora
   // confermato dall'amministratore — salvato in automatico man mano che
   // si compila il modulo "Nuovo evento", così un'uscita accidentale (o

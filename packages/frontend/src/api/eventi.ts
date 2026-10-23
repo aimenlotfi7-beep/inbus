@@ -22,6 +22,9 @@ export interface EventoInput {
   inEvidenza?: boolean; ordineEvidenza?: number; accontoEur?: number;
   statoDisponibilita?: 'POCHI_POSTI' | 'NUOVI_POSTI' | 'ESAURITO' | null;
   visibileSito?: boolean;
+  /** "AAAA-MM-GG" oppure null per tornare al valore generale di Impostazioni. */
+  decisionePianoIl?: string | null;
+  fineVenditeIl?: string | null;
   bozza?: boolean;
   descrizione?: string;
   descrizioneSeo?: string;

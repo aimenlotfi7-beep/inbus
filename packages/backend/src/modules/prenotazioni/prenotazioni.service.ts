@@ -6,6 +6,7 @@ import type { RegolaCompensoPromoter } from '../../shared/commissioneRighe.js';
 import { ConflittoDati, NonTrovato, ErroreApplicativo, NonAutorizzato } from '../../shared/errors.js';
 import { prezzoNormaleFermata, applicaScontoOfferta } from '../../shared/prezzi.js';
 import { bundleService } from '../bundle/bundle.service.js';
+import { datePiano, venditeChiusePerData } from '../eventi/date-piano.js';
 import { leggiMetaPixelId, leggiMetaCapiToken } from '../impostazioni/impostazioni.routes.js';
 import { inviaEventoMetaCapi } from '../../shared/metaConversions.js';
 
@@ -231,6 +232,13 @@ async function rigaVendibile(lettore: Pick<typeof db, 'select'>, input: Pick<Cre
   // "Ferma vendite" dal gestionale: nessuna prenotazione da nessun canale
   // (sito, link diretto, widget White Label, carrello, lista d'attesa).
   if (evento.venditeFermate) throw new ConflittoDati('Le prenotazioni per questo evento sono chiuse.');
+  // Fine vendite per data (proprietario, ottobre 2026): dopo non si
+  // compra più, ma la lista d'attesa resta aperta — per questo il
+  // controllo sta qui e non insieme a "Ferma vendite" qui sopra, che
+  // invece blocca ogni canale.
+  if (venditeChiusePerData(await datePiano(evento))) {
+    throw new ConflittoDati('Le prenotazioni per questo viaggio sono chiuse: puoi metterti in lista d\'attesa.');
+  }
   // Il giorno dell'evento si vende ancora (ora di Roma): i bus partono.
   if (evento.data < inizioOggiRoma()) throw new ConflittoDati('Questo evento è già passato.');
   if (!tragitto.attivo || tragitto.stato === 'DA_CONFERMARE') throw new ConflittoDati('Questo tragitto non è in vendita.');

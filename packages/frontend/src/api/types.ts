@@ -70,6 +70,12 @@ export interface Evento {
   /** "Ferma vendite" dal gestionale: l'evento non compare sul sito e non si
    *  può prenotare, nemmeno con il link o dal widget. */
   venditeFermate?: boolean;
+  /** Quando si decide il piano dei bus per questo evento. Vuota = vale il
+   *  valore generale in Impostazioni (giorni prima dell'evento). */
+  decisionePianoIl?: string | null;
+  /** Quando chiudono le vendite di questo evento: dopo non si compra più,
+   *  ma la lista d'attesa resta aperta. Vuota = valore generale. */
+  fineVenditeIl?: string | null;
   descrizione: string | null;
   descrizioneSeo: string | null;
   cosaIncluso: string | null;
