@@ -39,7 +39,12 @@ describe('quando scattano', () => {
     expect(venditeChiusePerData(date, new Date('2027-08-05T00:00:00+02:00'))).toBe(true);
   });
 
+  it('senza data di fine vendite non si chiude mai (comportamento di sempre)', () => {
+    const senzaChiusura: DatePiano = { ...date, fineVendite: null };
+    expect(venditeChiusePerData(senzaChiusura, new Date('2027-08-07T23:00:00+02:00'))).toBe(false);
+  });
+
   it('il piano si decide sempre prima della chiusura delle vendite', () => {
-    expect(date.decisione.getTime()).toBeLessThan(date.fineVendite.getTime());
+    expect(date.decisione.getTime()).toBeLessThan(date.fineVendite!.getTime());
   });
 });

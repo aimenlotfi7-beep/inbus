@@ -17,7 +17,10 @@ const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
 
 export interface DatePiano {
   decisione: Date;
-  fineVendite: Date;
+  /** null = nessuna chiusura anticipata: si vende fino a tutto il
+   *  giorno dell'evento (nessun giorno impostato e nessuna data
+   *  sull'evento). */
+  fineVendite: Date | null;
   /** Se la data arriva dall'evento invece che dalle impostazioni. */
   decisionePersonalizzata: boolean;
   fineVenditePersonalizzata: boolean;
@@ -29,7 +32,8 @@ export async function datePiano(evento: { data: Date; decisionePianoIl: Date | n
   const [giorniDecisione, giorniFineVendite] = await Promise.all([leggiGiorniDecisionePiano(), leggiGiorniFineVendite()]);
   return {
     decisione: evento.decisionePianoIl ?? giorniPrima(evento.data, giorniDecisione),
-    fineVendite: evento.fineVenditeIl ?? giorniPrima(evento.data, giorniFineVendite),
+    // Zero giorni e nessuna data sull'evento: nessuna chiusura.
+    fineVendite: evento.fineVenditeIl ?? (giorniFineVendite > 0 ? giorniPrima(evento.data, giorniFineVendite) : null),
     decisionePersonalizzata: evento.decisionePianoIl !== null,
     fineVenditePersonalizzata: evento.fineVenditeIl !== null,
   };
@@ -43,5 +47,7 @@ export function giorniPrima(dataEvento: Date, giorni: number): Date {
 /** Il piano si decide da adesso in poi? */
 export const decisioneArrivata = (date: DatePiano, adesso = new Date()) => adesso >= date.decisione;
 
-/** Le vendite sono chiuse per data? (l'interruttore "Ferma vendite" è un'altra cosa) */
-export const venditeChiusePerData = (date: DatePiano, adesso = new Date()) => adesso >= date.fineVendite;
+/** Le vendite sono chiuse per data? Senza una data di fine vendite non
+ *  si chiude niente (l'interruttore "Ferma vendite" è un'altra cosa). */
+export const venditeChiusePerData = (date: DatePiano, adesso = new Date()) =>
+  date.fineVendite !== null && adesso >= date.fineVendite;

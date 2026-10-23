@@ -99,9 +99,15 @@ export async function leggiGiorniDecisionePiano(): Promise<number> {
  *  d'attesa compresa): qui si chiudono solo gli acquisti e la lista
  *  d'attesa resta aperta, così chi arriva tardi si segna comunque.
  *  Anche questa si può sovrascrivere sul singolo evento
- *  (eventi.fine_vendite_il). */
+ *  (eventi.fine_vendite_il).
+ *
+ *  Zero (il valore iniziale) = nessuna chiusura anticipata: si vende
+ *  fino a tutto il giorno dell'evento, come si è sempre fatto. La
+ *  chiusura la si attiva scrivendo un numero qui o una data sul singolo
+ *  evento: una funzione nuova non deve cambiare da sola le vendite già
+ *  in corso. */
 export const CHIAVE_GIORNI_FINE_VENDITE = 'giorni_fine_vendite';
-const DEFAULT_GIORNI_FINE_VENDITE = 2;
+const DEFAULT_GIORNI_FINE_VENDITE = 0;
 
 export async function leggiGiorniFineVendite(): Promise<number> {
   const [riga] = await db.select().from(impostazioni).where(eq(impostazioni.chiave, CHIAVE_GIORNI_FINE_VENDITE)).limit(1);
