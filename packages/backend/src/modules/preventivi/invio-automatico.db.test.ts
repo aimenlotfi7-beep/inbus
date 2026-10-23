@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
-import { logAttivita, preventiviRichieste, prenotazioni, tragitti } from '../../db/schema.js';
+import { eventi, logAttivita, preventiviRichieste, prenotazioni, tragitti } from '../../db/schema.js';
 import { invioAutomaticoService } from './invio-automatico.service.js';
 import { lineeDaConfermareService } from '../eventi/linee-da-confermare.service.js';
-import { creaCliente, creaEvento, creaFermata, creaFornitore, creaProposta, creaTragitto, fraGiorni, svuotaDatabase } from '../../../test/dati.js';
+import { creaCliente, creaEvento, creaFermata, creaFornitore, creaProposta, creaTragitto, fraGiorni, impostazione, svuotaDatabase } from '../../../test/dati.js';
 import { posta } from '../../../test/posta.js';
 
 // Richieste ai fornitori che partono da sole, senza clic (deciso dal
@@ -103,6 +103,13 @@ describe('quotazione che parte da sola', () => {
 });
 
 describe('preventivi per il bus che partono da soli', () => {
+  // I preventivi dei bus partono dalla data in cui si decide il piano
+  // (proprietario, ottobre 2026). Qui la finestra è aperta: si decide
+  // un anno prima dell'evento, quindi per un evento fra 60 giorni la
+  // data è già passata. Il comportamento prima della data ha i suoi
+  // test più sotto.
+  beforeEach(() => impostazione('giorni_decisione_piano', 365));
+
   it('appena c\'è la proposta: ai fornitori con "Invio automatico" vicini e a chi ha dato la quotazione, una volta sola', async () => {
     const f = await fornitori();
     const t = await tragittoConOrari({ tragitto: { stato: 'PREZZATO', preventivoCosto: '1000', preventivoPostiBus: 50, fornitoreId: f.lontano.id } });
@@ -131,8 +138,50 @@ describe('preventivi per il bus che partono da soli', () => {
   });
 });
 
+describe('prima della data in cui si decide il piano', () => {
+  /** Un tragitto in vendita con una proposta da confermare. */
+  async function conProposta() {
+    const f = await fornitori();
+    const t = await tragittoConOrari({ tragitto: { stato: 'PREZZATO', preventivoCosto: '1000', preventivoPostiBus: 50, fornitoreId: f.lontano.id } });
+    const proposta = await creaProposta(t.tragitto.id, [t.roma.id, t.firenze.id]);
+    return { t, proposta };
+  }
+
+  it('non parte nessun preventivo per i bus: si raccolgono solo prenotazioni', async () => {
+    // Evento fra 60 giorni, si decide 30 giorni prima: manca ancora un mese.
+    await impostazione('giorni_decisione_piano', 30);
+    const { t, proposta } = await conProposta();
+
+    expect(await invioAutomaticoService.perProposta(proposta.id)).toBe(false);
+    expect(await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.lineaId, proposta.id))).toHaveLength(0);
+    // La quotazione del tragitto invece parte lo stesso: senza quella non si venderebbe.
+    expect((await richiesteDelTragitto(t.tragitto.id)).every((r) => r.scopo === 'QUOTAZIONE')).toBe(true);
+  });
+
+  it('spostando la data sull\'evento i preventivi partono subito', async () => {
+    await impostazione('giorni_decisione_piano', 30);
+    const { t, proposta } = await conProposta();
+    expect(await invioAutomaticoService.perProposta(proposta.id)).toBe(false);
+
+    // "Decido adesso": la data dell'evento vince su quella generale.
+    await db.update(eventi).set({ decisionePianoIl: fraGiorni(-1) }).where(eq(eventi.id, t.evento.id));
+    expect(await invioAutomaticoService.perProposta(proposta.id)).toBe(true);
+    expect((await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.lineaId, proposta.id))).length).toBeGreaterThan(0);
+  });
+
+  it('il giro di ogni ora le manda da solo appena la data è arrivata', async () => {
+    await impostazione('giorni_decisione_piano', 30);
+    const { t } = await conProposta();
+    expect((await invioAutomaticoService.tutti()).bus).toBe(0);
+
+    await db.update(eventi).set({ decisionePianoIl: fraGiorni(-1) }).where(eq(eventi.id, t.evento.id));
+    expect((await invioAutomaticoService.tutti()).bus).toBe(1);
+  });
+});
+
 describe('giro di ogni ora', () => {
   it('manda anche quello che era già in attesa', async () => {
+    await impostazione('giorni_decisione_piano', 365);
     const f = await fornitori();
     const conOrari = await tragittoConOrari();
     const inVendita = await tragittoConOrari({ tragitto: { stato: 'PREZZATO', preventivoCosto: '1000', preventivoPostiBus: 50, fornitoreId: f.lontano.id } });

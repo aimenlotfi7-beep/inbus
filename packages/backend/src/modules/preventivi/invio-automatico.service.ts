@@ -4,6 +4,7 @@ import { eventi, fermate, fermateAnagrafica, fornitori, lineaFermate, linee, log
 import { inizioOggiRoma } from '../../shared/formato.js';
 import { geocodificaServer, type Coordinate } from '../../shared/geocodifica.js';
 import { cambiPercorso } from './cambio-percorso.js';
+import { datePiano, decisioneArrivata } from '../eventi/date-piano.js';
 import { inviaPreventiviBusSenzaClic, inviaQuotazioneSenzaClic } from './preventivi.routes.js';
 
 /** Richieste ai fornitori che partono DA SOLE, senza clic (deciso dal
@@ -13,9 +14,13 @@ import { inviaPreventiviBusSenzaClic, inviaQuotazioneSenzaClic } from './prevent
  *    con "Invio automatico" nel raggio della prima fermata;
  *  - percorso cambiato dopo la quotazione: una nuova richiesta, ai fornitori
  *    con "Invio automatico" e a chi aveva dato la quotazione;
- *  - preventivi per il bus: appena nasce la proposta da confermare, se per
- *    quella proposta non ne sono partiti; ai fornitori con "Invio automatico"
- *    vicini alla prima fermata del bus e a chi ha dato la quotazione.
+ *  - preventivi per il bus: dalla data in cui si decide il piano
+ *    (eventi.decisione_piano_il, o i giorni impostati in Impostazioni —
+ *    vedi eventi/date-piano.ts), per le proposte da confermare che non ne
+ *    hanno ancora; ai fornitori con "Invio automatico" vicini alla prima
+ *    fermata del bus e a chi ha dato la quotazione. Prima di quella data
+ *    si raccolgono solo prenotazioni: nessun impegno con i fornitori
+ *    (proprietario, ottobre 2026).
  *  Se nessun fornitore va bene non parte niente e il gestionale resta rosso:
  *  la richiesta si manda a mano. Partono subito dopo il salvataggio degli
  *  orari o di un evento e alla nascita di una proposta, e ogni ora per
@@ -144,13 +149,21 @@ export const invioAutomaticoService = {
     for (const id of tragittiIds) await invioAutomaticoService.perTragitto(id);
   },
 
-  /** Preventivi per il bus di una proposta da confermare, se non sono ancora partiti. */
+  /** Preventivi per il bus di una proposta da confermare, se non sono ancora
+   *  partiti e se è arrivata la data in cui si decide il piano. */
   async perProposta(lineaId: string): Promise<boolean> {
     try {
       return (await inEsclusiva(`proposta:${lineaId}`, async () => {
         const [linea] = await db.select().from(linee).where(and(eq(linee.id, lineaId), eq(linee.daConfermare, true))).limit(1);
         const tragitto = linea ? await tragittoInProgramma(linea.tragittoId) : null;
         if (!linea || !tragitto) return false;
+        // Prima della data di decisione non si prende nessun impegno
+        // (proprietario, ottobre 2026): si raccolgono le prenotazioni e
+        // basta. Non serve ricordarsene: il giro di ogni ora ripassa da
+        // qui e le richieste partono da sole appena la data arriva.
+        const [evento] = await db.select({ data: eventi.data, decisionePianoIl: eventi.decisionePianoIl, fineVenditeIl: eventi.fineVenditeIl })
+          .from(eventi).where(eq(eventi.id, tragitto.eventoId)).limit(1);
+        if (!evento || !decisioneArrivata(await datePiano(evento))) return false;
         if (!tragitto.fornitoreId && !(await ciSonoFornitoriAutomatici())) return false;
         const [giaChiesti] = await db.select({ id: preventiviRichieste.id }).from(preventiviRichieste)
           .where(and(eq(preventiviRichieste.lineaId, lineaId), eq(preventiviRichieste.scopo, 'BUS'))).limit(1);
