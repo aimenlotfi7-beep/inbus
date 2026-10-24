@@ -92,6 +92,11 @@ eventiRouter.get('/tragitti/:tragittoId/linee', richiedeAuth, richiedePermesso('
 eventiRouter.get('/tragitti/:tragittoId/anteprima-smistamento', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.anteprimaSmistamento));
 eventiRouter.get('/tragitti/:tragittoId/vendite', richiedeAuth, richiedePermesso('eventi.economia'), asyncHandler(eventiController.venditePerFermata));
 eventiRouter.get('/tragitti/:tragittoId/suggerimento-linea', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.suggerimentoLinea));
+// "Crea piano": prima l'anteprima (non scrive niente), poi la conferma —
+// che anticipa a oggi la data di decisione di TUTTO l'evento e fa
+// partire le richieste ai fornitori.
+eventiRouter.get('/tragitti/:tragittoId/piano', richiedeAuth, richiedePermesso('eventi.partenze'), asyncHandler(eventiController.anteprimaPiano));
+eventiRouter.post('/:id/piano', richiedeAuth, richiedePermesso('preventivi.accetta'), asyncHandler(eventiController.confermaPiano));
 eventiRouter.put('/tragitti/:tragittoId/operativo', richiedeAuth, richiedePermesso('eventi.crea'), valida(aggiornaTragittoOperativoSchema), asyncHandler(eventiController.aggiornaTragittoOperativo));
 // Anteprima delle variazioni (e di quanti clienti verrebbero avvisati)
 // per lo stesso corpo del PUT qui sopra — nessuna scrittura.

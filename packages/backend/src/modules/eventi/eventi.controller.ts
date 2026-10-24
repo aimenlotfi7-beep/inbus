@@ -238,6 +238,19 @@ export const eventiController = {
     res.json({ ...suggerimento, contatorePareggio });
   },
 
+  /** "Crea piano": come sarebbe il piano dei bus adesso, senza scrivere niente. */
+  async anteprimaPiano(req: Request, res: Response) {
+    const piano = await lineeDaConfermareService.anteprimaPiano(req.params.tragittoId);
+    if (!piano) throw new NonTrovato('Tragitto');
+    res.json(piano);
+  },
+
+  /** "Crea piano" confermato: anticipa a oggi la data di decisione
+   *  dell'evento, ricalcola le proposte e manda le richieste ai fornitori. */
+  async confermaPiano(req: Request, res: Response) {
+    res.json(await lineeDaConfermareService.confermaPiano(req.params.id));
+  },
+
   async allertePartenzePerEvento(req: Request, res: Response) {
     res.json(await soloEventiConsentiti(req, await eventiService.allertePartenzePerEvento()));
   },

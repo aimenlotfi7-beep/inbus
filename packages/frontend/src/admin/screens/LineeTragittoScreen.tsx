@@ -14,6 +14,7 @@ import type { Evento, Fermata } from '../../api/types';
 import { fornitoriApi, type Fornitore } from '../../api/fornitori';
 import { preventiviApi, type CambioPercorso, type RichiestaConRisposta } from '../../api/preventivi';
 import { PreventiviBus, PreventivoDelBusRiga } from './partenze/PreventiviBus';
+import { PianoBus } from './partenze/PianoBus';
 import { RiquadroBusInPiu } from './statistiche/BusInPiu';
 import { tourLeaderApi, type TourLeader } from '../../api/tourleader';
 import { haPermesso } from '../../api/auth';
@@ -749,7 +750,12 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
           <p className="titolo">{prossimoPasso.titolo}</p>
           <p>{prossimoPasso.testo}</p>
         </div>
-        {prossimoPasso.azione && <button type="button" className="btn btn-primary" onClick={prossimoPasso.azione.onClick}>{prossimoPasso.azione.testo}</button>}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Vedere il piano prima di decidere, e confermarlo senza
+              aspettare la data delle Impostazioni. */}
+          {puoScegliereFornitori && <PianoBus eventoId={idEvento} tragittoId={idTragitto} onConfermato={aggiornaDopoModifica} />}
+          {prossimoPasso.azione && <button type="button" className="btn btn-primary" onClick={prossimoPasso.azione.onClick}>{prossimoPasso.azione.testo}</button>}
+        </div>
       </div>
 
       {vedeEconomia && <RiquadroBusInPiu eventoId={idEvento} tragittoId={idTragitto} versione={versioneDati} />}

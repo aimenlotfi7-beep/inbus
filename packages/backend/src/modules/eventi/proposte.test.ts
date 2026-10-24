@@ -50,6 +50,34 @@ describe('quando nasce una proposta (bus da 50, pareggio 30, gruppi da una perso
   });
 });
 
+describe('da dove parte il bus proposto', () => {
+  // Percorso Roma → Firenze → Bologna (→ evento). Il bus deve partire
+  // dalla prima fermata dove c'è davvero qualcuno: prima il primo bus
+  // di un tragitto nasceva su tutte le fermate, e si pagavano i
+  // chilometri per andare a prendere nessuno (proprietario, ottobre 2026).
+  it('il primo bus parte dalla prima fermata con prenotati, non dall\'inizio del percorso', () => {
+    const { proposte } = calcola({ gruppi: persone('Bologna', 30) });
+    expect(proposte).toHaveLength(1);
+    expect(proposte[0].fermateIds).toEqual(['bologna']);
+  });
+
+  it('con prenotati a metà percorso prende da lì in poi', () => {
+    const { proposte } = calcola({ gruppi: [...persone('Firenze', 20), ...persone('Bologna', 10)] });
+    expect(proposte[0].fermateIds).toEqual(['firenze', 'bologna']);
+  });
+
+  it('con qualcuno sulla prima fermata copre tutto il percorso, come prima', () => {
+    const { proposte } = calcola({ gruppi: [...persone('Roma', 10), ...persone('Bologna', 20)] });
+    expect(proposte[0].fermateIds).toEqual(['roma', 'firenze', 'bologna']);
+  });
+
+  it('un bus in più su una linea che c\'è già fa le stesse fermate della linea', () => {
+    const conBus = { bus: [busSu('b1', 30, ['Roma', 'Firenze', 'Bologna'])], busConfermati: 1, lineeConfermate: 1 };
+    const { proposte } = calcola({ ...conBus, gruppi: persone('Roma', 60) });
+    expect(proposte[0]).toMatchObject({ tipo: 'bus', fermateIds: ['roma', 'firenze', 'bologna'] });
+  });
+});
+
 describe('i gruppi non si dividono', () => {
   // Il caso reale di produzione (settembre 2026): Linea 1 Como-Saronno con 3 bus
   // da 15, Linea 2 da Saronno con un bus da 15, gruppi già smistati; restano

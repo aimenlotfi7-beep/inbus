@@ -184,6 +184,28 @@ export interface VenditePerFermata {
   andamento: { data: string; citta: string; cumulativo: number }[];
 }
 
+/** Il piano dei bus come sarebbe adesso ("Crea piano"): lo stesso calcolo
+ *  che gira da solo alla data di decisione. */
+export interface AnteprimaPiano {
+  tragittoId: string;
+  tragittoNome: string;
+  voci: {
+    tipo: 'bus' | 'linea';
+    /** Le città delle fermate, in ordine: la prima è da dove parte il bus. */
+    fermate: string[];
+    posti: number;
+    passeggeri: number;
+    costoStimato: number | null;
+    /** Già proposta in Da confermare: confermando il piano non cambia. */
+    giaProposta: boolean;
+  }[];
+  /** Passeggeri che resterebbero a terra perché sotto il pareggio. */
+  senzaPosto: number;
+  contatore: { bus: number; contati: number; pareggio: number } | null;
+  costoStimatoTotale: number | null;
+  senzaQuotazione: boolean;
+}
+
 export const eventiApi = {
   list: (filtri?: { citta?: string; genere?: string; ricerca?: string; soloFuturi?: boolean; soloVisibili?: boolean; escludiEventiInTour?: boolean }) => {
     const query = new URLSearchParams(filtri as Record<string, string>).toString();
@@ -258,6 +280,11 @@ export const eventiApi = {
   riepilogoEconomico: (id: string) => api.get<RiepilogoEconomicoTratta[]>(`/api/eventi/${id}/riepilogo-economico`),
   venditePerFermata: (tragittoId: string) => api.get<VenditePerFermata>(`/api/eventi/tragitti/${tragittoId}/vendite`),
   suggerimentoLinea: (tragittoId: string) => api.get<SuggerimentoLinea>(`/api/eventi/tragitti/${tragittoId}/suggerimento-linea`),
+  /** "Crea piano": come sarebbe il piano dei bus adesso. Non scrive niente. */
+  anteprimaPiano: (tragittoId: string) => api.get<AnteprimaPiano>(`/api/eventi/tragitti/${tragittoId}/piano`),
+  /** Conferma il piano: anticipa a oggi la data di decisione dell'evento
+   *  (vale per tutti i suoi tragitti) e manda le richieste ai fornitori. */
+  confermaPiano: (eventoId: string) => api.post<{ proposte: number; richiesteInviate: number }>(`/api/eventi/${eventoId}/piano`, {}),
   allertePartenzePerEvento: () => api.get<Record<string, number>>('/api/eventi/allerte-partenze-per-evento'),
   /** `soloInProgramma`: senza gli eventi passati (per i pallini del menu). */
   elencoPartenze: (opzioni?: { soloInProgramma?: boolean }) => api.get<Array<{

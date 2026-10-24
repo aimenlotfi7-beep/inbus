@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { busFisici, eventi, fermate, lineaFermate, linee, prenotazioni, tragitti, utenti } from '../../db/schema.js';
+import { NonTrovato } from '../../shared/errors.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
 import { calcolaTempi, leggiOrariTragitto, type Lettore } from '../prenotazioni/partenza.js';
 import { etaPrenotazione, primaFermataDellaLinea, riempiBus, type BusDaRiempire, type GruppoPasseggeri } from '../prenotazioni/riempimento-bus.js';
@@ -97,9 +98,19 @@ export function passiBusInPiu(dati: Omit<DatiProposte, 'postiPareggio'>, minimo:
     const primaFuori = Math.min(...fuori.map((g) => ordineCitta.indexOf(g.fermataCitta)));
     const principaleCopre = fuori.every((g) => dati.fermateLineaPrincipale.some((id) => cittaDi.get(id) === g.fermataCitta));
     const primoBusDelTragitto = dati.lineeConfermate === 0 && passi.length === 0;
-    const proposta: Proposta = primoBusDelTragitto || (primaFuori === 0 && principaleCopre)
-      ? { tipo: 'bus', fermateIds: dati.fermateLineaPrincipale }
-      : { tipo: 'linea', fermateIds: fermateOrdinate.slice(primaFuori).map((f) => f.id) };
+    // Da dove parte il bus (proprietario, ottobre 2026): dalla prima
+    // fermata dove c'è davvero qualcuno, non dall'inizio del percorso.
+    // Il primo bus di un tragitto nasceva con la linea su TUTTE le
+    // fermate: se le vendite erano tutte sull'ultima, si pagavano ore e
+    // chilometri per andare a prendere nessuno, e niente lo segnalava
+    // (i passeggeri un posto ce l'avevano). Le fermate dopo restano
+    // tutte: il bus ci passa comunque andando a destinazione.
+    const daPrimoPasseggero = fermateOrdinate.slice(primaFuori).map((f) => f.id);
+    const proposta: Proposta = primoBusDelTragitto
+      ? { tipo: 'bus', fermateIds: daPrimoPasseggero }
+      : (primaFuori === 0 && principaleCopre)
+        ? { tipo: 'bus', fermateIds: dati.fermateLineaPrincipale }
+        : { tipo: 'linea', fermateIds: daPrimoPasseggero };
     const cittaProposta = new Set(proposta.fermateIds.map((id) => cittaDi.get(id)).filter((c): c is string => !!c));
     const nuovo = { busId: `proposta-${passi.length + 1}`, postiBus: postiPerBus, fermate: cittaProposta, primaFermata: primaFermataDellaLinea(cittaProposta, ordineCitta) };
     passi.push({ proposta, bus: nuovo, senzaPostoPrima: senzaPosto });
@@ -268,6 +279,31 @@ async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, 
   };
 }
 
+/** Una voce del piano: un bus da confermare, con quello che serve per
+ *  decidere (da dove parte, quanta gente porta, quanto costa). */
+export interface VoceDelPiano {
+  tipo: 'bus' | 'linea';
+  /** Le città delle sue fermate, in ordine di percorso. */
+  fermate: string[];
+  posti: number;
+  passeggeri: number;
+  /** Il costo della quotazione del tragitto, null se non c'è. */
+  costoStimato: number | null;
+  giaProposta: boolean;
+}
+
+export interface AnteprimaPiano {
+  tragittoId: string;
+  tragittoNome: string;
+  voci: VoceDelPiano[];
+  /** Passeggeri che resterebbero a terra: sotto il pareggio, nessun bus li giustifica. */
+  senzaPosto: number;
+  contatore: ContatorePareggio | null;
+  costoStimatoTotale: number | null;
+  /** Senza quotazione non si può calcolare niente: prima serve un prezzo per il bus. */
+  senzaQuotazione: boolean;
+}
+
 /** Il nome di ogni proposta: "Bus 2 · Linea 1" per un bus in più su una
  *  linea che c'è; null per una linea nuova ("Linea N", numero libero).
  *  Senza ancora nessuna linea anche il primo bus fa nascere una linea. */
@@ -358,10 +394,76 @@ export const lineeDaConfermareService = {
     return (await leggiStato(db, tragittoId, soglia, postiPerBus))?.contatore ?? null;
   },
 
+  /** Il piano come sarebbe adesso, senza scrivere niente: quali bus
+   *  servirebbero, da dove partirebbero, quanta gente ci salirebbe,
+   *  quanto costerebbero e chi resterebbe comunque a terra. È lo stesso
+   *  calcolo che gira alla data di decisione (proprietario, ottobre
+   *  2026): il pulsante "Crea piano" lo mostra prima di confermarlo. */
+  async anteprimaPiano(tragittoId: string): Promise<AnteprimaPiano | null> {
+    const [soglia, postiPerBus] = await Promise.all([leggiSogliaOccupazionePareggio(), leggiPostiPerBus()]);
+    const stato = await leggiStato(db, tragittoId, soglia, postiPerBus);
+    if (!stato) return null;
+
+    const [t] = await db.select({ costo: tragitti.preventivoCosto, nome: tragitti.nome }).from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    const cittaDi = new Map(stato.dati.fermateOrdinate.map((f) => [f.id, f.citta]));
+    const pareggio = stato.dati.postiPareggio === null ? null : Math.max(1, stato.dati.postiPareggio);
+    // Gli stessi passi che userebbe allinea, per sapere chi sale su quale bus.
+    const { passi, fuori } = pareggio === null ? { passi: [], fuori: [] } : passiBusInPiu(stato.dati, pareggio, 100);
+    const carico = riempiBus(stato.dati.gruppi, [...stato.dati.bus, ...passi.map((p) => p.bus)]).carico;
+    const costoBus = t?.costo ? Number(t.costo) : null;
+
+    return {
+      tragittoId,
+      tragittoNome: t?.nome ?? '',
+      // Una voce per bus da confermare, nell'ordine in cui nascerebbero.
+      voci: passi.map((passo, i) => ({
+        tipo: passo.proposta.tipo,
+        fermate: passo.proposta.fermateIds.map((id) => cittaDi.get(id) ?? '').filter(Boolean),
+        posti: passo.bus.postiBus,
+        passeggeri: carico.get(passo.bus.busId)?.passeggeri ?? 0,
+        costoStimato: costoBus,
+        // Una proposta uguale c'è già: confermando il piano non cambia niente per lei.
+        giaProposta: i < proposteGiaGiuste(stato),
+      })),
+      senzaPosto: fuori.reduce((s, g) => s + g.passeggeri, 0),
+      contatore: stato.contatore,
+      costoStimatoTotale: costoBus === null ? null : costoBus * passi.length,
+      senzaQuotazione: pareggio === null,
+    };
+  },
+
   /** Lo stato di un tragitto di un evento non ancora passato, anche fuori
    *  vendita, per la simulazione economica dei bus in più. */
   statoPerSimulazione(tragittoId: string, soglia: number, postiPerBus: number): Promise<StatoProposte | null> {
     return leggiStato(db, tragittoId, soglia, postiPerBus, { ancheFuoriVendita: true });
+  },
+
+  /** "Crea piano": anticipa la decisione a oggi invece di aspettare la
+   *  data (proprietario, ottobre 2026). Scrive la data sull'evento —
+   *  quindi vale per TUTTI i suoi tragitti — ricalcola le proposte e fa
+   *  partire subito le richieste di preventivo, senza aspettare il giro
+   *  dell'ora. Serve quando i numeri sono già maturi e cercare i bus
+   *  dopo sarebbe tardi. */
+  async confermaPiano(eventoId: string): Promise<{ proposte: number; richiesteInviate: number }> {
+    const [evento] = await db.select({ id: eventi.id, data: eventi.data }).from(eventi)
+      .where(and(eq(eventi.id, eventoId), isNull(eventi.eliminatoIl))).limit(1);
+    if (!evento) throw new NonTrovato('Evento');
+
+    await db.update(eventi).set({ decisionePianoIl: new Date() }).where(eq(eventi.id, eventoId));
+
+    const suoiTragitti = await db.select({ id: tragitti.id }).from(tragitti)
+      .where(and(eq(tragitti.eventoId, eventoId), isNull(tragitti.eliminatoIl)));
+    for (const t of suoiTragitti) await allinea(t.id);
+
+    // Le richieste dei bus: ora che la data è arrivata partono. perProposta
+    // non lancia mai e salta quelle che le hanno già.
+    const proposte = suoiTragitti.length === 0 ? [] : await db.select({ id: linee.id }).from(linee)
+      .where(and(inArray(linee.tragittoId, suoiTragitti.map((t) => t.id)), eq(linee.daConfermare, true)));
+    let richiesteInviate = 0;
+    for (const p of proposte) {
+      if (await invioAutomaticoService.perProposta(p.id)) richiesteInviate += 1;
+    }
+    return { proposte: proposte.length, richiesteInviate };
   },
 
   /** Dopo una prenotazione, una cancellazione, un preventivo o un cambio di
