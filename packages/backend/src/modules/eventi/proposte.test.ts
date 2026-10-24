@@ -78,6 +78,50 @@ describe('da dove parte il bus proposto', () => {
   });
 });
 
+describe('il bus parte il più avanti possibile, se conviene e nessuno resta a terra', () => {
+  // Caso vero di ottobre 2026 (Como → Roma, Harry Styles): 7 prenotati a
+  // Como e 11 a Saronno, bus da 10 posti, pareggio 6. Il gestionale
+  // proponeva DUE bus gemelli Como → Saronno, perché il riempimento per
+  // età lascia fuori anche qualcuno di Como. Conviene invece un bus da
+  // Como e uno da Saronno: meno strada, e il risparmio arriva col
+  // preventivo del fornitore (la richiesta porta solo quelle fermate).
+  const como = { id: 'como', citta: 'Como' };
+  const saronno = { id: 'saronno', citta: 'Saronno' };
+  const pugliese: Partial<DatiProposte> = {
+    fermateOrdinate: [como, saronno], fermateLineaPrincipale: ['como', 'saronno'],
+    postiPerBus: 10, postiPareggio: 6,
+  };
+  /** `quante` persone da `citta`, tutte di `eta` anni. */
+  const diEta = (citta: string, quante: number, eta: number) => persone(citta, quante).map((g) => ({ ...g, eta }));
+
+  it('secondo bus da Saronno: gli 11 di Saronno lo ripagano e i 7 di Como stanno sul primo', () => {
+    const { proposte } = calcola({ ...pugliese, gruppi: [...diEta('Saronno', 11, 90), ...diEta('Como', 7, 50)] });
+    expect(proposte).toEqual([
+      { tipo: 'bus', fermateIds: ['como', 'saronno'] },
+      { tipo: 'linea', fermateIds: ['saronno'] },
+    ]);
+  });
+
+  it('se partendo da Saronno qualcuno di Como resterebbe a terra, il bus parte da Como', () => {
+    // 11 a Como e 7 a Saronno: un bus da Saronno lascerebbe a terra
+    // l'undicesimo di Como, che su quel bus non potrebbe mai salire.
+    const { proposte } = calcola({ ...pugliese, gruppi: [...diEta('Como', 11, 90), ...diEta('Saronno', 7, 50)] });
+    expect(proposte).toEqual([
+      { tipo: 'bus', fermateIds: ['como', 'saronno'] },
+      { tipo: 'bus', fermateIds: ['como', 'saronno'] },
+    ]);
+  });
+
+  it('su una linea già confermata: il bus in più parte da Saronno se ci salgono solo loro', () => {
+    const conLinea = {
+      ...pugliese,
+      bus: [busSu('b1', 10, ['Como', 'Saronno'])], busConfermati: 1, lineeConfermate: 1,
+      gruppi: [...diEta('Saronno', 11, 90), ...diEta('Como', 7, 50)],
+    };
+    expect(calcola(conLinea).proposte).toEqual([{ tipo: 'linea', fermateIds: ['saronno'] }]);
+  });
+});
+
 describe('i gruppi non si dividono', () => {
   // Il caso reale di produzione (settembre 2026): Linea 1 Como-Saronno con 3 bus
   // da 15, Linea 2 da Saronno con un bus da 15, gruppi già smistati; restano
@@ -126,8 +170,19 @@ describe('bus in più o linea nuova', () => {
     expect(calcola({ ...lineaIntera, gruppi }).proposte[0]).toEqual({ tipo: 'linea', fermateIds: ['bologna'] });
   });
 
-  it('se anche uno solo della prima fermata resta senza posto, un bus in più sulla linea', () => {
+  it('qualcuno della prima fermata resta fuori ma nessuno a terra: linea da Bologna, meno strada', () => {
+    // I 45 di Bologna (più grandi) prendono il bus confermato e restano
+    // fuori 40 di Roma. Un secondo bus Roma → Bologna li porterebbe tutti,
+    // ma conviene una linea da Bologna: i 45 di Bologna salgono su quella
+    // e i 45 di Roma stanno tutti sul bus confermato (ottobre 2026).
     const gruppi = [...persone('Bologna', 45), ...persone('Roma', 45)].map((g, i) => ({ ...g, eta: 90 - i }));
+    expect(calcola({ ...lineaIntera, gruppi }).proposte[0]).toEqual({ tipo: 'linea', fermateIds: ['bologna'] });
+  });
+
+  it('se quelli di Bologna hanno già il bus, per i 45 di Roma serve un bus sulla linea', () => {
+    // Chi ha già un bus non si muove: una linea da Bologna non servirebbe
+    // a nessuno e lascerebbe a terra 40 di Roma.
+    const gruppi = [...persone('Bologna', 45).map((g) => ({ ...g, busId: 'b1' })), ...persone('Roma', 45)];
     expect(calcola({ ...lineaIntera, gruppi }).proposte[0]).toEqual({ tipo: 'bus', fermateIds: ['roma', 'firenze', 'bologna'] });
   });
 });

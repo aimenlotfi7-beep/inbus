@@ -84,7 +84,8 @@ export function PianoBus({ eventoId, tragittoId, onConfermato }: {
                 <>
                   <p className="testo-intro">
                     {plurale(piano.voci.length, 'bus da confermare', 'bus da confermare')} su «{piano.tragittoNome}».
-                    Ogni bus parte dalla prima fermata dove c'è qualcuno: più avanti parte, meno costa.
+                    Il primo parte da dove inizia il tragitto; gli altri partono il più avanti possibile — meno strada,
+                    meno costo — purché chi sale lì basti a ripagare il bus e nessuno resti a terra.
                   </p>
                   <div className="table-scroll adattiva">
                     <table className="data-table">
@@ -119,7 +120,7 @@ export function PianoBus({ eventoId, tragittoId, onConfermato }: {
               <div className="riepilogo-numeri" style={{ marginTop: 14 }}>
                 <div className="riepilogo-numero">
                   <span>Spesa stimata</span><b>{piano.costoStimatoTotale === null ? '—' : formattaEuro(piano.costoStimatoTotale)}</b>
-                  <small>al prezzo della quotazione, prima dei preventivi veri</small>
+                  <small>la quotazione per ogni bus: un bus che parte più avanti costerà meno</small>
                 </div>
                 <div className={`riepilogo-numero ${piano.senzaPosto > 0 ? 'rosso' : 'verde'}`}>
                   <span>Resterebbero a terra</span><b>{piano.senzaPosto}</b>
@@ -128,6 +129,11 @@ export function PianoBus({ eventoId, tragittoId, onConfermato }: {
               </div>
 
               <p className="testo-secondario" style={{ marginTop: 12, lineHeight: 1.5 }}>
+                La stima usa il prezzo della quotazione, che è uno solo per tutto il tragitto: il risparmio di un bus
+                che parte più avanti si vedrà nel <b>preventivo del fornitore</b>, perché la richiesta porta solo le
+                fermate di quel bus.
+              </p>
+              <p className="testo-secondario" style={{ marginTop: 8, lineHeight: 1.5 }}>
                 Confermando, la data di decisione di <b>tutto l'evento</b> viene portata a oggi: le proposte vengono
                 ricalcolate e le richieste di preventivo partono subito ai fornitori della zona di ogni bus, più chi
                 ha dato la quotazione. I bus già confermati non si toccano. Niente diventa definitivo finché non

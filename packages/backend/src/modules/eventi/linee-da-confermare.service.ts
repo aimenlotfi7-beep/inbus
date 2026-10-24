@@ -99,19 +99,62 @@ export function passiBusInPiu(dati: Omit<DatiProposte, 'postiPareggio'>, minimo:
     const primaFuori = Math.min(...fuori.map((g) => ordineCitta.indexOf(g.fermataCitta)));
     const principaleCopre = fuori.every((g) => dati.fermateLineaPrincipale.some((id) => cittaDi.get(id) === g.fermataCitta));
     const primoBusDelTragitto = dati.lineeConfermate === 0 && passi.length === 0;
-    // Da dove parte il bus (proprietario, ottobre 2026): dalla prima
-    // fermata dove c'è davvero qualcuno, non dall'inizio del percorso.
-    // Il primo bus di un tragitto nasceva con la linea su TUTTE le
-    // fermate: se le vendite erano tutte sull'ultima, si pagavano ore e
-    // chilometri per andare a prendere nessuno, e niente lo segnalava
-    // (i passeggeri un posto ce l'avevano). Le fermate dopo restano
-    // tutte: il bus ci passa comunque andando a destinazione.
-    const daPrimoPasseggero = fermateOrdinate.slice(primaFuori).map((f) => f.id);
+
+    /** Come andrebbe se questo bus partisse dalla fermata numero `indice`:
+     *  quanti ci salirebbero e quanti resterebbero senza posto in tutto. */
+    const provaDa = (indice: number) => {
+      const citta = new Set(fermateOrdinate.slice(indice).map((f) => f.citta));
+      const finto = { busId: `prova-${passi.length + 1}`, postiBus: postiPerBus, fermate: citta, primaFermata: indice };
+      const esito = riempiBus(dati.gruppi, [...bus, finto]);
+      return {
+        indice,
+        caricoSuDiLui: esito.carico.get(finto.busId)?.passeggeri ?? 0,
+        senzaPostoDopo: esito.senzaPosto
+          .filter((g) => ordineCitta.includes(g.fermataCitta) && g.passeggeri <= postiMassimi)
+          .reduce((s, g) => s + g.passeggeri, 0),
+      };
+    };
+
+    // Da dove parte il bus (proprietario, ottobre 2026): il più avanti
+    // possibile, perché meno strada vuol dire meno costo. Prima il bus
+    // nasceva dalla prima fermata dove c'era qualcuno rimasto senza posto
+    // dopo il riempimento per età — e siccome quel riempimento pesca da
+    // tutte le fermate, bastava una persona della prima fermata per far
+    // partire anche il secondo bus dall'inizio del percorso (caso vero di
+    // ottobre 2026: 7 da Como e 11 da Saronno, due bus gemelli Como →
+    // Saronno invece di uno da Como e uno da Saronno). Ora si prova a far
+    // partire il bus da ogni fermata, dalla più avanti all'indietro, e si
+    // tiene la più avanti che:
+    //  - non lascia a terra nessuno in più (chi sale prima può salire solo
+    //    sui bus che passano da lì, e riempiBus manda ognuno sulla linea
+    //    che parte più vicino alla sua fermata: quindi quelli delle prime
+    //    fermate finiscono sui bus che partono da lì);
+    //  - porta comunque abbastanza passeggeri da ripagarsi (il minimo, che
+    //    per le proposte è il pareggio).
+    // Le fermate dopo la partenza restano tutte: il bus ci passa comunque
+    // andando a destinazione.
+    // Il primo bus di un tragitto resta ancorato alla prima fermata dove
+    // c'è qualcuno: spostarlo più avanti non farebbe risparmiare niente
+    // (gli altri bus nascono comunque per chi resta indietro) e la Linea 1
+    // non partirebbe più dalla partenza del tragitto.
+    const base = provaDa(primaFuori);
+    let scelta = base;
+    if (!primoBusDelTragitto) {
+      for (let indice = ordineCitta.length - 1; indice > primaFuori; indice -= 1) {
+        const prova = provaDa(indice);
+        if (prova.senzaPostoDopo <= base.senzaPostoDopo && prova.caricoSuDiLui >= Math.max(1, minimo)) {
+          scelta = prova;
+          break;
+        }
+      }
+    }
+
+    const daDoveParte = fermateOrdinate.slice(scelta.indice).map((f) => f.id);
     const proposta: Proposta = primoBusDelTragitto
-      ? { tipo: 'bus', fermateIds: daPrimoPasseggero }
-      : (primaFuori === 0 && principaleCopre)
+      ? { tipo: 'bus', fermateIds: daDoveParte }
+      : (scelta.indice === 0 && principaleCopre)
         ? { tipo: 'bus', fermateIds: dati.fermateLineaPrincipale }
-        : { tipo: 'linea', fermateIds: daPrimoPasseggero };
+        : { tipo: 'linea', fermateIds: daDoveParte };
     const cittaProposta = new Set(proposta.fermateIds.map((id) => cittaDi.get(id)).filter((c): c is string => !!c));
     const nuovo = { busId: `proposta-${passi.length + 1}`, postiBus: postiPerBus, fermate: cittaProposta, primaFermata: primaFermataDellaLinea(cittaProposta, ordineCitta) };
     passi.push({ proposta, bus: nuovo, senzaPostoPrima: senzaPosto });

@@ -81,7 +81,10 @@ describe('i bus della simulazione', () => {
       postiPerBus: 15,
     };
     const bus = busDellaSimulazione('t1', stato(dati));
-    expect(inPiu(bus).map((b) => [b.lineaChiave, b.lineaNome])).toEqual([['linea:l1', 'Linea 1'], ['linea-nuova:saronno', 'Linea nuova da Saronno']]);
+    // I due gruppi da 9 non stanno su un bus da 15: uno dei due aspetta
+    // comunque il bus dopo. Nasce prima quello da Saronno, che fa meno
+    // strada (ottobre 2026); il gruppo di Como ha poi il suo sulla Linea 1.
+    expect(inPiu(bus).map((b) => [b.lineaChiave, b.lineaNome])).toEqual([['linea-nuova:saronno', 'Linea nuova da Saronno'], ['linea:l1', 'Linea 1']]);
     expect(partonoPerCombinazione(esitiCombinazioni(dati.gruppi, bus))).toEqual([15, 24, 24, 33]);
   });
 
