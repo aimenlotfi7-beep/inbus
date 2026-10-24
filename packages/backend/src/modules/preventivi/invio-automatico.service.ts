@@ -29,15 +29,28 @@ import { inviaPreventiviBusSenzaClic, inviaQuotazioneSenzaClic } from './prevent
 
 /** Un solo invio alla volta per tragitto o proposta: il controllo dell'ora e
  *  un salvataggio nello stesso istante non mandano la richiesta due volte. */
-const inCorso = new Set<string>();
+const inCorso = new Map<string, Promise<void>>();
 
-async function inEsclusiva<T>(chiave: string, lavoro: () => Promise<T>): Promise<T | null> {
-  if (inCorso.has(chiave)) return null;
-  inCorso.add(chiave);
+/** Di norma chi arriva secondo lascia perdere (ci ripassa il giro dell'ora).
+ *  Con `inCoda` invece aspetta il suo turno: serve a chi ha appena cambiato
+ *  le carte in tavola — la conferma del piano scrive la data e poi manda le
+ *  richieste, e un invio partito in sottofondo un istante prima aveva
+ *  guardato l'evento quando la data non c'era ancora. */
+async function inEsclusiva<T>(chiave: string, lavoro: () => Promise<T>, inCoda = false): Promise<T | null> {
+  const precedente = inCorso.get(chiave);
+  if (precedente && !inCoda) return null;
+  const mio = (async () => {
+    if (precedente) await precedente;
+    return lavoro();
+  })();
+  // Nella fila va la promessa senza errori: chi aspetta il turno non deve
+  // ereditare il problema di chi lo precede.
+  const segnaposto = mio.then(() => undefined, () => undefined);
+  inCorso.set(chiave, segnaposto);
   try {
-    return await lavoro();
+    return await mio;
   } finally {
-    inCorso.delete(chiave);
+    if (inCorso.get(chiave) === segnaposto) inCorso.delete(chiave);
   }
 }
 
@@ -150,8 +163,11 @@ export const invioAutomaticoService = {
   },
 
   /** Preventivi per il bus di una proposta da confermare, se non sono ancora
-   *  partiti e se è arrivata la data in cui si decide il piano. */
-  async perProposta(lineaId: string): Promise<boolean> {
+   *  partiti e se è arrivata la data in cui si decide il piano.
+   *  `inCoda`: aspetta un eventuale invio già in corso sulla stessa proposta
+   *  invece di lasciar perdere (lo usa la conferma del piano, che deve dire
+   *  quante richieste sono partite davvero). */
+  async perProposta(lineaId: string, inCoda = false): Promise<boolean> {
     try {
       return (await inEsclusiva(`proposta:${lineaId}`, async () => {
         const [linea] = await db.select().from(linee).where(and(eq(linee.id, lineaId), eq(linee.daConfermare, true))).limit(1);
@@ -178,7 +194,7 @@ export const invioAutomaticoService = {
         if (!esito || richiesteCreate(esito) === 0) return false;
         await registra(`Preventivi per il bus "${linea.nome}"`, esito);
         return true;
-      })) ?? false;
+      }, inCoda)) ?? false;
     } catch (err) {
       console.error(`[invio automatico] preventivi per la proposta ${lineaId} non inviati (riprova il giro dell'ora):`, err);
       return false;

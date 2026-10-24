@@ -330,7 +330,11 @@ function proposteGiaGiuste(stato: StatoProposte): number {
   return uguali;
 }
 
-async function allinea(tragittoId: string): Promise<EsitoAllineamento> {
+/** `senzaInvii`: non manda in sottofondo i preventivi delle proposte appena
+ *  nate. Lo usa la conferma del piano, che li manda lei un attimo dopo
+ *  aspettando l'esito (altrimenti i due invii si darebbero il turno a vicenda
+ *  e il conto delle richieste partite sarebbe a caso). */
+async function allinea(tragittoId: string, opzioni?: { senzaInvii?: boolean }): Promise<EsitoAllineamento> {
   const [soglia, postiPerBus] = await Promise.all([leggiSogliaOccupazionePareggio(), leggiPostiPerBus()]);
   // Prima senza blocchi: quasi sempre non c'è niente da cambiare.
   const primaLettura = await leggiStato(db, tragittoId, soglia, postiPerBus);
@@ -380,7 +384,7 @@ async function allinea(tragittoId: string): Promise<EsitoAllineamento> {
   // Dopo il salvataggio, in sottofondo: i preventivi per i bus delle proposte
   // appena nate partono da soli (non rallentano la prenotazione che le ha
   // fatte nascere; perProposta non lancia mai).
-  for (const id of nuoveProposte) void invioAutomaticoService.perProposta(id);
+  if (!opzioni?.senzaInvii) for (const id of nuoveProposte) void invioAutomaticoService.perProposta(id);
   return esitoTransazione;
 }
 
@@ -453,15 +457,17 @@ export const lineeDaConfermareService = {
 
     const suoiTragitti = await db.select({ id: tragitti.id }).from(tragitti)
       .where(and(eq(tragitti.eventoId, eventoId), isNull(tragitti.eliminatoIl)));
-    for (const t of suoiTragitti) await allinea(t.id);
+    // Gli invii li fa il giro qui sotto, aspettandone l'esito.
+    for (const t of suoiTragitti) await allinea(t.id, { senzaInvii: true });
 
     // Le richieste dei bus: ora che la data è arrivata partono. perProposta
-    // non lancia mai e salta quelle che le hanno già.
+    // non lancia mai e salta quelle che le hanno già; `inCoda` aspetta un
+    // invio partito in sottofondo un istante prima della conferma.
     const proposte = suoiTragitti.length === 0 ? [] : await db.select({ id: linee.id }).from(linee)
       .where(and(inArray(linee.tragittoId, suoiTragitti.map((t) => t.id)), eq(linee.daConfermare, true)));
     let richiesteInviate = 0;
     for (const p of proposte) {
-      if (await invioAutomaticoService.perProposta(p.id)) richiesteInviate += 1;
+      if (await invioAutomaticoService.perProposta(p.id, true)) richiesteInviate += 1;
     }
     return { proposte: proposte.length, richiesteInviate };
   },

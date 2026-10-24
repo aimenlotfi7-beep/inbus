@@ -107,12 +107,8 @@ describe('conferma del piano', () => {
     await creaFornitore({ nome: 'Bus Taranto', lat: 40.47, lng: 17.24, invioAutomatico: true });
     const s = await tragittoPugliese();
     await prenotati(s.evento.id, s.tragitto.id, 'Taranto', 12);
-    // La proposta nasce prima della conferma: così le richieste partono
-    // solo dalla conferma, e si contano senza corse con il sottofondo
-    // (allinea manda da sé i preventivi delle proposte appena nate,
-    // quando la data è già arrivata).
-    await lineeDaConfermareService.allinea(s.tragitto.id);
 
+    // La prima conferma fa nascere la proposta e manda la richiesta.
     expect(await lineeDaConfermareService.confermaPiano(s.evento.id)).toMatchObject({ richiesteInviate: 1 });
     const dopoUna = await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.scopo, 'BUS'));
 

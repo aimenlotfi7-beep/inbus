@@ -123,6 +123,23 @@ describe('preventivi per il bus che partono da soli', () => {
     expect(await invioAutomaticoService.perProposta(proposta.id)).toBe(false);
   });
 
+  it('due invii nello stesso istante: chi si mette in coda aspetta il turno e non manda il doppione', async () => {
+    const f = await fornitori();
+    const t = await tragittoConOrari({ tragitto: { stato: 'PREZZATO', preventivoCosto: '1000', preventivoPostiBus: 50 } });
+    const proposta = await creaProposta(t.tragitto.id, [t.roma.id, t.firenze.id]);
+
+    // Il secondo parte quando il primo sta ancora lavorando: con `inCoda`
+    // non lascia perdere (serve alla conferma del piano, che deve sapere se
+    // le richieste sono partite davvero), ma trova il lavoro già fatto.
+    const esiti = await Promise.all([
+      invioAutomaticoService.perProposta(proposta.id),
+      invioAutomaticoService.perProposta(proposta.id, true),
+    ]);
+    expect(esiti.filter(Boolean)).toHaveLength(1);
+    const richieste = await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.lineaId, proposta.id));
+    expect(richieste.map((r) => r.fornitoreId)).toEqual([f.automatico.id]);
+  });
+
   it('quando le prenotazioni fanno nascere la proposta, i preventivi partono senza fare nulla', async () => {
     const f = await fornitori();
     const t = await tragittoConOrari({ tragitto: { stato: 'PREZZATO', preventivoCosto: '1000', preventivoPostiBus: 50 } });
