@@ -47,6 +47,14 @@ export function giorniPrima(dataEvento: Date, giorni: number): Date {
 /** Il piano si decide da adesso in poi? */
 export const decisioneArrivata = (date: DatePiano, adesso = new Date()) => adesso >= date.decisione;
 
+/** Le date del piano viste dal gestionale: la pagina delle linee le mostra
+ *  per spiegare perché le richieste non sono ancora partite (proprietario,
+ *  ottobre 2026: un solo meccanismo, la data, e si deve vedere). Qui non si
+ *  legge il database: questo modulo resta puro (ha i test senza database). */
+export interface DatePianoViste extends DatePiano {
+  decisioneArrivata: boolean;
+}
+
 /** Le vendite sono chiuse per data? Senza una data di fine vendite non
  *  si chiude niente (l'interruttore "Ferma vendite" è un'altra cosa). */
 export const venditeChiusePerData = (date: DatePiano, adesso = new Date()) =>

@@ -178,6 +178,16 @@ export interface SuggerimentoLinea {
   /** Pareggio del prossimo bus non ancora proposto ("3° bus": contati su
    *  pareggio, mai oltre); null senza quotazione, fuori vendita o a evento passato. */
   contatorePareggio: { bus: number; contati: number; pareggio: number } | null;
+  /** Le due date del piano dell'evento (proprietario, ottobre 2026): fino
+   *  alla decisione si raccolgono solo prenotazioni e nessuna richiesta
+   *  parte ai fornitori; dalla fine vendite non si compra più. */
+  datePiano: {
+    decisione: string;
+    fineVendite: string | null;
+    decisionePersonalizzata: boolean;
+    fineVenditePersonalizzata: boolean;
+    decisioneArrivata: boolean;
+  } | null;
 }
 export interface VenditePerFermata {
   perFermata: { citta: string; confermati: number }[];

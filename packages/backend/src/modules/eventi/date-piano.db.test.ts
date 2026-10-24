@@ -3,6 +3,8 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { eventi } from '../../db/schema.js';
 import { prenotazioniService } from '../prenotazioni/prenotazioni.service.js';
+import { lineeDaConfermareService } from './linee-da-confermare.service.js';
+import { giorniPrima } from './date-piano.js';
 import { listaAttesaService } from '../lista-attesa/lista-attesa.service.js';
 import { creaCliente, fraGiorni, impostazione, riga, scenarioBase, svuotaDatabase } from '../../../test/dati.js';
 
@@ -51,6 +53,25 @@ describe('fine vendite scritta sull\'evento', () => {
     await db.update(eventi).set({ fineVenditeIl: fraGiorni(1) }).where(eq(eventi.id, s.evento.id));
     const cliente = await creaCliente();
     expect((await compra(s, cliente, cliente.id)).pnr).toBeTruthy();
+  });
+});
+
+describe('le date che il gestionale mostra nella pagina delle linee', () => {
+  it('dicono quando si decide il piano e se la decisione è già arrivata', async () => {
+    await impostazione('giorni_decisione_piano', 30);
+    const s = await scenarioBase({ evento: { data: fraGiorni(60) } });
+
+    const lontano = (await lineeDaConfermareService.datePianoDelTragitto(s.tragitto.id))!;
+    expect(lontano.decisioneArrivata).toBe(false);
+    expect(lontano.decisionePersonalizzata).toBe(false);
+    expect(lontano.decisione.getTime()).toBe(giorniPrima(s.evento.data, 30).getTime());
+    // La fine vendite generale di questo file: 2 giorni prima.
+    expect(lontano.fineVendite?.getTime()).toBe(giorniPrima(s.evento.data, 2).getTime());
+
+    // Data scritta sull'evento (anche da "Crea piano"): vince e si vede.
+    await db.update(eventi).set({ decisionePianoIl: fraGiorni(-1) }).where(eq(eventi.id, s.evento.id));
+    const deciso = (await lineeDaConfermareService.datePianoDelTragitto(s.tragitto.id))!;
+    expect(deciso).toMatchObject({ decisioneArrivata: true, decisionePersonalizzata: true });
   });
 });
 

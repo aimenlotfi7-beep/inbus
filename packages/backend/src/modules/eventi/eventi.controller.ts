@@ -230,12 +230,15 @@ export const eventiController = {
   },
   async suggerimentoLinea(req: Request, res: Response) {
     const { lineeDaConfermareService } = await import('./linee-da-confermare.service.js');
-    // Con il contatore del pareggio: lo stesso conto che fa nascere le proposte.
-    const [suggerimento, contatorePareggio] = await Promise.all([
+    // Con il contatore del pareggio (lo stesso conto che fa nascere le
+    // proposte) e le date del piano, che dicono se le richieste ai
+    // fornitori possono già partire.
+    const [suggerimento, contatorePareggio, datePiano] = await Promise.all([
       eventiService.suggerimentoLinea(req.params.tragittoId),
       lineeDaConfermareService.contatore(req.params.tragittoId),
+      lineeDaConfermareService.datePianoDelTragitto(req.params.tragittoId),
     ]);
-    res.json({ ...suggerimento, contatorePareggio });
+    res.json({ ...suggerimento, contatorePareggio, datePiano });
   },
 
   /** "Crea piano": come sarebbe il piano dei bus adesso, senza scrivere niente. */

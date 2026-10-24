@@ -2,6 +2,7 @@ import { and, asc, eq, gte, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { busFisici, eventi, fermate, lineaFermate, linee, prenotazioni, tragitti, utenti } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
+import { datePiano, decisioneArrivata, type DatePianoViste } from './date-piano.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
 import { calcolaTempi, leggiOrariTragitto, type Lettore } from '../prenotazioni/partenza.js';
 import { etaPrenotazione, primaFermataDellaLinea, riempiBus, type BusDaRiempire, type GruppoPasseggeri } from '../prenotazioni/riempimento-bus.js';
@@ -440,6 +441,19 @@ export const lineeDaConfermareService = {
    *  vendita, per la simulazione economica dei bus in più. */
   statoPerSimulazione(tragittoId: string, soglia: number, postiPerBus: number): Promise<StatoProposte | null> {
     return leggiStato(db, tragittoId, soglia, postiPerBus, { ancheFuoriVendita: true });
+  },
+
+  /** Le due date del piano di un tragitto (quelle del suo evento), già
+   *  risolte. La pagina delle linee le mostra: finché la decisione non
+   *  arriva le proposte si vedono ma non parte nessuna richiesta, e il
+   *  proprietario deve poter leggere da dove viene quel silenzio. */
+  async datePianoDelTragitto(tragittoId: string): Promise<DatePianoViste | null> {
+    const [riga] = await db.select({ data: eventi.data, decisionePianoIl: eventi.decisionePianoIl, fineVenditeIl: eventi.fineVenditeIl })
+      .from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+      .where(and(eq(tragitti.id, tragittoId), isNull(eventi.eliminatoIl))).limit(1);
+    if (!riga) return null;
+    const date = await datePiano(riga);
+    return { ...date, decisioneArrivata: decisioneArrivata(date) };
   },
 
   /** "Crea piano": anticipa la decisione a oggi invece di aspettare la

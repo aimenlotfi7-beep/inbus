@@ -590,6 +590,11 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   // Il contatore del pareggio (dal server, stesso conto delle proposte): sempre
   // per il prossimo bus non ancora proposto, da 0 al pareggio.
   const contatore = suggerimento?.contatorePareggio ?? null;
+  // Le date del piano (dal server: le stesse che usano le richieste
+  // automatiche). Finché la decisione non arriva le proposte si vedono ma
+  // non parte niente, e va detto.
+  const datePiano = suggerimento?.datePiano ?? null;
+  const inAttesaDiDecisione = !!datePiano && !datePiano.decisioneArrivata;
   const mancantiAlPareggio = contatore ? contatore.pareggio - contatore.contati : null;
   const alPareggioDel = contatore ? ` del ${contatore.bus}° bus` : '';
   // Chi resta senza posto con i bus confermati: gruppi interi, solo sui bus
@@ -606,7 +611,11 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     prossimoPasso = {
       tono: 'azione',
       titolo: lineeDaConfermare.length === 1 ? `${nomeProposta(prima)} da confermare` : `${lineeDaConfermare.length} proposte da confermare`,
-      testo: lineeConfermate.length === 0
+      testo: inAttesaDiDecisione
+        // Prima della decisione le proposte dicono come sta andando: i
+        // preventivi si possono ancora chiedere a mano, ma non è il momento.
+        ? 'Come sarebbero i bus con le prenotazioni di adesso. Finché il piano non si decide puoi guardare e aspettare: i numeri cambiano ancora.'
+        : lineeConfermate.length === 0
         ? 'Le prenotazioni hanno raggiunto il pareggio: chiedi i preventivi per il primo bus ai fornitori, qui sotto nella proposta, poi scegli e conferma. Se hai già un accordo, conferma inserendo i dati.'
         : diBus
           ? 'Chi è rimasto fuori dai posti dei bus ha raggiunto di nuovo il pareggio: chiedi i preventivi per il bus in più, poi scegli e conferma. Intanto le vendite continuano.'
@@ -749,6 +758,17 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         <div>
           <p className="titolo">{prossimoPasso.titolo}</p>
           <p>{prossimoPasso.testo}</p>
+          {/* Un solo meccanismo, la data (proprietario, ottobre 2026): finché
+              non arriva, qui si vede soltanto come sta andando. */}
+          {inAttesaDiDecisione && (
+            <p className="testo-secondario" style={{ marginTop: 6 }}>
+              Il piano dei bus si decide <b>il {formattaData(datePiano!.decisione)}</b>
+              {datePiano!.decisionePersonalizzata ? ' (data di questo evento)' : ' (dai giorni in Impostazioni)'}: fino a
+              quel giorno si raccolgono prenotazioni e <b>nessuna richiesta parte ai fornitori</b>. Quel giorno il piano
+              si costruisce da solo e le richieste partono; con «Crea piano» puoi anticiparlo.
+              {datePiano!.fineVendite && ` Le vendite chiudono il ${formattaData(datePiano!.fineVendite)}; la lista d'attesa resta aperta.`}
+            </p>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Vedere il piano prima di decidere, e confermarlo senza
