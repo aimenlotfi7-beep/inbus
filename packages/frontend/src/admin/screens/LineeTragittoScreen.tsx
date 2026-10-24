@@ -765,7 +765,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
               Il piano dei bus si decide <b>il {formattaData(datePiano!.decisione)}</b>
               {datePiano!.decisionePersonalizzata ? ' (data di questo evento)' : ' (dai giorni in Impostazioni)'}: fino a
               quel giorno si raccolgono prenotazioni e <b>nessuna richiesta parte ai fornitori</b>. Quel giorno il piano
-              si costruisce da solo e le richieste partono; con «Crea piano» puoi anticiparlo.
+              si costruisce da solo e le richieste partono{puoScegliereFornitori ? '; con «Crea piano» puoi anticiparlo.' : '.'}
               {datePiano!.fineVendite && ` Le vendite chiudono il ${formattaData(datePiano!.fineVendite)}; la lista d'attesa resta aperta.`}
             </p>
           )}
