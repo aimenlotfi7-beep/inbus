@@ -24,7 +24,8 @@ import { NonTrovato, ConflittoDati, ErroreApplicativo } from '../../shared/error
 import { busNonTrovato, generaPdfPasseggeriBus, leggiSchedaBus, passeggeriDelBus, type PasseggeroBus } from './passeggeri-bus.service.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { confrontaPerEta, etaPrenotazione } from '../prenotazioni/riempimento-bus.js';
-import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
+import { leggiGiorniDecisionePiano, leggiGiorniFineVendite, leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
+import { decisioneArrivata, risolviDatePiano } from './date-piano.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema } from './eventi.dto.js';
 import {
@@ -2208,6 +2209,8 @@ export const eventiService = {
       eventoCitta: eventi.citta,
       eventoLuogo: eventi.luogo,
       eventoSlug: eventi.slug,
+      eventoDecisionePianoIl: eventi.decisionePianoIl,
+      eventoFineVenditeIl: eventi.fineVenditeIl,
       servizioNome: servizi.nome,
       servizioId: tragitti.servizioId,
     }).from(tragitti)
@@ -2296,39 +2299,48 @@ export const eventiService = {
     // "Mancano N posti": chi resterebbe davvero senza posto, solo sui tragitti con bus.
     const { smistamentoService } = await import('../prenotazioni/smistamento.service.js');
     const senzaPosto = await smistamentoService.senzaPostoPerTragitti(righe.filter((r) => r.stato === 'CONFERMATO' && (mappaPasseggeri.get(r.tragittoId) ?? 0) > 0).map((r) => r.tragittoId));
+    // La data in cui si decide il piano dei bus (date-piano.ts): prima di
+    // quella, le proposte senza richieste non sono "da fare" ma si aspetta
+    // la data. Giorni delle Impostazioni letti una volta sola.
+    const [giorniDecisione, giorniFineVendite] = await Promise.all([leggiGiorniDecisionePiano(), leggiGiorniFineVendite()]);
 
-    return righe.map((r) => ({
-      tragittoId: r.tragittoId,
-      tragittoNome: r.tragittoNome,
-      stato: r.stato,
-      postiTotali: r.postiTotali,
-      postiSuiBus: postiSuiBus.get(r.tragittoId) ?? 0,
-      senzaPosto: senzaPosto.get(r.tragittoId) ?? 0,
-      lineeDaConfermare: lineeDaConfermare.get(r.tragittoId) ?? 0,
-      cambioPercorso: cambi.get(r.tragittoId)?.stato ?? null,
-      totalePasseggeri: mappaPasseggeri.get(r.tragittoId) ?? 0,
-      preventivoCosto: r.preventivoCosto,
-      fornitoreId: r.fornitoreId,
-      richiestePreventivo: richiestePer.get(r.tragittoId)?.richieste ?? 0,
-      rispostePreventivo: richiestePer.get(r.tragittoId)?.risposte ?? 0,
-      // Proposte da confermare ancora senza richieste di preventivo per il
-      // bus, e risposte arrivate per i bus (da scegliere).
-      proposteSenzaRichieste: proposteSenzaRichieste.get(r.tragittoId) ?? 0,
-      risposteBus: risposteBusPer.get(r.tragittoId) ?? 0,
-      fermateCompilate: mappaFermateCompilate.get(r.tragittoId) ?? false,
-      servizioNome: r.servizioNome,
-      servizioId: r.servizioId,
-      evento: {
-        id: r.eventoId,
-        artista: r.eventoArtista,
-        genere: r.eventoGenere,
-        data: r.eventoData,
-        citta: r.eventoCitta,
-        luogo: r.eventoLuogo,
-        slug: r.eventoSlug,
-        immagineUrl: mappaImmagine.get(r.eventoId) ?? null,
-      },
-    }));
+    return righe.map((r) => {
+      const date = risolviDatePiano({ data: r.eventoData, decisionePianoIl: r.eventoDecisionePianoIl, fineVenditeIl: r.eventoFineVenditeIl }, giorniDecisione, giorniFineVendite);
+      return {
+        tragittoId: r.tragittoId,
+        tragittoNome: r.tragittoNome,
+        stato: r.stato,
+        postiTotali: r.postiTotali,
+        postiSuiBus: postiSuiBus.get(r.tragittoId) ?? 0,
+        senzaPosto: senzaPosto.get(r.tragittoId) ?? 0,
+        lineeDaConfermare: lineeDaConfermare.get(r.tragittoId) ?? 0,
+        cambioPercorso: cambi.get(r.tragittoId)?.stato ?? null,
+        totalePasseggeri: mappaPasseggeri.get(r.tragittoId) ?? 0,
+        preventivoCosto: r.preventivoCosto,
+        fornitoreId: r.fornitoreId,
+        richiestePreventivo: richiestePer.get(r.tragittoId)?.richieste ?? 0,
+        rispostePreventivo: richiestePer.get(r.tragittoId)?.risposte ?? 0,
+        // Proposte da confermare ancora senza richieste di preventivo per il
+        // bus, e risposte arrivate per i bus (da scegliere).
+        proposteSenzaRichieste: proposteSenzaRichieste.get(r.tragittoId) ?? 0,
+        risposteBus: risposteBusPer.get(r.tragittoId) ?? 0,
+        fermateCompilate: mappaFermateCompilate.get(r.tragittoId) ?? false,
+        decisionePianoIl: date.decisione,
+        decisionePianoArrivata: decisioneArrivata(date),
+        servizioNome: r.servizioNome,
+        servizioId: r.servizioId,
+        evento: {
+          id: r.eventoId,
+          artista: r.eventoArtista,
+          genere: r.eventoGenere,
+          data: r.eventoData,
+          citta: r.eventoCitta,
+          luogo: r.eventoLuogo,
+          slug: r.eventoSlug,
+          immagineUrl: mappaImmagine.get(r.eventoId) ?? null,
+        },
+      };
+    });
   },
 
   /** "Ferma vendite" sulla card dell'evento in Eventi: l'evento sparisce dal

@@ -769,6 +769,16 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
               {datePiano!.fineVendite && ` Le vendite chiudono il ${formattaData(datePiano!.fineVendite)}; la lista d'attesa resta aperta.`}
             </p>
           )}
+          {/* Dopo la data: si dice che il piano è deciso, da quando e da chi.
+              Prima non lo diceva nessuna pagina. */}
+          {datePiano?.decisioneArrivata && (
+            <p className="testo-secondario" style={{ marginTop: 6 }}>
+              Piano dei bus deciso <b>il {datePiano.decisioneDaCreaPiano ? formattaDataOra(datePiano.decisione) : formattaData(datePiano.decisione)}</b>
+              {datePiano.decisioneDaCreaPiano ? ', anticipato con «Crea piano»' : datePiano.decisionePersonalizzata ? ' (data di questo evento)' : ' (dai giorni in Impostazioni)'}:
+              per ogni bus proposto le richieste di preventivo partono da sole ai fornitori.
+              {datePiano.fineVendite && ` Le vendite chiudono il ${formattaData(datePiano.fineVendite)}; la lista d'attesa resta aperta.`}
+            </p>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Vedere il piano prima di decidere, e confermarlo senza

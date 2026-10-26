@@ -1,5 +1,5 @@
 import type { eventiApi } from '../../../api/eventi';
-import { eventoPassato, plurale } from '../../../shared/formato';
+import { eventoPassato, formattaData, plurale } from '../../../shared/formato';
 import { ETICHETTA_CAMBIO_PERCORSO } from '../../shared/AvvisoCambioPercorso';
 import type { TabPartenze } from './tipi';
 
@@ -26,7 +26,7 @@ export interface StatoTappa {
 export type DatiStatoTragitto = Pick<Partenza,
   'stato' | 'fermateCompilate' | 'fornitoreId' | 'preventivoCosto' | 'cambioPercorso'
   | 'richiestePreventivo' | 'rispostePreventivo' | 'lineeDaConfermare' | 'senzaPosto'
-  | 'proposteSenzaRichieste' | 'risposteBus'>;
+  | 'proposteSenzaRichieste' | 'risposteBus' | 'decisionePianoIl' | 'decisionePianoArrivata'>;
 
 export const COLORE_LIVELLO: Record<Livello, string> = {
   'da-fare': 'var(--pink)',
@@ -95,6 +95,11 @@ export function statoInTappa(t: DatiStatoTragitto, tab: TabPartenze): StatoTappa
       // Proposte da confermare: si chiedono i preventivi per i bus, si sceglie, si conferma.
       if (t.lineeDaConfermare > 0) {
         if (t.risposteBus > 0) return { livello: 'da-fare', testo: plurale(t.risposteBus, 'preventivo bus da valutare', 'preventivi bus da valutare') };
+        // Prima della data in cui si decide il piano (proprietario, ottobre
+        // 2026) non si chiede niente a nessuno: le richieste partono da sole
+        // quel giorno. Non è "tocca a noi" ma un'attesa, con la data: prima
+        // il rosso restava acceso per settimane su ogni evento con proposte.
+        if (t.proposteSenzaRichieste > 0 && !t.decisionePianoArrivata) return { livello: 'attesa', testo: `Piano il ${formattaData(t.decisionePianoIl)}` };
         if (t.proposteSenzaRichieste > 0) return { livello: 'da-fare', testo: t.proposteSenzaRichieste === 1 ? 'Bus da richiedere' : `${t.proposteSenzaRichieste} bus da richiedere` };
         return { livello: 'attesa', testo: 'Preventivi bus inviati' };
       }

@@ -187,6 +187,8 @@ export interface SuggerimentoLinea {
     decisionePersonalizzata: boolean;
     fineVenditePersonalizzata: boolean;
     decisioneArrivata: boolean;
+    /** La data l'ha anticipata «Crea piano» (non la scheda dell'evento). */
+    decisioneDaCreaPiano: boolean;
   } | null;
 }
 export interface VenditePerFermata {
@@ -312,6 +314,9 @@ export const eventiApi = {
     richiestePreventivo: number; rispostePreventivo: number;
     /** Proposte da confermare senza richieste di preventivo per il bus, e risposte arrivate per i bus. */
     proposteSenzaRichieste: number; risposteBus: number;
+    /** Quando si decide il piano dei bus dell'evento, e se la data è arrivata
+     *  (prima di allora le richieste ai fornitori non partono). */
+    decisionePianoIl: string; decisionePianoArrivata: boolean;
     evento: { id: string; artista: string; genere: string; data: string; citta: string; luogo: string; slug: string; immagineUrl: string | null };
   }>>(`/api/eventi/elenco-partenze${opzioni?.soloInProgramma ? '?inProgramma=1' : ''}`),
   statistichePerEvento: () => api.get<Record<string, { partecipanti: number; busCensiti: number }>>('/api/eventi/statistiche-per-evento'),

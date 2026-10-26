@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { formattaData } from '../../../shared/formato';
 import { palliniPartenze, statoCard, statoGenerale, statoInTappa, tappeDi, type Partenza } from './statiPartenze';
 
 // Regola dei colori di Partenze (proprietario, settembre 2026): rosso tocca a
@@ -11,6 +12,8 @@ function partenza(o: Partial<Partenza> = {}): Partenza {
     tragittoId: 't1', tragittoNome: 'Da Roma', stato: 'DA_CONFERMARE', postiTotali: 999999, totalePasseggeri: 0,
     postiSuiBus: 0, senzaPosto: 0, lineeDaConfermare: 0, cambioPercorso: null, preventivoCosto: null, fornitoreId: null,
     fermateCompilate: false, servizioNome: null, servizioId: null, richiestePreventivo: 0, rispostePreventivo: 0, proposteSenzaRichieste: 0, risposteBus: 0,
+    // Di serie il piano è già stato deciso: le regole di prima valgono così.
+    decisionePianoIl: fraGiorni(-1), decisionePianoArrivata: true,
     evento: { id: 'e1', artista: 'Concerto', genere: 'Pop', data: fraGiorni(30), citta: 'Milano', luogo: 'Stadio', slug: 'concerto', immagineUrl: null },
     ...o,
   };
@@ -77,6 +80,25 @@ describe('Da confermare e Confermate', () => {
   });
   it('fuori da Partenze (scheda in Eventi): da prezzare è rosso', () => {
     expect(statoGenerale(partenza()).livello).toBe('da-fare');
+  });
+});
+
+describe('prima della data in cui si decide il piano', () => {
+  // Proprietario, ottobre 2026: fino a quella data non si chiede niente a
+  // nessuno, le richieste partono da sole quel giorno. Non è "tocca a noi".
+  const prima = { stato: 'PREZZATO' as const, lineeDaConfermare: 1, proposteSenzaRichieste: 1, decisionePianoIl: fraGiorni(20), decisionePianoArrivata: false };
+
+  it('proposta senza richieste: arancio, con la data del piano', () => {
+    expect(statoInTappa(partenza(prima), 'da-confermare')).toEqual({ livello: 'attesa', testo: `Piano il ${formattaData(prima.decisionePianoIl)}` });
+  });
+  it('se qualcuno ha già risposto (richiesta fatta a mano), tocca comunque a noi scegliere', () => {
+    expect(statoInTappa(partenza({ ...prima, risposteBus: 1 }), 'da-confermare')?.livello).toBe('da-fare');
+  });
+  it('arrivata la data, la proposta senza richieste torna rossa', () => {
+    expect(statoInTappa(partenza({ ...prima, decisionePianoArrivata: true }), 'da-confermare')).toEqual({ livello: 'da-fare', testo: 'Bus da richiedere' });
+  });
+  it('non accende il pallino del menu', () => {
+    expect(palliniPartenze([partenza({ ...prima, fermateCompilate: true, preventivoCosto: '900' })]).perVoce['da-confermare']).toBe(0);
   });
 });
 

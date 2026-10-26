@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decisioneArrivata, giorniPrima, venditeChiusePerData, type DatePiano } from './date-piano.js';
+import { decisioneArrivata, decisioneDaCreaPiano, giorniPrima, risolviDatePiano, venditeChiusePerData, type DatePiano } from './date-piano.js';
 
 // Le due date del piano bus (proprietario, ottobre 2026): quella
 // dell'evento vince su quella generale, e il conto all'indietro parte
@@ -46,5 +46,30 @@ describe('quando scattano', () => {
 
   it('il piano si decide sempre prima della chiusura delle vendite', () => {
     expect(date.decisione.getTime()).toBeLessThan(date.fineVendite!.getTime());
+  });
+});
+
+describe('date risolte con i giorni già letti (elenco di Partenze)', () => {
+  it('senza date sull\'evento: i giorni delle Impostazioni', () => {
+    const date = risolviDatePiano({ data: evento, decisionePianoIl: null, fineVenditeIl: null }, 30, 0);
+    expect(date.decisione.toISOString()).toBe(giorniPrima(evento, 30).toISOString());
+    expect(date.fineVendite).toBeNull();
+    expect(date.decisionePersonalizzata).toBe(false);
+  });
+
+  it('con la data sull\'evento vince quella', () => {
+    const propria = new Date('2027-06-01T00:00:00Z');
+    const date = risolviDatePiano({ data: evento, decisionePianoIl: propria, fineVenditeIl: null }, 30, 2);
+    expect(date.decisione).toBe(propria);
+    expect(date.decisionePersonalizzata).toBe(true);
+    expect(date.fineVendite?.toISOString()).toBe(giorniPrima(evento, 2).toISOString());
+  });
+});
+
+describe('da dove arriva la data di decisione', () => {
+  it('«Crea piano» salva l\'istante della conferma, la scheda dell\'evento un giorno intero', () => {
+    expect(decisioneDaCreaPiano(new Date('2026-10-24T11:42:37.564Z'))).toBe(true);
+    expect(decisioneDaCreaPiano(new Date('2026-11-24T00:00:00.000Z'))).toBe(false);
+    expect(decisioneDaCreaPiano(null)).toBe(false);
   });
 });

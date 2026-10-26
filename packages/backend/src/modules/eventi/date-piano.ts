@@ -26,10 +26,18 @@ export interface DatePiano {
   fineVenditePersonalizzata: boolean;
 }
 
+type EventoConDate = { data: Date; decisionePianoIl: Date | null; fineVenditeIl: Date | null };
+
 /** Le date di un evento, già risolte: quella sua se c'è, altrimenti
  *  quella generale. Una sola funzione, usata ovunque serva saperlo. */
-export async function datePiano(evento: { data: Date; decisionePianoIl: Date | null; fineVenditeIl: Date | null }): Promise<DatePiano> {
+export async function datePiano(evento: EventoConDate): Promise<DatePiano> {
   const [giorniDecisione, giorniFineVendite] = await Promise.all([leggiGiorniDecisionePiano(), leggiGiorniFineVendite()]);
+  return risolviDatePiano(evento, giorniDecisione, giorniFineVendite);
+}
+
+/** Come datePiano, con i giorni delle Impostazioni già letti: per gli
+ *  elenchi con tanti eventi (Partenze), che li leggono una volta sola. */
+export function risolviDatePiano(evento: EventoConDate, giorniDecisione: number, giorniFineVendite: number): DatePiano {
   return {
     decisione: evento.decisionePianoIl ?? giorniPrima(evento.data, giorniDecisione),
     // Zero giorni e nessuna data sull'evento: nessuna chiusura.
@@ -37,6 +45,16 @@ export async function datePiano(evento: { data: Date; decisionePianoIl: Date | n
     decisionePersonalizzata: evento.decisionePianoIl !== null,
     fineVenditePersonalizzata: evento.fineVenditeIl !== null,
   };
+}
+
+/** La data di decisione è stata scritta da «Crea piano»? «Crea piano»
+ *  salva l'istante della conferma; la scheda dell'evento salva un giorno
+ *  intero (mezzanotte UTC, dal campo data). Serve solo a dire nel
+ *  gestionale da dove arriva la data. */
+export function decisioneDaCreaPiano(decisionePianoIl: Date | null): boolean {
+  if (!decisionePianoIl) return false;
+  return decisionePianoIl.getUTCHours() !== 0 || decisionePianoIl.getUTCMinutes() !== 0
+    || decisionePianoIl.getUTCSeconds() !== 0 || decisionePianoIl.getUTCMilliseconds() !== 0;
 }
 
 /** Mezzanotte (ora di Roma) di `giorni` giorni prima della data dell'evento. */
@@ -53,6 +71,8 @@ export const decisioneArrivata = (date: DatePiano, adesso = new Date()) => adess
  *  legge il database: questo modulo resta puro (ha i test senza database). */
 export interface DatePianoViste extends DatePiano {
   decisioneArrivata: boolean;
+  /** La data l'ha anticipata «Crea piano» (non la scheda dell'evento). */
+  decisioneDaCreaPiano: boolean;
 }
 
 /** Le vendite sono chiuse per data? Senza una data di fine vendite non

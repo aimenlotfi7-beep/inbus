@@ -197,6 +197,9 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
       risposteBus: riga?.risposteBus ?? 0,
       lineeDaConfermare: tragitto.lineeDaConfermare,
       senzaPosto: riga?.senzaPosto ?? 0,
+      // Finché l'elenco non è arrivato vale la regola di sempre (piano deciso).
+      decisionePianoIl: riga?.decisionePianoIl ?? '',
+      decisionePianoArrivata: riga?.decisionePianoArrivata ?? true,
     };
     return contestoPartenze ? statoInTappa(dati, contestoPartenze.tabOrigine) : statoGenerale(dati);
   }

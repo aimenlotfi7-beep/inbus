@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { eventi, linee, prenotazioni, preventiviRichieste } from '../../db/schema.js';
 import { lineeDaConfermareService } from './linee-da-confermare.service.js';
+import { eventiService } from './eventi.service.js';
 import { creaCliente, creaEvento, creaFermata, creaFornitore, creaTragitto, fraGiorni, impostazione, svuotaDatabase } from '../../../test/dati.js';
 
 // "Crea piano" (proprietario, ottobre 2026): l'anteprima mostra come
@@ -114,5 +115,20 @@ describe('conferma del piano', () => {
 
     expect(await lineeDaConfermareService.confermaPiano(s.evento.id)).toMatchObject({ richiesteInviate: 0 });
     expect(await db.select().from(preventiviRichieste).where(eq(preventiviRichieste.scopo, 'BUS'))).toHaveLength(dopoUna.length);
+  });
+
+  it('l\'elenco di Partenze sa se il piano è deciso: prima della data la proposta aspetta, non è da fare', async () => {
+    await creaFornitore({ nome: 'Bus Taranto', lat: 40.47, lng: 17.24, invioAutomatico: true });
+    const s = await tragittoPugliese();
+    await prenotati(s.evento.id, s.tragitto.id, 'Taranto', 12);
+    await lineeDaConfermareService.allinea(s.tragitto.id);
+    const riga = async () => (await eventiService.elencoPartenze()).find((r) => r.tragittoId === s.tragitto.id)!;
+
+    expect(await riga()).toMatchObject({ decisionePianoArrivata: false, proposteSenzaRichieste: 1 });
+
+    await lineeDaConfermareService.confermaPiano(s.evento.id);
+    expect(await riga()).toMatchObject({ decisionePianoArrivata: true, proposteSenzaRichieste: 0 });
+    // La pagina delle linee dice che l'ha anticipato «Crea piano».
+    expect((await lineeDaConfermareService.datePianoDelTragitto(s.tragitto.id))!.decisioneDaCreaPiano).toBe(true);
   });
 });
