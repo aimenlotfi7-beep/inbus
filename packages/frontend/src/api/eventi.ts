@@ -25,6 +25,8 @@ export interface EventoInput {
   /** "AAAA-MM-GG" oppure null per tornare al valore generale di Impostazioni. */
   decisionePianoIl?: string | null;
   fineVenditeIl?: string | null;
+  /** Soglia di pareggio di questo evento (% dei posti); null = vale quella di Impostazioni. */
+  sogliaPareggio?: number | null;
   bozza?: boolean;
   descrizione?: string;
   descrizioneSeo?: string;
@@ -281,6 +283,9 @@ export const eventiApi = {
     api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/preventivo`, input),
   // Sezione PREZZI: i prezzi di vendita per fermata, da un costo GIÀ noto.
   /** I posti del bus del preventivo (il fornitore dal link indica solo il prezzo). */
+  /** Soglia di pareggio di un solo tragitto; null = vale quella dell'evento o di Impostazioni. Risponde con quella che vale adesso. */
+  impostaSogliaTragitto: (tragittoId: string, soglia: number | null) =>
+    api.put<{ valore: number; fonte: 'tragitto' | 'evento' | 'generale' }>(`/api/eventi/tragitti/${tragittoId}/soglia-pareggio`, { soglia }),
   impostaPostiPreventivo: (tragittoId: string, postiBus: number) =>
     api.put<{ ok: true }>(`/api/eventi/tragitti/${tragittoId}/posti-preventivo`, { postiBus }),
   calcolaPrezziVendita: (tragittoId: string, input: { prezziPerFermata: { fermataId: string; prezzo: number }[] }) =>

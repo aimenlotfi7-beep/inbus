@@ -36,6 +36,8 @@ export interface Tragitto {
   arrivoOrario: string | null;
   arrivoCitta: string | null;
   preventivoPostiBus: number | null;
+  /** Soglia di pareggio solo di questo tragitto: vince su evento e Impostazioni. */
+  sogliaPareggio?: number | null;
   referenteNome: string | null;
   referenteTelefono: string | null;
   fornitoreId: string | null;
@@ -76,6 +78,9 @@ export interface Evento {
   /** Quando chiudono le vendite di questo evento: dopo non si compra più,
    *  ma la lista d'attesa resta aperta. Vuota = valore generale. */
   fineVenditeIl?: string | null;
+  /** Soglia di pareggio di questo evento (% dei posti). Vuota = vale quella
+   *  di Impostazioni; un tragitto può averne una sua. */
+  sogliaPareggio?: number | null;
   descrizione: string | null;
   descrizioneSeo: string | null;
   cosaIncluso: string | null;

@@ -7,6 +7,7 @@ import {
 } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
 import { chiaveNome } from '../../shared/nomi.js';
+import { risolviSoglia, sogliaPropria } from '../eventi/soglia-pareggio.js';
 import { giornoARoma } from '../../shared/formato.js';
 import { applicaScontoOfferta, prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
@@ -225,10 +226,13 @@ function sintesiPerTipo(righe: PrenotazioneStatistica[], ctx: ContestoFonti) {
 // ---------------------------------------------------------------- Tragitti, linee e bus
 
 async function leggiStrutture(eventoIds: string[]): Promise<StruttureEventi> {
-  const righeTragitti = await aBlocchiDaDb(eventoIds, (ids) => db.select({
+  const righeTragitti = (await aBlocchiDaDb(eventoIds, (ids) => db.select({
     id: tragitti.id, eventoId: tragitti.eventoId, nome: tragitti.nome, attivo: tragitti.attivo, preventivoPostiBus: tragitti.preventivoPostiBus,
-    preventivoCosto: tragitti.preventivoCosto,
-  }).from(tragitti).where(and(inArray(tragitti.eventoId, ids), isNull(tragitti.eliminatoIl))).orderBy(asc(tragitti.nome)));
+    preventivoCosto: tragitti.preventivoCosto, sogliaTragitto: tragitti.sogliaPareggio, sogliaEvento: eventi.sogliaPareggio,
+  }).from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
+    .where(and(inArray(tragitti.eventoId, ids), isNull(tragitti.eliminatoIl))).orderBy(asc(tragitti.nome))))
+    // La soglia propria del tragitto o dell'evento; null = vale Impostazioni.
+    .map(({ sogliaTragitto, sogliaEvento, ...t }) => ({ ...t, sogliaPareggio: sogliaPropria({ tragitto: sogliaTragitto, evento: sogliaEvento }) }));
   const righeLinee = await aBlocchiDaDb(righeTragitti.map((t) => t.id), (ids) => db.select({
     id: linee.id, nome: linee.nome, tragittoId: linee.tragittoId, daConfermare: linee.daConfermare,
   }).from(linee).where(inArray(linee.tragittoId, ids)).orderBy(asc(linee.ordine), asc(linee.creatoIl)));
@@ -531,7 +535,7 @@ export const statisticheService = {
   },
 
   async evento(id: string) {
-    const [e] = await db.select(colonneEvento).from(eventi).where(and(eq(eventi.id, id), eventoValido)).limit(1);
+    const [e] = await db.select({ ...colonneEvento, sogliaPareggio: eventi.sogliaPareggio }).from(eventi).where(and(eq(eventi.id, id), eventoValido)).limit(1);
     if (!e) throw new NonTrovato('Evento');
     const oggi = oggiRoma();
     const giorniOggi = giorniTra(oggi, giornoARoma(e.data));
@@ -576,6 +580,7 @@ export const statisticheService = {
       if (pt.salitoIl) voce.saliti += 1;
       salitiPerLinea.set(lineaId, voce);
     }
+    const sogliaEvento = risolviSoglia({ evento: e.sogliaPareggio }, dati.soglia);
 
     return {
       evento: {
@@ -607,7 +612,12 @@ export const statisticheService = {
         // Un evento oltre l'ultimo giorno del grafico resta sul suo bordo.
         oggi: giorniOggi >= 0 ? Math.min(giorniOggi, maxGiorni) : null,
       },
-      sogliaPareggio: dati.soglia,
+      // La soglia dell'evento (sua o di Impostazioni) e i tragitti che ne hanno una diversa.
+      sogliaPareggio: sogliaEvento.valore,
+      fonteSoglia: sogliaEvento.fonte,
+      soglieTragitti: dati.strutture.tragitti
+        .filter((t) => t.sogliaPareggio != null && t.sogliaPareggio !== sogliaEvento.valore)
+        .map((t) => ({ nome: t.nome, soglia: t.sogliaPareggio! })),
       linee: lineeCalcolate.map((l) => ({
         id: l.id, nome: l.nome, tragittoNome: l.tragittoNome, daConfermare: l.daConfermare, fermate: l.fermate,
         posti: l.posti, passeggeri: l.passeggeri, postiPareggio: l.postiPareggio,

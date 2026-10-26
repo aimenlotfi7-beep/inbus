@@ -6,6 +6,10 @@ import { inizioOggiRoma } from '../../shared/formato.js';
 // e lo tratta come "non impostato", invece di rifiutare la richiesta.
 const prezzoFermataSchema = z.number().positive().nullable().optional().transform((v) => v ?? undefined);
 
+/** Soglia di pareggio propria (evento o tragitto): % dei posti, da 1 a 100; null la toglie. */
+export const sogliaPareggioSchema = z.number().int('La soglia di pareggio è un numero intero.')
+  .min(1, 'La soglia di pareggio va da 1 a 100%.').max(100, 'La soglia di pareggio va da 1 a 100%.').nullable().optional();
+
 const fermataSchema = z.object({
   // Da quale voce dell'anagrafica arriva — facoltativo, resta possibile
   // scrivere una fermata al volo senza passare dall'anagrafica.
@@ -92,6 +96,9 @@ const creaEventoBase = z.object({
   // valori generali dopo averle scritte.
   decisionePianoIl: z.coerce.date().nullable().optional(),
   fineVenditeIl: z.coerce.date().nullable().optional(),
+  // Soglia di pareggio solo per questo evento, in % dei posti (proprietario,
+  // ottobre 2026). Vuota (null) = vale quella di Impostazioni.
+  sogliaPareggio: sogliaPareggioSchema,
   bozza: z.boolean().optional(),
   descrizione: z.string().optional(),
   descrizioneSeo: z.string().optional(),

@@ -209,6 +209,8 @@ export function ImpostazioniScreen() {
                     <code style={{ fontSize: 'var(--testo-sm)' }}>Prezzo fermata = Prezzo minimo + (Costo al km per persona × km di strada fino all'arrivo)</code>
                     <br />
                     Nessuna fermata scende mai sotto il prezzo minimo; la più lontana paga circa il doppio. La stessa soglia decide quando nasce la proposta di un bus in Da confermare.
+                    <br />
+                    Vale per tutti gli eventi. Un evento può averne una sua (scheda dell'evento, «Pareggio di questo evento»), e un singolo tragitto anche (Partenze › Prezzi): il tragitto vince sull'evento, l'evento su questa.
                   </p>
                   <div className="campo" style={{ marginBottom: 10 }}>
                     <label htmlFor="soglia-occupazione">Soglia di occupazione assunta per il pareggio (%) — più bassa = prezzi più prudenti/alti</label>

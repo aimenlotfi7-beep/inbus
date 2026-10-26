@@ -248,7 +248,9 @@ function SchedaEvento({ d }: { d: StatisticheEvento }) {
           ? <Vuoto>Nessuna linea per questo evento.</Vuoto>
           : <div className="stat-linee">{d.linee.map((l) => <BloccoLinea key={l.id} l={l} />)}</div>}
         <p className="stat-didascalia">
-          Pareggio al {formattaPercentuale(d.sogliaPareggio)} dei posti (si cambia in Impostazioni).
+          Pareggio al {formattaPercentuale(d.sogliaPareggio)} dei posti
+          {d.fonteSoglia === 'evento' ? ' (soglia di questo evento, si cambia nella sua scheda)' : ' (soglia di Impostazioni)'}.
+          {d.soglieTragitti.length > 0 && ` Con una soglia propria: ${d.soglieTragitti.map((t) => `${t.nome} ${formattaPercentuale(t.soglia)}`).join(', ')}.`}
           {conLineeSenzaBus && ' Una linea senza bus non ha costo né pareggio.'}
           {conQuadratini && ' Ogni quadratino è un posto: pieno se venduto, con il bordo ambra sul posto del pareggio.'}
           {conBarre && ` Oltre ${POSTI_MASSIMI_GRIGLIA} posti una barra: in blu i venduti, il segno ambra è il pareggio.`}

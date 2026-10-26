@@ -24,8 +24,9 @@ import { NonTrovato, ConflittoDati, ErroreApplicativo } from '../../shared/error
 import { busNonTrovato, generaPdfPasseggeriBus, leggiSchedaBus, passeggeriDelBus, type PasseggeroBus } from './passeggeri-bus.service.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { stessoNome } from '../../shared/nomi.js';
+import { sogliaDelTragitto } from './soglia-pareggio.js';
 import { confrontaPerEta, etaPrenotazione } from '../prenotazioni/riempimento-bus.js';
-import { leggiGiorniDecisionePiano, leggiGiorniFineVendite, leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
+import { leggiGiorniDecisionePiano, leggiGiorniFineVendite, leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
 import { decisioneArrivata, risolviDatePiano } from './date-piano.js';
 import type { CreaEventoInput, AggiornaEventoInput, ListaEventiQuery } from './eventi.dto.js';
 import { tragittoSchema, aggiornaTragittoOperativoSchema, registraPreventivoManualeSchema, calcolaPrezziVenditaSchema } from './eventi.dto.js';
@@ -843,6 +844,7 @@ export const eventiService = {
           visibileSito: input.visibileSito,
           decisionePianoIl: input.decisionePianoIl ?? null,
           fineVenditeIl: input.fineVenditeIl ?? null,
+          sogliaPareggio: input.sogliaPareggio ?? null,
           bozza: input.bozza ?? false,
           descrizione: input.descrizione,
           descrizioneSeo: input.descrizioneSeo,
@@ -910,6 +912,7 @@ export const eventiService = {
           ...(input.visibileSito !== undefined && { visibileSito: input.visibileSito }),
           ...(input.decisionePianoIl !== undefined && { decisionePianoIl: input.decisionePianoIl }),
           ...(input.fineVenditeIl !== undefined && { fineVenditeIl: input.fineVenditeIl }),
+          ...(input.sogliaPareggio !== undefined && { sogliaPareggio: input.sogliaPareggio }),
           ...(input.bozza !== undefined && { bozza: input.bozza }),
           ...(input.descrizione !== undefined && { descrizione: input.descrizione }),
           ...(input.descrizioneSeo !== undefined && { descrizioneSeo: input.descrizioneSeo }),
@@ -1429,6 +1432,14 @@ export const eventiService = {
    *  link indica solo il prezzo: accettando la sua risposta i posti restano
    *  vuoti, e senza posti non si calcolano i prezzi né le linee da
    *  confermare. Si scrivono dal pannello Prezzi. */
+  /** La soglia di pareggio di un solo tragitto (null = vale quella dell'evento o di Impostazioni). */
+  async impostaSogliaTragitto(tragittoId: string, soglia: number | null) {
+    const [esiste] = await db.select({ id: tragitti.id }).from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
+    if (!esiste) throw new NonTrovato('Tragitto');
+    await db.update(tragitti).set({ sogliaPareggio: soglia }).where(eq(tragitti.id, tragittoId));
+    return sogliaDelTragitto(tragittoId);
+  },
+
   async impostaPostiPreventivo(tragittoId: string, postiBus: number) {
     const [esiste] = await db.select({ preventivoCosto: tragitti.preventivoCosto }).from(tragitti).where(eq(tragitti.id, tragittoId)).limit(1);
     if (!esiste) throw new NonTrovato('Tragitto');
@@ -2061,7 +2072,7 @@ export const eventiService = {
 
     if (lineaGiaConfermata) {
       // Il pareggio riparte dopo ogni bus: conta chi è oltre i posti dei bus.
-      const soglia = await leggiSogliaOccupazionePareggio();
+      const soglia = (await sogliaDelTragitto(tragittoId)).valore;
       return {
         pronta: false, lineaGiaConfermata: true,
         serveSecondoBus: totaleConfermati > capienzaReale,
@@ -2076,7 +2087,7 @@ export const eventiService = {
       return { pronta: false, lineaGiaConfermata: false, serveSecondoBus: false, totaleConfermati, capienzaReale: 0 } as const;
     }
 
-    const soglia = await leggiSogliaOccupazionePareggio();
+    const soglia = (await sogliaDelTragitto(tragittoId)).valore;
     const postiDiPareggio = Math.round(t.preventivoPostiBus * (soglia / 100));
     if (totaleConfermati < postiDiPareggio) {
       return { pronta: false, lineaGiaConfermata: false, serveSecondoBus: false, totaleConfermati, postiDiPareggio, capienzaReale: 0 } as const;

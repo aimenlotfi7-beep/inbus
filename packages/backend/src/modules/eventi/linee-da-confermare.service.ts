@@ -4,6 +4,7 @@ import { busFisici, eventi, fermate, lineaFermate, linee, prenotazioni, tragitti
 import { NonTrovato } from '../../shared/errors.js';
 import { datePiano, decisioneArrivata, decisioneDaCreaPiano, type DatePianoViste } from './date-piano.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
+import { risolviSoglia } from './soglia-pareggio.js';
 import { calcolaTempi, leggiOrariTragitto, type Lettore } from '../prenotazioni/partenza.js';
 import { etaPrenotazione, primaFermataDellaLinea, riempiBus, type BusDaRiempire, type GruppoPasseggeri } from '../prenotazioni/riempimento-bus.js';
 import { ricollegaPreventiviBus } from '../preventivi/preventivi-bus.service.js';
@@ -214,12 +215,14 @@ export interface StatoProposte {
  *  non è in vendita, o l'evento è passato o nel cestino: lì le proposte
  *  restano come sono. Con ancheFuoriVendita (simulazione economica) basta
  *  che tragitto ed evento non siano eliminati né l'evento passato. */
-async function leggiStato(lettore: Lettore, tragittoId: string, soglia: number, postiPerBusImpostazioni: number, opzioni: { ancheFuoriVendita?: boolean } = {}): Promise<StatoProposte | null> {
+async function leggiStato(lettore: Lettore, tragittoId: string, sogliaGenerale: number, postiPerBusImpostazioni: number, opzioni: { ancheFuoriVendita?: boolean } = {}): Promise<StatoProposte | null> {
   const [t] = await lettore.select({
     stato: tragitti.stato, attivo: tragitti.attivo, eliminatoIl: tragitti.eliminatoIl, preventivoPostiBus: tragitti.preventivoPostiBus,
-    eventoData: eventi.data, eventoEliminatoIl: eventi.eliminatoIl,
+    eventoData: eventi.data, eventoEliminatoIl: eventi.eliminatoIl, sogliaTragitto: tragitti.sogliaPareggio, sogliaEvento: eventi.sogliaPareggio,
   }).from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId)).where(eq(tragitti.id, tragittoId)).limit(1);
   if (!t || t.eliminatoIl || t.eventoEliminatoIl) return null;
+  // Tragitto, poi evento, poi Impostazioni (soglia-pareggio.ts).
+  const soglia = risolviSoglia({ tragitto: t.sogliaTragitto, evento: t.sogliaEvento }, sogliaGenerale).valore;
   if (!opzioni.ancheFuoriVendita && (!t.attivo || (t.stato !== 'PREZZATO' && t.stato !== 'CONFERMATO'))) return null;
   if (t.eventoData.getTime() < Date.now() - UN_GIORNO_MS) return null;
 
@@ -482,8 +485,8 @@ export const lineeDaConfermareService = {
 
   /** Lo stato di un tragitto di un evento non ancora passato, anche fuori
    *  vendita, per la simulazione economica dei bus in più. */
-  statoPerSimulazione(tragittoId: string, soglia: number, postiPerBus: number): Promise<StatoProposte | null> {
-    return leggiStato(db, tragittoId, soglia, postiPerBus, { ancheFuoriVendita: true });
+  statoPerSimulazione(tragittoId: string, sogliaGenerale: number, postiPerBus: number): Promise<StatoProposte | null> {
+    return leggiStato(db, tragittoId, sogliaGenerale, postiPerBus, { ancheFuoriVendita: true });
   },
 
   /** Le due date del piano di un tragitto (quelle del suo evento), già

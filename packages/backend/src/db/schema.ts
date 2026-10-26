@@ -161,6 +161,11 @@ export const eventi = pgTable('eventi', {
   // fineVenditeIl: da lì nessuno può più comprare, ma la lista d'attesa
   // resta aperta — diverso da venditeFermate qui sopra, che blocca tutto.
   fineVenditeIl: timestamp('fine_vendite_il'),
+  // Soglia di pareggio (% dei posti) solo per questo evento (proprietario,
+  // ottobre 2026: un evento molto richiesto può rischiare di più). Vuota =
+  // vale soglia_occupazione_pareggio di Impostazioni; un tragitto può
+  // averne una sua (tragitti.soglia_pareggio). Vedi eventi/soglia-pareggio.ts.
+  sogliaPareggio: integer('soglia_pareggio'),
   // Vero mentre l'evento è ancora in fase di creazione, non ancora
   // confermato dall'amministratore — salvato in automatico man mano che
   // si compila il modulo "Nuovo evento", così un'uscita accidentale (o
@@ -361,6 +366,9 @@ export const tragitti = pgTable('tragitti', {
   // margine extra resta un guadagno, non si gira al cliente.
   preventivoCosto: numeric('preventivo_costo', { precision: 10, scale: 2 }),
   preventivoPostiBus: integer('preventivo_posti_bus'),
+  // Soglia di pareggio (% dei posti) solo per questo tragitto: vince su
+  // quella dell'evento e su Impostazioni. Vuota = vale quella dell'evento.
+  sogliaPareggio: integer('soglia_pareggio'),
   referenteNome: text('referente_nome'),
   referenteTelefono: text('referente_telefono'),
   // set null: un fornitore eliminato non deve bloccare tragitti/bus

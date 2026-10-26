@@ -197,6 +197,29 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
   function tragittoVeroDi(tragittoId: string): Tragitto | undefined {
     return eventoCompleto ? [...eventoCompleto.tragitti, ...eventoCompleto.servizi.flatMap((s) => s.tragitti)].find((t) => t.id === tragittoId) : undefined;
   }
+  /** La soglia di pareggio del tragitto: sua, poi dell'evento, poi di
+   *  Impostazioni (la stessa regola del server, eventi/soglia-pareggio.ts). */
+  function sogliaDelTragitto(tragittoId: string): { valore: number; fonte: FonteSoglia } {
+    const propria = tragittoVeroDi(tragittoId)?.sogliaPareggio;
+    if (propria) return { valore: propria, fonte: 'tragitto' };
+    if (eventoCompleto?.sogliaPareggio) return { valore: eventoCompleto.sogliaPareggio, fonte: 'evento' };
+    return { valore: sogliaOccupazionePercento, fonte: 'generale' };
+  }
+  /** Salva (o toglie, con null) la soglia di un solo tragitto. */
+  async function salvaSogliaTragitto(tragittoId: string, soglia: number | null): Promise<boolean> {
+    try {
+      await eventiApi.impostaSogliaTragitto(tragittoId, soglia);
+      const conSoglia = (t: Tragitto) => (t.id === tragittoId ? { ...t, sogliaPareggio: soglia } : t);
+      setEventoCompleto((ev) => ev && { ...ev, tragitti: ev.tragitti.map(conSoglia), servizi: ev.servizi.map((s) => ({ ...s, tragitti: s.tragitti.map(conSoglia) })) });
+      impostaStatoPrezzi(tragittoId, 'Soglia salvata: premi "Calcola prezzi per fermata" per ricalcolare i prezzi con la soglia nuova.', 'info');
+      // Niente ricarica: l'ordine dei tragitti dal server può cambiare e si
+      // perderebbe la linguetta aperta; la soglia è già aggiornata qui sopra.
+      return true;
+    } catch (e) {
+      notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');
+      return false;
+    }
+  }
   /** Lo stato del tragitto con le regole di statiPartenze.ts: nella voce da
    *  cui si arriva, o in generale (scheda dell'evento in Eventi). Orari,
    *  preventivo, bus e passeggeri dai dati appena caricati qui; richieste,
@@ -506,7 +529,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
     const valide = distanze.filter((d): d is { fermataId: string; citta: string; distanza: number } => d.distanza !== null);
     // I prezzi scritti a mano per le fermate non trovate restano.
     const precedenti = new Map((prezziCalcolatiMap.get(tragittoId) ?? []).map((p) => [p.fermataId, p.prezzo]));
-    const postiDiPareggio = postiBus * (sogliaOccupazionePercento / 100);
+    // La soglia del tragitto (o dell'evento): prezzi più alti o più bassi solo qui.
+    const postiDiPareggio = postiBus * (sogliaDelTragitto(tragittoId).valore / 100);
     const prezzoMinimo = costo / postiDiPareggio;
     // I km totali = la distanza più lunga tra quelle calcolate (di norma la
     // prima fermata, il punto più lontano dall'arrivo).
@@ -1027,6 +1051,15 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
                   </div>
                   <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 8, marginBottom: 0 }}>Per cambiare la quotazione, vai in Quotazione.</p>
                 </div>
+                {/* La soglia di pareggio che usa il calcolo: si può dare a questo
+                    solo tragitto (proprietario, ottobre 2026). */}
+                <CampoSogliaTragitto
+                  key={`${tragitto.tragittoId}-${tragittoVeroDi(tragitto.tragittoId)?.sogliaPareggio ?? ''}`}
+                  soglia={sogliaDelTragitto(tragitto.tragittoId)}
+                  generale={sogliaOccupazionePercento}
+                  sogliaEvento={eventoCompleto?.sogliaPareggio ?? null}
+                  onSalva={(valore) => salvaSogliaTragitto(tragitto.tragittoId, valore)}
+                />
                 {sogliaNonLetta && (
                   <p className="testo-intro" style={{ fontSize: 'var(--testo-md)', marginTop: -4, marginBottom: 12 }}>
                     Non riesco a leggere la soglia di pareggio dalle Impostazioni: il calcolo usa il {sogliaOccupazionePercento}%.
@@ -1261,6 +1294,58 @@ function PallinoDaFare({ quanti }: { quanti: number }) {
 
 /** Campo per i posti del bus di un preventivo che non li ha (risposta del
  *  fornitore dal link, che indica solo il prezzo). */
+type FonteSoglia = 'tragitto' | 'evento' | 'generale';
+
+const TESTO_FONTE_SOGLIA: Record<FonteSoglia, string> = {
+  tragitto: 'di questo tragitto',
+  evento: "dell'evento",
+  generale: 'di Impostazioni',
+};
+
+/** Pannello Prezzi: la soglia di pareggio che usa il calcolo, da dove
+ *  arriva, e il campo per darne una solo a questo tragitto. */
+function CampoSogliaTragitto({ soglia, generale, sogliaEvento, onSalva }: {
+  soglia: { valore: number; fonte: FonteSoglia };
+  generale: number;
+  sogliaEvento: number | null;
+  onSalva: (valore: number | null) => Promise<boolean>;
+}) {
+  const [valore, setValore] = useState<number | undefined>(soglia.fonte === 'tragitto' ? soglia.valore : undefined);
+  const [salvando, setSalvando] = useState(false);
+  const valido = valore !== undefined && Number.isInteger(valore) && valore >= 1 && valore <= 100;
+  async function salva(nuovo: number | null) {
+    setSalvando(true);
+    await onSalva(nuovo);
+    setSalvando(false);
+  }
+  const senzaTragitto = sogliaEvento ?? generale;
+  return (
+    <div className="section-card" style={{ marginBottom: 16 }}>
+      <span style={{ fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase', letterSpacing: .3 }}>Soglia di pareggio usata nel calcolo</span>
+      <p style={{ margin: '2px 0 8px', fontWeight: 600 }}>{soglia.valore}% dei posti, {TESTO_FONTE_SOGLIA[soglia.fonte]}</p>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <CampoNumero
+          value={valore} onChange={setValore} placeholder={`${senzaTragitto}`} style={{ width: 90 }}
+          aria-label="Soglia di pareggio solo per questo tragitto, in percentuale"
+        />
+        <span style={{ color: 'var(--mist)' }}>%</span>
+        <button type="button" className="btn btn-primary btn-piccolo" disabled={!valido || salvando || valore === (soglia.fonte === 'tragitto' ? soglia.valore : undefined)} onClick={() => valore !== undefined && salva(valore)}>
+          {salvando ? 'Salvo…' : 'Salva per questo tragitto'}
+        </button>
+        {soglia.fonte === 'tragitto' && (
+          <button type="button" className="btn btn-ghost btn-piccolo" disabled={salvando} onClick={() => salva(null)}>
+            Togli (torna al {senzaTragitto}% {sogliaEvento !== null ? "dell'evento" : 'di Impostazioni'})
+          </button>
+        )}
+      </div>
+      <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', marginTop: 8, marginBottom: 0 }}>
+        Più bassa: prezzi calcolati più alti e bus in più proposto con meno passeggeri. Più alta: il contrario.
+        {valore !== undefined && !valido && ' Scrivi un numero intero da 1 a 100.'}
+      </p>
+    </div>
+  );
+}
+
 function CampoPostiPreventivo({ onSalva }: { onSalva: (posti: number) => Promise<boolean> }) {
   const [posti, setPosti] = useState<number | undefined>(undefined);
   const [salvando, setSalvando] = useState(false);

@@ -64,8 +64,9 @@ export interface ContestoFonti {
 }
 
 export interface StruttureEventi {
-  /** preventivoCosto: il costo di un bus della quotazione (stima dei bus senza costo). */
-  tragitti: { id: string; eventoId: string; nome: string; attivo: boolean; preventivoPostiBus: number | null; preventivoCosto?: string | null }[];
+  /** preventivoCosto: il costo di un bus della quotazione (stima dei bus senza costo).
+   *  sogliaPareggio: quella propria del tragitto o del suo evento; null o assente = vale `soglia` di DatiEventi. */
+  tragitti: { id: string; eventoId: string; nome: string; attivo: boolean; preventivoPostiBus: number | null; preventivoCosto?: string | null; sogliaPareggio?: number | null }[];
   linee: { id: string; nome: string; tragittoId: string; daConfermare: boolean }[];
   fermateLinee: { lineaId: string; citta: string }[];
   bus: { id: string; lineaId: string | null; costo: string | null; postiBus: number | null }[];
@@ -75,7 +76,7 @@ export interface DatiEventi {
   righe: PrenotazioneStatistica[];
   strutture: StruttureEventi;
   ctx: ContestoFonti;
-  /** Soglia di pareggio, in % dei posti (Impostazioni). */
+  /** Soglia di pareggio, in % dei posti (Impostazioni): vale per i tragitti senza una soglia propria. */
   soglia: number;
   /** Posti di un bus quando il preventivo non li dice (Impostazioni). */
   postiPerBus: number;
@@ -319,8 +320,8 @@ export interface LineaCalcolata {
  *  linee-da-confermare.service.ts: una linea con bus vale i posti dei suoi bus
  *  (anche se era da confermare), una linea senza bus i posti del preventivo.
  *  Una linea con bus conta i passeggeri e l'incasso delle fermate che copre
- *  (come il riepilogo economico di Partenze) e il pareggio è la soglia di
- *  Impostazioni sui suoi posti. Una linea da confermare copre tutte le
+ *  (come il riepilogo economico di Partenze) e il pareggio è la soglia del
+ *  tragitto (sua, dell'evento o di Impostazioni) sui suoi posti. Una linea da confermare copre tutte le
  *  fermate: prende i passeggeri che non stanno nelle altre linee del
  *  tragitto, una dopo l'altra, con la parte di incasso in proporzione; senza
  *  bus non c'è un costo, quindi niente pareggio né margine. */
@@ -356,7 +357,7 @@ export function lineeEventi(dati: DatiEventi): LineaCalcolata[] {
       busIds: bus.map((b) => b.id),
       posti,
       passeggeri: sommaPasseggeri(righe),
-      postiPareggio: conBus && posti > 0 ? Math.round(posti * (dati.soglia / 100)) : null,
+      postiPareggio: conBus && posti > 0 ? Math.round(posti * ((t.sogliaPareggio ?? dati.soglia) / 100)) : null,
       incasso,
       incassato,
       costo,

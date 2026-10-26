@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { EventoInput } from '../../../api/eventi';
+import { impostazioniApi } from '../../../api/impostazioni';
 import type { Categoria } from '../../../api/categorie';
 import type { CategoriaEvento } from '../../../api/categorieEvento';
 import { CampoNumero } from '../../shared/CampoNumero';
@@ -23,6 +24,11 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
   mappaTooltip: Record<string, string>;
 }) {
   const [subTabInfo, setSubTabInfo] = useState<'info' | 'descrizione'>('info');
+  // La soglia di Impostazioni, da scrivere accanto al campo dell'evento.
+  const [sogliaGenerale, setSogliaGenerale] = useState<number | null>(null);
+  useEffect(() => {
+    impostazioniApi.calcoloPrezzi().then((r) => setSogliaGenerale(r.sogliaOccupazionePareggio)).catch(() => {});
+  }, []);
   return (
   <>
     <div className="sub-tabs">
@@ -123,6 +129,26 @@ export function StepInformazioni({ form, setForm, inCreazione, categorie, catego
             />
             <small className="testo-secondario">
               Da questa data non si compra più, ma la lista d'attesa resta aperta. Vuota: vale quella generale.
+            </small>
+          </label>
+        </div>
+
+        {/* La soglia di pareggio solo per questo evento (proprietario,
+            ottobre 2026: un evento molto richiesto può rischiare di più).
+            Vuota vale quella di Impostazioni. */}
+        <p className="section-label">Pareggio di questo evento</p>
+        <div className="form-grid">
+          <label>Soglia di pareggio (%)
+            <input
+              type="number" min={1} max={100} step={1}
+              aria-label="Soglia di pareggio di questo evento, in percentuale"
+              placeholder={sogliaGenerale !== null ? `Generale: ${sogliaGenerale}%` : 'Come in Impostazioni'}
+              value={form.sogliaPareggio ?? ''}
+              onChange={(e) => setForm({ ...form, sogliaPareggio: e.target.value === '' ? null : Math.round(Number(e.target.value)) })}
+            />
+            <small className="testo-secondario">
+              Più bassa: bus in più proposto prima e prezzi calcolati più alti. Vuota: vale Impostazioni
+              {sogliaGenerale !== null ? ` (${sogliaGenerale}%)` : ''}. Un tragitto può averne una sua in Partenze › Prezzi.
             </small>
           </label>
         </div>

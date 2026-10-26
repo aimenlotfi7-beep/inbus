@@ -298,7 +298,11 @@ export interface StatisticheEvento {
     /** Giorni alla partenza oggi; null se l'evento è passato. */
     oggi: number | null;
   };
+  /** La soglia di pareggio dell'evento: sua o di Impostazioni. */
   sogliaPareggio: number;
+  fonteSoglia: 'evento' | 'generale';
+  /** I tragitti che hanno una soglia diversa da quella dell'evento. */
+  soglieTragitti: { nome: string; soglia: number }[];
   linee: RigaLineaStatistiche[];
   fermate: RigaFermataStatistiche[];
   perFonte: RigaFonteSintesi[];

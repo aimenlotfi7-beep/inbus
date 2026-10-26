@@ -234,6 +234,7 @@ export function SchedaEventoModale({
         // Solo il giorno: i campi data del modulo sono "AAAA-MM-GG".
         decisionePianoIl: sorgente.decisionePianoIl ? sorgente.decisionePianoIl.slice(0, 10) : null,
         fineVenditeIl: sorgente.fineVenditeIl ? sorgente.fineVenditeIl.slice(0, 10) : null,
+        sogliaPareggio: sorgente.sogliaPareggio ?? null,
         descrizione: sorgente.descrizione ?? undefined,
         descrizioneSeo: sorgente.descrizioneSeo ?? undefined,
         // Prima non si caricavano: in modifica sembravano vuoti.

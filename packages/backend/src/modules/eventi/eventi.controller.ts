@@ -187,6 +187,12 @@ export const eventiController = {
     await lineeDaConfermareService.allineaSubito(req.params.tragittoId);
     res.json({ ok: true });
   },
+  async impostaSogliaTragitto(req: Request, res: Response) {
+    const soglia = await eventiService.impostaSogliaTragitto(req.params.tragittoId, req.body.soglia);
+    // Con un pareggio diverso cambiano le proposte dei bus.
+    await lineeDaConfermareService.allineaSubito(req.params.tragittoId);
+    res.json(soglia);
+  },
   async impostaPostiPreventivo(req: Request, res: Response) {
     await eventiService.impostaPostiPreventivo(req.params.tragittoId, req.body.postiBus);
     // I posti del preventivo contano per le linee da confermare.
