@@ -7,8 +7,9 @@ import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { ConflittoDati, NonTrovato } from '../../shared/errors.js';
+import { stessoNome } from '../../shared/nomi.js';
 
-const creaCategoriaEventoSchema = z.object({ nome: z.string().min(1) });
+const creaCategoriaEventoSchema = z.object({ nome: z.string().trim().min(1) });
 
 export const categorieEventoRouter = Router();
 
@@ -23,9 +24,11 @@ categorieEventoRouter.post(
   richiedePermesso('eventi.crea'),
   valida(creaCategoriaEventoSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const [esiste] = await db.select().from(categorieEvento).where(eq(categorieEvento.nome, req.body.nome)).limit(1);
-    if (esiste) throw new ConflittoDati('Esiste già una categoria con questo nome.');
-    const [nuova] = await db.insert(categorieEvento).values({ nome: req.body.nome }).returning();
+    // Come i generi: maiuscole e spazi ai lati non fanno una categoria diversa.
+    const nome = String(req.body.nome).trim();
+    const [esiste] = await db.select().from(categorieEvento).where(stessoNome(categorieEvento.nome, nome)).limit(1);
+    if (esiste) throw new ConflittoDati(`Esiste già la categoria «${esiste.nome}»: sceglila dall'elenco.`);
+    const [nuova] = await db.insert(categorieEvento).values({ nome }).returning();
     res.status(201).json(nuova);
   })
 );

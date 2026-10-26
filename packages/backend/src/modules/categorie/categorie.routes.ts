@@ -7,8 +7,9 @@ import { richiedeAuth, richiedePermesso } from '../auth/auth.middleware.js';
 import { valida } from '../../shared/validate.js';
 import { asyncHandler } from '../../shared/http.js';
 import { ConflittoDati, NonTrovato } from '../../shared/errors.js';
+import { stessoNome } from '../../shared/nomi.js';
 
-const creaCategoriaSchema = z.object({ nome: z.string().min(1) });
+const creaCategoriaSchema = z.object({ nome: z.string().trim().min(1) });
 
 export const categorieRouter = Router();
 
@@ -25,9 +26,11 @@ categorieRouter.post(
   richiedePermesso('eventi.crea'),
   valida(creaCategoriaSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const [esiste] = await db.select().from(categorie).where(eq(categorie.nome, req.body.nome)).limit(1);
-    if (esiste) throw new ConflittoDati('Esiste già un genere con questo nome.');
-    const [nuova] = await db.insert(categorie).values({ nome: req.body.nome }).returning();
+    // «Rock» e «rock» sono lo stesso genere (proprietario, ottobre 2026).
+    const nome = String(req.body.nome).trim();
+    const [esiste] = await db.select().from(categorie).where(stessoNome(categorie.nome, nome)).limit(1);
+    if (esiste) throw new ConflittoDati(`Esiste già il genere «${esiste.nome}»: sceglilo dall'elenco.`);
+    const [nuova] = await db.insert(categorie).values({ nome }).returning();
     res.status(201).json(nuova);
   })
 );

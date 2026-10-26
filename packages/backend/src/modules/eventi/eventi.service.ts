@@ -23,6 +23,7 @@ import crypto from 'node:crypto';
 import { NonTrovato, ConflittoDati, ErroreApplicativo } from '../../shared/errors.js';
 import { busNonTrovato, generaPdfPasseggeriBus, leggiSchedaBus, passeggeriDelBus, type PasseggeroBus } from './passeggeri-bus.service.js';
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
+import { stessoNome } from '../../shared/nomi.js';
 import { confrontaPerEta, etaPrenotazione } from '../prenotazioni/riempimento-bus.js';
 import { leggiGiorniDecisionePiano, leggiGiorniFineVendite, leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
 import { decisioneArrivata, risolviDatePiano } from './date-piano.js';
@@ -716,7 +717,7 @@ export const eventiService = {
     if (!perGestionale) condizioni.push(eq(eventi.bozza, false));
     if (query.citta) condizioni.push(ilike(eventi.citta, `%${query.citta}%`));
     if (query.genere) condizioni.push(ilike(eventi.genere, `%${query.genere}%`));
-    if (query.categoria) condizioni.push(eq(eventi.categoria, query.categoria));
+    if (query.categoria) condizioni.push(stessoNome(eventi.categoria, query.categoria));
     if (query.soloInEvidenza) condizioni.push(eq(eventi.inEvidenza, true));
     if (query.ricerca?.trim()) {
       const q = `%${query.ricerca.trim()}%`;

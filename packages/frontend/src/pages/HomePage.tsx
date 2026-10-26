@@ -13,6 +13,7 @@ import { pagineApi } from '../api/pagine';
 import { useSeoTags } from '../features/useSeoTags';
 import { plurale } from '../shared/formato';
 import { comportamentoScorrimento } from '../shared/movimento';
+import { nomiSenzaDoppioni, stessoNome } from '../shared/nomi';
 
 // Le chiavi dei filtri che vivono nell'URL: "Mostra tutti" le toglie
 // tutte insieme, in un solo aggiornamento. `evento` (checkout aperto da
@@ -131,10 +132,11 @@ export function HomePage() {
   // I generi mostrati sono SOLO quelli davvero presenti tra gli eventi
   // della categoria selezionata.
   const eventiDellaCategoria = useMemo(
-    () => categoriaAttiva ? eventi.filter((e) => e.categoria === categoriaAttiva) : eventi,
+    () => categoriaAttiva ? eventi.filter((e) => stessoNome(e.categoria, categoriaAttiva)) : eventi,
     [eventi, categoriaAttiva]
   );
-  const generi = useMemo(() => ['Tutti', ...new Set(eventiDellaCategoria.map((e) => e.genere))], [eventiDellaCategoria]);
+  // «Rock» e «rock» sono lo stesso genere: un pulsante solo.
+  const generi = useMemo(() => ['Tutti', ...nomiSenzaDoppioni(eventiDellaCategoria.map((e) => e.genere))], [eventiDellaCategoria]);
 
   // Città di partenza e conteggio partenze: solo tragitti e fermate
   // attivi, gli stessi che le card mostrano in "Parte da…".
@@ -147,8 +149,8 @@ export function HomePage() {
   }, [eventi]);
 
   const eventiFiltrati = useMemo(() => {
-    let lista = genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => e.genere === genereAttivo);
-    if (categoriaAttiva) lista = lista.filter((e) => e.categoria === categoriaAttiva);
+    let lista = genereAttivo === 'Tutti' ? eventi : eventi.filter((e) => stessoNome(e.genere, genereAttivo));
+    if (categoriaAttiva) lista = lista.filter((e) => stessoNome(e.categoria, categoriaAttiva));
     // Normalizza per il confronto: minuscolo + senza accenti (così
     // "citta" trova anche "città") — sul testo cercato e sui campi.
     const normalizza = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -260,7 +262,7 @@ export function HomePage() {
             <>
               <button type="button" className="chip" onClick={() => impostaCategoria('Tutti')}>Tutte le categorie</button>
               {generi.map((g) => (
-                <button key={g} type="button" className={`chip${g === genereAttivo ? ' active' : ''}`} aria-pressed={g === genereAttivo} onClick={() => setGenereAttivo(g)}>
+                <button key={g} type="button" className={`chip${stessoNome(g, genereAttivo) ? ' active' : ''}`} aria-pressed={stessoNome(g, genereAttivo)} onClick={() => setGenereAttivo(g)}>
                   {g === 'Tutti' ? categoriaAttiva : g}
                 </button>
               ))}

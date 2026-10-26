@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { eventiApi } from '../api/eventi';
 import type { Evento } from '../api/types';
+import { stessoNome } from '../shared/nomi';
 import { EventoCard } from './eventi/EventoCard';
 
 /** "Ti potrebbe interessare anche" — eventi veri, futuri, dello stesso
@@ -13,8 +14,8 @@ export function EventiCorrelati({ evento }: { evento: Evento }) {
   useEffect(() => {
     eventiApi.list({ soloFuturi: true, soloVisibili: true }).then((lista) => {
       const altri = lista.filter((e) => e.id !== evento.id);
-      const stessoGenere = altri.filter((e) => e.genere === evento.genere);
-      const stessaCitta = altri.filter((e) => e.genere !== evento.genere && e.citta === evento.citta);
+      const stessoGenere = altri.filter((e) => stessoNome(e.genere, evento.genere));
+      const stessaCitta = altri.filter((e) => !stessoNome(e.genere, evento.genere) && e.citta === evento.citta);
       setCorrelati([...stessoGenere, ...stessaCitta].slice(0, 4));
     });
   }, [evento.id, evento.genere, evento.citta]);
