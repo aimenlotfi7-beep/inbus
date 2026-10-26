@@ -14,9 +14,10 @@ import type { Evento, Tragitto } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { impostazioniApi } from '../../../api/impostazioni';
 import { PreventiviTragitto } from './PreventiviTragitto';
-import { QuadroDaConfermare } from './QuadroDaConfermare';
+import { DettagliLinguetta, TestataLinguette, passaFiltro, type FiltroLinguette } from './LinguetteDaConfermare';
 import { LineeTragittoScreen } from '../LineeTragittoScreen';
 import { statisticheApi, type EventoSimulato } from '../../../api/statistiche';
+import { leggiScelte } from '../statistiche/contiBusInPiu';
 import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useSessione } from '../../shared/SessioneContext';
@@ -126,6 +127,7 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
   const inDaConfermare = contestoPartenze?.tabOrigine === 'da-confermare';
   const [contatori, setContatori] = useState<Map<string, SuggerimentoLinea['contatorePareggio']>>(new Map());
   const [simulazioneEvento, setSimulazioneEvento] = useState<EventoSimulato | null>(null);
+  const [filtroLinguette, setFiltroLinguette] = useState<FiltroLinguette>('tutti');
 
   // "Carico…" solo la prima volta: dopo un salvataggio i dati si
   // aggiornano sotto gli occhi, senza smontare la pagina (prima si
@@ -678,6 +680,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
     ? (calcoloVisibile.find((t) => t.tragittoId === tabTragittoAttivo) ?? calcoloVisibile[0])
     : null;
   const calcoloDaRenderizzare = tragittoTabSelezionato ? [tragittoTabSelezionato] : calcoloVisibile;
+  // Le stesse scelte «Parte / Non parte» della tabella dei bus (ricordate nel browser).
+  const scelteBus = leggiScelte();
 
   const stileEtichettaPiccola = { fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase' as const, letterSpacing: .3 };
 
@@ -710,23 +714,17 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
         <p className="testo-intro">Questo evento non ha ancora tragitti: aggiungili da Eventi, nella scheda dell'evento.</p>
       )}
 
-      {inDaConfermare && calcoloVisibile.length > 1 && (
-        <QuadroDaConfermare
-          tragitti={calcoloVisibile}
-          partenze={partenzePerTragitto}
-          bus={busLista}
-          contatori={contatori}
-          simulazione={vedeEconomia ? simulazioneEvento : null}
-          statoDi={statoDi}
-          attivo={tragittoTabSelezionato?.tragittoId ?? null}
-          onApri={setTabTragittoAttivo}
-        />
-      )}
-
       <div className="partenze-layout">
       {mostraTabTragitti && (
         <div className="mini-tabs partenze-tabs-colonna" style={{ marginBottom: 16 }}>
-          {calcoloVisibile.map((t) => {
+          {/* Da confermare: totale dell'evento e filtri, per non scorrere 30 linguette. */}
+          {inDaConfermare && (
+            <TestataLinguette
+              tragitti={calcoloVisibile} statoDi={statoDi} simulazione={vedeEconomia ? simulazioneEvento : null}
+              scelte={scelteBus} filtro={filtroLinguette} onFiltro={setFiltroLinguette}
+            />
+          )}
+          {calcoloVisibile.filter((t) => !inDaConfermare || passaFiltro(statoDi(t), filtroLinguette)).map((t) => {
             // La linguetta ha il colore dello stato del tragitto in questa
             // voce, visibile senza doverci cliccare.
             const tv = tragittoVeroDi(t.tragittoId);
@@ -738,7 +736,18 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
                 title={statoLinguetta?.testo || undefined}
                 onClick={() => setTabTragittoAttivo(t.tragittoId)}
               >
-                {t.nome} · {plurale(tv?.fermate.filter((f) => f.attivo !== false).length ?? 0, 'fermata', 'fermate')}
+                {inDaConfermare ? (
+                  // I numeri del quadro dentro la linguetta: si legge tutto senza aprirla.
+                  <>
+                    <span className="linguetta-nome">{t.nome}</span>
+                    <DettagliLinguetta
+                      tragitto={t} contatore={contatori.get(t.tragittoId)} stato={statoLinguetta}
+                      simulazione={vedeEconomia ? simulazioneEvento : null} scelte={scelteBus}
+                    />
+                  </>
+                ) : (
+                  <>{t.nome} · {plurale(tv?.fermate.filter((f) => f.attivo !== false).length ?? 0, 'fermata', 'fermate')}</>
+                )}
               </button>
             );
           })}

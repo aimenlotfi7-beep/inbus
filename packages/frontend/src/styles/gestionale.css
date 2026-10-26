@@ -646,6 +646,8 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
     overflow-x:visible; overflow-y:auto; max-height:calc(100vh - 200px);
   }
   .partenze-layout .partenze-tabs-colonna .mini-tab{ width:100%; text-align:left; }
+  /* Totale e filtri restano in cima mentre le linguette scorrono (30 tragitti). */
+  .partenze-layout .partenze-tabs-colonna .testata-linguette{ position:sticky; top:0; z-index:1; background:var(--night); padding-bottom:6px; }
   .partenze-layout .partenze-contenuto{ flex:1; min-width:0; }
 }
 .mini-tab:focus, .mini-tab:focus-visible{outline:none; box-shadow:none;}
@@ -666,6 +668,17 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .mini-tab.completato.active, .mini-tab.attenzione.active, .mini-tab.in-attesa.active, .mini-tab.percorso-cambiato.active{
   background:var(--colore-stato); border-color:var(--colore-stato); color:#fff;
 }
+/* «Da confermare»: i numeri del quadro dell'evento dentro le linguette dei
+   tragitti, e in cima alla colonna il totale dell'evento con i filtri. */
+.linguetta-nome{display:block;}
+.linguetta-dettagli{display:block; margin-top:2px; font-size:var(--testo-xs); font-weight:500; line-height:1.4; white-space:normal; opacity:.9;}
+.testata-linguette{display:flex; flex-direction:column; gap:6px; width:100%; flex-shrink:0;}
+.testata-linguette .totale-evento{margin:0; font-size:var(--testo-sm); color:var(--mist); line-height:1.45;}
+.filtri-linguette{display:flex; flex-wrap:wrap; gap:4px;}
+.filtro-linguette{border:1px solid var(--line); background:var(--dusk); border-radius:999px; padding:2px 9px; font:inherit; font-size:var(--testo-xs); font-weight:600; color:var(--mist); cursor:pointer;}
+.filtro-linguette:hover{border-color:var(--mist);}
+.filtro-linguette.attivo{border-color:var(--paper); background:var(--paper); color:var(--ink);}
+.filtro-linguette:focus-visible{outline:2px solid var(--blue); outline-offset:2px;}
 
 /* Sotto-tab (dentro una sezione, es. Info/Descrizione dentro "Info
    evento") — più piccole e discrete delle tab principali, per capire a
@@ -869,13 +882,6 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .riepilogo-numero.rosso{background:color-mix(in srgb, var(--pink) 10%, var(--dusk-2));}
 .riepilogo-numero.rosso b{color:var(--pink);}
 .riepilogo-numero.verde b{color:var(--green);}
-/* «Da confermare», il quadro dell'evento: una riga per tragitto, la riga apre il tragitto. */
-.quadro-da-confermare{margin-bottom:16px;}
-.riga-apribile{cursor:pointer;}
-.riga-apribile:hover td{background:color-mix(in srgb, var(--blue) 5%, transparent);}
-.riga-apribile.attiva td{background:color-mix(in srgb, var(--blue) 10%, transparent);}
-.link-riga{border:none; background:none; padding:0; font:inherit; font-weight:700; color:var(--blue); cursor:pointer; text-align:left;}
-.link-riga:focus-visible{outline:2px solid var(--blue); outline-offset:2px; border-radius:2px;}
 /* I numeri di un bus proposto, dentro la sua scheda nella pagina Linee: più piccoli di quelli in cima. */
 .numeri-bus-proposto{margin:10px 0 0; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px;}
 .numeri-bus-proposto .riepilogo-numero{padding:8px 10px;}
