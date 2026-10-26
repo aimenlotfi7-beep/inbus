@@ -1090,7 +1090,8 @@ export function SchedaEventoModale({
         : { dettagli: 'Modifica evento', partenze: 'Partenze', 'lista-attesa': "Lista d'attesa", offerte: 'Offerte', comunicazioni: 'Comunicazioni', responsabile: 'Responsabile' }[tabIniziale])
       : 'Modifica evento';
     return (
-      <PaginaSezione titolo={`${titoloTab} — ${evento.artista}`} onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)} larga={tabAttiva === 'partenze'}>
+      // La data nel titolo: si sa subito quando è l'evento (proprietario, ottobre 2026).
+      <PaginaSezione titolo={`${titoloTab} — ${evento.artista} · ${formattaData(evento.data)}`} onIndietro={onClose} richiediConferma={() => chiediConferma(onClose)} larga={tabAttiva === 'partenze'}>
         {!soloQuestaTab && (
           <div className="mini-tabs">
             <button type="button" className={`mini-tab${tabAttiva === 'dettagli' ? ' active' : ''}`} onClick={() => setTabAttiva('dettagli')}>Dettagli</button>
