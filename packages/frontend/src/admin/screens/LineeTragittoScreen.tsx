@@ -131,6 +131,8 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   // dei bus»): servono ai numeri dentro la scheda di ogni bus proposto.
   const [simulazione, setSimulazione] = useState<TragittoSimulato | null>(null);
   const scelteBus = useScelteSalvate();
+  // La tabella delle fermate parte chiusa: da chiusa si legge una riga di sintesi.
+  const [fermateAperte, setFermateAperte] = useState(false);
 
   // "Carico…" solo la prima volta: dopo una modifica i dati si aggiornano
   // senza smontare la pagina.
@@ -798,10 +800,21 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         </div>
       </div>
 
-      {vedeEconomia && <RiquadroBusInPiu eventoId={idEvento} tragittoId={idTragitto} versione={versioneDati} />}
+      {/* Incasso e spesa dei bus e Fermate partono chiusi (proprietario,
+          ottobre 2026): in cima restano il passo da fare e le linee. */}
+      {vedeEconomia && <RiquadroBusInPiu eventoId={idEvento} tragittoId={idTragitto} versione={versioneDati} chiusoAllInizio />}
 
-      <p className="section-label" style={{ marginBottom: 8 }}>Fermate</p>
-      <div className="tabella-righe fermate-linee">
+      <button type="button" className="sezione-apribile" aria-expanded={fermateAperte} onClick={() => setFermateAperte((a) => !a)}>
+        <span className="sim-freccia" aria-hidden="true">{fermateAperte ? '▾' : '▸'}</span>
+        <span className="section-label">Fermate</span>
+        {!fermateAperte && (
+          <span className="sezione-apribile-sintesi">
+            {plurale(fermateAttive.length, 'fermata', 'fermate')} · {plurale(passeggeriTotali, 'prenotato', 'prenotati')}
+            {(anteprima?.senzaPosto.passeggeri ?? 0) > 0 && <> · <span className="valore-rosso">{anteprima!.senzaPosto.passeggeri} senza posto</span></>}
+          </span>
+        )}
+      </button>
+      {fermateAperte && <div className="tabella-righe fermate-linee">
         <div className="riga intestazione">
           <span>Fermata</span><span className="num">Orario</span><span className="num">Prenotati</span>
           <span className="num">{anteprima?.giaSmistato ? 'Sui bus' : 'Con posto'}</span><span className="num">Senza posto</span><span />
@@ -832,7 +845,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
           </div>
           );
         })}
-      </div>
+      </div>}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <p className="section-label" style={{ margin: 0 }}>Linee</p>

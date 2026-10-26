@@ -371,11 +371,18 @@ function TabellaEventi({ eventi, scelte, onCambia, apertiIniziali }: { eventi: E
  *  interruttori dei bus in più. Così si vede se il guadagno di un tragitto
  *  copre la perdita di un altro. Tragitti e linee si chiudono toccandoli.
  *  `versione` cambia quando la pagina ricarica i dati. */
-export function RiquadroBusInPiu({ eventoId, tragittoId, versione }: { eventoId: string; tragittoId: string; versione: number }) {
+export function RiquadroBusInPiu({ eventoId, tragittoId, versione, chiusoAllInizio = false }: {
+  eventoId: string;
+  tragittoId: string;
+  versione: number;
+  /** Da confermare (proprietario, ottobre 2026): parte chiuso, con il risultato in una riga. */
+  chiusoAllInizio?: boolean;
+}) {
   const stato = useDati(() => statisticheApi.busInPiuEvento(eventoId), `${eventoId}|${versione}`);
   const { scelte, cambia } = useScelteBus();
   const aperti = useAperti();
   const [modifica, setModifica] = useState<string | null>(null);
+  const [aperto, setAperto] = useState(!chiusoAllInizio);
   if (stato.errore) return <ErroreStatistiche motivo={stato.errore.motivo} onRiprova={stato.riprova} />;
   const e = stato.dati?.evento;
   const t = e?.tragitti.find((x) => x.id === tragittoId);
@@ -384,19 +391,28 @@ export function RiquadroBusInPiu({ eventoId, tragittoId, versione }: { eventoId:
   const piuTragitti = evento.tragitti.length > 1;
   const questo = evento.tragitti.find((ct) => ct.tragitto.id === tragittoId)!;
   const righeLinee = (ct: ContiTragitto) => <RigheLinee conti={ct} scelte={scelte} onCambia={cambia} modifica={modifica} onModifica={setModifica} aperti={aperti} />;
+  const titolo = 'Incasso e spesa dei bus';
+  const r = risultato(evento.voce);
   return (
     <section className={`section-card sim-riquadro${stato.caricando ? ' stat-aggiorno' : ''}`} aria-busy={stato.caricando}>
-      <div className="stat-scheda-testa">
+      <div className="stat-scheda-testa" style={aperto ? undefined : { marginBottom: 0 }}>
         <h3>
-          Incasso e spesa dei bus
+          {chiusoAllInizio ? <NomeApribile aperto={aperto} onAlterna={() => setAperto((a) => !a)}>{titolo}</NomeApribile> : titolo}
           <InfoTooltip>
             In cima il risultato di tutto l'evento, poi ogni tragitto: il guadagno di un tragitto può coprire la perdita di un altro.
             Tocca un tragitto o una linea per aprirla o chiuderla. Ogni bus in più ha «Parte / Non parte»: è solo una prova, non conferma
             niente. Le stesse scelte sono in Statistiche › Bus in più.
           </InfoTooltip>
         </h3>
+        {/* Da chiuso, il risultato in una riga. */}
+        {!aperto && (
+          <span className="sezione-apribile-sintesi">
+            {piuTragitti ? 'Evento' : 'Questo tragitto'}: <b className={`sim-valore ${giudizio(r)}`}>{conSegno(r)}</b>
+            {evento.aTerra.passeggeri > 0 && <> · {pluraleNumero(evento.aTerra.passeggeri, 'a terra', 'a terra')}</>}
+          </span>
+        )}
       </div>
-      <div className="table-scroll">
+      {aperto && <div className="table-scroll">
         <table className="data-table sim-tabella">
           <Intestazione primaColonna={piuTragitti ? 'Evento, tragitti, linee e bus' : 'Linea e bus'} />
           <tbody>
@@ -437,7 +453,7 @@ export function RiquadroBusInPiu({ eventoId, tragittoId, versione }: { eventoId:
             )}
           </tbody>
         </table>
-      </div>
+      </div>}
     </section>
   );
 }

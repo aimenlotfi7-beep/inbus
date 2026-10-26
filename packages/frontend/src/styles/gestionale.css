@@ -547,6 +547,14 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .sim-tabella tr.sim-corrente.sim-cliccabile:hover > td{background:color-mix(in srgb, var(--blue) 9%, var(--dusk));}
 .sim-apri:focus-visible, .sim-link:focus-visible{outline:2px solid var(--blue); outline-offset:2px; border-radius:4px;}
 .sim-freccia{display:inline-block; width:16px; color:var(--mist);}
+/* Sezioni che partono chiuse (Da confermare: Fermate, Incasso e spesa dei bus):
+   titolo con la freccia e, da chiuse, una riga di sintesi. */
+.sezione-apribile{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; width:100%; margin:0 0 12px; padding:4px 0; border:none; background:none; font:inherit; text-align:left; color:var(--paper); cursor:pointer;}
+.sezione-apribile .section-label{margin:0;}
+.sezione-apribile .sim-freccia{width:auto;}
+.sezione-apribile:focus-visible{outline:2px solid var(--blue); outline-offset:2px; border-radius:4px;}
+.sezione-apribile-sintesi{font-size:var(--testo-md); font-weight:400; color:var(--mist);}
+.sezione-apribile-sintesi b{font-variant-numeric:tabular-nums;}
 .sim-posti{font-weight:400; color:var(--mist);}
 .sim-nome-bus{display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px 8px;}
 .sim-nome-bus > span:first-child{font-weight:600;}
