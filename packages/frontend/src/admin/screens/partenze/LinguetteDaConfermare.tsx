@@ -46,7 +46,7 @@ export function TestataLinguette({ tragitti, statoDi, simulazione, scelte, filtr
     <div className="testata-linguette">
       {evento && evento.voce.bus > 0 && (
         <p className="totale-evento">
-          Evento, se partono i bus proposti: <b className={`sim-valore ${r < 0 ? 'perdita' : 'guadagno'}`}>{conSegno(r)}</b>
+          Evento, con i bus che partono: <b className={`sim-valore ${r < 0 ? 'perdita' : 'guadagno'}`}>{conSegno(r)}</b>
           {evento.aTerra.passeggeri > 0 && <>, {evento.aTerra.passeggeri} a terra</>}
         </p>
       )}

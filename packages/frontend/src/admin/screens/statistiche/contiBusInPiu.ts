@@ -226,12 +226,18 @@ export function leggiScelte(): Scelte {
   }
 }
 
+/** L'avviso che salvaScelte manda alla pagina, con le scelte nuove: le
+ *  linguette di Partenze e i numeri dei bus proposti si aggiornano subito,
+ *  senza ricaricare (useScelteSalvate in BusInPiu.tsx). */
+export const SCELTE_CAMBIATE = 'inbus:scelte-bus-in-piu';
+
 export function salvaScelte(scelte: Scelte) {
   try {
     window.localStorage.setItem(CHIAVE_SCELTE, JSON.stringify(scelte));
   } catch {
     // Senza memoria del browser le scelte valgono finché la pagina resta aperta.
   }
+  window.dispatchEvent(new CustomEvent<Scelte>(SCELTE_CAMBIATE, { detail: scelte }));
 }
 
 /** Cambia una scelta; tornata come di serie (e senza costo a mano) sparisce. */

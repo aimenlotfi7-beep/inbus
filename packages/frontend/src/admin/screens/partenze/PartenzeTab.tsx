@@ -17,7 +17,7 @@ import { PreventiviTragitto } from './PreventiviTragitto';
 import { DettagliLinguetta, TestataLinguette, passaFiltro, type FiltroLinguette } from './LinguetteDaConfermare';
 import { LineeTragittoScreen } from '../LineeTragittoScreen';
 import { statisticheApi, type EventoSimulato } from '../../../api/statistiche';
-import { leggiScelte } from '../statistiche/contiBusInPiu';
+import { useScelteSalvate } from '../statistiche/BusInPiu';
 import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useSessione } from '../../shared/SessioneContext';
@@ -128,6 +128,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
   const [contatori, setContatori] = useState<Map<string, SuggerimentoLinea['contatorePareggio']>>(new Map());
   const [simulazioneEvento, setSimulazioneEvento] = useState<EventoSimulato | null>(null);
   const [filtroLinguette, setFiltroLinguette] = useState<FiltroLinguette>('tutti');
+  // Le stesse scelte «Parte / Non parte» della tabella dei bus (ricordate nel browser).
+  const scelteBus = useScelteSalvate();
 
   // "Carico…" solo la prima volta: dopo un salvataggio i dati si
   // aggiornano sotto gli occhi, senza smontare la pagina (prima si
@@ -680,8 +682,6 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
     ? (calcoloVisibile.find((t) => t.tragittoId === tabTragittoAttivo) ?? calcoloVisibile[0])
     : null;
   const calcoloDaRenderizzare = tragittoTabSelezionato ? [tragittoTabSelezionato] : calcoloVisibile;
-  // Le stesse scelte «Parte / Non parte» della tabella dei bus (ricordate nel browser).
-  const scelteBus = leggiScelte();
 
   const stileEtichettaPiccola = { fontSize: 'var(--testo-xs)', color: 'var(--mist)', textTransform: 'uppercase' as const, letterSpacing: .3 };
 

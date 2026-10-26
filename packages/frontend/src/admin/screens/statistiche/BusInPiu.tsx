@@ -1,10 +1,10 @@
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { statisticheApi, type BusSimulato, type EventoSimulato, type StatisticheBusInPiu } from '../../../api/statistiche';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { InfoTooltip } from '../../shared/InfoTooltip';
 import { Caricamento, ErroreStatistiche, formattaEuroIntero, formattaNumero, pluraleNumero, Scheda, useDati, Vuoto } from './comuni';
 import {
-  conInterruttore, conScelta, contiEvento, contiEventi, costoDi, giudizio, leggiScelte, previsto, risultato, risultatoAOggi, salvaScelte, spesa,
+  conInterruttore, conScelta, contiEvento, contiEventi, costoDi, giudizio, leggiScelte, previsto, risultato, risultatoAOggi, salvaScelte, SCELTE_CAMBIATE, spesa,
   type ATerra, type ContiTragitto, type SceltaBus, type Scelte, type Voce,
 } from './contiBusInPiu';
 import { formattaGiorno, oggiRoma } from './periodo';
@@ -42,13 +42,23 @@ function Giudizio({ valore }: { valore: number }) {
   return <span className={`sim-giudizio ${g}`}>{TESTO_GIUDIZIO[g]}</span>;
 }
 
-/** Le scelte degli interruttori, ricordate in questo browser (le stesse in Statistiche e nella pagina Linee). */
-function useScelteBus() {
+/** Le scelte degli interruttori, ricordate in questo browser (le stesse in
+ *  Statistiche, nella pagina Linee e nelle linguette di Partenze): chi le
+ *  legge si aggiorna appena un interruttore cambia, anche in un altro riquadro. */
+export function useScelteSalvate(): Scelte {
   const [scelte, setScelte] = useState<Scelte>(leggiScelte);
-  function aggiorna(nuove: Scelte) {
-    salvaScelte(nuove);
-    setScelte(nuove);
-  }
+  useEffect(() => {
+    const cambiate = (e: Event) => setScelte((e as CustomEvent<Scelte>).detail);
+    window.addEventListener(SCELTE_CAMBIATE, cambiate);
+    return () => window.removeEventListener(SCELTE_CAMBIATE, cambiate);
+  }, []);
+  return scelte;
+}
+
+function useScelteBus() {
+  const scelte = useScelteSalvate();
+  // salvaScelte avvisa la pagina, e useScelteSalvate qui sopra ascolta.
+  const aggiorna = (nuove: Scelte) => salvaScelte(nuove);
   return {
     scelte,
     cambia: (b: BusSimulato, cambio: SceltaBus) => aggiorna(conScelta(scelte, b, cambio)),
