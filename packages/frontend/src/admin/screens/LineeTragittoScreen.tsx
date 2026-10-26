@@ -624,7 +624,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
         // preventivi si possono ancora chiedere a mano, ma non è il momento.
         ? 'Come sarebbero i bus con le prenotazioni di adesso. Finché il piano non si decide puoi guardare e aspettare: i numeri cambiano ancora.'
         : lineeConfermate.length === 0
-        ? 'Le prenotazioni hanno raggiunto il pareggio: chiedi i preventivi per il primo bus ai fornitori, qui sotto nella proposta, poi scegli e conferma. Se hai già un accordo, conferma inserendo i dati.'
+        ? 'Pareggio raggiunto: chiedi i preventivi nella proposta qui sotto, poi scegli e conferma. Hai già un accordo? Conferma a mano.'
         : diBus
           ? 'Chi è rimasto fuori dai posti dei bus ha raggiunto di nuovo il pareggio: chiedi i preventivi per il bus in più, poi scegli e conferma. Intanto le vendite continuano.'
           : `Le prime fermate sono già coperte dai bus e da ${prima.fermate[0]?.citta ?? 'una fermata successiva'} in poi i prenotati raggiungono il pareggio: conviene una linea che parta da lì.`,
@@ -782,10 +782,10 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
               Prima non lo diceva nessuna pagina. */}
           {datePiano?.decisioneArrivata && (
             <p className="testo-secondario" style={{ marginTop: 6 }}>
-              Piano dei bus deciso <b>il {datePiano.decisioneDaCreaPiano ? formattaDataOra(datePiano.decisione) : formattaData(datePiano.decisione)}</b>
-              {datePiano.decisioneDaCreaPiano ? ', anticipato con «Crea piano»' : datePiano.decisionePersonalizzata ? ' (data di questo evento)' : ' (dai giorni in Impostazioni)'}:
-              per ogni bus proposto le richieste di preventivo partono da sole ai fornitori.
-              {datePiano.fineVendite && ` Le vendite chiudono il ${formattaData(datePiano.fineVendite)}; la lista d'attesa resta aperta.`}
+              Piano deciso <b>il {datePiano.decisioneDaCreaPiano ? formattaDataOra(datePiano.decisione) : formattaData(datePiano.decisione)}</b>
+              {datePiano.decisioneDaCreaPiano ? ' con «Crea piano»' : datePiano.decisionePersonalizzata ? ' (data dell\'evento)' : ' (Impostazioni)'}:
+              i preventivi si chiedono da soli ai fornitori.
+              {datePiano.fineVendite && ` Le vendite chiudono il ${formattaData(datePiano.fineVendite)}, poi lista d'attesa.`}
             </p>
           )}
         </div>
