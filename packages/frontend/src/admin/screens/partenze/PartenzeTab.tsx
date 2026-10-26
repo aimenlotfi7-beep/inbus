@@ -212,8 +212,8 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
       const conSoglia = (t: Tragitto) => (t.id === tragittoId ? { ...t, sogliaPareggio: soglia } : t);
       setEventoCompleto((ev) => ev && { ...ev, tragitti: ev.tragitti.map(conSoglia), servizi: ev.servizi.map((s) => ({ ...s, tragitti: s.tragitti.map(conSoglia) })) });
       impostaStatoPrezzi(tragittoId, 'Soglia salvata: premi "Calcola prezzi per fermata" per ricalcolare i prezzi con la soglia nuova.', 'info');
-      // Niente ricarica: l'ordine dei tragitti dal server può cambiare e si
-      // perderebbe la linguetta aperta; la soglia è già aggiornata qui sopra.
+      // Niente ricarica: la soglia è già aggiornata qui sopra e al pannello
+      // Prezzi non serve altro.
       return true;
     } catch (e) {
       notifica(`Salvataggio non riuscito: ${motivoErrore(e)}`, 'errore');

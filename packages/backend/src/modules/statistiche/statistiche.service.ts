@@ -8,6 +8,7 @@ import {
 import { NonTrovato } from '../../shared/errors.js';
 import { chiaveNome } from '../../shared/nomi.js';
 import { risolviSoglia, sogliaPropria } from '../eventi/soglia-pareggio.js';
+import { ORDINE_TRAGITTI } from '../eventi/ordine-tragitti.js';
 import { giornoARoma } from '../../shared/formato.js';
 import { applicaScontoOfferta, prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
@@ -230,7 +231,7 @@ async function leggiStrutture(eventoIds: string[]): Promise<StruttureEventi> {
     id: tragitti.id, eventoId: tragitti.eventoId, nome: tragitti.nome, attivo: tragitti.attivo, preventivoPostiBus: tragitti.preventivoPostiBus,
     preventivoCosto: tragitti.preventivoCosto, sogliaTragitto: tragitti.sogliaPareggio, sogliaEvento: eventi.sogliaPareggio,
   }).from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-    .where(and(inArray(tragitti.eventoId, ids), isNull(tragitti.eliminatoIl))).orderBy(asc(tragitti.nome))))
+    .where(and(inArray(tragitti.eventoId, ids), isNull(tragitti.eliminatoIl))).orderBy(...ORDINE_TRAGITTI)))
     // La soglia propria del tragitto o dell'evento; null = vale Impostazioni.
     .map(({ sogliaTragitto, sogliaEvento, ...t }) => ({ ...t, sogliaPareggio: sogliaPropria({ tragitto: sogliaTragitto, evento: sogliaEvento }) }));
   const righeLinee = await aBlocchiDaDb(righeTragitti.map((t) => t.id), (ids) => db.select({

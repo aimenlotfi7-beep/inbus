@@ -9,6 +9,7 @@ import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazion
 import type { RegolaCompenso } from '../collaboratori/compenso.js';
 import { commissioniPer, sommaDaIncassare, sommaPagati, tragittiConclusi } from './economia.js';
 import { condizioneEventi, type FiltroEventi } from './filtro-eventi.js';
+import { ORDINE_TRAGITTI } from '../eventi/ordine-tragitti.js';
 import { inizioGiornoRoma, oggiRoma } from './periodo.js';
 import { aBlocchiDaDb, caricaDatiEventi, leggiCompensi, prenotazioniComeStatistiche } from './statistiche.service.js';
 
@@ -62,7 +63,7 @@ async function simulaEventi(righeEventi: RigaEvento[]): Promise<EventoSimulato[]
     prenotazioniComeStatistiche(inArray(prenotazioni.eventoId, ids)),
     rimborsiInAttesa(ids),
     db.select({ id: tragitti.id, eventoId: tragitti.eventoId, nome: tragitti.nome, preventivoCosto: tragitti.preventivoCosto })
-      .from(tragitti).where(and(inArray(tragitti.eventoId, ids), isNull(tragitti.eliminatoIl))).orderBy(asc(tragitti.nome)),
+      .from(tragitti).where(and(inArray(tragitti.eventoId, ids), isNull(tragitti.eliminatoIl))).orderBy(...ORDINE_TRAGITTI),
     leggiSogliaOccupazionePareggio(),
     leggiPostiPerBus(),
     leggiCompensi(ids),

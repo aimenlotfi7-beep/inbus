@@ -25,6 +25,7 @@ import { busNonTrovato, generaPdfPasseggeriBus, leggiSchedaBus, passeggeriDelBus
 import { prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { stessoNome } from '../../shared/nomi.js';
 import { sogliaDelTragitto } from './soglia-pareggio.js';
+import { ORDINE_TRAGITTI } from './ordine-tragitti.js';
 import { confrontaPerEta, etaPrenotazione } from '../prenotazioni/riempimento-bus.js';
 import { leggiGiorniDecisionePiano, leggiGiorniFineVendite, leggiPostiPerBus } from '../impostazioni/impostazioni.routes.js';
 import { decisioneArrivata, risolviDatePiano } from './date-piano.js';
@@ -311,11 +312,17 @@ export const includeCompleto = {
   // essere davvero la partenza, se le fermate sono state riordinate
   // dopo la creazione. Bug corretto qui: mancava su entrambe le
   // relazioni (tragitti liberi e dentro i servizi).
-  tragitti: { where: and(isNull(tragitti.eliminatoIl), isNull(tragitti.servizioId)), with: { fermate: { orderBy: () => [asc(fermate.ordine)] } } },
+  // Tragitti e servizi nell'ordine della scheda (ottobre 2026): senza un
+  // ordine il database li restituiva come capitava e le linguette di
+  // Partenze cambiavano posto dopo ogni salvataggio.
+  tragitti: { where: and(isNull(tragitti.eliminatoIl), isNull(tragitti.servizioId)), orderBy: () => ORDINE_TRAGITTI, with: { fermate: { orderBy: () => [asc(fermate.ordine)] } } },
   // I servizi (se l'evento ne ha) — ognuno con le proprie tratte. Un
   // evento senza nessun servizio (il caso normale) ha semplicemente un
   // array vuoto qui: tutto continua a funzionare come prima.
-  servizi: { with: { tragitti: { where: isNull(tragitti.eliminatoIl), with: { fermate: { orderBy: () => [asc(fermate.ordine)] } } } } },
+  servizi: {
+    orderBy: () => [asc(servizi.ordine), asc(servizi.nome), asc(servizi.id)],
+    with: { tragitti: { where: isNull(tragitti.eliminatoIl), orderBy: () => ORDINE_TRAGITTI, with: { fermate: { orderBy: () => [asc(fermate.ordine)] } } } },
+  },
   immagini: true,
   allegati: true,
 } as const;
@@ -616,13 +623,14 @@ async function sincronizzaFermate(tx: Parameters<Parameters<typeof db.transactio
   if (libere.size > 0) await tx.delete(fermate).where(inArray(fermate.id, [...libere]));
 }
 
-async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], eventoId: string, servizioId: string | null, tragitto: z.infer<typeof tragittoSchema>) {
+async function inserisciTragitto(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], eventoId: string, servizioId: string | null, tragitto: z.infer<typeof tragittoSchema>, ordine: number) {
   const [nuovoTragitto] = await tx
     .insert(tragitti)
     .values({
       eventoId,
       servizioId,
       nome: tragitto.nome,
+      ordine,
       postiTotali: tragitto.postiTotali,
       postiDisponibili: tragitto.postiTotali, // alla creazione tutti i posti sono liberi
       prezzoExtra: tragitto.prezzoExtra.toFixed(2),
@@ -676,7 +684,8 @@ async function sincronizzaTuttiITragitti(
     await tx.update(tragitti).set({ eliminatoIl: new Date() }).where(eq(tragitti.id, esistente.id));
   }
 
-  for (const { servizioId, tragitto } of bersagli) {
+  // L'ordine dei tragitti è quello della scheda: liberi, poi servizio per servizio.
+  for (const [ordine, { servizioId, tragitto }] of bersagli.entries()) {
     const giaEsistente = tragitto.id ? esistenti.find((l) => l.id === tragitto.id) : undefined;
 
     if (giaEsistente) {
@@ -687,6 +696,7 @@ async function sincronizzaTuttiITragitti(
       await tx.update(tragitti).set({
         servizioId,
         nome: tragitto.nome,
+        ordine,
         prezzoExtra: tragitto.prezzoExtra.toFixed(2),
         attivo: tragitto.attivo,
         referenteNome: tragitto.referenteNome,
@@ -699,7 +709,7 @@ async function sincronizzaTuttiITragitti(
 
       await sincronizzaFermate(tx, giaEsistente.id, tragitto.fermate);
     } else {
-      await inserisciTragitto(tx, eventoId, servizioId, tragitto);
+      await inserisciTragitto(tx, eventoId, servizioId, tragitto, ordine);
     }
   }
 }
@@ -866,15 +876,17 @@ export const eventiService = {
           input.allegati.map((a) => ({ eventoId: nuovoEvento.id, nome: a.nome, url: a.url }))
         );
       }
+      // L'ordine è quello della scheda, come al salvataggio (sincronizzaTuttiITragitti).
+      let ordine = 0;
       for (const tragitto of input.tragitti.filter((l) => !l.servizioId)) {
-        await inserisciTragitto(tx, nuovoEvento.id, tragitto.servizioId ?? null, tragitto);
+        await inserisciTragitto(tx, nuovoEvento.id, tragitto.servizioId ?? null, tragitto, ordine++);
       }
-      for (const servizio of input.servizi) {
+      for (const [ordineServizio, servizio] of input.servizi.entries()) {
         const [nuovoServizio] = await tx.insert(servizi).values({
-          eventoId: nuovoEvento.id, nome: servizio.nome,
+          eventoId: nuovoEvento.id, nome: servizio.nome, ordine: ordineServizio,
         }).returning();
         for (const tragitto of servizio.tragitti) {
-          await inserisciTragitto(tx, nuovoEvento.id, nuovoServizio.id, tragitto);
+          await inserisciTragitto(tx, nuovoEvento.id, nuovoServizio.id, tragitto, ordine++);
         }
       }
 
@@ -971,12 +983,13 @@ export const eventiService = {
           if (!idsInviati.has(esistente.id)) serviziDaEliminare.push(esistente.id);
         }
 
-        for (const servizio of input.servizi) {
+        // I servizi nell'ordine della scheda, come i tragitti.
+        for (const [ordineServizio, servizio] of input.servizi.entries()) {
           if (servizio.id) {
-            await tx.update(servizi).set({ nome: servizio.nome }).where(eq(servizi.id, servizio.id));
+            await tx.update(servizi).set({ nome: servizio.nome, ordine: ordineServizio }).where(eq(servizi.id, servizio.id));
             for (const tragitto of servizio.tragitti) bersagli.push({ servizioId: servizio.id, tragitto });
           } else {
-            const [nuovoServizio] = await tx.insert(servizi).values({ eventoId: id, nome: servizio.nome }).returning();
+            const [nuovoServizio] = await tx.insert(servizi).values({ eventoId: id, nome: servizio.nome, ordine: ordineServizio }).returning();
             for (const tragitto of servizio.tragitti) bersagli.push({ servizioId: nuovoServizio.id, tragitto });
           }
         }
@@ -2237,7 +2250,9 @@ export const eventiService = {
         eq(tragitti.attivo, true), isNull(tragitti.eliminatoIl), isNull(eventi.eliminatoIl), eq(eventi.bozza, false),
         // Il giorno dell'evento è ancora "in programma" (ora di Roma).
         ...(soloInProgramma ? [gte(eventi.data, inizioOggiRoma())] : []),
-      ));
+      ))
+      // Dentro ogni evento i tragitti nell'ordine della scheda.
+      .orderBy(asc(eventi.data), asc(eventi.id), ...ORDINE_TRAGITTI);
 
     if (righe.length === 0) return [];
 

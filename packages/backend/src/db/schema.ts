@@ -330,6 +330,11 @@ export const tragitti = pgTable('tragitti', {
   // di sempre, un solo pacchetto bus per l'evento).
   servizioId: text('servizio_id').references(() => servizi.id, { onDelete: 'cascade' }),
   nome: text('nome').notNull(),
+  // Posizione nella scheda dell'evento (proprietario, ottobre 2026: le
+  // linguette dei tragitti cambiavano posto dopo ogni salvataggio, perché
+  // senza un ordine il database li restituiva come capitava). Si riscrive a
+  // ogni salvataggio della scheda; a parità vale il nome.
+  ordine: integer('ordine').notNull().default(0),
   postiTotali: integer('posti_totali').notNull(),
   postiDisponibili: integer('posti_disponibili').notNull(),
   prezzoExtra: numeric('prezzo_extra', { precision: 10, scale: 2 }).notNull().default('0'),
