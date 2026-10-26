@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BusSimulato, EventoSimulato, TragittoSimulato } from '../../../api/statistiche';
-import { conScelta, contiEvento, contiTragitto, giudizio, previsto, risultato, risultatoAOggi, spesa } from './contiBusInPiu';
+import { conScelta, contiEvento, contiTragitto, giudizio, numeriBusProposto, previsto, risultato, risultatoAOggi, spesa } from './contiBusInPiu';
 
 // Bus in più (proprietario, settembre 2026): interruttore per ogni bus, chi non
 // parte è rimborsato, spesa = bus + commissioni, numeri per linea e per bus.
@@ -32,6 +32,28 @@ function tragitto(o: Partial<TragittoSimulato> = {}): TragittoSimulato {
 
 const evento = (tragitti: TragittoSimulato[], compenso: EventoSimulato['compenso'] = null): EventoSimulato => ({
   id: 'e1', artista: 'Stadio', citta: 'Roma', data: '2026-10-27T00:00:00.000Z', anno: 2026, compenso, tragitti,
+});
+
+describe('numeri di un bus proposto (scheda nella pagina Linee)', () => {
+  it('partendo porta 15 passeggeri e 490 €, costa 600 € più 15 € di commissioni; senza, quei 15 restano a terra', () => {
+    const n = numeriBusProposto(tragitto(), 'B2', {})!;
+    expect(n.voce).toMatchObject({ passeggeri: 15, incasso: 490, costoBus: 600, promoter: 10, whiteLabel: 5 });
+    expect(risultato(n.voce)).toBe(-125);
+    expect(n.fonteCosto).toBe('quotazione');
+    expect(n.seNonParte).toEqual({ passeggeri: 15, valore: 490 });
+  });
+
+  it('se il bus 3 è acceso, spegnere il bus 2 lascia a terra solo chi il bus 3 non prende', () => {
+    // Bus 2 spento e bus 3 acceso: il bus 3 porta 15; con entrambi accesi a terra nessuno.
+    const n = numeriBusProposto(tragitto(), 'B2', { B3: { parte: true } })!;
+    expect(n.seNonParte.passeggeri).toBe(2);
+  });
+
+  it('un costo scritto a mano non è più "quotazione"; un bus confermato non ha scheda', () => {
+    expect(numeriBusProposto(tragitto(), 'B2', { B2: { costo: 450 } })!).toMatchObject({ fonteCosto: null, voce: { costoBus: 450 } });
+    expect(numeriBusProposto(tragitto(), 'B1', {})).toBeNull();
+    expect(numeriBusProposto(tragitto(), 'manca', {})).toBeNull();
+  });
 });
 
 describe('conti di un tragitto', () => {

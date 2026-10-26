@@ -157,6 +157,37 @@ export function contiTragitto(t: TragittoSimulato, scelte: Scelte): ContiTragitt
   return { tragitto: t, voce, aTerra, linee };
 }
 
+/** I numeri di un bus proposto, per la sua scheda nella pagina Linee: quanto
+ *  porta, incassa e costa partendo (con gli altri bus come sono scelti), e
+ *  chi resterebbe a terra se non partisse (con quanto vale). Stessi conti
+ *  della tabella «Incasso e spesa dei bus». null se il bus non c'è o parte
+ *  sempre (confermato). */
+export interface NumeriBusProposto {
+  voce: Voce;
+  fonteCosto: BusSimulato['fonteCosto'];
+  /** Preventivi arrivati per questo bus (il costo è il più basso). */
+  preventivi: number;
+  seNonParte: ATerra;
+}
+
+export function numeriBusProposto(t: TragittoSimulato, chiave: string, scelte: Scelte): NumeriBusProposto | null {
+  const b = t.bus.find((x) => x.chiave === chiave);
+  if (!b || !conInterruttore(b)) return null;
+  const parteSi = contiTragitto(t, conScelta(scelte, b, { parte: true }));
+  const parteNo = contiTragitto(t, conScelta(scelte, b, { parte: false }));
+  const riga = parteSi.linee.flatMap((l) => l.bus).find((r) => r.bus.chiave === chiave);
+  if (!riga) return null;
+  return {
+    voce: riga.voce,
+    fonteCosto: scelte[chiave]?.costo !== undefined ? null : b.fonteCosto,
+    preventivi: b.preventivi,
+    seNonParte: {
+      passeggeri: Math.max(0, parteNo.aTerra.passeggeri - parteSi.aTerra.passeggeri),
+      valore: Math.max(0, arrotonda(parteNo.aTerra.valore - parteSi.aTerra.valore)),
+    },
+  };
+}
+
 /** L'evento intero: i suoi tragitti più il compenso del responsabile,
  *  calcolato su chi parte con i bus scelti (chi resta a terra è rimborsato). */
 export function contiEvento(e: EventoSimulato, scelte: Scelte): ContiEvento {

@@ -15,7 +15,10 @@ import { fornitoriApi, type Fornitore } from '../../api/fornitori';
 import { preventiviApi, type CambioPercorso, type RichiestaConRisposta } from '../../api/preventivi';
 import { PreventiviBus, PreventivoDelBusRiga } from './partenze/PreventiviBus';
 import { PianoBus } from './partenze/PianoBus';
+import { NumeriBusPropostoRiquadro } from './partenze/NumeriBusProposto';
 import { RiquadroBusInPiu } from './statistiche/BusInPiu';
+import { leggiScelte, numeriBusProposto } from './statistiche/contiBusInPiu';
+import { statisticheApi, type TragittoSimulato } from '../../api/statistiche';
 import { tourLeaderApi, type TourLeader } from '../../api/tourleader';
 import { haPermesso } from '../../api/auth';
 import { CampoNumero } from '../shared/CampoNumero';
@@ -124,6 +127,9 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
   const [scaricandoPdfId, setScaricandoPdfId] = useState<string | null>(null);
   // Cambia a ogni ricarica: il riquadro dei bus in più rilegge i suoi conti.
   const [versioneDati, setVersioneDati] = useState(0);
+  // I conti dei bus del tragitto (gli stessi della tabella «Incasso e spesa
+  // dei bus»): servono ai numeri dentro la scheda di ogni bus proposto.
+  const [simulazione, setSimulazione] = useState<TragittoSimulato | null>(null);
 
   // "Carico…" solo la prima volta: dopo una modifica i dati si aggiornano
   // senza smontare la pagina.
@@ -139,6 +145,8 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
     eventiApi.suggerimentoLinea(tragittoId).then(setSuggerimento).catch((e) => { setSuggerimento(null); nonCaricato('Suggerimento della linea')(e); });
     eventiApi.anteprimaSmistamento(tragittoId).then(setAnteprima).catch((e) => { setAnteprima(null); nonCaricato('Smistamento sui bus')(e); });
     if (vedeEconomia) eventiApi.riepilogoEconomico(eventoId).then(setEconomia).catch((e) => { setEconomia([]); nonCaricato('Riepilogo economico')(e); });
+    // Senza questi conti le schede dei bus proposti restano come prima (il riquadro sotto dice già l'errore).
+    if (vedeEconomia) statisticheApi.busInPiuEvento(eventoId).then((r) => setSimulazione(r.evento?.tragitti.find((t) => t.id === tragittoId) ?? null)).catch(() => setSimulazione(null));
   }
   /** Dopo ogni modifica: dati di questa pagina e, se incorporata, la
    *  pagina che la contiene (intestazione e card non restano indietro). */
@@ -694,6 +702,7 @@ export function LineeTragittoScreen(props?: { eventoIdProp?: string; tragittoIdP
           </div>
           <button type="button" className="btn btn-ghost btn-piccolo" title="Se hai già un accordo con un fornitore, senza chiedere preventivi" onClick={() => apriConfermaLinea(p)}>{diBus ? 'Conferma a mano' : 'Conferma la linea a mano'}</button>
         </div>
+        {simulazione && <NumeriBusPropostoRiquadro numeri={numeriBusProposto(simulazione, `proposta:${p.id}`, leggiScelte())} />}
         <p style={{ fontSize: 'var(--testo-md)', margin: '10px 0 0' }}>{motivo} Chiedi i preventivi per questo bus, scegli il fornitore e conferma: da quel momento lo smistamento per età ci mette i passeggeri.</p>
         {!diBus && (
           <p style={{ fontSize: 'var(--testo-sm)', color: 'var(--mist)', margin: '6px 0 0' }}>Preferisci un bus in più su una linea già confermata? Aggiungilo lì: questa proposta sparisce da sola.</p>

@@ -9,12 +9,14 @@ import { formattaEuro, plurale } from '../../../shared/formato';
 import type { ContestoPartenze } from './tipi';
 import { CLASSE_BADGE_LIVELLO, CLASSE_LINGUETTA_LIVELLO, COLORE_LIVELLO, statoGenerale, statoInTappa, type DatiStatoTragitto, type Partenza, type StatoTappa } from './statiPartenze';
 import { COLORE_ARRIVO, COLORE_PARTENZA, PartenzaArrivo } from '../../shared/PartenzaArrivo';
-import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea } from '../../../api/eventi';
+import { eventiApi, type CalcoloBusTragitto, type BusFisico, type RiepilogoEconomicoTratta, type FermataInput, type Linea, type SuggerimentoLinea } from '../../../api/eventi';
 import type { Evento, Tragitto } from '../../../api/types';
 import { fermateAnagraficaApi, type FermataAnagrafica } from '../../../api/fermateAnagrafica';
 import { impostazioniApi } from '../../../api/impostazioni';
 import { PreventiviTragitto } from './PreventiviTragitto';
+import { QuadroDaConfermare } from './QuadroDaConfermare';
 import { LineeTragittoScreen } from '../LineeTragittoScreen';
+import { statisticheApi, type EventoSimulato } from '../../../api/statistiche';
 import { fornitoriApi, type Fornitore } from '../../../api/fornitori';
 import { OrarioInput } from '../../shared/OrarioInput';
 import { useSessione } from '../../shared/SessioneContext';
@@ -119,6 +121,11 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
   // ognuno fosse un evento a parte: una tab per servizio (più una per i
   // tragitti liberi, se ce ne sono).
   const [servizioAttivo, setServizioAttivo] = useState<string | 'liberi'>(servizi?.[0]?.key ?? 'liberi');
+  // Solo in Da confermare, per il quadro dell'evento: il contatore del
+  // pareggio di ogni tragitto e i conti dei bus (chi vede i soldi).
+  const inDaConfermare = contestoPartenze?.tabOrigine === 'da-confermare';
+  const [contatori, setContatori] = useState<Map<string, SuggerimentoLinea['contatorePareggio']>>(new Map());
+  const [simulazioneEvento, setSimulazioneEvento] = useState<EventoSimulato | null>(null);
 
   // "Carico…" solo la prima volta: dopo un salvataggio i dati si
   // aggiornano sotto gli occhi, senza smontare la pagina (prima si
@@ -127,6 +134,14 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
     eventiApi.elencoPartenze()
       .then((elenco) => setPartenzePerTragitto(new Map(elenco.filter((p) => p.evento.id === eventoId).map((p) => [p.tragittoId, p]))))
       .catch(() => {});
+    if (inDaConfermare && contestoPartenze) {
+      // Uno per tragitto: lo stesso contatore della pagina delle linee, dal server.
+      Promise.all(contestoPartenze.tragittiIds.map((id) => eventiApi.suggerimentoLinea(id)
+        .then((s) => [id, s.contatorePareggio] as const)
+        .catch(() => [id, null] as const)))
+        .then((righe) => setContatori(new Map(righe)));
+      if (vedeEconomia) statisticheApi.busInPiuEvento(eventoId).then((r) => setSimulazioneEvento(r.evento)).catch(() => setSimulazioneEvento(null));
+    }
     Promise.all([
       eventiApi.calcolaBus(eventoId),
       eventiApi.listaBus(eventoId),
@@ -693,6 +708,19 @@ export function PartenzeTab({ eventoId, servizi, contestoPartenze, onSalvato, on
 
       {calcoloVisibile.length === 0 && (
         <p className="testo-intro">Questo evento non ha ancora tragitti: aggiungili da Eventi, nella scheda dell'evento.</p>
+      )}
+
+      {inDaConfermare && calcoloVisibile.length > 1 && (
+        <QuadroDaConfermare
+          tragitti={calcoloVisibile}
+          partenze={partenzePerTragitto}
+          bus={busLista}
+          contatori={contatori}
+          simulazione={vedeEconomia ? simulazioneEvento : null}
+          statoDi={statoDi}
+          attivo={tragittoTabSelezionato?.tragittoId ?? null}
+          onApri={setTabTragittoAttivo}
+        />
       )}
 
       <div className="partenze-layout">

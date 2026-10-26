@@ -869,6 +869,17 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
 .riepilogo-numero.rosso{background:color-mix(in srgb, var(--pink) 10%, var(--dusk-2));}
 .riepilogo-numero.rosso b{color:var(--pink);}
 .riepilogo-numero.verde b{color:var(--green);}
+/* «Da confermare», il quadro dell'evento: una riga per tragitto, la riga apre il tragitto. */
+.quadro-da-confermare{margin-bottom:16px;}
+.riga-apribile{cursor:pointer;}
+.riga-apribile:hover td{background:color-mix(in srgb, var(--blue) 5%, transparent);}
+.riga-apribile.attiva td{background:color-mix(in srgb, var(--blue) 10%, transparent);}
+.link-riga{border:none; background:none; padding:0; font:inherit; font-weight:700; color:var(--blue); cursor:pointer; text-align:left;}
+.link-riga:focus-visible{outline:2px solid var(--blue); outline-offset:2px; border-radius:2px;}
+/* I numeri di un bus proposto, dentro la sua scheda nella pagina Linee: più piccoli di quelli in cima. */
+.numeri-bus-proposto{margin:10px 0 0; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px;}
+.numeri-bus-proposto .riepilogo-numero{padding:8px 10px;}
+.numeri-bus-proposto .riepilogo-numero b{font-size:var(--testo-xl);}
 /* Posti occupati di un bus o di una linea. */
 .barra-posti{display:block; height:6px; border-radius:999px; background:var(--line); overflow:hidden; margin-top:6px; max-width:320px;}
 .barra-posti > i{display:block; height:100%; background:var(--green); border-radius:999px;}
