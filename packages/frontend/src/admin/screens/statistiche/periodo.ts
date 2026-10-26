@@ -1,4 +1,4 @@
-import type { Confronto } from '../../../api/statistiche';
+import type { Confronto, FiltroEventi } from '../../../api/statistiche';
 import { formattaData, plurale } from '../../../shared/formato';
 
 /** Filtro del periodo delle Statistiche: preset, giorni di calendario di Roma
@@ -134,7 +134,10 @@ export interface PreferenzeStatistiche {
   dal: string;
   al: string;
   confronto: Confronto;
+  eventi: FiltroEventi;
 }
+
+const CAMPI_FILTRO_EVENTI = ['categoria', 'genere', 'citta', 'tourId', 'eventoId'] as const;
 
 export function leggiPreferenze(): Partial<PreferenzeStatistiche> {
   try {
@@ -149,6 +152,12 @@ export function leggiPreferenze(): Partial<PreferenzeStatistiche> {
     if (typeof o.dal === 'string' && giornoValido(o.dal)) risultato.dal = o.dal;
     if (typeof o.al === 'string' && giornoValido(o.al)) risultato.al = o.al;
     if (OPZIONI_CONFRONTO.some((c) => c.id === o.confronto)) risultato.confronto = o.confronto as Confronto;
+    if (o.eventi && typeof o.eventi === 'object') {
+      const e = o.eventi as Record<string, unknown>;
+      const eventi: FiltroEventi = {};
+      for (const campo of CAMPI_FILTRO_EVENTI) if (typeof e[campo] === 'string' && e[campo]) eventi[campo] = e[campo] as string;
+      risultato.eventi = eventi;
+    }
     return risultato;
   } catch {
     return {};

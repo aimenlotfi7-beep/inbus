@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   statisticheApi,
-  type AvvisoStatistiche, type Confronto, type GravitaAvviso, type StatistichePanoramica,
+  type AvvisoStatistiche, type Confronto, type GravitaAvviso, type StatistichePanoramica, type Valore,
 } from '../../../api/statistiche';
 import { haPermesso } from '../../../api/auth';
 import { formattaEuro } from '../../../shared/formato';
@@ -10,11 +10,12 @@ import { PERMESSO_SEZIONE } from '../../shared/permessiSezioni';
 import { useSessione } from '../../shared/SessioneContext';
 import {
   chiaveFiltro, ErroreStatistiche, ETICHETTA_FONTE, formattaEuroIntero, formattaNumero, formattaPercentuale,
-  GrigliaKpi, Kpi, MargineAOggi, NotaCostiMancanti, Scheda, useDati, useSegnalaPeriodo, Variazione, VariazionePunti, Vuoto,
+  GrigliaKpi, Kpi, MargineAOggi, NotaCostiMancanti, pluraleNumero, Scheda, useDati, useSegnalaPeriodo, Variazione, VariazionePunti, Vuoto,
   type PropsScheda, type StatoDati,
 } from './comuni';
+import { filtriAttivi } from './FiltriEventi';
 import { BarraProiettile, BarreOrizzontali, GraficoAndamento } from './grafici';
-import { OPZIONI_CONFRONTO } from './periodo';
+import { formattaGiorno, OPZIONI_CONFRONTO } from './periodo';
 
 const NOME_GRAVITA: Record<GravitaAvviso, string> = { urgente: 'Urgente', critico: 'Critico', attenzione: 'Attenzione' };
 const AVVISI_IN_VISTA = 6;
@@ -36,7 +37,7 @@ export function Panoramica({ filtro, onPeriodo }: PropsScheda) {
         {stato.errore
           ? <ErroreStatistiche motivo={stato.errore.motivo} onRiprova={stato.riprova} />
           : <p className="testo-intro">Carico…</p>}
-        <DaGuardare stato={avvisi} />
+        <DaGuardare stato={avvisi} conFiltri={filtriAttivi(filtro.eventi ?? {})} />
       </>
     );
   }
@@ -46,25 +47,47 @@ export function Panoramica({ filtro, onPeriodo }: PropsScheda) {
       confronto={stato.dati.confronto}
       aggiorno={stato.caricando}
       avvisi={avvisi}
+      conFiltri={filtriAttivi(filtro.eventi ?? {})}
     />
   );
 }
 
-function ContenutoPanoramica({ d, confronto, aggiorno, avvisi }: {
+/** Senza nessuna vendita (o nessun evento) nel periodo di confronto, i
+ *  "prima: 0" sotto ogni numero non dicono niente: il confronto si nasconde e
+ *  lo si scrive una volta sola. */
+const senzaPrecedente = (x: Valore): Valore => ({ ...x, precedente: null });
+
+function ContenutoPanoramica({ d, confronto, aggiorno, avvisi, conFiltri }: {
   d: StatistichePanoramica;
   /** Il confronto con cui sono stati caricati questi dati. */
   confronto: Confronto;
   aggiorno: boolean;
   avvisi: StatoDati<AvvisoStatistiche[]>;
+  conFiltri: boolean;
 }) {
-  const v = d.vendite;
-  const e = d.eventiDelPeriodo;
+  const confrontoVendite = d.vendite.prenotazioni.precedente !== 0;
+  const confrontoEventi = d.eventiDelPeriodo.eventi.precedente !== 0;
+  const v = confrontoVendite ? d.vendite : {
+    ...d.vendite,
+    passeggeri: senzaPrecedente(d.vendite.passeggeri), prenotazioni: senzaPrecedente(d.vendite.prenotazioni), incasso: senzaPrecedente(d.vendite.incasso),
+    incassato: senzaPrecedente(d.vendite.incassato), ricavoPerPasseggero: senzaPrecedente(d.vendite.ricavoPerPasseggero),
+  };
+  const e = confrontoEventi ? d.eventiDelPeriodo : {
+    ...d.eventiDelPeriodo,
+    eventi: senzaPrecedente(d.eventiDelPeriodo.eventi), passeggeri: senzaPrecedente(d.eventiDelPeriodo.passeggeri), incasso: senzaPrecedente(d.eventiDelPeriodo.incasso),
+    incassato: senzaPrecedente(d.eventiDelPeriodo.incassato), costoBus: senzaPrecedente(d.eventiDelPeriodo.costoBus), commissioni: senzaPrecedente(d.eventiDelPeriodo.commissioni),
+    compensi: senzaPrecedente(d.eventiDelPeriodo.compensi), margine: senzaPrecedente(d.eventiDelPeriodo.margine), margineAOggi: senzaPrecedente(d.eventiDelPeriodo.margineAOggi),
+    riempimentoBus: { ...d.eventiDelPeriodo.riempimentoBus, precedente: null },
+  };
+  const periodoConfronto = d.periodo.confrontoDal && d.periodo.confrontoAl
+    ? `dal ${formattaGiorno(d.periodo.confrontoDal)} al ${formattaGiorno(d.periodo.confrontoAl)}`
+    : null;
   const attenuato = aggiorno ? 'stat-aggiorno' : undefined;
 
   const n = Math.min(d.periodo.intervalli.length, v.andamento.length);
   const etichette = d.periodo.intervalli.slice(0, n).map((x) => x.etichetta);
   const attuale = v.andamento.slice(0, n).map((p) => p.attuale);
-  const precedente = confronto === 'nessuno' ? null : v.andamento.slice(0, n).map((p) => p.precedente);
+  const precedente = confronto === 'nessuno' || !confrontoVendite ? null : v.andamento.slice(0, n).map((p) => p.precedente);
   const conPrecedente = (precedente ?? []).some((x) => x !== null);
   const nomeConfronto = OPZIONI_CONFRONTO.find((c) => c.id === confronto)?.etichetta ?? '';
   const totale = attuale.reduce((s, x) => s + x, 0);
@@ -78,10 +101,39 @@ function ContenutoPanoramica({ d, confronto, aggiorno, avvisi }: {
 
   const riempimento = e.riempimentoBus;
 
+  const periodo = `dal ${formattaGiorno(d.periodo.dal)} al ${formattaGiorno(d.periodo.al)}`;
+  // Il confronto è scelto ma non c'è niente da confrontare: lo si dice una volta.
+  let confrontoVuoto: string | null = null;
+  if (confronto !== 'nessuno' && periodoConfronto) {
+    if (!confrontoVendite && !confrontoEventi) confrontoVuoto = `Nel periodo di confronto (${periodoConfronto}) non ci sono vendite né eventi: per questo non vedi confronti.`;
+    else if (!confrontoVendite) confrontoVuoto = `Nel periodo di confronto (${periodoConfronto}) non ci sono vendite: il confronto delle vendite è nascosto.`;
+    else if (!confrontoEventi) confrontoVuoto = `Nel periodo di confronto (${periodoConfronto}) non ci sono eventi: il confronto degli eventi è nascosto.`;
+  }
+
   return (
     <>
+      {/* La risposta in parole prima dei numeri. */}
+      <p className={`stat-in-breve${attenuato ? ` ${attenuato}` : ''}`}>
+        {d.vendite.prenotazioni.attuale === 0
+          ? <>Nessuna vendita {periodo}.</>
+          : <>
+            {periodo[0].toUpperCase() + periodo.slice(1)} hai venduto <b>{pluraleNumero(d.vendite.passeggeri.attuale, 'posto', 'posti')}</b>
+            {' '}in {pluraleNumero(d.vendite.prenotazioni.attuale, 'prenotazione', 'prenotazioni')}, per <b>{formattaEuroIntero(d.vendite.incasso.attuale)}</b>.
+          </>}
+        {' '}
+        {d.eventiDelPeriodo.eventi.attuale === 0
+          ? <>Nessun evento con la data nel periodo.</>
+          : <>
+            {d.eventiDelPeriodo.eventi.attuale === 1 ? "L'evento del periodo ha" : `I ${formattaNumero(d.eventiDelPeriodo.eventi.attuale)} eventi del periodo hanno`}{' '}
+            {pluraleNumero(d.eventiDelPeriodo.passeggeri.attuale, 'passeggero', 'passeggeri')} e un margine previsto di{' '}
+            <b className={d.eventiDelPeriodo.margine.attuale < 0 ? 'stat-negativo' : undefined}>{formattaEuroIntero(d.eventiDelPeriodo.margine.attuale)}</b>.
+          </>}
+      </p>
+      {confrontoVuoto && <p className="stat-didascalia stat-sotto-breve">{confrontoVuoto}</p>}
+
       <div className={attenuato} aria-busy={aggiorno}>
-        <p className="section-label">Vendite nel periodo · per data d'acquisto</p>
+        <p className="section-label">Cosa hai venduto nel periodo</p>
+        <p className="stat-sottotitolo">Le prenotazioni fatte {periodo}, per eventi di qualsiasi data.</p>
         <GrigliaKpi>
           <Kpi etichetta="Passeggeri" valore={formattaNumero(v.passeggeri.attuale)}>
             <Variazione valore={v.passeggeri} formatta={formattaNumero} />
@@ -112,7 +164,7 @@ function ContenutoPanoramica({ d, confronto, aggiorno, avvisi }: {
             ariaLabel={descrizione}
           />
         </Scheda>
-        <DaGuardare stato={avvisi} />
+        <DaGuardare stato={avvisi} conFiltri={conFiltri} />
       </div>
 
       <Scheda titolo="Incasso previsto per fonte" classe={attenuato}>
@@ -130,7 +182,8 @@ function ContenutoPanoramica({ d, confronto, aggiorno, avvisi }: {
       </Scheda>
 
       <div className={attenuato} aria-busy={aggiorno}>
-        <p className="section-label stat-titoletto">Eventi del periodo · per data dell'evento</p>
+        <p className="section-label stat-titoletto">Come sono andati gli eventi del periodo</p>
+        <p className="stat-sottotitolo">Gli eventi con la data {periodo}, con tutte le loro prenotazioni (anche quelle fatte prima).</p>
         <GrigliaKpi>
           <Kpi etichetta="Eventi" valore={formattaNumero(e.eventi.attuale)}>
             <Variazione valore={e.eventi} formatta={formattaNumero} />
@@ -182,7 +235,7 @@ function ContenutoPanoramica({ d, confronto, aggiorno, avvisi }: {
   );
 }
 
-function DaGuardare({ stato }: { stato: StatoDati<AvvisoStatistiche[]> }) {
+function DaGuardare({ stato, conFiltri }: { stato: StatoDati<AvvisoStatistiche[]>; conFiltri: boolean }) {
   const naviga = useNavigazione();
   const sessione = useSessione();
   const [tutti, setTutti] = useState(false);
@@ -228,6 +281,8 @@ function DaGuardare({ stato }: { stato: StatoDati<AvvisoStatistiche[]> }) {
           )}
         </>
       )}
+      {/* Le cose urgenti non si nascondono con un filtro. */}
+      {conFiltri && <p className="stat-didascalia">Questo elenco mostra sempre tutti gli eventi, anche con i filtri.</p>}
     </Scheda>
   );
 }

@@ -1,11 +1,12 @@
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, sql, type SQL } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
-  busFisici, campagne, coupon, eventi, eventoResponsabile, fermate, fornitori, lineaFermate, linee, listaAttesa, offerteEvento, organizzatori,
-  partecipantiPrenotazione, preventiviRichieste, preventiviRisposte, prenotazioni, promoter, richiesteRimborso, tragitti, utenti,
-  whiteLabel,
+  busFisici, campagne, categorie, categorieEvento, coupon, eventi, eventoResponsabile, fermate, fornitori, lineaFermate, linee, listaAttesa,
+  offerteEvento, organizzatori, partecipantiPrenotazione, preventiviRichieste, preventiviRisposte, prenotazioni, promoter, richiesteRimborso,
+  tour, tourEventi, tragitti, utenti, whiteLabel,
 } from '../../db/schema.js';
 import { NonTrovato } from '../../shared/errors.js';
+import { chiaveNome } from '../../shared/nomi.js';
 import { giornoARoma } from '../../shared/formato.js';
 import { applicaScontoOfferta, prezzoNormaleFermata } from '../../shared/prezzi.js';
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
@@ -21,6 +22,7 @@ import {
 } from './economia.js';
 import { giorniTra, indiceIntervallo, inizioGiornoRoma, oggiRoma, periodoPerRisposta, type Intervallo, type Periodo } from './periodo.js';
 import type { RegolaCompenso } from '../collaboratori/compenso.js';
+import { condizioneEventi, SENZA_CATEGORIA, type FiltroEventi } from './filtro-eventi.js';
 
 /** Statistiche del gestionale: legge i dati e li passa ai conti puri di
  *  calcoli.ts ed economia.ts. Contano solo le prenotazioni CONFERMATE di
@@ -163,10 +165,10 @@ const colonneEvento = {
 };
 type RigaEvento = { id: string; artista: string; genere: string; citta: string; luogo: string; data: Date; venditeFermate: boolean };
 
-async function eventiTra(inizio: Date, fine: Date): Promise<RigaEvento[]> {
+async function eventiTra(inizio: Date, fine: Date, fe: FiltroEventi = {}): Promise<RigaEvento[]> {
   if (inizio >= fine) return [];
   return db.select(colonneEvento).from(eventi)
-    .where(and(eventoValido, gte(eventi.data, inizio), lt(eventi.data, fine)))
+    .where(and(eventoValido, gte(eventi.data, inizio), lt(eventi.data, fine), condizioneEventi(fe)))
     .orderBy(desc(eventi.data));
 }
 
@@ -299,12 +301,13 @@ function quando(giorni: number): string {
 // ---------------------------------------------------------------- Servizio
 
 export const statisticheService = {
-  async panoramica(p: Periodo) {
+  async panoramica(p: Periodo, fe: FiltroEventi = {}) {
+    const filtro = condizioneEventi(fe);
     const [righe, righeConfronto, eventiPeriodo, eventiConfronto] = await Promise.all([
-      leggiPrenotazioni(fatteTra(p.inizio, p.fine)),
-      p.confronto ? leggiPrenotazioni(fatteTra(p.confronto.inizio, p.confronto.fine)) : Promise.resolve(null),
-      eventiTra(p.inizio, p.fine),
-      p.confronto ? eventiTra(p.confronto.inizio, p.confronto.fine) : Promise.resolve(null),
+      leggiPrenotazioni(and(fatteTra(p.inizio, p.fine), filtro)),
+      p.confronto ? leggiPrenotazioni(and(fatteTra(p.confronto.inizio, p.confronto.fine), filtro)) : Promise.resolve(null),
+      eventiTra(p.inizio, p.fine, fe),
+      p.confronto ? eventiTra(p.confronto.inizio, p.confronto.fine, fe) : Promise.resolve(null),
     ]);
     const idsPeriodo = eventiPeriodo.map((e) => e.id);
     const idsConfronto = eventiConfronto?.map((e) => e.id) ?? null;
@@ -479,12 +482,12 @@ export const statisticheService = {
       || (a.data ?? '9999').localeCompare(b.data ?? '9999'));
   },
 
-  async eventi(p: Periodo) {
+  async eventi(p: Periodo, fe: FiltroEventi = {}) {
     const oggi = oggiRoma();
     const inizioOggi = inizioGiornoRoma(oggi);
     const [futuri, passati] = await Promise.all([
-      db.select(colonneEvento).from(eventi).where(and(eventoValido, gte(eventi.data, inizioOggi))).orderBy(asc(eventi.data)),
-      eventiTra(p.inizio, p.fine < inizioOggi ? p.fine : inizioOggi),
+      db.select(colonneEvento).from(eventi).where(and(eventoValido, gte(eventi.data, inizioOggi), condizioneEventi(fe))).orderBy(asc(eventi.data)),
+      eventiTra(p.inizio, p.fine < inizioOggi ? p.fine : inizioOggi, fe),
     ]);
     const ids = [...futuri, ...passati].map((e) => e.id);
     const [dati, attese] = await Promise.all([caricaDatiEventi(ids), contaListaAttesa(ids)]);
@@ -616,8 +619,8 @@ export const statisticheService = {
     };
   },
 
-  async vendite(p: Periodo) {
-    const righe = await leggiPrenotazioni(fatteTra(p.inizio, p.fine));
+  async vendite(p: Periodo, fe: FiltroEventi = {}) {
+    const righe = await leggiPrenotazioni(and(fatteTra(p.inizio, p.fine), condizioneEventi(fe)));
     const ctx = await leggiContestoFonti(righe);
     const adesso = new Date();
 
@@ -710,11 +713,14 @@ export const statisticheService = {
     };
   },
 
-  async clienti(p: Periodo) {
+  async clienti(p: Periodo, fe: FiltroEventi = {}) {
     const oggi = oggiRoma();
+    const filtro = condizioneEventi(fe);
     const [righe, righeConfronto, tutte] = await Promise.all([
-      leggiPrenotazioni(fatteTra(p.inizio, p.fine)),
-      p.confronto ? leggiPrenotazioni(fatteTra(p.confronto.inizio, p.confronto.fine)) : Promise.resolve(null),
+      leggiPrenotazioni(and(fatteTra(p.inizio, p.fine), filtro)),
+      p.confronto ? leggiPrenotazioni(and(fatteTra(p.confronto.inizio, p.confronto.fine), filtro)) : Promise.resolve(null),
+      // Tutti gli eventi, anche con i filtri: "nuovo" è chi prenota per la
+      // prima volta in assoluto, e le righe per mese contano tutti.
       db.select({ utenteId: prenotazioni.utenteId, creataIl: prenotazioni.creataIl }).from(prenotazioni)
         .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
         .where(and(eq(prenotazioni.stato, 'CONFERMATA'), eventoValido)),
@@ -785,25 +791,26 @@ export const statisticheService = {
     };
   },
 
-  async costi(p: Periodo) {
-    const eventiPeriodo = await eventiTra(p.inizio, p.fine);
+  async costi(p: Periodo, fe: FiltroEventi = {}) {
+    const filtro = condizioneEventi(fe);
+    const eventiPeriodo = await eventiTra(p.inizio, p.fine, fe);
     const ids = eventiPeriodo.map((e) => e.id);
     const [dati, righeTratte, cancellate, rimborsi, fornitoriPeriodo] = await Promise.all([
       caricaDatiEventi(ids),
       db.select({ id: tragitti.id, nome: tragitti.nome, arrivoCitta: tragitti.arrivoCitta, prezzo: tragitti.preventivoCosto, km: tragitti.kmAccettati, data: eventi.data, artista: eventi.artista })
         .from(tragitti).innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
-        .where(and(eventoValido, gte(eventi.data, p.inizio), lt(eventi.data, p.fine), isNull(tragitti.eliminatoIl), isNotNull(tragitti.preventivoCosto), isNotNull(tragitti.fornitoreId)))
+        .where(and(eventoValido, gte(eventi.data, p.inizio), lt(eventi.data, p.fine), isNull(tragitti.eliminatoIl), isNotNull(tragitti.preventivoCosto), isNotNull(tragitti.fornitoreId), filtro))
         .orderBy(desc(eventi.data)),
       // "importo" = quanto era stato pagato (per un acconto non saldato, l'acconto).
       db.select({ passeggeri: prenotazioni.passeggeri, totale: prenotazioni.totale, cancellataIl: prenotazioni.cancellataIl })
         .from(prenotazioni).innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
-        .where(and(eq(prenotazioni.stato, 'CANCELLATA'), eventoValido, gte(prenotazioni.cancellataIl, p.inizio), lt(prenotazioni.cancellataIl, p.fine))),
+        .where(and(eq(prenotazioni.stato, 'CANCELLATA'), eventoValido, gte(prenotazioni.cancellataIl, p.inizio), lt(prenotazioni.cancellataIl, p.fine), filtro)),
       db.select({ stato: richiesteRimborso.stato, origine: richiesteRimborso.origine, totale: prenotazioni.totale })
         .from(richiesteRimborso)
         .innerJoin(prenotazioni, eq(prenotazioni.id, richiesteRimborso.prenotazioneId))
         .innerJoin(eventi, eq(eventi.id, prenotazioni.eventoId))
-        .where(and(eventoValido, gte(richiesteRimborso.richiestaIl, p.inizio), lt(richiesteRimborso.richiestaIl, p.fine))),
-      statisticheFornitori(p.inizio, p.fine),
+        .where(and(eventoValido, gte(richiesteRimborso.richiestaIl, p.inizio), lt(richiesteRimborso.richiestaIl, p.fine), filtro)),
+      statisticheFornitori(p.inizio, p.fine, filtro),
     ]);
     const economia = economiaEventi(ids, dati);
     const tuttiEco = [...economia.values()];
@@ -850,7 +857,134 @@ export const statisticheService = {
       },
     };
   },
+
+  /** Le voci dei filtri: solo quelle che hanno almeno un evento, scritte come
+   *  nel menu del gestionale («Rock» e «rock» una volta sola). */
+  async opzioniFiltri() {
+    const [righe, generiMenu, categorieMenu, tours] = await Promise.all([
+      db.select({ id: eventi.id, artista: eventi.artista, citta: eventi.citta, data: eventi.data, genere: eventi.genere, categoria: eventi.categoria })
+        .from(eventi).where(eventoValido).orderBy(desc(eventi.data)),
+      db.select({ nome: categorie.nome }).from(categorie),
+      db.select({ nome: categorieEvento.nome }).from(categorieEvento),
+      db.select({ id: tour.id, nome: tour.nome }).from(tour)
+        .where(and(isNull(tour.eliminatoIl), sql`exists (select 1 from ${tourEventi} where ${tourEventi.tourId} = ${tour.id})`))
+        .orderBy(asc(tour.nome)),
+    ]);
+    const voci = (menu: { nome: string }[], valori: (string | null)[]) => {
+      const scritte = new Map(menu.map((m) => [chiaveNome(m.nome), m.nome.trim()]));
+      const usate = new Map<string, string>();
+      for (const v of valori) {
+        const k = chiaveNome(v);
+        if (k && !usate.has(k)) usate.set(k, scritte.get(k) ?? v!.trim());
+      }
+      return [...usate.values()].sort((a, b) => a.localeCompare(b, 'it'));
+    };
+    return {
+      categorie: voci(categorieMenu, righe.map((r) => r.categoria)),
+      senzaCategoria: righe.some((r) => !chiaveNome(r.categoria)),
+      generi: voci(generiMenu, righe.map((r) => r.genere)),
+      citta: voci([], righe.map((r) => r.citta)),
+      tour: tours,
+      eventi: righe.map((r) => ({ id: r.id, artista: r.artista, citta: r.citta, data: r.data.toISOString() })),
+    };
+  },
+
+  /** Confronto: gli eventi del periodo (per data dell'evento) raggruppati per
+   *  categoria, genere, città, tour o mese, uno accanto all'altro (proprietario,
+   *  ottobre 2026: su che tipo di evento si guadagna). Un evento in due tour
+   *  conta in tutti e due; il totale lo conta una volta. */
+  async confronto(p: Periodo, per: RaggruppaConfronto, fe: FiltroEventi = {}) {
+    const righeEventi = await db.select({ ...colonneEvento, categoria: eventi.categoria }).from(eventi)
+      .where(and(eventoValido, gte(eventi.data, p.inizio), lt(eventi.data, p.fine), condizioneEventi(fe)))
+      .orderBy(asc(eventi.data));
+    const ids = righeEventi.map((e) => e.id);
+    const [dati, tourDegliEventi] = await Promise.all([
+      caricaDatiEventi(ids),
+      per === 'tour'
+        ? aBlocchiDaDb(ids, (blocco) => db.select({ eventoId: tourEventi.eventoId, id: tour.id, nome: tour.nome }).from(tourEventi)
+          .innerJoin(tour, eq(tour.id, tourEventi.tourId))
+          .where(and(inArray(tourEventi.eventoId, blocco), isNull(tour.eliminatoIl))))
+        : Promise.resolve([]),
+    ]);
+    const economia = economiaEventi(ids, dati);
+    const tourPerEvento = raggruppa(tourDegliEventi, (t) => t.eventoId);
+
+    const gruppiDi = (e: (typeof righeEventi)[number]): { chiave: string; nome: string }[] => {
+      if (per === 'categoria') return chiaveNome(e.categoria) ? [{ chiave: chiaveNome(e.categoria), nome: e.categoria!.trim() }] : [{ chiave: SENZA_CATEGORIA, nome: 'Senza categoria' }];
+      if (per === 'genere') return [{ chiave: chiaveNome(e.genere), nome: e.genere.trim() }];
+      if (per === 'citta') return [{ chiave: chiaveNome(e.citta), nome: e.citta.trim() }];
+      if (per === 'tour') {
+        const suoi = tourPerEvento.get(e.id) ?? [];
+        return suoi.length ? suoi.map((t) => ({ chiave: t.id, nome: t.nome })) : [{ chiave: SENZA_CATEGORIA, nome: 'Senza tour' }];
+      }
+      const g = giornoARoma(e.data);
+      return [{ chiave: `${g.anno}-${String(g.mese).padStart(2, '0')}`, nome: NOME_MESE.format(e.data) }];
+    };
+
+    const vuoto = (chiave: string, nome: string) => ({
+      chiave, nome, eventi: 0, passeggeri: 0, incasso: 0, incassato: 0, costoBus: 0, commissioni: 0, compensi: 0, margine: 0, margineAOggi: 0,
+      posti: 0, passeggeriConBus: 0, eventiInPerdita: 0, eventiConCostiMancanti: 0,
+    });
+    type Accumulo = ReturnType<typeof vuoto>;
+    const aggiungi = (a: Accumulo, eco: EconomiaEvento) => {
+      a.eventi += 1;
+      a.passeggeri += eco.passeggeri;
+      a.incasso += eco.incasso;
+      a.incassato += eco.incassato;
+      a.costoBus += eco.costoBus;
+      a.commissioni += eco.commissioni;
+      a.compensi += eco.compenso;
+      a.margine += eco.margine;
+      a.margineAOggi += eco.margineAOggi;
+      a.posti += eco.postiSuiBus;
+      a.passeggeriConBus += eco.passeggeriConBus;
+      if (eco.bus > 0 && eco.margine < 0) a.eventiInPerdita += 1;
+      if (costiMancanti(eco)) a.eventiConCostiMancanti += 1;
+    };
+    const inRisposta = (a: Accumulo) => ({
+      chiave: a.chiave,
+      nome: a.nome,
+      eventi: a.eventi,
+      passeggeri: a.passeggeri,
+      passeggeriPerEvento: a.eventi > 0 ? Math.round((a.passeggeri / a.eventi) * 10) / 10 : 0,
+      incasso: arrotondaEuro(a.incasso),
+      incassato: arrotondaEuro(a.incassato),
+      costoBus: arrotondaEuro(a.costoBus),
+      commissioni: arrotondaEuro(a.commissioni),
+      compensi: arrotondaEuro(a.compensi),
+      margine: arrotondaEuro(a.margine),
+      margineAOggi: arrotondaEuro(a.margineAOggi),
+      ricavoPerPasseggero: a.passeggeri > 0 ? arrotondaEuro(a.incasso / a.passeggeri) : null,
+      marginePerPasseggero: a.passeggeri > 0 ? arrotondaEuro(a.margine / a.passeggeri) : null,
+      riempimento: a.posti > 0 ? percentuale(a.passeggeriConBus, a.posti) : null,
+      eventiInPerdita: a.eventiInPerdita,
+      eventiConCostiMancanti: a.eventiConCostiMancanti,
+    });
+
+    const gruppi = new Map<string, Accumulo>();
+    const totale = vuoto('totale', 'Totale');
+    for (const e of righeEventi) {
+      const eco = economia.get(e.id)!;
+      aggiungi(totale, eco);
+      for (const g of gruppiDi(e)) {
+        const a = gruppi.get(g.chiave) ?? vuoto(g.chiave, g.nome);
+        aggiungi(a, eco);
+        gruppi.set(g.chiave, a);
+      }
+    }
+    return {
+      periodo: periodoPerRisposta(p),
+      per,
+      // Per mese in ordine di calendario, gli altri dal margine più alto.
+      gruppi: [...gruppi.values()].map(inRisposta).sort((a, b) => (per === 'mese' ? a.chiave.localeCompare(b.chiave) : b.margine - a.margine)),
+      totale: inRisposta(totale),
+    };
+  },
 };
+
+export type RaggruppaConfronto = 'categoria' | 'genere' | 'citta' | 'tour' | 'mese';
+
+const NOME_MESE = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric', timeZone: 'Europe/Rome' });
 
 // ---------------------------------------------------------------- Aiuti del servizio
 
@@ -939,7 +1073,7 @@ async function fermateEvento(eventoId: string, dati: DatiEventi, attese: { tragi
 /** Per fornitore, sulle richieste di preventivo fatte nel periodo: risposte,
  *  tempo di risposta (valore centrale, in ore), volte scelto e prezzo medio
  *  dei preventivi accettati. */
-async function statisticheFornitori(inizio: Date, fine: Date) {
+async function statisticheFornitori(inizio: Date, fine: Date, filtroEventi: SQL | undefined) {
   const righe = await db.select({
     fornitoreId: preventiviRichieste.fornitoreId,
     nome: fornitori.nome,
@@ -951,8 +1085,9 @@ async function statisticheFornitori(inizio: Date, fine: Date) {
   }).from(preventiviRichieste)
     .innerJoin(fornitori, eq(fornitori.id, preventiviRichieste.fornitoreId))
     .innerJoin(tragitti, eq(tragitti.id, preventiviRichieste.tragittoId))
+    .innerJoin(eventi, eq(eventi.id, tragitti.eventoId))
     .leftJoin(preventiviRisposte, eq(preventiviRisposte.richiestaId, preventiviRichieste.id))
-    .where(and(gte(preventiviRichieste.creataIl, inizio), lt(preventiviRichieste.creataIl, fine)));
+    .where(and(gte(preventiviRichieste.creataIl, inizio), lt(preventiviRichieste.creataIl, fine), filtroEventi));
 
   return [...raggruppa(righe, (r) => r.fornitoreId).values()].map((sue) => {
     const conRisposta = sue.filter((r) => r.rispostaIl !== null);

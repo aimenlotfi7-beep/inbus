@@ -12,10 +12,68 @@ import { api } from './client';
 export type Confronto = 'anno' | 'precedente' | 'nessuno';
 export type Granularita = 'giorno' | 'settimana' | 'mese';
 
+/** I filtri sugli eventi, uguali per tutte le schede (proprietario, ottobre
+ *  2026). Vuoti = tutti gli eventi. Maiuscole e spazi non contano. */
+export interface FiltroEventi {
+  categoria?: string;
+  genere?: string;
+  citta?: string;
+  tourId?: string;
+  eventoId?: string;
+}
+
+/** Il valore del filtro Categoria per gli eventi senza categoria (lo stesso del server). */
+export const SENZA_CATEGORIA = '__senza__';
+
 export interface FiltroPeriodo {
   dal: string;
   al: string;
   confronto: Confronto;
+  eventi?: FiltroEventi;
+}
+
+export interface OpzioniFiltri {
+  categorie: string[];
+  /** C'è almeno un evento senza categoria. */
+  senzaCategoria: boolean;
+  generi: string[];
+  citta: string[];
+  tour: { id: string; nome: string }[];
+  /** Dal più recente. */
+  eventi: { id: string; artista: string; citta: string; data: string }[];
+}
+
+export type RaggruppaConfronto = 'categoria' | 'genere' | 'citta' | 'tour' | 'mese';
+
+export interface RigaConfronto {
+  chiave: string;
+  nome: string;
+  eventi: number;
+  passeggeri: number;
+  passeggeriPerEvento: number;
+  incasso: number;
+  incassato: number;
+  costoBus: number;
+  commissioni: number;
+  compensi: number;
+  margine: number;
+  margineAOggi: number;
+  /** null senza passeggeri. */
+  ricavoPerPasseggero: number | null;
+  marginePerPasseggero: number | null;
+  /** null senza bus. */
+  riempimento: number | null;
+  /** Eventi con bus e margine sotto zero. */
+  eventiInPerdita: number;
+  eventiConCostiMancanti: number;
+}
+
+export interface StatisticheConfronto {
+  periodo: PeriodoRisposta;
+  per: RaggruppaConfronto;
+  gruppi: RigaConfronto[];
+  /** Ogni evento una volta sola (anche se è in due tour). */
+  totale: RigaConfronto;
 }
 
 export interface PeriodoRisposta {
@@ -493,19 +551,29 @@ export interface StatisticheBusInPiu {
   conclusi: EventoSimulato[];
 }
 
+/** I filtri sugli eventi in fondo all'indirizzo (solo quelli scelti). */
+function queryEventi(fe: FiltroEventi | undefined) {
+  return Object.entries(fe ?? {})
+    .filter(([, v]) => typeof v === 'string' && v !== '')
+    .map(([k, v]) => `&${k}=${encodeURIComponent(v as string)}`)
+    .join('');
+}
+
 function query(f: FiltroPeriodo) {
-  return `dal=${encodeURIComponent(f.dal)}&al=${encodeURIComponent(f.al)}&confronto=${f.confronto}`;
+  return `dal=${encodeURIComponent(f.dal)}&al=${encodeURIComponent(f.al)}&confronto=${f.confronto}${queryEventi(f.eventi)}`;
 }
 
 export const statisticheApi = {
   panoramica: (f: FiltroPeriodo) => api.get<StatistichePanoramica>(`/api/statistiche/panoramica?${query(f)}`),
   daGuardare: () => api.get<AvvisoStatistiche[]>('/api/statistiche/da-guardare'),
+  opzioniFiltri: () => api.get<OpzioniFiltri>('/api/statistiche/opzioni-filtri'),
+  confronto: (f: FiltroPeriodo, per: RaggruppaConfronto) => api.get<StatisticheConfronto>(`/api/statistiche/confronto?${query(f)}&per=${per}`),
   eventi: (f: FiltroPeriodo) => api.get<StatisticheEventi>(`/api/statistiche/eventi?${query(f)}`),
   evento: (id: string) => api.get<StatisticheEvento>(`/api/statistiche/eventi/${encodeURIComponent(id)}`),
   vendite: (f: FiltroPeriodo) => api.get<StatisticheVendite>(`/api/statistiche/vendite?${query(f)}`),
   clienti: (f: FiltroPeriodo) => api.get<StatisticheClienti>(`/api/statistiche/clienti?${query(f)}`),
   costi: (f: FiltroPeriodo) => api.get<StatisticheCosti>(`/api/statistiche/costi?${query(f)}`),
-  busInPiu: (anno: number) => api.get<StatisticheBusInPiu>(`/api/statistiche/bus-in-piu?anno=${anno}`),
+  busInPiu: (anno: number, fe?: FiltroEventi) => api.get<StatisticheBusInPiu>(`/api/statistiche/bus-in-piu?anno=${anno}${queryEventi(fe)}`),
   /** Un solo evento, per la pagina Linee (null se è già passato). */
   busInPiuEvento: (eventoId: string) => api.get<{ evento: EventoSimulato | null }>(`/api/eventi/${encodeURIComponent(eventoId)}/simulazione-bus`),
 };

@@ -366,6 +366,30 @@ input[type="checkbox"]{min-width:16px; min-height:16px; accent-color:var(--blue)
   .stat-campo select, .stat-campo input{width:100%;}
   .stat-periodo{flex-basis:100%; margin-left:0; padding-bottom:0;}
 }
+/* Chiarezza (proprietario, ottobre 2026): una riga che dice a cosa serve la
+   scheda, i filtri in un riquadro (quando + quali eventi), la risposta in
+   parole prima dei numeri. */
+.stat-descrizione{margin:-6px 0 14px; max-width:95ch; font-size:var(--testo-md); line-height:1.5; color:var(--mist);}
+.stat-filtri-riquadro{margin-bottom:18px; padding:12px 14px 2px; border:1px solid var(--line); border-radius:12px; background:var(--dusk);}
+.stat-filtri-riquadro .stat-filtri{margin-bottom:12px;}
+.stat-filtri-riquadro .stat-errore-date:empty{margin:0;}
+.stat-campo-evento{flex:1 1 260px; max-width:420px;}
+.stat-campo-evento select{width:100%;}
+.stat-filtri-attivi{display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin:0 0 12px; padding:8px 12px; border-left:3px solid var(--blue); border-radius:8px; background:color-mix(in srgb, var(--blue) 10%, var(--dusk)); font-size:var(--testo-md);}
+.stat-in-breve{margin:0 0 14px; max-width:95ch; font-size:var(--testo-lg); line-height:1.5; color:var(--paper);}
+.stat-in-breve b{font-variant-numeric:tabular-nums;}
+.stat-sotto-breve{margin:-8px 0 14px;}
+.stat-sottotitolo{margin:-6px 0 10px; font-size:var(--testo-sm); color:var(--mist);}
+/* Confronto: barra del margine che va a destra (verde) o a sinistra (rosso) dallo zero */
+.stat-margine-cella{display:inline-flex; align-items:center; gap:8px; white-space:nowrap; font-variant-numeric:tabular-nums;}
+.stat-margine-barra{display:inline-flex; flex-shrink:0; width:96px; height:8px;}
+.stat-margine-meta{display:flex; flex:1; height:100%; background:var(--dusk-2);}
+.stat-margine-meta.negativa{justify-content:flex-end; border-radius:999px 0 0 999px; border-right:1px solid var(--mist);}
+.stat-margine-meta.positiva{border-radius:0 999px 999px 0;}
+.stat-margine-meta > span{display:block; height:100%;}
+.stat-margine-meta.negativa > span{border-radius:4px 0 0 4px; background:var(--pink);}
+.stat-margine-meta.positiva > span{border-radius:0 4px 4px 0; background:var(--green);}
+.stat-confronto td{vertical-align:top;}
 .stat-aggiorno{opacity:.55; transition:opacity .15s ease;}
 .stat-errore p{margin:0 0 10px; font-size:var(--testo-base); color:var(--pink);}
 .stat-solo-lettori{position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;}

@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
-import { statisticheApi, type BusSimulato, type EventoSimulato, type StatisticheBusInPiu } from '../../../api/statistiche';
+import { statisticheApi, type BusSimulato, type EventoSimulato, type FiltroEventi, type StatisticheBusInPiu } from '../../../api/statistiche';
 import { CampoNumero } from '../../shared/CampoNumero';
 import { InfoTooltip } from '../../shared/InfoTooltip';
-import { Caricamento, ErroreStatistiche, formattaEuroIntero, formattaNumero, pluraleNumero, Scheda, useDati, Vuoto } from './comuni';
+import { Caricamento, chiaveFiltroEventi, ErroreStatistiche, formattaEuroIntero, formattaNumero, pluraleNumero, Scheda, useDati, Vuoto } from './comuni';
 import {
   conInterruttore, conScelta, contiEvento, contiEventi, costoDi, giudizio, leggiScelte, previsto, risultato, risultatoAOggi, salvaScelte, SCELTE_CAMBIATE, spesa,
   type ATerra, type ContiTragitto, type SceltaBus, type Scelte, type Voce,
@@ -445,9 +445,9 @@ export function RiquadroBusInPiu({ eventoId, tragittoId, versione }: { eventoId:
 
 // ---------------------------------------------------------------- Scheda
 
-export function BusInPiu() {
+export function BusInPiu({ filtroEventi }: { filtroEventi?: FiltroEventi }) {
   const [anno, setAnno] = useState(() => Number(oggiRoma().slice(0, 4)));
-  const stato = useDati(() => statisticheApi.busInPiu(anno), String(anno));
+  const stato = useDati(() => statisticheApi.busInPiu(anno, filtroEventi), `${anno}|${chiaveFiltroEventi(filtroEventi)}`);
   const { scelte, cambia, azzera } = useScelteBus();
   const anni = stato.dati?.anni.includes(anno) ? stato.dati.anni : [anno, ...(stato.dati?.anni ?? [])].sort((a, b) => b - a);
   return (

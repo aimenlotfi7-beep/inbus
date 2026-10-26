@@ -8,6 +8,7 @@ import { busDellaSimulazione, esitiCombinazioni, lineeEBus, type BusSimulato, ty
 import { leggiPostiPerBus, leggiSogliaOccupazionePareggio } from '../impostazioni/impostazioni.routes.js';
 import type { RegolaCompenso } from '../collaboratori/compenso.js';
 import { commissioniPer, sommaDaIncassare, sommaPagati, tragittiConclusi } from './economia.js';
+import { condizioneEventi, type FiltroEventi } from './filtro-eventi.js';
 import { inizioGiornoRoma, oggiRoma } from './periodo.js';
 import { aBlocchiDaDb, caricaDatiEventi, leggiCompensi, prenotazioniComeStatistiche } from './statistiche.service.js';
 
@@ -131,14 +132,15 @@ async function simulaEventi(righeEventi: RigaEvento[]): Promise<EventoSimulato[]
 export const simulazioneBusService = {
   /** Gli eventi in vendita (di ogni anno) e i conti veri degli eventi già
    *  passati dell'anno scelto, nella stessa forma. */
-  async anno(anno: number) {
+  async anno(anno: number, fe: FiltroEventi = {}) {
     const confine = new Date(Date.now() - UN_GIORNO_MS);
     const inizio = inizioGiornoRoma({ anno, mese: 1, giorno: 1 });
     const fine = inizioGiornoRoma({ anno: anno + 1, mese: 1, giorno: 1 });
     const annoRoma = sql<number>`extract(year from ((${eventi.data} at time zone 'UTC') at time zone 'Europe/Rome'))::int`.mapWith(Number);
+    const filtro = condizioneEventi(fe);
     const [inVendita, passati, anniEventi] = await Promise.all([
-      db.select(colonneEvento).from(eventi).where(and(eventoValido, gte(eventi.data, confine))).orderBy(asc(eventi.data)),
-      db.select(colonneEvento).from(eventi).where(and(eventoValido, gte(eventi.data, inizio), lt(eventi.data, fine), lt(eventi.data, confine))).orderBy(asc(eventi.data)),
+      db.select(colonneEvento).from(eventi).where(and(eventoValido, gte(eventi.data, confine), filtro)).orderBy(asc(eventi.data)),
+      db.select(colonneEvento).from(eventi).where(and(eventoValido, gte(eventi.data, inizio), lt(eventi.data, fine), lt(eventi.data, confine), filtro)).orderBy(asc(eventi.data)),
       db.selectDistinct({ anno: annoRoma }).from(eventi).where(eventoValido),
     ]);
 

@@ -1,5 +1,5 @@
 import { Component, Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { FiltroPeriodo, TipoFonte, Valore } from '../../../api/statistiche';
+import type { FiltroEventi, FiltroPeriodo, TipoFonte, Valore } from '../../../api/statistiche';
 import { formattaEuro } from '../../../shared/formato';
 import { motivoErrore } from '../../shared/errori';
 import type { InfoPeriodo } from './periodo';
@@ -14,7 +14,12 @@ export interface PropsScheda {
 }
 
 export function chiaveFiltro(filtro: FiltroPeriodo): string {
-  return `${filtro.dal}|${filtro.al}|${filtro.confronto}`;
+  return `${filtro.dal}|${filtro.al}|${filtro.confronto}|${chiaveFiltroEventi(filtro.eventi)}`;
+}
+
+export function chiaveFiltroEventi(fe: FiltroEventi | undefined): string {
+  const f = fe ?? {};
+  return [f.categoria, f.genere, f.citta, f.tourId, f.eventoId].map((v) => v ?? '').join('|');
 }
 
 // ---------------------------------------------------------------- Numeri

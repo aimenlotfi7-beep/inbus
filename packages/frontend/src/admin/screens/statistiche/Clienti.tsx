@@ -4,15 +4,24 @@ import {
   Caricamento, chiaveFiltro, formattaNumero, formattaPercentuale, GrigliaKpi, Kpi, KpiExtra, pluraleNumero, Scheda,
   useDati, useSegnalaPeriodo, Variazione, Vuoto, type PropsScheda,
 } from './comuni';
+import { filtriAttivi } from './FiltriEventi';
 import { BarraDivisa, BarreOrizzontali, Colonne } from './grafici';
+import { formattaGiorno } from './periodo';
 
 export function Clienti({ filtro, onPeriodo }: PropsScheda) {
   const stato = useDati(() => statisticheApi.clienti(filtro), chiaveFiltro(filtro));
   useSegnalaPeriodo(stato.dati && !stato.caricando ? stato.dati.periodo : null, onPeriodo);
-  return <Caricamento stato={stato}>{(d) => <ContenutoClienti d={d} />}</Caricamento>;
+  return <Caricamento stato={stato}>{(d) => <ContenutoClienti d={d} conFiltri={filtriAttivi(filtro.eventi ?? {})} />}</Caricamento>;
 }
 
-function ContenutoClienti({ d }: { d: StatisticheClienti }) {
+function ContenutoClienti({ d: dati, conFiltri }: { d: StatisticheClienti; conFiltri: boolean }) {
+  // Nessun cliente nel periodo di confronto: niente "prima: 0" sotto ogni numero, lo si dice una volta.
+  const confrontoVuoto = dati.clienti.precedente === 0 && dati.periodo.confrontoDal && dati.periodo.confrontoAl
+    ? `Nel periodo di confronto (dal ${formattaGiorno(dati.periodo.confrontoDal)} al ${formattaGiorno(dati.periodo.confrontoAl)}) non ci sono clienti: per questo non vedi confronti.`
+    : null;
+  const d = confrontoVuoto
+    ? { ...dati, clienti: { ...dati.clienti, precedente: null }, nuovi: { ...dati.nuovi, precedente: null }, diRitorno: { ...dati.diRitorno, precedente: null } }
+    : dati;
   const quotaRitorno = d.clienti.attuale > 0 ? (d.diRitorno.attuale / d.clienti.attuale) * 100 : null;
   const conDatiAccount = d.ospiti + d.conAccount;
   const quotaOspiti = conDatiAccount > 0 ? (d.ospiti / conDatiAccount) * 100 : null;
@@ -21,6 +30,7 @@ function ContenutoClienti({ d }: { d: StatisticheClienti }) {
 
   return (
     <>
+      {confrontoVuoto && <p className="stat-didascalia stat-sotto-breve">{confrontoVuoto}</p>}
       <GrigliaKpi>
         <Kpi etichetta="Clienti" valore={formattaNumero(d.clienti.attuale)}>
           <Variazione valore={d.clienti} formatta={formattaNumero} />
@@ -97,7 +107,10 @@ function ContenutoClienti({ d }: { d: StatisticheClienti }) {
               </table>
             </div>
           )}
-          <p className="stat-didascalia">Ultimi 12 mesi, per mese della prima prenotazione: quanti hanno prenotato di nuovo.</p>
+          <p className="stat-didascalia">
+            Ultimi 12 mesi, per mese della prima prenotazione: quanti hanno prenotato di nuovo.
+            {conFiltri && ' La tabella conta sempre tutti gli eventi; «nuovo» è chi prenota per la prima volta in assoluto.'}
+          </p>
         </Scheda>
       </div>
 
